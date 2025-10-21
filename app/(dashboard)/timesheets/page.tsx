@@ -76,13 +76,13 @@ export default function TimesheetsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Timesheets</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold text-white">Timesheets</h1>
+          <p className="text-slate-400">
             Manage your weekly timesheets
           </p>
         </div>
         <Link href="/timesheets/new">
-          <Button>
+          <Button className="bg-timesheet hover:bg-timesheet/90 text-white">
             <Plus className="h-4 w-4 mr-2" />
             New Timesheet
           </Button>

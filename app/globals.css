@@ -1,30 +1,30 @@
 @import "tailwindcss";
 
-/* AVS Squires Brand Colors */
+/* AVS Squires Brand Colors - Inspired by avs.mpdee.co.uk */
 @layer base {
   :root {
-    /* Base colors - clean white interface for employees */
+    /* Base colors - clean interface matching AVS website */
     --background: 0 0% 100%;
-    --foreground: 0 0% 14.5%; /* Dark gray/black from AVS site */
+    --foreground: 0 0% 14.5%; /* Dark grey from AVS */
     --card: 0 0% 100%;
     --card-foreground: 0 0% 14.5%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 14.5%;
     
-    /* Primary - professional blue */
-    --primary: 210 100% 40%;
-    --primary-foreground: 0 0% 100%;
+    /* Primary - AVS Signature Yellow (#F1D64A) */
+    --primary: 48 87% 69%;
+    --primary-foreground: 0 0% 14.5%;
     
-    /* Secondary - light gray */
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 0 0% 14.5%;
+    /* Secondary - Dark grey from AVS */
+    --secondary: 0 0% 20.5%;
+    --secondary-foreground: 0 0% 100%;
     
     /* Muted */
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
     
-    /* Accent */
-    --accent: 210 40% 96.1%;
+    /* Accent - Lighter yellow */
+    --accent: 48 100% 94%;
     --accent-foreground: 0 0% 14.5%;
     
     /* Status colors */
@@ -34,37 +34,59 @@
     --warning: 38 92% 50%;
     --error: 0 84% 60%;
     
-    /* UI Elements */
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 210 100% 40%;
-    --radius: 0.5rem;
+    /* Document Type Colors - Unique per form type */
+    /* Timesheets - Professional Blue */
+    --timesheet-primary: 210 90% 50%;
+    --timesheet-light: 210 100% 96%;
+    --timesheet-dark: 210 90% 35%;
     
-    /* Glass-morphism for admin/manager pages */
-    --glass-bg: 0 0% 100% / 0.1;
-    --glass-border: 0 0% 100% / 0.2;
+    /* Vehicle Inspections - Safety Orange/Amber */
+    --inspection-primary: 30 95% 55%;
+    --inspection-light: 30 100% 96%;
+    --inspection-dark: 30 95% 40%;
+    
+    /* Reports - Professional Green */
+    --report-primary: 150 70% 45%;
+    --report-light: 150 100% 96%;
+    --report-dark: 150 70% 30%;
+    
+    /* Admin/Management - Deep Purple */
+    --admin-primary: 260 60% 50%;
+    --admin-light: 260 100% 96%;
+    --admin-dark: 260 60% 35%;
+    
+    /* UI Elements */
+    --border: 0 0% 92%;
+    --input: 0 0% 92%;
+    --ring: 48 87% 69%;
+    --radius: 0.625rem;
+    
+    /* AVS Yellow variants */
+    --avs-yellow: 48 87% 69%; /* #F1D64A */
+    --avs-yellow-hover: 48 73% 56%; /* #d1b82f */
+    --avs-yellow-light: 48 100% 94%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 100% 50%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --background: 0 0% 14.5%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 20.5%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 20.5%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 48 87% 69%;
+    --primary-foreground: 0 0% 14.5%;
+    --secondary: 0 0% 27%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 27%;
+    --muted-foreground: 0 0% 70%;
+    --accent: 0 0% 27%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 10% / 0.1;
+    --input: 0 0% 15% / 0.1;
+    --ring: 48 87% 69%;
     --success: 142 71% 45%;
     --warning: 38 92% 50%;
     --error: 0 84% 60%;
@@ -75,10 +97,180 @@
   * {
     border-color: hsl(var(--border));
   }
+  
   body {
-    background: hsl(var(--background));
+    background: linear-gradient(135deg, #fafafa 0%, #ffffff 50%, #fef9e7 100%);
+    background-attachment: fixed;
     color: hsl(var(--foreground));
     font-family: var(--font-inter), Inter, system-ui, -apple-system, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
+    position: relative;
   }
+  
+  body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+      repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 100px,
+        rgba(241, 214, 74, 0.02) 100px,
+        rgba(241, 214, 74, 0.02) 102px
+      ),
+      repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 100px,
+        rgba(241, 214, 74, 0.01) 100px,
+        rgba(241, 214, 74, 0.01) 102px
+      );
+    pointer-events: none;
+    z-index: -1;
+  }
+}
+
+/* AVS Yellow Custom Classes */
+@layer utilities {
+  .bg-avs-yellow {
+    background-color: #F1D64A;
+  }
+  
+  .bg-avs-yellow-hover:hover {
+    background-color: #d1b82f;
+  }
+  
+  .text-avs-yellow {
+    color: #F1D64A;
+  }
+  
+  .border-avs-yellow {
+    border-color: #F1D64A;
+  }
+  
+  /* Timesheet Colors */
+  .bg-timesheet {
+    background-color: hsl(var(--timesheet-primary));
+  }
+  
+  .bg-timesheet-light {
+    background-color: hsl(var(--timesheet-light));
+  }
+  
+  .text-timesheet {
+    color: hsl(var(--timesheet-primary));
+  }
+  
+  .border-timesheet {
+    border-color: hsl(var(--timesheet-primary));
+  }
+  
+  /* Inspection Colors */
+  .bg-inspection {
+    background-color: hsl(var(--inspection-primary));
+  }
+  
+  .bg-inspection-light {
+    background-color: hsl(var(--inspection-light));
+  }
+  
+  .text-inspection {
+    color: hsl(var(--inspection-primary));
+  }
+  
+  .border-inspection {
+    border-color: hsl(var(--inspection-primary));
+  }
+  
+  /* Report Colors */
+  .bg-report {
+    background-color: hsl(var(--report-primary));
+  }
+  
+  .bg-report-light {
+    background-color: hsl(var(--report-light));
+  }
+  
+  .text-report {
+    color: hsl(var(--report-primary));
+  }
+  
+  .border-report {
+    border-color: hsl(var(--report-primary));
+  }
+  
+  /* Admin Colors */
+  .bg-admin {
+    background-color: hsl(var(--admin-primary));
+  }
+  
+  .bg-admin-light {
+    background-color: hsl(var(--admin-light));
+  }
+  
+  .text-admin {
+    color: hsl(var(--admin-primary));
+  }
+  
+  .border-admin {
+    border-color: hsl(var(--admin-primary));
+  }
+}
+
+/* Custom scrollbar with AVS Yellow */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #F1D64A;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #d1b82f;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Global dark theme text styles for dashboard pages */
+h1, h2, h3, h4, h5, h6 {
+  @apply text-white;
+}
+
+/* Default text color for all elements */
+p, span, label, div {
+  @apply text-slate-300;
+}
+
+/* Override muted foreground globally */
+.text-muted-foreground {
+  color: rgb(148 163 184) !important; /* slate-400 */
+}
+
+/* Ensure medium/semibold text is also white */
+.font-medium, .font-semibold {
+  @apply text-white;
+}
+
+/* Card components - default dark glass-morphism */
+.card, [class*="Card"] {
+  @apply bg-slate-800/40 backdrop-blur-xl border-slate-700/50;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  transition: box-shadow 0.2s ease;
+}
+
+.card:hover, [class*="Card"]:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
 }

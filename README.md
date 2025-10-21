@@ -1,5 +1,7 @@
 # AVS Worklog
 
+**Live at: [avsworklog.mpdee.uk](https://avsworklog.mpdee.uk)**
+
 Digital forms management system for A&V Squires Plant Co. Ltd.
 
 A Progressive Web App (PWA) for managing employee timesheets and vehicle inspections with offline support, real-time synchronization, and comprehensive reporting.
@@ -181,6 +183,12 @@ npm run build       # Test production build
 
 ## Deployment
 
+### Production Site
+
+**Live at:** [https://avsworklog.mpdee.uk](https://avsworklog.mpdee.uk)
+
+The application is deployed on Vercel with automatic deployments from the `main` branch.
+
 ### Deploy to Vercel
 
 1. Push code to GitHub
@@ -200,7 +208,7 @@ Vercel will automatically:
 In Vercel dashboard:
 - Go to Settings > Environment Variables
 - Add all variables from `.env.local`
-- Update `NEXT_PUBLIC_APP_URL` to your production URL
+- Update `NEXT_PUBLIC_APP_URL` to your production URL (https://avsworklog.mpdee.uk)
 
 ## Troubleshooting
 

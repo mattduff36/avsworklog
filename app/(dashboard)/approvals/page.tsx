@@ -172,8 +172,8 @@ export default function ApprovalsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Approvals</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold text-white">Approvals</h1>
+          <p className="text-slate-400">
             Review and approve pending submissions
           </p>
         </div>

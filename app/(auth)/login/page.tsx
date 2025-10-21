@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Lock } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -56,79 +57,108 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-secondary/30 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-3xl font-bold">AVS Worklog</CardTitle>
-          <CardDescription className="text-base">
-            A&V Squires Plant Co. Ltd.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
-                {error}
-              </div>
-            )}
-            
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="your.email@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </div>
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950">
+      {/* Subtle background pattern */}
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(241,214,74,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(241,214,74,0.03)_1px,transparent_1px)] bg-[size:64px_64px]" />
+      
+      {/* Top bar with company info */}
+      <div className="absolute top-0 left-0 right-0 bg-slate-900/50 backdrop-blur-sm border-b border-slate-700/50 px-6 py-3 flex justify-between items-center text-slate-300 text-sm">
+        <span className="flex items-center gap-2">
+          <span className="font-semibold text-avs-yellow">A&V Squires</span>
+          <span className="text-slate-500">|</span>
+          <span>Civil Engineering & Plant Hire</span>
+        </span>
+        <span className="text-slate-400">Established Since 1971</span>
+      </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="remember"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
-                disabled={loading}
-              />
-              <Label 
-                htmlFor="remember" 
-                className="text-sm font-normal cursor-pointer"
-              >
-                Keep me signed in
-              </Label>
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={loading}
-            >
-              {loading ? 'Signing in...' : 'Sign In'}
-            </Button>
-          </form>
-
-          <div className="mt-4 text-center text-sm text-muted-foreground">
-            <p>Contact your administrator for account access</p>
+      <div className="w-full max-w-md relative z-10">
+        {/* AVS Yellow Icon */}
+        <div className="flex justify-center mb-6">
+          <div className="bg-avs-yellow rounded-2xl p-5 shadow-lg shadow-avs-yellow/20">
+            <Lock className="h-10 w-10 text-slate-900" strokeWidth={2.5} />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* Title */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-white mb-2">Employee Access</h1>
+          <p className="text-slate-400">Sign in to manage your timesheets and inspections</p>
+        </div>
+
+        {/* Glass-morphism Card */}
+        <Card className="bg-slate-800/40 backdrop-blur-xl border-slate-700/50 shadow-2xl">
+          <CardContent className="p-8">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {error && (
+                <div className="p-3 text-sm text-red-300 bg-red-900/30 border border-red-700/50 rounded-lg backdrop-blur-sm">
+                  {error}
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-slate-300 font-medium">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={loading}
+                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-avs-yellow focus:ring-avs-yellow/20 h-12"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-slate-300 font-medium">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-avs-yellow focus:ring-avs-yellow/20 h-12"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="remember"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-600 bg-slate-700/50 text-avs-yellow focus:ring-avs-yellow focus:ring-offset-slate-800"
+                  disabled={loading}
+                />
+                <Label 
+                  htmlFor="remember" 
+                  className="text-sm font-normal cursor-pointer text-slate-300"
+                >
+                  Keep me signed in
+                </Label>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full h-12 bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 font-semibold text-base shadow-lg shadow-avs-yellow/20 transition-all"
+                disabled={loading}
+              >
+                {loading ? 'Signing in...' : 'Sign In'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <div className="mt-6 text-center text-sm text-slate-400">
+          <p>Contact your administrator for account access</p>
+        </div>
+        
+        <div className="mt-4 text-center text-xs text-slate-500">
+          <p>A&V Squires Plant Company LTD</p>
+        </div>
+      </div>
     </div>
   );
 }

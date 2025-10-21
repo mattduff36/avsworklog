@@ -91,13 +91,13 @@ export default function InspectionsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Vehicle Inspections</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold text-white">Vehicle Inspections</h1>
+          <p className="text-slate-400">
             Daily safety check sheets
           </p>
         </div>
         <Link href="/inspections/new">
-          <Button>
+          <Button className="bg-inspection hover:bg-inspection/90 text-white">
             <Plus className="h-4 w-4 mr-2" />
             New Inspection
           </Button>
