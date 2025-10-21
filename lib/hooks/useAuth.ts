@@ -71,6 +71,9 @@ export function useAuth() {
     if (!error) {
       setUser(null);
       setProfile(null);
+      
+      // Clear remember me preference on logout
+      localStorage.removeItem('rememberMe');
     }
     return { error };
   };
