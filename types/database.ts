@@ -194,7 +194,7 @@ export interface Database {
           inspection_id: string
           item_number: number
           item_description: string
-          status: 'ok' | 'defect' | 'na'
+          status: 'ok' | 'defect'
           comments: string | null
           created_at: string
         }
@@ -203,7 +203,7 @@ export interface Database {
           inspection_id: string
           item_number: number
           item_description: string
-          status?: 'ok' | 'defect' | 'na'
+          status?: 'ok' | 'defect'
           comments?: string | null
           created_at?: string
         }
@@ -212,7 +212,7 @@ export interface Database {
           inspection_id?: string
           item_number?: number
           item_description?: string
-          status?: 'ok' | 'defect' | 'na'
+          status?: 'ok' | 'defect'
           comments?: string | null
           created_at?: string
         }

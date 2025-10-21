@@ -8,12 +8,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Save } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ArrowLeft, Save, Check, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { getWeekEnding, formatDateISO } from '@/lib/utils/date';
 import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
 import { DAY_NAMES } from '@/types/timesheet';
 import { Database } from '@/types/database';
+import { SignaturePad } from '@/components/forms/SignaturePad';
 
 export default function NewTimesheetPage() {
   const router = useRouter();
@@ -24,6 +27,9 @@ export default function NewTimesheetPage() {
   const [weekEnding, setWeekEnding] = useState(formatDateISO(getWeekEnding()));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [activeDay, setActiveDay] = useState('0');
+  const [showSignatureDialog, setShowSignatureDialog] = useState(false);
+  const [signature, setSignature] = useState<string | null>(null);
 
   // Initialize entries for all 7 days
   const [entries, setEntries] = useState(
@@ -65,10 +71,24 @@ export default function NewTimesheetPage() {
   };
 
   const handleSubmit = async () => {
-    await saveTimesheet('submitted');
+    // Validate at least one day has hours
+    const hasHours = entries.some(e => e.time_started && e.time_finished);
+    if (!hasHours) {
+      setError('Please enter hours for at least one day');
+      return;
+    }
+    
+    // Show signature dialog
+    setShowSignatureDialog(true);
   };
 
-  const saveTimesheet = async (status: 'draft' | 'submitted') => {
+  const handleSignatureComplete = async (sig: string) => {
+    setSignature(sig);
+    setShowSignatureDialog(false);
+    await saveTimesheet('submitted', sig);
+  };
+
+  const saveTimesheet = async (status: 'draft' | 'submitted', signatureData?: string) => {
     if (!user) return;
 
     setError('');
@@ -83,6 +103,8 @@ export default function NewTimesheetPage() {
         week_ending: weekEnding,
         status,
         submitted_at: status === 'submitted' ? new Date().toISOString() : null,
+        signature_data: signatureData || null,
+        signed_at: signatureData ? new Date().toISOString() : null,
       };
 
       const { data: timesheet, error: timesheetError } = await supabase
@@ -126,226 +148,328 @@ export default function NewTimesheetPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div className="flex items-center space-x-4">
-        <Link href="/timesheets">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-3xl font-bold">New Timesheet</h1>
-          <p className="text-muted-foreground">
-            {profile?.full_name}
-          </p>
+    <div className="space-y-4 pb-32 md:pb-6 max-w-5xl">
+      {/* Header - Sticky on mobile */}
+      <div className="sticky top-0 z-10 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 pb-4 -mx-4 px-4 md:static md:bg-transparent md:mx-0 md:px-0">
+        <div className="flex items-center justify-between pt-4 md:pt-0">
+          <div className="flex items-center space-x-3">
+            <Link href="/timesheets">
+              <Button variant="ghost" size="sm" className="h-9 w-9 p-0 md:w-auto md:px-3">
+                <ArrowLeft className="h-5 w-5 md:mr-2" />
+                <span className="hidden md:inline">Back</span>
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-xl md:text-3xl font-bold text-white">New Timesheet</h1>
+              <p className="text-sm text-slate-400 hidden md:block">
+                {profile?.full_name}
+              </p>
+            </div>
+          </div>
+          {/* Weekly Total Badge - Mobile */}
+          <div className="md:hidden bg-timesheet/20 border border-timesheet/30 rounded-lg px-3 py-2">
+            <div className="text-xs text-slate-400">Total</div>
+            <div className="text-lg font-bold text-white">{formatHours(weeklyTotal)}h</div>
+          </div>
         </div>
       </div>
 
       {error && (
-        <div className="p-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
-          {error}
+        <div className="p-4 text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg backdrop-blur-xl flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+          <div>{error}</div>
         </div>
       )}
 
+      {/* Basic Info Card */}
       <Card>
-        <CardHeader>
-          <CardTitle>Timesheet Details</CardTitle>
-          <CardDescription>
-            Fill in your hours for the week ending on Sunday
+        <CardHeader className="pb-4">
+          <CardTitle className="text-white">Timesheet Details</CardTitle>
+          <CardDescription className="text-slate-400">
+            Week ending {new Date(weekEnding).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Header Info */}
+        <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="reg_number">Registration Number</Label>
+              <Label htmlFor="reg_number" className="text-white text-base">Vehicle Registration</Label>
               <Input
                 id="reg_number"
                 value={regNumber}
                 onChange={(e) => setRegNumber(e.target.value)}
                 placeholder="e.g., YX65ABC"
+                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="week_ending">Week Ending (Sunday)</Label>
+              <Label htmlFor="week_ending" className="text-white text-base">Week Ending (Sunday)</Label>
               <Input
                 id="week_ending"
                 type="date"
                 value={weekEnding}
                 onChange={(e) => setWeekEnding(e.target.value)}
+                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white"
               />
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          {/* Daily Entries */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Daily Hours</h3>
-            
-            {/* Desktop Table View */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-2 font-medium">Day</th>
-                    <th className="text-left p-2 font-medium">Time Started</th>
-                    <th className="text-center p-2 font-medium">In Yard</th>
-                    <th className="text-left p-2 font-medium">Time Finished</th>
-                    <th className="text-right p-2 font-medium">Total Hours</th>
-                    <th className="text-left p-2 font-medium">Remarks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entries.map((entry, index) => (
-                    <tr key={entry.day_of_week} className="border-b">
-                      <td className="p-2 font-medium">{DAY_NAMES[index]}</td>
-                      <td className="p-2">
-                        <Input
-                          type="time"
-                          value={entry.time_started}
-                          onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
-                          className="w-32"
-                        />
-                      </td>
-                      <td className="p-2 text-center">
-                        <input
-                          type="checkbox"
-                          checked={entry.working_in_yard}
-                          onChange={(e) => updateEntry(index, 'working_in_yard', e.target.checked)}
-                          className="w-4 h-4"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <Input
-                          type="time"
-                          value={entry.time_finished}
-                          onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
-                          className="w-32"
-                        />
-                      </td>
-                      <td className="p-2 text-right font-semibold">
-                        {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'}
-                      </td>
-                      <td className="p-2">
-                        <Input
-                          value={entry.remarks}
-                          onChange={(e) => updateEntry(index, 'remarks', e.target.value)}
-                          placeholder="Notes"
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="bg-secondary/50 font-bold">
-                    <td colSpan={4} className="p-2 text-right">
-                      Weekly Total:
-                    </td>
-                    <td className="p-2 text-right text-lg">
-                      {formatHours(weeklyTotal)}
-                    </td>
-                    <td></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+      {/* Daily Hours - Tabbed Interface (Mobile) / Table (Desktop) */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-white">Daily Hours</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0 md:p-6">
 
-            {/* Mobile Card View */}
-            <div className="md:hidden space-y-4">
+          {/* Mobile Tabbed View */}
+          <div className="md:hidden">
+            <Tabs value={activeDay} onValueChange={setActiveDay} className="w-full">
+              <TabsList className="grid w-full grid-cols-7 bg-slate-900/50 p-1 rounded-lg mb-4">
+                {DAY_NAMES.map((day, index) => (
+                  <TabsTrigger 
+                    key={index} 
+                    value={String(index)}
+                    className="text-xs py-3 data-[state=active]:bg-timesheet data-[state=active]:text-slate-900 text-slate-400"
+                  >
+                    {day.substring(0, 3)}
+                    {entries[index].daily_total && entries[index].daily_total! > 0 && (
+                      <Check className="h-3 w-3 ml-1" />
+                    )}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+
               {entries.map((entry, index) => (
-                <Card key={entry.day_of_week}>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">{DAY_NAMES[index]}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Time Started</Label>
-                        <Input
-                          type="time"
-                          value={entry.time_started}
-                          onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Time Finished</Label>
-                        <Input
-                          type="time"
-                          value={entry.time_finished}
-                          onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
-                        />
+                <TabsContent key={index} value={String(index)} className="space-y-4 px-4 pb-4">
+                  <div className="text-center mb-4">
+                    <h3 className="text-2xl font-bold text-white">{DAY_NAMES[index]}</h3>
+                    <p className="text-sm text-slate-400">Tap to enter your hours</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-white text-lg">Start Time</Label>
+                      <Input
+                        type="time"
+                        value={entry.time_started}
+                        onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
+                        className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-white text-lg">Finish Time</Label>
+                      <Input
+                        type="time"
+                        value={entry.time_finished}
+                        onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
+                        className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white"
+                      />
+                    </div>
+
+                    <div className="bg-timesheet/10 border border-timesheet/30 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-white font-medium">Total Hours</span>
+                        <span className="text-3xl font-bold text-timesheet">
+                          {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'}h
+                        </span>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
+
+                    <div className="flex items-center space-x-3 bg-slate-900/30 p-4 rounded-lg">
                       <input
                         type="checkbox"
                         id={`yard-${index}`}
                         checked={entry.working_in_yard}
                         onChange={(e) => updateEntry(index, 'working_in_yard', e.target.checked)}
-                        className="w-4 h-4"
+                        className="w-6 h-6 rounded border-slate-600 text-timesheet focus:ring-timesheet"
                       />
-                      <Label htmlFor={`yard-${index}`} className="text-sm">
+                      <Label htmlFor={`yard-${index}`} className="text-white text-base">
                         Working in Yard
                       </Label>
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Remarks</Label>
+
+                    <div className="space-y-2">
+                      <Label className="text-white text-lg">Notes / Remarks</Label>
                       <Input
                         value={entry.remarks}
                         onChange={(e) => updateEntry(index, 'remarks', e.target.value)}
-                        placeholder="Any notes..."
+                        placeholder="Add any notes for this day..."
+                        className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
                       />
                     </div>
-                    <div className="pt-2 border-t">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">Daily Total:</span>
-                        <span className="text-lg font-bold">
-                          {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'} hrs
-                        </span>
-                      </div>
+
+                    {/* Quick Navigation */}
+                    <div className="flex justify-between pt-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => setActiveDay(String(Math.max(0, index - 1)))}
+                        disabled={index === 0}
+                        className="border-slate-600 text-white hover:bg-slate-800"
+                      >
+                        ← Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setActiveDay(String(Math.min(6, index + 1)))}
+                        disabled={index === 6}
+                        className="border-slate-600 text-white hover:bg-slate-800"
+                      >
+                        Next →
+                      </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-
-              {/* Weekly Total for Mobile */}
-              <Card className="bg-primary text-primary-foreground">
-                <CardContent className="pt-6">
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-semibold">Weekly Total:</span>
-                    <span className="text-2xl font-bold">
-                      {formatHours(weeklyTotal)} hrs
-                    </span>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                </TabsContent>
+              ))}
+            </Tabs>
           </div>
 
-          {/* Confirmation Text */}
-          <div className="p-4 bg-secondary/50 rounded-md text-sm">
-            <p className="italic">
-              All time and other details are correct and should be used as a basis for wages etc.
-            </p>
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-slate-700">
+                  <th className="text-left p-3 font-medium text-white">Day</th>
+                  <th className="text-left p-3 font-medium text-white">Time Started</th>
+                  <th className="text-center p-3 font-medium text-white">In Yard</th>
+                  <th className="text-left p-3 font-medium text-white">Time Finished</th>
+                  <th className="text-right p-3 font-medium text-white">Total Hours</th>
+                  <th className="text-left p-3 font-medium text-white">Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((entry, index) => (
+                  <tr key={entry.day_of_week} className="border-b border-slate-700/50">
+                    <td className="p-3 font-medium text-white">{DAY_NAMES[index]}</td>
+                    <td className="p-3">
+                      <Input
+                        type="time"
+                        value={entry.time_started}
+                        onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
+                        className="w-32 bg-slate-900/50 border-slate-600 text-white"
+                      />
+                    </td>
+                    <td className="p-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={entry.working_in_yard}
+                        onChange={(e) => updateEntry(index, 'working_in_yard', e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-600 text-timesheet"
+                      />
+                    </td>
+                    <td className="p-3">
+                      <Input
+                        type="time"
+                        value={entry.time_finished}
+                        onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
+                        className="w-32 bg-slate-900/50 border-slate-600 text-white"
+                      />
+                    </td>
+                    <td className="p-3 text-right font-semibold text-timesheet">
+                      {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'}
+                    </td>
+                    <td className="p-3">
+                      <Input
+                        value={entry.remarks}
+                        onChange={(e) => updateEntry(index, 'remarks', e.target.value)}
+                        placeholder="Notes"
+                        className="bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
+                      />
+                    </td>
+                  </tr>
+                ))}
+                <tr className="bg-timesheet/10 font-bold">
+                  <td colSpan={4} className="p-3 text-right text-white">
+                    Weekly Total:
+                  </td>
+                  <td className="p-3 text-right text-lg text-timesheet">
+                    {formatHours(weeklyTotal)}h
+                  </td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 justify-end">
-            <Button
-              variant="outline"
-              onClick={handleSaveDraft}
-              disabled={saving}
-            >
-              <Save className="h-4 w-4 mr-2" />
-              Save as Draft
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={saving}
-            >
-              {saving ? 'Submitting...' : 'Submit Timesheet'}
-            </Button>
-          </div>
         </CardContent>
       </Card>
+
+      {/* Confirmation Text - Desktop Only */}
+      <div className="hidden md:block p-4 bg-slate-800/40 border border-slate-700/50 rounded-lg backdrop-blur-xl">
+        <p className="text-sm text-slate-300 italic">
+          ✓ All time and other details are correct and should be used as a basis for wages etc.
+        </p>
+      </div>
+
+      {/* Desktop Action Buttons */}
+      <div className="hidden md:flex flex-row gap-3 justify-end">
+        <Button
+          variant="outline"
+          onClick={handleSaveDraft}
+          disabled={saving}
+          className="border-slate-600 text-white hover:bg-slate-800"
+        >
+          <Save className="h-4 w-4 mr-2" />
+          Save as Draft
+        </Button>
+        <Button
+          onClick={handleSubmit}
+          disabled={saving}
+          className="bg-timesheet hover:bg-timesheet/90 text-slate-900 font-semibold"
+        >
+          {saving ? 'Submitting...' : 'Submit Timesheet'}
+        </Button>
+      </div>
+
+      {/* Mobile Sticky Footer */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-slate-700/50 p-4 z-20">
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            onClick={handleSaveDraft}
+            disabled={saving}
+            className="flex-1 h-14 border-slate-600 text-white hover:bg-slate-800"
+          >
+            <Save className="h-5 w-5 mr-2" />
+            Save Draft
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="flex-1 h-14 bg-timesheet hover:bg-timesheet/90 text-slate-900 font-semibold text-base"
+          >
+            {saving ? 'Submitting...' : 'Submit'}
+          </Button>
+        </div>
+      </div>
+
+      {/* Signature Dialog */}
+      <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">Sign Timesheet</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Please sign below to confirm your timesheet is accurate
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <SignaturePad
+              onSave={handleSignatureComplete}
+              onCancel={() => setShowSignatureDialog(false)}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowSignatureDialog(false)}
+              className="border-slate-600 text-white hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

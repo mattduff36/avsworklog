@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle, Info } from 'lucide-react';
 import Link from 'next/link';
 import { formatDateISO } from '@/lib/utils/date';
 import { INSPECTION_ITEMS, InspectionStatus } from '@/types/inspection';
@@ -110,72 +111,96 @@ export default function NewInspectionPage() {
     }
   };
 
-  const getStatusIcon = (status: InspectionStatus) => {
+  const getStatusIcon = (status: InspectionStatus, isSelected: boolean) => {
     switch (status) {
       case 'ok':
-        return <CheckCircle2 className="h-5 w-5 text-green-600" />;
+        return <CheckCircle2 className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-green-400' : 'text-slate-500'}`} />;
       case 'defect':
-        return <XCircle className="h-5 w-5 text-red-600" />;
-      case 'na':
-        return <AlertCircle className="h-5 w-5 text-gray-400" />;
+        return <XCircle className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-red-400' : 'text-slate-500'}`} />;
       default:
         return null;
     }
   };
 
   const getStatusColor = (status: InspectionStatus, isSelected: boolean) => {
-    if (!isSelected) return 'bg-gray-100 text-gray-400 border-gray-200';
+    if (!isSelected) return 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50';
     
     switch (status) {
       case 'ok':
-        return 'bg-green-100 text-green-700 border-green-300';
+        return 'bg-green-500/20 border-green-500 shadow-lg shadow-green-500/20';
       case 'defect':
-        return 'bg-red-100 text-red-700 border-red-300';
-      case 'na':
-        return 'bg-gray-100 text-gray-700 border-gray-300';
+        return 'bg-red-500/20 border-red-500 shadow-lg shadow-red-500/20';
       default:
-        return 'bg-gray-100 text-gray-400 border-gray-200';
+        return 'bg-slate-800/30 border-slate-700';
     }
   };
 
+  // Calculate progress
+  const totalItems = INSPECTION_ITEMS.length;
+  const completedItems = Object.keys(checkboxStates).length;
+  const progressPercent = Math.round((completedItems / totalItems) * 100);
+
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div className="flex items-center space-x-4">
-        <Link href="/inspections">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-3xl font-bold">New Vehicle Inspection</h1>
-          <p className="text-muted-foreground">Daily safety check</p>
+    <div className="space-y-4 pb-32 md:pb-6 max-w-5xl">
+      {/* Sticky Header - Mobile */}
+      <div className="sticky top-0 z-10 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 pb-4 -mx-4 px-4 md:static md:bg-transparent md:mx-0 md:px-0">
+        <div className="flex items-center justify-between pt-4 md:pt-0">
+          <div className="flex items-center space-x-3">
+            <Link href="/inspections">
+              <Button variant="ghost" size="sm" className="h-9 w-9 p-0 md:w-auto md:px-3">
+                <ArrowLeft className="h-5 w-5 md:mr-2" />
+                <span className="hidden md:inline">Back</span>
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-xl md:text-3xl font-bold text-white">New Inspection</h1>
+              <p className="text-sm text-slate-400 hidden md:block">Daily safety check</p>
+            </div>
+          </div>
+          {/* Progress Badge - Mobile */}
+          <div className="md:hidden bg-inspection/20 border border-inspection/30 rounded-lg px-3 py-2">
+            <div className="text-xs text-slate-400">Progress</div>
+            <div className="text-lg font-bold text-white">{completedItems}/{totalItems}</div>
+          </div>
+        </div>
+        {/* Progress Bar - Mobile */}
+        <div className="md:hidden mt-3">
+          <div className="h-2 bg-slate-800/50 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-inspection transition-all duration-300"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
         </div>
       </div>
 
       {error && (
-        <div className="p-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
-          {error}
+        <div className="p-4 text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg backdrop-blur-xl flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+          <div>{error}</div>
         </div>
       )}
 
+      {/* Vehicle Details Card */}
       <Card>
-        <CardHeader>
-          <CardTitle>Inspection Details</CardTitle>
-          <CardDescription>Select the vehicle and date for this inspection</CardDescription>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-white">Inspection Details</CardTitle>
+          <CardDescription className="text-slate-400">
+            {new Date(selectedDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="vehicle">Vehicle</Label>
+              <Label htmlFor="vehicle" className="text-white text-base">Vehicle</Label>
               <Select value={vehicleId} onValueChange={setVehicleId}>
-                <SelectTrigger id="vehicle">
+                <SelectTrigger id="vehicle" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
                   <SelectValue placeholder="Select a vehicle" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-slate-900 border-slate-700">
                   {vehicles.map((vehicle) => (
-                    <SelectItem key={vehicle.id} value={vehicle.id}>
-                      {vehicle.reg_number} - {vehicle.make} {vehicle.model}
+                    <SelectItem key={vehicle.id} value={vehicle.id} className="text-white">
+                      {vehicle.reg_number}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -183,36 +208,104 @@ export default function NewInspectionPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="date">Inspection Date</Label>
+              <Label htmlFor="date" className="text-white text-base">Inspection Date</Label>
               <Input
                 id="date"
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
                 max={formatDateISO(new Date())}
+                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white"
               />
             </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* 26-Point Safety Check */}
       <Card>
-        <CardHeader>
-          <CardTitle>26-Point Safety Check</CardTitle>
-          <CardDescription>
-            Mark each item as OK (✓), Defect (✗), or N/A
+        <CardHeader className="pb-3">
+          <CardTitle className="text-white">26-Point Safety Check</CardTitle>
+          <CardDescription className="text-slate-400">
+            Mark each item as Pass or Fail
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Desktop View */}
-          <div className="hidden md:block">
+        <CardContent className="space-y-3 p-4 md:p-6">
+          
+          {/* Mobile View - Card-based */}
+          <div className="md:hidden space-y-3">
+            {INSPECTION_ITEMS.map((item, index) => {
+              const itemNumber = index + 1;
+              const currentStatus = checkboxStates[itemNumber];
+              const hasDefectComment = currentStatus === 'defect' && comments[itemNumber];
+              
+              return (
+                <div key={itemNumber} className="bg-slate-900/30 border border-slate-700/50 rounded-lg p-4 space-y-3">
+                  {/* Item Header */}
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center">
+                      <span className="text-sm font-bold text-slate-400">{itemNumber}</span>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-base font-medium text-white leading-tight">{item}</h4>
+                      {currentStatus && (
+                        <div className="mt-1">
+                          <span className={`text-xs font-semibold ${
+                            currentStatus === 'ok' ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {currentStatus === 'ok' ? '✓ Pass' : '✗ Fail'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Status Buttons - Pass or Fail */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {(['ok', 'defect'] as InspectionStatus[]).map((status) => (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => handleStatusChange(itemNumber, status)}
+                        className={`flex items-center justify-center h-24 rounded-xl border-3 transition-all ${
+                          getStatusColor(status, currentStatus === status)
+                        }`}
+                      >
+                        {getStatusIcon(status, currentStatus === status)}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Comments/Notes */}
+                  {(currentStatus === 'defect' || comments[itemNumber]) && (
+                    <div className="space-y-2">
+                      <Label className="text-white text-sm">
+                        {currentStatus === 'defect' ? 'Comments (Required)' : 'Notes'}
+                      </Label>
+                      <Textarea
+                        value={comments[itemNumber] || ''}
+                        onChange={(e) => handleCommentChange(itemNumber, e.target.value)}
+                        placeholder="Add details..."
+                        className={`min-h-[80px] text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 ${
+                          currentStatus === 'defect' && !comments[itemNumber] ? 'border-red-500' : ''
+                        }`}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop View - Table */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2 w-12 font-medium">#</th>
-                  <th className="text-left p-2 font-medium">Item</th>
-                  <th className="text-center p-2 w-48 font-medium">Status</th>
-                  <th className="text-left p-2 font-medium">Comments</th>
+                <tr className="border-b border-slate-700">
+                  <th className="text-left p-3 w-12 font-medium text-white">#</th>
+                  <th className="text-left p-3 font-medium text-white">Item</th>
+                  <th className="text-center p-3 w-48 font-medium text-white">Status</th>
+                  <th className="text-left p-3 font-medium text-white">Comments</th>
                 </tr>
               </thead>
               <tbody>
@@ -221,32 +314,34 @@ export default function NewInspectionPage() {
                   const currentStatus = checkboxStates[itemNumber];
                   
                   return (
-                    <tr key={itemNumber} className="border-b hover:bg-secondary/20">
-                      <td className="p-2 text-sm text-muted-foreground">{itemNumber}</td>
-                      <td className="p-2 text-sm">{item}</td>
-                      <td className="p-2">
-                        <div className="flex items-center justify-center gap-2">
-                          {(['ok', 'defect', 'na'] as InspectionStatus[]).map((status) => (
+                    <tr key={itemNumber} className="border-b border-slate-700/50 hover:bg-slate-800/30">
+                      <td className="p-3 text-sm text-slate-400">{itemNumber}</td>
+                      <td className="p-3 text-sm text-white">{item}</td>
+                      <td className="p-3">
+                        <div className="flex items-center justify-center gap-3">
+                          {(['ok', 'defect'] as InspectionStatus[]).map((status) => (
                             <button
                               key={status}
                               type="button"
                               onClick={() => handleStatusChange(itemNumber, status)}
-                              className={`flex items-center justify-center w-10 h-10 rounded border-2 transition-all ${
+                              className={`flex items-center justify-center w-12 h-12 rounded-lg border-2 transition-all ${
                                 getStatusColor(status, currentStatus === status)
                               }`}
-                              title={status.toUpperCase()}
+                              title={status === 'ok' ? 'Pass' : 'Fail'}
                             >
-                              {getStatusIcon(status)}
+                              {getStatusIcon(status, currentStatus === status)}
                             </button>
                           ))}
                         </div>
                       </td>
-                      <td className="p-2">
+                      <td className="p-3">
                         <Input
                           value={comments[itemNumber] || ''}
                           onChange={(e) => handleCommentChange(itemNumber, e.target.value)}
                           placeholder={currentStatus === 'defect' ? 'Required for defects' : 'Optional notes'}
-                          className={currentStatus === 'defect' && !comments[itemNumber] ? 'border-red-300' : ''}
+                          className={`bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 ${
+                            currentStatus === 'defect' && !comments[itemNumber] ? 'border-red-500' : ''
+                          }`}
                         />
                       </td>
                     </tr>
@@ -256,65 +351,33 @@ export default function NewInspectionPage() {
             </table>
           </div>
 
-          {/* Mobile View */}
-          <div className="md:hidden space-y-4">
-            {INSPECTION_ITEMS.map((item, index) => {
-              const itemNumber = index + 1;
-              const currentStatus = checkboxStates[itemNumber];
-              
-              return (
-                <Card key={itemNumber}>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">
-                      {itemNumber}. {item}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex items-center justify-center gap-3">
-                      {(['ok', 'defect', 'na'] as InspectionStatus[]).map((status) => (
-                        <button
-                          key={status}
-                          type="button"
-                          onClick={() => handleStatusChange(itemNumber, status)}
-                          className={`flex flex-col items-center justify-center w-20 h-20 rounded border-2 transition-all ${
-                            getStatusColor(status, currentStatus === status)
-                          }`}
-                        >
-                          {getStatusIcon(status)}
-                          <span className="text-xs mt-1 font-medium">
-                            {status.toUpperCase()}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                    <Input
-                      value={comments[itemNumber] || ''}
-                      onChange={(e) => handleCommentChange(itemNumber, e.target.value)}
-                      placeholder={currentStatus === 'defect' ? 'Required for defects' : 'Optional notes'}
-                      className={currentStatus === 'defect' && !comments[itemNumber] ? 'border-red-300' : ''}
-                    />
-                  </CardContent>
-                </Card>
-              );
-            })}
+          {/* Information Box - Desktop Only */}
+          <div className="hidden md:block p-4 bg-slate-800/40 border border-slate-700/50 rounded-lg backdrop-blur-xl">
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-inspection flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-white mb-2">Inspection Guidelines:</p>
+                <ul className="space-y-2 text-sm text-slate-300">
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-400" />
+                    <span><strong>Pass:</strong> Item is in good working condition</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <XCircle className="h-5 w-5 text-red-400" />
+                    <span><strong>Fail:</strong> Item needs attention - comment required</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
           </div>
 
-          {/* Information Box */}
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-md text-sm">
-            <p className="font-semibold text-blue-900 mb-1">Inspection Guidelines:</p>
-            <ul className="list-disc list-inside text-blue-800 space-y-1">
-              <li><strong>OK (✓)</strong>: Item is in good working condition</li>
-              <li><strong>Defect (✗)</strong>: Item needs attention - comment required</li>
-              <li><strong>N/A</strong>: Item is not applicable to this vehicle</li>
-            </ul>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 justify-end">
+          {/* Desktop Action Buttons */}
+          <div className="hidden md:flex flex-row gap-3 justify-end pt-4">
             <Button
               variant="outline"
               onClick={() => handleSave(false)}
               disabled={loading || !vehicleId}
+              className="border-slate-600 text-white hover:bg-slate-800"
             >
               <Save className="h-4 w-4 mr-2" />
               {loading ? 'Saving...' : 'Save Draft'}
@@ -322,6 +385,7 @@ export default function NewInspectionPage() {
             <Button
               onClick={() => handleSave(true)}
               disabled={loading || !vehicleId}
+              className="bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold"
             >
               <Send className="h-4 w-4 mr-2" />
               {loading ? 'Submitting...' : 'Submit Inspection'}
@@ -329,6 +393,29 @@ export default function NewInspectionPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Mobile Sticky Footer */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-slate-700/50 p-4 z-20">
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            onClick={() => handleSave(false)}
+            disabled={loading || !vehicleId}
+            className="flex-1 h-14 border-slate-600 text-white hover:bg-slate-800"
+          >
+            <Save className="h-5 w-5 mr-2" />
+            Save Draft
+          </Button>
+          <Button
+            onClick={() => handleSave(true)}
+            disabled={loading || !vehicleId}
+            className="flex-1 h-14 bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold text-base"
+          >
+            <Send className="h-5 w-5 mr-2" />
+            Submit
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

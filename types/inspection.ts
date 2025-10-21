@@ -1,4 +1,4 @@
-export type InspectionStatus = 'ok' | 'defect' | 'na';
+export type InspectionStatus = 'ok' | 'defect';
 
 export interface VehicleInspection {
   id: string;

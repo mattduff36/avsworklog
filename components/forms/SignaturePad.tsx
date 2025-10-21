@@ -12,7 +12,7 @@ interface SignaturePadProps {
   initialValue?: string | null;
 }
 
-export default function SignaturePad({ onSave, onCancel, initialValue }: SignaturePadProps) {
+export function SignaturePad({ onSave, onCancel, initialValue }: SignaturePadProps) {
   const sigCanvas = useRef<SignatureCanvas>(null);
 
   useEffect(() => {
@@ -86,4 +86,6 @@ export default function SignaturePad({ onSave, onCancel, initialValue }: Signatu
     </Card>
   );
 }
+
+export default SignaturePad;
 
