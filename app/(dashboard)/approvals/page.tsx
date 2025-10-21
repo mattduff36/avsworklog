@@ -16,21 +16,19 @@ import { VehicleInspection } from '@/types/inspection';
 import { Database } from '@/types/database';
 
 interface TimesheetWithProfile extends Timesheet {
-  profiles: {
+  user: {
     full_name: string;
     employee_id: string;
   };
 }
 
 interface InspectionWithDetails extends VehicleInspection {
-  profiles: {
+  user: {
     full_name: string;
     employee_id: string;
   };
   vehicles: {
     reg_number: string;
-    make: string;
-    model: string;
   };
 }
 
@@ -61,7 +59,7 @@ export default function ApprovalsPage() {
         .from('timesheets')
         .select(`
           *,
-          profiles (
+          user:profiles!user_id (
             full_name,
             employee_id
           )
@@ -77,14 +75,12 @@ export default function ApprovalsPage() {
         .from('vehicle_inspections')
         .select(`
           *,
-          profiles (
+          user:profiles!user_id (
             full_name,
             employee_id
           ),
           vehicles (
-            reg_number,
-            make,
-            model
+            reg_number
           )
         `)
         .eq('status', 'submitted')
@@ -239,8 +235,8 @@ export default function ApprovalsPage() {
                           </CardTitle>
                           <CardDescription className="flex items-center gap-2 mt-1">
                             <User className="h-3 w-3" />
-                            {timesheet.profiles?.full_name || 'Unknown'} 
-                            {timesheet.profiles?.employee_id && ` (${timesheet.profiles.employee_id})`}
+                            {timesheet.user?.full_name || 'Unknown'} 
+                            {timesheet.user?.employee_id && ` (${timesheet.user.employee_id})`}
                           </CardDescription>
                         </div>
                       </div>
@@ -307,11 +303,11 @@ export default function ApprovalsPage() {
                           <CardDescription className="mt-1">
                             <div className="flex items-center gap-2">
                               <User className="h-3 w-3" />
-                              {inspection.profiles?.full_name || 'Unknown'}
-                              {inspection.profiles?.employee_id && ` (${inspection.profiles.employee_id})`}
+                              {inspection.user?.full_name || 'Unknown'}
+                              {inspection.user?.employee_id && ` (${inspection.user.employee_id})`}
                             </div>
                             <div className="text-xs mt-1">
-                              {inspection.vehicles?.make} {inspection.vehicles?.model} • {formatDate(inspection.inspection_date)}
+                              {formatDate(inspection.inspection_date)}
                             </div>
                           </CardDescription>
                         </div>
