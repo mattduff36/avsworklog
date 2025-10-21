@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "setup:storage": "tsx scripts/setup-storage.ts"
+    "setup:storage": "tsx scripts/setup-storage.ts",
+    "setup:test-users": "tsx scripts/create-test-users.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
