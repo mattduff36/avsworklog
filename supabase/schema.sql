@@ -311,6 +311,56 @@ INSERT INTO vehicles (reg_number, vehicle_type, status) VALUES
   ('YX65GHI', 'artic', 'active')
 ON CONFLICT (reg_number) DO NOTHING;
 
+-- =============================================
+-- STORAGE BUCKET FOR INSPECTION PHOTOS
+-- =============================================
+
+-- Create storage bucket (run this in Supabase SQL Editor or Storage settings)
+-- This should be created via the Supabase Dashboard > Storage > Create Bucket
+-- Bucket name: inspection-photos
+-- Public: true (for easy access)
+
+-- Storage Policies for inspection-photos bucket
+-- These need to be set in the Supabase Dashboard > Storage > inspection-photos > Policies
+
+-- Policy: Users can upload photos for their own inspections
+-- INSERT policy:
+-- Allowed for authenticated users where the inspection_id in the path belongs to them
+
+-- Policy: Users can view photos for their own inspections or managers can view all
+-- SELECT policy:
+-- Allowed for authenticated users
+
+-- Policy: Users can delete photos from their own inspections
+-- DELETE policy:
+-- Allowed for authenticated users where the inspection_id in the path belongs to them
+
+-- Note: Storage policies need to be set up through Supabase Dashboard manually
+-- Or run these SQL commands in the Supabase SQL Editor:
+
+-- Enable RLS on storage.objects
+-- ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+-- Policy for INSERT
+-- CREATE POLICY "Users can upload inspection photos" ON storage.objects
+--   FOR INSERT WITH CHECK (
+--     bucket_id = 'inspection-photos' AND
+--     auth.uid() IS NOT NULL
+--   );
+
+-- Policy for SELECT
+-- CREATE POLICY "Anyone can view inspection photos" ON storage.objects
+--   FOR SELECT USING (
+--     bucket_id = 'inspection-photos'
+--   );
+
+-- Policy for DELETE
+-- CREATE POLICY "Users can delete own inspection photos" ON storage.objects
+--   FOR DELETE USING (
+--     bucket_id = 'inspection-photos' AND
+--     auth.uid() IS NOT NULL
+--   );
+
 -- Note: Create your first admin user through Supabase Auth UI, then manually update their role:
 -- UPDATE profiles SET role = 'admin' WHERE id = 'your-user-id';
 

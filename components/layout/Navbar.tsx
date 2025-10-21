@@ -16,14 +16,15 @@ import {
   Users, 
   LogOut,
   WifiOff,
-  Wifi
+  Wifi,
+  CheckSquare
 } from 'lucide-react';
 import { useState } from 'react';
 
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { profile, signOut, isAdmin } = useAuth();
+  const { profile, signOut, isAdmin, isManager } = useAuth();
   const { isOnline, pendingCount } = useOfflineSync();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -36,6 +37,7 @@ export function Navbar() {
     { href: '/dashboard', label: 'Dashboard', icon: Home },
     { href: '/timesheets', label: 'Timesheets', icon: FileText },
     { href: '/inspections', label: 'Inspections', icon: ClipboardCheck },
+    ...(isManager ? [{ href: '/approvals', label: 'Approvals', icon: CheckSquare }] : []),
     { href: '/reports', label: 'Reports', icon: BarChart3 },
     ...(isAdmin ? [{ href: '/admin/users', label: 'Users', icon: Users }] : []),
   ];
