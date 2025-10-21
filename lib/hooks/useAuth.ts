@@ -48,8 +48,30 @@ export function useAuth() {
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
-      setProfile(data);
+      if (error) {
+        // If profile doesn't exist, it might be created by trigger
+        // Wait a moment and try again
+        if (error.code === 'PGRST116') {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          const { data: retryData, error: retryError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          
+          if (retryError) {
+            console.error('Profile not found after retry:', retryError);
+            setProfile(null);
+          } else {
+            setProfile(retryData);
+          }
+        } else {
+          console.error('Error fetching profile:', error);
+          setProfile(null);
+        }
+      } else {
+        setProfile(data);
+      }
     } catch (error) {
       console.error('Error fetching profile:', error);
       setProfile(null);

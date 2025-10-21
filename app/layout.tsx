@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
@@ -11,18 +11,19 @@ export const metadata: Metadata = {
   title: "AVS Worklog - A&V Squires Plant Co. Ltd.",
   description: "Digital forms management system for timesheets and vehicle inspections",
   manifest: "/manifest.json",
-  themeColor: "#0066CC",
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "AVS Worklog",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#0066CC",
 };
 
 export default function RootLayout({
