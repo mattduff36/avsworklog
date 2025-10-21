@@ -1,7 +1,7 @@
 # AVS Worklog - PRD Implementation Status
 
 **Last Updated**: October 21, 2025  
-**Overall Progress**: 9/14 Core Tasks Complete (64%)
+**Overall Progress**: 12/14 Core Tasks Complete (86%)
 
 ## ✅ Completed Tasks
 
@@ -49,7 +49,7 @@
   - Logout functionality
 
 ### 5. ✅ Build complete timesheet module (form, validation, CRUD operations, auto-calculations)
-- **Status**: 60% Complete
+- **Status**: 90% Complete ✅
 - **Delivered**:
   - ✅ Timesheet list page with status badges
   - ✅ Full-featured create timesheet form
@@ -62,42 +62,72 @@
     - Remarks fields
     - Save as draft
     - Submit functionality
+  - ✅ **View/edit existing timesheet page** (`/timesheets/[id]`)
+    - Inline editing for draft/rejected timesheets
+    - Auto-save capability
+    - Manager comments display
+    - Status badges and workflow
+  - ✅ **Digital signature capture**
+    - SignaturePad component
+    - Save/display signatures
+    - Required before submission
+  - ✅ **Manager approval workflow**
+    - Approve/reject actions
+    - Comments system for rejections
+    - Edit history via updated_at
   - ✅ Database integration
   - ✅ Type-safe operations
 - **Still Needed**:
-  - [ ] View/edit existing timesheet page
-  - [ ] Digital signature on submission
-  - [ ] Debounced auto-save
-  - [ ] Edit history tracking
+  - [ ] Debounced auto-save (manual save works)
 
-### 6. ❌ Build vehicle inspection module (26-point checklist, daily columns, status toggles)
-- **Status**: 10% Complete
+### 6. ✅ Build vehicle inspection module (26-point checklist, daily columns, status toggles)
+- **Status**: 95% Complete ✅
 - **Delivered**:
-  - ✅ Inspection list placeholder page
-  - ✅ New inspection placeholder page
+  - ✅ **Inspection list page** (`/inspections`)
+    - View all inspections (own or all if manager)
+    - Status badges and filtering
+    - Vehicle and date display
+  - ✅ **New inspection form** (`/inspections/new`)
+    - Vehicle selector dropdown
+    - Date picker
+    - 26-point safety checklist
+    - Status toggles (OK ✓, Defect ✗, N/A)
+    - Comments for each item
+    - Validation (defects require comments)
+    - Desktop table view + mobile card view
+  - ✅ **View/edit inspection page** (`/inspections/[id]`)
+    - Full inspection details
+    - Inline editing for draft/rejected
+    - Summary stats (OK, Defect, N/A counts)
+    - Manager approval/rejection workflow
+  - ✅ **Photo upload** (PhotoUpload component)
+    - Camera/file upload
+    - Supabase Storage integration
+    - Multiple photos per item
+    - Captions and notes
+    - Delete capability
+    - Image preview
   - ✅ Database schema ready
   - ✅ TypeScript types defined
   - ✅ Inspection items constant (1-26)
 - **Still Needed**:
-  - [ ] Vehicle selector dropdown
-  - [ ] 26-point checklist grid
-  - [ ] Daily column layout (Mon-Sun)
-  - [ ] Quick-tap status buttons (✓/X/0)
-  - [ ] Defects/comments section
-  - [ ] Photo upload
-  - [ ] Action taken field
-  - [ ] View/edit inspection page
+  - [ ] Daily column layout (Mon-Sun) - current: one inspection per date
 
-### 7. ❌ Implement digital signature capture and storage for employee sign-offs
-- **Status**: Not Started
-- **Dependencies**: react-signature-canvas installed
+### 7. ✅ Implement digital signature capture and storage for employee sign-offs
+- **Status**: Complete ✅
+- **Delivered**:
+  - ✅ **SignaturePad component** (`components/forms/SignaturePad.tsx`)
+    - React-signature-canvas integration
+    - Touch/mouse support
+    - Clear/reset functionality
+    - Canvas configuration
+  - ✅ Save signature as base64 PNG
+  - ✅ Display signature on timesheet forms
+  - ✅ Required for timesheet submission
+  - ✅ Timestamp logging (signed_at field)
+  - ✅ Update signature capability
 - **Still Needed**:
-  - [ ] SignaturePad component
-  - [ ] Canvas configuration
-  - [ ] Save signature as base64
-  - [ ] Display signature on forms
-  - [ ] Add to timesheet submission
-  - [ ] Timestamp and IP logging
+  - [ ] IP address logging (optional)
 
 ### 8. ✅ Create role-based dashboard with pending forms, quick actions, and stats
 - **Status**: Complete
@@ -165,15 +195,34 @@
   - [ ] Defect log export
   - [ ] API routes for Excel generation
 
-### 13. ❌ Build manager approval workflow with comments and edit history tracking
-- **Status**: Not Started
+### 13. ✅ Build manager approval workflow with comments and edit history tracking
+- **Status**: 90% Complete ✅
+- **Delivered**:
+  - ✅ **Manager approval dashboard** (`/approvals`)
+    - Manager-only access control
+    - Tabbed interface (Timesheets & Inspections)
+    - Pending count badges
+    - View all pending submissions
+  - ✅ **Approve/reject actions**
+    - Quick approve button
+    - Quick reject with comments
+    - "View Details" for full review
+  - ✅ **Comment field for rejections**
+    - manager_comments in database
+    - Displayed on rejected forms
+    - Required for rejection
+  - ✅ **Edit history tracking**
+    - updated_at timestamps
+    - reviewed_by field
+    - reviewed_at timestamp
+  - ✅ **Approval in detail pages**
+    - Approve/reject on timesheet view
+    - Approve/reject on inspection view
+    - Employee info display
 - **Still Needed**:
-  - [ ] Manager approval page/dashboard
-  - [ ] Approve/reject actions
-  - [ ] Comment field for rejections
-  - [ ] Edit history viewer
-  - [ ] Notification on status change
+  - [ ] Email/push notifications on status change
   - [ ] Bulk approval option
+  - [ ] Full audit log viewer
 
 ### 14. ⚠️ Deploy to Vercel with production environment variables and CI/CD setup
 - **Status**: Ready, Not Deployed
@@ -205,20 +254,20 @@
 - [x] Protected routes
 - [x] Session management
 
-### Timesheet Module: 60% 🔨
+### Timesheet Module: 90% ✅
 - [x] Create form (full featured)
 - [x] List view
 - [x] Database integration
-- [ ] View/edit page
-- [ ] Digital signature
-- [ ] Auto-save
+- [x] View/edit page
+- [x] Digital signature
+- [ ] Debounced auto-save
 
-### Vehicle Inspection Module: 10% ⏳
-- [x] Placeholder pages
+### Vehicle Inspection Module: 95% ✅
+- [x] Inspection pages (list, new, view/edit)
 - [x] Database schema
-- [ ] Form implementation
-- [ ] Photo upload
-- [ ] Manager review
+- [x] Form implementation (26-point checklist)
+- [x] Photo upload
+- [x] Manager review workflow
 
 ### Dashboard: 80% ✅
 - [x] Layout and navigation
@@ -239,46 +288,55 @@
 - [ ] Excel generation
 - [ ] Report interface
 
-### Manager Features: 10% ⏳
+### Manager Features: 90% ✅
 - [x] Dashboard section
-- [ ] Approval workflow
-- [ ] Review interface
-- [ ] Notifications
+- [x] Approval workflow
+- [x] Review interface (Approvals page)
+- [x] Quick approve/reject
+- [ ] Email/push notifications
 
 ---
 
 ## 🎯 Next Priority Tasks (In Order)
 
-### Immediate (Week 1)
-1. **Connect to Supabase** - Add environment variables and test
-2. **Test timesheet creation** - Verify data saves correctly
-3. **Build view/edit timesheet page** - With signature capture
-4. **Test authentication** - All three roles
+### Immediate ✅ (COMPLETED)
+1. ✅ **Connect to Supabase** - Environment variables set and tested
+2. ✅ **Test timesheet creation** - Data saves correctly
+3. ✅ **Build view/edit timesheet page** - With signature capture
+4. ✅ **Test authentication** - All three roles working
+5. ✅ **Implement digital signatures** - SignaturePad component complete
+6. ✅ **Build vehicle inspection form** - 26-point checklist grid
+7. ✅ **Add photo upload** - For inspection defects
+8. ✅ **Manager approval page** - Review and approve timesheets & inspections
+9. ✅ **Supabase Storage setup** - Automated script created and run
 
-### Short-term (Week 2)
-5. **Implement digital signatures** - SignaturePad component
-6. **Build vehicle inspection form** - 26-point checklist grid
-7. **Add photo upload** - For inspection defects
-8. **Manager approval page** - Review and approve timesheets
+### Short-term (Now - Week 1)
+1. **PDF export** - Timesheet and inspection templates
+2. **Excel reports** - Weekly summaries and payroll format
+3. **Debounced auto-save** - For timesheet drafts
+4. **PWA icons** - Generate and add 192x192, 512x512
 
-### Medium-term (Week 3-4)
-9. **PDF export** - Timesheet and inspection templates
-10. **Excel reports** - Weekly summaries
-11. **Real-time integration** - Live updates on dashboard
-12. **PWA icons and testing** - Full offline capability
+### Medium-term (Week 2-3)
+5. **Real-time integration** - Live updates on dashboard
+6. **User management UI** - Admin interface for creating users
+7. **Email notifications** - On form status changes
+8. **Enhanced edit history** - Full audit log viewer
+9. **Bulk approvals** - For managers
 
 ---
 
 ## 🚧 Known Limitations
 
-1. **Timesheet view/edit not implemented** - Can only create new
-2. **No digital signatures yet** - Planned for view/edit page
-3. **Vehicle inspections placeholder only** - Needs full form
-4. **No reporting yet** - PDF/Excel not implemented
-5. **Manager approval not built** - No review workflow
+1. ~~**Timesheet view/edit not implemented**~~ - ✅ Complete
+2. ~~**No digital signatures yet**~~ - ✅ Complete
+3. ~~**Vehicle inspections placeholder only**~~ - ✅ Complete
+4. **No reporting yet** - PDF/Excel not implemented (next priority)
+5. ~~**Manager approval not built**~~ - ✅ Complete
 6. **PWA needs icons** - 192x192 and 512x512 required
 7. **Real-time not integrated** - Infrastructure ready but not used
-8. **No photo upload** - Needed for inspection defects
+8. ~~**No photo upload**~~ - ✅ Complete
+9. **No debounced auto-save** - Manual save works, auto-save pending
+10. **No email notifications** - On status change
 
 ---
 
@@ -286,14 +344,16 @@
 
 These can be implemented quickly:
 
-1. **View timesheet page** - Read from database and display (2-3 hours)
-2. **Edit timesheet page** - Allow editing draft timesheets (2-3 hours)
-3. **Digital signature** - Add SignaturePad component (2 hours)
-4. **Vehicle dropdown** - Fetch vehicles from DB (30 min)
+1. ~~**View timesheet page**~~ - ✅ Complete
+2. ~~**Edit timesheet page**~~ - ✅ Complete
+3. ~~**Digital signature**~~ - ✅ Complete
+4. ~~**Vehicle dropdown**~~ - ✅ Complete
 5. **PWA icons** - Generate and add to public folder (15 min)
-6. **Toast notifications** - Add sonner for feedback (1 hour)
-7. **Loading states** - Add skeletons (1 hour)
+6. **Toast notifications** - Add sonner for user feedback (1 hour)
+7. **Loading states** - Add skeleton loaders (1 hour)
 8. **Error boundaries** - Better error handling (1 hour)
+9. **Debounced auto-save** - Add to timesheet/inspection forms (2 hours)
+10. **Basic PDF template** - Simple timesheet PDF (2-3 hours)
 
 ---
 
@@ -306,16 +366,19 @@ These can be implemented quickly:
 - ✅ Basic timesheet module
 - ✅ Dashboard structure
 
-**Sprint 2 (Current - 40% done)**:
-- 🔨 Complete timesheet module
-- ⏳ Vehicle inspection form
-- ⏳ Digital signatures
-- ⏳ Manager workflow
+**Sprint 2 (Completed - Phase 1-3)**:
+- ✅ Complete timesheet module
+- ✅ Vehicle inspection form
+- ✅ Digital signatures
+- ✅ Manager workflow
+- ✅ Photo upload
+- ✅ Storage setup automation
 
-**Sprint 3 (Planned)**:
+**Sprint 3 (Current)**:
 - ⏳ PDF/Excel exports
 - ⏳ Real-time features
-- ⏳ PWA completion
+- ⏳ PWA completion (icons)
+- ⏳ Auto-save
 - ⏳ Testing & polish
 
 ---
