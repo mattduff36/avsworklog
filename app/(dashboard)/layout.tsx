@@ -1,5 +1,8 @@
 import { Navbar } from '@/components/layout/Navbar';
 
+// Force dynamic rendering to prevent build-time errors
+export const dynamic = 'force-dynamic';
+
 export default function DashboardLayout({
   children,
 }: {
