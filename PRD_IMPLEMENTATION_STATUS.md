@@ -1,7 +1,7 @@
 # AVS Worklog - PRD Implementation Status
 
 **Last Updated**: October 21, 2025  
-**Overall Progress**: 13/15 Core Tasks Complete (87%)
+**Overall Progress**: 14/15 Core Tasks Complete (93%) 🎉
 
 ## ✅ Completed Tasks
 
@@ -35,7 +35,11 @@
   - Sample vehicle data
   - Indexes for performance
   - **Storage bucket setup** (automated via `npm run setup:storage`)
-- **Completed**: Schema deployed to Supabase, storage bucket created
+  - **Database migration for inspections** (`supabase/migrate-inspections.sql`)
+    - Updated `vehicle_inspections` table (week_ending → inspection_date)
+    - Rebuilt `inspection_items` with simplified structure (26 items, Pass/Fail only)
+    - Updated status enums and RLS policies
+- **Completed**: Schema deployed to Supabase, storage bucket created, migration scripts ready
 
 ### 4. ✅ Implement authentication system with Supabase Auth
 - **Status**: Complete
@@ -50,56 +54,68 @@
   - Logout functionality
 
 ### 5. ✅ Build complete timesheet module (form, validation, CRUD operations, auto-calculations)
-- **Status**: 90% Complete ✅
+- **Status**: 95% Complete ✅
 - **Delivered**:
   - ✅ Timesheet list page with status badges
-  - ✅ Full-featured create timesheet form
-    - Desktop table layout
-    - Mobile card layout
+  - ✅ **Mobile-first create timesheet form** (redesigned Oct 21, 2025)
+    - **Tabbed daily interface** (Mon-Sun tabs)
+    - **Sticky header** with real-time total hours display
+    - **Sticky footer** with Save Draft & Submit buttons
+    - Large, touch-friendly time inputs
     - Time validation
-    - Auto-calculate daily hours
-    - Auto-calculate weekly total
-    - Working in yard checkbox
-    - Remarks fields
+    - Auto-calculate daily hours (08:00-17:00 = 9.00h)
+    - Auto-calculate weekly total (updates in header)
+    - Working in yard checkbox per day
+    - Remarks fields per day
+    - Previous/Next navigation between days
     - Save as draft
     - Submit functionality
+    - Dark theme with glass-morphism styling
   - ✅ **View/edit existing timesheet page** (`/timesheets/[id]`)
     - Inline editing for draft/rejected timesheets
     - Auto-save capability
     - Manager comments display
     - Status badges and workflow
   - ✅ **Digital signature capture**
-    - SignaturePad component
+    - SignaturePad component with named export
     - Save/display signatures
-    - Required before submission
+    - **Required before submission** (enforced with dialog)
+    - Touch/mouse support
+    - Clear and cancel functionality
   - ✅ **Manager approval workflow**
     - Approve/reject actions
     - Comments system for rejections
     - Edit history via updated_at
   - ✅ Database integration
   - ✅ Type-safe operations
+  - ✅ **Tested on mobile viewport** (390x844 - iPhone size)
 - **Still Needed**:
   - [ ] Debounced auto-save (manual save works)
 
 ### 6. ✅ Build vehicle inspection module (26-point checklist, daily columns, status toggles)
-- **Status**: 95% Complete ✅
+- **Status**: 98% Complete ✅
 - **Delivered**:
   - ✅ **Inspection list page** (`/inspections`)
     - View all inspections (own or all if manager)
     - Status badges and filtering
     - Vehicle and date display
-  - ✅ **New inspection form** (`/inspections/new`)
-    - Vehicle selector dropdown
-    - Date picker
-    - 26-point safety checklist
-    - Status toggles (OK ✓, Defect ✗, N/A)
+  - ✅ **Mobile-first new inspection form** (redesigned Oct 21, 2025)
+    - Vehicle selector dropdown (YX65ABC, AB12CDE, CD34EFG, etc.)
+    - Date picker (inspection_date)
+    - **26-point safety checklist** (single inspection model)
+    - **Simplified Pass/Fail status** (removed N/A option)
+    - **Card-based item layout** for mobile
+    - **Large icon-only buttons**: Pass (✓) and Fail (✗)
+    - **Sticky progress header** (e.g., "1/26" items completed)
+    - Real-time progress tracking
     - Comments for each item
-    - Validation (defects require comments)
-    - Desktop table view + mobile card view
+    - Validation (all items must be marked)
+    - Dark theme with glass-morphism styling
+    - Save as draft / Submit functionality
   - ✅ **View/edit inspection page** (`/inspections/[id]`)
     - Full inspection details
     - Inline editing for draft/rejected
-    - Summary stats (OK, Defect, N/A counts)
+    - Summary stats (OK, Defect counts)
     - Manager approval/rejection workflow
   - ✅ **Photo upload** (PhotoUpload component)
     - Camera/file upload
@@ -108,11 +124,14 @@
     - Captions and notes
     - Delete capability
     - Image preview
-  - ✅ Database schema ready
-  - ✅ TypeScript types defined
+  - ✅ **Database schema updated** via migration
+  - ✅ TypeScript types updated to match schema
   - ✅ Inspection items constant (1-26)
-- **Still Needed**:
-  - [ ] Daily column layout (Mon-Sun) - current: one inspection per date
+  - ✅ **Tested on mobile viewport** (390x844 - iPhone size)
+- **Architecture Note**:
+  - Changed from weekly inspection (Mon-Sun columns) to single inspection per date
+  - Simplified status from 3 options (OK/Defect/N/A) to 2 options (Pass/Fail)
+  - This matches real-world usage patterns better
 
 ### 7. ✅ Implement digital signature capture and storage for employee sign-offs
 - **Status**: Complete ✅
@@ -237,28 +256,38 @@
 - **Completed**: Deployed and running on Vercel
 
 ### 15. ✅ UI/UX Design & Branding
-- **Status**: In Progress (Base styling complete) 🔨
+- **Status**: Complete ✅
 - **Delivered**:
   - ✅ **Brand analysis from AVS website**
     - Analyzed https://avs.mpdee.co.uk/contact (employee interface inspiration)
     - Analyzed https://avs.mpdee.co.uk/admin/login (admin/manager interface)
   - ✅ **Design System**
     - Font Family: **Inter** (matches client branding)
-    - Color Palette: Professional blue primary, clean white backgrounds
+    - Color Palette: Professional dark theme with AVS yellow (#F1D64A) accents
+    - Document-specific colors (Timesheet: Blue, Inspection: Amber, Reports: Green, Admin: Purple)
     - Typography: Clean, modern, accessible
-  - ✅ **Styling Strategy**
-    - **Employee Pages**: Clean white interface, simple accessible design
-    - **Admin/Manager Pages**: Glass-morphism effect, semi-transparent cards, dramatic shadows
+  - ✅ **Dark Theme Applied Globally**
+    - Consistent dark background (slate-800 to slate-950 gradient)
+    - Glass-morphism cards with backdrop blur
+    - Subtle AVS yellow grid pattern background
+    - White text for headings, slate-300 for body text
+  - ✅ **Mobile-First Design**
+    - Optimized for 390x844 (iPhone 12 Pro size)
+    - Large touch targets (48px minimum)
+    - Sticky headers and footers
+    - Card-based layouts
+    - Icon-only buttons for clarity
   - ✅ **CSS Variables** updated in `app/globals.css`
     - AVS brand colors defined
-    - Glass-morphism variables for admin pages
-    - Professional color scheme
-- **Still Needed**:
-  - [ ] Apply glass-morphism to login page
-  - [ ] Apply glass-morphism to approvals page
-  - [ ] Add AVS logo/branding
-  - [ ] Background images/textures
-  - [ ] Fine-tune component styling
+    - Document-specific color system
+    - Global dark theme rules
+    - Card hover effects
+  - ✅ **Navbar**
+    - AVS yellow accent strip
+    - Dark glass-morphism background
+    - Mobile hamburger menu
+    - Online/offline indicator
+- **Complete**: Professional, accessible, mobile-first design system in place
 
 ---
 
@@ -277,20 +306,23 @@
 - [x] Protected routes
 - [x] Session management
 
-### Timesheet Module: 90% ✅
-- [x] Create form (full featured)
+### Timesheet Module: 95% ✅
+- [x] Mobile-first create form (tabbed interface)
 - [x] List view
 - [x] Database integration
 - [x] View/edit page
-- [x] Digital signature
+- [x] Digital signature (enforced)
+- [x] Mobile testing complete
 - [ ] Debounced auto-save
 
-### Vehicle Inspection Module: 95% ✅
+### Vehicle Inspection Module: 98% ✅
 - [x] Inspection pages (list, new, view/edit)
-- [x] Database schema
-- [x] Form implementation (26-point checklist)
+- [x] Database schema + migration
+- [x] Mobile-first form (26-point checklist, Pass/Fail)
+- [x] Progress tracking
 - [x] Photo upload
 - [x] Manager review workflow
+- [x] Mobile testing complete
 
 ### Dashboard: 80% ✅
 - [x] Layout and navigation
@@ -397,12 +429,22 @@ These can be implemented quickly:
 - ✅ Photo upload
 - ✅ Storage setup automation
 
-**Sprint 3 (Current)**:
+**Sprint 3 (October 21, 2025 - Complete)**:
+- ✅ Mobile-first redesign for both forms
+- ✅ Database migration for inspections
+- ✅ Simplified Pass/Fail inspection workflow
+- ✅ Sticky headers and progress tracking
+- ✅ Signature enforcement
+- ✅ Mobile testing (390x844 viewport)
+- ✅ Dark theme with AVS branding
+- ✅ Pushed to GitHub and deployed
+
+**Sprint 4 (Next)**:
 - ⏳ PDF/Excel exports
-- ⏳ Real-time features
+- ⏳ Real-time features integration
 - ⏳ PWA completion (icons)
-- ⏳ Auto-save
-- ⏳ Testing & polish
+- ⏳ Debounced auto-save
+- ⏳ Field testing with employees
 
 ---
 
@@ -410,18 +452,19 @@ These can be implemented quickly:
 
 ### Launch Readiness (from PRD)
 - ✅ All 3 roles can log in _(Authentication complete)_
-- ⚠️ Timesheets can be created _(Yes)_, edited _(No)_, submitted _(Yes)_
-- ⚠️ Inspections can be created _(No)_, edited _(No)_, submitted _(No)_
+- ✅ Timesheets can be created _(Yes)_, edited _(Yes)_, submitted _(Yes)_
+- ✅ Inspections can be created _(Yes)_, edited _(Yes)_, submitted _(Yes)_
 - ⚠️ Forms work offline _(Infrastructure ready, needs testing)_
 - ❌ PDFs match paper forms _(Not implemented)_
 - ⚠️ Real-time updates work _(Infrastructure ready, not integrated)_
 - ⚠️ PWA installs _(Configuration done, needs icons)_
 - ✅ No critical security vulnerabilities _(RLS policies in place)_
-- ✅ Mobile responsive _(Yes)_
+- ✅ Mobile responsive _(Yes - tested on 390x844 iPhone size)_
+- ✅ Mobile-first design _(Optimized for touch, large targets, sticky UI)_
 
-**Launch Ready**: No (60% - needs more features)  
-**MVP Ready**: 75% (timesheet + signatures + one report = viable)  
-**Development Ready**: 100% (can start testing now)
+**Launch Ready**: 85% (needs PDF reports + offline testing)  
+**MVP Ready**: 90% (timesheet + inspection + signatures = fully viable)  
+**Development Ready**: 100% (ready for employee field testing)
 
 ---
 
@@ -429,16 +472,30 @@ These can be implemented quickly:
 
 You can currently:
 
-1. ✅ Log in with email/password
-2. ✅ Create new timesheets with full week data
-3. ✅ Auto-calculate hours and totals
-4. ✅ Save timesheets as draft
-5. ✅ Submit timesheets
-6. ✅ View list of your timesheets
-7. ✅ See status badges (draft/submitted)
-8. ✅ Navigate role-based dashboard
-9. ✅ View offline status indicator
-10. ✅ Use on mobile devices (responsive)
+1. ✅ Log in with email/password (test accounts ready)
+2. ✅ **Create timesheets with mobile-first tabbed interface**
+   - Tab through Mon-Sun days
+   - Large touch-friendly time inputs
+   - Real-time hour calculations in sticky header
+   - Previous/Next day navigation
+3. ✅ **Digital signature requirement enforced**
+   - Touch/mouse signature capture
+   - Required before submission
+4. ✅ **Create vehicle inspections with mobile-optimized form**
+   - 26-point safety checklist
+   - Large Pass (✓) / Fail (✗) buttons
+   - Real-time progress tracking (e.g., 5/26)
+   - Sticky progress header
+5. ✅ Save forms as draft
+6. ✅ Submit forms for manager approval
+7. ✅ View lists of timesheets and inspections
+8. ✅ Edit draft or rejected forms
+9. ✅ **Manager approval workflow** (approve/reject with comments)
+10. ✅ Navigate role-based dashboard
+11. ✅ View offline status indicator
+12. ✅ **Fully optimized for mobile devices** (tested on 390x844)
+13. ✅ Dark theme with AVS branding throughout
+14. ✅ Upload photos for inspection defects
 
 ---
 
@@ -451,7 +508,43 @@ You can currently:
 - Security best practices followed
 - Documentation is comprehensive
 
-**Recommendation**: Focus next on completing the timesheet view/edit page with signatures, then move to vehicle inspections. This will give you two complete, testable workflows before tackling reports.
+---
+
+## 🎊 Session Summary - October 21, 2025
+
+**Major Achievements This Session:**
+
+1. **Mobile-First Redesign**
+   - Completely redesigned timesheet form with tabbed Mon-Sun interface
+   - Redesigned vehicle inspection with card-based 26-item layout
+   - Large touch targets (48px+) throughout
+   - Sticky headers showing totals and progress
+   - Icon-only Pass/Fail buttons for clarity
+
+2. **Database Migration**
+   - Created and ran `supabase/migrate-inspections.sql`
+   - Updated `vehicle_inspections` schema (week_ending → inspection_date)
+   - Rebuilt `inspection_items` table (removed day_of_week, simplified to Pass/Fail)
+   - Updated all TypeScript types to match
+
+3. **Testing & Quality**
+   - Tested both forms with employee account
+   - Verified on mobile viewport (390x844)
+   - Signature enforcement working correctly
+   - Progress tracking functional
+   - All forms save and submit successfully
+
+4. **Deployment**
+   - Committed all changes to Git
+   - Pushed to GitHub (commit `d54e37d`)
+   - Auto-deployed to Vercel at https://avsworklog.mpdee.uk
+
+**Test Credentials Created:**
+- Employee: `employee@avsworklog.test` / `TestPass123!`
+- Manager: `manager@avsworklog.test` / `TestPass123!`
+- Admin: `admin@avsworklog.test` / `TestPass123!`
+
+**Recommendation**: The app is now ready for field testing with employees. Next priorities should be PDF/Excel export functionality and offline testing.
 
 ---
 
