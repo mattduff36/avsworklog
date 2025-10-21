@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
 import { INSPECTION_ITEMS, InspectionStatus, VehicleInspection, InspectionItem } from '@/types/inspection';
 import PhotoUpload from '@/components/forms/PhotoUpload';
+import { Database } from '@/types/database';
 
 interface InspectionWithDetails extends VehicleInspection {
   vehicles: {
@@ -56,17 +57,17 @@ export default function ViewInspectionPage() {
           )
         `)
         .eq('id', id)
-        .single();
+        .single() as { data: InspectionWithDetails | null; error: unknown };
 
       if (inspectionError) throw inspectionError;
       
       // Check if user has access
-      if (!isManager && inspectionData.user_id !== user?.id) {
+      if (!isManager && inspectionData && inspectionData.user_id !== user?.id) {
         setError('You do not have permission to view this inspection');
         return;
       }
 
-      setInspection(inspectionData);
+      setInspection(inspectionData!);
 
       // Fetch items
       const { data: itemsData, error: itemsError } = await supabase
@@ -80,7 +81,7 @@ export default function ViewInspectionPage() {
       setItems(itemsData || []);
       
       // Enable editing for draft or rejected inspections
-      if (inspectionData.status === 'draft' || inspectionData.status === 'rejected') {
+      if (inspectionData && (inspectionData.status === 'draft' || inspectionData.status === 'rejected')) {
         setEditing(true);
       }
     } catch (err) {
@@ -108,24 +109,30 @@ export default function ViewInspectionPage() {
 
     try {
       // Update inspection
+      type InspectionUpdate = Database['public']['Tables']['vehicle_inspections']['Update'];
+      const inspectionUpdate: InspectionUpdate = {
+        updated_at: new Date().toISOString(),
+      };
+
       const { error: inspectionError } = await supabase
         .from('vehicle_inspections')
-        .update({
-          updated_at: new Date().toISOString(),
-        })
+        .update(inspectionUpdate)
         .eq('id', inspection.id);
 
       if (inspectionError) throw inspectionError;
 
       // Update items
+      type InspectionItemUpdate = Database['public']['Tables']['inspection_items']['Update'];
       for (const item of items) {
         if (item.id) {
+          const itemUpdate: InspectionItemUpdate = {
+            status: item.status,
+            comments: item.comments,
+          };
+
           const { error: updateError } = await supabase
             .from('inspection_items')
-            .update({
-              status: item.status,
-              comments: item.comments,
-            })
+            .update(itemUpdate)
             .eq('id', item.id);
 
           if (updateError) throw updateError;

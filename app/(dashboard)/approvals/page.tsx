@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 import { VehicleInspection } from '@/types/inspection';
+import { Database } from '@/types/database';
 
 interface TimesheetWithProfile extends Timesheet {
   profiles: {
@@ -100,16 +101,25 @@ export default function ApprovalsPage() {
 
   const handleQuickApprove = async (type: 'timesheet' | 'inspection', id: string) => {
     try {
-      const table = type === 'timesheet' ? 'timesheets' : 'vehicle_inspections';
-      const { error } = await supabase
-        .from(table)
-        .update({
-          status: 'approved',
-          reviewed_at: new Date().toISOString(),
-        } as never)
-        .eq('id', id);
-
-      if (error) throw error;
+      if (type === 'timesheet') {
+        const { error } = await supabase
+          .from('timesheets')
+          .update({
+            status: 'approved',
+            reviewed_at: new Date().toISOString(),
+          })
+          .eq('id', id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('vehicle_inspections')
+          .update({
+            status: 'approved',
+            reviewed_at: new Date().toISOString(),
+          })
+          .eq('id', id);
+        if (error) throw error;
+      }
 
       // Refresh data
       await fetchPendingApprovals();
@@ -123,17 +133,27 @@ export default function ApprovalsPage() {
     if (!comments) return;
 
     try {
-      const table = type === 'timesheet' ? 'timesheets' : 'vehicle_inspections';
-      const { error } = await supabase
-        .from(table)
-        .update({
-          status: 'rejected',
-          reviewed_at: new Date().toISOString(),
-          manager_comments: comments,
-        } as never)
-        .eq('id', id);
-
-      if (error) throw error;
+      if (type === 'timesheet') {
+        const { error } = await supabase
+          .from('timesheets')
+          .update({
+            status: 'rejected',
+            reviewed_at: new Date().toISOString(),
+            manager_comments: comments,
+          })
+          .eq('id', id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('vehicle_inspections')
+          .update({
+            status: 'rejected',
+            reviewed_at: new Date().toISOString(),
+            manager_comments: comments,
+          })
+          .eq('id', id);
+        if (error) throw error;
+      }
 
       // Refresh data
       await fetchPendingApprovals();

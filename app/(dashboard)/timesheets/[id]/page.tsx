@@ -16,6 +16,7 @@ import { formatDate, formatDateISO } from '@/lib/utils/date';
 import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
 import { DAY_NAMES, Timesheet, TimesheetEntry } from '@/types/timesheet';
 import SignaturePad from '@/components/forms/SignaturePad';
+import { Database } from '@/types/database';
 
 export default function ViewTimesheetPage() {
   const router = useRouter();
@@ -140,7 +141,8 @@ export default function ViewTimesheetPage() {
         .eq('timesheet_id', timesheet.id);
 
       // Insert updated entries (only those with data)
-      const entriesToInsert = entries
+      type TimesheetEntryInsert = Database['public']['Tables']['timesheet_entries']['Insert'];
+      const entriesToInsert: TimesheetEntryInsert[] = entries
         .filter(entry => entry.time_started || entry.time_finished || entry.remarks)
         .map(entry => ({
           timesheet_id: timesheet.id,
@@ -155,7 +157,7 @@ export default function ViewTimesheetPage() {
       if (entriesToInsert.length > 0) {
         const { error: entriesError } = await supabase
           .from('timesheet_entries')
-          .insert(entriesToInsert as never);
+          .insert(entriesToInsert);
 
         if (entriesError) throw entriesError;
       }

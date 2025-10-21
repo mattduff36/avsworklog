@@ -13,13 +13,14 @@ import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle } from 'lucid
 import Link from 'next/link';
 import { formatDateISO } from '@/lib/utils/date';
 import { INSPECTION_ITEMS, InspectionStatus } from '@/types/inspection';
+import { Database } from '@/types/database';
 
 export default function NewInspectionPage() {
   const router = useRouter();
   const { user } = useAuth();
   const supabase = createClient();
   
-  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<Array<{ id: string; reg_number: string; make: string; model: string }>>([]);
   const [vehicleId, setVehicleId] = useState('');
   const [selectedDate, setSelectedDate] = useState(formatDateISO(new Date()));
   const [checkboxStates, setCheckboxStates] = useState<Record<number, InspectionStatus>>({});
@@ -66,23 +67,28 @@ export default function NewInspectionPage() {
 
     try {
       // Create inspection record
+      type InspectionInsert = Database['public']['Tables']['vehicle_inspections']['Insert'];
+      const inspectionData: InspectionInsert = {
+        vehicle_id: vehicleId,
+        user_id: user.id,
+        inspection_date: selectedDate,
+        status: submitForApproval ? 'submitted' : 'draft',
+        submitted_at: submitForApproval ? new Date().toISOString() : null,
+      };
+
       const { data: inspection, error: inspectionError } = await supabase
         .from('vehicle_inspections')
-        .insert({
-          vehicle_id: vehicleId,
-          user_id: user.id,
-          inspection_date: selectedDate,
-          status: submitForApproval ? 'submitted' : 'draft',
-          submitted_at: submitForApproval ? new Date().toISOString() : null,
-        } as never)
+        .insert(inspectionData)
         .select()
         .single();
 
       if (inspectionError) throw inspectionError;
+      if (!inspection) throw new Error('Failed to create inspection');
 
       // Create inspection items
-      const items = INSPECTION_ITEMS.map((item, index) => ({
-        inspection_id: (inspection as any).id,
+      type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
+      const items: InspectionItemInsert[] = INSPECTION_ITEMS.map((item, index) => ({
+        inspection_id: inspection.id,
         item_number: index + 1,
         item_description: item,
         status: checkboxStates[index + 1] || 'ok',
@@ -91,7 +97,7 @@ export default function NewInspectionPage() {
 
       const { error: itemsError } = await supabase
         .from('inspection_items')
-        .insert(items as never);
+        .insert(items);
 
       if (itemsError) throw itemsError;
 

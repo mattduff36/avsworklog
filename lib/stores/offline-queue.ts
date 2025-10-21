@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { createClient } from '@/lib/supabase/client';
+import { Database } from '@/types/database';
 
 export interface QueueItem {
   id: string;
@@ -44,26 +45,31 @@ export const useOfflineStore = create<OfflineStore>()(
         const { queue, removeFromQueue } = get();
         const supabase = createClient();
 
+        type TimesheetInsert = Database['public']['Tables']['timesheets']['Insert'];
+        type TimesheetUpdate = Database['public']['Tables']['timesheets']['Update'];
+        type InspectionInsert = Database['public']['Tables']['vehicle_inspections']['Insert'];
+        type InspectionUpdate = Database['public']['Tables']['vehicle_inspections']['Update'];
+
         for (const item of queue) {
           try {
             if (item.type === 'timesheet') {
               if (item.action === 'create') {
-                await supabase.from('timesheets').insert(item.data as never);
+                await supabase.from('timesheets').insert(item.data as TimesheetInsert);
               } else if (item.action === 'update') {
                 await supabase
                   .from('timesheets')
-                  .update(item.data as never)
+                  .update(item.data as TimesheetUpdate)
                   .eq('id', (item.data as { id: string }).id);
               } else if (item.action === 'delete') {
                 await supabase.from('timesheets').delete().eq('id', (item.data as { id: string }).id);
               }
             } else if (item.type === 'inspection') {
               if (item.action === 'create') {
-                await supabase.from('vehicle_inspections').insert(item.data as never);
+                await supabase.from('vehicle_inspections').insert(item.data as InspectionInsert);
               } else if (item.action === 'update') {
                 await supabase
                   .from('vehicle_inspections')
-                  .update(item.data as never)
+                  .update(item.data as InspectionUpdate)
                   .eq('id', (item.data as { id: string }).id);
               } else if (item.action === 'delete') {
                 await supabase

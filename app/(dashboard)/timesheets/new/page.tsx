@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { getWeekEnding, formatDateISO } from '@/lib/utils/date';
 import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
 import { DAY_NAMES } from '@/types/timesheet';
+import { Database } from '@/types/database';
 
 export default function NewTimesheetPage() {
   const router = useRouter();
@@ -75,15 +76,18 @@ export default function NewTimesheetPage() {
 
     try {
       // Insert timesheet
+      type TimesheetInsert = Database['public']['Tables']['timesheets']['Insert'];
+      const timesheetData: TimesheetInsert = {
+        user_id: user.id,
+        reg_number: regNumber || null,
+        week_ending: weekEnding,
+        status,
+        submitted_at: status === 'submitted' ? new Date().toISOString() : null,
+      };
+
       const { data: timesheet, error: timesheetError } = await supabase
         .from('timesheets')
-        .insert({
-          user_id: user.id,
-          reg_number: regNumber || null,
-          week_ending: weekEnding,
-          status,
-          submitted_at: status === 'submitted' ? new Date().toISOString() : null,
-        } as never)
+        .insert(timesheetData)
         .select()
         .single();
 
@@ -91,10 +95,11 @@ export default function NewTimesheetPage() {
       if (!timesheet) throw new Error('Failed to create timesheet');
 
       // Insert entries (only those with data)
-      const entriesToInsert = entries
+      type TimesheetEntryInsert = Database['public']['Tables']['timesheet_entries']['Insert'];
+      const entriesToInsert: TimesheetEntryInsert[] = entries
         .filter(entry => entry.time_started || entry.time_finished || entry.remarks)
         .map(entry => ({
-          timesheet_id: (timesheet as {id: string}).id,
+          timesheet_id: timesheet.id,
           day_of_week: entry.day_of_week,
           time_started: entry.time_started || null,
           time_finished: entry.time_finished || null,
@@ -106,7 +111,7 @@ export default function NewTimesheetPage() {
       if (entriesToInsert.length > 0) {
         const { error: entriesError } = await supabase
           .from('timesheet_entries')
-          .insert(entriesToInsert as never);
+          .insert(entriesToInsert);
 
         if (entriesError) throw entriesError;
       }

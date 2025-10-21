@@ -3,8 +3,9 @@
 import { useEffect } from 'react';
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
+import { Database } from '@/types/database';
 
-type RealtimeCallback = (payload: RealtimePostgresChangesPayload<Record<string, never>>) => void;
+type RealtimeCallback<T = Record<string, unknown>> = (payload: RealtimePostgresChangesPayload<T>) => void;
 
 export function useRealtimeSubscription(
   table: string,
@@ -20,6 +21,7 @@ export function useRealtimeSubscription(
     const subscribe = () => {
       const channelBuilder = supabase.channel(`${table}_changes`);
       
+      // Type assertion needed due to Supabase Realtime API limitations
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const channelWithListener = (channelBuilder as any).on(
         'postgres_changes',
@@ -29,9 +31,8 @@ export function useRealtimeSubscription(
           table,
           filter,
         },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (payload: any) => {
-          callback(payload as never);
+        (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+          callback(payload);
         }
       );
       
