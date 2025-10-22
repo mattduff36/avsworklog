@@ -147,42 +147,44 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Recent Activity - Unified view for all form types */}
-      <Card className="bg-slate-800/40 backdrop-blur-xl border-slate-700/50">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between text-white">
-            <span>Recent Activity</span>
-            <Badge variant="outline" className="text-slate-400 border-slate-600">
-              All Forms
-            </Badge>
-          </CardTitle>
-          <CardDescription className="text-slate-400">
-            Your recent submissions across all form types
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-12 text-slate-400">
-            <FileSpreadsheet className="h-16 w-16 mx-auto mb-4 opacity-20 text-avs-yellow" />
-            <p className="text-lg mb-2">No activity yet</p>
-            <p className="text-sm text-slate-500 mb-6">
-              Start by creating your first form above
-            </p>
-            <div className="flex flex-wrap justify-center gap-2">
-              {formTypes.map((formType) => (
-                <Link key={formType.id} href={formType.listHref}>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="border-slate-600 text-slate-300 hover:bg-slate-700/50"
-                  >
-                    View All {formType.title}s
-                  </Button>
-                </Link>
-              ))}
+      {/* Recent Activity - Manager/Admin Only */}
+      {isManager && (
+        <Card className="bg-slate-800/40 backdrop-blur-xl border-slate-700/50">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between text-white">
+              <span>Recent Activity</span>
+              <Badge variant="outline" className="text-slate-400 border-slate-600">
+                All Forms
+              </Badge>
+            </CardTitle>
+            <CardDescription className="text-slate-400">
+              Recent submissions across all form types
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-12 text-slate-400">
+              <FileSpreadsheet className="h-16 w-16 mx-auto mb-4 opacity-20 text-avs-yellow" />
+              <p className="text-lg mb-2">No activity yet</p>
+              <p className="text-sm text-slate-500 mb-6">
+                Recent form submissions will appear here
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {formTypes.map((formType) => (
+                  <Link key={formType.id} href={formType.listHref}>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="border-slate-600 text-slate-300 hover:bg-slate-700/50"
+                    >
+                      View All {formType.title}s
+                    </Button>
+                  </Link>
+                ))}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Manager Section */}
       {isManager && (
