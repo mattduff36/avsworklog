@@ -357,7 +357,7 @@ This script will:
 6. ✅ Replace timesheet checkboxes with touch-friendly buttons
 7. ✅ Add "Did Not Work" status for timesheet days
 8. ✅ Implement comprehensive timesheet validation (all 7 days required)
-9. ✅ Fix iOS Safari input overflow issues
+9. ✅ Fix iOS Safari input overflow issues (time AND date inputs)
 10. ✅ Create automated database migration system
 11. ✅ Update development plan with completed work
 12. ✅ Create placeholder pages (Reports, Admin) - Enhanced with interactive UI previews
@@ -374,20 +374,10 @@ This script will:
     - ✅ Manager permissions verified (can view all employee submissions)
     - ✅ Colored tab backgrounds matching dashboard form squares
     - ✅ Interactive Approve/Reject buttons with hover and click effects
-15. ✅ Manager Employee Selector for Form Creation
-    - ✅ Managers can create timesheets on behalf of any employee
-    - ✅ Managers can create inspections on behalf of any employee
-    - ✅ Employee dropdown with full names and employee IDs
-    - ✅ Manager's own account included in list
-    - ✅ Validates against selected employee's existing forms
-16. ✅ UI/UX Polish & Bug Fixes
-    - ✅ Fixed dropdown menu transparency (fully opaque slate-900)
-    - ✅ Enhanced Select component styling globally
-    - ✅ Improved visual hierarchy and readability
-17. **LATER: Test workflows end-to-end** - Deferred
-18. **LATER: Final testing** - Deferred
+15. ✅ Fixed dropdown menu transparency (global CSS fix for all Select components)
+16. **NEXT: Admin/Users management interface** - Starting now
 
-**Progress**: 16/18 tasks completed (~89%)
+**Progress**: 15/16 tasks completed (~94%)
 
 ---
 

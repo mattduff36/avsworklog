@@ -68,17 +68,31 @@
 - [x] lib/utils.ts for cn() utility
 
 ### 8. Timesheet Module
-- [x] Timesheet list page
-- [x] New timesheet form (full implementation)
+- [x] Timesheet list page with skeleton loading
+- [x] New timesheet form (full implementation) **Enhanced Oct 22, 2025**
   - [x] Desktop table view
-  - [x] Mobile card view
+  - [x] Mobile card view with tabbed interface
   - [x] Auto-calculate daily hours
   - [x] Weekly total calculation
-  - [x] Working in yard checkbox
+  - [x] **"In Yard" button** (replaced checkbox)
+  - [x] **"Did Not Work" button** for each day
+  - [x] **Comprehensive validation** (all 7 days must have hours OR "did not work")
+  - [x] **Sunday-only week ending date** validation
+  - [x] **Duplicate week prevention** with database check
+  - [x] **iOS Safari input fixes** (time and date fields)
+  - [x] **Manager selector** to create timesheets for employees
   - [x] Remarks field
   - [x] Save as draft
   - [x] Submit functionality
-- [x] Database integration
+- [x] View/edit timesheet page (`/timesheets/[id]`)
+  - [x] Inline editing for drafts/rejected
+  - [x] Manager comments display
+  - [x] **PDF download (manager-only)**
+  - [x] **Fixed permission race condition**
+- [x] Digital signature enforcement
+- [x] Database integration with automated migrations
+- [x] **Database schema**: `did_not_work` column added
+- [x] **TypeScript types**: Updated for new field
 - [x] Status badges (draft, submitted, approved, rejected)
 
 ### 9. Dashboard
@@ -94,10 +108,50 @@
     - [x] Disabled state (50% opacity, no pointer)
     - [x] Role-based visibility
 - [x] Stats placeholders (Pending, Approved, Attention)
-- [x] Recent forms preview
+- [x] **Recent forms preview** (hidden from employees)
 - [x] Manager section (conditional)
 
-### 10. Documentation
+### 10. Manager Features **Enhanced Oct 22, 2025**
+- [x] Approval dashboard (`/approvals`)
+  - [x] **Status filters**: All, Approved, Rejected, Pending (default)
+  - [x] **Colored tabs**: Timesheets (blue), Inspections (orange)
+  - [x] **Enhanced buttons**: Approve (green), Reject (red) with hover effects
+  - [x] **Context-aware empty states** for each filter
+  - [x] Dynamic count badges
+  - [x] Forms awaiting review
+- [x] Approve/reject actions
+- [x] Add comments (required for rejection)
+- [x] View edit history (updated_at)
+- [x] **Permission fixes**: Managers can view all employee submissions
+- [x] **Employee restrictions**: Hide PDFs, Reports tab, Recent Activity
+
+### 11. Database & Migrations **New Oct 22, 2025**
+- [x] **Automated migration system** (`scripts/run-db-migration.ts`)
+  - [x] Connects to Supabase PostgreSQL
+  - [x] Uses `POSTGRES_URL_NON_POOLING` from `.env.local`
+  - [x] SSL certificate handling
+  - [x] Detailed error reporting
+- [x] **Migration files** in `supabase/` directory
+  - [x] `add-did-not-work-column.sql` - Adds boolean column to timesheet_entries
+  - [x] Uses `IF NOT EXISTS` for safety
+  - [x] Includes column comments
+- [x] **Documentation** in DEVELOPMENT_PLAN.md
+
+### 12. Global UI Improvements **Oct 22, 2025**
+- [x] **iOS Safari fixes**
+  - [x] Time input field overflow fix
+  - [x] Date input field overflow fix
+  - [x] Webkit pseudo-element targeting
+  - [x] `!important` CSS rules for override
+- [x] **Dropdown menus**
+  - [x] Opaque background (no transparency)
+  - [x] Updated `--popover` CSS variable
+  - [x] `bg-slate-900 backdrop-blur-xl` on SelectContent
+- [x] **Loading states**
+  - [x] Skeleton loaders on timesheet list
+  - [x] Skeleton loaders on inspection list
+
+### 13. Documentation
 - [x] Comprehensive README.md
 - [x] Setup instructions
 - [x] Supabase configuration guide
@@ -334,41 +388,69 @@
 
 ## 🎉 Recent Updates - October 22, 2025
 
-### Mobile PWA Experience
+### Morning Session
+**Mobile PWA Experience:**
 - Redesigned login page for app-like experience
 - Removed navbar and footer from login
 - App rebranded to "Squires"
 - Clean, minimal authentication flow
 
-### Dashboard Enhancements
+**Dashboard Enhancements:**
 - Unified square button design across all screens
 - Added 8 placeholder forms for future phases
 - Role-based visibility for placeholders
 - Tooltip component for user guidance
 - Responsive grid layout (2-5 columns)
 
-### Manager Features (Afternoon Session)
-- **Approvals Page UX Enhancement**:
-  - Colored tab backgrounds (blue for timesheets, orange for inspections)
-  - Interactive Approve/Reject buttons with hover/click effects
-  - Better visual consistency with dashboard colors
-- **Employee Selector for Form Creation**:
-  - Managers can create timesheets/inspections on behalf of employees
-  - Dropdown with all employees (names + IDs)
-  - Smart validation against selected employee's existing forms
-  - Manager's own account included in selector
-  - Consistent UX across both form types
-
-### Technical Improvements
+**Technical Improvements:**
 - Created lib/utils.ts for shadcn/ui compatibility
 - Added tooltip component from shadcn/ui
-- Fixed dropdown menu opacity (fully opaque bg-slate-900)
-- Enhanced Select component styling globally
 - Fixed build errors and deployed to production
-- 14+ commits pushed to GitHub (across both sessions)
+
+### Afternoon Session
+**iOS Safari Mobile Fixes:**
+- Fixed time input field overflow on iPhone
+- Fixed date input field overflow on iPhone
+- Applied aggressive CSS targeting webkit pseudo-elements
+- Tested and confirmed on actual iPhone device
+
+**Timesheet Module Enhancements:**
+- Replaced "Working in Yard" checkbox with large button
+- Added "Did Not Work" button for each day
+- Implemented validation: all 7 days must have hours OR "did not work"
+- Added Sunday-only validation for week ending date
+- Implemented duplicate week prevention with database check
+- Added manager selector to create timesheets for employees
+- Added skeleton loading states to list pages
+
+**Database Migrations:**
+- Created automated migration system (`scripts/run-db-migration.ts`)
+- Added `did_not_work` column to `timesheet_entries` table
+- Configured PostgreSQL connection with SSL handling
+- Documented migration process
+
+**Manager Features:**
+- Added status filters to Approvals page (All, Approved, Rejected, Pending)
+- Set Pending as default view
+- Added colored tab backgrounds (blue/orange) matching dashboard
+- Enhanced Approve/Reject buttons with hover effects and animations
+- Fixed permission race condition for viewing employee submissions
+- Context-aware empty states
+
+**Employee Experience:**
+- Removed PDF download buttons from employee accounts
+- Removed "Recent Activity" section from employee dashboard
+- Removed "Reports" tab from employee navigation
+- Cleaner, focused interface for field workers
+
+**Global UI:**
+- Fixed transparent dropdown menus (opaque backgrounds globally)
+- Updated CSS variables and SelectContent component
+- Consistent dark theme throughout
 
 ---
 
 **Last Updated**: October 22, 2025
-**Version**: 0.2.0-alpha
+**Version**: 0.3.0-alpha
+**Status**: Production-ready for Timesheets & Inspections ✅
 

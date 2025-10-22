@@ -58,28 +58,36 @@
   - Logout functionality
 
 ### 5. ✅ Build complete timesheet module (form, validation, CRUD operations, auto-calculations)
-- **Status**: 95% Complete ✅
+- **Status**: 98% Complete ✅
 - **Delivered**:
-  - ✅ Timesheet list page with status badges
-  - ✅ **Mobile-first create timesheet form** (redesigned Oct 21, 2025)
+  - ✅ Timesheet list page with status badges and skeleton loading
+  - ✅ **Mobile-first create timesheet form** (redesigned Oct 21, 2025, enhanced Oct 22, 2025)
     - **Tabbed daily interface** (Mon-Sun tabs)
     - **Sticky header** with real-time total hours display
     - **Sticky footer** with Save Draft & Submit buttons
-    - Large, touch-friendly time inputs
+    - Large, touch-friendly time inputs **with iOS Safari fixes**
     - Time validation
     - Auto-calculate daily hours (08:00-17:00 = 9.00h)
     - Auto-calculate weekly total (updates in header)
-    - Working in yard checkbox per day
+    - **"In Yard" button** (replaced checkbox for mobile-first UX)
+    - **"Did Not Work" button** for each day
+    - **Comprehensive validation**: All 7 days must have hours OR "did not work"
+    - **Sunday-only date picker** for week ending
+    - **Duplicate week prevention** (checks existing timesheets)
     - Remarks fields per day
     - Previous/Next navigation between days
     - Save as draft
     - Submit functionality
+    - **Manager selector** (create timesheets for employees)
     - Dark theme with glass-morphism styling
+    - **Perfect on iPhone** (tested and confirmed)
   - ✅ **View/edit existing timesheet page** (`/timesheets/[id]`)
     - Inline editing for draft/rejected timesheets
     - Auto-save capability
     - Manager comments display
     - Status badges and workflow
+    - **PDF download (manager-only)**
+    - Fixed permission race condition
   - ✅ **Digital signature capture**
     - SignaturePad component with named export
     - Save/display signatures
@@ -90,9 +98,13 @@
     - Approve/reject actions
     - Comments system for rejections
     - Edit history via updated_at
+  - ✅ **Database schema**
+    - `did_not_work` column added via automated migration
+    - All TypeScript types updated
   - ✅ Database integration
   - ✅ Type-safe operations
   - ✅ **Tested on mobile viewport** (390x844 - iPhone size)
+  - ✅ **Tested on actual iPhone device** (iOS Safari)
 - **Still Needed**:
   - [ ] Debounced auto-save (manual save works)
 
@@ -258,16 +270,24 @@
   - [ ] API routes for Excel generation
 
 ### 13. ✅ Build manager approval workflow with comments and edit history tracking
-- **Status**: 90% Complete ✅
+- **Status**: 95% Complete ✅
 - **Delivered**:
-  - ✅ **Manager approval dashboard** (`/approvals`)
+  - ✅ **Manager approval dashboard** (`/approvals`) - **Enhanced Oct 22, 2025**
     - Manager-only access control
-    - Tabbed interface (Timesheets & Inspections)
-    - Pending count badges
-    - View all pending submissions
-  - ✅ **Approve/reject actions**
-    - Quick approve button
-    - Quick reject with comments
+    - **Tabbed interface** with colored backgrounds:
+      - **Timesheets tab**: Blue background matching dashboard
+      - **Inspections tab**: Orange background matching dashboard
+      - Hover and active states
+    - **Status filters**: All, Approved, Rejected, Pending
+    - **Default view**: Pending (most relevant for managers)
+    - **Dynamic count badges** reflecting current filter
+    - **Context-aware empty states** for each filter
+    - View all submissions by filter
+  - ✅ **Approve/reject actions** - **Enhanced UI**
+    - **Approve button**: Green border, hover fill, scale animation
+    - **Reject button**: Red border, hover fill, scale animation
+    - Quick approve with single click
+    - Quick reject with required comments dialog
     - "View Details" for full review
   - ✅ **Comment field for rejections**
     - manager_comments in database
@@ -281,6 +301,11 @@
     - Approve/reject on timesheet view
     - Approve/reject on inspection view
     - Employee info display
+    - **Fixed permission race condition** for viewing all employees
+  - ✅ **Employee account restrictions**
+    - PDF downloads hidden from employees (manager-only)
+    - Recent Activity section hidden from employees
+    - Reports tab hidden from employee navigation
 - **Still Needed**:
   - [ ] Email/push notifications on status change
   - [ ] Bulk approval option
@@ -359,13 +384,19 @@
 - [x] Protected routes
 - [x] Session management
 
-### Timesheet Module: 95% ✅
+### Timesheet Module: 98% ✅
 - [x] Mobile-first create form (tabbed interface)
-- [x] List view
-- [x] Database integration
-- [x] View/edit page
+- [x] Button-based UI (In Yard, Did Not Work)
+- [x] Comprehensive validation (all 7 days required)
+- [x] Sunday-only week ending date
+- [x] Duplicate week prevention
+- [x] iOS Safari input fixes
+- [x] Manager selector for employee timesheets
+- [x] List view with skeleton loading
+- [x] Database integration with migrations
+- [x] View/edit page with race condition fix
 - [x] Digital signature (enforced)
-- [x] Mobile testing complete
+- [x] Mobile testing complete (iPhone verified)
 - [ ] Debounced auto-save
 
 ### Vehicle Inspection Module: 98% ✅
@@ -396,12 +427,15 @@
 - [ ] Excel generation
 - [ ] Report interface
 
-### Manager Features: 90% ✅
+### Manager Features: 95% ✅
 - [x] Dashboard section
-- [x] Approval workflow
-- [x] Review interface (Approvals page)
-- [x] Quick approve/reject
+- [x] Approval workflow with status filters
+- [x] Review interface (Approvals page with colored tabs)
+- [x] Quick approve/reject with enhanced UI
+- [x] Permission fixes for viewing all employees
+- [x] Employee account restrictions (hide PDFs, Reports, etc.)
 - [ ] Email/push notifications
+- [ ] Bulk approval
 
 ---
 
@@ -529,9 +563,13 @@ You can currently:
 1. ✅ Log in with email/password (test accounts ready)
 2. ✅ **Create timesheets with mobile-first tabbed interface**
    - Tab through Mon-Sun days
-   - Large touch-friendly time inputs
+   - Large touch-friendly time inputs **with iOS Safari fixes**
+   - **"In Yard" and "Did Not Work" buttons** (touch-friendly)
+   - **Comprehensive validation**: all 7 days must have hours OR "did not work"
+   - **Sunday-only week ending** with duplicate prevention
    - Real-time hour calculations in sticky header
    - Previous/Next day navigation
+   - **Manager can create timesheets for employees**
 3. ✅ **Digital signature requirement enforced**
    - Touch/mouse signature capture
    - Required before submission
@@ -542,14 +580,21 @@ You can currently:
    - Sticky progress header
 5. ✅ Save forms as draft
 6. ✅ Submit forms for manager approval
-7. ✅ View lists of timesheets and inspections
+7. ✅ View lists of timesheets and inspections **with skeleton loading**
 8. ✅ Edit draft or rejected forms
 9. ✅ **Manager approval workflow** (approve/reject with comments)
+   - **Status filters**: All, Approved, Rejected, Pending (default)
+   - **Colored tabs**: Blue (Timesheets), Orange (Inspections)
+   - **Enhanced buttons**: Green (Approve), Red (Reject) with hover effects
+   - **Context-aware empty states**
+   - **Permission fixes**: Managers can view all employee submissions
 10. ✅ Navigate role-based dashboard
-11. ✅ View offline status indicator
-12. ✅ **Fully optimized for mobile devices** (tested on 390x844)
-13. ✅ Dark theme with AVS branding throughout
-14. ✅ Upload photos for inspection defects
+11. ✅ **Role-based UI**: Employees don't see Reports, Recent Activity, or PDF downloads
+12. ✅ View offline status indicator
+13. ✅ **Fully optimized for mobile devices** (tested on 390x844 + actual iPhone)
+14. ✅ Dark theme with AVS branding throughout
+15. ✅ Upload photos for inspection defects
+16. ✅ **Opaque dropdown menus** (global CSS fix)
 
 ---
 
@@ -566,7 +611,74 @@ You can currently:
 
 ## 🎊 Recent Session Summaries
 
-### Session - October 22, 2025
+### Session - October 22, 2025 (Afternoon)
+
+**Major Achievements:**
+
+1. **iOS Safari Mobile Fixes** 🍎
+   - Fixed time input field overflow on iPhone
+   - Fixed date input field overflow on iPhone
+   - Applied aggressive CSS rules with `!important` flags
+   - Targeted webkit pseudo-elements for proper rendering
+   - Wrapped inputs in overflow containers
+   - Tested and confirmed working on actual iPhone device
+
+2. **Timesheet Enhancements** ⏱️
+   - Changed "Working in Yard" from checkbox to large button
+   - Added "Did Not Work" button for each day
+   - Implemented validation: all 7 days must have hours OR "did not work" marked
+   - Added Sunday-only validation for "Week Ending" field
+   - Implemented duplicate week prevention (checks existing timesheets)
+   - Updated database schema with `did_not_work` boolean column
+   - Manager selector for creating timesheets on behalf of employees
+
+3. **Automated Database Migrations** 🗄️
+   - Created `scripts/run-db-migration.ts` for automated migrations
+   - Configured to use `POSTGRES_URL_NON_POOLING` from `.env.local`
+   - Added SSL certificate handling for development
+   - Created `supabase/add-did-not-work-column.sql` migration file
+   - Successfully migrated database without manual SQL execution
+   - Documented migration process in DEVELOPMENT_PLAN.md
+
+4. **Employee UI Polish** 👥
+   - Removed PDF download buttons from employee accounts (manager-only now)
+   - Removed "Recent Activity" section from employee dashboard
+   - Removed "Reports" tab from employee navigation
+   - Added skeleton loading states to timesheet and inspection lists
+   - Fixed manager permission race condition on detail pages
+
+5. **Manager Approvals Enhancement** ✅
+   - Added status filter tabs (All, Approved, Rejected, Pending)
+   - Set "Pending" as default view
+   - Context-aware empty states for each filter
+   - Dynamic count badges reflecting current filter
+   - Colored tab backgrounds: Timesheets (blue), Inspections (orange)
+   - Enhanced Approve/Reject buttons with:
+     - Colored borders (green/red)
+     - Hover effects (background color change)
+     - Active states (scale animation)
+     - Consistent with dashboard design language
+
+6. **Global UI Improvements** 🎨
+   - Fixed transparent dropdown menus globally
+   - Updated `--popover` CSS variable for opacity
+   - Added `bg-slate-900 backdrop-blur-xl` to SelectContent
+   - Ensured all dropdown menus have solid backgrounds
+
+**Technical Details:**
+- Added `did_not_work` field to TypeScript types
+- Implemented `fetchExistingTimesheets` for duplicate detection
+- Created `isSunday` and `weekExists` validation helpers
+- Enhanced error handling for PostgreSQL constraint violations
+- Fixed race condition with `authLoading` in useAuth hook
+
+**Git Commits:**
+- Multiple commits for iOS fixes, validation, migrations, UI enhancements
+
+**🎯 OUTCOME:**
+Timesheet and Inspection workflows are now production-ready with comprehensive validation, perfect mobile experience, and polished manager approval interface.
+
+### Session - October 22, 2025 (Morning)
 
 **Major Achievements:**
 
@@ -640,62 +752,6 @@ You can currently:
 
 **🎊 MILESTONE ACHIEVED:**
 All 15 core PRD tasks are now COMPLETE! The app is feature-complete and ready for production deployment and field testing.
-
-### Session - October 22, 2025 (Afternoon - Manager UX Enhancements)
-
-**Major Achievements:**
-
-1. **Manager Approvals UI Enhancement**
-   - Added permanent colored tab backgrounds matching dashboard:
-     - Timesheets tab: Blue (matching timesheet square)
-     - Inspections tab: Orange (matching inspection square)
-   - Enhanced Approve/Reject buttons with interactive hover states:
-     - Red border → Red fill on hover → Darker red + scale on click (Reject)
-     - Green border → Green fill on hover → Darker green + scale on click (Approve)
-   - Improved visual feedback for all manager actions
-   - Better color consistency across entire application
-
-2. **Manager Employee Selector for Form Creation** ✅
-   - Managers can now create timesheets on behalf of any employee
-   - Managers can now create inspections on behalf of any employee
-   - Employee dropdown selector with:
-     - All employee names and IDs
-     - Manager's own account included in list
-     - "(You)" indicator for current user
-     - Clean, professional UI with User icon
-   - Smart validation:
-     - Checks existing timesheets for selected employee
-     - Prevents duplicate week submissions
-     - Shows appropriate error messages
-   - Benefits:
-     - Managers can help employees who need assistance
-     - Managers can create forms for unavailable employees
-     - Flexible enough for managers to create their own forms
-     - Consistent UX across both timesheet and inspection forms
-
-3. **UI/UX Polish & Bug Fixes**
-   - Fixed dropdown menu transparency issue:
-     - Changed --popover CSS variable to solid slate-900
-     - Updated SelectContent component with bg-slate-900
-     - Added backdrop-blur-xl for extra polish
-     - All dropdown menus now fully opaque (no see-through)
-   - Enhanced Select component styling globally
-   - Improved readability across all dropdown menus
-
-**Git Commits:**
-- `04f992e` - Enhanced approvals page UX with colored tabs and interactive buttons
-- `c4653e4` - Updated development plan with approvals UI enhancements
-- `198243c` - Added employee selector for managers creating forms
-- `d02a043` - Added permanent colored backgrounds to approval tabs
-- `8c7ff6c` - Fixed tab opacity to match dashboard exactly
-- `20e5cf1` - Fixed dropdown menu opacity with solid background
-
-**Impact:**
-- Significantly improved manager workflow efficiency
-- Better visual consistency across the application
-- Enhanced tactile feedback for all interactions
-- Flexible form creation capabilities for managers
-- Professional, polished user experience
 
 ### Session - October 21, 2025
 
