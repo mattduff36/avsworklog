@@ -389,7 +389,7 @@ export default function NewTimesheetPage() {
                   <TabsTrigger 
                     key={index} 
                     value={String(index)}
-                    className="text-xs py-3 data-[state=active]:bg-timesheet data-[state=active]:text-slate-900 text-slate-400"
+                    className="text-xs py-3 data-[state=active]:bg-timesheet data-[state=active]:text-slate-900 data-[state=active]:border-2 data-[state=active]:border-white text-slate-400"
                   >
                     {day.substring(0, 3)}
                     {entries[index].daily_total && entries[index].daily_total! > 0 && (
