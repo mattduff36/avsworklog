@@ -123,7 +123,7 @@
   - [ ] Vehicle selector (fetch from database)
   - [ ] 26-point checklist (1-21 standard + 22-26 ARTIC)
   - [ ] Daily column grid (Mon-Sun)
-  - [ ] Quick-tap status buttons (✓/X/0)
+  - [ ] Quick-tap status buttons (✓/X)
   - [ ] Photo upload for defects
   - [ ] Defects/comments section
   - [ ] Action taken field (Manager only)

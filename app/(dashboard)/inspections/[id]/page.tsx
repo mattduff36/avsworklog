@@ -44,6 +44,8 @@ export default function ViewInspectionPage() {
 
   const fetchInspection = async (id: string) => {
     try {
+      setError(''); // Clear any previous errors
+      
       // Fetch inspection
       const { data: inspectionData, error: inspectionError } = await supabase
         .from('vehicle_inspections')
@@ -62,6 +64,7 @@ export default function ViewInspectionPage() {
       // Check if user has access
       if (!isManager && inspectionData && inspectionData.user_id !== user?.id) {
         setError('You do not have permission to view this inspection');
+        setLoading(false);
         return;
       }
 

@@ -41,6 +41,8 @@ export default function ViewTimesheetPage() {
 
   const fetchTimesheet = async (id: string) => {
     try {
+      setError(''); // Clear any previous errors
+      
       // Fetch timesheet
       const { data: timesheetData, error: timesheetError } = await supabase
         .from('timesheets')
@@ -53,6 +55,7 @@ export default function ViewTimesheetPage() {
       // Check if user has access
       if (!isManager && timesheetData.user_id !== user?.id) {
         setError('You do not have permission to view this timesheet');
+        setLoading(false);
         return;
       }
 
