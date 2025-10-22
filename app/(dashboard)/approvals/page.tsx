@@ -265,8 +265,11 @@ export default function ApprovalsPage() {
         </Card>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="timesheets" className="flex items-center gap-2">
+          <TabsList className="grid w-full max-w-md grid-cols-2 bg-slate-800/40">
+            <TabsTrigger 
+              value="timesheets" 
+              className="flex items-center gap-2 data-[state=active]:bg-timesheet data-[state=active]:text-white"
+            >
               <FileText className="h-4 w-4" />
               Timesheets
               {timesheets.length > 0 && (
@@ -275,7 +278,10 @@ export default function ApprovalsPage() {
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="inspections" className="flex items-center gap-2">
+            <TabsTrigger 
+              value="inspections" 
+              className="flex items-center gap-2 data-[state=active]:bg-inspection data-[state=active]:text-white"
+            >
               <Clipboard className="h-4 w-4" />
               Inspections
               {inspections.length > 0 && (
@@ -328,6 +334,7 @@ export default function ApprovalsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleQuickReject('timesheet', timesheet.id)}
+                          className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
                         >
                           <XCircle className="h-4 w-4 mr-1" />
                           Reject
@@ -336,6 +343,7 @@ export default function ApprovalsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleQuickApprove('timesheet', timesheet.id)}
+                          className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
                         >
                           <CheckCircle2 className="h-4 w-4 mr-1" />
                           Approve
@@ -399,6 +407,7 @@ export default function ApprovalsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleQuickReject('inspection', inspection.id)}
+                          className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
                         >
                           <XCircle className="h-4 w-4 mr-1" />
                           Reject
@@ -407,6 +416,7 @@ export default function ApprovalsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleQuickApprove('inspection', inspection.id)}
+                          className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
                         >
                           <CheckCircle2 className="h-4 w-4 mr-1" />
                           Approve
