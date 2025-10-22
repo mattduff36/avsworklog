@@ -8,13 +8,13 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "AVS Worklog - A&V Squires Plant Co. Ltd.",
+  title: "Squires - A&V Squires Plant Co. Ltd.",
   description: "Digital forms management system for timesheets and vehicle inspections",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
-    title: "AVS Worklog",
+    statusBarStyle: "black-translucent",
+    title: "Squires",
   },
 };
 
@@ -23,7 +23,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#0066CC",
+  themeColor: "#F1D64A",
 };
 
 export default function RootLayout({

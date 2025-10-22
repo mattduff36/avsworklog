@@ -1,11 +1,11 @@
 {
-  "name": "AVS Worklog",
-  "short_name": "AVS Worklog",
+  "name": "Squires",
+  "short_name": "Squires",
   "description": "Digital forms management for A&V Squires Plant Co. Ltd.",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#0066CC",
+  "background_color": "#0f172a",
+  "theme_color": "#F1D64A",
   "orientation": "portrait-primary",
   "icons": [
     {
