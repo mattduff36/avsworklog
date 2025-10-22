@@ -247,25 +247,29 @@ export default function NewTimesheetPage() {
                     <p className="text-sm text-slate-400">Tap to enter your hours</p>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="space-y-2">
+                  <div className="space-y-4 max-w-full">
+                    <div className="space-y-2 max-w-full">
                       <Label className="text-white text-lg">Start Time</Label>
-                      <Input
-                        type="time"
-                        value={entry.time_started}
-                        onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
-                        className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full max-w-full [&::-webkit-datetime-edit]:max-w-full"
-                      />
+                      <div className="max-w-full overflow-hidden">
+                        <Input
+                          type="time"
+                          value={entry.time_started}
+                          onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
+                          className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full"
+                        />
+                      </div>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-w-full">
                       <Label className="text-white text-lg">Finish Time</Label>
-                      <Input
-                        type="time"
-                        value={entry.time_finished}
-                        onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
-                        className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full max-w-full [&::-webkit-datetime-edit]:max-w-full"
-                      />
+                      <div className="max-w-full overflow-hidden">
+                        <Input
+                          type="time"
+                          value={entry.time_finished}
+                          onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
+                          className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full"
+                        />
+                      </div>
                     </div>
 
                     <div className="bg-timesheet/10 border border-timesheet/30 rounded-lg p-4">
