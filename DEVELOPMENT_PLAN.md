@@ -366,10 +366,16 @@ This script will:
     - ✅ Added skeleton loading states
     - ✅ Removed Recent Activity from employee dashboard
     - ✅ Removed Reports tab from employee navigation
-14. **LATER: Test workflows end-to-end** - Deferred
-15. **LATER: Final testing** - Deferred
+14. ✅ Enhanced Manager Approvals Experience
+    - ✅ Added status filters (Pending, Approved, Rejected, All)
+    - ✅ Default view set to Pending
+    - ✅ Context-aware empty states
+    - ✅ Dynamic count badges
+    - ✅ Manager permissions verified (can view all employee submissions)
+15. **LATER: Test workflows end-to-end** - Deferred
+16. **LATER: Final testing** - Deferred
 
-**Progress**: 13/15 tasks completed (~87%)
+**Progress**: 14/16 tasks completed (~88%)
 
 ---
 
