@@ -308,3 +308,37 @@ input[type="time"]::-webkit-datetime-edit-hour-field,
 input[type="time"]::-webkit-datetime-edit-minute-field {
   padding: 0 !important;
 }
+
+/* Fix iOS Safari date input width overflow - same treatment as time inputs */
+input[type="date"] {
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  display: block !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type="date"]::-webkit-datetime-edit {
+  max-width: 100% !important;
+  width: 100% !important;
+  padding: 0 !important;
+  overflow: hidden;
+  display: block;
+}
+
+input[type="date"]::-webkit-datetime-edit-fields-wrapper {
+  max-width: 100% !important;
+  width: 100% !important;
+  padding: 0 !important;
+}
+
+input[type="date"]::-webkit-datetime-edit-text {
+  padding: 0 2px;
+}
+
+input[type="date"]::-webkit-datetime-edit-day-field,
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-year-field {
+  padding: 0 !important;
+}

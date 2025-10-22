@@ -201,15 +201,17 @@ export default function NewTimesheetPage() {
                 className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 max-w-full">
               <Label htmlFor="week_ending" className="text-white text-base">Week Ending (Sunday)</Label>
-              <Input
-                id="week_ending"
-                type="date"
-                value={weekEnding}
-                onChange={(e) => setWeekEnding(e.target.value)}
-                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
-              />
+              <div className="max-w-full overflow-hidden">
+                <Input
+                  id="week_ending"
+                  type="date"
+                  value={weekEnding}
+                  onChange={(e) => setWeekEnding(e.target.value)}
+                  className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
+                />
+              </div>
             </div>
           </div>
         </CardContent>
