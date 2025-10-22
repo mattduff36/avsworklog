@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
@@ -30,6 +30,7 @@ export default function NewTimesheetPage() {
   const [activeDay, setActiveDay] = useState('0');
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
+  const [existingWeeks, setExistingWeeks] = useState<string[]>([]);
 
   // Initialize entries for all 7 days
   const [entries, setEntries] = useState(
@@ -42,6 +43,67 @@ export default function NewTimesheetPage() {
       remarks: '',
     }))
   );
+
+  // Fetch existing timesheets on mount
+  useEffect(() => {
+    if (user) {
+      fetchExistingTimesheets();
+    }
+  }, [user]);
+
+  const fetchExistingTimesheets = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select('week_ending')
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      // Store existing week ending dates
+      const weeks = data?.map(t => t.week_ending) || [];
+      setExistingWeeks(weeks);
+    } catch (err) {
+      console.error('Error fetching existing timesheets:', err);
+    }
+  };
+
+  // Check if a date is a Sunday
+  const isSunday = (dateString: string): boolean => {
+    const date = new Date(dateString + 'T00:00:00');
+    return date.getDay() === 0;
+  };
+
+  // Check if week already has a timesheet
+  const weekExists = (dateString: string): boolean => {
+    return existingWeeks.includes(dateString);
+  };
+
+  // Handle week ending date change with validation
+  const handleWeekEndingChange = (newDate: string) => {
+    setError(''); // Clear any previous errors
+    
+    if (!newDate) {
+      setWeekEnding(newDate);
+      return;
+    }
+
+    // Check if it's a Sunday
+    if (!isSunday(newDate)) {
+      setError('Week Ending must be a Sunday. Please select a Sunday date.');
+      return;
+    }
+
+    // Check if week already exists
+    if (weekExists(newDate)) {
+      setError('You already have a timesheet for this week. Please select a different week.');
+      return;
+    }
+
+    setWeekEnding(newDate);
+  };
 
   // Calculate hours when times change
   const updateEntry = (dayIndex: number, field: string, value: string | boolean) => {
@@ -139,9 +201,15 @@ export default function NewTimesheetPage() {
       }
 
       router.push('/timesheets');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving timesheet:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save timesheet');
+      
+      // Handle duplicate key constraint error
+      if (err?.code === '23505' || err?.message?.includes('duplicate key')) {
+        setError('You already have a timesheet for this week. Please select a different week ending date.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to save timesheet');
+      }
     } finally {
       setSaving(false);
     }
@@ -208,10 +276,11 @@ export default function NewTimesheetPage() {
                   id="week_ending"
                   type="date"
                   value={weekEnding}
-                  onChange={(e) => setWeekEnding(e.target.value)}
+                  onChange={(e) => handleWeekEndingChange(e.target.value)}
                   className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
                 />
               </div>
+              <p className="text-xs text-slate-400">Please select a Sunday that you haven't already submitted</p>
             </div>
           </div>
         </CardContent>
