@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { Plus, FileText, Clock, CheckCircle2, XCircle } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
@@ -90,8 +91,26 @@ export default function TimesheetsPage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Loading timesheets...</p>
+        <div className="grid gap-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-3 flex-1">
+                    <Skeleton className="h-5 w-5" />
+                    <div className="space-y-2 flex-1">
+                      <Skeleton className="h-5 w-48" />
+                      <Skeleton className="h-4 w-32" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-6 w-20" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-4 w-full" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
       ) : timesheets.length === 0 ? (
         <Card>
