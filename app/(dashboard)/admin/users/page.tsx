@@ -1,8 +1,7 @@
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Users, Construction } from 'lucide-react';
+import { Construction } from 'lucide-react';
 
 export default function UsersAdminPage() {
   return (

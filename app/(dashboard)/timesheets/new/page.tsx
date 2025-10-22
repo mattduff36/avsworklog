@@ -220,11 +220,12 @@ export default function NewTimesheetPage() {
       }
 
       router.push('/timesheets');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error saving timesheet:', err);
       
       // Handle duplicate key constraint error
-      if (err?.code === '23505' || err?.message?.includes('duplicate key')) {
+      const error = err as { code?: string; message?: string };
+      if (error?.code === '23505' || error?.message?.includes('duplicate key')) {
         setError('You already have a timesheet for this week. Please select a different week ending date.');
       } else {
         setError(err instanceof Error ? err.message : 'Failed to save timesheet');
@@ -299,7 +300,7 @@ export default function NewTimesheetPage() {
                   className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
                 />
               </div>
-              <p className="text-xs text-slate-400">Please select a Sunday that you haven't already submitted</p>
+              <p className="text-xs text-slate-400">Please select a Sunday that you haven&apos;t already submitted</p>
             </div>
           </div>
         </CardContent>

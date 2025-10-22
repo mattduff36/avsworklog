@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -13,7 +13,6 @@ import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 import { VehicleInspection } from '@/types/inspection';
-import { Database } from '@/types/database';
 
 interface TimesheetWithProfile extends Timesheet {
   user: {
@@ -42,17 +41,7 @@ export default function ApprovalsPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('timesheets');
 
-  useEffect(() => {
-    if (!authLoading) {
-      if (!isManager) {
-        router.push('/dashboard');
-        return;
-      }
-      fetchPendingApprovals();
-    }
-  }, [isManager, authLoading]);
-
-  const fetchPendingApprovals = async () => {
+  const fetchPendingApprovals = useCallback(async () => {
     try {
       // Fetch pending timesheets
       const { data: timesheetData, error: timesheetError } = await supabase
@@ -93,7 +82,17 @@ export default function ApprovalsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
+
+  useEffect(() => {
+    if (!authLoading) {
+      if (!isManager) {
+        router.push('/dashboard');
+        return;
+      }
+      fetchPendingApprovals();
+    }
+  }, [isManager, authLoading, router, fetchPendingApprovals]);
 
   const handleQuickApprove = async (type: 'timesheet' | 'inspection', id: string) => {
     try {

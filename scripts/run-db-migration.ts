@@ -8,25 +8,30 @@ const { Client } = pg;
 // Load .env.local
 config({ path: resolve(process.cwd(), '.env.local') });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
+const sqlFile = 'supabase/add-did-not-work-column.sql';
 
-if (!supabaseUrl || !serviceRoleKey) {
-  console.error('❌ Missing Supabase credentials');
-  console.error('Please ensure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in .env.local');
+if (!connectionString) {
+  console.error('❌ Missing database connection string');
+  console.error('Please ensure POSTGRES_URL_NON_POOLING or POSTGRES_URL is set in .env.local');
   process.exit(1);
 }
 
-// Extract project ref from URL and build connection string
-const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
-const connectionString = `postgresql://postgres.${projectRef}:${serviceRoleKey}@aws-0-eu-west-2.pooler.supabase.com:6543/postgres`;
-
 async function runMigration() {
-  console.log('🚀 Adding did_not_work column to timesheet_entries...\n');
+  console.log('🚀 Running database migration...\n');
 
+  // Parse connection string and rebuild with explicit SSL config
+  const url = new URL(connectionString);
+  
   const client = new Client({
-    connectionString,
-    ssl: { rejectUnauthorized: false }
+    host: url.hostname,
+    port: parseInt(url.port) || 5432,
+    database: url.pathname.slice(1),
+    user: url.username,
+    password: url.password,
+    ssl: {
+      rejectUnauthorized: false
+    }
   });
 
   try {
@@ -36,12 +41,14 @@ async function runMigration() {
 
     // Read the migration SQL file
     const migrationSQL = readFileSync(
-      resolve(process.cwd(), 'supabase/add-did-not-work-column.sql'),
+      resolve(process.cwd(), sqlFile),
       'utf-8'
     );
 
-    console.log('📄 Migration file loaded');
-    console.log('🔄 Executing SQL migration...\n');
+    console.log('📄 Executing migration:');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(migrationSQL.trim());
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
     // Execute the migration
     await client.query(migrationSQL);
@@ -52,11 +59,12 @@ async function runMigration() {
     
     console.log('📊 Database changes applied:');
     console.log('   ✓ Added did_not_work column to timesheet_entries');
-    console.log('   ✓ Default value: FALSE');
+    console.log('   ✓ Type: BOOLEAN NOT NULL DEFAULT FALSE');
     console.log('   ✓ Column comment added\n');
     
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('✨ Ready to use!');
+    console.log('✨ Ready to use! Start your dev server:');
+    console.log('   npm run dev');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
   } catch (error: any) {
@@ -70,8 +78,13 @@ async function runMigration() {
     if (error.hint) {
       console.error('Hint:', error.hint);
     }
-    console.log('\n📝 You can run the migration manually in Supabase SQL Editor:');
-    console.log('   Copy & paste contents of: supabase/add-did-not-work-column.sql\n');
+    
+    // Check if column already exists
+    if (error.message?.includes('already exists')) {
+      console.log('\n✅ Column already exists - no action needed!\n');
+      process.exit(0);
+    }
+    
     process.exit(1);
   } finally {
     await client.end();
