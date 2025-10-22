@@ -541,7 +541,7 @@ export default function UsersAdminPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="add-role">Role *</Label>
-              <Select value={formData.role} onValueChange={(value: any) => setFormData({ ...formData, role: value })}>
+              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value as 'admin' | 'manager' | 'employee' })}>
                 <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
                   <SelectValue />
                 </SelectTrigger>
@@ -618,7 +618,7 @@ export default function UsersAdminPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-role">Role *</Label>
-              <Select value={formData.role} onValueChange={(value: any) => setFormData({ ...formData, role: value })}>
+              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value as 'admin' | 'manager' | 'employee' })}>
                 <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
                   <SelectValue />
                 </SelectTrigger>
