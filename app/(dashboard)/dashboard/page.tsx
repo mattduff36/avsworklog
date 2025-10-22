@@ -4,19 +4,40 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Link from 'next/link';
 import { 
   Clock, 
   CheckCircle2, 
   XCircle,
   Plus,
-  FileSpreadsheet
+  FileSpreadsheet,
+  AlertTriangle,
+  Wrench,
+  PackageCheck,
+  Clipboard,
+  HardHat,
+  Truck,
+  FileCheck,
+  ScrollText
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
 
 export default function DashboardPage() {
   const { profile, isManager } = useAuth();
   const formTypes = getEnabledForms();
+
+  // Placeholder forms for future development
+  const placeholderForms = [
+    { id: 'incident', title: 'Incident Report', icon: AlertTriangle, color: 'bg-red-500' },
+    { id: 'maintenance', title: 'Maintenance Request', icon: Wrench, color: 'bg-purple-500' },
+    { id: 'delivery', title: 'Delivery Note', icon: PackageCheck, color: 'bg-green-500' },
+    { id: 'site-diary', title: 'Site Diary', icon: Clipboard, color: 'bg-cyan-500' },
+    { id: 'risk-assessment', title: 'Risk Assessment', icon: HardHat, color: 'bg-rose-500' },
+    { id: 'plant-hire', title: 'Plant Hire', icon: Truck, color: 'bg-indigo-500' },
+    { id: 'quality-check', title: 'Quality Check', icon: FileCheck, color: 'bg-emerald-500' },
+    { id: 'daily-report', title: 'Daily Report', icon: ScrollText, color: 'bg-amber-500' },
+  ];
 
   return (
     <div className="space-y-8">
@@ -30,59 +51,48 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Quick Actions - Scalable Grid */}
+      {/* Quick Actions - Square Button Grid */}
       <div>
         <h2 className="text-xl font-semibold text-white mb-4">Create New Form</h2>
         
-        {/* Mobile View - Compact Square Buttons */}
-        <div className="md:hidden grid grid-cols-2 gap-3">
-          {formTypes.map((formType) => {
-            const Icon = formType.icon;
-            return (
-              <Link key={formType.id} href={formType.href}>
-                <div className={`bg-${formType.color} hover:bg-${formType.color}/90 transition-all rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3`}>
-                  <Icon className="h-8 w-8 text-white" />
-                  <span className="text-white font-semibold text-base leading-tight">
-                    {formType.title}
-                  </span>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-
-        {/* Desktop View - Full Cards */}
-        <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-4">
-          {formTypes.map((formType) => {
-            const Icon = formType.icon;
-            return (
-              <Card 
-                key={formType.id}
-                className={`hover:shadow-2xl transition-all cursor-pointer border-l-4 border-${formType.color} bg-slate-800/40 backdrop-blur-xl border-slate-700/50`}
-              >
-                <Link href={formType.href}>
-                  <CardHeader className={`flex flex-row items-center justify-between space-y-0 pb-2 bg-${formType.color}/10`}>
-                    <CardTitle className="text-lg font-medium text-white">
+        <TooltipProvider>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {/* Active Forms */}
+            {formTypes.map((formType) => {
+              const Icon = formType.icon;
+              return (
+                <Link key={formType.id} href={formType.href}>
+                  <div className={`bg-${formType.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3 cursor-pointer`}>
+                    <Icon className="h-8 w-8 text-white" />
+                    <span className="text-white font-semibold text-sm leading-tight">
                       {formType.title}
-                    </CardTitle>
-                    <Icon className={`h-5 w-5 text-${formType.color}`} />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <CardDescription className="text-slate-400">
-                        {formType.description}
-                      </CardDescription>
-                      <Button size="sm" className={`bg-${formType.color} hover:bg-${formType.color}/90 text-white`}>
-                        <Plus className="h-4 w-4 mr-1" />
-                        Create
-                      </Button>
-                    </div>
-                  </CardContent>
+                    </span>
+                  </div>
                 </Link>
-              </Card>
-            );
-          })}
-        </div>
+              );
+            })}
+
+            {/* Placeholder Forms */}
+            {placeholderForms.map((form) => {
+              const Icon = form.icon;
+              return (
+                <Tooltip key={form.id}>
+                  <TooltipTrigger asChild>
+                    <div className={`${form.color} opacity-50 cursor-not-allowed rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3`}>
+                      <Icon className="h-8 w-8 text-white" />
+                      <span className="text-white font-semibold text-sm leading-tight">
+                        {form.title}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Coming in a future development phase</p>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </div>
+        </TooltipProvider>
       </div>
 
       {/* Recent Activity / Stats - Manager/Admin Only */}
