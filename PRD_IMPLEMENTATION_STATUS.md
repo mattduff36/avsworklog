@@ -1,6 +1,6 @@
-# AVS Worklog - PRD Implementation Status
+# Squires - PRD Implementation Status
 
-**Last Updated**: October 21, 2025  
+**Last Updated**: October 22, 2025  
 **Overall Progress**: 14/15 Core Tasks Complete (93%) 🎉
 
 ## ✅ Completed Tasks
@@ -44,7 +44,11 @@
 ### 4. ✅ Implement authentication system with Supabase Auth
 - **Status**: Complete
 - **Delivered**:
-  - Login page with email/password
+  - ✅ **Mobile PWA-optimized login page**
+    - Removed navbar for app-like experience
+    - Removed company footer for clean design
+    - App name "SQUIRES" in uppercase
+    - Clean, minimal mobile-first layout
   - Supabase client configuration (browser & server)
   - Authentication middleware
   - Protected routes
@@ -150,10 +154,25 @@
   - [ ] IP address logging (optional)
 
 ### 8. ✅ Create role-based dashboard with pending forms, quick actions, and stats
-- **Status**: Complete
+- **Status**: Complete ✅
 - **Delivered**:
-  - ✅ Role-based dashboard layout
-  - ✅ Quick action cards (New Timesheet, New Inspection)
+  - ✅ **Square button grid design** (consistent with mobile)
+    - Replaced desktop rectangle cards with square buttons
+    - 5-column responsive grid (2 on mobile, 3 on tablet, 4-5 on desktop)
+    - Active forms: Timesheet (blue) & Vehicle Inspection (orange)
+    - **8 placeholder forms** for future development (manager/admin only)
+      - Incident Report (red)
+      - Maintenance Request (purple)
+      - Delivery Note (green)
+      - Site Diary (cyan)
+      - Risk Assessment (rose)
+      - Plant Hire (indigo)
+      - Quality Check (emerald)
+      - Daily Report (amber)
+    - Tooltips on placeholders: "Coming in a future development phase"
+    - Disabled state (50% opacity, cursor-not-allowed)
+    - Hover effects on active forms (scale & opacity)
+  - ✅ Role-based visibility (placeholders hidden from employees)
   - ✅ Stats placeholders (Pending, Approved, Attention)
   - ✅ Recent forms sections
   - ✅ Manager-only section
@@ -258,6 +277,12 @@
 ### 15. ✅ UI/UX Design & Branding
 - **Status**: Complete ✅
 - **Delivered**:
+  - ✅ **App Rebranding to "Squires"** (October 22, 2025)
+    - Changed app name from "AVS Worklog" to "Squires"
+    - Updated login page title to "SQUIRES" (uppercase)
+    - Updated navbar branding to "Squires"
+    - Removed login page navbar for app-like PWA experience
+    - Removed company footer from login for cleaner mobile design
   - ✅ **Brand analysis from AVS website**
     - Analyzed https://avs.mpdee.co.uk/contact (employee interface inspiration)
     - Analyzed https://avs.mpdee.co.uk/admin/login (admin/manager interface)
@@ -277,17 +302,22 @@
     - Sticky headers and footers
     - Card-based layouts
     - Icon-only buttons for clarity
+    - Square button grid on dashboard
   - ✅ **CSS Variables** updated in `app/globals.css`
     - AVS brand colors defined
     - Document-specific color system
     - Global dark theme rules
     - Card hover effects
   - ✅ **Navbar**
+    - App name "Squires" displayed
     - AVS yellow accent strip
     - Dark glass-morphism background
     - Mobile hamburger menu
     - Online/offline indicator
-- **Complete**: Professional, accessible, mobile-first design system in place
+  - ✅ **shadcn/ui Components**
+    - Tooltip component added for placeholders
+    - lib/utils.ts created for cn() utility
+- **Complete**: Professional, accessible, mobile-first design system with consistent "Squires" branding
 
 ---
 
@@ -510,9 +540,52 @@ You can currently:
 
 ---
 
-## 🎊 Session Summary - October 21, 2025
+## 🎊 Recent Session Summaries
 
-**Major Achievements This Session:**
+### Session - October 22, 2025
+
+**Major Achievements:**
+
+1. **Mobile PWA Login Experience**
+   - Removed navbar from login page for app-like experience
+   - Removed company footer for cleaner design
+   - Changed "Employee Access" to "SQUIRES" (uppercase)
+   - Removed subtitle text for minimal design
+
+2. **App Rebranding to "Squires"**
+   - Changed app name from "AVS Worklog" to "Squires"
+   - Updated login page branding
+   - Updated navbar branding throughout app
+   - Positioned as a mobile-first PWA
+
+3. **Dashboard Redesign with Placeholders**
+   - Replaced desktop rectangle cards with square buttons
+   - Unified design: same square buttons on mobile and desktop
+   - Added 8 placeholder forms for future development:
+     - Incident Report, Maintenance Request, Delivery Note, Site Diary
+     - Risk Assessment, Plant Hire, Quality Check, Daily Report
+   - Added tooltip component for "Coming soon" messages
+   - Role-based visibility: placeholders only shown to managers/admins
+   - Responsive grid: 2 cols mobile → 5 cols desktop
+   - Hover effects and disabled states
+
+4. **Technical Improvements**
+   - Created `lib/utils.ts` for shadcn/ui compatibility
+   - Added tooltip component to component library
+   - Fixed build errors
+   - Pushed 5 commits to GitHub
+
+**Git Commits:**
+- `1f4631d` - Remove navbar and footer from login
+- `8bb2283` - Rebrand to "Squires"
+- `e98434c` - Uppercase title and remove subtitle
+- `7d5a93b` - Dashboard redesign with placeholders
+- `0fb31f1` - Fix lib/utils.ts
+- `2c7f674` - Hide placeholders from employees
+
+### Session - October 21, 2025
+
+**Major Achievements:**
 
 1. **Mobile-First Redesign**
    - Completely redesigned timesheet form with tabbed Mon-Sun interface
