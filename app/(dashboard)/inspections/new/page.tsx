@@ -215,7 +215,7 @@ export default function NewInspectionPage() {
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
                 max={formatDateISO(new Date())}
-                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white"
+                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
               />
             </div>
           </div>
@@ -286,7 +286,7 @@ export default function NewInspectionPage() {
                         value={comments[itemNumber] || ''}
                         onChange={(e) => handleCommentChange(itemNumber, e.target.value)}
                         placeholder="Add details..."
-                        className={`min-h-[80px] text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 ${
+                        className={`w-full min-h-[80px] text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 ${
                           currentStatus === 'defect' && !comments[itemNumber] ? 'border-red-500' : ''
                         }`}
                       />

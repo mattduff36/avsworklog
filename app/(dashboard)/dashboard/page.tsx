@@ -33,7 +33,26 @@ export default function DashboardPage() {
       {/* Quick Actions - Scalable Grid */}
       <div>
         <h2 className="text-xl font-semibold text-white mb-4">Create New Form</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        
+        {/* Mobile View - Compact Square Buttons */}
+        <div className="md:hidden grid grid-cols-2 gap-3">
+          {formTypes.map((formType) => {
+            const Icon = formType.icon;
+            return (
+              <Link key={formType.id} href={formType.href}>
+                <div className={`bg-${formType.color} hover:bg-${formType.color}/90 transition-all rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3`}>
+                  <Icon className="h-8 w-8 text-white" />
+                  <span className="text-white font-semibold text-base leading-tight">
+                    {formType.title}
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Desktop View - Full Cards */}
+        <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-4">
           {formTypes.map((formType) => {
             const Icon = formType.icon;
             return (
@@ -66,53 +85,55 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Recent Activity / Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-t-4 border-t-amber-400 bg-slate-800/40 backdrop-blur-xl border-slate-700/50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white">
-              Pending Approval
-            </CardTitle>
-            <Clock className="h-4 w-4 text-amber-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-400">0</div>
-            <p className="text-xs text-slate-400">
-              Forms awaiting review
-            </p>
-          </CardContent>
-        </Card>
+      {/* Recent Activity / Stats - Manager/Admin Only */}
+      {isManager && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="border-t-4 border-t-amber-400 bg-slate-800/40 backdrop-blur-xl border-slate-700/50">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-white">
+                Pending Approval
+              </CardTitle>
+              <Clock className="h-4 w-4 text-amber-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-amber-400">0</div>
+              <p className="text-xs text-slate-400">
+                Forms awaiting review
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card className="border-t-4 border-t-green-400 bg-slate-800/40 backdrop-blur-xl border-slate-700/50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white">
-              Approved
-            </CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-green-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-400">0</div>
-            <p className="text-xs text-slate-400">
-              This month
-            </p>
-          </CardContent>
-        </Card>
+          <Card className="border-t-4 border-t-green-400 bg-slate-800/40 backdrop-blur-xl border-slate-700/50">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-white">
+                Approved
+              </CardTitle>
+              <CheckCircle2 className="h-4 w-4 text-green-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-400">0</div>
+              <p className="text-xs text-slate-400">
+                This month
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card className="border-t-4 border-t-red-400 bg-slate-800/40 backdrop-blur-xl border-slate-700/50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white">
-              Requires Attention
-            </CardTitle>
-            <XCircle className="h-4 w-4 text-red-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-400">0</div>
-            <p className="text-xs text-slate-400">
-              Items needing action
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+          <Card className="border-t-4 border-t-red-400 bg-slate-800/40 backdrop-blur-xl border-slate-700/50">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-white">
+                Requires Attention
+              </CardTitle>
+              <XCircle className="h-4 w-4 text-red-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-400">0</div>
+              <p className="text-xs text-slate-400">
+                Items needing action
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Recent Activity - Unified view for all form types */}
       <Card className="bg-slate-800/40 backdrop-blur-xl border-slate-700/50">

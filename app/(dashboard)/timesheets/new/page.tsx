@@ -254,7 +254,7 @@ export default function NewTimesheetPage() {
                         type="time"
                         value={entry.time_started}
                         onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
-                        className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white"
+                        className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full"
                       />
                     </div>
 
@@ -264,7 +264,7 @@ export default function NewTimesheetPage() {
                         type="time"
                         value={entry.time_finished}
                         onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
-                        className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white"
+                        className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full"
                       />
                     </div>
 
@@ -296,7 +296,7 @@ export default function NewTimesheetPage() {
                         value={entry.remarks}
                         onChange={(e) => updateEntry(index, 'remarks', e.target.value)}
                         placeholder="Add any notes for this day..."
-                        className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
+                        className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 w-full"
                       />
                     </div>
 
