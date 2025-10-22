@@ -24,10 +24,10 @@ import {
 import { getEnabledForms } from '@/lib/config/forms';
 
 export default function DashboardPage() {
-  const { profile, isManager } = useAuth();
+  const { profile, isManager, isAdmin } = useAuth();
   const formTypes = getEnabledForms();
 
-  // Placeholder forms for future development
+  // Placeholder forms for future development (only shown to managers/admins)
   const placeholderForms = [
     { id: 'incident', title: 'Incident Report', icon: AlertTriangle, color: 'bg-red-500' },
     { id: 'maintenance', title: 'Maintenance Request', icon: Wrench, color: 'bg-purple-500' },
@@ -38,6 +38,8 @@ export default function DashboardPage() {
     { id: 'quality-check', title: 'Quality Check', icon: FileCheck, color: 'bg-emerald-500' },
     { id: 'daily-report', title: 'Daily Report', icon: ScrollText, color: 'bg-amber-500' },
   ];
+
+  const showPlaceholders = isManager || isAdmin;
 
   return (
     <div className="space-y-8">
@@ -72,8 +74,8 @@ export default function DashboardPage() {
               );
             })}
 
-            {/* Placeholder Forms */}
-            {placeholderForms.map((form) => {
+            {/* Placeholder Forms - Only visible to managers/admins */}
+            {showPlaceholders && placeholderForms.map((form) => {
               const Icon = form.icon;
               return (
                 <Tooltip key={form.id}>
