@@ -265,27 +265,27 @@ export default function ApprovalsPage() {
         </Card>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-md grid-cols-2 bg-slate-800/40">
+          <TabsList className="grid w-full max-w-md grid-cols-2 bg-transparent gap-2">
             <TabsTrigger 
               value="timesheets" 
-              className="flex items-center gap-2 data-[state=active]:bg-timesheet data-[state=active]:text-white"
+              className="flex items-center gap-2 bg-timesheet/80 text-white data-[state=active]:bg-timesheet data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all"
             >
               <FileText className="h-4 w-4" />
               Timesheets
               {timesheets.length > 0 && (
-                <Badge variant="secondary" className="ml-1">
+                <Badge variant="secondary" className="ml-1 bg-white/20 text-white border-white/30">
                   {timesheets.length}
                 </Badge>
               )}
             </TabsTrigger>
             <TabsTrigger 
               value="inspections" 
-              className="flex items-center gap-2 data-[state=active]:bg-inspection data-[state=active]:text-white"
+              className="flex items-center gap-2 bg-inspection/80 text-white data-[state=active]:bg-inspection data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all"
             >
               <Clipboard className="h-4 w-4" />
               Inspections
               {inspections.length > 0 && (
-                <Badge variant="secondary" className="ml-1">
+                <Badge variant="secondary" className="ml-1 bg-white/20 text-white border-white/30">
                   {inspections.length}
                 </Badge>
               )}
