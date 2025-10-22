@@ -268,7 +268,7 @@ export default function ApprovalsPage() {
           <TabsList className="grid w-full max-w-md grid-cols-2 bg-transparent gap-2">
             <TabsTrigger 
               value="timesheets" 
-              className="flex items-center gap-2 bg-timesheet/80 text-white data-[state=active]:bg-timesheet data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all"
+              className="flex items-center gap-2 bg-timesheet text-white data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all"
             >
               <FileText className="h-4 w-4" />
               Timesheets
@@ -280,7 +280,7 @@ export default function ApprovalsPage() {
             </TabsTrigger>
             <TabsTrigger 
               value="inspections" 
-              className="flex items-center gap-2 bg-inspection/80 text-white data-[state=active]:bg-inspection data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all"
+              className="flex items-center gap-2 bg-inspection text-white data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all"
             >
               <Clipboard className="h-4 w-4" />
               Inspections
