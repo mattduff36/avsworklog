@@ -13,18 +13,54 @@
 - Authentication system (login, roles, sessions)
 - Mobile-first UI with "Squires" branding
 - Timesheet module (create, edit, view, submit, approve, PDF)
+  - ✅ Button-based UI for "Working in Yard" and "Did Not Work" statuses
+  - ✅ Validation requiring all 7 days to have hours OR "did not work" marked
+  - ✅ Sunday-only date selection for week ending
+  - ✅ Duplicate week prevention
+  - ✅ iOS Safari input field fixes
 - Vehicle Inspection module (create, edit, view, submit, approve, PDF, photos)
 - Digital signatures with enforcement
 - Manager approval workflow with comments
 - PWA icons and manifest
-- Dashboard with square button grid
+- Dashboard with square button grid (with 8 placeholder forms for future)
 - Role-based access control
+- **Automated database migration system** (scripts/run-db-migration.ts)
 
 ### ⚠️ What Needs Attention
 1. **End-to-end workflow testing** - Verify employee → manager flow works perfectly
 2. **Placeholder pages** - Reports and Admin sections need structure
 3. **Code quality** - Ensure extensibility for future forms
 4. **Bug fixes** - Any issues discovered during testing
+
+---
+
+## 🗄️ Database Migrations
+
+### How to Run Migrations
+The project includes an automated migration system that connects directly to Supabase PostgreSQL.
+
+**Requirements:**
+- All Supabase credentials must be in `.env.local` (including `POSTGRES_URL_NON_POOLING`)
+
+**To run a migration:**
+```bash
+npx tsx scripts/run-db-migration.ts
+```
+
+This script will:
+1. Load credentials from `.env.local`
+2. Connect to the Supabase database
+3. Execute SQL from `supabase/add-did-not-work-column.sql`
+4. Report success or failure with detailed error messages
+
+**Creating new migrations:**
+1. Create a new `.sql` file in `supabase/` directory
+2. Write your migration SQL (use `IF NOT EXISTS` for safety)
+3. Update the migration script to reference the new file
+4. Run `npx tsx scripts/run-db-migration.ts`
+
+**Recent migrations:**
+- ✅ Added `did_not_work` column to `timesheet_entries` table
 
 ---
 
@@ -314,16 +350,22 @@
 ## 🎯 Today's Priority Order
 
 1. ✅ Create this development plan
-2. **Create placeholder pages** (Reports, Admin) - 30 min
-3. **Test timesheet workflow end-to-end** - 45 min
-4. **Fix any timesheet issues** - 30 min
-5. **Test inspection workflow end-to-end** - 45 min
-6. **Fix any inspection issues** - 30 min
-7. **Polish UI/UX** - 30 min
-8. **Final testing** - 30 min
-9. **Documentation update** - 20 min
+2. ✅ Rebrand app to "Squires"
+3. ✅ Redesign dashboard with square buttons + 8 placeholder forms
+4. ✅ Setup PWA icons and manifest
+5. ✅ Implement PDF export for timesheets and inspections
+6. ✅ Replace timesheet checkboxes with touch-friendly buttons
+7. ✅ Add "Did Not Work" status for timesheet days
+8. ✅ Implement comprehensive timesheet validation (all 7 days required)
+9. ✅ Fix iOS Safari input overflow issues
+10. ✅ Create automated database migration system
+11. ✅ Update development plan with completed work
+12. **NEXT: Create placeholder pages** (Reports, Admin) - 30 min
+13. **NEXT: Polish UI/UX** - 30 min
+14. **LATER: Test workflows end-to-end** - Deferred
+15. **LATER: Final testing** - Deferred
 
-**Total estimated time**: ~4.5 hours
+**Progress**: 11/15 tasks completed (~73%)
 
 ---
 
