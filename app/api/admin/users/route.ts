@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createServerClient } from '@/lib/supabase/server';
+import { createClient as createServerClient } from '@/lib/supabase/server';
 
 // Create admin client with service role key
 const supabaseAdmin = createClient(
