@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Save, Check, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Save, Check, AlertCircle, CheckCircle2, XCircle, Home } from 'lucide-react';
 import Link from 'next/link';
 import { getWeekEnding, formatDateISO } from '@/lib/utils/date';
 import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
@@ -39,6 +39,7 @@ export default function NewTimesheetPage() {
       time_started: '',
       time_finished: '',
       working_in_yard: false,
+      did_not_work: false,
       daily_total: null as number | null,
       remarks: '',
     }))
@@ -108,16 +109,29 @@ export default function NewTimesheetPage() {
   // Calculate hours when times change
   const updateEntry = (dayIndex: number, field: string, value: string | boolean) => {
     const newEntries = [...entries];
-    newEntries[dayIndex] = {
-      ...newEntries[dayIndex],
-      [field]: value,
-    };
+    
+    // Special handling for "did_not_work" toggle
+    if (field === 'did_not_work' && value === true) {
+      newEntries[dayIndex] = {
+        ...newEntries[dayIndex],
+        did_not_work: true,
+        time_started: '',
+        time_finished: '',
+        working_in_yard: false,
+        daily_total: 0,
+      };
+    } else {
+      newEntries[dayIndex] = {
+        ...newEntries[dayIndex],
+        [field]: value,
+      };
 
-    // Auto-calculate daily total if both times are present
-    if (field === 'time_started' || field === 'time_finished') {
-      const entry = newEntries[dayIndex];
-      const hours = calculateHours(entry.time_started, entry.time_finished);
-      newEntries[dayIndex].daily_total = hours;
+      // Auto-calculate daily total if both times are present
+      if (field === 'time_started' || field === 'time_finished') {
+        const entry = newEntries[dayIndex];
+        const hours = calculateHours(entry.time_started, entry.time_finished);
+        newEntries[dayIndex].daily_total = hours;
+      }
     }
 
     setEntries(newEntries);
@@ -133,10 +147,15 @@ export default function NewTimesheetPage() {
   };
 
   const handleSubmit = async () => {
-    // Validate at least one day has hours
-    const hasHours = entries.some(e => e.time_started && e.time_finished);
-    if (!hasHours) {
-      setError('Please enter hours for at least one day');
+    // Validate that ALL days have either hours OR "did not work" marked
+    const allDaysComplete = entries.every(entry => {
+      const hasHours = entry.time_started && entry.time_finished;
+      const markedDidNotWork = entry.did_not_work;
+      return hasHours || markedDidNotWork;
+    });
+    
+    if (!allDaysComplete) {
+      setError('Please enter hours OR mark "Did Not Work" for ALL 7 days of the week');
       return;
     }
     
@@ -326,7 +345,8 @@ export default function NewTimesheetPage() {
                           type="time"
                           value={entry.time_started}
                           onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
-                          className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full"
+                          disabled={entry.did_not_work}
+                          className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed"
                         />
                       </div>
                     </div>
@@ -338,7 +358,8 @@ export default function NewTimesheetPage() {
                           type="time"
                           value={entry.time_finished}
                           onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
-                          className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full"
+                          disabled={entry.did_not_work}
+                          className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed"
                         />
                       </div>
                     </div>
@@ -352,17 +373,46 @@ export default function NewTimesheetPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-3 bg-slate-900/30 p-4 rounded-lg">
-                      <input
-                        type="checkbox"
-                        id={`yard-${index}`}
-                        checked={entry.working_in_yard}
-                        onChange={(e) => updateEntry(index, 'working_in_yard', e.target.checked)}
-                        className="w-6 h-6 rounded border-slate-600 text-timesheet focus:ring-timesheet"
-                      />
-                      <Label htmlFor={`yard-${index}`} className="text-white text-base">
-                        Working in Yard
-                      </Label>
+                    {/* Status Buttons */}
+                    <div className="space-y-3">
+                      <Label className="text-white text-lg">Day Status</Label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* Working in Yard Button */}
+                        <button
+                          type="button"
+                          onClick={() => updateEntry(index, 'working_in_yard', !entry.working_in_yard)}
+                          disabled={entry.did_not_work}
+                          className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                            entry.working_in_yard
+                              ? 'bg-blue-500/20 border-blue-500 shadow-lg shadow-blue-500/20'
+                              : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
+                          } disabled:opacity-30 disabled:cursor-not-allowed`}
+                        >
+                          <Home className={`h-8 w-8 mb-2 ${entry.working_in_yard ? 'text-blue-400' : 'text-slate-500'}`} />
+                          <span className={`text-sm font-medium ${entry.working_in_yard ? 'text-blue-400' : 'text-slate-400'}`}>
+                            In Yard
+                          </span>
+                        </button>
+
+                        {/* Did Not Work Button */}
+                        <button
+                          type="button"
+                          onClick={() => updateEntry(index, 'did_not_work', !entry.did_not_work)}
+                          className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                            entry.did_not_work
+                              ? 'bg-amber-500/20 border-amber-500 shadow-lg shadow-amber-500/20'
+                              : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
+                          }`}
+                        >
+                          <XCircle className={`h-8 w-8 mb-2 ${entry.did_not_work ? 'text-amber-400' : 'text-slate-500'}`} />
+                          <span className={`text-sm font-medium ${entry.did_not_work ? 'text-amber-400' : 'text-slate-400'}`}>
+                            Did Not Work
+                          </span>
+                        </button>
+                      </div>
+                      {entry.did_not_work && (
+                        <p className="text-xs text-amber-400 text-center">Time entries disabled for this day</p>
+                      )}
                     </div>
 
                     <div className="space-y-2">
@@ -407,8 +457,8 @@ export default function NewTimesheetPage() {
                 <tr className="border-b border-slate-700">
                   <th className="text-left p-3 font-medium text-white">Day</th>
                   <th className="text-left p-3 font-medium text-white">Time Started</th>
-                  <th className="text-center p-3 font-medium text-white">In Yard</th>
                   <th className="text-left p-3 font-medium text-white">Time Finished</th>
+                  <th className="text-center p-3 font-medium text-white w-32">Status</th>
                   <th className="text-right p-3 font-medium text-white">Total Hours</th>
                   <th className="text-left p-3 font-medium text-white">Remarks</th>
                 </tr>
@@ -422,15 +472,8 @@ export default function NewTimesheetPage() {
                         type="time"
                         value={entry.time_started}
                         onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
-                        className="w-32 bg-slate-900/50 border-slate-600 text-white"
-                      />
-                    </td>
-                    <td className="p-3 text-center">
-                      <input
-                        type="checkbox"
-                        checked={entry.working_in_yard}
-                        onChange={(e) => updateEntry(index, 'working_in_yard', e.target.checked)}
-                        className="w-4 h-4 rounded border-slate-600 text-timesheet"
+                        disabled={entry.did_not_work}
+                        className="w-32 bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed"
                       />
                     </td>
                     <td className="p-3">
@@ -438,8 +481,41 @@ export default function NewTimesheetPage() {
                         type="time"
                         value={entry.time_finished}
                         onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
-                        className="w-32 bg-slate-900/50 border-slate-600 text-white"
+                        disabled={entry.did_not_work}
+                        className="w-32 bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed"
                       />
+                    </td>
+                    <td className="p-3">
+                      <div className="flex items-center justify-center gap-2">
+                        {/* In Yard Button */}
+                        <button
+                          type="button"
+                          onClick={() => updateEntry(index, 'working_in_yard', !entry.working_in_yard)}
+                          disabled={entry.did_not_work}
+                          className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
+                            entry.working_in_yard
+                              ? 'bg-blue-500/20 border-blue-500 shadow-lg shadow-blue-500/20'
+                              : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
+                          } disabled:opacity-30 disabled:cursor-not-allowed`}
+                          title="Working in Yard"
+                        >
+                          <Home className={`h-5 w-5 ${entry.working_in_yard ? 'text-blue-400' : 'text-slate-500'}`} />
+                        </button>
+
+                        {/* Did Not Work Button */}
+                        <button
+                          type="button"
+                          onClick={() => updateEntry(index, 'did_not_work', !entry.did_not_work)}
+                          className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
+                            entry.did_not_work
+                              ? 'bg-amber-500/20 border-amber-500 shadow-lg shadow-amber-500/20'
+                              : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
+                          }`}
+                          title="Did Not Work"
+                        >
+                          <XCircle className={`h-5 w-5 ${entry.did_not_work ? 'text-amber-400' : 'text-slate-500'}`} />
+                        </button>
+                      </div>
                     </td>
                     <td className="p-3 text-right font-semibold text-timesheet">
                       {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'}

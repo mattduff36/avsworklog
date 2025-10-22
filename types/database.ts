@@ -117,6 +117,7 @@ export interface Database {
           time_started: string | null
           time_finished: string | null
           working_in_yard: boolean
+          did_not_work: boolean
           daily_total: number | null
           remarks: string | null
           created_at: string
@@ -129,6 +130,7 @@ export interface Database {
           time_started?: string | null
           time_finished?: string | null
           working_in_yard?: boolean
+          did_not_work?: boolean
           daily_total?: number | null
           remarks?: string | null
           created_at?: string
@@ -141,6 +143,7 @@ export interface Database {
           time_started?: string | null
           time_finished?: string | null
           working_in_yard?: boolean
+          did_not_work?: boolean
           daily_total?: number | null
           remarks?: string | null
           created_at?: string
