@@ -34,7 +34,7 @@ import {
   Loader2,
   AlertTriangle,
 } from 'lucide-react';
-import { createBrowserClient } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import type { Database } from '@/types/database';
 
@@ -43,7 +43,7 @@ type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
 
 export default function UsersAdminPage() {
   const { user, isAdmin } = useAuth();
-  const supabase = createBrowserClient();
+  const supabase = createClient();
 
   // State
   const [users, setUsers] = useState<Profile[]>([]);
