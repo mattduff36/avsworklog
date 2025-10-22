@@ -208,7 +208,7 @@ export default function NewTimesheetPage() {
                 type="date"
                 value={weekEnding}
                 onChange={(e) => setWeekEnding(e.target.value)}
-                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white"
+                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
               />
             </div>
           </div>

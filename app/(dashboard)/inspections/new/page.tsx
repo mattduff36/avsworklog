@@ -57,6 +57,16 @@ export default function NewInspectionPage() {
     setComments(prev => ({ ...prev, [itemNumber]: comment }));
   };
 
+  const handleMarkAllPass = () => {
+    const allPassStates: Record<number, InspectionStatus> = {};
+    INSPECTION_ITEMS.forEach((_, index) => {
+      allPassStates[index + 1] = 'ok';
+    });
+    setCheckboxStates(allPassStates);
+    // Clear all comments when marking all as pass
+    setComments({});
+  };
+
   const handleSave = async (submitForApproval: boolean = false) => {
     if (!user || !vehicleId) {
       setError('Please select a vehicle');
@@ -232,6 +242,19 @@ export default function NewInspectionPage() {
         </CardHeader>
         <CardContent className="space-y-3 p-4 md:p-6">
           
+          {/* Mark All Pass Button - Mobile */}
+          <div className="md:hidden mb-4">
+            <Button
+              type="button"
+              onClick={handleMarkAllPass}
+              variant="outline"
+              className="w-full h-12 border-green-500/50 text-green-400 hover:bg-green-500/10 hover:border-green-500"
+            >
+              <CheckCircle2 className="h-5 w-5 mr-2" />
+              Mark All as PASS
+            </Button>
+          </div>
+
           {/* Mobile View - Card-based */}
           <div className="md:hidden space-y-3">
             {INSPECTION_ITEMS.map((item, index) => {
@@ -248,15 +271,6 @@ export default function NewInspectionPage() {
                     </div>
                     <div className="flex-1">
                       <h4 className="text-base font-medium text-white leading-tight">{item}</h4>
-                      {currentStatus && (
-                        <div className="mt-1">
-                          <span className={`text-xs font-semibold ${
-                            currentStatus === 'ok' ? 'text-green-400' : 'text-red-400'
-                          }`}>
-                            {currentStatus === 'ok' ? '✓ Pass' : '✗ Fail'}
-                          </span>
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -267,7 +281,7 @@ export default function NewInspectionPage() {
                         key={status}
                         type="button"
                         onClick={() => handleStatusChange(itemNumber, status)}
-                        className={`flex items-center justify-center h-24 rounded-xl border-3 transition-all ${
+                        className={`flex items-center justify-center h-12 rounded-xl border-3 transition-all ${
                           getStatusColor(status, currentStatus === status)
                         }`}
                       >
@@ -295,6 +309,19 @@ export default function NewInspectionPage() {
                 </div>
               );
             })}
+          </div>
+
+          {/* Mark All Pass Button - Desktop */}
+          <div className="hidden md:block mb-4">
+            <Button
+              type="button"
+              onClick={handleMarkAllPass}
+              variant="outline"
+              className="border-green-500/50 text-green-400 hover:bg-green-500/10 hover:border-green-500"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Mark All as PASS
+            </Button>
           </div>
 
           {/* Desktop View - Table */}
