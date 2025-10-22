@@ -374,10 +374,20 @@ This script will:
     - ✅ Manager permissions verified (can view all employee submissions)
     - ✅ Colored tab backgrounds matching dashboard form squares
     - ✅ Interactive Approve/Reject buttons with hover and click effects
-15. **LATER: Test workflows end-to-end** - Deferred
-16. **LATER: Final testing** - Deferred
+15. ✅ Manager Employee Selector for Form Creation
+    - ✅ Managers can create timesheets on behalf of any employee
+    - ✅ Managers can create inspections on behalf of any employee
+    - ✅ Employee dropdown with full names and employee IDs
+    - ✅ Manager's own account included in list
+    - ✅ Validates against selected employee's existing forms
+16. ✅ UI/UX Polish & Bug Fixes
+    - ✅ Fixed dropdown menu transparency (fully opaque slate-900)
+    - ✅ Enhanced Select component styling globally
+    - ✅ Improved visual hierarchy and readability
+17. **LATER: Test workflows end-to-end** - Deferred
+18. **LATER: Final testing** - Deferred
 
-**Progress**: 14/16 tasks completed (~88%)
+**Progress**: 16/18 tasks completed (~89%)
 
 ---
 

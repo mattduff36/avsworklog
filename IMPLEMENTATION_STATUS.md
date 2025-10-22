@@ -347,11 +347,25 @@
 - Tooltip component for user guidance
 - Responsive grid layout (2-5 columns)
 
+### Manager Features (Afternoon Session)
+- **Approvals Page UX Enhancement**:
+  - Colored tab backgrounds (blue for timesheets, orange for inspections)
+  - Interactive Approve/Reject buttons with hover/click effects
+  - Better visual consistency with dashboard colors
+- **Employee Selector for Form Creation**:
+  - Managers can create timesheets/inspections on behalf of employees
+  - Dropdown with all employees (names + IDs)
+  - Smart validation against selected employee's existing forms
+  - Manager's own account included in selector
+  - Consistent UX across both form types
+
 ### Technical Improvements
 - Created lib/utils.ts for shadcn/ui compatibility
 - Added tooltip component from shadcn/ui
+- Fixed dropdown menu opacity (fully opaque bg-slate-900)
+- Enhanced Select component styling globally
 - Fixed build errors and deployed to production
-- 6 commits pushed to GitHub
+- 14+ commits pushed to GitHub (across both sessions)
 
 ---
 
