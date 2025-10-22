@@ -385,18 +385,25 @@ export default function NewTimesheetPage() {
           <div className="md:hidden">
             <Tabs value={activeDay} onValueChange={setActiveDay} className="w-full">
               <TabsList className="grid w-full grid-cols-7 bg-slate-900/50 p-1 rounded-lg mb-4">
-                {DAY_NAMES.map((day, index) => (
-                  <TabsTrigger 
-                    key={index} 
-                    value={String(index)}
-                    className="text-xs py-3 data-[state=active]:bg-timesheet data-[state=active]:text-slate-900 data-[state=active]:border-2 data-[state=active]:border-white text-slate-400"
-                  >
-                    {day.substring(0, 3)}
-                    {entries[index].daily_total && entries[index].daily_total! > 0 && (
-                      <Check className="h-3 w-3 ml-1" />
-                    )}
-                  </TabsTrigger>
-                ))}
+                {DAY_NAMES.map((day, index) => {
+                  const isComplete = entries[index].did_not_work || (entries[index].daily_total && entries[index].daily_total! > 0);
+                  return (
+                    <TabsTrigger 
+                      key={index} 
+                      value={String(index)}
+                      className={`text-xs py-3 data-[state=active]:bg-timesheet data-[state=active]:text-slate-900 text-slate-400 ${
+                        isComplete 
+                          ? 'data-[state=active]:border-2 data-[state=active]:border-green-500 border-2 border-green-500/50' 
+                          : 'data-[state=active]:border-2 data-[state=active]:border-white'
+                      }`}
+                    >
+                      {day.substring(0, 3)}
+                      {!entries[index].did_not_work && entries[index].daily_total && entries[index].daily_total! > 0 && (
+                        <Check className="h-3 w-3 ml-1" />
+                      )}
+                    </TabsTrigger>
+                  );
+                })}
               </TabsList>
 
               {entries.map((entry, index) => (
