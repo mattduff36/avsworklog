@@ -333,12 +333,14 @@ export default function ViewInspectionPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <a href={`/api/inspections/${inspection.id}/pdf`} target="_blank" rel="noopener noreferrer">
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Download PDF
-            </Button>
-          </a>
+          {isManager && (
+            <a href={`/api/inspections/${inspection.id}/pdf`} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
+            </a>
+          )}
           {getStatusBadge(inspection.status)}
         </div>
       </div>
