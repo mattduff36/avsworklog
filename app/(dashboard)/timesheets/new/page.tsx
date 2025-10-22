@@ -241,7 +241,7 @@ export default function NewTimesheetPage() {
               </TabsList>
 
               {entries.map((entry, index) => (
-                <TabsContent key={index} value={String(index)} className="space-y-4 px-4 pb-4">
+                <TabsContent key={index} value={String(index)} className="space-y-4 px-4 pb-4 overflow-hidden">
                   <div className="text-center mb-4">
                     <h3 className="text-2xl font-bold text-white">{DAY_NAMES[index]}</h3>
                     <p className="text-sm text-slate-400">Tap to enter your hours</p>
@@ -254,7 +254,7 @@ export default function NewTimesheetPage() {
                         type="time"
                         value={entry.time_started}
                         onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
-                        className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full"
+                        className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full max-w-full [&::-webkit-datetime-edit]:max-w-full"
                       />
                     </div>
 
@@ -264,7 +264,7 @@ export default function NewTimesheetPage() {
                         type="time"
                         value={entry.time_finished}
                         onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
-                        className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full"
+                        className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full max-w-full [&::-webkit-datetime-edit]:max-w-full"
                       />
                     </div>
 
