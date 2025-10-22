@@ -71,7 +71,7 @@ export default function LoginPage() {
 
         {/* Title */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Employee Access</h1>
+          <h1 className="text-4xl font-bold text-white mb-2">Squires</h1>
           <p className="text-slate-400">Sign in to manage your timesheets and inspections</p>
         </div>
 
