@@ -25,7 +25,7 @@ interface InspectionWithDetails extends VehicleInspection {
 export default function ViewInspectionPage() {
   const router = useRouter();
   const params = useParams();
-  const { user, isManager } = useAuth();
+  const { user, isManager, loading: authLoading } = useAuth();
   const supabase = createClient();
   
   const [inspection, setInspection] = useState<InspectionWithDetails | null>(null);
@@ -37,10 +37,10 @@ export default function ViewInspectionPage() {
   const [photoUploadItem, setPhotoUploadItem] = useState<number | null>(null);
 
   useEffect(() => {
-    if (params.id) {
+    if (params.id && !authLoading) {
       fetchInspection(params.id as string);
     }
-  }, [params.id, user]);
+  }, [params.id, user, authLoading]);
 
   const fetchInspection = async (id: string) => {
     try {
@@ -279,7 +279,7 @@ export default function ViewInspectionPage() {
     }
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <p className="text-muted-foreground">Loading inspection...</p>

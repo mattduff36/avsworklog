@@ -21,7 +21,7 @@ import { Database } from '@/types/database';
 export default function ViewTimesheetPage() {
   const router = useRouter();
   const params = useParams();
-  const { user, profile, isManager } = useAuth();
+  const { user, profile, isManager, loading: authLoading } = useAuth();
   const supabase = createClient();
   
   const [timesheet, setTimesheet] = useState<Timesheet | null>(null);
@@ -34,10 +34,10 @@ export default function ViewTimesheetPage() {
   const [showSignaturePad, setShowSignaturePad] = useState(false);
 
   useEffect(() => {
-    if (params.id) {
+    if (params.id && !authLoading) {
       fetchTimesheet(params.id as string);
     }
-  }, [params.id, user]);
+  }, [params.id, user, authLoading]);
 
   const fetchTimesheet = async (id: string) => {
     try {
@@ -273,7 +273,7 @@ export default function ViewTimesheetPage() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <p className="text-muted-foreground">Loading timesheet...</p>
