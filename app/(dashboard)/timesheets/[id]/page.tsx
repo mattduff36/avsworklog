@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Save, Send, Edit2, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, Save, Send, Edit2, CheckCircle2, XCircle, Download } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate, formatDateISO } from '@/lib/utils/date';
 import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
@@ -319,7 +319,15 @@ export default function ViewTimesheetPage() {
             </p>
           </div>
         </div>
-        {getStatusBadge(timesheet.status)}
+        <div className="flex items-center gap-2">
+          <a href={`/api/timesheets/${timesheet.id}/pdf`} target="_blank" rel="noopener noreferrer">
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4 mr-2" />
+              Download PDF
+            </Button>
+          </a>
+          {getStatusBadge(timesheet.status)}
+        </div>
       </div>
 
       {error && (

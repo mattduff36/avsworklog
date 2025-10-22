@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Save, Send, Edit2, CheckCircle2, XCircle, AlertCircle, Camera } from 'lucide-react';
+import { ArrowLeft, Save, Send, Edit2, CheckCircle2, XCircle, AlertCircle, Camera, Download } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
 import { INSPECTION_ITEMS, InspectionStatus, VehicleInspection, InspectionItem } from '@/types/inspection';
@@ -329,7 +329,15 @@ export default function ViewInspectionPage() {
             </p>
           </div>
         </div>
-        {getStatusBadge(inspection.status)}
+        <div className="flex items-center gap-2">
+          <a href={`/api/inspections/${inspection.id}/pdf`} target="_blank" rel="noopener noreferrer">
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4 mr-2" />
+              Download PDF
+            </Button>
+          </a>
+          {getStatusBadge(inspection.status)}
+        </div>
       </div>
 
       {error && (
