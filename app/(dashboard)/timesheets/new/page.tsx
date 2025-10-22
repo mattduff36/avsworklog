@@ -8,9 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Save, Check, AlertCircle, CheckCircle2, XCircle, Home } from 'lucide-react';
+import { ArrowLeft, Save, Check, AlertCircle, CheckCircle2, XCircle, Home, User } from 'lucide-react';
 import Link from 'next/link';
 import { getWeekEnding, formatDateISO } from '@/lib/utils/date';
 import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
@@ -18,9 +19,15 @@ import { DAY_NAMES } from '@/types/timesheet';
 import { Database } from '@/types/database';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 
+type Employee = {
+  id: string;
+  full_name: string;
+  employee_id: string | null;
+};
+
 export default function NewTimesheetPage() {
   const router = useRouter();
-  const { user, profile } = useAuth();
+  const { user, profile, isManager } = useAuth();
   const supabase = createClient();
   
   const [regNumber, setRegNumber] = useState('');
@@ -31,6 +38,10 @@ export default function NewTimesheetPage() {
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
   const [existingWeeks, setExistingWeeks] = useState<string[]>([]);
+  
+  // Manager-specific states
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
 
   // Initialize entries for all 7 days
   const [entries, setEntries] = useState(
@@ -45,21 +56,51 @@ export default function NewTimesheetPage() {
     }))
   );
 
-  // Fetch existing timesheets on mount
+  // Fetch employees if manager, and set initial selected employee
   useEffect(() => {
-    if (user) {
+    if (user && isManager) {
+      fetchEmployees();
+    } else if (user) {
+      // If not a manager, set selected employee to current user
+      setSelectedEmployeeId(user.id);
+    }
+  }, [user, isManager]);
+
+  // Fetch existing timesheets when selected employee changes
+  useEffect(() => {
+    if (selectedEmployeeId) {
       fetchExistingTimesheets();
     }
-  }, [user]);
+  }, [selectedEmployeeId]);
+
+  const fetchEmployees = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, employee_id')
+        .order('full_name');
+      
+      if (error) throw error;
+      
+      setEmployees(data || []);
+      
+      // Set default to current user
+      if (user) {
+        setSelectedEmployeeId(user.id);
+      }
+    } catch (err) {
+      console.error('Error fetching employees:', err);
+    }
+  };
 
   const fetchExistingTimesheets = async () => {
-    if (!user) return;
+    if (!selectedEmployeeId) return;
     
     try {
       const { data, error } = await supabase
         .from('timesheets')
         .select('week_ending')
-        .eq('user_id', user.id);
+        .eq('user_id', selectedEmployeeId);
       
       if (error) throw error;
       
@@ -170,7 +211,7 @@ export default function NewTimesheetPage() {
   };
 
   const saveTimesheet = async (status: 'draft' | 'submitted', signatureData?: string) => {
-    if (!user) return;
+    if (!user || !selectedEmployeeId) return;
 
     setError('');
     setSaving(true);
@@ -179,7 +220,7 @@ export default function NewTimesheetPage() {
       // Insert timesheet
       type TimesheetInsert = Database['public']['Tables']['timesheets']['Insert'];
       const timesheetData: TimesheetInsert = {
-        user_id: user.id,
+        user_id: selectedEmployeeId, // Use selected employee ID (can be manager's own ID or another employee's)
         reg_number: regNumber || null,
         week_ending: weekEnding,
         status,
@@ -278,6 +319,33 @@ export default function NewTimesheetPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Manager: Employee Selector */}
+          {isManager && (
+            <div className="space-y-2 pb-4 border-b border-slate-700">
+              <Label htmlFor="employee" className="text-white text-base flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Creating timesheet for
+              </Label>
+              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+                <SelectTrigger className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
+                  <SelectValue placeholder="Select employee..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map((employee) => (
+                    <SelectItem key={employee.id} value={employee.id}>
+                      {employee.full_name}
+                      {employee.employee_id && ` (${employee.employee_id})`}
+                      {employee.id === user?.id && ' (You)'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-400">
+                Select which employee this timesheet is for
+              </p>
+            </div>
+          )}
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="reg_number" className="text-white text-base">Vehicle Registration</Label>

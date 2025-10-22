@@ -10,15 +10,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle, Info } from 'lucide-react';
+import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User } from 'lucide-react';
 import Link from 'next/link';
 import { formatDateISO } from '@/lib/utils/date';
 import { INSPECTION_ITEMS, InspectionStatus } from '@/types/inspection';
 import { Database } from '@/types/database';
 
+type Employee = {
+  id: string;
+  full_name: string;
+  employee_id: string | null;
+};
+
 export default function NewInspectionPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isManager } = useAuth();
   const supabase = createClient();
   
   const [vehicles, setVehicles] = useState<Array<{ id: string; reg_number: string; vehicle_type: string }>>([]);
@@ -28,10 +34,44 @@ export default function NewInspectionPage() {
   const [comments, setComments] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Manager-specific states
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
 
   useEffect(() => {
     fetchVehicles();
   }, []);
+
+  // Fetch employees if manager, and set initial selected employee
+  useEffect(() => {
+    if (user && isManager) {
+      fetchEmployees();
+    } else if (user) {
+      // If not a manager, set selected employee to current user
+      setSelectedEmployeeId(user.id);
+    }
+  }, [user, isManager]);
+
+  const fetchEmployees = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, employee_id')
+        .order('full_name');
+      
+      if (error) throw error;
+      
+      setEmployees(data || []);
+      
+      // Set default to current user
+      if (user) {
+        setSelectedEmployeeId(user.id);
+      }
+    } catch (err) {
+      console.error('Error fetching employees:', err);
+    }
+  };
 
   const fetchVehicles = async () => {
     try {
@@ -68,7 +108,7 @@ export default function NewInspectionPage() {
   };
 
   const handleSave = async (submitForApproval: boolean = false) => {
-    if (!user || !vehicleId) {
+    if (!user || !selectedEmployeeId || !vehicleId) {
       setError('Please select a vehicle');
       return;
     }
@@ -81,7 +121,7 @@ export default function NewInspectionPage() {
       type InspectionInsert = Database['public']['Tables']['vehicle_inspections']['Insert'];
       const inspectionData: InspectionInsert = {
         vehicle_id: vehicleId,
-        user_id: user.id,
+        user_id: selectedEmployeeId, // Use selected employee ID (can be manager's own ID or another employee's)
         inspection_date: selectedDate,
         status: submitForApproval ? 'submitted' : 'draft',
         submitted_at: submitForApproval ? new Date().toISOString() : null,
@@ -200,6 +240,33 @@ export default function NewInspectionPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Manager: Employee Selector */}
+          {isManager && (
+            <div className="space-y-2 pb-4 border-b border-slate-700">
+              <Label htmlFor="employee" className="text-white text-base flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Creating inspection for
+              </Label>
+              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+                <SelectTrigger className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
+                  <SelectValue placeholder="Select employee..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map((employee) => (
+                    <SelectItem key={employee.id} value={employee.id}>
+                      {employee.full_name}
+                      {employee.employee_id && ` (${employee.employee_id})`}
+                      {employee.id === user?.id && ' (You)'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-400">
+                Select which employee this inspection is for
+              </p>
+            </div>
+          )}
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="vehicle" className="text-white text-base">Vehicle</Label>
