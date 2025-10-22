@@ -8,11 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, Clipboard, Clock, CheckCircle2, XCircle, User } from 'lucide-react';
+import { FileText, Clipboard, Clock, CheckCircle2, XCircle, User, Filter } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 import { VehicleInspection } from '@/types/inspection';
+
+type StatusFilter = 'pending' | 'approved' | 'rejected' | 'all';
 
 interface TimesheetWithProfile extends Timesheet {
   user: {
@@ -40,11 +42,14 @@ export default function ApprovalsPage() {
   const [inspections, setInspections] = useState<InspectionWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('timesheets');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
 
-  const fetchPendingApprovals = useCallback(async () => {
+  const fetchApprovals = useCallback(async (filter: StatusFilter) => {
     try {
-      // Fetch pending timesheets
-      const { data: timesheetData, error: timesheetError } = await supabase
+      setLoading(true);
+      
+      // Build query for timesheets
+      let timesheetQuery = supabase
         .from('timesheets')
         .select(`
           *,
@@ -52,15 +57,26 @@ export default function ApprovalsPage() {
             full_name,
             employee_id
           )
-        `)
-        .eq('status', 'submitted')
+        `);
+
+      // Apply status filter
+      if (filter === 'pending') {
+        timesheetQuery = timesheetQuery.eq('status', 'submitted');
+      } else if (filter === 'approved') {
+        timesheetQuery = timesheetQuery.eq('status', 'approved');
+      } else if (filter === 'rejected') {
+        timesheetQuery = timesheetQuery.eq('status', 'rejected');
+      }
+      // 'all' doesn't filter
+
+      const { data: timesheetData, error: timesheetError } = await timesheetQuery
         .order('submitted_at', { ascending: false });
 
       if (timesheetError) throw timesheetError;
       setTimesheets(timesheetData || []);
 
-      // Fetch pending inspections
-      const { data: inspectionData, error: inspectionError } = await supabase
+      // Build query for inspections
+      let inspectionQuery = supabase
         .from('vehicle_inspections')
         .select(`
           *,
@@ -71,14 +87,24 @@ export default function ApprovalsPage() {
           vehicles (
             reg_number
           )
-        `)
-        .eq('status', 'submitted')
+        `);
+
+      // Apply status filter
+      if (filter === 'pending') {
+        inspectionQuery = inspectionQuery.eq('status', 'submitted');
+      } else if (filter === 'approved') {
+        inspectionQuery = inspectionQuery.eq('status', 'approved');
+      } else if (filter === 'rejected') {
+        inspectionQuery = inspectionQuery.eq('status', 'rejected');
+      }
+
+      const { data: inspectionData, error: inspectionError } = await inspectionQuery
         .order('submitted_at', { ascending: false });
 
       if (inspectionError) throw inspectionError;
       setInspections(inspectionData || []);
     } catch (error) {
-      console.error('Error fetching pending approvals:', error);
+      console.error('Error fetching approvals:', error);
     } finally {
       setLoading(false);
     }
@@ -90,9 +116,9 @@ export default function ApprovalsPage() {
         router.push('/dashboard');
         return;
       }
-      fetchPendingApprovals();
+      fetchApprovals(statusFilter);
     }
-  }, [isManager, authLoading, router, fetchPendingApprovals]);
+  }, [isManager, authLoading, router, fetchApprovals, statusFilter]);
 
   const handleQuickApprove = async (type: 'timesheet' | 'inspection', id: string) => {
     try {
@@ -117,7 +143,7 @@ export default function ApprovalsPage() {
       }
 
       // Refresh data
-      await fetchPendingApprovals();
+      await fetchApprovals(statusFilter);
     } catch (error) {
       console.error('Error approving:', error);
     }
@@ -151,7 +177,7 @@ export default function ApprovalsPage() {
       }
 
       // Refresh data
-      await fetchPendingApprovals();
+      await fetchApprovals(statusFilter);
     } catch (error) {
       console.error('Error rejecting:', error);
     }
@@ -165,7 +191,16 @@ export default function ApprovalsPage() {
     );
   }
 
-  const pendingCount = timesheets.length + inspections.length;
+  const totalCount = timesheets.length + inspections.length;
+
+  const getFilterLabel = (filter: StatusFilter) => {
+    switch (filter) {
+      case 'pending': return 'Pending';
+      case 'approved': return 'Approved';
+      case 'rejected': return 'Rejected';
+      case 'all': return 'All';
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -173,21 +208,58 @@ export default function ApprovalsPage() {
         <div>
           <h1 className="text-3xl font-bold text-white">Approvals</h1>
           <p className="text-slate-400">
-            Review and approve pending submissions
+            Review and manage submissions
           </p>
         </div>
-        <Badge variant="warning" className="text-lg px-4 py-2">
-          {pendingCount} Pending
+        <Badge variant={statusFilter === 'pending' ? 'warning' : 'secondary'} className="text-lg px-4 py-2">
+          {totalCount} {getFilterLabel(statusFilter)}
         </Badge>
       </div>
 
-      {pendingCount === 0 ? (
+      {/* Status Filter Buttons */}
+      <Card className="bg-slate-800/40 backdrop-blur-xl border-slate-700/50">
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-slate-400" />
+            <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
+            <div className="flex gap-2 flex-wrap">
+              {(['pending', 'approved', 'rejected', 'all'] as StatusFilter[]).map((filter) => (
+                <Button
+                  key={filter}
+                  variant={statusFilter === filter ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setStatusFilter(filter)}
+                  className={statusFilter === filter ? '' : 'border-slate-600 text-slate-300 hover:bg-slate-700/50'}
+                >
+                  {filter === 'pending' && <Clock className="h-3 w-3 mr-1" />}
+                  {filter === 'approved' && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                  {filter === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
+                  {getFilterLabel(filter)}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {totalCount === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <CheckCircle2 className="h-16 w-16 text-green-600 mb-4" />
-            <h3 className="text-lg font-semibold mb-2">All caught up!</h3>
+            {statusFilter === 'pending' && <CheckCircle2 className="h-16 w-16 text-green-600 mb-4" />}
+            {statusFilter === 'approved' && <CheckCircle2 className="h-16 w-16 text-green-600 mb-4" />}
+            {statusFilter === 'rejected' && <XCircle className="h-16 w-16 text-red-600 mb-4" />}
+            {statusFilter === 'all' && <FileText className="h-16 w-16 text-slate-400 mb-4" />}
+            <h3 className="text-lg font-semibold mb-2">
+              {statusFilter === 'pending' && 'All caught up!'}
+              {statusFilter === 'approved' && 'No approved submissions'}
+              {statusFilter === 'rejected' && 'No rejected submissions'}
+              {statusFilter === 'all' && 'No submissions yet'}
+            </h3>
             <p className="text-muted-foreground">
-              There are no pending approvals at the moment
+              {statusFilter === 'pending' && 'There are no pending approvals at the moment'}
+              {statusFilter === 'approved' && 'There are no approved submissions to display'}
+              {statusFilter === 'rejected' && 'There are no rejected submissions to display'}
+              {statusFilter === 'all' && 'No submissions have been made yet'}
             </p>
           </CardContent>
         </Card>
