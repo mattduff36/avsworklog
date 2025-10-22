@@ -60,16 +60,6 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950">
       {/* Subtle background pattern */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(241,214,74,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(241,214,74,0.03)_1px,transparent_1px)] bg-[size:64px_64px]" />
-      
-      {/* Top bar with company info */}
-      <div className="absolute top-0 left-0 right-0 bg-slate-900/50 backdrop-blur-sm border-b border-slate-700/50 px-6 py-3 flex justify-between items-center text-slate-300 text-sm">
-        <span className="flex items-center gap-2">
-          <span className="font-semibold text-avs-yellow">A&V Squires</span>
-          <span className="text-slate-500">|</span>
-          <span>Civil Engineering & Plant Hire</span>
-        </span>
-        <span className="text-slate-400">Established Since 1971</span>
-      </div>
 
       <div className="w-full max-w-md relative z-10">
         {/* AVS Yellow Icon */}
@@ -153,10 +143,6 @@ export default function LoginPage() {
 
         <div className="mt-6 text-center text-sm text-slate-400">
           <p>Contact your administrator for account access</p>
-        </div>
-        
-        <div className="mt-4 text-center text-xs text-slate-500">
-          <p>A&V Squires Plant Company LTD</p>
         </div>
       </div>
     </div>
