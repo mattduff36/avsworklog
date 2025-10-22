@@ -14,8 +14,7 @@ import { VehicleInspection } from '@/types/inspection';
 interface InspectionWithVehicle extends VehicleInspection {
   vehicles: {
     reg_number: string;
-    make: string;
-    model: string;
+    vehicle_type: string;
   };
 }
 
@@ -39,8 +38,7 @@ export default function InspectionsPage() {
           *,
           vehicles (
             reg_number,
-            make,
-            model
+            vehicle_type
           )
         `)
         .order('inspection_date', { ascending: false });
@@ -138,7 +136,7 @@ export default function InspectionsPage() {
                           {inspection.vehicles?.reg_number || 'Unknown Vehicle'}
                         </CardTitle>
                         <CardDescription>
-                          {inspection.vehicles?.make} {inspection.vehicles?.model} • {formatDate(inspection.inspection_date)}
+                          {inspection.vehicles?.vehicle_type && `${inspection.vehicles.vehicle_type} • `}{formatDate(inspection.inspection_date)}
                         </CardDescription>
                       </div>
                     </div>

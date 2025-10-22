@@ -18,8 +18,7 @@ import { Database } from '@/types/database';
 interface InspectionWithDetails extends VehicleInspection {
   vehicles: {
     reg_number: string;
-    make: string;
-    model: string;
+    vehicle_type: string;
   };
 }
 
@@ -52,8 +51,7 @@ export default function ViewInspectionPage() {
           *,
           vehicles (
             reg_number,
-            make,
-            model
+            vehicle_type
           )
         `)
         .eq('id', id)
@@ -379,7 +377,7 @@ export default function ViewInspectionPage() {
             <div>
               <CardTitle>Inspection Items</CardTitle>
               <CardDescription>
-                {inspection.vehicles?.make} {inspection.vehicles?.model}
+                {inspection.vehicles?.vehicle_type || 'Vehicle'}
               </CardDescription>
             </div>
             {canEdit && !editing && (

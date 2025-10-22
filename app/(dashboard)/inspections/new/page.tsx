@@ -21,7 +21,7 @@ export default function NewInspectionPage() {
   const { user } = useAuth();
   const supabase = createClient();
   
-  const [vehicles, setVehicles] = useState<Array<{ id: string; reg_number: string; make: string; model: string }>>([]);
+  const [vehicles, setVehicles] = useState<Array<{ id: string; reg_number: string; vehicle_type: string }>>([]);
   const [vehicleId, setVehicleId] = useState('');
   const [selectedDate, setSelectedDate] = useState(formatDateISO(new Date()));
   const [checkboxStates, setCheckboxStates] = useState<Record<number, InspectionStatus>>({});
