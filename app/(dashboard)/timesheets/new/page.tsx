@@ -288,11 +288,15 @@ export default function NewTimesheetPage() {
         signed_at: signatureData ? new Date().toISOString() : null,
       };
 
+      console.log('Attempting to insert timesheet:', timesheetData);
+
       const { data: timesheet, error: timesheetError } = await supabase
         .from('timesheets')
         .insert(timesheetData)
         .select()
         .single();
+
+      console.log('Timesheet insert result:', { timesheet, timesheetError });
 
       if (timesheetError) throw timesheetError;
       if (!timesheet) throw new Error('Failed to create timesheet');
@@ -313,10 +317,14 @@ export default function NewTimesheetPage() {
           remarks: entry.remarks || null,
         }));
 
+      console.log('Entries to insert:', entriesToInsert);
+
       if (entriesToInsert.length > 0) {
         const { error: entriesError } = await supabase
           .from('timesheet_entries')
           .insert(entriesToInsert);
+
+        console.log('Entries insert result:', { entriesError });
 
         if (entriesError) throw entriesError;
       }
@@ -324,13 +332,17 @@ export default function NewTimesheetPage() {
       router.push('/timesheets');
     } catch (err: unknown) {
       console.error('Error saving timesheet:', err);
+      console.error('Error details:', JSON.stringify(err, null, 2));
       
       // Handle duplicate key constraint error
-      const error = err as { code?: string; message?: string };
+      const error = err as { code?: string; message?: string; details?: string; hint?: string };
+      
       if (error?.code === '23505' || error?.message?.includes('duplicate key')) {
         setError('You already have a timesheet for this week. Please select a different week ending date.');
+      } else if (error?.message) {
+        setError(`Error: ${error.message}${error.details ? ` - ${error.details}` : ''}`);
       } else {
-        setError(err instanceof Error ? err.message : 'Failed to save timesheet');
+        setError(err instanceof Error ? err.message : 'Failed to save timesheet. Please check the console for details.');
       }
     } finally {
       setSaving(false);
