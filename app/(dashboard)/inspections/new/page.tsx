@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User } from 'lucide-react';
+import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { formatDateISO, formatDate } from '@/lib/utils/date';
 import { INSPECTION_ITEMS, InspectionStatus } from '@/types/inspection';
@@ -40,6 +40,10 @@ export default function NewInspectionPage() {
   const [error, setError] = useState('');
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
+  const [showAddVehicleDialog, setShowAddVehicleDialog] = useState(false);
+  const [newVehicleReg, setNewVehicleReg] = useState('');
+  const [newVehicleType, setNewVehicleType] = useState('');
+  const [addingVehicle, setAddingVehicle] = useState(false);
   
   // Manager-specific states
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -147,6 +151,56 @@ export default function NewInspectionPage() {
     setSignature(sig);
     setShowSignatureDialog(false);
     await saveInspection('submitted', sig);
+  };
+
+  const handleAddVehicle = async () => {
+    if (!newVehicleReg.trim() || !newVehicleType.trim()) {
+      setError('Please enter both registration number and vehicle type');
+      return;
+    }
+
+    setAddingVehicle(true);
+    setError('');
+
+    try {
+      type VehicleInsert = Database['public']['Tables']['vehicles']['Insert'];
+      const vehicleData: VehicleInsert = {
+        reg_number: newVehicleReg.trim().toUpperCase(),
+        vehicle_type: newVehicleType.trim(),
+        status: 'active',
+      };
+
+      const { data: newVehicle, error: vehicleError } = await supabase
+        .from('vehicles')
+        .insert(vehicleData)
+        .select()
+        .single();
+
+      if (vehicleError) {
+        if (vehicleError.code === '23505') {
+          throw new Error('A vehicle with this registration already exists');
+        }
+        throw vehicleError;
+      }
+
+      // Refresh vehicles list
+      await fetchVehicles();
+      
+      // Select the new vehicle
+      if (newVehicle) {
+        setVehicleId(newVehicle.id);
+      }
+
+      // Close dialog and reset form
+      setShowAddVehicleDialog(false);
+      setNewVehicleReg('');
+      setNewVehicleType('');
+    } catch (err) {
+      console.error('Error adding vehicle:', err);
+      setError(err instanceof Error ? err.message : 'Failed to add vehicle');
+    } finally {
+      setAddingVehicle(false);
+    }
   };
 
   const saveInspection = async (status: 'draft' | 'submitted', signatureData?: string) => {
@@ -344,14 +398,26 @@ export default function NewInspectionPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="vehicle" className="text-white text-base">Vehicle</Label>
-              <Select value={vehicleId} onValueChange={setVehicleId}>
+              <Select value={vehicleId} onValueChange={(value) => {
+                if (value === 'add-new') {
+                  setShowAddVehicleDialog(true);
+                } else {
+                  setVehicleId(value);
+                }
+              }}>
                 <SelectTrigger id="vehicle" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
                   <SelectValue placeholder="Select a vehicle" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-900 border-slate-700">
+                  <SelectItem value="add-new" className="text-avs-yellow font-semibold border-b border-slate-700">
+                    <div className="flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      Add New Vehicle
+                    </div>
+                  </SelectItem>
                   {vehicles.map((vehicle) => (
                     <SelectItem key={vehicle.id} value={vehicle.id} className="text-white">
-                      {vehicle.reg_number}
+                      {vehicle.reg_number} - {vehicle.vehicle_type}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -643,6 +709,67 @@ export default function NewInspectionPage() {
           </Button>
         </div>
       </div>
+
+      {/* Add Vehicle Dialog */}
+      <Dialog open={showAddVehicleDialog} onOpenChange={setShowAddVehicleDialog}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">Add New Vehicle</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Enter the vehicle registration number and type
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="newVehicleReg" className="text-white">
+                Registration Number <span className="text-red-400">*</span>
+              </Label>
+              <Input
+                id="newVehicleReg"
+                value={newVehicleReg}
+                onChange={(e) => setNewVehicleReg(e.target.value.toUpperCase())}
+                placeholder="e.g., ABC123"
+                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 uppercase"
+                disabled={addingVehicle}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="newVehicleType" className="text-white">
+                Vehicle Type <span className="text-red-400">*</span>
+              </Label>
+              <Input
+                id="newVehicleType"
+                value={newVehicleType}
+                onChange={(e) => setNewVehicleType(e.target.value)}
+                placeholder="e.g., Van, Truck, Car"
+                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
+                disabled={addingVehicle}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowAddVehicleDialog(false);
+                setNewVehicleReg('');
+                setNewVehicleType('');
+              }}
+              disabled={addingVehicle}
+              className="border-slate-600 text-white hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddVehicle}
+              disabled={addingVehicle || !newVehicleReg.trim() || !newVehicleType.trim()}
+              className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 font-semibold"
+            >
+              {addingVehicle ? 'Adding...' : 'Add Vehicle'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Signature Dialog */}
       <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>
