@@ -9,7 +9,7 @@ const { Client } = pg;
 config({ path: resolve(process.cwd(), '.env.local') });
 
 const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
-const sqlFile = 'supabase/create-actions-table.sql';
+const sqlFile = 'supabase/add-job-number-column.sql';
 
 if (!connectionString) {
   console.error('❌ Missing database connection string');
@@ -58,11 +58,9 @@ async function runMigration() {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     
     console.log('📊 Database changes applied:');
-    console.log('   ✓ Created actions table for manager defect tracking');
-    console.log('   ✓ Added RLS policies for manager-only access');
-    console.log('   ✓ Created indexes for performance optimization');
-    console.log('   ✓ Added foreign key references to inspections');
-    console.log('   ✓ Table and column comments added\n');
+    console.log('   ✓ Added job_number column to timesheet_entries table');
+    console.log('   ✓ Column accepts TEXT format (NNNN-LL)');
+    console.log('   ✓ Column comment added for documentation\n');
     
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('✨ Ready to use! Start your dev server:');
