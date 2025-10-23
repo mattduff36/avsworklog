@@ -81,7 +81,7 @@ export function SignaturePad({ onSave, onCancel, initialValue }: SignaturePadPro
           variant="outline"
           size="sm"
           onClick={handleSave}
-          className="border-2 border-slate-900 text-slate-900 hover:bg-slate-100 font-semibold"
+          className="border-slate-600 text-slate-700 hover:bg-slate-100"
         >
           <Check className="h-4 w-4 mr-2" />
           Save Signature
