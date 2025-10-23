@@ -339,15 +339,17 @@ export default function NewTimesheetPage() {
       console.error('Error saving timesheet:', err);
       console.error('Error details:', JSON.stringify(err, null, 2));
       
-      // Handle duplicate key constraint error
+      // Handle errors
       const error = err as { code?: string; message?: string; details?: string; hint?: string };
       
-      if (error?.code === '23505' || error?.message?.includes('duplicate key')) {
-        setError('You already have a timesheet for this week. Please select a different week ending date.');
+      if (error?.code === '23505' || error?.message?.includes('duplicate key') || error?.message?.includes('timesheets_user_id_week_ending_key')) {
+        setError('A timesheet already exists for this week. Please go back to the timesheets list to view or edit the existing timesheet, or select a different week ending date.');
+      } else if (error?.code === '42501' || error?.message?.includes('row-level security')) {
+        setError('Permission denied. You may not have permission to create this timesheet. Please contact your administrator.');
       } else if (error?.message) {
-        setError(`Error: ${error.message}${error.details ? ` - ${error.details}` : ''}`);
+        setError(`${error.message}${error.details ? ` - ${error.details}` : ''}`);
       } else {
-        setError(err instanceof Error ? err.message : 'Failed to save timesheet. Please check the console for details.');
+        setError('Failed to save timesheet. Please try again or contact support if the problem persists.');
       }
       setShowErrorDialog(true);
     } finally {
