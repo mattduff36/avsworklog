@@ -271,7 +271,6 @@ export default function NewTimesheetPage() {
   };
 
   const handleSignatureComplete = async (sig: string) => {
-    setSignature(sig);
     setShowSignatureDialog(false);
     await saveTimesheet('submitted', sig);
   };
