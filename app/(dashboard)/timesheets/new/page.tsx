@@ -38,6 +38,7 @@ export default function NewTimesheetPage() {
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
   const [existingWeeks, setExistingWeeks] = useState<string[]>([]);
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
   
   // Manager-specific states
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -155,12 +156,14 @@ export default function NewTimesheetPage() {
     // Check if it's a Sunday
     if (!isSunday(newDate)) {
       setError('Week Ending must be a Sunday. Please select a Sunday date.');
+      setShowErrorDialog(true);
       return;
     }
 
     // Check if week already exists
     if (weekExists(newDate)) {
       setError('You already have a timesheet for this week. Please select a different week.');
+      setShowErrorDialog(true);
       return;
     }
 
@@ -244,6 +247,7 @@ export default function NewTimesheetPage() {
     
     if (!allDaysComplete) {
       setError('Please enter hours OR mark "Did Not Work" for ALL 7 days of the week');
+      setShowErrorDialog(true);
       return;
     }
 
@@ -256,6 +260,7 @@ export default function NewTimesheetPage() {
     
     if (!allJobNumbersValid) {
       setError('Please enter a valid Job Number (format: 1234-AB) for all working days');
+      setShowErrorDialog(true);
       return;
     }
     
@@ -344,6 +349,7 @@ export default function NewTimesheetPage() {
       } else {
         setError(err instanceof Error ? err.message : 'Failed to save timesheet. Please check the console for details.');
       }
+      setShowErrorDialog(true);
     } finally {
       setSaving(false);
     }
@@ -376,12 +382,6 @@ export default function NewTimesheetPage() {
         </div>
       </div>
 
-      {error && (
-        <div className="p-4 text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg backdrop-blur-xl flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
-          <div>{error}</div>
-        </div>
-      )}
 
       {/* Basic Info Card */}
       <Card>
@@ -789,6 +789,34 @@ export default function NewTimesheetPage() {
               className="border-slate-600 text-white hover:bg-slate-800"
             >
               Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Error Dialog */}
+      <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
+        <DialogContent className="bg-slate-900 border-red-500/50 text-white max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/20 border border-red-500/50">
+                <AlertCircle className="h-5 w-5 text-red-400" />
+              </div>
+              <DialogTitle className="text-white text-xl">Error</DialogTitle>
+            </div>
+            <DialogDescription className="text-slate-300 text-base pt-2">
+              {error}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button
+              onClick={() => {
+                setShowErrorDialog(false);
+                setError('');
+              }}
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold"
+            >
+              OK
             </Button>
           </DialogFooter>
         </DialogContent>
