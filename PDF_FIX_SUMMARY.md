@@ -1,7 +1,8 @@
 # PDF Generation Fix - Summary
 
 **Date**: October 23, 2025  
-**Status**: ✅ RESOLVED
+**Status**: ✅ RESOLVED  
+**Final Fix**: Border Style Syntax Error
 
 ## Issue Investigation
 
@@ -119,12 +120,77 @@ If PDFs are still not appearing in browser:
 4. **Check Supabase**: Verify timesheet/inspection data exists
 5. **Test API Directly**: Visit `/api/timesheets/[id]/pdf` directly in browser
 
+## Final Issue Found (Runtime Error)
+
+### Error in Dev Server:
+```
+PDF generation error: Error: Invalid border style: 1
+    at async GET (app\api\timesheets\[id]\pdf\route.ts:56:20)
+```
+
+### Root Cause:
+`@react-pdf/renderer` v4.3.1 does **NOT** accept shorthand border syntax like:
+- ❌ `border: 1`
+- ❌ `borderBottom: 1`
+- ❌ `borderTop: 1`
+
+Instead, it requires separate properties:
+- ✅ `borderWidth: 1, borderStyle: 'solid'`
+- ✅ `borderBottomWidth: 1, borderBottomStyle: 'solid'`
+- ✅ `borderTopWidth: 1, borderTopStyle: 'solid'`
+
+### Fixed Styles:
+
+**Timesheet PDF** - Changed 8 style definitions:
+1. `header` - borderBottom
+2. `tableRow` - borderBottom
+3. `tableRowAlt` - borderBottom
+4. `signatureSection` - borderTop
+5. `signatureImage` - border
+6. `signatureLine` - borderBottom
+7. `footer` - borderTop
+8. `commentsSection` - borderLeft
+
+**Inspection PDF** - Changed 8 style definitions:
+1. `header` - borderBottom
+2. `tableRow` - borderBottom
+3. `tableRowAlt` - borderBottom
+4. `tableRowDefect` - borderBottom
+5. `summarySection` - borderLeft
+6. `defectSection` - borderLeft
+7. `commentsSection` - borderLeft
+8. `footer` - borderTop
+
+### Example Fix:
+```tsx
+// BEFORE (causes error)
+header: {
+  borderBottom: 2,
+  borderBottomColor: '#F1D64A',
+}
+
+// AFTER (works correctly)
+header: {
+  borderBottomWidth: 2,
+  borderBottomColor: '#F1D64A',
+  borderBottomStyle: 'solid',
+}
+```
+
 ## Conclusion
 
 ✅ PDF generation is **fully functional**  
 ✅ Build successful with no errors  
+✅ Runtime PDF generation errors **FIXED**  
 ✅ New `did_not_work` field properly handled  
+✅ Border styles corrected for @react-pdf/renderer v4.3.1  
 ✅ All changes committed and pushed to GitHub  
 
-The PDF system is production-ready and properly displays all timesheet data including the new "Did Not Work" feature.
+**Git Commits:**
+1. `fix: enhance PDF generation for timesheets with 'Did Not Work' support`
+2. `docs: add PDF fix investigation and resolution summary`
+3. `fix: correct PDF border styles for react-pdf compatibility`
+
+The PDF system is **production-ready** and properly displays all timesheet/inspection data. 
+Users can now successfully download PDFs without errors! 🎉
 
