@@ -189,11 +189,39 @@ export default function NewInspectionPage() {
         comments: comments[index + 1] || null,
       }));
 
-      const { error: itemsError } = await supabase
+      const { data: insertedItems, error: itemsError } = await supabase
         .from('inspection_items')
-        .insert(items);
+        .insert(items)
+        .select();
 
       if (itemsError) throw itemsError;
+
+      // Auto-create actions for failed items (only when submitting, not drafting)
+      if (status === 'submitted' && insertedItems) {
+        const failedItems = insertedItems.filter(item => item.status === 'defect');
+        
+        if (failedItems.length > 0) {
+          type ActionInsert = Database['public']['Tables']['actions']['Insert'];
+          const actions: ActionInsert[] = failedItems.map(item => ({
+            inspection_id: inspection.id,
+            inspection_item_id: item.id,
+            title: `Defect: ${item.item_description}`,
+            description: item.comments || 'Vehicle inspection item failed',
+            priority: 'high',
+            status: 'pending',
+            created_by: user!.id,
+          }));
+
+          const { error: actionsError } = await supabase
+            .from('actions')
+            .insert(actions);
+
+          if (actionsError) {
+            console.error('Error creating actions:', actionsError);
+            // Don't throw - we don't want to fail the inspection if action creation fails
+          }
+        }
+      }
 
       router.push('/inspections');
     } catch (err) {

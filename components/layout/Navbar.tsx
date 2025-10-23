@@ -39,6 +39,7 @@ export function Navbar() {
     { href: '/timesheets', label: 'Timesheets', icon: FileText },
     { href: '/inspections', label: 'Inspections', icon: ClipboardCheck },
     ...(isManager ? [{ href: '/approvals', label: 'Approvals', icon: CheckSquare }] : []),
+    ...(isManager ? [{ href: '/actions', label: 'Actions', icon: ListTodo }] : []),
     ...(isManager ? [{ href: '/reports', label: 'Reports', icon: BarChart3 }] : []),
     ...(isAdmin ? [{ href: '/admin/users', label: 'Users', icon: Users }] : []),
   ];
