@@ -159,6 +159,7 @@ export interface Database {
           vehicle_id: string
           user_id: string
           inspection_date: string
+          current_mileage: number | null
           status: 'draft' | 'submitted' | 'approved' | 'rejected'
           submitted_at: string | null
           reviewed_by: string | null
@@ -172,6 +173,7 @@ export interface Database {
           vehicle_id: string
           user_id: string
           inspection_date: string
+          current_mileage?: number | null
           status?: 'draft' | 'submitted' | 'approved' | 'rejected'
           submitted_at?: string | null
           reviewed_by?: string | null
@@ -185,6 +187,7 @@ export interface Database {
           vehicle_id?: string
           user_id?: string
           inspection_date?: string
+          current_mileage?: number | null
           status?: 'draft' | 'submitted' | 'approved' | 'rejected'
           submitted_at?: string | null
           reviewed_by?: string | null

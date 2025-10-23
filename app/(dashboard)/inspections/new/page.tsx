@@ -30,6 +30,7 @@ export default function NewInspectionPage() {
   const [vehicles, setVehicles] = useState<Array<{ id: string; reg_number: string; vehicle_type: string }>>([]);
   const [vehicleId, setVehicleId] = useState('');
   const [selectedDate, setSelectedDate] = useState(formatDateISO(new Date()));
+  const [currentMileage, setCurrentMileage] = useState('');
   const [checkboxStates, setCheckboxStates] = useState<Record<number, InspectionStatus>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
@@ -113,6 +114,11 @@ export default function NewInspectionPage() {
       return;
     }
 
+    if (!currentMileage || parseInt(currentMileage) < 0) {
+      setError('Please enter a valid current mileage');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -123,6 +129,7 @@ export default function NewInspectionPage() {
         vehicle_id: vehicleId,
         user_id: selectedEmployeeId, // Use selected employee ID (can be manager's own ID or another employee's)
         inspection_date: selectedDate,
+        current_mileage: parseInt(currentMileage),
         status: submitForApproval ? 'submitted' : 'draft',
         submitted_at: submitForApproval ? new Date().toISOString() : null,
       };
@@ -294,6 +301,25 @@ export default function NewInspectionPage() {
                 max={formatDateISO(new Date())}
                 className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="mileage" className="text-white text-base flex items-center gap-2">
+                Current Mileage
+                <span className="text-red-400">*</span>
+              </Label>
+              <Input
+                id="mileage"
+                type="number"
+                value={currentMileage}
+                onChange={(e) => setCurrentMileage(e.target.value)}
+                placeholder="e.g., 45000"
+                min="0"
+                step="1"
+                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
+                required
+              />
+              <p className="text-xs text-slate-400">Enter the current mileage reading</p>
             </div>
           </div>
         </CardContent>
