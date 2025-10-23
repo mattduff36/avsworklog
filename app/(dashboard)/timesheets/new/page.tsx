@@ -49,6 +49,7 @@ export default function NewTimesheetPage() {
       day_of_week: i + 1,
       time_started: '',
       time_finished: '',
+      job_number: '',
       working_in_yard: false,
       did_not_work: false,
       daily_total: null as number | null,
@@ -72,6 +73,25 @@ export default function NewTimesheetPage() {
       fetchExistingTimesheets();
     }
   }, [selectedEmployeeId]);
+
+  // Handle job number input with auto-dash formatting (NNNN-LL format)
+  const handleJobNumberChange = (index: number, value: string) => {
+    // Remove all non-alphanumeric characters except dash
+    let cleaned = value.replace(/[^0-9A-Za-z-]/g, '').toUpperCase();
+    
+    // Remove any existing dashes
+    cleaned = cleaned.replace(/-/g, '');
+    
+    // Auto-format: add dash after 4 digits
+    if (cleaned.length > 4) {
+      cleaned = cleaned.substring(0, 4) + '-' + cleaned.substring(4, 6);
+    }
+    
+    // Limit to 7 characters (4 digits + dash + 2 letters)
+    cleaned = cleaned.substring(0, 7);
+    
+    updateEntry(index, 'job_number', cleaned);
+  };
 
   const fetchEmployees = async () => {
     try {
@@ -199,6 +219,18 @@ export default function NewTimesheetPage() {
       setError('Please enter hours OR mark "Did Not Work" for ALL 7 days of the week');
       return;
     }
+
+    // Validate job numbers for all working days
+    const jobNumberRegex = /^\d{4}-[A-Z]{2}$/;
+    const allJobNumbersValid = entries.every(entry => {
+      if (entry.did_not_work) return true; // Skip validation for non-working days
+      return entry.job_number && jobNumberRegex.test(entry.job_number);
+    });
+    
+    if (!allJobNumbersValid) {
+      setError('Please enter a valid Job Number (format: 1234-AB) for all working days');
+      return;
+    }
     
     // Show signature dialog
     setShowSignatureDialog(true);
@@ -238,16 +270,18 @@ export default function NewTimesheetPage() {
       if (timesheetError) throw timesheetError;
       if (!timesheet) throw new Error('Failed to create timesheet');
 
-      // Insert entries (only those with data)
+      // Insert entries (only those with data or marked as did_not_work)
       type TimesheetEntryInsert = Database['public']['Tables']['timesheet_entries']['Insert'];
       const entriesToInsert: TimesheetEntryInsert[] = entries
-        .filter(entry => entry.time_started || entry.time_finished || entry.remarks)
+        .filter(entry => entry.time_started || entry.time_finished || entry.remarks || entry.did_not_work)
         .map(entry => ({
           timesheet_id: timesheet.id,
           day_of_week: entry.day_of_week,
           time_started: entry.time_started || null,
           time_finished: entry.time_finished || null,
+          job_number: entry.job_number || null,
           working_in_yard: entry.working_in_yard,
+          did_not_work: entry.did_not_work,
           daily_total: entry.daily_total,
           remarks: entry.remarks || null,
         }));
@@ -346,30 +380,18 @@ export default function NewTimesheetPage() {
             </div>
           )}
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="reg_number" className="text-white text-base">Vehicle Registration</Label>
+          <div className="space-y-2 max-w-full">
+            <Label htmlFor="week_ending" className="text-white text-base">Week Ending (Sunday)</Label>
+            <div className="max-w-full overflow-hidden">
               <Input
-                id="reg_number"
-                value={regNumber}
-                onChange={(e) => setRegNumber(e.target.value)}
-                placeholder="e.g., YX65ABC"
-                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
+                id="week_ending"
+                type="date"
+                value={weekEnding}
+                onChange={(e) => handleWeekEndingChange(e.target.value)}
+                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
               />
             </div>
-            <div className="space-y-2 max-w-full">
-              <Label htmlFor="week_ending" className="text-white text-base">Week Ending (Sunday)</Label>
-              <div className="max-w-full overflow-hidden">
-                <Input
-                  id="week_ending"
-                  type="date"
-                  value={weekEnding}
-                  onChange={(e) => handleWeekEndingChange(e.target.value)}
-                  className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
-                />
-              </div>
-              <p className="text-xs text-slate-400">Please select a Sunday that you haven&apos;t already submitted</p>
-            </div>
+            <p className="text-xs text-slate-400">Please select a Sunday that you haven&apos;t already submitted</p>
           </div>
         </CardContent>
       </Card>
@@ -410,7 +432,9 @@ export default function NewTimesheetPage() {
                 <TabsContent key={index} value={String(index)} className="space-y-4 px-4 pb-4 overflow-hidden">
                   <div className="text-center mb-4">
                     <h3 className="text-2xl font-bold text-white">{DAY_NAMES[index]}</h3>
-                    <p className="text-sm text-slate-400">Tap to enter your hours</p>
+                    <p className="text-lg font-semibold text-timesheet">
+                      {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'}h
+                    </p>
                   </div>
 
                   <div className="space-y-4 max-w-full">
@@ -435,18 +459,26 @@ export default function NewTimesheetPage() {
                           value={entry.time_finished}
                           onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
                           disabled={entry.did_not_work}
-                          className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-work"
                         />
                       </div>
                     </div>
 
-                    <div className="bg-timesheet/10 border border-timesheet/30 rounded-lg p-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-white font-medium">Total Hours</span>
-                        <span className="text-3xl font-bold text-timesheet">
-                          {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'}h
-                        </span>
-                      </div>
+                    <div className="space-y-2">
+                      <Label className="text-white text-lg flex items-center gap-2">
+                        Job Number
+                        <span className="text-red-400 text-base">*</span>
+                      </Label>
+                      <Input
+                        value={entry.job_number}
+                        onChange={(e) => handleJobNumberChange(index, e.target.value)}
+                        placeholder="1234-AB"
+                        maxLength={7}
+                        disabled={entry.did_not_work}
+                        className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 uppercase disabled:opacity-30 disabled:cursor-not-allowed"
+                        required
+                      />
+                      <p className="text-xs text-slate-400">Format: 1234-AB (4 digits, dash, 2 letters)</p>
                     </div>
 
                     {/* Status Buttons */}

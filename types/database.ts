@@ -116,6 +116,7 @@ export interface Database {
           day_of_week: number
           time_started: string | null
           time_finished: string | null
+          job_number: string | null
           working_in_yard: boolean
           did_not_work: boolean
           daily_total: number | null
@@ -129,6 +130,7 @@ export interface Database {
           day_of_week: number
           time_started?: string | null
           time_finished?: string | null
+          job_number?: string | null
           working_in_yard?: boolean
           did_not_work?: boolean
           daily_total?: number | null
@@ -142,6 +144,7 @@ export interface Database {
           day_of_week?: number
           time_started?: string | null
           time_finished?: string | null
+          job_number?: string | null
           working_in_yard?: boolean
           did_not_work?: boolean
           daily_total?: number | null
