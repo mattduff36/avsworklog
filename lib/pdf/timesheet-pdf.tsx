@@ -255,7 +255,7 @@ export function TimesheetPDF({ timesheet, employeeName, employeeEmail }: Timeshe
                 {entry.did_not_work ? 'N/A' : (entry.time_finished || '-')}
               </Text>
               <Text style={styles.colJob}>
-                {entry.did_not_work ? 'N/A' : ((entry as any).job_number || (entry.working_in_yard ? 'YARD' : '-'))}
+                {entry.did_not_work ? 'N/A' : ((entry as TimesheetEntry & { job_number?: string }).job_number || (entry.working_in_yard ? 'YARD' : '-'))}
               </Text>
               <Text style={styles.colYard}>
                 {entry.did_not_work ? 'N/A' : (entry.working_in_yard ? 'Yes' : 'No')}

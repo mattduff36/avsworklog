@@ -413,7 +413,7 @@ export default function ViewTimesheetPage() {
                       )}
                     </td>
                     <td className="p-2">
-                      <span className="text-sm font-mono">{(entry as any).job_number || (entry.working_in_yard ? 'YARD' : '-')}</span>
+                      <span className="text-sm font-mono">{(entry as TimesheetEntry & { job_number?: string }).job_number || (entry.working_in_yard ? 'YARD' : '-')}</span>
                     </td>
                     <td className="p-2 text-center">
                       {canEdit ? (
@@ -492,7 +492,7 @@ export default function ViewTimesheetPage() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Job Number</Label>
-                    <p className="text-sm font-mono">{(entry as any).job_number || (entry.working_in_yard ? 'YARD' : '-')}</p>
+                    <p className="text-sm font-mono">{(entry as TimesheetEntry & { job_number?: string }).job_number || (entry.working_in_yard ? 'YARD' : '-')}</p>
                   </div>
                   <div className="flex items-center space-x-2">
                     {canEdit ? (
@@ -554,6 +554,7 @@ export default function ViewTimesheetPage() {
               <h3 className="text-lg font-semibold mb-4">Employee Signature</h3>
               {signature && !showSignaturePad ? (
                 <div className="space-y-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={signature} alt="Signature" className="border rounded p-2 bg-white max-w-md" />
                   <p className="text-xs text-muted-foreground">
                     Signed on {timesheet.signed_at ? formatDate(timesheet.signed_at) : 'Unknown'}

@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Save, Check, AlertCircle, CheckCircle2, XCircle, Home, User } from 'lucide-react';
+import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User } from 'lucide-react';
 import Link from 'next/link';
 import { getWeekEnding, formatDateISO } from '@/lib/utils/date';
 import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
@@ -30,13 +30,12 @@ export default function NewTimesheetPage() {
   const { user, profile, isManager } = useAuth();
   const supabase = createClient();
   
-  const [regNumber, setRegNumber] = useState('');
+  const [regNumber] = useState('');
   const [weekEnding, setWeekEnding] = useState(formatDateISO(getWeekEnding()));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [activeDay, setActiveDay] = useState('0');
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
-  const [signature, setSignature] = useState<string | null>(null);
   const [existingWeeks, setExistingWeeks] = useState<string[]>([]);
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   
@@ -66,6 +65,7 @@ export default function NewTimesheetPage() {
       // If not a manager, set selected employee to current user
       setSelectedEmployeeId(user.id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isManager]);
 
   // Fetch existing timesheets when selected employee changes
@@ -73,6 +73,7 @@ export default function NewTimesheetPage() {
     if (selectedEmployeeId) {
       fetchExistingTimesheets();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmployeeId]);
 
   // Handle job number input with auto-dash formatting (NNNN-LL format)
