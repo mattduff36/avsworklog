@@ -308,19 +308,18 @@ export default function NewInspectionPage() {
                 Current Mileage
                 <span className="text-red-400">*</span>
               </Label>
-              <Input
-                id="mileage"
-                type="number"
-                value={currentMileage}
-                onChange={(e) => setCurrentMileage(e.target.value)}
-                placeholder="e.g., 45000"
-                min="0"
-                step="1"
-                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
-                required
-              />
-              <p className="text-xs text-slate-400">Enter the current mileage reading</p>
-            </div>
+                  <Input
+                    id="mileage"
+                    type="number"
+                    value={currentMileage}
+                    onChange={(e) => setCurrentMileage(e.target.value)}
+                    placeholder="e.g., 45000"
+                    min="0"
+                    step="1"
+                    className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
+                    required
+                  />
+                </div>
           </div>
         </CardContent>
       </Card>

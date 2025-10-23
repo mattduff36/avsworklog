@@ -486,7 +486,6 @@ export default function NewTimesheetPage() {
                         className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 uppercase disabled:opacity-30 disabled:cursor-not-allowed"
                         required
                       />
-                      <p className="text-xs text-slate-400">Format: 1234-AB (4 digits, dash, 2 letters)</p>
                     </div>
 
                     {/* Status Buttons */}
@@ -541,25 +540,6 @@ export default function NewTimesheetPage() {
                       />
                     </div>
 
-                    {/* Quick Navigation */}
-                    <div className="flex justify-between pt-4">
-                      <Button
-                        variant="outline"
-                        onClick={() => setActiveDay(String(Math.max(0, index - 1)))}
-                        disabled={index === 0}
-                        className="border-slate-600 text-white hover:bg-slate-800"
-                      >
-                        ← Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setActiveDay(String(Math.min(6, index + 1)))}
-                        disabled={index === 6}
-                        className="border-slate-600 text-white hover:bg-slate-800"
-                      >
-                        Next →
-                      </Button>
-                    </div>
                   </div>
                 </TabsContent>
               ))}
@@ -702,11 +682,40 @@ export default function NewTimesheetPage() {
             Save Draft
           </Button>
           <Button
-            onClick={handleSubmit}
+            onClick={() => {
+              // Check if all days are complete
+              const allDaysComplete = entries.every(entry => {
+                return entry.did_not_work || (entry.daily_total && entry.daily_total > 0);
+              });
+
+              if (allDaysComplete) {
+                handleSubmit();
+              } else {
+                // Find next incomplete day
+                const currentIndex = parseInt(activeDay);
+                const nextIncompleteIndex = entries.findIndex((entry, idx) => {
+                  return idx > currentIndex && !entry.did_not_work && (!entry.daily_total || entry.daily_total === 0);
+                });
+                
+                // If no incomplete days after current, wrap to first incomplete
+                const finalIndex = nextIncompleteIndex !== -1 
+                  ? nextIncompleteIndex 
+                  : entries.findIndex(entry => !entry.did_not_work && (!entry.daily_total || entry.daily_total === 0));
+                
+                if (finalIndex !== -1) {
+                  setActiveDay(String(finalIndex));
+                }
+              }
+            }}
             disabled={saving}
             className="flex-1 h-14 bg-timesheet hover:bg-timesheet/90 text-slate-900 font-semibold text-base"
           >
-            {saving ? 'Submitting...' : 'Submit'}
+            {saving ? 'Submitting...' : (() => {
+              const allDaysComplete = entries.every(entry => {
+                return entry.did_not_work || (entry.daily_total && entry.daily_total > 0);
+              });
+              return allDaysComplete ? 'Submit' : 'Next';
+            })()}
           </Button>
         </div>
       </div>
