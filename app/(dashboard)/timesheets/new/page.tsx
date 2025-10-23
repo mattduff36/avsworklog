@@ -190,7 +190,13 @@ export default function NewTimesheetPage() {
       // Auto-calculate daily total if both times are present
       if (field === 'time_started' || field === 'time_finished') {
         const entry = newEntries[dayIndex];
-        const hours = calculateHours(entry.time_started, entry.time_finished);
+        let hours = calculateHours(entry.time_started, entry.time_finished);
+        
+        // Auto-deduct 30 mins (0.5 hours) for lunch break if daily total > 5 hours
+        if (hours !== null && hours > 5) {
+          hours = hours - 0.5;
+        }
+        
         newEntries[dayIndex].daily_total = hours;
       }
     }
@@ -443,6 +449,7 @@ export default function NewTimesheetPage() {
                       <div className="max-w-full overflow-hidden">
                         <Input
                           type="time"
+                          step="900"
                           value={entry.time_started}
                           onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
                           disabled={entry.did_not_work}
@@ -456,10 +463,11 @@ export default function NewTimesheetPage() {
                       <div className="max-w-full overflow-hidden">
                         <Input
                           type="time"
+                          step="900"
                           value={entry.time_finished}
                           onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
                           disabled={entry.did_not_work}
-                          className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-work"
+                          className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed"
                         />
                       </div>
                     </div>
