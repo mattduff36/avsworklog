@@ -167,6 +167,22 @@ export default function NewTimesheetPage() {
     setWeekEnding(newDate);
   };
 
+  // Validate and round time to nearest 15-minute interval
+  const roundToQuarterHour = (timeString: string): string => {
+    if (!timeString) return timeString;
+    
+    const [hours, minutes] = timeString.split(':').map(Number);
+    const roundedMinutes = Math.round(minutes / 15) * 15;
+    
+    // Handle 60 minutes (round to next hour)
+    if (roundedMinutes === 60) {
+      const newHours = (hours + 1) % 24;
+      return `${String(newHours).padStart(2, '0')}:00`;
+    }
+    
+    return `${String(hours).padStart(2, '0')}:${String(roundedMinutes).padStart(2, '0')}`;
+  };
+
   // Calculate hours when times change
   const updateEntry = (dayIndex: number, field: string, value: string | boolean) => {
     const newEntries = [...entries];
@@ -182,6 +198,11 @@ export default function NewTimesheetPage() {
         daily_total: 0,
       };
     } else {
+      // Round time inputs to 15-minute intervals
+      if ((field === 'time_started' || field === 'time_finished') && typeof value === 'string') {
+        value = roundToQuarterHour(value);
+      }
+      
       newEntries[dayIndex] = {
         ...newEntries[dayIndex],
         [field]: value,
