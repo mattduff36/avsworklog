@@ -236,11 +236,21 @@ export function TimesheetPDF({ timesheet, employeeName, employeeEmail }: Timeshe
           {sortedEntries.map((entry: TimesheetEntry, index: number) => (
             <View key={entry.id || index} style={index % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
               <Text style={styles.colDay}>{DAY_NAMES[entry.day_of_week - 1]}</Text>
-              <Text style={styles.colStart}>{entry.time_started || '-'}</Text>
-              <Text style={styles.colFinish}>{entry.time_finished || '-'}</Text>
-              <Text style={styles.colYard}>{entry.working_in_yard ? 'Yes' : 'No'}</Text>
-              <Text style={styles.colHours}>{entry.daily_total ? entry.daily_total.toFixed(2) : '0.00'}</Text>
-              <Text style={styles.colRemarks}>{entry.remarks || '-'}</Text>
+              <Text style={styles.colStart}>
+                {entry.did_not_work ? 'N/A' : (entry.time_started || '-')}
+              </Text>
+              <Text style={styles.colFinish}>
+                {entry.did_not_work ? 'N/A' : (entry.time_finished || '-')}
+              </Text>
+              <Text style={styles.colYard}>
+                {entry.did_not_work ? 'N/A' : (entry.working_in_yard ? 'Yes' : 'No')}
+              </Text>
+              <Text style={styles.colHours}>
+                {entry.did_not_work ? 'DID NOT WORK' : (entry.daily_total ? entry.daily_total.toFixed(2) : '0.00')}
+              </Text>
+              <Text style={styles.colRemarks}>
+                {entry.did_not_work ? 'Day off' : (entry.remarks || '-')}
+              </Text>
             </View>
           ))}
 
@@ -266,7 +276,7 @@ export function TimesheetPDF({ timesheet, employeeName, employeeEmail }: Timeshe
             <View style={styles.signatureBox}>
               <Text style={styles.signatureLabel}>Employee Signature:</Text>
               {timesheet.signature_data ? (
-                <Image style={styles.signatureImage} src={timesheet.signature_data} />
+                <Image style={styles.signatureImage} src={timesheet.signature_data} alt="Employee signature" />
               ) : (
                 <View style={styles.signatureLine} />
               )}
