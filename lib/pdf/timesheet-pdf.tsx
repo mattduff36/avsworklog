@@ -63,22 +63,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9f9f9',
   },
   colDay: {
-    width: '15%',
-  },
-  colStart: {
     width: '12%',
   },
+  colStart: {
+    width: '11%',
+  },
   colFinish: {
+    width: '11%',
+  },
+  colJob: {
     width: '12%',
   },
   colYard: {
-    width: '10%',
+    width: '8%',
   },
   colHours: {
     width: '10%',
   },
   colRemarks: {
-    width: '41%',
+    width: '36%',
   },
   totalRow: {
     flexDirection: 'row',
@@ -235,6 +238,7 @@ export function TimesheetPDF({ timesheet, employeeName, employeeEmail }: Timeshe
             <Text style={styles.colDay}>Day</Text>
             <Text style={styles.colStart}>Start</Text>
             <Text style={styles.colFinish}>Finish</Text>
+            <Text style={styles.colJob}>Job No.</Text>
             <Text style={styles.colYard}>Yard</Text>
             <Text style={styles.colHours}>Hours</Text>
             <Text style={styles.colRemarks}>Remarks</Text>
@@ -249,6 +253,9 @@ export function TimesheetPDF({ timesheet, employeeName, employeeEmail }: Timeshe
               </Text>
               <Text style={styles.colFinish}>
                 {entry.did_not_work ? 'N/A' : (entry.time_finished || '-')}
+              </Text>
+              <Text style={styles.colJob}>
+                {entry.did_not_work ? 'N/A' : ((entry as any).job_number || (entry.working_in_yard ? 'YARD' : '-'))}
               </Text>
               <Text style={styles.colYard}>
                 {entry.did_not_work ? 'N/A' : (entry.working_in_yard ? 'Yes' : 'No')}
@@ -265,6 +272,8 @@ export function TimesheetPDF({ timesheet, employeeName, employeeEmail }: Timeshe
           {/* Total Row */}
           <View style={styles.totalRow}>
             <Text style={{ width: '49%' }}>TOTAL HOURS:</Text>
+            <Text style={styles.colJob}></Text>
+            <Text style={styles.colYard}></Text>
             <Text style={styles.colHours}>{totalHours.toFixed(2)}</Text>
             <Text style={styles.colRemarks}></Text>
           </View>

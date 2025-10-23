@@ -377,8 +377,9 @@ export default function ViewTimesheetPage() {
                 <tr className="border-b">
                   <th className="text-left p-2 font-medium">Day</th>
                   <th className="text-left p-2 font-medium">Time Started</th>
-                  <th className="text-center p-2 font-medium">In Yard</th>
                   <th className="text-left p-2 font-medium">Time Finished</th>
+                  <th className="text-left p-2 font-medium">Job Number</th>
+                  <th className="text-center p-2 font-medium">In Yard</th>
                   <th className="text-right p-2 font-medium">Total Hours</th>
                   <th className="text-left p-2 font-medium">Remarks</th>
                 </tr>
@@ -399,18 +400,6 @@ export default function ViewTimesheetPage() {
                         <span>{entry.time_started || '-'}</span>
                       )}
                     </td>
-                    <td className="p-2 text-center">
-                      {canEdit ? (
-                        <input
-                          type="checkbox"
-                          checked={entry.working_in_yard}
-                          onChange={(e) => updateEntry(index, 'working_in_yard', e.target.checked)}
-                          className="w-4 h-4"
-                        />
-                      ) : (
-                        entry.working_in_yard && <CheckCircle2 className="h-4 w-4 inline text-green-600" />
-                      )}
-                    </td>
                     <td className="p-2">
                       {canEdit ? (
                         <Input
@@ -421,6 +410,21 @@ export default function ViewTimesheetPage() {
                         />
                       ) : (
                         <span>{entry.time_finished || '-'}</span>
+                      )}
+                    </td>
+                    <td className="p-2">
+                      <span className="text-sm font-mono">{(entry as any).job_number || (entry.working_in_yard ? 'YARD' : '-')}</span>
+                    </td>
+                    <td className="p-2 text-center">
+                      {canEdit ? (
+                        <input
+                          type="checkbox"
+                          checked={entry.working_in_yard}
+                          onChange={(e) => updateEntry(index, 'working_in_yard', e.target.checked)}
+                          className="w-4 h-4"
+                        />
+                      ) : (
+                        entry.working_in_yard && <CheckCircle2 className="h-4 w-4 inline text-green-600" />
                       )}
                     </td>
                     <td className="p-2 text-right font-semibold">
@@ -440,7 +444,7 @@ export default function ViewTimesheetPage() {
                   </tr>
                 ))}
                 <tr className="bg-secondary/50 font-bold">
-                  <td colSpan={4} className="p-2 text-right">
+                  <td colSpan={5} className="p-2 text-right">
                     Weekly Total:
                   </td>
                   <td className="p-2 text-right text-lg">
@@ -485,6 +489,10 @@ export default function ViewTimesheetPage() {
                         <p className="text-sm">{entry.time_finished || '-'}</p>
                       )}
                     </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Job Number</Label>
+                    <p className="text-sm font-mono">{(entry as any).job_number || (entry.working_in_yard ? 'YARD' : '-')}</p>
                   </div>
                   <div className="flex items-center space-x-2">
                     {canEdit ? (

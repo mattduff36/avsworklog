@@ -251,15 +251,16 @@ export default function NewTimesheetPage() {
       return;
     }
 
-    // Validate job numbers for all working days
+    // Validate job numbers for all working days (unless working in yard)
     const jobNumberRegex = /^\d{4}-[A-Z]{2}$/;
     const allJobNumbersValid = entries.every(entry => {
       if (entry.did_not_work) return true; // Skip validation for non-working days
+      if (entry.working_in_yard) return true; // Skip validation for yard work
       return entry.job_number && jobNumberRegex.test(entry.job_number);
     });
     
     if (!allJobNumbersValid) {
-      setError('Please enter a valid Job Number (format: 1234-AB) for all working days');
+      setError('Please enter a valid Job Number (format: 1234-AB) for all working days (not required when working in yard)');
       setShowErrorDialog(true);
       return;
     }
@@ -510,16 +511,16 @@ export default function NewTimesheetPage() {
                     <div className="space-y-2">
                       <Label className="text-white text-lg flex items-center gap-2">
                         Job Number
-                        <span className="text-red-400 text-base">*</span>
+                        {!entry.working_in_yard && <span className="text-red-400 text-base">*</span>}
+                        {entry.working_in_yard && <span className="text-slate-500 text-sm">(Not required - working in yard)</span>}
                       </Label>
                       <Input
                         value={entry.job_number}
                         onChange={(e) => handleJobNumberChange(index, e.target.value)}
                         placeholder="1234-AB"
                         maxLength={7}
-                        disabled={entry.did_not_work}
+                        disabled={entry.did_not_work || entry.working_in_yard}
                         className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 uppercase disabled:opacity-30 disabled:cursor-not-allowed"
-                        required
                       />
                     </div>
 
@@ -623,11 +624,10 @@ export default function NewTimesheetPage() {
                       <Input
                         value={entry.job_number}
                         onChange={(e) => handleJobNumberChange(index, e.target.value)}
-                        placeholder="1234-AB"
+                        placeholder={entry.working_in_yard ? "N/A (Yard)" : "1234-AB"}
                         maxLength={7}
-                        disabled={entry.did_not_work}
+                        disabled={entry.did_not_work || entry.working_in_yard}
                         className="w-28 bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 uppercase disabled:opacity-30 disabled:cursor-not-allowed"
-                        required
                       />
                     </td>
                     <td className="p-3">
