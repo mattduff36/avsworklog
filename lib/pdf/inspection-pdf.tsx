@@ -226,7 +226,12 @@ export function InspectionPDF({ inspection, items, vehicleReg, employeeName, emp
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Inspection Date:</Text>
-            <Text style={styles.value}>{formatDate(new Date(inspection.inspection_date))}</Text>
+            <Text style={styles.value}>
+              {inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
+                ? `${formatDate(new Date(inspection.inspection_date))} - ${formatDate(new Date(inspection.inspection_end_date))}`
+                : formatDate(new Date(inspection.inspection_date))
+              }
+            </Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Status:</Text>

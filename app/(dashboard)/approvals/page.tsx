@@ -386,7 +386,10 @@ export default function ApprovalsPage() {
                               {inspection.user?.employee_id && ` (${inspection.user.employee_id})`}
                             </div>
                             <div className="text-xs mt-1">
-                              {formatDate(inspection.inspection_date)}
+                              {inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
+                                ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
+                                : formatDate(inspection.inspection_date)
+                              }
                             </div>
                           </CardDescription>
                         </div>

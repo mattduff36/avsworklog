@@ -9,7 +9,7 @@ const { Client } = pg;
 config({ path: resolve(process.cwd(), '.env.local') });
 
 const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
-const sqlFile = 'supabase/add-did-not-work-column.sql';
+const sqlFile = 'supabase/add-inspection-date-range.sql';
 
 if (!connectionString) {
   console.error('❌ Missing database connection string');
@@ -58,9 +58,11 @@ async function runMigration() {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     
     console.log('📊 Database changes applied:');
-    console.log('   ✓ Added did_not_work column to timesheet_entries');
-    console.log('   ✓ Type: BOOLEAN NOT NULL DEFAULT FALSE');
-    console.log('   ✓ Column comment added\n');
+    console.log('   ✓ Added inspection_end_date column to vehicle_inspections');
+    console.log('   ✓ Type: DATE (nullable)');
+    console.log('   ✓ Updated existing records to set end date = start date');
+    console.log('   ✓ Added check constraints for date range validation');
+    console.log('   ✓ Column comments added\n');
     
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('✨ Ready to use! Start your dev server:');

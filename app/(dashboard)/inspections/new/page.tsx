@@ -29,7 +29,8 @@ export default function NewInspectionPage() {
   
   const [vehicles, setVehicles] = useState<Array<{ id: string; reg_number: string; vehicle_type: string }>>([]);
   const [vehicleId, setVehicleId] = useState('');
-  const [selectedDate, setSelectedDate] = useState(formatDateISO(new Date()));
+  const [startDate, setStartDate] = useState(formatDateISO(new Date()));
+  const [endDate, setEndDate] = useState(formatDateISO(new Date()));
   const [currentMileage, setCurrentMileage] = useState('');
   const [checkboxStates, setCheckboxStates] = useState<Record<number, InspectionStatus>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
@@ -119,6 +120,21 @@ export default function NewInspectionPage() {
       return;
     }
 
+    // Validate date range
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const daysDiff = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (end < start) {
+      setError('End date must be on or after start date');
+      return;
+    }
+    
+    if (daysDiff > 6) {
+      setError('Date range cannot exceed 7 days');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -128,7 +144,8 @@ export default function NewInspectionPage() {
       const inspectionData: InspectionInsert = {
         vehicle_id: vehicleId,
         user_id: selectedEmployeeId, // Use selected employee ID (can be manager's own ID or another employee's)
-        inspection_date: selectedDate,
+        inspection_date: startDate,
+        inspection_end_date: endDate,
         current_mileage: parseInt(currentMileage),
         status: submitForApproval ? 'submitted' : 'draft',
         submitted_at: submitForApproval ? new Date().toISOString() : null,
@@ -243,7 +260,10 @@ export default function NewInspectionPage() {
         <CardHeader className="pb-4">
           <CardTitle className="text-white">Inspection Details</CardTitle>
           <CardDescription className="text-slate-400">
-            {new Date(selectedDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            {startDate === endDate 
+              ? new Date(startDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+              : `${new Date(startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} - ${new Date(endDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
+            }
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -291,16 +311,57 @@ export default function NewInspectionPage() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="date" className="text-white text-base">Inspection Date</Label>
-              <Input
-                id="date"
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                max={formatDateISO(new Date())}
-                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="startDate" className="text-white text-base flex items-center gap-2">
+                  Start Date
+                  <span className="text-red-400">*</span>
+                </Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    // Auto-adjust end date if it's before start date
+                    if (endDate < e.target.value) {
+                      setEndDate(e.target.value);
+                    }
+                  }}
+                  max={formatDateISO(new Date())}
+                  className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="endDate" className="text-white text-base flex items-center gap-2">
+                  End Date
+                  <span className="text-red-400">*</span>
+                </Label>
+                <Input
+                  id="endDate"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => {
+                    const start = new Date(startDate);
+                    const end = new Date(e.target.value);
+                    const daysDiff = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysDiff > 6) {
+                      setError('Date range cannot exceed 7 days');
+                      return;
+                    }
+                    setError('');
+                    setEndDate(e.target.value);
+                  }}
+                  min={startDate}
+                  max={formatDateISO(new Date())}
+                  className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
+                  required
+                />
+                <p className="text-xs text-slate-400">Max 7 days from start date</p>
+              </div>
             </div>
 
             <div className="space-y-2">

@@ -155,7 +155,11 @@ export default function InspectionsPage() {
                           {inspection.vehicles?.reg_number || 'Unknown Vehicle'}
                         </CardTitle>
                         <CardDescription>
-                          {inspection.vehicles?.vehicle_type && `${inspection.vehicles.vehicle_type} • `}{formatDate(inspection.inspection_date)}
+                          {inspection.vehicles?.vehicle_type && `${inspection.vehicles.vehicle_type} • `}
+                          {inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
+                            ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
+                            : formatDate(inspection.inspection_date)
+                          }
                         </CardDescription>
                       </div>
                     </div>
