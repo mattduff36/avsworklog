@@ -9,7 +9,7 @@ const { Client } = pg;
 config({ path: resolve(process.cwd(), '.env.local') });
 
 const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
-const sqlFile = 'supabase/add-job-number-column.sql';
+const sqlFile = 'supabase/fix-timesheet-rls.sql';
 
 if (!connectionString) {
   console.error('❌ Missing database connection string');
@@ -58,9 +58,10 @@ async function runMigration() {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     
     console.log('📊 Database changes applied:');
-    console.log('   ✓ Added job_number column to timesheet_entries table');
-    console.log('   ✓ Column accepts TEXT format (NNNN-LL)');
-    console.log('   ✓ Column comment added for documentation\n');
+    console.log('   ✓ Fixed RLS policies for timesheets table');
+    console.log('   ✓ Fixed RLS policies for timesheet_entries table');
+    console.log('   ✓ Managers can now create timesheets for employees');
+    console.log('   ✓ Users can create their own timesheets\n');
     
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('✨ Ready to use! Start your dev server:');
