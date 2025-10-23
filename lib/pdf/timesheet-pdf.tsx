@@ -12,8 +12,9 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 20,
-    borderBottom: 2,
+    borderBottomWidth: 2,
     borderBottomColor: '#F1D64A',
+    borderBottomStyle: 'solid',
     paddingBottom: 10,
   },
   title: {
@@ -48,14 +49,16 @@ const styles = StyleSheet.create({
   },
   tableRow: {
     flexDirection: 'row',
-    borderBottom: 1,
+    borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+    borderBottomStyle: 'solid',
     padding: 8,
   },
   tableRowAlt: {
     flexDirection: 'row',
-    borderBottom: 1,
+    borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+    borderBottomStyle: 'solid',
     padding: 8,
     backgroundColor: '#f9f9f9',
   },
@@ -86,8 +89,9 @@ const styles = StyleSheet.create({
   },
   signatureSection: {
     marginTop: 30,
-    borderTop: 1,
+    borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
+    borderTopStyle: 'solid',
     paddingTop: 15,
   },
   signatureRow: {
@@ -106,12 +110,14 @@ const styles = StyleSheet.create({
   signatureImage: {
     width: 200,
     height: 60,
-    border: 1,
+    borderWidth: 1,
     borderColor: '#e0e0e0',
+    borderStyle: 'solid',
   },
   signatureLine: {
-    borderBottom: 1,
+    borderBottomWidth: 1,
     borderBottomColor: '#000',
+    borderBottomStyle: 'solid',
     marginBottom: 5,
     height: 60,
   },
@@ -143,16 +149,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 8,
     color: '#666',
-    borderTop: 1,
+    borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
+    borderTopStyle: 'solid',
     paddingTop: 10,
   },
   commentsSection: {
     marginTop: 15,
     padding: 10,
     backgroundColor: '#fff3cd',
-    borderLeft: 3,
+    borderLeftWidth: 3,
     borderLeftColor: '#ffc107',
+    borderLeftStyle: 'solid',
   },
   commentsLabel: {
     fontWeight: 'bold',
