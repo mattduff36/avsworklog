@@ -554,6 +554,7 @@ export default function NewTimesheetPage() {
                   <th className="text-left p-3 font-medium text-white">Day</th>
                   <th className="text-left p-3 font-medium text-white">Time Started</th>
                   <th className="text-left p-3 font-medium text-white">Time Finished</th>
+                  <th className="text-left p-3 font-medium text-white">Job Number</th>
                   <th className="text-center p-3 font-medium text-white w-32">Status</th>
                   <th className="text-right p-3 font-medium text-white">Total Hours</th>
                   <th className="text-left p-3 font-medium text-white">Remarks</th>
@@ -566,6 +567,7 @@ export default function NewTimesheetPage() {
                     <td className="p-3">
                       <Input
                         type="time"
+                        step="900"
                         value={entry.time_started}
                         onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
                         disabled={entry.did_not_work}
@@ -575,10 +577,22 @@ export default function NewTimesheetPage() {
                     <td className="p-3">
                       <Input
                         type="time"
+                        step="900"
                         value={entry.time_finished}
                         onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
                         disabled={entry.did_not_work}
                         className="w-32 bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                      />
+                    </td>
+                    <td className="p-3">
+                      <Input
+                        value={entry.job_number}
+                        onChange={(e) => handleJobNumberChange(index, e.target.value)}
+                        placeholder="1234-AB"
+                        maxLength={7}
+                        disabled={entry.did_not_work}
+                        className="w-28 bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 uppercase disabled:opacity-30 disabled:cursor-not-allowed"
+                        required
                       />
                     </td>
                     <td className="p-3">
@@ -627,7 +641,7 @@ export default function NewTimesheetPage() {
                   </tr>
                 ))}
                 <tr className="bg-timesheet/10 font-bold">
-                  <td colSpan={4} className="p-3 text-right text-white">
+                  <td colSpan={5} className="p-3 text-right text-white">
                     Weekly Total:
                   </td>
                   <td className="p-3 text-right text-lg text-timesheet">

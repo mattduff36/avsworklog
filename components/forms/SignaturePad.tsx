@@ -61,6 +61,7 @@ export function SignaturePad({ onSave, onCancel, initialValue }: SignaturePadPro
           variant="outline"
           size="sm"
           onClick={handleClear}
+          className="border-slate-600 text-slate-700 hover:bg-slate-100"
         >
           <RotateCcw className="h-4 w-4 mr-2" />
           Clear
@@ -70,6 +71,7 @@ export function SignaturePad({ onSave, onCancel, initialValue }: SignaturePadPro
           variant="outline"
           size="sm"
           onClick={onCancel}
+          className="border-slate-600 text-slate-700 hover:bg-slate-100"
         >
           <X className="h-4 w-4 mr-2" />
           Cancel
@@ -78,6 +80,7 @@ export function SignaturePad({ onSave, onCancel, initialValue }: SignaturePadPro
           type="button"
           size="sm"
           onClick={handleSave}
+          className="bg-white border-2 border-slate-900 text-slate-900 hover:bg-slate-100 shadow-lg font-semibold"
         >
           <Check className="h-4 w-4 mr-2" />
           Save Signature
