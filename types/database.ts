@@ -293,6 +293,53 @@ export interface Database {
           created_at?: string
         }
       }
+      actions: {
+        Row: {
+          id: string
+          inspection_id: string | null
+          inspection_item_id: string | null
+          title: string
+          description: string | null
+          priority: 'low' | 'medium' | 'high' | 'urgent'
+          status: 'pending' | 'in_progress' | 'completed'
+          actioned: boolean
+          actioned_at: string | null
+          actioned_by: string | null
+          created_by: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          inspection_id?: string | null
+          inspection_item_id?: string | null
+          title: string
+          description?: string | null
+          priority?: 'low' | 'medium' | 'high' | 'urgent'
+          status?: 'pending' | 'in_progress' | 'completed'
+          actioned?: boolean
+          actioned_at?: string | null
+          actioned_by?: string | null
+          created_by: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          inspection_id?: string | null
+          inspection_item_id?: string | null
+          title?: string
+          description?: string | null
+          priority?: 'low' | 'medium' | 'high' | 'urgent'
+          status?: 'pending' | 'in_progress' | 'completed'
+          actioned?: boolean
+          actioned_at?: string | null
+          actioned_by?: string | null
+          created_by?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

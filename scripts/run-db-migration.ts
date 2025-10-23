@@ -9,7 +9,7 @@ const { Client } = pg;
 config({ path: resolve(process.cwd(), '.env.local') });
 
 const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
-const sqlFile = 'supabase/add-inspection-signature.sql';
+const sqlFile = 'supabase/create-actions-table.sql';
 
 if (!connectionString) {
   console.error('❌ Missing database connection string');
@@ -58,11 +58,11 @@ async function runMigration() {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     
     console.log('📊 Database changes applied:');
-    console.log('   ✓ Added signature_data column to vehicle_inspections');
-    console.log('   ✓ Type: TEXT (nullable)');
-    console.log('   ✓ Added signed_at column to vehicle_inspections');
-    console.log('   ✓ Type: TIMESTAMP WITH TIME ZONE (nullable)');
-    console.log('   ✓ Column comments added\n');
+    console.log('   ✓ Created actions table for manager defect tracking');
+    console.log('   ✓ Added RLS policies for manager-only access');
+    console.log('   ✓ Created indexes for performance optimization');
+    console.log('   ✓ Added foreign key references to inspections');
+    console.log('   ✓ Table and column comments added\n');
     
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('✨ Ready to use! Start your dev server:');
