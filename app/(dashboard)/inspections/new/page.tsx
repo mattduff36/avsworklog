@@ -10,11 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User } from 'lucide-react';
 import Link from 'next/link';
 import { formatDateISO } from '@/lib/utils/date';
 import { INSPECTION_ITEMS, InspectionStatus } from '@/types/inspection';
 import { Database } from '@/types/database';
+import { SignaturePad } from '@/components/forms/SignaturePad';
 
 type Employee = {
   id: string;
@@ -36,6 +38,8 @@ export default function NewInspectionPage() {
   const [comments, setComments] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showSignatureDialog, setShowSignatureDialog] = useState(false);
+  const [signature, setSignature] = useState<string | null>(null);
   
   // Manager-specific states
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -109,8 +113,8 @@ export default function NewInspectionPage() {
     setComments({});
   };
 
-  const handleSave = async (submitForApproval: boolean = false) => {
-    if (!user || !selectedEmployeeId || !vehicleId) {
+  const handleSubmit = () => {
+    if (!vehicleId) {
       setError('Please select a vehicle');
       return;
     }
@@ -134,9 +138,22 @@ export default function NewInspectionPage() {
       setError('Date range cannot exceed 7 days');
       return;
     }
+    
+    // Show signature dialog
+    setShowSignatureDialog(true);
+  };
 
-    setLoading(true);
+  const handleSignatureComplete = async (sig: string) => {
+    setSignature(sig);
+    setShowSignatureDialog(false);
+    await saveInspection('submitted', sig);
+  };
+
+  const saveInspection = async (status: 'draft' | 'submitted', signatureData?: string) => {
+    if (!user || !selectedEmployeeId || !vehicleId) return;
+
     setError('');
+    setLoading(true);
 
     try {
       // Create inspection record
@@ -147,8 +164,10 @@ export default function NewInspectionPage() {
         inspection_date: startDate,
         inspection_end_date: endDate,
         current_mileage: parseInt(currentMileage),
-        status: submitForApproval ? 'submitted' : 'draft',
-        submitted_at: submitForApproval ? new Date().toISOString() : null,
+        status,
+        submitted_at: status === 'submitted' ? new Date().toISOString() : null,
+        signature_data: signatureData || null,
+        signed_at: signatureData ? new Date().toISOString() : null,
       };
 
       const { data: inspection, error: inspectionError } = await supabase
@@ -555,7 +574,7 @@ export default function NewInspectionPage() {
           <div className="hidden md:flex flex-row gap-3 justify-end pt-4">
             <Button
               variant="outline"
-              onClick={() => handleSave(false)}
+              onClick={() => saveInspection('draft')}
               disabled={loading || !vehicleId}
               className="border-slate-600 text-white hover:bg-slate-800"
             >
@@ -563,7 +582,7 @@ export default function NewInspectionPage() {
               {loading ? 'Saving...' : 'Save Draft'}
             </Button>
             <Button
-              onClick={() => handleSave(true)}
+              onClick={handleSubmit}
               disabled={loading || !vehicleId}
               className="bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold"
             >
@@ -579,7 +598,7 @@ export default function NewInspectionPage() {
         <div className="flex gap-3">
           <Button
             variant="outline"
-            onClick={() => handleSave(false)}
+            onClick={() => saveInspection('draft')}
             disabled={loading || !vehicleId}
             className="flex-1 h-14 border-slate-600 text-white hover:bg-slate-800"
           >
@@ -587,7 +606,7 @@ export default function NewInspectionPage() {
             Save Draft
           </Button>
           <Button
-            onClick={() => handleSave(true)}
+            onClick={handleSubmit}
             disabled={loading || !vehicleId}
             className="flex-1 h-14 bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold text-base"
           >
@@ -596,6 +615,33 @@ export default function NewInspectionPage() {
           </Button>
         </div>
       </div>
+
+      {/* Signature Dialog */}
+      <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">Sign Inspection</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Please sign below to confirm your inspection is accurate
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <SignaturePad
+              onSave={handleSignatureComplete}
+              onCancel={() => setShowSignatureDialog(false)}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowSignatureDialog(false)}
+              className="border-slate-600 text-white hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

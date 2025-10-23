@@ -166,6 +166,8 @@ export interface Database {
           reviewed_by: string | null
           reviewed_at: string | null
           manager_comments: string | null
+          signature_data: string | null
+          signed_at: string | null
           created_at: string
           updated_at: string
         }
@@ -181,6 +183,8 @@ export interface Database {
           reviewed_by?: string | null
           reviewed_at?: string | null
           manager_comments?: string | null
+          signature_data?: string | null
+          signed_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -196,6 +200,8 @@ export interface Database {
           reviewed_by?: string | null
           reviewed_at?: string | null
           manager_comments?: string | null
+          signature_data?: string | null
+          signed_at?: string | null
           created_at?: string
           updated_at?: string
         }

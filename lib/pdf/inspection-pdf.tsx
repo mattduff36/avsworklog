@@ -1,5 +1,5 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { VehicleInspection, InspectionItem, INSPECTION_ITEMS } from '@/types/inspection';
 import { formatDate } from '@/lib/utils/date';
 
@@ -160,6 +160,40 @@ const styles = StyleSheet.create({
     borderTopStyle: 'solid',
     paddingTop: 10,
   },
+  signatureSection: {
+    marginTop: 30,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    borderTopStyle: 'solid',
+    paddingTop: 15,
+  },
+  signatureRow: {
+    flexDirection: 'row',
+    marginBottom: 20,
+  },
+  signatureBox: {
+    flex: 1,
+    marginRight: 20,
+  },
+  signatureLabel: {
+    fontSize: 9,
+    color: '#666',
+    marginBottom: 5,
+  },
+  signatureImage: {
+    width: 200,
+    height: 60,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderStyle: 'solid',
+  },
+  signatureLine: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#000',
+    borderBottomStyle: 'solid',
+    marginBottom: 5,
+    height: 60,
+  },
 });
 
 interface InspectionPDFProps {
@@ -314,6 +348,37 @@ export function InspectionPDF({ inspection, items, vehicleReg, employeeName, emp
             </View>
           </View>
         )}
+
+        {/* Signature Section */}
+        <View style={styles.signatureSection}>
+          <View style={styles.signatureRow}>
+            <View style={styles.signatureBox}>
+              <Text style={styles.signatureLabel}>Inspector Signature:</Text>
+              {inspection.signature_data ? (
+                <Image style={styles.signatureImage} src={inspection.signature_data} alt="Inspector signature" />
+              ) : (
+                <View style={styles.signatureLine} />
+              )}
+              {inspection.signed_at && (
+                <Text style={{ fontSize: 8, marginTop: 5 }}>
+                  Signed: {formatDate(new Date(inspection.signed_at))}
+                </Text>
+              )}
+            </View>
+          </View>
+
+          {inspection.reviewed_at && (
+            <View style={styles.signatureRow}>
+              <View style={styles.signatureBox}>
+                <Text style={styles.signatureLabel}>Reviewed By:</Text>
+                <View style={styles.signatureLine} />
+                <Text style={{ fontSize: 8, marginTop: 5 }}>
+                  Date: {formatDate(new Date(inspection.reviewed_at))}
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
 
         {/* Footer */}
         <View style={styles.footer}>
