@@ -17,7 +17,8 @@ import {
   LogOut,
   WifiOff,
   Wifi,
-  CheckSquare
+  CheckSquare,
+  ListTodo
 } from 'lucide-react';
 import { useState } from 'react';
 

@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User } from 'lucide-react';
 import Link from 'next/link';
-import { formatDateISO } from '@/lib/utils/date';
+import { formatDateISO, formatDate } from '@/lib/utils/date';
 import { INSPECTION_ITEMS, InspectionStatus } from '@/types/inspection';
 import { Database } from '@/types/database';
 import { SignaturePad } from '@/components/forms/SignaturePad';
@@ -280,8 +280,8 @@ export default function NewInspectionPage() {
           <CardTitle className="text-white">Inspection Details</CardTitle>
           <CardDescription className="text-slate-400">
             {startDate === endDate 
-              ? new Date(startDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-              : `${new Date(startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} - ${new Date(endDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
+              ? formatDate(startDate)
+              : `${formatDate(startDate)} - ${formatDate(endDate)}`
             }
           </CardDescription>
         </CardHeader>
