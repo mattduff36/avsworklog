@@ -202,6 +202,45 @@ export default function ApprovalsPage() {
     }
   };
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'submitted':
+        return (
+          <Badge variant="warning">
+            <Clock className="h-3 w-3 mr-1" />
+            Pending
+          </Badge>
+        );
+      case 'approved':
+        return (
+          <Badge variant="success" className="bg-green-500/10 text-green-600 border-green-500/20">
+            <CheckCircle2 className="h-3 w-3 mr-1" />
+            Approved
+          </Badge>
+        );
+      case 'rejected':
+        return (
+          <Badge variant="destructive">
+            <XCircle className="h-3 w-3 mr-1" />
+            Rejected
+          </Badge>
+        );
+      case 'draft':
+        return (
+          <Badge variant="secondary">
+            <FileText className="h-3 w-3 mr-1" />
+            Draft
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant="secondary">
+            {status}
+          </Badge>
+        );
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -317,10 +356,7 @@ export default function ApprovalsPage() {
                           </CardDescription>
                         </div>
                       </div>
-                      <Badge variant="warning">
-                        <Clock className="h-3 w-3 mr-1" />
-                        Pending
-                      </Badge>
+                      {getStatusBadge(timesheet.status)}
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -330,24 +366,28 @@ export default function ApprovalsPage() {
                         {timesheet.reg_number && ` • Reg: ${timesheet.reg_number}`}
                       </div>
                       <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleQuickReject('timesheet', timesheet.id)}
-                          className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
-                        >
-                          <XCircle className="h-4 w-4 mr-1" />
-                          Reject
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleQuickApprove('timesheet', timesheet.id)}
-                          className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
-                        >
-                          <CheckCircle2 className="h-4 w-4 mr-1" />
-                          Approve
-                        </Button>
+                        {timesheet.status === 'submitted' && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleQuickReject('timesheet', timesheet.id)}
+                              className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
+                            >
+                              <XCircle className="h-4 w-4 mr-1" />
+                              Reject
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleQuickApprove('timesheet', timesheet.id)}
+                              className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
+                            >
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                              Approve
+                            </Button>
+                          </>
+                        )}
                         <Link href={`/timesheets/${timesheet.id}`}>
                           <Button size="sm">
                             View Details
@@ -394,10 +434,7 @@ export default function ApprovalsPage() {
                           </CardDescription>
                         </div>
                       </div>
-                      <Badge variant="warning">
-                        <Clock className="h-3 w-3 mr-1" />
-                        Pending
-                      </Badge>
+                      {getStatusBadge(inspection.status)}
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -406,24 +443,28 @@ export default function ApprovalsPage() {
                         Submitted {formatDate(inspection.submitted_at || '')}
                       </div>
                       <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleQuickReject('inspection', inspection.id)}
-                          className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
-                        >
-                          <XCircle className="h-4 w-4 mr-1" />
-                          Reject
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleQuickApprove('inspection', inspection.id)}
-                          className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
-                        >
-                          <CheckCircle2 className="h-4 w-4 mr-1" />
-                          Approve
-                        </Button>
+                        {inspection.status === 'submitted' && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleQuickReject('inspection', inspection.id)}
+                              className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
+                            >
+                              <XCircle className="h-4 w-4 mr-1" />
+                              Reject
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleQuickApprove('inspection', inspection.id)}
+                              className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
+                            >
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                              Approve
+                            </Button>
+                          </>
+                        )}
                         <Link href={`/inspections/${inspection.id}`}>
                           <Button size="sm">
                             View Details

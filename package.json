@@ -9,7 +9,9 @@
     "lint": "eslint",
     "setup:storage": "tsx scripts/setup-storage.ts",
     "setup:test-users": "tsx scripts/create-test-users.ts",
-    "migrate": "tsx scripts/run-migration.ts"
+    "seed:sample-data": "tsx scripts/seed-sample-data.ts",
+    "migrate": "tsx scripts/run-migration.ts",
+    "test:reports": "tsx scripts/test-reports.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
