@@ -7,7 +7,6 @@ import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, AlertTriangle, CheckCircle2, Clock, Trash2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Database } from '@/types/database';
@@ -33,6 +32,7 @@ export default function ActionsPage() {
   const [actions, setActions] = useState<Action[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [completingActions, setCompletingActions] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!authLoading) {
@@ -76,6 +76,9 @@ export default function ActionsPage() {
 
   const handleToggleActioned = async (actionId: string, currentState: boolean) => {
     try {
+      // Mark as completing for visual feedback
+      setCompletingActions(prev => new Set(prev).add(actionId));
+      
       const { error } = await supabase
         .from('actions')
         .update({
@@ -87,11 +90,23 @@ export default function ActionsPage() {
 
       if (error) throw error;
       
-      // Refresh the list
-      fetchActions();
+      // Wait 1 second to show "Complete" feedback before refreshing
+      setTimeout(() => {
+        setCompletingActions(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(actionId);
+          return newSet;
+        });
+        fetchActions();
+      }, 1000);
     } catch (err) {
       console.error('Error updating action:', err);
       setError('Failed to update action');
+      setCompletingActions(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(actionId);
+        return newSet;
+      });
     }
   };
 
@@ -199,55 +214,72 @@ export default function ActionsPage() {
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Pending Actions</h2>
           <div className="space-y-3">
-            {pendingActions.map((action) => (
-              <Card key={action.id} className="hover:bg-slate-800/30 transition-colors">
-                <CardContent className="pt-6">
-                  <div className="flex items-start gap-4">
-                    <Checkbox
-                      id={`action-${action.id}`}
-                      checked={action.actioned}
-                      onCheckedChange={() => handleToggleActioned(action.id, action.actioned)}
-                      className="mt-1"
-                    />
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            {getStatusIcon(action.status)}
-                            <h3 className="font-semibold text-lg">{action.title}</h3>
-                            {getPriorityBadge(action.priority)}
+            {pendingActions.map((action) => {
+              const isCompleting = completingActions.has(action.id);
+              return (
+                <Card key={action.id} className="hover:bg-slate-800/30 transition-colors">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              {getStatusIcon(action.status)}
+                              <h3 className="font-semibold text-lg">{action.title}</h3>
+                              {getPriorityBadge(action.priority)}
+                            </div>
+                            {action.description && (
+                              <p className="text-sm text-muted-foreground mb-2">{action.description}</p>
+                            )}
+                            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                              {action.vehicle_inspections && (
+                                <span>
+                                  Vehicle: {action.vehicle_inspections.vehicles?.reg_number || 'N/A'}
+                                </span>
+                              )}
+                              {action.inspection_items && (
+                                <span>
+                                  Issue: {action.inspection_items.item_description}
+                                </span>
+                              )}
+                              <span>Created: {formatDate(action.created_at)}</span>
+                            </div>
                           </div>
-                          {action.description && (
-                            <p className="text-sm text-muted-foreground mb-2">{action.description}</p>
-                          )}
-                          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                            {action.vehicle_inspections && (
-                              <span>
-                                Vehicle: {action.vehicle_inspections.vehicles?.reg_number || 'N/A'}
-                              </span>
-                            )}
-                            {action.inspection_items && (
-                              <span>
-                                Issue: {action.inspection_items.item_description}
-                              </span>
-                            )}
-                            <span>Created: {formatDate(action.created_at)}</span>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteAction(action.id)}
+                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              onClick={() => handleToggleActioned(action.id, action.actioned)}
+                              disabled={isCompleting}
+                              className={`h-16 min-w-[140px] text-base font-semibold transition-all ${
+                                isCompleting
+                                  ? 'bg-green-500 hover:bg-green-500 text-white'
+                                  : 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900'
+                              }`}
+                            >
+                              {isCompleting ? (
+                                <>
+                                  <CheckCircle2 className="h-5 w-5 mr-2" />
+                                  Complete
+                                </>
+                              ) : (
+                                'Complete'
+                              )}
+                            </Button>
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteAction(action.id)}
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
       )}
@@ -261,12 +293,6 @@ export default function ActionsPage() {
               <Card key={action.id} className="opacity-60 hover:opacity-80 transition-opacity">
                 <CardContent className="pt-6">
                   <div className="flex items-start gap-4">
-                    <Checkbox
-                      id={`action-${action.id}`}
-                      checked={action.actioned}
-                      onCheckedChange={() => handleToggleActioned(action.id, action.actioned)}
-                      className="mt-1"
-                    />
                     <div className="flex-1 space-y-2">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
@@ -286,14 +312,23 @@ export default function ActionsPage() {
                             )}
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteAction(action.id)}
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteAction(action.id)}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            onClick={() => handleToggleActioned(action.id, action.actioned)}
+                            variant="outline"
+                            className="h-16 min-w-[140px] text-base font-semibold"
+                          >
+                            Undo Complete
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>

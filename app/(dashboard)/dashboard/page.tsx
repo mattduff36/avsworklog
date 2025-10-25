@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { formatDate } from '@/lib/utils/date';
 import { 
   Clock, 
   CheckCircle2, 
@@ -19,13 +22,43 @@ import {
   HardHat,
   Truck,
   FileCheck,
-  ScrollText
+  ScrollText,
+  CarFront,
+  FileText
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
+import { Database } from '@/types/database';
+
+type RecentActivity = {
+  id: string;
+  type: 'timesheet' | 'inspection';
+  title: string;
+  user: string;
+  status: string;
+  created_at: string;
+};
+
+type Action = Database['public']['Tables']['actions']['Row'] & {
+  vehicle_inspections?: {
+    inspection_date: string;
+    vehicles?: {
+      reg_number: string;
+    };
+  };
+  inspection_items?: {
+    item_description: string;
+    status: string;
+  };
+};
 
 export default function DashboardPage() {
   const { profile, isManager, isAdmin } = useAuth();
   const formTypes = getEnabledForms();
+  const supabase = createClient();
+
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [topActions, setTopActions] = useState<Action[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Placeholder forms for future development (only shown to managers/admins)
   const placeholderForms = [
@@ -40,6 +73,117 @@ export default function DashboardPage() {
   ];
 
   const showPlaceholders = isManager || isAdmin;
+
+  useEffect(() => {
+    if (isManager || isAdmin) {
+      fetchRecentActivity();
+      fetchTopActions();
+    }
+  }, [isManager, isAdmin]);
+
+  const fetchRecentActivity = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch recent timesheets
+      const { data: timesheets, error: timesheetsError } = await supabase
+        .from('timesheets')
+        .select(`
+          id,
+          status,
+          created_at,
+          profiles:user_id (
+            full_name
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (timesheetsError) throw timesheetsError;
+
+      // Fetch recent inspections
+      const { data: inspections, error: inspectionsError } = await supabase
+        .from('vehicle_inspections')
+        .select(`
+          id,
+          status,
+          created_at,
+          profiles:user_id (
+            full_name
+          ),
+          vehicles (
+            reg_number
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (inspectionsError) throw inspectionsError;
+
+      // Combine and format the data
+      const combined: RecentActivity[] = [
+        ...(timesheets || []).map((ts: any) => ({
+          id: ts.id,
+          type: 'timesheet' as const,
+          title: 'Timesheet',
+          user: ts.profiles?.full_name || 'Unknown User',
+          status: ts.status,
+          created_at: ts.created_at,
+        })),
+        ...(inspections || []).map((insp: any) => ({
+          id: insp.id,
+          type: 'inspection' as const,
+          title: `Inspection - ${insp.vehicles?.reg_number || 'Unknown Vehicle'}`,
+          user: insp.profiles?.full_name || 'Unknown User',
+          status: insp.status,
+          created_at: insp.created_at,
+        })),
+      ]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 5);
+
+      setRecentActivity(combined);
+    } catch (error) {
+      console.error('Error fetching recent activity:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTopActions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('actions')
+        .select(`
+          *,
+          vehicle_inspections (
+            inspection_date,
+            vehicles (
+              reg_number
+            )
+          ),
+          inspection_items (
+            item_description,
+            status
+          )
+        `)
+        .eq('actioned', false)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+
+      // Sort by priority: urgent > high > medium > low
+      const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
+      const sortedData = (data || []).sort(
+        (a, b) => priorityOrder[a.priority as keyof typeof priorityOrder] - priorityOrder[b.priority as keyof typeof priorityOrder]
+      );
+
+      setTopActions(sortedData);
+    } catch (error) {
+      console.error('Error fetching top actions:', error);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -97,55 +241,6 @@ export default function DashboardPage() {
         </TooltipProvider>
       </div>
 
-      {/* Recent Activity / Stats - Manager/Admin Only */}
-      {isManager && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="border-t-4 border-t-amber-400 bg-slate-800/40 backdrop-blur-xl border-slate-700/50">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white">
-                Pending Approval
-              </CardTitle>
-              <Clock className="h-4 w-4 text-amber-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-amber-400">0</div>
-              <p className="text-xs text-slate-400">
-                Forms awaiting review
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-t-4 border-t-green-400 bg-slate-800/40 backdrop-blur-xl border-slate-700/50">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white">
-                Approved
-              </CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-green-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-400">0</div>
-              <p className="text-xs text-slate-400">
-                This month
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-t-4 border-t-red-400 bg-slate-800/40 backdrop-blur-xl border-slate-700/50">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white">
-                Requires Attention
-              </CardTitle>
-              <XCircle className="h-4 w-4 text-red-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-400">0</div>
-              <p className="text-xs text-slate-400">
-                Items needing action
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       {/* Recent Activity - Manager/Admin Only */}
       {isManager && (
@@ -154,7 +249,7 @@ export default function DashboardPage() {
             <CardTitle className="flex items-center justify-between text-white">
               <span>Recent Activity</span>
               <Badge variant="outline" className="text-slate-400 border-slate-600">
-                All Forms
+                Last 5 Submissions
               </Badge>
             </CardTitle>
             <CardDescription className="text-slate-400">
@@ -162,43 +257,173 @@ export default function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-12 text-slate-400">
-              <FileSpreadsheet className="h-16 w-16 mx-auto mb-4 opacity-20 text-avs-yellow" />
-              <p className="text-lg mb-2">No activity yet</p>
-              <p className="text-sm text-slate-500 mb-6">
-                Recent form submissions will appear here
-              </p>
-              <div className="flex flex-wrap justify-center gap-2">
-                {formTypes.map((formType) => (
-                  <Link key={formType.id} href={formType.listHref}>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="border-slate-600 text-slate-300 hover:bg-slate-700/50"
-                    >
-                      View All {formType.title}s
-                    </Button>
+            {loading ? (
+              <div className="text-center py-8 text-slate-400">
+                <p>Loading recent activity...</p>
+              </div>
+            ) : recentActivity.length > 0 ? (
+              <div className="space-y-3">
+                {recentActivity.map((activity) => (
+                  <Link
+                    key={activity.id}
+                    href={activity.type === 'timesheet' ? `/timesheets/${activity.id}` : `/inspections/${activity.id}`}
+                    className="block"
+                  >
+                    <div className="flex items-center justify-between p-4 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 transition-colors border border-slate-700/50">
+                      <div className="flex items-center gap-3">
+                        {activity.type === 'timesheet' ? (
+                          <FileText className="h-5 w-5 text-blue-400" />
+                        ) : (
+                          <CarFront className="h-5 w-5 text-purple-400" />
+                        )}
+                        <div>
+                          <p className="font-medium text-white">{activity.title}</p>
+                          <p className="text-sm text-slate-400">
+                            by {activity.user} • {formatDate(activity.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={
+                          activity.status === 'submitted'
+                            ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
+                            : activity.status === 'approved'
+                            ? 'border-green-500/30 text-green-400 bg-green-500/10'
+                            : activity.status === 'rejected'
+                            ? 'border-red-500/30 text-red-400 bg-red-500/10'
+                            : 'border-slate-600 text-slate-400'
+                        }
+                      >
+                        {activity.status}
+                      </Badge>
+                    </div>
                   </Link>
                 ))}
+                <div className="flex justify-center gap-2 pt-4">
+                  {formTypes.map((formType) => (
+                    <Link key={formType.id} href={formType.listHref}>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="border-slate-600 text-slate-300 hover:bg-slate-700/50"
+                      >
+                        View All {formType.title}s
+                      </Button>
+                    </Link>
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-12 text-slate-400">
+                <FileSpreadsheet className="h-16 w-16 mx-auto mb-4 opacity-20 text-avs-yellow" />
+                <p className="text-lg mb-2">No activity yet</p>
+                <p className="text-sm text-slate-500 mb-6">
+                  Recent form submissions will appear here
+                </p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {formTypes.map((formType) => (
+                    <Link key={formType.id} href={formType.listHref}>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="border-slate-600 text-slate-300 hover:bg-slate-700/50"
+                      >
+                        View All {formType.title}s
+                      </Button>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Manager Section */}
+      {/* Manager Actions Section */}
       {isManager && (
-        <Card className="bg-slate-800/40 backdrop-blur-xl border-slate-700/50 border-t-2 border-t-admin">
-          <CardHeader className="bg-admin/10">
-            <CardTitle className="text-white">Manager Actions</CardTitle>
+        <Card className="bg-slate-800/40 backdrop-blur-xl border-slate-700/50 border-t-2 border-t-red-500">
+          <CardHeader className="bg-red-500/10">
+            <CardTitle className="flex items-center justify-between text-white">
+              <span>High Priority Actions</span>
+              <Link href="/actions">
+                <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-700/50">
+                  View All Actions
+                </Button>
+              </Link>
+            </CardTitle>
             <CardDescription className="text-slate-400">
-              Forms requiring your review and approval
+              Highest priority items requiring attention
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8 text-slate-400">
-              <p>No pending approvals</p>
-            </div>
+            {loading ? (
+              <div className="text-center py-8 text-slate-400">
+                <p>Loading actions...</p>
+              </div>
+            ) : topActions.length > 0 ? (
+              <div className="space-y-3">
+                {topActions.map((action) => {
+                  const getPriorityColor = (priority: string) => {
+                    switch (priority) {
+                      case 'urgent':
+                        return 'border-red-500/30 text-red-400 bg-red-500/20';
+                      case 'high':
+                        return 'border-orange-500/30 text-orange-400 bg-orange-500/20';
+                      case 'medium':
+                        return 'border-yellow-500/30 text-yellow-400 bg-yellow-500/20';
+                      case 'low':
+                        return 'border-blue-500/30 text-blue-400 bg-blue-500/20';
+                      default:
+                        return 'border-slate-600 text-slate-400';
+                    }
+                  };
+
+                  return (
+                    <div
+                      key={action.id}
+                      className="p-4 rounded-lg bg-slate-700/30 border border-slate-700/50"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertTriangle className="h-5 w-5 text-amber-400" />
+                            <h3 className="font-semibold text-white">{action.title}</h3>
+                            <Badge variant="outline" className={getPriorityColor(action.priority)}>
+                              {action.priority.toUpperCase()}
+                            </Badge>
+                          </div>
+                          {action.description && (
+                            <p className="text-sm text-slate-400 mb-2">{action.description}</p>
+                          )}
+                          <div className="flex flex-wrap gap-4 text-sm text-slate-400">
+                            {action.vehicle_inspections && (
+                              <span>
+                                Vehicle: {action.vehicle_inspections.vehicles?.reg_number || 'N/A'}
+                              </span>
+                            )}
+                            {action.inspection_items && (
+                              <span>
+                                Issue: {action.inspection_items.item_description}
+                              </span>
+                            )}
+                            <span>Created: {formatDate(action.created_at)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-slate-400">
+                <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-20 text-amber-400" />
+                <p className="text-lg mb-2">No pending actions</p>
+                <p className="text-sm text-slate-500">
+                  High priority items will appear here
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
