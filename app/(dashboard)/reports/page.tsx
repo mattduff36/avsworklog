@@ -5,15 +5,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   FileText, 
   Calendar, 
   FileSpreadsheet, 
-  Loader2
+  Loader2,
+  Clipboard,
+  Download,
+  Package
 } from 'lucide-react';
 
 export default function ReportsPage() {
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('timesheets');
 
   // Form state
   const [dateFrom, setDateFrom] = useState('');
@@ -68,196 +74,254 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">Reports</h1>
-        <p className="text-muted-foreground">
-          Generate and export reports for timesheets and inspections
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Reports</h1>
+        <p className="text-slate-600 dark:text-slate-400">
+          Generate and export reports for your business operations
         </p>
       </div>
 
-      {/* Date Range Selector */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Report Date Range</CardTitle>
-          <CardDescription>
+      {/* Date Range - Clean style */}
+      <Card className="bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700">
+        <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50">
+          <CardTitle className="text-slate-900 dark:text-white flex items-center gap-2">
+            <Calendar className="h-5 w-5" style={{ color: '#F1D64A' }} />
+            Report Date Range
+          </CardTitle>
+          <CardDescription className="text-slate-600 dark:text-slate-400">
             Select the date range for generating reports (default: last 30 days)
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label>Date From</Label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  type="date" 
-                  className="pl-9" 
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                />
-              </div>
+              <Label className="text-slate-700 dark:text-slate-300 font-medium">Date From</Label>
+              <Input 
+                type="date" 
+                className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white" 
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
             </div>
             
             <div className="space-y-2">
-              <Label>Date To</Label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  type="date" 
-                  className="pl-9"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                />
-              </div>
+              <Label className="text-slate-700 dark:text-slate-300 font-medium">Date To</Label>
+              <Input 
+                type="date" 
+                className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Timesheet Reports */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Timesheet Reports</span>
-              <FileText className="h-5 w-5 text-primary" />
-            </CardTitle>
-            <CardDescription>
-              Generate Excel reports for employee timesheets
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between p-3 border rounded-md hover:bg-accent/50 transition-colors">
-              <div>
-                <div className="font-medium">Weekly Timesheet Summary</div>
-                <div className="text-xs text-muted-foreground">
-                  Export timesheet summary with daily breakdown
-                </div>
-              </div>
-              <Button
-                size="sm"
-                onClick={() =>
-                  downloadReport(
-                    '/api/reports/timesheets/summary',
-                    `Timesheet_Summary_${dateFrom}_to_${dateTo}.xlsx`
-                  )
-                }
-                disabled={downloading === '/api/reports/timesheets/summary'}
-              >
-                {downloading === '/api/reports/timesheets/summary' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Excel
-                  </>
-                )}
-              </Button>
-            </div>
+      {/* Tabs Navigation */}
+      <Tabs defaultValue="timesheets" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full max-w-2xl grid-cols-3 h-auto p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+          <TabsTrigger 
+            value="timesheets" 
+            className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
+            style={activeTab === 'timesheets' ? {
+              backgroundColor: 'hsl(210 90% 50%)',
+              color: 'white',
+              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
+            } : {}}
+          >
+            <FileText className="h-5 w-5" />
+            <span className="text-sm font-medium">Timesheets</span>
+          </TabsTrigger>
+          <TabsTrigger 
+            value="inspections" 
+            className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
+            style={activeTab === 'inspections' ? {
+              backgroundColor: 'hsl(30 95% 55%)',
+              color: 'white',
+              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
+            } : {}}
+          >
+            <Clipboard className="h-5 w-5" />
+            <span className="text-sm font-medium">Inspections</span>
+          </TabsTrigger>
+          <TabsTrigger 
+            value="future" 
+            className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
+            style={activeTab === 'future' ? {
+              backgroundColor: '#F1D64A',
+              color: '#252525',
+              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
+            } : {}}
+          >
+            <Package className="h-5 w-5" />
+            <span className="text-sm font-medium">More Reports</span>
+          </TabsTrigger>
+        </TabsList>
 
-            <div className="flex items-center justify-between p-3 border rounded-md hover:bg-accent/50 transition-colors">
-              <div>
-                <div className="font-medium">Payroll Export</div>
-                <div className="text-xs text-muted-foreground">
-                  Export approved hours for payroll processing
+        <TabsContent value="timesheets" className="space-y-4">
+          <div className="grid gap-4">
+            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-timesheet/50 transition-all duration-200">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                      Weekly Timesheet Summary
+                    </h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                      Export timesheet summary with daily breakdown and totals
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-500">
+                      <Badge variant="outline" className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700">
+                        Approved Items
+                      </Badge>
+                    </div>
+                  </div>
+                  <Button
+                    size="lg"
+                    className="bg-timesheet hover:bg-timesheet-dark text-white ml-4 transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
+                    onClick={() => downloadReport('/api/reports/timesheets/summary', `Timesheet_Summary_${dateFrom}_to_${dateTo}.xlsx`)}
+                    disabled={downloading === '/api/reports/timesheets/summary'}
+                  >
+                    {downloading === '/api/reports/timesheets/summary' ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <>
+                        <Download className="h-5 w-5 mr-2" />
+                        Download
+                      </>
+                    )}
+                  </Button>
                 </div>
-              </div>
-              <Button
-                size="sm"
-                onClick={() =>
-                  downloadReport(
-                    '/api/reports/timesheets/payroll',
-                    `Payroll_Export_${dateFrom}_to_${dateTo}.xlsx`
-                  )
-                }
-                disabled={downloading === '/api/reports/timesheets/payroll'}
-              >
-                {downloading === '/api/reports/timesheets/payroll' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Excel
-                  </>
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
 
-        {/* Inspection Reports */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Inspection Reports</span>
-              <FileText className="h-5 w-5 text-primary" />
-            </CardTitle>
-            <CardDescription>
-              Generate Excel reports for vehicle inspections
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between p-3 border rounded-md hover:bg-accent/50 transition-colors">
-              <div>
-                <div className="font-medium">Compliance Summary</div>
-                <div className="text-xs text-muted-foreground">
-                  Vehicle safety compliance with statistics
+            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-timesheet/50 transition-all duration-200">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                      Payroll Export
+                    </h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                      Export approved hours for payroll processing
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-500">
+                      <Badge variant="outline" className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800">
+                        Payroll Ready
+                      </Badge>
+                    </div>
+                  </div>
+                  <Button
+                    size="lg"
+                    className="bg-timesheet hover:bg-timesheet-dark text-white ml-4 transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
+                    onClick={() => downloadReport('/api/reports/timesheets/payroll', `Payroll_Export_${dateFrom}_to_${dateTo}.xlsx`)}
+                    disabled={downloading === '/api/reports/timesheets/payroll'}
+                  >
+                    {downloading === '/api/reports/timesheets/payroll' ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <>
+                        <Download className="h-5 w-5 mr-2" />
+                        Download
+                      </>
+                    )}
+                  </Button>
                 </div>
-              </div>
-              <Button
-                size="sm"
-                onClick={() =>
-                  downloadReport(
-                    '/api/reports/inspections/compliance',
-                    `Inspection_Compliance_${dateFrom}_to_${dateTo}.xlsx`
-                  )
-                }
-                disabled={downloading === '/api/reports/inspections/compliance'}
-              >
-                {downloading === '/api/reports/inspections/compliance' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Excel
-                  </>
-                )}
-              </Button>
-            </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-            <div className="flex items-center justify-between p-3 border rounded-md hover:bg-accent/50 transition-colors">
-              <div>
-                <div className="font-medium">Defects Log</div>
-                <div className="text-xs text-muted-foreground">
-                  All failed items requiring attention
+        <TabsContent value="inspections" className="space-y-4">
+          <div className="grid gap-4">
+            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                      Compliance Summary
+                    </h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                      Vehicle safety compliance with statistics and trends
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-500">
+                      <Badge variant="outline" className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700">
+                        All Inspections
+                      </Badge>
+                    </div>
+                  </div>
+                  <Button
+                    size="lg"
+                    className="bg-inspection hover:bg-inspection-dark text-white ml-4 transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
+                    onClick={() => downloadReport('/api/reports/inspections/compliance', `Inspection_Compliance_${dateFrom}_to_${dateTo}.xlsx`)}
+                    disabled={downloading === '/api/reports/inspections/compliance'}
+                  >
+                    {downloading === '/api/reports/inspections/compliance' ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <>
+                        <Download className="h-5 w-5 mr-2" />
+                        Download
+                      </>
+                    )}
+                  </Button>
                 </div>
-              </div>
-              <Button
-                size="sm"
-                onClick={() =>
-                  downloadReport(
-                    '/api/reports/inspections/defects',
-                    `Defects_Log_${dateFrom}_to_${dateTo}.xlsx`
-                  )
-                }
-                disabled={downloading === '/api/reports/inspections/defects'}
-              >
-                {downloading === '/api/reports/inspections/defects' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Excel
-                  </>
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              </CardContent>
+            </Card>
 
+            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                      Defects Log
+                    </h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                      All failed items requiring immediate attention
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-500">
+                      <Badge variant="outline" className="bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800">
+                        Action Required
+                      </Badge>
+                    </div>
+                  </div>
+                  <Button
+                    size="lg"
+                    className="bg-inspection hover:bg-inspection-dark text-white ml-4 transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
+                    onClick={() => downloadReport('/api/reports/inspections/defects', `Defects_Log_${dateFrom}_to_${dateTo}.xlsx`)}
+                    disabled={downloading === '/api/reports/inspections/defects'}
+                  >
+                    {downloading === '/api/reports/inspections/defects' ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <>
+                        <Download className="h-5 w-5 mr-2" />
+                        Download
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="future" className="space-y-4">
+          <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700">
+            <CardContent className="py-12 text-center">
+              <Package className="h-16 w-16 mx-auto mb-4 text-slate-400" />
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                More Reports Coming Soon
+              </h3>
+              <p className="text-slate-600 dark:text-slate-400">
+                Additional report types will be added here as new features are developed
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
