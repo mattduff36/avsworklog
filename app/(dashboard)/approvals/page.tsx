@@ -307,30 +307,50 @@ export default function ApprovalsPage() {
         </Card>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-md grid-cols-2 bg-transparent gap-2">
+          <TabsList className="grid w-full max-w-2xl grid-cols-2 h-auto p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
             <TabsTrigger 
               value="timesheets" 
-              className="flex items-center gap-2 bg-timesheet text-white data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all"
+              className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
+              style={activeTab === 'timesheets' ? {
+                backgroundColor: 'hsl(210 90% 50%)', // Timesheet Blue
+                color: 'white',
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
+              } : {}}
             >
-              <FileText className="h-4 w-4" />
-              Timesheets
-              {timesheets.length > 0 && (
-                <Badge variant="secondary" className="ml-1 bg-white/20 text-white border-white/30">
-                  {timesheets.length}
-                </Badge>
-              )}
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                <span className="text-sm font-medium">Timesheets</span>
+                {timesheets.length > 0 && (
+                  <Badge 
+                    variant="secondary" 
+                    className={activeTab === 'timesheets' ? "bg-white/20 text-white border-white/30" : ""}
+                  >
+                    {timesheets.length}
+                  </Badge>
+                )}
+              </div>
             </TabsTrigger>
             <TabsTrigger 
               value="inspections" 
-              className="flex items-center gap-2 bg-inspection text-white data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all"
+              className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
+              style={activeTab === 'inspections' ? {
+                backgroundColor: 'hsl(30 95% 55%)', // Inspection Orange
+                color: 'white',
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
+              } : {}}
             >
-              <Clipboard className="h-4 w-4" />
-              Inspections
-              {inspections.length > 0 && (
-                <Badge variant="secondary" className="ml-1 bg-white/20 text-white border-white/30">
-                  {inspections.length}
-                </Badge>
-              )}
+              <div className="flex items-center gap-2">
+                <Clipboard className="h-5 w-5" />
+                <span className="text-sm font-medium">Inspections</span>
+                {inspections.length > 0 && (
+                  <Badge 
+                    variant="secondary"
+                    className={activeTab === 'inspections' ? "bg-white/20 text-white border-white/30" : ""}
+                  >
+                    {inspections.length}
+                  </Badge>
+                )}
+              </div>
             </TabsTrigger>
           </TabsList>
 
