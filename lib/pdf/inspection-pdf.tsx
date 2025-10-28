@@ -6,8 +6,8 @@ import { formatDate } from '@/lib/utils/date';
 // Create styles for the PDF matching the scanned form
 const styles = StyleSheet.create({
   page: {
-    padding: 30,
-    fontSize: 8,
+    padding: 20,
+    fontSize: 7,
     fontFamily: 'Helvetica',
   },
   // Form number in top right
@@ -22,34 +22,34 @@ const styles = StyleSheet.create({
   // Company header
   companyHeader: {
     textAlign: 'center',
-    marginBottom: 15,
+    marginBottom: 8,
   },
   companyName: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 2,
-    letterSpacing: 1,
+    marginBottom: 1,
+    letterSpacing: 0.5,
   },
   companyDetails: {
-    fontSize: 7,
+    fontSize: 6,
     marginBottom: 1,
   },
   companyPhone: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: 'bold',
-    marginTop: 2,
+    marginTop: 1,
   },
   registeredNo: {
-    fontSize: 7,
+    fontSize: 6,
     fontStyle: 'italic',
-    marginTop: 2,
-    marginBottom: 3,
+    marginTop: 1,
+    marginBottom: 2,
   },
   pageTitle: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 6,
   },
   // Top info table
   topTable: {
@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#000',
-    minHeight: 30,
+    minHeight: 22,
   },
   topCell: {
     padding: 4,
@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   // Week ending row with day columns
   weekRow: {
     flexDirection: 'row',
-    minHeight: 25,
+    minHeight: 18,
   },
   weekLabel: {
     width: '40%',
@@ -122,11 +122,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#000',
-    minHeight: 20,
+    minHeight: 14,
   },
   checklistRowLast: {
     flexDirection: 'row',
-    minHeight: 20,
+    minHeight: 14,
   },
   numberCell: {
     width: '6%',
@@ -186,45 +186,45 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#000',
     borderTopWidth: 0,
-    padding: 8,
-    minHeight: 25,
+    padding: 4,
+    minHeight: 16,
   },
   checkedByText: {
-    fontSize: 8,
+    fontSize: 7,
   },
   // Comments sections
   commentsBox: {
     borderWidth: 1,
     borderColor: '#000',
-    marginTop: 10,
-    padding: 8,
-    minHeight: 60,
+    marginTop: 4,
+    padding: 4,
+    minHeight: 30,
   },
   commentsTitle: {
-    fontSize: 8,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  commentsText: {
-    fontSize: 7,
-    lineHeight: 1.4,
-  },
-  // Legend section
-  legendSection: {
-    marginTop: 10,
-    textAlign: 'center',
-  },
-  legendText: {
     fontSize: 7,
     fontWeight: 'bold',
     marginBottom: 2,
   },
-  legendNote: {
+  commentsText: {
     fontSize: 6,
+    lineHeight: 1.2,
+  },
+  // Legend section
+  legendSection: {
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  legendText: {
+    fontSize: 6,
+    fontWeight: 'bold',
     marginBottom: 1,
   },
+  legendNote: {
+    fontSize: 5,
+    marginBottom: 0.5,
+  },
   distributionText: {
-    fontSize: 6,
+    fontSize: 5,
     fontStyle: 'italic',
   },
 });
@@ -276,9 +276,9 @@ export function InspectionPDF({ inspection, items, vehicleReg, employeeName, emp
     'Nil Defects',
   ];
 
-  // Helper to get check mark for an item
-  const getCheckMark = (itemNumber: number) => {
-    const item = items.find(i => i.item_number === itemNumber);
+  // Helper to get check mark for an item on a specific day (1=Monday, 7=Sunday)
+  const getCheckMark = (itemNumber: number, dayOfWeek: number) => {
+    const item = items.find(i => i.item_number === itemNumber && i.day_of_week === dayOfWeek);
     if (!item) return '';
     return item.status === 'ok' ? '✓' : item.status === 'defect' ? '✗' : '0';
   };
@@ -368,14 +368,14 @@ export function InspectionPDF({ inspection, items, vehicleReg, employeeName, emp
               <View style={styles.itemCell}>
                 <Text style={styles.itemText}>{item}</Text>
               </View>
-              {/* 7 day columns */}
-              {[0, 1, 2, 3, 4, 5].map((day) => (
-                <View key={day} style={styles.checkCell}>
-                  <Text style={styles.checkText}>{getCheckMark(index + 1)}</Text>
+              {/* 7 day columns (1=Mon, 2=Tue, ..., 7=Sun) */}
+              {[1, 2, 3, 4, 5, 6].map((dayOfWeek) => (
+                <View key={dayOfWeek} style={styles.checkCell}>
+                  <Text style={styles.checkText}>{getCheckMark(index + 1, dayOfWeek)}</Text>
                 </View>
               ))}
               <View style={styles.checkCellLast}>
-                <Text style={styles.checkText}>{getCheckMark(index + 1)}</Text>
+                <Text style={styles.checkText}>{getCheckMark(index + 1, 7)}</Text>
               </View>
             </View>
           ))}
@@ -394,14 +394,14 @@ export function InspectionPDF({ inspection, items, vehicleReg, employeeName, emp
               <View style={styles.itemCell}>
                 <Text style={styles.itemText}>{item}</Text>
               </View>
-              {/* 7 day columns */}
-              {[0, 1, 2, 3, 4, 5].map((day) => (
-                <View key={day} style={styles.checkCell}>
-                  <Text style={styles.checkText}>{getCheckMark(index + 22)}</Text>
+              {/* 7 day columns (1=Mon, 2=Tue, ..., 7=Sun) */}
+              {[1, 2, 3, 4, 5, 6].map((dayOfWeek) => (
+                <View key={dayOfWeek} style={styles.checkCell}>
+                  <Text style={styles.checkText}>{getCheckMark(index + 22, dayOfWeek)}</Text>
                 </View>
               ))}
               <View style={styles.checkCellLast}>
-                <Text style={styles.checkText}>{getCheckMark(index + 22)}</Text>
+                <Text style={styles.checkText}>{getCheckMark(index + 22, 7)}</Text>
               </View>
             </View>
           ))}
