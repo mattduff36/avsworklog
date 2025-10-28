@@ -178,6 +178,21 @@ export function TimesheetPDF({ timesheet, employeeName, employeeEmail }: Timeshe
     ? timesheet.id.slice(-5).toUpperCase() 
     : '00000';
 
+  // Helper to format remarks with job number
+  const formatRemarks = (entry: any) => {
+    const jobNumber = (entry as TimesheetEntry & { job_number?: string }).job_number;
+    const remarks = entry.remarks;
+    
+    if (jobNumber && remarks) {
+      return `Job number ${jobNumber} - ${remarks}`;
+    } else if (jobNumber) {
+      return `Job number ${jobNumber}`;
+    } else if (remarks) {
+      return remarks;
+    }
+    return '';
+  };
+
   // Create an array with all 7 days
   const allDays = [1, 2, 3, 4, 5, 6, 7].map(dayNum => {
     const entry = sortedEntries.find(e => e.day_of_week === dayNum);
@@ -286,7 +301,7 @@ export function TimesheetPDF({ timesheet, employeeName, employeeEmail }: Timeshe
               </View>
               <View style={styles.colRemarks}>
                 <Text style={[styles.cellText, { textAlign: 'left' }]}>
-                  {entry.did_not_work ? 'DID NOT WORK' : (entry.remarks || '')}
+                  {entry.did_not_work ? 'DID NOT WORK' : formatRemarks(entry)}
                 </Text>
               </View>
             </View>
