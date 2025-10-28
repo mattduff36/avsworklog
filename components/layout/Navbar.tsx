@@ -111,9 +111,9 @@ export function Navbar() {
                 size="sm"
                 onClick={handleSignOut}
                 className="text-slate-300 hover:text-white hover:bg-slate-800/50"
+                title="Sign Out"
               >
-                <LogOut className="w-4 h-4 mr-2" />
-                Sign Out
+                <LogOut className="w-4 h-4" />
               </Button>
             </div>
 
