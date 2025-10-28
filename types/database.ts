@@ -211,8 +211,9 @@ export interface Database {
           id: string
           inspection_id: string
           item_number: number
+          day_of_week: number
           item_description: string
-          status: 'ok' | 'defect'
+          status: 'ok' | 'attention' | 'na'
           comments: string | null
           created_at: string
         }
@@ -220,8 +221,9 @@ export interface Database {
           id?: string
           inspection_id: string
           item_number: number
-          item_description: string
-          status?: 'ok' | 'defect'
+          day_of_week: number
+          item_description?: string
+          status?: 'ok' | 'attention' | 'na'
           comments?: string | null
           created_at?: string
         }
@@ -229,8 +231,9 @@ export interface Database {
           id?: string
           inspection_id?: string
           item_number?: number
+          day_of_week?: number
           item_description?: string
-          status?: 'ok' | 'defect'
+          status?: 'ok' | 'attention' | 'na'
           comments?: string | null
           created_at?: string
         }

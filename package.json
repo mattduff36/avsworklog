@@ -12,7 +12,9 @@
     "seed:sample-data": "tsx scripts/seed-sample-data.ts",
     "clear:inspections": "tsx scripts/clear-inspections.ts",
     "reseed:inspections": "npm run clear:inspections && npm run seed:sample-data",
+    "seed:inspections-sql": "tsx scripts/seed-inspections-sql.ts",
     "migrate": "tsx scripts/run-migration.ts",
+    "migrate:day-of-week": "tsx scripts/run-day-of-week-migration.ts",
     "test:reports": "tsx scripts/test-reports.ts"
   },
   "dependencies": {

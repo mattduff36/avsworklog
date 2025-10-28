@@ -534,7 +534,7 @@ export default function NewInspectionPage() {
                     const dayOfWeek = dayIndex + 1;
                     const key = `${dayOfWeek}-${itemNumber}`;
                     const currentStatus = checkboxStates[key];
-                    const hasDefectComment = currentStatus === 'defect' && comments[key];
+                    const hasDefectComment = currentStatus === 'attention' && comments[key];
               
               return (
                 <div key={itemNumber} className="bg-slate-900/30 border border-slate-700/50 rounded-lg p-4 space-y-3">
@@ -674,6 +674,10 @@ export default function NewInspectionPage() {
             </div>
           </div>
 
+              </TabsContent>
+            ))}
+          </Tabs>
+
           {/* Desktop Action Buttons */}
           <div className="hidden md:flex flex-row gap-3 justify-end pt-4">
             <Button
@@ -694,9 +698,6 @@ export default function NewInspectionPage() {
               {loading ? 'Submitting...' : 'Submit Inspection'}
             </Button>
           </div>
-              </TabsContent>
-            ))}
-          </Tabs>
         </CardContent>
       </Card>
 
