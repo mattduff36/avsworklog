@@ -280,16 +280,17 @@ export function InspectionPDF({ inspection, items, vehicleReg, employeeName, emp
   const getCheckMark = (itemNumber: number, dayOfWeek: number) => {
     const item = items.find(i => i.item_number === itemNumber && i.day_of_week === dayOfWeek);
     if (!item) return '';
-    return item.status === 'ok' ? '✓' : item.status === 'defect' ? '✗' : '0';
+    return item.status === 'ok' ? '✓' : item.status === 'attention' ? '✗' : '0';
   };
 
   // Collect all defects and comments
   const defectsAndComments = items
-    .filter(item => item.comments || item.status === 'defect')
+    .filter(item => item.comments || item.status === 'attention')
     .map(item => {
       const itemName = INSPECTION_ITEMS[item.item_number - 1] || formItems[item.item_number - 1];
-      const status = item.status === 'ok' ? '✓' : item.status === 'defect' ? '✗' : '0';
-      return `${item.item_number}. ${itemName} [${status}]${item.comments ? ': ' + item.comments : ''}`;
+      const status = item.status === 'ok' ? '✓' : item.status === 'attention' ? '✗' : '0';
+      const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][item.day_of_week - 1];
+      return `${item.item_number}. ${itemName} (${dayName}) [${status}]${item.comments ? ': ' + item.comments : ''}`;
     })
     .join('\n');
 
@@ -333,6 +334,7 @@ export function InspectionPDF({ inspection, items, vehicleReg, employeeName, emp
           <View style={styles.weekRow}>
             <View style={styles.weekLabel}>
               <Text style={styles.topLabel}>WEEK ENDING.</Text>
+              <Text style={styles.topValue}>{inspection.week_ending ? formatDate(new Date(inspection.week_ending)) : ''}</Text>
             </View>
             <View style={styles.dayCell}>
               <Text style={styles.dayText}>MON</Text>

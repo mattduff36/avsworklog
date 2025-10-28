@@ -1,27 +1,38 @@
-export type InspectionStatus = 'ok' | 'defect';
+export type InspectionStatus = 'ok' | 'attention' | 'na';
 
 export interface VehicleInspection {
   id: string;
   vehicle_id: string;
   user_id: string;
-  inspection_date: string;
-  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  week_ending: string;
+  mileage: number | null;
+  checked_by: string | null;
+  defects_comments: string | null;
+  action_taken: string | null;
+  status: 'in_progress' | 'submitted' | 'reviewed';
   submitted_at: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
   manager_comments: string | null;
   created_at: string;
   updated_at: string;
+  // Added for compatibility
+  inspection_date?: string;
+  inspection_end_date?: string;
+  signature_data?: string | null;
+  signed_at?: string | null;
 }
 
 export interface InspectionItem {
   id: string;
   inspection_id: string;
   item_number: number;
-  item_description: string;
+  day_of_week: number;
   status: InspectionStatus;
   comments: string | null;
   created_at: string;
+  // Added for compatibility
+  item_description?: string;
 }
 
 export interface InspectionPhoto {
