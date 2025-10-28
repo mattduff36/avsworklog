@@ -10,7 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import { Plus, Clipboard, CheckCircle2, XCircle, Clock, AlertCircle, User } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Plus, Clipboard, CheckCircle2, XCircle, Clock, AlertCircle, User, Download } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { VehicleInspection } from '@/types/inspection';
 
@@ -29,10 +30,12 @@ interface InspectionWithVehicle extends VehicleInspection {
 
 export default function InspectionsPage() {
   const { user, isManager } = useAuth();
+  const router = useRouter();
   const [inspections, setInspections] = useState<InspectionWithVehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
+  const [downloading, setDownloading] = useState<string | null>(null);
   const supabase = createClient();
 
   // Fetch employees if manager
@@ -119,6 +122,34 @@ export default function InspectionsPage() {
         return <XCircle className="h-5 w-5 text-red-600" />;
       default:
         return <Clipboard className="h-5 w-5 text-muted-foreground" />;
+    }
+  };
+
+  const handleDownloadPDF = async (e: React.MouseEvent, inspectionId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    setDownloading(inspectionId);
+    try {
+      const response = await fetch(`/api/inspections/${inspectionId}/pdf`);
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `inspection-${inspectionId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      alert('Failed to download PDF');
+    } finally {
+      setDownloading(null);
     }
   };
 
@@ -209,44 +240,62 @@ export default function InspectionsPage() {
       ) : (
         <div className="grid gap-4">
           {inspections.map((inspection) => (
-            <Link key={inspection.id} href={`/inspections/${inspection.id}`}>
-              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200 cursor-pointer">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-3">
-                      {getStatusIcon(inspection.status)}
-                      <div>
-                        <CardTitle className="text-lg text-slate-900 dark:text-white">
-                          {inspection.vehicles?.reg_number || 'Unknown Vehicle'}
-                        </CardTitle>
-                        <CardDescription className="text-slate-600 dark:text-slate-400">
-                          {inspection.vehicles?.vehicle_type && `${inspection.vehicles.vehicle_type} • `}
-                          {inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
-                            ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
-                            : formatDate(inspection.inspection_date)
-                          }
-                        </CardDescription>
-                      </div>
+            <Card 
+              key={inspection.id} 
+              className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200 cursor-pointer"
+              onClick={() => router.push(`/inspections/${inspection.id}`)}
+            >
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-3">
+                    {getStatusIcon(inspection.status)}
+                    <div>
+                      <CardTitle className="text-lg text-slate-900 dark:text-white">
+                        {inspection.vehicles?.reg_number || 'Unknown Vehicle'}
+                      </CardTitle>
+                      <CardDescription className="text-slate-600 dark:text-slate-400">
+                        {inspection.vehicles?.vehicle_type && `${inspection.vehicles.vehicle_type} • `}
+                        {inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
+                          ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
+                          : formatDate(inspection.inspection_date)
+                        }
+                      </CardDescription>
                     </div>
-                    {getStatusBadge(inspection.status)}
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="text-slate-600 dark:text-slate-400">
-                      {inspection.submitted_at
-                        ? `Submitted ${formatDate(inspection.submitted_at)}`
-                        : 'Not yet submitted'}
+                  {getStatusBadge(inspection.status)}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between text-sm">
+                  <div className="text-slate-600 dark:text-slate-400">
+                    {inspection.submitted_at
+                      ? `Submitted ${formatDate(inspection.submitted_at)}`
+                      : 'Not yet submitted'}
+                  </div>
+                  {inspection.status === 'rejected' && inspection.manager_comments && (
+                    <div className="text-red-600 text-xs">
+                      See manager comments
                     </div>
-                    {inspection.status === 'rejected' && inspection.manager_comments && (
-                      <div className="text-red-600 text-xs">
-                        See manager comments
-                      </div>
-                    )}
+                  )}
+                </div>
+                
+                {/* Download PDF Button for Approved/Pending */}
+                {(inspection.status === 'approved' || inspection.status === 'submitted') && (
+                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <Button
+                      onClick={(e) => handleDownloadPDF(e, inspection.id)}
+                      disabled={downloading === inspection.id}
+                      variant="outline"
+                      size="sm"
+                      className="w-full sm:w-auto bg-white dark:bg-slate-900 border-inspection text-inspection hover:bg-inspection hover:text-white transition-all duration-200"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {downloading === inspection.id ? 'Downloading...' : 'Download PDF'}
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-            </Link>
+                )}
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}

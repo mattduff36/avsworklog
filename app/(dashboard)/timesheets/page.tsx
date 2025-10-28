@@ -10,7 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import { Plus, FileText, Clock, CheckCircle2, XCircle, User } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Plus, FileText, Clock, CheckCircle2, XCircle, User, Download } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 
@@ -22,10 +23,12 @@ type Employee = {
 
 export default function TimesheetsPage() {
   const { user, isManager } = useAuth();
+  const router = useRouter();
   const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
+  const [downloading, setDownloading] = useState<string | null>(null);
   const supabase = createClient();
 
   // Fetch employees if manager
@@ -106,6 +109,34 @@ export default function TimesheetsPage() {
         return <XCircle className="h-5 w-5 text-red-600" />;
       default:
         return <FileText className="h-5 w-5 text-muted-foreground" />;
+    }
+  };
+
+  const handleDownloadPDF = async (e: React.MouseEvent, timesheetId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    setDownloading(timesheetId);
+    try {
+      const response = await fetch(`/api/timesheets/${timesheetId}/pdf`);
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `timesheet-${timesheetId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      alert('Failed to download PDF');
+    } finally {
+      setDownloading(null);
     }
   };
 
@@ -196,40 +227,58 @@ export default function TimesheetsPage() {
       ) : (
         <div className="grid gap-4">
           {timesheets.map((timesheet) => (
-            <Link key={timesheet.id} href={`/timesheets/${timesheet.id}`}>
-              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-timesheet/50 transition-all duration-200 cursor-pointer">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-3">
-                      {getStatusIcon(timesheet.status)}
-                      <div>
-                        <CardTitle className="text-lg text-slate-900 dark:text-white">
-                          Week Ending {formatDate(timesheet.week_ending)}
-                        </CardTitle>
-                        <CardDescription className="text-slate-600 dark:text-slate-400">
-                          {timesheet.reg_number && `Reg: ${timesheet.reg_number}`}
-                        </CardDescription>
-                      </div>
+            <Card 
+              key={timesheet.id} 
+              className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-timesheet/50 transition-all duration-200 cursor-pointer"
+              onClick={() => router.push(`/timesheets/${timesheet.id}`)}
+            >
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-3">
+                    {getStatusIcon(timesheet.status)}
+                    <div>
+                      <CardTitle className="text-lg text-slate-900 dark:text-white">
+                        Week Ending {formatDate(timesheet.week_ending)}
+                      </CardTitle>
+                      <CardDescription className="text-slate-600 dark:text-slate-400">
+                        {timesheet.reg_number && `Reg: ${timesheet.reg_number}`}
+                      </CardDescription>
                     </div>
-                    {getStatusBadge(timesheet.status)}
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="text-slate-600 dark:text-slate-400">
-                      {timesheet.submitted_at
-                        ? `Submitted ${formatDate(timesheet.submitted_at)}`
-                        : 'Not yet submitted'}
+                  {getStatusBadge(timesheet.status)}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between text-sm">
+                  <div className="text-slate-600 dark:text-slate-400">
+                    {timesheet.submitted_at
+                      ? `Submitted ${formatDate(timesheet.submitted_at)}`
+                      : 'Not yet submitted'}
+                  </div>
+                  {timesheet.status === 'rejected' && timesheet.manager_comments && (
+                    <div className="text-red-600 text-xs">
+                      See manager comments
                     </div>
-                    {timesheet.status === 'rejected' && timesheet.manager_comments && (
-                      <div className="text-red-600 text-xs">
-                        See manager comments
-                      </div>
-                    )}
+                  )}
+                </div>
+                
+                {/* Download PDF Button for Approved/Pending */}
+                {(timesheet.status === 'approved' || timesheet.status === 'submitted') && (
+                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <Button
+                      onClick={(e) => handleDownloadPDF(e, timesheet.id)}
+                      disabled={downloading === timesheet.id}
+                      variant="outline"
+                      size="sm"
+                      className="w-full sm:w-auto bg-white dark:bg-slate-900 border-timesheet text-timesheet hover:bg-timesheet hover:text-white transition-all duration-200"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {downloading === timesheet.id ? 'Downloading...' : 'Download PDF'}
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-            </Link>
+                )}
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
