@@ -168,43 +168,46 @@ export default function ActionsPage() {
 
   return (
     <div className="space-y-6 max-w-6xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Actions & Defects</h1>
-          <p className="text-muted-foreground mt-1">
-            Track and manage issues from vehicle inspections
-          </p>
+      {/* Header */}
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Actions & Defects</h1>
+            <p className="text-slate-600 dark:text-slate-400">
+              Track and manage issues from vehicle inspections
+            </p>
+          </div>
+          <Button className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 font-semibold transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg">
+            <Plus className="h-4 w-4 mr-2" />
+            New Action
+          </Button>
         </div>
-        <Button className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 font-semibold">
-          <Plus className="h-4 w-4 mr-2" />
-          New Action
-        </Button>
       </div>
 
       {error && (
-        <div className="p-4 text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg">
+        <div className="p-4 text-sm text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-lg">
           {error}
         </div>
       )}
 
       {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardHeader className="pb-3">
-            <CardDescription>Pending</CardDescription>
-            <CardTitle className="text-3xl text-amber-400">{pendingActions.length}</CardTitle>
+            <CardDescription className="text-slate-600 dark:text-slate-400">Pending</CardDescription>
+            <CardTitle className="text-3xl text-amber-600 dark:text-amber-400">{pendingActions.length}</CardTitle>
           </CardHeader>
         </Card>
-        <Card>
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardHeader className="pb-3">
-            <CardDescription>Actioned</CardDescription>
-            <CardTitle className="text-3xl text-green-400">{actionedActions.length}</CardTitle>
+            <CardDescription className="text-slate-600 dark:text-slate-400">Actioned</CardDescription>
+            <CardTitle className="text-3xl text-green-600 dark:text-green-400">{actionedActions.length}</CardTitle>
           </CardHeader>
         </Card>
-        <Card>
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardHeader className="pb-3">
-            <CardDescription>Total</CardDescription>
-            <CardTitle className="text-3xl">{actions.length}</CardTitle>
+            <CardDescription className="text-slate-600 dark:text-slate-400">Total</CardDescription>
+            <CardTitle className="text-3xl text-slate-900 dark:text-white">{actions.length}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -212,12 +215,12 @@ export default function ActionsPage() {
       {/* Pending Actions */}
       {pendingActions.length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Pending Actions</h2>
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Pending Actions</h2>
           <div className="space-y-3">
             {pendingActions.map((action) => {
               const isCompleting = completingActions.has(action.id);
               return (
-                <Card key={action.id} className="hover:bg-slate-800/30 transition-colors">
+                <Card key={action.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-red-500/50 transition-all duration-200">
                   <CardContent className="pt-6">
                     <div className="flex items-start gap-4">
                       <div className="flex-1 space-y-2">
@@ -225,13 +228,13 @@ export default function ActionsPage() {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               {getStatusIcon(action.status)}
-                              <h3 className="font-semibold text-lg">{action.title}</h3>
+                              <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{action.title}</h3>
                               {getPriorityBadge(action.priority)}
                             </div>
                             {action.description && (
-                              <p className="text-sm text-muted-foreground mb-2">{action.description}</p>
+                              <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{action.description}</p>
                             )}
-                            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                            <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
                               {action.vehicle_inspections && (
                                 <span>
                                   Vehicle: {action.vehicle_inspections.vehicles?.reg_number || 'N/A'}
@@ -287,24 +290,24 @@ export default function ActionsPage() {
       {/* Actioned Items */}
       {actionedActions.length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-muted-foreground">Completed Actions</h2>
+          <h2 className="text-xl font-semibold text-slate-600 dark:text-slate-400">Completed Actions</h2>
           <div className="space-y-3">
             {actionedActions.map((action) => (
-              <Card key={action.id} className="opacity-60 hover:opacity-80 transition-opacity">
+              <Card key={action.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-90 transition-opacity">
                 <CardContent className="pt-6">
                   <div className="flex items-start gap-4">
                     <div className="flex-1 space-y-2">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
-                            <CheckCircle2 className="h-5 w-5 text-green-400" />
-                            <h3 className="font-semibold text-lg line-through">{action.title}</h3>
+                            <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                            <h3 className="font-semibold text-lg text-slate-900 dark:text-white line-through">{action.title}</h3>
                             {getPriorityBadge(action.priority)}
                           </div>
                           {action.description && (
-                            <p className="text-sm text-muted-foreground mb-2">{action.description}</p>
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{action.description}</p>
                           )}
-                          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                          <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
                             {action.actioned_at && (
                               <span className="text-green-400">
                                 Actioned: {formatDate(action.actioned_at)}
@@ -340,11 +343,11 @@ export default function ActionsPage() {
       )}
 
       {actions.length === 0 && !loading && (
-        <Card>
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardContent className="pt-6 text-center py-12">
-            <AlertTriangle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Actions Yet</h3>
-            <p className="text-muted-foreground mb-4">
+            <AlertTriangle className="h-12 w-12 mx-auto text-slate-400 mb-4" />
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No Actions Yet</h3>
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
               Actions will be automatically created when inspections have failed items
             </p>
           </CardContent>

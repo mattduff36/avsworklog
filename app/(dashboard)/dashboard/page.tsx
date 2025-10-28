@@ -186,20 +186,20 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-6xl">
       {/* Welcome Section */}
-      <div>
-        <h1 className="text-3xl font-bold text-white">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
           Welcome back, {profile?.full_name}
         </h1>
-        <p className="text-slate-400 mt-1">
+        <p className="text-slate-600 dark:text-slate-400 mt-1">
           Manage your forms and documents
         </p>
       </div>
 
       {/* Quick Actions - Square Button Grid */}
       <div>
-        <h2 className="text-xl font-semibold text-white mb-4">Create New Form</h2>
+        <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">Create New Form</h2>
         
         <TooltipProvider>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
@@ -244,9 +244,9 @@ export default function DashboardPage() {
 
       {/* Recent Activity - Manager/Admin Only */}
       {isManager && (
-        <Card className="bg-slate-800/40 backdrop-blur-xl border-slate-700/50">
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between text-white">
+            <CardTitle className="flex items-center justify-between text-slate-900 dark:text-white">
               <span>Recent Activity</span>
               <Badge variant="outline" className="text-slate-400 border-slate-600">
                 Last 5 Submissions
@@ -269,16 +269,16 @@ export default function DashboardPage() {
                     href={activity.type === 'timesheet' ? `/timesheets/${activity.id}` : `/inspections/${activity.id}`}
                     className="block"
                   >
-                    <div className="flex items-center justify-between p-4 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 transition-colors border border-slate-700/50">
+                    <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-700/30 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors border border-slate-200 dark:border-slate-700/50">
                       <div className="flex items-center gap-3">
                         {activity.type === 'timesheet' ? (
-                          <FileText className="h-5 w-5 text-blue-400" />
+                          <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                         ) : (
-                          <CarFront className="h-5 w-5 text-purple-400" />
+                          <CarFront className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                         )}
                         <div>
-                          <p className="font-medium text-white">{activity.title}</p>
-                          <p className="text-sm text-slate-400">
+                          <p className="font-medium text-slate-900 dark:text-white">{activity.title}</p>
+                          <p className="text-sm text-slate-600 dark:text-slate-400">
                             by {activity.user} • {formatDate(activity.created_at)}
                           </p>
                         </div>
@@ -342,9 +342,9 @@ export default function DashboardPage() {
 
       {/* Manager Actions Section */}
       {isManager && (
-        <Card className="bg-slate-800/40 backdrop-blur-xl border-slate-700/50 border-t-2 border-t-red-500">
-          <CardHeader className="bg-red-500/10">
-            <CardTitle className="flex items-center justify-between text-white">
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 border-t-2 border-t-red-500">
+          <CardHeader className="bg-red-50 dark:bg-red-500/10">
+            <CardTitle className="flex items-center justify-between text-slate-900 dark:text-white">
               <span>High Priority Actions</span>
               <Link href="/actions">
                 <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-700/50">
@@ -382,21 +382,21 @@ export default function DashboardPage() {
                   return (
                     <div
                       key={action.id}
-                      className="p-4 rounded-lg bg-slate-700/30 border border-slate-700/50"
+                      className="p-4 rounded-lg bg-slate-50 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-700/50"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
-                            <AlertTriangle className="h-5 w-5 text-amber-400" />
-                            <h3 className="font-semibold text-white">{action.title}</h3>
+                            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                            <h3 className="font-semibold text-slate-900 dark:text-white">{action.title}</h3>
                             <Badge variant="outline" className={getPriorityColor(action.priority)}>
                               {action.priority.toUpperCase()}
                             </Badge>
                           </div>
                           {action.description && (
-                            <p className="text-sm text-slate-400 mb-2">{action.description}</p>
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{action.description}</p>
                           )}
-                          <div className="flex flex-wrap gap-4 text-sm text-slate-400">
+                          <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
                             {action.vehicle_inspections && (
                               <span>
                                 Vehicle: {action.vehicle_inspections.vehicles?.reg_number || 'N/A'}

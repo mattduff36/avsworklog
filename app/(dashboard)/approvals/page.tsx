@@ -242,21 +242,24 @@ export default function ApprovalsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Approvals</h1>
-          <p className="text-slate-400">
-            Review and manage submissions
-          </p>
+    <div className="space-y-6 max-w-6xl">
+      {/* Header */}
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Approvals</h1>
+            <p className="text-slate-600 dark:text-slate-400">
+              Review and manage submissions
+            </p>
+          </div>
+          <Badge variant={statusFilter === 'pending' ? 'warning' : 'secondary'} className="text-lg px-4 py-2">
+            {totalCount} {getFilterLabel(statusFilter)}
+          </Badge>
         </div>
-        <Badge variant={statusFilter === 'pending' ? 'warning' : 'secondary'} className="text-lg px-4 py-2">
-          {totalCount} {getFilterLabel(statusFilter)}
-        </Badge>
       </div>
 
       {/* Status Filter Buttons */}
-      <Card className="bg-slate-800/40 backdrop-blur-xl border-slate-700/50">
+      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
         <CardContent className="pt-6">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-slate-400" />
@@ -282,19 +285,19 @@ export default function ApprovalsPage() {
       </Card>
 
       {totalCount === 0 ? (
-        <Card>
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            {statusFilter === 'pending' && <CheckCircle2 className="h-16 w-16 text-green-600 mb-4" />}
-            {statusFilter === 'approved' && <CheckCircle2 className="h-16 w-16 text-green-600 mb-4" />}
-            {statusFilter === 'rejected' && <XCircle className="h-16 w-16 text-red-600 mb-4" />}
+            {statusFilter === 'pending' && <CheckCircle2 className="h-16 w-16 text-green-600 dark:text-green-400 mb-4" />}
+            {statusFilter === 'approved' && <CheckCircle2 className="h-16 w-16 text-green-600 dark:text-green-400 mb-4" />}
+            {statusFilter === 'rejected' && <XCircle className="h-16 w-16 text-red-600 dark:text-red-400 mb-4" />}
             {statusFilter === 'all' && <FileText className="h-16 w-16 text-slate-400 mb-4" />}
-            <h3 className="text-lg font-semibold mb-2">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
               {statusFilter === 'pending' && 'All caught up!'}
               {statusFilter === 'approved' && 'No approved submissions'}
               {statusFilter === 'rejected' && 'No rejected submissions'}
               {statusFilter === 'all' && 'No submissions yet'}
             </h3>
-            <p className="text-muted-foreground">
+            <p className="text-slate-600 dark:text-slate-400">
               {statusFilter === 'pending' && 'There are no pending approvals at the moment'}
               {statusFilter === 'approved' && 'There are no approved submissions to display'}
               {statusFilter === 'rejected' && 'There are no rejected submissions to display'}
@@ -333,14 +336,14 @@ export default function ApprovalsPage() {
 
           <TabsContent value="timesheets" className="mt-6 space-y-4">
             {timesheets.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center text-muted-foreground">
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+                <CardContent className="py-12 text-center text-slate-600 dark:text-slate-400">
                   No pending timesheet approvals
                 </CardContent>
               </Card>
             ) : (
               timesheets.map((timesheet) => (
-                <Card key={timesheet.id} className="hover:shadow-md transition-shadow">
+                <Card key={timesheet.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-timesheet/50 transition-all duration-200">
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex items-center space-x-3">
@@ -403,14 +406,14 @@ export default function ApprovalsPage() {
 
           <TabsContent value="inspections" className="mt-6 space-y-4">
             {inspections.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center text-muted-foreground">
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+                <CardContent className="py-12 text-center text-slate-600 dark:text-slate-400">
                   No pending inspection approvals
                 </CardContent>
               </Card>
             ) : (
               inspections.map((inspection) => (
-                <Card key={inspection.id} className="hover:shadow-md transition-shadow">
+                <Card key={inspection.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200">
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex items-center space-x-3">
