@@ -7,10 +7,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import { Plus, Clipboard, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { Plus, Clipboard, CheckCircle2, XCircle, Clock, AlertCircle, User } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { VehicleInspection } from '@/types/inspection';
+
+type Employee = {
+  id: string;
+  full_name: string;
+  employee_id: string | null;
+};
 
 interface InspectionWithVehicle extends VehicleInspection {
   vehicles: {
@@ -23,11 +31,34 @@ export default function InspectionsPage() {
   const { user, isManager } = useAuth();
   const [inspections, setInspections] = useState<InspectionWithVehicle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
   const supabase = createClient();
+
+  // Fetch employees if manager
+  useEffect(() => {
+    if (user && isManager) {
+      fetchEmployees();
+    }
+  }, [user, isManager]);
 
   useEffect(() => {
     fetchInspections();
-  }, [user]);
+  }, [user, selectedEmployeeId]);
+
+  const fetchEmployees = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, employee_id')
+        .order('full_name');
+      
+      if (error) throw error;
+      setEmployees(data || []);
+    } catch (err) {
+      console.error('Error fetching employees:', err);
+    }
+  };
 
   const fetchInspections = async () => {
     if (!user) return;
@@ -44,10 +75,15 @@ export default function InspectionsPage() {
         `)
         .order('inspection_date', { ascending: false });
 
-      // If not manager, only show own inspections
+      // Filter based on user role and selection
       if (!isManager) {
+        // Regular employees only see their own
         query = query.eq('user_id', user.id);
+      } else if (selectedEmployeeId && selectedEmployeeId !== 'all') {
+        // Manager filtering by specific employee
+        query = query.eq('user_id', selectedEmployeeId);
       }
+      // If manager and 'all' selected, show all inspections
 
       const { data, error } = await query;
 
@@ -90,7 +126,7 @@ export default function InspectionsPage() {
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Vehicle Inspections</h1>
             <p className="text-slate-600 dark:text-slate-400">
@@ -104,6 +140,32 @@ export default function InspectionsPage() {
             </Button>
           </Link>
         </div>
+        
+        {/* Manager: Employee Filter */}
+        {isManager && employees.length > 0 && (
+          <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-3 max-w-md">
+              <Label htmlFor="employee-filter" className="text-slate-900 dark:text-white text-sm flex items-center gap-2 whitespace-nowrap">
+                <User className="h-4 w-4" />
+                View inspections for:
+              </Label>
+              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+                <SelectTrigger id="employee-filter" className="h-10 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white">
+                  <SelectValue placeholder="Select employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Employees</SelectItem>
+                  {employees.map((employee) => (
+                    <SelectItem key={employee.id} value={employee.id}>
+                      {employee.full_name}
+                      {employee.employee_id && ` (${employee.employee_id})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
       </div>
 
       {loading ? (
