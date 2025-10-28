@@ -277,23 +277,20 @@ export default function InspectionsPage() {
                       See manager comments
                     </div>
                   )}
-                </div>
-                
-                {/* Download PDF Button for Approved/Pending */}
-                {(inspection.status === 'approved' || inspection.status === 'submitted') && (
-                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                  {/* Download PDF Button for Approved/Pending */}
+                  {(inspection.status === 'approved' || inspection.status === 'submitted') && (
                     <Button
                       onClick={(e) => handleDownloadPDF(e, inspection.id)}
                       disabled={downloading === inspection.id}
                       variant="outline"
                       size="sm"
-                      className="w-full sm:w-auto bg-white dark:bg-slate-900 border-inspection text-inspection hover:bg-inspection hover:text-white transition-all duration-200"
+                      className="bg-white dark:bg-slate-900 border-inspection text-inspection hover:bg-inspection hover:text-white transition-all duration-200"
                     >
                       <Download className="h-4 w-4 mr-2" />
                       {downloading === inspection.id ? 'Downloading...' : 'Download PDF'}
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}

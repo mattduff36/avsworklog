@@ -260,23 +260,20 @@ export default function TimesheetsPage() {
                       See manager comments
                     </div>
                   )}
-                </div>
-                
-                {/* Download PDF Button for Approved/Pending */}
-                {(timesheet.status === 'approved' || timesheet.status === 'submitted') && (
-                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                  {/* Download PDF Button for Approved/Pending */}
+                  {(timesheet.status === 'approved' || timesheet.status === 'submitted') && (
                     <Button
                       onClick={(e) => handleDownloadPDF(e, timesheet.id)}
                       disabled={downloading === timesheet.id}
                       variant="outline"
                       size="sm"
-                      className="w-full sm:w-auto bg-white dark:bg-slate-900 border-timesheet text-timesheet hover:bg-timesheet hover:text-white transition-all duration-200"
+                      className="bg-white dark:bg-slate-900 border-timesheet text-timesheet hover:bg-timesheet hover:text-white transition-all duration-200"
                     >
                       <Download className="h-4 w-4 mr-2" />
                       {downloading === timesheet.id ? 'Downloading...' : 'Download PDF'}
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}
