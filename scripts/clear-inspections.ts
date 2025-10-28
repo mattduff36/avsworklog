@@ -53,7 +53,7 @@ async function clearInspections() {
     const { error: actionsError } = await supabase
       .from('actions')
       .delete()
-      .eq('source_type', 'inspection');
+      .not('inspection_id', 'is', null);
 
     if (actionsError) {
       console.error('❌ Error deleting inspection actions:', actionsError);
