@@ -343,50 +343,49 @@ async function createInspections(employees: any[], vehicles: any[], managerId: s
         for (let itemNum = 1; itemNum <= 26; itemNum++) {
           const isDefect = defectItems.includes(itemNum);
           
-          const { data: item, error: itemError } = await supabase
-            .from('inspection_items')
-            .insert({
-              inspection_id: inspection.id,
-              item_number: itemNum,
-              item_description: INSPECTION_ITEMS[itemNum - 1] || `Item ${itemNum}`,
-              status: isDefect ? 'defect' : 'ok',
-              comments: isDefect ? randomElement([
-                'Requires immediate attention',
-                'Minor wear detected',
-                'Needs replacement soon',
-                'Service required',
-                'Not functioning properly'
-              ]) : null
-            })
-            .select()
-            .single();
-
-          if (itemError) {
-            console.error(`   ❌ Error creating item:`, itemError.message);
-          } else if (isDefect && item) {
-            totalDefects++;
-            
-            // Create action for this defect
-            const priority = randomElement(['low', 'medium', 'high', 'urgent']);
-            const actionStatus = randomElement(['pending', 'pending', 'pending', 'in_progress']); // Most pending
-            
-            const { error: actionError } = await supabase
-              .from('actions')
+          // Create item for each day of the week
+          for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
+            const { data: item, error: itemError} = await supabase
+              .from('inspection_items')
               .insert({
                 inspection_id: inspection.id,
-                inspection_item_id: item.id,
-                title: `${vehicle.reg_number}: ${item.item_description}`,
-                description: item.comments || 'Defect found during inspection',
-                priority: priority,
-                status: actionStatus,
-                actioned: false,
-                created_by: managerId,
-              });
-            
-            if (actionError) {
-              console.error(`   ❌ Error creating action:`, actionError.message);
-            } else {
-              totalActions++;
+                item_number: itemNum,
+                day_of_week: dayOfWeek,
+                status: isDefect ? 'attention' : 'ok',
+              })
+              .select()
+              .single();
+
+            if (itemError) {
+              console.error(`   ❌ Error creating item:`, itemError.message);
+              continue;
+            }
+
+            // Create action for defect (only for first day of week to avoid duplicates)
+            if (isDefect && item && dayOfWeek === 1) {
+              totalDefects++;
+              
+              const priority = randomElement(['low', 'medium', 'high', 'urgent']);
+              const actionStatus = randomElement(['pending', 'pending', 'pending', 'in_progress']); // Most pending
+              
+              const { error: actionError } = await supabase
+                .from('actions')
+                .insert({
+                  inspection_id: inspection.id,
+                  inspection_item_id: item.id,
+                  title: `${vehicle.reg_number}: ${INSPECTION_ITEMS[itemNum - 1]}`,
+                  description: 'Defect found during inspection',
+                  priority: priority,
+                  status: actionStatus,
+                  actioned: false,
+                  created_by: managerId,
+                });
+              
+              if (actionError) {
+                console.error(`   ❌ Error creating action:`, actionError.message);
+              } else {
+                totalActions++;
+              }
             }
           }
         }

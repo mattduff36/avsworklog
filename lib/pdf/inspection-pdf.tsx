@@ -278,18 +278,19 @@ export function InspectionPDF({ inspection, items, vehicleReg, employeeName, emp
 
   // Helper to get check mark for an item on a specific day (1=Monday, 7=Sunday)
   const getCheckMark = (itemNumber: number, dayOfWeek: number) => {
-    const item = items.find(i => i.item_number === itemNumber);
+    const item = items.find(i => i.item_number === itemNumber && i.day_of_week === dayOfWeek);
     if (!item) return '';
-    return item.status === 'ok' ? '✓' : item.status === 'defect' ? '✗' : '0';
+    return item.status === 'ok' ? '✓' : item.status === 'attention' ? '✗' : '0';
   };
 
   // Collect all defects and comments
   const defectsAndComments = items
-    .filter(item => item.comments || item.status === 'defect')
+    .filter(item => item.comments || item.status === 'attention')
     .map(item => {
       const itemName = item.item_description || INSPECTION_ITEMS[item.item_number - 1] || formItems[item.item_number - 1];
-      const status = item.status === 'ok' ? '✓' : item.status === 'defect' ? '✗' : '0';
-      return `${item.item_number}. ${itemName} [${status}]${item.comments ? ': ' + item.comments : ''}`;
+      const status = item.status === 'ok' ? '✓' : item.status === 'attention' ? '✗' : '0';
+      const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][item.day_of_week - 1];
+      return `${item.item_number}. ${itemName} (${dayName}) [${status}]${item.comments ? ': ' + item.comments : ''}`;
     })
     .join('\n');
 

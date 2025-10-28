@@ -17,12 +17,13 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Fetch inspection with items
+    // Fetch inspection with items and employee details
     const { data: inspection, error: inspectionError } = await supabase
       .from('vehicle_inspections')
       .select(`
         *,
-        vehicle:vehicles(reg_number)
+        vehicle:vehicles(reg_number),
+        profile:profiles!vehicle_inspections_user_id_fkey(full_name, email)
       `)
       .eq('id', id)
       .single();
@@ -56,21 +57,14 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    // Get employee details
-    const { data: employee } = await supabase
-      .from('profiles')
-      .select('full_name, email')
-      .eq('id', inspection.user_id)
-      .single();
-
     // Generate PDF
     const stream = await renderToStream(
       InspectionPDF({
         inspection,
         items,
-        vehicleReg: inspection.vehicle?.reg_number,
-        employeeName: employee?.full_name,
-        employeeEmail: employee?.email,
+        vehicleReg: (inspection as any).vehicle?.reg_number,
+        employeeName: (inspection as any).profile?.full_name,
+        employeeEmail: (inspection as any).profile?.email,
       })
     );
 

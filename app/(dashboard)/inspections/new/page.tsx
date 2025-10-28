@@ -9,14 +9,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus } from 'lucide-react';
 import Link from 'next/link';
-import { formatDateISO, formatDate } from '@/lib/utils/date';
+import { formatDateISO, formatDate, getWeekEnding } from '@/lib/utils/date';
 import { INSPECTION_ITEMS, InspectionStatus } from '@/types/inspection';
 import { Database } from '@/types/database';
 import { SignaturePad } from '@/components/forms/SignaturePad';
+
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 type Employee = {
   id: string;
@@ -31,11 +34,12 @@ export default function NewInspectionPage() {
   
   const [vehicles, setVehicles] = useState<Array<{ id: string; reg_number: string; vehicle_type: string }>>([]);
   const [vehicleId, setVehicleId] = useState('');
-  const [startDate, setStartDate] = useState(formatDateISO(new Date()));
-  const [endDate, setEndDate] = useState(formatDateISO(new Date()));
+  const [weekEnding, setWeekEnding] = useState(formatDateISO(getWeekEnding()));
+  const [activeDay, setActiveDay] = useState('0'); // 0-6 for Monday-Sunday
   const [currentMileage, setCurrentMileage] = useState('');
-  const [checkboxStates, setCheckboxStates] = useState<Record<number, InspectionStatus>>({});
-  const [comments, setComments] = useState<Record<number, string>>({});
+  // Store checkbox states as "dayOfWeek-itemNumber": status (e.g., "1-5": "ok")
+  const [checkboxStates, setCheckboxStates] = useState<Record<string, InspectionStatus>>({});
+  const [comments, setComments] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
@@ -100,21 +104,32 @@ export default function NewInspectionPage() {
   };
 
   const handleStatusChange = (itemNumber: number, status: InspectionStatus) => {
-    setCheckboxStates(prev => ({ ...prev, [itemNumber]: status }));
+    const dayOfWeek = parseInt(activeDay) + 1; // Convert 0-6 to 1-7
+    const key = `${dayOfWeek}-${itemNumber}`;
+    setCheckboxStates(prev => ({ ...prev, [key]: status }));
   };
 
   const handleCommentChange = (itemNumber: number, comment: string) => {
-    setComments(prev => ({ ...prev, [itemNumber]: comment }));
+    const dayOfWeek = parseInt(activeDay) + 1; // Convert 0-6 to 1-7
+    const key = `${dayOfWeek}-${itemNumber}`;
+    setComments(prev => ({ ...prev, [key]: comment }));
   };
 
   const handleMarkAllPass = () => {
-    const allPassStates: Record<number, InspectionStatus> = {};
+    const dayOfWeek = parseInt(activeDay) + 1; // Convert 0-6 to 1-7
+    const allPassStates: Record<string, InspectionStatus> = {};
     INSPECTION_ITEMS.forEach((_, index) => {
-      allPassStates[index + 1] = 'ok';
+      const key = `${dayOfWeek}-${index + 1}`;
+      allPassStates[key] = 'ok';
     });
-    setCheckboxStates(allPassStates);
-    // Clear all comments when marking all as pass
-    setComments({});
+    setCheckboxStates(prev => ({ ...prev, ...allPassStates }));
+    // Clear comments for this day
+    const updatedComments = { ...comments };
+    INSPECTION_ITEMS.forEach((_, index) => {
+      const key = `${dayOfWeek}-${index + 1}`;
+      delete updatedComments[key];
+    });
+    setComments(updatedComments);
   };
 
   const handleSubmit = () => {
@@ -128,18 +143,10 @@ export default function NewInspectionPage() {
       return;
     }
 
-    // Validate date range
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const daysDiff = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (end < start) {
-      setError('End date must be on or after start date');
-      return;
-    }
-    
-    if (daysDiff > 6) {
-      setError('Date range cannot exceed 7 days');
+    // Validate week ending is a Sunday
+    const weekEndDate = new Date(weekEnding + 'T00:00:00');
+    if (weekEndDate.getDay() !== 0) {
+      setError('Week ending must be a Sunday');
       return;
     }
     
@@ -210,13 +217,18 @@ export default function NewInspectionPage() {
     setLoading(true);
 
     try {
+      // Calculate inspection start date (Monday of the week)
+      const weekEndDate = new Date(weekEnding + 'T00:00:00');
+      const startDate = new Date(weekEndDate);
+      startDate.setDate(weekEndDate.getDate() - 6); // Go back 6 days to Monday
+      
       // Create inspection record
       type InspectionInsert = Database['public']['Tables']['vehicle_inspections']['Insert'];
       const inspectionData: InspectionInsert = {
         vehicle_id: vehicleId,
         user_id: selectedEmployeeId, // Use selected employee ID (can be manager's own ID or another employee's)
-        inspection_date: startDate,
-        inspection_end_date: endDate,
+        inspection_date: formatDateISO(startDate),
+        inspection_end_date: weekEnding,
         current_mileage: parseInt(currentMileage),
         status,
         submitted_at: status === 'submitted' ? new Date().toISOString() : null,
@@ -233,15 +245,23 @@ export default function NewInspectionPage() {
       if (inspectionError) throw inspectionError;
       if (!inspection) throw new Error('Failed to create inspection');
 
-      // Create inspection items
+      // Create inspection items for all 7 days
       type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
-      const items: InspectionItemInsert[] = INSPECTION_ITEMS.map((item, index) => ({
-        inspection_id: inspection.id,
-        item_number: index + 1,
-        item_description: item,
-        status: checkboxStates[index + 1] || 'ok',
-        comments: comments[index + 1] || null,
-      }));
+      const items: InspectionItemInsert[] = [];
+      
+      for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
+        INSPECTION_ITEMS.forEach((item, index) => {
+          const itemNumber = index + 1;
+          const key = `${dayOfWeek}-${itemNumber}`;
+          items.push({
+            inspection_id: inspection.id,
+            item_number: itemNumber,
+            day_of_week: dayOfWeek,
+            status: checkboxStates[key] || 'ok',
+            // comments: comments[key] || null, // Comments not in current schema
+          });
+        });
+      }
 
       const { data: insertedItems, error: itemsError } = await supabase
         .from('inspection_items')
@@ -252,19 +272,23 @@ export default function NewInspectionPage() {
 
       // Auto-create actions for failed items (only when submitting, not drafting)
       if (status === 'submitted' && insertedItems) {
-        const failedItems = insertedItems.filter(item => item.status === 'defect');
+        const failedItems = insertedItems.filter((item: any) => item.status === 'attention');
         
         if (failedItems.length > 0) {
           type ActionInsert = Database['public']['Tables']['actions']['Insert'];
-          const actions: ActionInsert[] = failedItems.map(item => ({
-            inspection_id: inspection.id,
-            inspection_item_id: item.id,
-            title: `Defect: ${item.item_description}`,
-            description: item.comments || 'Vehicle inspection item failed',
-            priority: 'high',
-            status: 'pending',
-            created_by: user!.id,
-          }));
+          const actions: ActionInsert[] = failedItems.map((item: any) => {
+            const itemName = INSPECTION_ITEMS[item.item_number - 1] || `Item ${item.item_number}`;
+            const dayName = DAY_NAMES[item.day_of_week - 1] || `Day ${item.day_of_week}`;
+            return {
+              inspection_id: inspection.id,
+              inspection_item_id: item.id,
+              title: `Defect: ${itemName} (${dayName})`,
+              description: `Vehicle inspection item failed during ${dayName} inspection`,
+              priority: 'high',
+              status: 'pending',
+              created_by: user!.id,
+            };
+          });
 
           const { error: actionsError } = await supabase
             .from('actions')
@@ -290,7 +314,7 @@ export default function NewInspectionPage() {
     switch (status) {
       case 'ok':
         return <CheckCircle2 className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-green-400' : 'text-slate-500'}`} />;
-      case 'defect':
+      case 'attention':
         return <XCircle className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-red-400' : 'text-slate-500'}`} />;
       default:
         return null;
@@ -303,15 +327,15 @@ export default function NewInspectionPage() {
     switch (status) {
       case 'ok':
         return 'bg-green-500/20 border-green-500 shadow-lg shadow-green-500/20';
-      case 'defect':
+      case 'attention':
         return 'bg-red-500/20 border-red-500 shadow-lg shadow-red-500/20';
       default:
         return 'bg-slate-800/30 border-slate-700';
     }
   };
 
-  // Calculate progress
-  const totalItems = INSPECTION_ITEMS.length;
+  // Calculate progress (7 days × 26 items = 182 total)
+  const totalItems = INSPECTION_ITEMS.length * 7;
   const completedItems = Object.keys(checkboxStates).length;
   const progressPercent = Math.round((completedItems / totalItems) * 100);
 
@@ -359,10 +383,7 @@ export default function NewInspectionPage() {
         <CardHeader className="pb-4">
           <CardTitle className="text-slate-900 dark:text-white">Inspection Details</CardTitle>
           <CardDescription className="text-slate-600 dark:text-slate-400">
-            {startDate === endDate 
-              ? formatDate(startDate)
-              : `${formatDate(startDate)} - ${formatDate(endDate)}`
-            }
+            Week ending: {formatDate(weekEnding)}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -422,57 +443,29 @@ export default function NewInspectionPage() {
               </Select>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="startDate" className="text-slate-900 dark:text-white text-base flex items-center gap-2">
-                  Start Date
-                  <span className="text-red-400">*</span>
-                </Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => {
-                    setStartDate(e.target.value);
-                    // Auto-adjust end date if it's before start date
-                    if (endDate < e.target.value) {
-                      setEndDate(e.target.value);
-                    }
-                  }}
-                  max={formatDateISO(new Date())}
-                  className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="endDate" className="text-slate-900 dark:text-white text-base flex items-center gap-2">
-                  End Date
-                  <span className="text-red-400">*</span>
-                </Label>
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => {
-                    const start = new Date(startDate);
-                    const end = new Date(e.target.value);
-                    const daysDiff = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-                    
-                    if (daysDiff > 6) {
-                      setError('Date range cannot exceed 7 days');
-                      return;
-                    }
-                    setError('');
-                    setEndDate(e.target.value);
-                  }}
-                  min={startDate}
-                  max={formatDateISO(new Date())}
-                  className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
-                  required
-                />
-                <p className="text-xs text-slate-400">Max 7 days from start date</p>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="weekEnding" className="text-slate-900 dark:text-white text-base flex items-center gap-2">
+                Week Ending (Sunday)
+                <span className="text-red-400">*</span>
+              </Label>
+              <Input
+                id="weekEnding"
+                type="date"
+                value={weekEnding}
+                onChange={(e) => {
+                  const selectedDate = new Date(e.target.value + 'T00:00:00');
+                  if (selectedDate.getDay() !== 0) {
+                    setError('Week ending must be a Sunday');
+                    return;
+                  }
+                  setError('');
+                  setWeekEnding(e.target.value);
+                }}
+                max={formatDateISO(new Date())}
+                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
+                required
+              />
+              <p className="text-xs text-slate-400">Select the Sunday that ends the inspection week</p>
             </div>
 
             <div className="space-y-2">
@@ -501,30 +494,47 @@ export default function NewInspectionPage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-slate-900 dark:text-white">26-Point Safety Check</CardTitle>
           <CardDescription className="text-slate-600 dark:text-slate-400">
-            Mark each item as Pass or Fail
+            Mark each item as Pass or Fail for each day
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 p-4 md:p-6">
           
-          {/* Mark All Pass Button - Mobile */}
-          <div className="md:hidden mb-4">
-            <Button
-              type="button"
-              onClick={handleMarkAllPass}
-              variant="outline"
-              className="w-full h-12 border-green-500/50 text-green-400 hover:bg-green-500/10 hover:border-green-500"
-            >
-              <CheckCircle2 className="h-5 w-5 mr-2" />
-              Mark All as PASS
-            </Button>
-          </div>
+          <Tabs value={activeDay} onValueChange={setActiveDay} className="w-full">
+            <TabsList className="w-full grid grid-cols-7 mb-4 h-auto p-1 gap-1">
+              {DAY_NAMES.map((day, index) => (
+                <TabsTrigger 
+                  key={index} 
+                  value={index.toString()} 
+                  className="text-xs sm:text-sm px-1 sm:px-3 py-2 data-[state=active]:bg-inspection data-[state=active]:text-white"
+                >
+                  {day.substring(0, 3)}
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-          {/* Mobile View - Card-based */}
-          <div className="md:hidden space-y-3">
-            {INSPECTION_ITEMS.map((item, index) => {
-              const itemNumber = index + 1;
-              const currentStatus = checkboxStates[itemNumber];
-              const hasDefectComment = currentStatus === 'defect' && comments[itemNumber];
+            {DAY_NAMES.map((day, dayIndex) => (
+              <TabsContent key={dayIndex} value={dayIndex.toString()} className="mt-0">
+                {/* Mark All Pass Button - Mobile */}
+                <div className="md:hidden mb-4">
+                  <Button
+                    type="button"
+                    onClick={handleMarkAllPass}
+                    variant="outline"
+                    className="w-full h-12 border-green-500/50 text-green-400 hover:bg-green-500/10 hover:border-green-500"
+                  >
+                    <CheckCircle2 className="h-5 w-5 mr-2" />
+                    Mark All as PASS
+                  </Button>
+                </div>
+
+                {/* Mobile View - Card-based */}
+                <div className="md:hidden space-y-3">
+                  {INSPECTION_ITEMS.map((item, index) => {
+                    const itemNumber = index + 1;
+                    const dayOfWeek = dayIndex + 1;
+                    const key = `${dayOfWeek}-${itemNumber}`;
+                    const currentStatus = checkboxStates[key];
+                    const hasDefectComment = currentStatus === 'defect' && comments[key];
               
               return (
                 <div key={itemNumber} className="bg-slate-900/30 border border-slate-700/50 rounded-lg p-4 space-y-3">
@@ -540,7 +550,7 @@ export default function NewInspectionPage() {
 
                   {/* Status Buttons - Pass or Fail */}
                   <div className="grid grid-cols-2 gap-3">
-                    {(['ok', 'defect'] as InspectionStatus[]).map((status) => (
+                    {(['ok', 'attention'] as InspectionStatus[]).map((status) => (
                       <button
                         key={status}
                         type="button"
@@ -555,17 +565,17 @@ export default function NewInspectionPage() {
                   </div>
 
                   {/* Comments/Notes */}
-                  {(currentStatus === 'defect' || comments[itemNumber]) && (
+                  {(currentStatus === 'attention' || comments[key]) && (
                     <div className="space-y-2">
                       <Label className="text-slate-900 dark:text-white text-sm">
-                        {currentStatus === 'defect' ? 'Comments (Required)' : 'Notes'}
+                        {currentStatus === 'attention' ? 'Comments (Required)' : 'Notes'}
                       </Label>
                       <Textarea
-                        value={comments[itemNumber] || ''}
+                        value={comments[key] || ''}
                         onChange={(e) => handleCommentChange(itemNumber, e.target.value)}
                         placeholder="Add details..."
                         className={`w-full min-h-[80px] text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 ${
-                          currentStatus === 'defect' && !comments[itemNumber] ? 'border-red-500' : ''
+                          currentStatus === 'attention' && !comments[key] ? 'border-red-500' : ''
                         }`}
                       />
                     </div>
@@ -602,7 +612,9 @@ export default function NewInspectionPage() {
               <tbody>
                 {INSPECTION_ITEMS.map((item, index) => {
                   const itemNumber = index + 1;
-                  const currentStatus = checkboxStates[itemNumber];
+                  const dayOfWeek = dayIndex + 1;
+                  const key = `${dayOfWeek}-${itemNumber}`;
+                  const currentStatus = checkboxStates[key];
                   
                   return (
                     <tr key={itemNumber} className="border-b border-slate-700/50 hover:bg-slate-800/30">
@@ -610,7 +622,7 @@ export default function NewInspectionPage() {
                       <td className="p-3 text-sm text-white">{item}</td>
                       <td className="p-3">
                         <div className="flex items-center justify-center gap-3">
-                          {(['ok', 'defect'] as InspectionStatus[]).map((status) => (
+                          {(['ok', 'attention'] as InspectionStatus[]).map((status) => (
                             <button
                               key={status}
                               type="button"
@@ -627,11 +639,11 @@ export default function NewInspectionPage() {
                       </td>
                       <td className="p-3">
                         <Input
-                          value={comments[itemNumber] || ''}
+                          value={comments[key] || ''}
                           onChange={(e) => handleCommentChange(itemNumber, e.target.value)}
-                          placeholder={currentStatus === 'defect' ? 'Required for defects' : 'Optional notes'}
+                          placeholder={currentStatus === 'attention' ? 'Required for defects' : 'Optional notes'}
                           className={`bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 ${
-                            currentStatus === 'defect' && !comments[itemNumber] ? 'border-red-500' : ''
+                            currentStatus === 'attention' && !comments[key] ? 'border-red-500' : ''
                           }`}
                         />
                       </td>
@@ -682,6 +694,9 @@ export default function NewInspectionPage() {
               {loading ? 'Submitting...' : 'Submit Inspection'}
             </Button>
           </div>
+              </TabsContent>
+            ))}
+          </Tabs>
         </CardContent>
       </Card>
 
