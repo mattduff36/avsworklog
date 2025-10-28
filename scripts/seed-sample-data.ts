@@ -72,34 +72,34 @@ const SAMPLE_VEHICLES = [
 // Sample job codes
 const JOB_CODES = ['JOB001', 'JOB002', 'JOB003', 'JOB004', 'JOB005', 'YARD'];
 
-// Inspection items (based on your schema)
+// Inspection items (matches official VEHICLE INSPECTION PAD form)
 const INSPECTION_ITEMS = [
-  'Brakes - Service',
-  'Brakes - Parking',
-  'Steering',
-  'Tyres and wheels',
-  'Seat belts',
-  'Lights - Front',
-  'Lights - Rear',
-  'Reflectors',
-  'Direction indicators',
-  'Horn',
-  'Windscreen',
-  'Windscreen wipers/washers',
-  'Mirrors',
-  'Fuel system',
-  'Exhaust system',
-  'Body and structure',
-  'Doors and tailgate',
-  'Cab steps and handholds',
-  'Load security',
-  'Coupling devices',
-  'Wheels and tyres (trailer)',
-  'Suspension',
+  'Fuel - and ad-blu',
+  'Mirrors - includes Class V & Class VI',
+  'Safety Equipment - Cameras & Audible Alerts',
+  'Warning Signage - VRU Sign',
+  'FORS Stickers',
+  'Oil',
+  'Water',
   'Battery',
-  'Engine oil level',
-  'Coolant level',
-  'Brake fluid level'
+  'Tyres',
+  'Brakes',
+  'Steering',
+  'Lights',
+  'Reflectors',
+  'Indicators',
+  'Wipers',
+  'Washers',
+  'Horn',
+  'Markers',
+  'Sheets / Ropes / Chains',
+  'Security of Load',
+  'Side underbar/Rails',
+  'Brake Hoses',
+  'Couplings Secure',
+  'Electrical Connections',
+  'Trailer No. Plate',
+  'Nil Defects'
 ];
 
 // Helper to get date for weeks ago
