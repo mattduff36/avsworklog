@@ -87,26 +87,29 @@ export default function InspectionsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Vehicle Inspections</h1>
-          <p className="text-slate-400">
-            Daily safety check sheets
-          </p>
+    <div className="space-y-6 max-w-6xl">
+      {/* Header */}
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Vehicle Inspections</h1>
+            <p className="text-slate-600 dark:text-slate-400">
+              Daily safety check sheets
+            </p>
+          </div>
+          <Link href="/inspections/new">
+            <Button className="bg-inspection hover:bg-inspection-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg">
+              <Plus className="h-4 w-4 mr-2" />
+              New Inspection
+            </Button>
+          </Link>
         </div>
-        <Link href="/inspections/new">
-          <Button className="bg-inspection hover:bg-inspection/90 text-white">
-            <Plus className="h-4 w-4 mr-2" />
-            New Inspection
-          </Button>
-        </Link>
       </div>
 
       {loading ? (
         <div className="grid gap-4">
           {[1, 2, 3].map((i) => (
-            <Card key={i}>
+            <Card key={i} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3 flex-1">
@@ -126,15 +129,15 @@ export default function InspectionsPage() {
           ))}
         </div>
       ) : inspections.length === 0 ? (
-        <Card>
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <Clipboard className="h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No inspections yet</h3>
-            <p className="text-muted-foreground mb-4">
+            <Clipboard className="h-16 w-16 text-slate-400 mb-4" />
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No inspections yet</h3>
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
               Create your first vehicle inspection
             </p>
             <Link href="/inspections/new">
-              <Button>
+              <Button className="bg-inspection hover:bg-inspection-dark text-white transition-all duration-200 active:scale-95">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Inspection
               </Button>
@@ -145,16 +148,16 @@ export default function InspectionsPage() {
         <div className="grid gap-4">
           {inspections.map((inspection) => (
             <Link key={inspection.id} href={`/inspections/${inspection.id}`}>
-              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200 cursor-pointer">
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-3">
                       {getStatusIcon(inspection.status)}
                       <div>
-                        <CardTitle className="text-lg">
+                        <CardTitle className="text-lg text-slate-900 dark:text-white">
                           {inspection.vehicles?.reg_number || 'Unknown Vehicle'}
                         </CardTitle>
-                        <CardDescription>
+                        <CardDescription className="text-slate-600 dark:text-slate-400">
                           {inspection.vehicles?.vehicle_type && `${inspection.vehicles.vehicle_type} • `}
                           {inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
                             ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
@@ -168,7 +171,7 @@ export default function InspectionsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center justify-between text-sm">
-                    <div className="text-muted-foreground">
+                    <div className="text-slate-600 dark:text-slate-400">
                       {inspection.submitted_at
                         ? `Submitted ${formatDate(inspection.submitted_at)}`
                         : 'Not yet submitted'}

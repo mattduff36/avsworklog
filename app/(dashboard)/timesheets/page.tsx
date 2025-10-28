@@ -74,20 +74,23 @@ export default function TimesheetsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Timesheets</h1>
-          <p className="text-slate-400">
-            Manage your weekly timesheets
-          </p>
+    <div className="space-y-6 max-w-6xl">
+      {/* Header */}
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Timesheets</h1>
+            <p className="text-slate-600 dark:text-slate-400">
+              Manage your weekly timesheets
+            </p>
+          </div>
+          <Link href="/timesheets/new">
+            <Button className="bg-timesheet hover:bg-timesheet-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg">
+              <Plus className="h-4 w-4 mr-2" />
+              New Timesheet
+            </Button>
+          </Link>
         </div>
-        <Link href="/timesheets/new">
-          <Button className="bg-timesheet hover:bg-timesheet/90 text-white">
-            <Plus className="h-4 w-4 mr-2" />
-            New Timesheet
-          </Button>
-        </Link>
       </div>
 
       {loading ? (
@@ -113,15 +116,15 @@ export default function TimesheetsPage() {
           ))}
         </div>
       ) : timesheets.length === 0 ? (
-        <Card>
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No timesheets yet</h3>
-            <p className="text-muted-foreground mb-4">
+            <FileText className="h-16 w-16 text-slate-400 mb-4" />
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No timesheets yet</h3>
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
               Create your first timesheet to get started
             </p>
             <Link href="/timesheets/new">
-              <Button>
+              <Button className="bg-timesheet hover:bg-timesheet-dark text-white transition-all duration-200 active:scale-95">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Timesheet
               </Button>
@@ -132,16 +135,16 @@ export default function TimesheetsPage() {
         <div className="grid gap-4">
           {timesheets.map((timesheet) => (
             <Link key={timesheet.id} href={`/timesheets/${timesheet.id}`}>
-              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-timesheet/50 transition-all duration-200 cursor-pointer">
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-3">
                       {getStatusIcon(timesheet.status)}
                       <div>
-                        <CardTitle className="text-lg">
+                        <CardTitle className="text-lg text-slate-900 dark:text-white">
                           Week Ending {formatDate(timesheet.week_ending)}
                         </CardTitle>
-                        <CardDescription>
+                        <CardDescription className="text-slate-600 dark:text-slate-400">
                           {timesheet.reg_number && `Reg: ${timesheet.reg_number}`}
                         </CardDescription>
                       </div>
@@ -151,7 +154,7 @@ export default function TimesheetsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center justify-between text-sm">
-                    <div className="text-muted-foreground">
+                    <div className="text-slate-600 dark:text-slate-400">
                       {timesheet.submitted_at
                         ? `Submitted ${formatDate(timesheet.submitted_at)}`
                         : 'Not yet submitted'}
