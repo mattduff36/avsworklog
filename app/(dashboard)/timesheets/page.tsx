@@ -40,7 +40,7 @@ export default function TimesheetsPage() {
 
   useEffect(() => {
     fetchTimesheets();
-  }, [user, selectedEmployeeId]);
+  }, [user, isManager, selectedEmployeeId]);
 
   const fetchEmployees = async () => {
     try {

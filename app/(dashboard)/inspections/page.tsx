@@ -47,7 +47,7 @@ export default function InspectionsPage() {
 
   useEffect(() => {
     fetchInspections();
-  }, [user, selectedEmployeeId]);
+  }, [user, isManager, selectedEmployeeId]);
 
   const fetchEmployees = async () => {
     try {
