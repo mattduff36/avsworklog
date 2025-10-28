@@ -49,6 +49,9 @@ export async function GET(
       return NextResponse.json({ error: 'Inspection items not found' }, { status: 404 });
     }
 
+    console.log(`✅ Found ${items.length} items for PDF generation`);
+    console.log('Sample item:', items[0]);
+
     // Check authorization - user must be owner, manager, or admin
     const { data: profile } = await supabase
       .from('profiles')

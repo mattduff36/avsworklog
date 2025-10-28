@@ -277,7 +277,10 @@ export function InspectionPDF({ inspection, items, vehicleReg, employeeName }: I
 
   // Helper to get check mark for an item on a specific day (1=Monday, 7=Sunday)
   const getCheckMark = (itemNumber: number, dayOfWeek: number) => {
-    const item = items.find(i => i.item_number === itemNumber && i.day_of_week === dayOfWeek);
+    const item = items.find(i => 
+      Number(i.item_number) === Number(itemNumber) && 
+      Number(i.day_of_week) === Number(dayOfWeek)
+    );
     if (!item) return '';
     return item.status === 'ok' ? '✓' : item.status === 'attention' ? '✗' : '0';
   };
