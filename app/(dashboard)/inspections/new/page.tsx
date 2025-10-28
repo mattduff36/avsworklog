@@ -317,35 +317,33 @@ export default function NewInspectionPage() {
 
   return (
     <div className="space-y-4 pb-32 md:pb-6 max-w-5xl">
-      {/* Sticky Header - Mobile */}
-      <div className="sticky top-0 z-10 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 pb-4 -mx-4 px-4 md:static md:bg-transparent md:mx-0 md:px-0">
-        <div className="flex items-center justify-between pt-4 md:pt-0">
+      {/* Header */}
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-3">
             <Link href="/inspections">
-              <Button variant="ghost" size="sm" className="h-9 w-9 p-0 md:w-auto md:px-3">
+              <Button variant="ghost" size="sm" className="h-9 w-9 p-0 md:w-auto md:px-3 hover:bg-slate-100 dark:hover:bg-slate-800">
                 <ArrowLeft className="h-5 w-5 md:mr-2" />
                 <span className="hidden md:inline">Back</span>
               </Button>
             </Link>
             <div>
-              <h1 className="text-xl md:text-3xl font-bold text-white">New Inspection</h1>
-              <p className="text-sm text-slate-400 hidden md:block">Daily safety check</p>
+              <h1 className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white">New Inspection</h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400 hidden md:block">Daily safety check</p>
             </div>
           </div>
-          {/* Progress Badge - Mobile */}
-          <div className="md:hidden bg-inspection/20 border border-inspection/30 rounded-lg px-3 py-2">
-            <div className="text-xs text-slate-400">Progress</div>
-            <div className="text-lg font-bold text-white">{completedItems}/{totalItems}</div>
+          {/* Progress Badge */}
+          <div className="bg-inspection/10 dark:bg-inspection/20 border border-inspection/30 rounded-lg px-3 py-2">
+            <div className="text-xs text-slate-600 dark:text-slate-400">Progress</div>
+            <div className="text-lg font-bold text-slate-900 dark:text-white">{completedItems}/{totalItems}</div>
           </div>
         </div>
-        {/* Progress Bar - Mobile */}
-        <div className="md:hidden mt-3">
-          <div className="h-2 bg-slate-800/50 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-inspection transition-all duration-300"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
+        {/* Progress Bar */}
+        <div className="h-2 bg-slate-200 dark:bg-slate-800/50 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-inspection transition-all duration-300"
+            style={{ width: `${progressPercent}%` }}
+          />
         </div>
       </div>
 
@@ -357,10 +355,10 @@ export default function NewInspectionPage() {
       )}
 
       {/* Vehicle Details Card */}
-      <Card>
+      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
         <CardHeader className="pb-4">
-          <CardTitle className="text-white">Inspection Details</CardTitle>
-          <CardDescription className="text-slate-400">
+          <CardTitle className="text-slate-900 dark:text-white">Inspection Details</CardTitle>
+          <CardDescription className="text-slate-600 dark:text-slate-400">
             {startDate === endDate 
               ? formatDate(startDate)
               : `${formatDate(startDate)} - ${formatDate(endDate)}`
@@ -371,7 +369,7 @@ export default function NewInspectionPage() {
           {/* Manager: Employee Selector */}
           {isManager && (
             <div className="space-y-2 pb-4 border-b border-slate-700">
-              <Label htmlFor="employee" className="text-white text-base flex items-center gap-2">
+              <Label htmlFor="employee" className="text-slate-900 dark:text-white text-base flex items-center gap-2">
                 <User className="h-4 w-4" />
                 Creating inspection for
               </Label>
@@ -397,7 +395,7 @@ export default function NewInspectionPage() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="vehicle" className="text-white text-base">Vehicle</Label>
+              <Label htmlFor="vehicle" className="text-slate-900 dark:text-white text-base">Vehicle</Label>
               <Select value={vehicleId} onValueChange={(value) => {
                 if (value === 'add-new') {
                   setShowAddVehicleDialog(true);
@@ -426,7 +424,7 @@ export default function NewInspectionPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="startDate" className="text-white text-base flex items-center gap-2">
+                <Label htmlFor="startDate" className="text-slate-900 dark:text-white text-base flex items-center gap-2">
                   Start Date
                   <span className="text-red-400">*</span>
                 </Label>
@@ -448,7 +446,7 @@ export default function NewInspectionPage() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="endDate" className="text-white text-base flex items-center gap-2">
+                <Label htmlFor="endDate" className="text-slate-900 dark:text-white text-base flex items-center gap-2">
                   End Date
                   <span className="text-red-400">*</span>
                 </Label>
@@ -478,7 +476,7 @@ export default function NewInspectionPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="mileage" className="text-white text-base flex items-center gap-2">
+              <Label htmlFor="mileage" className="text-slate-900 dark:text-white text-base flex items-center gap-2">
                 Current Mileage
                 <span className="text-red-400">*</span>
               </Label>
@@ -499,10 +497,10 @@ export default function NewInspectionPage() {
       </Card>
 
       {/* 26-Point Safety Check */}
-      <Card>
+      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
         <CardHeader className="pb-3">
-          <CardTitle className="text-white">26-Point Safety Check</CardTitle>
-          <CardDescription className="text-slate-400">
+          <CardTitle className="text-slate-900 dark:text-white">26-Point Safety Check</CardTitle>
+          <CardDescription className="text-slate-600 dark:text-slate-400">
             Mark each item as Pass or Fail
           </CardDescription>
         </CardHeader>
@@ -559,7 +557,7 @@ export default function NewInspectionPage() {
                   {/* Comments/Notes */}
                   {(currentStatus === 'defect' || comments[itemNumber]) && (
                     <div className="space-y-2">
-                      <Label className="text-white text-sm">
+                      <Label className="text-slate-900 dark:text-white text-sm">
                         {currentStatus === 'defect' ? 'Comments (Required)' : 'Notes'}
                       </Label>
                       <Textarea
@@ -721,7 +719,7 @@ export default function NewInspectionPage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="newVehicleReg" className="text-white">
+              <Label htmlFor="newVehicleReg" className="text-slate-900 dark:text-white">
                 Registration Number <span className="text-red-400">*</span>
               </Label>
               <Input
@@ -734,7 +732,7 @@ export default function NewInspectionPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="newVehicleType" className="text-white">
+              <Label htmlFor="newVehicleType" className="text-slate-900 dark:text-white">
                 Vehicle Type <span className="text-red-400">*</span>
               </Label>
               <Input

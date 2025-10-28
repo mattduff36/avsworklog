@@ -360,37 +360,36 @@ export default function NewTimesheetPage() {
 
   return (
     <div className="space-y-4 pb-32 md:pb-6 max-w-5xl">
-      {/* Header - Sticky on mobile */}
-      <div className="sticky top-0 z-10 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 pb-4 -mx-4 px-4 md:static md:bg-transparent md:mx-0 md:px-0">
-        <div className="flex items-center justify-between pt-4 md:pt-0">
+      {/* Header */}
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <Link href="/timesheets">
-              <Button variant="ghost" size="sm" className="h-9 w-9 p-0 md:w-auto md:px-3">
+              <Button variant="ghost" size="sm" className="h-9 w-9 p-0 md:w-auto md:px-3 hover:bg-slate-100 dark:hover:bg-slate-800">
                 <ArrowLeft className="h-5 w-5 md:mr-2" />
                 <span className="hidden md:inline">Back</span>
               </Button>
             </Link>
             <div>
-              <h1 className="text-xl md:text-3xl font-bold text-white">New Timesheet</h1>
-              <p className="text-sm text-slate-400 hidden md:block">
+              <h1 className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white">New Timesheet</h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400 hidden md:block">
                 {profile?.full_name}
               </p>
             </div>
           </div>
-          {/* Weekly Total Badge - Mobile */}
-          <div className="md:hidden bg-timesheet/20 border border-timesheet/30 rounded-lg px-3 py-2">
-            <div className="text-xs text-slate-400">Total</div>
-            <div className="text-lg font-bold text-white">{formatHours(weeklyTotal)}h</div>
+          {/* Weekly Total Badge */}
+          <div className="bg-timesheet/10 dark:bg-timesheet/20 border border-timesheet/30 rounded-lg px-3 py-2">
+            <div className="text-xs text-slate-600 dark:text-slate-400">Total</div>
+            <div className="text-lg font-bold text-slate-900 dark:text-white">{formatHours(weeklyTotal)}h</div>
           </div>
         </div>
       </div>
 
-
       {/* Basic Info Card */}
-      <Card>
+      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
         <CardHeader className="pb-4">
-          <CardTitle className="text-white">Timesheet Details</CardTitle>
-          <CardDescription className="text-slate-400">
+          <CardTitle className="text-slate-900 dark:text-white">Timesheet Details</CardTitle>
+          <CardDescription className="text-slate-600 dark:text-slate-400">
             Week ending {new Date(weekEnding).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
           </CardDescription>
         </CardHeader>
@@ -398,7 +397,7 @@ export default function NewTimesheetPage() {
           {/* Manager: Employee Selector */}
           {isManager && (
             <div className="space-y-2 pb-4 border-b border-slate-700">
-              <Label htmlFor="employee" className="text-white text-base flex items-center gap-2">
+              <Label htmlFor="employee" className="text-slate-900 dark:text-white text-base flex items-center gap-2">
                 <User className="h-4 w-4" />
                 Creating timesheet for
               </Label>
@@ -423,7 +422,7 @@ export default function NewTimesheetPage() {
           )}
           
           <div className="space-y-2 max-w-full">
-            <Label htmlFor="week_ending" className="text-white text-base">Week Ending (Sunday)</Label>
+            <Label htmlFor="week_ending" className="text-slate-900 dark:text-white text-base">Week Ending (Sunday)</Label>
             <div className="max-w-full overflow-hidden">
               <Input
                 id="week_ending"
@@ -439,9 +438,9 @@ export default function NewTimesheetPage() {
       </Card>
 
       {/* Daily Hours - Tabbed Interface (Mobile) / Table (Desktop) */}
-      <Card>
+      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
         <CardHeader className="pb-3">
-          <CardTitle className="text-white">Daily Hours</CardTitle>
+          <CardTitle className="text-slate-900 dark:text-white">Daily Hours</CardTitle>
         </CardHeader>
         <CardContent className="p-0 md:p-6">
 
@@ -473,7 +472,7 @@ export default function NewTimesheetPage() {
               {entries.map((entry, index) => (
                 <TabsContent key={index} value={String(index)} className="space-y-4 px-4 pb-4 overflow-hidden">
                   <div className="text-center mb-4">
-                    <h3 className="text-2xl font-bold text-white">{DAY_NAMES[index]}</h3>
+                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{DAY_NAMES[index]}</h3>
                     <p className="text-lg font-semibold text-timesheet">
                       {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'}h
                     </p>
@@ -481,7 +480,7 @@ export default function NewTimesheetPage() {
 
                   <div className="space-y-4 max-w-full">
                     <div className="space-y-2 max-w-full">
-                      <Label className="text-white text-lg">Start Time</Label>
+                      <Label className="text-slate-900 dark:text-white text-lg">Start Time</Label>
                       <div className="max-w-full overflow-hidden">
                         <Input
                           type="time"
@@ -495,7 +494,7 @@ export default function NewTimesheetPage() {
                     </div>
 
                     <div className="space-y-2 max-w-full">
-                      <Label className="text-white text-lg">Finish Time</Label>
+                      <Label className="text-slate-900 dark:text-white text-lg">Finish Time</Label>
                       <div className="max-w-full overflow-hidden">
                         <Input
                           type="time"
@@ -509,7 +508,7 @@ export default function NewTimesheetPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-white text-lg flex items-center gap-2">
+                      <Label className="text-slate-900 dark:text-white text-lg flex items-center gap-2">
                         Job Number
                         {!entry.working_in_yard && <span className="text-red-400 text-base">*</span>}
                         {entry.working_in_yard && <span className="text-slate-500 text-sm">(Not required - working in yard)</span>}
@@ -526,7 +525,7 @@ export default function NewTimesheetPage() {
 
                     {/* Status Buttons */}
                     <div className="space-y-3">
-                      <Label className="text-white text-lg">Day Status</Label>
+                      <Label className="text-slate-900 dark:text-white text-lg">Day Status</Label>
                       <div className="grid grid-cols-2 gap-3">
                         {/* Working in Yard Button */}
                         <button
@@ -567,7 +566,7 @@ export default function NewTimesheetPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-white text-lg">Notes / Remarks</Label>
+                      <Label className="text-slate-900 dark:text-white text-lg">Notes / Remarks</Label>
                       <Input
                         value={entry.remarks}
                         onChange={(e) => updateEntry(index, 'remarks', e.target.value)}
