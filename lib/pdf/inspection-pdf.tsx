@@ -282,7 +282,8 @@ export function InspectionPDF({ inspection, items, vehicleReg, employeeName }: I
       Number(i.day_of_week) === Number(dayOfWeek)
     );
     if (!item) return '';
-    return item.status === 'ok' ? '✓' : item.status === 'attention' ? '✗' : '0';
+    // Use simple ASCII characters that render in PDFs: √ for OK, X for attention, O for N/A
+    return item.status === 'ok' ? '√' : item.status === 'attention' ? 'X' : 'O';
   };
 
   // Collect all defects and comments
@@ -290,7 +291,7 @@ export function InspectionPDF({ inspection, items, vehicleReg, employeeName }: I
     .filter(item => item.comments || item.status === 'attention')
     .map(item => {
       const itemName = item.item_description || INSPECTION_ITEMS[item.item_number - 1] || formItems[item.item_number - 1];
-      const status = item.status === 'ok' ? '✓' : item.status === 'attention' ? '✗' : '0';
+      const status = item.status === 'ok' ? '√' : item.status === 'attention' ? 'X' : 'O';
       const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][item.day_of_week - 1];
       return `${item.item_number}. ${itemName} (${dayName}) [${status}]${item.comments ? ': ' + item.comments : ''}`;
     })
