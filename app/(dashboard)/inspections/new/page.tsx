@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus } from 'lucide-react';
+import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus, Check } from 'lucide-react';
 import Link from 'next/link';
 import { formatDateISO, formatDate, getWeekEnding } from '@/lib/utils/date';
 import { INSPECTION_ITEMS, InspectionStatus } from '@/types/inspection';
@@ -500,16 +500,33 @@ export default function NewInspectionPage() {
         <CardContent className="space-y-3 p-4 md:p-6">
           
           <Tabs value={activeDay} onValueChange={setActiveDay} className="w-full">
-            <TabsList className="w-full grid grid-cols-7 mb-4 h-auto p-1 gap-1">
-              {DAY_NAMES.map((day, index) => (
-                <TabsTrigger 
-                  key={index} 
-                  value={index.toString()} 
-                  className="text-xs sm:text-sm px-1 sm:px-3 py-2 data-[state=active]:bg-inspection data-[state=active]:text-white"
-                >
-                  {day.substring(0, 3)}
-                </TabsTrigger>
-              ))}
+            <TabsList className="grid w-full grid-cols-7 bg-slate-900/50 p-1 rounded-lg mb-4">
+              {DAY_NAMES.map((day, index) => {
+                const dayOfWeek = index + 1;
+                // Check if all items for this day have a status
+                const isComplete = INSPECTION_ITEMS.every((_, itemIndex) => {
+                  const itemNumber = itemIndex + 1;
+                  const key = `${dayOfWeek}-${itemNumber}`;
+                  return checkboxStates[key] !== undefined;
+                });
+                
+                return (
+                  <TabsTrigger 
+                    key={index} 
+                    value={index.toString()} 
+                    className={`text-xs py-3 data-[state=active]:bg-inspection data-[state=active]:text-slate-900 text-slate-400 ${
+                      isComplete 
+                        ? 'data-[state=active]:border-2 data-[state=active]:border-green-500 border-2 border-green-500/50' 
+                        : 'data-[state=active]:border-2 data-[state=active]:border-white'
+                    }`}
+                  >
+                    {day.substring(0, 3)}
+                    {isComplete && (
+                      <Check className="h-3 w-3 ml-1" />
+                    )}
+                  </TabsTrigger>
+                );
+              })}
             </TabsList>
 
             {DAY_NAMES.map((day, dayIndex) => (
