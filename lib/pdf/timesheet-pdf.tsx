@@ -3,171 +3,162 @@ import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/render
 import { Timesheet, TimesheetEntry, DAY_NAMES } from '@/types/timesheet';
 import { formatDate } from '@/lib/utils/date';
 
-// Create styles for the PDF
+// Create styles for the PDF matching the scanned form
 const styles = StyleSheet.create({
   page: {
-    padding: 30,
-    fontSize: 10,
+    padding: 40,
+    fontSize: 9,
     fontFamily: 'Helvetica',
   },
-  header: {
-    marginBottom: 20,
-    borderBottomWidth: 2,
-    borderBottomColor: '#F1D64A',
-    borderBottomStyle: 'solid',
-    paddingBottom: 10,
-  },
-  title: {
-    fontSize: 24,
+  // Form number in top right
+  formNumber: {
+    position: 'absolute',
+    top: 40,
+    right: 40,
+    border: '2px solid #dc2626',
+    padding: 8,
+    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  subtitle: {
-    fontSize: 12,
     color: '#666',
   },
-  infoRow: {
-    flexDirection: 'row',
-    marginBottom: 5,
+  // Company header
+  companyHeader: {
+    textAlign: 'center',
+    marginBottom: 30,
   },
-  label: {
+  companyName: {
+    fontSize: 22,
     fontWeight: 'bold',
-    width: 100,
+    marginBottom: 3,
+    letterSpacing: 0.5,
   },
-  value: {
+  companyDetails: {
+    fontSize: 8,
+    marginBottom: 2,
+  },
+  companyPhone: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginTop: 3,
+  },
+  // Top info section
+  topInfo: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    marginTop: 10,
+  },
+  infoField: {
     flex: 1,
-  },
-  table: {
-    marginTop: 15,
-    marginBottom: 15,
-  },
-  tableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#F1D64A',
-    padding: 8,
-    fontWeight: 'bold',
+  },
+  infoLabel: {
+    fontSize: 9,
+    marginRight: 5,
+  },
+  infoDots: {
+    flex: 1,
+    borderBottomWidth: 1,
+    borderBottomColor: '#666',
+    borderBottomStyle: 'dotted',
+    marginRight: 10,
+  },
+  // Table
+  table: {
+    marginTop: 5,
+    borderWidth: 1,
+    borderColor: '#000',
+  },
+  tableHeaderRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#000',
   },
   tableRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    borderBottomStyle: 'solid',
-    padding: 8,
+    borderBottomColor: '#000',
+    minHeight: 35,
   },
-  tableRowAlt: {
+  tableTotalRow: {
     flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    borderBottomStyle: 'solid',
-    padding: 8,
-    backgroundColor: '#f9f9f9',
+    minHeight: 35,
   },
+  // Column styles
   colDay: {
     width: '12%',
+    padding: 6,
+    borderRightWidth: 1,
+    borderRightColor: '#000',
+    justifyContent: 'center',
   },
-  colStart: {
-    width: '11%',
-  },
-  colFinish: {
-    width: '11%',
-  },
-  colJob: {
+  colTimeStarted: {
     width: '12%',
+    padding: 6,
+    borderRightWidth: 1,
+    borderRightColor: '#000',
+    justifyContent: 'center',
   },
-  colYard: {
-    width: '8%',
+  colWorkingYard: {
+    width: '12%',
+    padding: 6,
+    borderRightWidth: 1,
+    borderRightColor: '#000',
+    justifyContent: 'center',
   },
-  colHours: {
+  colTimeFinished: {
+    width: '12%',
+    padding: 6,
+    borderRightWidth: 1,
+    borderRightColor: '#000',
+    justifyContent: 'center',
+  },
+  colDailyTotal: {
     width: '10%',
+    padding: 6,
+    borderRightWidth: 1,
+    borderRightColor: '#000',
+    justifyContent: 'center',
   },
   colRemarks: {
-    width: '36%',
+    width: '42%',
+    padding: 6,
+    justifyContent: 'center',
   },
-  totalRow: {
-    flexDirection: 'row',
-    backgroundColor: '#F1D64A',
-    padding: 8,
-    fontWeight: 'bold',
-    marginTop: 5,
+  headerText: {
+    fontSize: 8,
+    textAlign: 'center',
   },
-  signatureSection: {
+  cellText: {
+    fontSize: 8,
+    textAlign: 'center',
+  },
+  // Footer section
+  footer: {
     marginTop: 30,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    borderTopStyle: 'solid',
-    paddingTop: 15,
+  },
+  footerText: {
+    fontSize: 8,
+    marginBottom: 20,
   },
   signatureRow: {
     flexDirection: 'row',
-    marginBottom: 20,
-  },
-  signatureBox: {
-    flex: 1,
-    marginRight: 20,
+    alignItems: 'center',
+    marginTop: 10,
   },
   signatureLabel: {
     fontSize: 9,
-    color: '#666',
-    marginBottom: 5,
+    marginRight: 10,
   },
-  signatureImage: {
-    width: 200,
-    height: 60,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderStyle: 'solid',
-  },
-  signatureLine: {
+  signatureDots: {
+    flex: 1,
     borderBottomWidth: 1,
     borderBottomColor: '#000',
-    borderBottomStyle: 'solid',
-    marginBottom: 5,
-    height: 60,
+    borderBottomStyle: 'dotted',
+    height: 40,
   },
-  statusBadge: {
-    padding: 5,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 3,
-    fontSize: 9,
-    textAlign: 'center',
-    width: 80,
-  },
-  statusApproved: {
-    backgroundColor: '#4ade80',
-    color: '#fff',
-  },
-  statusRejected: {
-    backgroundColor: '#f87171',
-    color: '#fff',
-  },
-  statusSubmitted: {
-    backgroundColor: '#60a5fa',
-    color: '#fff',
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 30,
-    left: 30,
-    right: 30,
-    textAlign: 'center',
-    fontSize: 8,
-    color: '#666',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    borderTopStyle: 'solid',
-    paddingTop: 10,
-  },
-  commentsSection: {
-    marginTop: 15,
-    padding: 10,
-    backgroundColor: '#fff3cd',
-    borderLeftWidth: 3,
-    borderLeftColor: '#ffc107',
-    borderLeftStyle: 'solid',
-  },
-  commentsLabel: {
-    fontWeight: 'bold',
-    marginBottom: 5,
+  signatureImage: {
+    width: 180,
+    height: 40,
   },
 });
 
@@ -184,146 +175,165 @@ export function TimesheetPDF({ timesheet, employeeName, employeeEmail }: Timeshe
   // Calculate total hours
   const totalHours = sortedEntries.reduce((sum, entry) => sum + (entry.daily_total || 0), 0);
 
-  // Get status style
-  const getStatusStyle = () => {
-    switch (timesheet.status) {
-      case 'approved':
-        return [styles.statusBadge, styles.statusApproved];
-      case 'rejected':
-        return [styles.statusBadge, styles.statusRejected];
-      case 'submitted':
-        return [styles.statusBadge, styles.statusSubmitted];
-      default:
-        return styles.statusBadge;
-    }
-  };
+  // Get form number (last 5 digits of ID or full ID if shorter)
+  const formNumber = timesheet.id 
+    ? timesheet.id.slice(-5).toUpperCase() 
+    : '00000';
+
+  // Create an array with all 7 days
+  const allDays = [1, 2, 3, 4, 5, 6, 7].map(dayNum => {
+    const entry = sortedEntries.find(e => e.day_of_week === dayNum);
+    return entry || {
+      day_of_week: dayNum,
+      time_started: '',
+      time_finished: '',
+      working_in_yard: false,
+      daily_total: 0,
+      remarks: '',
+      did_not_work: false,
+    };
+  });
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>SQUIRES</Text>
-          <Text style={styles.subtitle}>Weekly Timesheet</Text>
+        {/* Form Number in top right */}
+        <View style={styles.formNumber}>
+          <Text>{formNumber}</Text>
         </View>
 
-        {/* Employee Information */}
-        <View style={{ marginBottom: 15 }}>
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Employee:</Text>
-            <Text style={styles.value}>{employeeName || 'N/A'}</Text>
+        {/* Company Header */}
+        <View style={styles.companyHeader}>
+          <Text style={styles.companyName}>A&V SQUIRES Plant Co. Ltd.</Text>
+          <Text style={styles.companyDetails}>
+            REGISTERED OFFICE: VIVIENNE HOUSE, RACECOURSE ROAD, CREW LANE INDUSTRIAL ESTATE, SOUTHWELL, NOTTS. NG25 0TX
+          </Text>
+          <Text style={styles.companyPhone}>Telephone: SOUTHWELL (01636) 812227</Text>
+        </View>
+
+        {/* Top Info Section */}
+        <View style={styles.topInfo}>
+          <View style={styles.infoField}>
+            <Text style={styles.infoLabel}>Reg No.</Text>
+            <View style={styles.infoDots}>
+              <Text style={{ fontSize: 9, paddingLeft: 5 }}>{timesheet.reg_number || ''}</Text>
+            </View>
           </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Email:</Text>
-            <Text style={styles.value}>{employeeEmail || 'N/A'}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Reg Number:</Text>
-            <Text style={styles.value}>{timesheet.reg_number || 'N/A'}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Week Ending:</Text>
-            <Text style={styles.value}>{formatDate(new Date(timesheet.week_ending))}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Status:</Text>
-            <Text style={getStatusStyle()}>{timesheet.status.toUpperCase()}</Text>
+          <View style={styles.infoField}>
+            <Text style={styles.infoLabel}>W/E Sunday</Text>
+            <View style={styles.infoDots}>
+              <Text style={{ fontSize: 9, paddingLeft: 5 }}>{formatDate(new Date(timesheet.week_ending))}</Text>
+            </View>
           </View>
         </View>
 
-        {/* Timesheet Table */}
+        <View style={{ marginBottom: 20 }}>
+          <View style={styles.infoField}>
+            <Text style={styles.infoLabel}>Driver</Text>
+            <View style={styles.infoDots}>
+              <Text style={{ fontSize: 9, paddingLeft: 5 }}>{employeeName || ''}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Table */}
         <View style={styles.table}>
-          {/* Table Header */}
-          <View style={styles.tableHeader}>
-            <Text style={styles.colDay}>Day</Text>
-            <Text style={styles.colStart}>Start</Text>
-            <Text style={styles.colFinish}>Finish</Text>
-            <Text style={styles.colJob}>Job No.</Text>
-            <Text style={styles.colYard}>Yard</Text>
-            <Text style={styles.colHours}>Hours</Text>
-            <Text style={styles.colRemarks}>Remarks</Text>
+          {/* Header Row */}
+          <View style={styles.tableHeaderRow}>
+            <View style={styles.colDay}>
+              <Text style={styles.headerText}></Text>
+            </View>
+            <View style={styles.colTimeStarted}>
+              <Text style={styles.headerText}>Time{'\n'}Started</Text>
+            </View>
+            <View style={styles.colWorkingYard}>
+              <Text style={styles.headerText}>Working{'\n'}in Yard</Text>
+            </View>
+            <View style={styles.colTimeFinished}>
+              <Text style={styles.headerText}>Time{'\n'}Finished</Text>
+            </View>
+            <View style={styles.colDailyTotal}>
+              <Text style={styles.headerText}>Daily{'\n'}Total</Text>
+            </View>
+            <View style={styles.colRemarks}>
+              <Text style={styles.headerText}>Remarks{'\n'}(Type of work, reason for delay etc.)</Text>
+            </View>
           </View>
 
-          {/* Table Rows */}
-          {sortedEntries.map((entry: TimesheetEntry, index: number) => (
-            <View key={entry.id || index} style={index % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
-              <Text style={styles.colDay}>{DAY_NAMES[entry.day_of_week - 1]}</Text>
-              <Text style={styles.colStart}>
-                {entry.did_not_work ? 'N/A' : (entry.time_started || '-')}
-              </Text>
-              <Text style={styles.colFinish}>
-                {entry.did_not_work ? 'N/A' : (entry.time_finished || '-')}
-              </Text>
-              <Text style={styles.colJob}>
-                {entry.did_not_work ? 'N/A' : ((entry as TimesheetEntry & { job_number?: string }).job_number || (entry.working_in_yard ? 'YARD' : '-'))}
-              </Text>
-              <Text style={styles.colYard}>
-                {entry.did_not_work ? 'N/A' : (entry.working_in_yard ? 'Yes' : 'No')}
-              </Text>
-              <Text style={styles.colHours}>
-                {entry.did_not_work ? 'DID NOT WORK' : (entry.daily_total ? entry.daily_total.toFixed(2) : '0.00')}
-              </Text>
-              <Text style={styles.colRemarks}>
-                {entry.did_not_work ? 'Day off' : (entry.remarks || '-')}
-              </Text>
+          {/* Data Rows - All 7 days */}
+          {allDays.map((entry, index) => (
+            <View key={index} style={styles.tableRow}>
+              <View style={styles.colDay}>
+                <Text style={[styles.cellText, { textAlign: 'left' }]}>{DAY_NAMES[entry.day_of_week - 1]}</Text>
+              </View>
+              <View style={styles.colTimeStarted}>
+                <Text style={styles.cellText}>
+                  {entry.did_not_work ? '' : (entry.time_started || '')}
+                </Text>
+              </View>
+              <View style={styles.colWorkingYard}>
+                <Text style={styles.cellText}>
+                  {entry.did_not_work ? '' : (entry.working_in_yard ? 'Yes' : '')}
+                </Text>
+              </View>
+              <View style={styles.colTimeFinished}>
+                <Text style={styles.cellText}>
+                  {entry.did_not_work ? '' : (entry.time_finished || '')}
+                </Text>
+              </View>
+              <View style={styles.colDailyTotal}>
+                <Text style={styles.cellText}>
+                  {entry.did_not_work ? '' : (entry.daily_total ? entry.daily_total.toFixed(2) : '')}
+                </Text>
+              </View>
+              <View style={styles.colRemarks}>
+                <Text style={[styles.cellText, { textAlign: 'left' }]}>
+                  {entry.did_not_work ? 'DID NOT WORK' : (entry.remarks || '')}
+                </Text>
+              </View>
             </View>
           ))}
 
           {/* Total Row */}
-          <View style={styles.totalRow}>
-            <Text style={{ width: '49%' }}>TOTAL HOURS:</Text>
-            <Text style={styles.colJob}></Text>
-            <Text style={styles.colYard}></Text>
-            <Text style={styles.colHours}>{totalHours.toFixed(2)}</Text>
-            <Text style={styles.colRemarks}></Text>
-          </View>
-        </View>
-
-        {/* Manager Comments (if rejected) */}
-        {timesheet.manager_comments && (
-          <View style={styles.commentsSection}>
-            <Text style={styles.commentsLabel}>Manager Comments:</Text>
-            <Text>{timesheet.manager_comments}</Text>
-          </View>
-        )}
-
-        {/* Signature Section */}
-        <View style={styles.signatureSection}>
-          <View style={styles.signatureRow}>
-            <View style={styles.signatureBox}>
-              <Text style={styles.signatureLabel}>Employee Signature:</Text>
-              {timesheet.signature_data ? (
-                <Image style={styles.signatureImage} src={timesheet.signature_data} alt="Employee signature" />
-              ) : (
-                <View style={styles.signatureLine} />
-              )}
-              {timesheet.signed_at && (
-                <Text style={{ fontSize: 8, marginTop: 5 }}>
-                  Signed: {formatDate(new Date(timesheet.signed_at))}
-                </Text>
-              )}
+          <View style={styles.tableTotalRow}>
+            <View style={styles.colDay}>
+              <Text style={[styles.cellText, { textAlign: 'left', fontWeight: 'bold' }]}>TOTAL</Text>
+            </View>
+            <View style={styles.colTimeStarted}>
+              <Text style={styles.cellText}></Text>
+            </View>
+            <View style={styles.colWorkingYard}>
+              <Text style={styles.cellText}></Text>
+            </View>
+            <View style={styles.colTimeFinished}>
+              <Text style={styles.cellText}></Text>
+            </View>
+            <View style={styles.colDailyTotal}>
+              <Text style={[styles.cellText, { fontWeight: 'bold' }]}>{totalHours.toFixed(2)}</Text>
+            </View>
+            <View style={styles.colRemarks}>
+              <Text style={styles.cellText}></Text>
             </View>
           </View>
-
-          {timesheet.reviewed_at && (
-            <View style={styles.signatureRow}>
-              <View style={styles.signatureBox}>
-                <Text style={styles.signatureLabel}>Reviewed By:</Text>
-                <View style={styles.signatureLine} />
-                <Text style={{ fontSize: 8, marginTop: 5 }}>
-                  Date: {formatDate(new Date(timesheet.reviewed_at))}
-                </Text>
-              </View>
-            </View>
-          )}
         </View>
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text>A&V Squires Plant Company Ltd. | Generated: {formatDate(new Date())}</Text>
+          <Text style={styles.footerText}>
+            All time and other details are correct and should{'\n'}be used as a basis for wages etc.
+          </Text>
+
+          <View style={styles.signatureRow}>
+            <Text style={styles.signatureLabel}>Driver</Text>
+            {timesheet.signature_data ? (
+              <Image style={styles.signatureImage} src={timesheet.signature_data} alt="Driver signature" />
+            ) : (
+              <View style={styles.signatureDots} />
+            )}
+            <Text style={[styles.signatureLabel, { marginLeft: 10 }]}>Signature</Text>
+          </View>
         </View>
       </Page>
     </Document>
   );
 }
-
