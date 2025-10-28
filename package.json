@@ -10,6 +10,8 @@
     "setup:storage": "tsx scripts/setup-storage.ts",
     "setup:test-users": "tsx scripts/create-test-users.ts",
     "seed:sample-data": "tsx scripts/seed-sample-data.ts",
+    "clear:inspections": "tsx scripts/clear-inspections.ts",
+    "reseed:inspections": "npm run clear:inspections && npm run seed:sample-data",
     "migrate": "tsx scripts/run-migration.ts",
     "test:reports": "tsx scripts/test-reports.ts"
   },
