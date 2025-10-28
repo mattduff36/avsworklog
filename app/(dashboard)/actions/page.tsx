@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, AlertTriangle, CheckCircle2, Clock, Trash2, Clipboard, Package } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Trash2, Clipboard, Package } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Database } from '@/types/database';
 
@@ -172,18 +172,10 @@ export default function ActionsPage() {
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Actions & Defects</h1>
-            <p className="text-slate-600 dark:text-slate-400">
-              Track and manage issues from vehicle inspections
-            </p>
-          </div>
-          <Button className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 font-semibold transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg">
-            <Plus className="h-4 w-4 mr-2" />
-            New Action
-          </Button>
-        </div>
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Manager Actions</h1>
+        <p className="text-slate-600 dark:text-slate-400">
+          Track and manage manager tasks
+        </p>
       </div>
 
       {error && (
