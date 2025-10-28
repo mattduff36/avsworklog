@@ -23,7 +23,7 @@ export async function GET(
       .select(`
         *,
         vehicle:vehicles(reg_number),
-        profile:profiles!vehicle_inspections_user_id_fkey(full_name, email)
+        profile:profiles!vehicle_inspections_user_id_fkey(full_name)
       `)
       .eq('id', id)
       .single();
@@ -70,7 +70,6 @@ export async function GET(
         items,
         vehicleReg: (inspection as any).vehicle?.reg_number,
         employeeName: (inspection as any).profile?.full_name,
-        employeeEmail: (inspection as any).profile?.email,
       })
     );
 

@@ -234,10 +234,9 @@ interface InspectionPDFProps {
   items: InspectionItem[];
   vehicleReg?: string;
   employeeName?: string;
-  employeeEmail?: string;
 }
 
-export function InspectionPDF({ inspection, items, vehicleReg, employeeName, employeeEmail }: InspectionPDFProps) {
+export function InspectionPDF({ inspection, items, vehicleReg, employeeName }: InspectionPDFProps) {
   // Get form number (last 5 digits of ID or full ID if shorter)
   const formNumber = inspection.id 
     ? inspection.id.slice(-5).toUpperCase() 
