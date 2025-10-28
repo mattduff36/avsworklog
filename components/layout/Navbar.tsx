@@ -36,8 +36,12 @@ export function Navbar() {
 
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: Home },
-    { href: '/timesheets', label: 'Timesheets', icon: FileText },
-    { href: '/inspections', label: 'Inspections', icon: ClipboardCheck },
+    // Timesheets and Inspections only for regular employees
+    ...(!isManager ? [
+      { href: '/timesheets', label: 'Timesheets', icon: FileText },
+      { href: '/inspections', label: 'Inspections', icon: ClipboardCheck },
+    ] : []),
+    // Manager/Admin specific navigation
     ...(isManager ? [{ href: '/approvals', label: 'Approvals', icon: CheckSquare }] : []),
     ...(isManager ? [{ href: '/actions', label: 'Actions', icon: ListTodo }] : []),
     ...(isManager ? [{ href: '/reports', label: 'Reports', icon: BarChart3 }] : []),
