@@ -62,7 +62,10 @@ export default function TimesheetsPage() {
     try {
       let query = supabase
         .from('timesheets')
-        .select('*')
+        .select(`
+          *,
+          profile:profiles!timesheets_user_id_fkey(full_name)
+        `)
         .order('week_ending', { ascending: false });
 
       // Filter based on user role and selection
@@ -241,6 +244,12 @@ export default function TimesheetsPage() {
                         Week Ending {formatDate(timesheet.week_ending)}
                       </CardTitle>
                       <CardDescription className="text-slate-600 dark:text-slate-400">
+                        {isManager && (timesheet as any).profile?.full_name && (
+                          <span className="font-medium text-slate-900 dark:text-white">
+                            {(timesheet as any).profile.full_name}
+                            {timesheet.reg_number && ' • '}
+                          </span>
+                        )}
                         {timesheet.reg_number && `Reg: ${timesheet.reg_number}`}
                       </CardDescription>
                     </div>

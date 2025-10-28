@@ -74,7 +74,8 @@ export default function InspectionsPage() {
           vehicles (
             reg_number,
             vehicle_type
-          )
+          ),
+          profile:profiles!vehicle_inspections_user_id_fkey(full_name)
         `)
         .order('inspection_date', { ascending: false });
 
@@ -254,6 +255,12 @@ export default function InspectionsPage() {
                         {inspection.vehicles?.reg_number || 'Unknown Vehicle'}
                       </CardTitle>
                       <CardDescription className="text-slate-600 dark:text-slate-400">
+                        {isManager && (inspection as any).profile?.full_name && (
+                          <span className="font-medium text-slate-900 dark:text-white">
+                            {(inspection as any).profile.full_name}
+                            {' • '}
+                          </span>
+                        )}
                         {inspection.vehicles?.vehicle_type && `${inspection.vehicles.vehicle_type} • `}
                         {inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
                           ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
