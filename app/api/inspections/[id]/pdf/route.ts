@@ -39,7 +39,13 @@ export async function GET(
       .eq('inspection_id', id)
       .order('item_number', { ascending: true });
 
-    if (itemsError || !items) {
+    if (itemsError) {
+      console.error('Items error:', itemsError);
+      return NextResponse.json({ error: 'Failed to fetch inspection items', details: itemsError.message }, { status: 500 });
+    }
+
+    if (!items || items.length === 0) {
+      console.error('No items found for inspection:', id);
       return NextResponse.json({ error: 'Inspection items not found' }, { status: 404 });
     }
 
