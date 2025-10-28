@@ -22,7 +22,7 @@ export async function GET(
       .from('vehicle_inspections')
       .select(`
         *,
-        vehicle:vehicles(registration_number)
+        vehicle:vehicles(reg_number)
       `)
       .eq('id', id)
       .single();
@@ -68,7 +68,7 @@ export async function GET(
       InspectionPDF({
         inspection,
         items,
-        vehicleReg: inspection.vehicle?.registration_number,
+        vehicleReg: inspection.vehicle?.reg_number,
         employeeName: employee?.full_name,
         employeeEmail: employee?.email,
       })

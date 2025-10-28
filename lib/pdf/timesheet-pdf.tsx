@@ -337,7 +337,7 @@ export function TimesheetPDF({ timesheet, employeeName, employeeEmail }: Timeshe
           </Text>
 
           <View style={styles.signatureRow}>
-            <Text style={styles.signatureLabel}>Driver</Text>
+            <Text style={styles.signatureLabel}>Driver: {employeeName || ''}</Text>
             {timesheet.signature_data ? (
               <Image style={styles.signatureImage} src={timesheet.signature_data} alt="Driver signature" />
             ) : (
