@@ -7,6 +7,12 @@ import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { 
   Menu, 
   X, 
   Home, 
@@ -18,7 +24,9 @@ import {
   WifiOff,
   Wifi,
   CheckSquare,
-  ListTodo
+  ListTodo,
+  FolderOpen,
+  ChevronDown
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -34,18 +42,31 @@ export function Navbar() {
     router.push('/login');
   };
 
-  const navItems = [
+  // Split navigation for proper ordering with Forms dropdown
+  const dashboardNav = [
     { href: '/dashboard', label: 'Dashboard', icon: Home },
-    // Timesheets and Inspections only for regular employees
-    ...(!isManager ? [
-      { href: '/timesheets', label: 'Timesheets', icon: FileText },
-      { href: '/inspections', label: 'Inspections', icon: ClipboardCheck },
-    ] : []),
-    // Manager/Admin specific navigation
-    ...(isManager ? [{ href: '/approvals', label: 'Approvals', icon: CheckSquare }] : []),
-    ...(isManager ? [{ href: '/actions', label: 'Actions', icon: ListTodo }] : []),
-    ...(isManager ? [{ href: '/reports', label: 'Reports', icon: BarChart3 }] : []),
-    ...(isAdmin ? [{ href: '/admin/users', label: 'Users', icon: Users }] : []),
+  ];
+  
+  const employeeNav = !isManager ? [
+    { href: '/timesheets', label: 'Timesheets', icon: FileText },
+    { href: '/inspections', label: 'Inspections', icon: ClipboardCheck },
+  ] : [];
+  
+  const managerNav = isManager ? [
+    { href: '/approvals', label: 'Approvals', icon: CheckSquare },
+    { href: '/actions', label: 'Actions', icon: ListTodo },
+    { href: '/reports', label: 'Reports', icon: BarChart3 },
+  ] : [];
+  
+  const adminNav = isAdmin ? [
+    { href: '/admin/users', label: 'Users', icon: Users },
+  ] : [];
+
+  const navItems = [
+    ...dashboardNav,
+    ...employeeNav,
+    ...managerNav,
+    ...adminNav,
   ];
 
   return (
@@ -63,7 +84,81 @@ export function Navbar() {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex md:ml-10 md:space-x-4">
-              {navItems.map((item) => {
+              {/* Dashboard */}
+              {dashboardNav.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname?.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      isActive
+                        ? 'bg-avs-yellow text-slate-900'
+                        : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 mr-2" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+              
+              {/* Employee Navigation (Timesheets/Inspections) */}
+              {employeeNav.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname?.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      isActive
+                        ? 'bg-avs-yellow text-slate-900'
+                        : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 mr-2" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+              
+              {/* Forms Dropdown - Manager/Admin only */}
+              {isManager && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                        pathname?.startsWith('/timesheets') || pathname?.startsWith('/inspections')
+                          ? 'bg-avs-yellow text-slate-900'
+                          : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                      }`}
+                    >
+                      <FolderOpen className="w-4 h-4 mr-2" />
+                      Forms
+                      <ChevronDown className="w-4 h-4 ml-1" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-48 bg-slate-800 border-slate-700">
+                    <DropdownMenuItem asChild>
+                      <Link href="/timesheets" className="flex items-center cursor-pointer">
+                        <FileText className="w-4 h-4 mr-2" />
+                        Timesheets
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/inspections" className="flex items-center cursor-pointer">
+                        <ClipboardCheck className="w-4 h-4 mr-2" />
+                        Inspections
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              
+              {/* Manager/Admin Navigation */}
+              {[...managerNav, ...adminNav].map((item) => {
                 const Icon = item.icon;
                 const isActive = pathname?.startsWith(item.href);
                 return (
@@ -140,7 +235,83 @@ export function Navbar() {
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-slate-700/50 bg-slate-900/95 backdrop-blur-xl">
           <div className="px-2 pt-2 pb-3 space-y-1">
-            {navItems.map((item) => {
+            {/* Dashboard */}
+            {dashboardNav.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname?.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
+                    isActive
+                      ? 'bg-avs-yellow text-slate-900'
+                      : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-5 h-5 mr-3" />
+                  {item.label}
+                </Link>
+              );
+            })}
+            
+            {/* Employee Navigation */}
+            {employeeNav.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname?.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
+                    isActive
+                      ? 'bg-avs-yellow text-slate-900'
+                      : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-5 h-5 mr-3" />
+                  {item.label}
+                </Link>
+              );
+            })}
+            
+            {/* Forms Section - Manager/Admin only (Mobile) */}
+            {isManager && (
+              <>
+                <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  Forms
+                </div>
+                <Link
+                  href="/timesheets"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center px-3 py-2 pl-6 text-base font-medium rounded-md ${
+                    pathname?.startsWith('/timesheets')
+                      ? 'bg-avs-yellow text-slate-900'
+                      : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                  }`}
+                >
+                  <FileText className="w-5 h-5 mr-3" />
+                  Timesheets
+                </Link>
+                <Link
+                  href="/inspections"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center px-3 py-2 pl-6 text-base font-medium rounded-md ${
+                    pathname?.startsWith('/inspections')
+                      ? 'bg-avs-yellow text-slate-900'
+                      : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                  }`}
+                >
+                  <ClipboardCheck className="w-5 h-5 mr-3" />
+                  Inspections
+                </Link>
+              </>
+            )}
+            
+            {/* Manager/Admin Navigation */}
+            {[...managerNav, ...adminNav].map((item) => {
               const Icon = item.icon;
               const isActive = pathname?.startsWith(item.href);
               return (
