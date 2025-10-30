@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
+import { sendProfileUpdateEmail } from '@/lib/utils/email';
 
 // Helper to create admin client with service role key
 function getSupabaseAdmin() {
@@ -47,7 +48,7 @@ export async function PUT(
 
     const userId = (await params).id;
     const body = await request.json();
-    const { email, full_name, employee_id, role } = body;
+    const { email, full_name, phone_number, employee_id, role } = body;
 
     // Validate required fields
     if (!full_name) {
@@ -58,12 +59,48 @@ export async function PUT(
     }
 
     // Validate role
-    const validRoles = ['admin', 'manager', 'employee'];
+    const validRoles = ['admin', 'manager', 'employee-civils', 'employee-plant', 'employee-transport', 'employee-office', 'employee-workshop'];
     if (!validRoles.includes(role)) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
     }
 
+    // Fetch existing user data for change tracking and email notification
+    const { data: existingUser, error: fetchError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (fetchError || !existingUser) {
+      console.error('Error fetching existing user:', fetchError);
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    // Get existing email from auth
     const supabaseAdmin = getSupabaseAdmin();
+    const { data: existingAuthUser } = await supabaseAdmin.auth.admin.getUserById(userId);
+    const existingEmail = existingAuthUser?.user?.email || '';
+
+    // Track changes for email notification
+    const changes: any = {};
+    if (email && email !== existingEmail) {
+      changes.email = { old: existingEmail, new: email };
+    }
+    if (full_name !== existingUser.full_name) {
+      changes.full_name = { old: existingUser.full_name, new: full_name };
+    }
+    if (phone_number !== existingUser.phone_number) {
+      changes.phone_number = { old: existingUser.phone_number || '', new: phone_number || '' };
+    }
+    if (employee_id !== existingUser.employee_id) {
+      changes.employee_id = { old: existingUser.employee_id || '', new: employee_id || '' };
+    }
+    if (role !== existingUser.role) {
+      changes.role = { old: existingUser.role, new: role };
+    }
 
     // Update email in auth if it changed
     if (email) {
@@ -81,12 +118,12 @@ export async function PUT(
       }
     }
 
-    // Update profile data
+    // Update profile data (email is only in auth, not in profiles table)
     const { error: profileError } = await supabase
       .from('profiles')
       .update({
-        email: email || undefined,
         full_name,
+        phone_number: phone_number || null,
         employee_id: employee_id || null,
         role,
       })
@@ -98,6 +135,21 @@ export async function PUT(
         { error: 'Failed to update user profile' },
         { status: 500 }
       );
+    }
+
+    // Send notification email if there were changes
+    if (Object.keys(changes).length > 0) {
+      const targetEmail = email || existingEmail; // Use new email if changed, otherwise existing
+      const emailResult = await sendProfileUpdateEmail({
+        to: targetEmail,
+        userName: full_name,
+        changes,
+      });
+
+      if (!emailResult.success) {
+        console.warn('Failed to send profile update notification:', emailResult.error);
+        // Don't fail the update if email fails - just log it
+      }
     }
 
     return NextResponse.json({

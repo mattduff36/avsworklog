@@ -123,7 +123,7 @@ export function useAuth() {
     signUp,
     isAdmin: profile?.role === 'admin',
     isManager: profile?.role === 'manager' || profile?.role === 'admin',
-    isEmployee: profile?.role === 'employee',
+    isEmployee: profile?.role?.startsWith('employee-') || false,
   };
 }
 

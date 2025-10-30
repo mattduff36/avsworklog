@@ -52,7 +52,7 @@ export async function POST(
     // Get target user's profile
     const { data: targetProfile, error: profileError } = await supabase
       .from('profiles')
-      .select('email, full_name')
+      .select('full_name')
       .eq('id', userId)
       .single();
 
@@ -60,12 +60,19 @@ export async function POST(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // Get user's email from auth and update password
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(userId);
+    
+    if (authError || !authUser.user || !authUser.user.email) {
+      return NextResponse.json({ error: 'User email not found' }, { status: 404 });
+    }
+
     // Generate new temporary password
     const temporaryPassword = generateSecurePassword();
-    console.log('Generated temporary password for', targetProfile.email);
+    console.log('Generated temporary password for', authUser.user.email);
 
     // Update password using admin API
-    const supabaseAdmin = getSupabaseAdmin();
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       userId,
       {
@@ -97,7 +104,7 @@ export async function POST(
 
     // Send email to user with new temporary password
     const emailResult = await sendPasswordEmail({
-      to: targetProfile.email!,
+      to: authUser.user.email,
       userName: targetProfile.full_name!,
       temporaryPassword,
       isReset: true,

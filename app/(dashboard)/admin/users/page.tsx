@@ -43,14 +43,15 @@ import type { Database } from '@/types/database';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
+type ProfileWithEmail = Profile & { email?: string };
 
 export default function UsersAdminPage() {
   const { user: currentUser, isAdmin } = useAuth();
   const supabase = createClient();
 
   // State
-  const [users, setUsers] = useState<Profile[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<Profile[]>([]);
+  const [users, setUsers] = useState<ProfileWithEmail[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<ProfileWithEmail[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -72,8 +73,9 @@ export default function UsersAdminPage() {
   const [formData, setFormData] = useState({
     email: '',
     full_name: '',
+    phone_number: '',
     employee_id: '',
-    role: 'employee' as 'admin' | 'manager' | 'employee',
+    role: 'employee-civils' as 'admin' | 'manager' | 'employee-civils' | 'employee-plant' | 'employee-transport' | 'employee-office' | 'employee-workshop',
   });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
@@ -83,22 +85,41 @@ export default function UsersAdminPage() {
     total: users.length,
     admins: users.filter((u) => u.role === 'admin').length,
     managers: users.filter((u) => u.role === 'manager').length,
-    employees: users.filter((u) => u.role === 'employee').length,
+    employees: users.filter((u) => u.role.startsWith('employee-')).length,
   };
+
+  // Helper function to fetch users with emails
+  async function fetchUsersWithEmails() {
+    // Fetch profiles from database
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (profilesError) throw profilesError;
+
+    // Fetch auth users to get emails (via API route)
+    const response = await fetch('/api/admin/users/list-with-emails');
+    const { users: authUsers } = await response.json();
+
+    // Create a map of user id to email
+    const emailMap = new Map(authUsers?.map((u: any) => [u.id, u.email]) || []);
+
+    // Merge profiles with emails
+    return profiles?.map(profile => ({
+      ...profile,
+      email: emailMap.get(profile.id) || ''
+    })) || [];
+  }
 
   // Fetch users
   useEffect(function () {
     async function fetchUsers() {
       try {
         setLoading(true);
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        setUsers(data || []);
-        setFilteredUsers(data || []);
+        const usersWithEmails = await fetchUsersWithEmails();
+        setUsers(usersWithEmails);
+        setFilteredUsers(usersWithEmails);
       } catch (error) {
         console.error('Error fetching users:', error);
       } finally {
@@ -145,6 +166,7 @@ export default function UsersAdminPage() {
         body: JSON.stringify({
           email: formData.email,
           full_name: formData.full_name,
+          phone_number: formData.phone_number,
           employee_id: formData.employee_id,
           role: formData.role,
         }),
@@ -157,13 +179,9 @@ export default function UsersAdminPage() {
       }
 
       // Refresh users list
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      setUsers(data || []);
-      setFilteredUsers(data || []);
+      const usersWithEmails = await fetchUsersWithEmails();
+      setUsers(usersWithEmails);
+      setFilteredUsers(usersWithEmails);
 
       // Show password to admin
       setTemporaryPassword(result.temporaryPassword);
@@ -176,8 +194,9 @@ export default function UsersAdminPage() {
       setFormData({
         email: '',
         full_name: '',
+        phone_number: '',
         employee_id: '',
-        role: 'employee',
+        role: 'employee-civils',
       });
       setAddDialogOpen(false);
     } catch (error) {
@@ -206,6 +225,7 @@ export default function UsersAdminPage() {
         body: JSON.stringify({
           email: formData.email,
           full_name: formData.full_name,
+          phone_number: formData.phone_number,
           employee_id: formData.employee_id,
           role: formData.role,
         }),
@@ -218,13 +238,9 @@ export default function UsersAdminPage() {
       }
 
       // Refresh users list
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      setUsers(data || []);
-      setFilteredUsers(data || []);
+      const usersWithEmails = await fetchUsersWithEmails();
+      setUsers(usersWithEmails);
+      setFilteredUsers(usersWithEmails);
 
       setEditDialogOpen(false);
       setSelectedUser(null);
@@ -255,13 +271,9 @@ export default function UsersAdminPage() {
       }
 
       // Refresh users list
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      setUsers(data || []);
-      setFilteredUsers(data || []);
+      const usersWithEmails = await fetchUsersWithEmails();
+      setUsers(usersWithEmails);
+      setFilteredUsers(usersWithEmails);
 
       setDeleteDialogOpen(false);
       setSelectedUser(null);
@@ -279,8 +291,9 @@ export default function UsersAdminPage() {
     setFormData({
       email: user.email || '',
       full_name: user.full_name || '',
+      phone_number: user.phone_number || '',
       employee_id: user.employee_id || '',
-      role: user.role as 'admin' | 'manager' | 'employee',
+      role: user.role as 'admin' | 'manager' | 'employee-civils' | 'employee-plant' | 'employee-transport' | 'employee-office' | 'employee-workshop',
     });
     setFormError('');
     setEditDialogOpen(true);
@@ -607,6 +620,17 @@ export default function UsersAdminPage() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="add-phone">Phone Number</Label>
+              <Input
+                id="add-phone"
+                type="tel"
+                value={formData.phone_number}
+                onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                placeholder="07123 456789"
+                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="add-employee-id">Employee ID</Label>
               <Input
                 id="add-employee-id"
@@ -618,12 +642,16 @@ export default function UsersAdminPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="add-role">Role *</Label>
-              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value as 'admin' | 'manager' | 'employee' })}>
+              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value as 'admin' | 'manager' | 'employee-civils' | 'employee-plant' | 'employee-transport' | 'employee-office' | 'employee-workshop' })}>
                 <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="employee-civils">Employee - Civils</SelectItem>
+                  <SelectItem value="employee-plant">Employee - Plant</SelectItem>
+                  <SelectItem value="employee-transport">Employee - Transport</SelectItem>
+                  <SelectItem value="employee-office">Employee - Office</SelectItem>
+                  <SelectItem value="employee-workshop">Employee - Workshop</SelectItem>
                   <SelectItem value="manager">Manager</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
@@ -687,6 +715,16 @@ export default function UsersAdminPage() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="edit-phone">Phone Number</Label>
+              <Input
+                id="edit-phone"
+                type="tel"
+                value={formData.phone_number}
+                onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                className="bg-slate-800 border-slate-600 text-white"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="edit-employee-id">Employee ID</Label>
               <Input
                 id="edit-employee-id"
@@ -697,12 +735,16 @@ export default function UsersAdminPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-role">Role *</Label>
-              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value as 'admin' | 'manager' | 'employee' })}>
+              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value as 'admin' | 'manager' | 'employee-civils' | 'employee-plant' | 'employee-transport' | 'employee-office' | 'employee-workshop' })}>
                 <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="employee-civils">Employee - Civils</SelectItem>
+                  <SelectItem value="employee-plant">Employee - Plant</SelectItem>
+                  <SelectItem value="employee-transport">Employee - Transport</SelectItem>
+                  <SelectItem value="employee-office">Employee - Office</SelectItem>
+                  <SelectItem value="employee-workshop">Employee - Workshop</SelectItem>
                   <SelectItem value="manager">Manager</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>

@@ -18,7 +18,9 @@ export interface Database {
           id: string
           employee_id: string | null
           full_name: string
-          role: 'admin' | 'manager' | 'employee'
+          phone_number: string | null
+          role: 'admin' | 'manager' | 'employee-civils' | 'employee-plant' | 'employee-transport' | 'employee-office' | 'employee-workshop'
+          must_change_password: boolean
           created_at: string
           updated_at: string
         }
@@ -26,7 +28,9 @@ export interface Database {
           id: string
           employee_id?: string | null
           full_name: string
-          role: 'admin' | 'manager' | 'employee'
+          phone_number?: string | null
+          role: 'admin' | 'manager' | 'employee-civils' | 'employee-plant' | 'employee-transport' | 'employee-office' | 'employee-workshop'
+          must_change_password?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -34,7 +38,9 @@ export interface Database {
           id?: string
           employee_id?: string | null
           full_name?: string
-          role?: 'admin' | 'manager' | 'employee'
+          phone_number?: string | null
+          role?: 'admin' | 'manager' | 'employee-civils' | 'employee-plant' | 'employee-transport' | 'employee-office' | 'employee-workshop'
+          must_change_password?: boolean
           created_at?: string
           updated_at?: string
         }

@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     // Get request body
     const body = await request.json();
-    const { email, full_name, employee_id, role } = body;
+    const { email, full_name, phone_number, employee_id, role } = body;
 
     // Validate required fields (password is now auto-generated)
     if (!email || !full_name) {
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate role
-    const validRoles = ['admin', 'manager', 'employee'];
+    const validRoles = ['admin', 'manager', 'employee-civils', 'employee-plant', 'employee-transport', 'employee-office', 'employee-workshop'];
     if (!validRoles.includes(role)) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
     }
@@ -88,6 +88,7 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .update({
         full_name,
+        phone_number: phone_number || null,
         employee_id: employee_id || null,
         role,
         must_change_password: true, // Force password change on first login

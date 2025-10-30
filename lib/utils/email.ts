@@ -209,3 +209,146 @@ export async function testEmailConfiguration(): Promise<{
   };
 }
 
+interface ProfileUpdateChanges {
+  email?: { old: string; new: string };
+  full_name?: { old: string; new: string };
+  phone_number?: { old: string; new: string };
+  role?: { old: string; new: string };
+  employee_id?: { old: string; new: string };
+}
+
+interface SendProfileUpdateEmailParams {
+  to: string;
+  userName: string;
+  changes: ProfileUpdateChanges;
+}
+
+/**
+ * Send profile update notification email to user
+ * @param params Email parameters
+ * @returns Promise with success status
+ */
+export async function sendProfileUpdateEmail(params: SendProfileUpdateEmailParams): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  const { to, userName, changes } = params;
+  
+  try {
+    // Check if Resend API key is configured
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      console.error('RESEND_API_KEY not configured');
+      return {
+        success: false,
+        error: 'Email service not configured'
+      };
+    }
+    
+    // Build changes list HTML
+    const changesHtml = Object.entries(changes)
+      .map(([field, change]) => {
+        const fieldName = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        return `
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-weight: bold; color: #374151;">${fieldName}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #6b7280;">${change.old || '-'}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; color: #059669; font-weight: 500;">${change.new || '-'}</td>
+          </tr>
+        `;
+      })
+      .join('');
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #F1D64A; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0; color: #252525;">SquiresApp</h1>
+          </div>
+          
+          <div style="background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+            <h2 style="color: #252525; margin-top: 0;">Your Profile Has Been Updated</h2>
+            
+            <p>Hello ${userName},</p>
+            
+            <p>An administrator has updated your profile information. Here are the changes:</p>
+            
+            <div style="background-color: #fff; border: 1px solid #e5e7eb; border-radius: 8px; margin: 20px 0; overflow: hidden;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                  <tr style="background-color: #f3f4f6;">
+                    <th style="padding: 12px; text-align: left; font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Field</th>
+                    <th style="padding: 12px; text-align: left; font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Previous Value</th>
+                    <th style="padding: 12px; text-align: left; font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">New Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${changesHtml}
+                </tbody>
+              </table>
+            </div>
+            
+            ${changes.email ? `
+              <div style="background-color: #dbeafe; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0;">
+                <p style="margin: 0; font-weight: bold; color: #1e40af;">📧 Email Address Changed</p>
+                <p style="margin: 5px 0 0 0; color: #1e40af;">Your email address has been updated. Please use <strong>${changes.email.new}</strong> to log in from now on.</p>
+              </div>
+            ` : ''}
+            
+            <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+              If you did not expect these changes or have any questions, please contact your administrator.
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin-top: 20px; color: #9ca3af; font-size: 12px;">
+            <p>© ${new Date().getFullYear()} A&V Squires Plant Co. Ltd. All rights reserved.</p>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    // Send email using Resend API
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: process.env.RESEND_FROM_EMAIL || 'AVS Worklog <onboarding@resend.dev>',
+        to: [to],
+        subject: 'Your SquiresApp Profile Has Been Updated',
+        html: htmlContent
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('Resend API error:', error);
+      return {
+        success: false,
+        error: `Failed to send email: ${error.message || 'Unknown error'}`
+      };
+    }
+    
+    const data = await response.json();
+    console.log('Profile update email sent successfully:', data);
+    
+    return {
+      success: true
+    };
+    
+  } catch (error: any) {
+    console.error('Error sending profile update email:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to send email'
+    };
+  }
+}
+
