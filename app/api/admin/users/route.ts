@@ -71,12 +71,18 @@ export async function POST(request: NextRequest) {
       email_confirm: true, // Auto-confirm email
       user_metadata: {
         full_name,
+        role, // Pass role to trigger function
+        employee_id: employee_id || null,
       },
     });
 
     if (authError) {
       console.error('Auth error:', authError);
-      return NextResponse.json({ error: authError.message }, { status: 400 });
+      console.error('Auth error details:', JSON.stringify(authError, null, 2));
+      return NextResponse.json({ 
+        error: authError.message || 'Failed to create auth user',
+        details: authError.code || 'unknown_error'
+      }, { status: 400 });
     }
 
     if (!authData.user) {

@@ -455,8 +455,9 @@ export default function UsersAdminPage() {
                   setFormData({
                     email: '',
                     full_name: '',
+                    phone_number: '',
                     employee_id: '',
-                    role: 'employee',
+                    role: 'employee-civils',
                   });
                   setFormError('');
                   setAddDialogOpen(true);
