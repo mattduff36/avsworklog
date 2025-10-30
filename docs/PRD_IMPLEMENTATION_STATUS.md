@@ -495,7 +495,7 @@
 - [x] Role-based visibility
 - [x] Real-time data (planned)
 
-### Real-time/Offline: 100% ✅
+### Real-time/Offline: 95% ⚠️ (iOS navigation issue)
 - [x] Infrastructure
 - [x] Hooks created
 - [x] Offline queue with Zustand persistence
@@ -503,6 +503,9 @@
 - [x] Integrated into inspection form
 - [x] Realtime updates in list pages
 - [x] Toast notifications for status changes
+- [x] Custom service worker for iOS (attempted fix)
+- [x] Offline fallback page
+- [ ] iOS offline navigation (pages don't cache properly)
 - [ ] Testing on actual device (user to test)
 
 ### Reporting: 100% ✅ **Complete Oct 24, 2025**

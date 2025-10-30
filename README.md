@@ -179,27 +179,35 @@ avsworklog/
 
 ### Offline Features
 
-Once installed, the app works **completely offline**:
+**⚠️ Current Status: Partial Offline Support**
 
+What works offline:
 ✅ **Create timesheets offline** - saved locally, synced when online  
 ✅ **Create inspections offline** - queued for automatic sync  
-✅ **View existing data** - cached for offline access  
 ✅ **Automatic sync** - happens seamlessly when connection restored  
 ✅ **Persistent queue** - survives browser restarts  
 ✅ **Visual feedback** - offline indicator in navbar shows pending items  
 
+**Known Issue (iOS):**
+❌ **Navigation between pages offline** - iOS Safari doesn't load cached pages properly  
+❌ **Opening app from home screen offline** - Shows "no internet" message
+
+**What this means**: You can still create forms offline if you're already on the form page, but you can't browse between different pages (like from Dashboard to Timesheets) when offline. This is an iOS Safari limitation we're working to resolve.
+
 ### Testing Offline Mode
 
-**On iPhone:**
-1. Install the PWA from production site
-2. Enable **Airplane Mode** ✈️
-3. Open the **Squires app** from home screen
-4. Create a timesheet or inspection
-5. Notice **"1 pending"** in the navbar
-6. Disable Airplane Mode
-7. Watch it **sync automatically**! 🎉
+**Desktop (Chrome):**
+1. Open Chrome DevTools → Network tab
+2. Set throttling to "Offline"
+3. Navigate to timesheet/inspection form
+4. Create a form - it will queue
+5. Set back to "Online"
+6. Watch it sync automatically! 🎉
 
-**Note**: The offline icon will change immediately when you go offline, but you need an active service worker (only available in production) to actually load pages and create forms offline.
+**Mobile (Limited):**
+Currently, the offline features work best when you're already on a form page and lose connection. Full offline navigation is not yet working on iOS Safari.
+
+For details on this issue and attempted fixes, see `docs/OFFLINE_PWA_IMPLEMENTATION.md`.
 
 ## Development
 
