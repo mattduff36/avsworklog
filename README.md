@@ -157,13 +157,49 @@ avsworklog/
 - Add/edit vehicles
 - System configuration
 
-## Offline Mode
+## 📱 PWA Installation & Offline Mode
 
-The app works offline! Changes are:
-- Saved locally in browser storage
-- Queued for synchronization
-- Automatically synced when connection restored
-- Indicated by offline icon in navbar
+### Installing on iPhone (iOS)
+
+**⚠️ IMPORTANT**: PWA only works on the **production site**, not localhost!
+
+1. **Open Safari** (must use Safari, not Chrome)
+2. **Navigate to**: [https://avsworklog.mpdee.uk](https://avsworklog.mpdee.uk)
+3. **Tap the Share button** ⬆️ (bottom toolbar)
+4. **Scroll down** and tap **"Add to Home Screen"**
+5. **Tap "Add"** in the top right
+6. **Icon appears** on your home screen with "Squires" name
+
+### Installing on Android
+
+1. Open Chrome browser
+2. Navigate to [https://avsworklog.mpdee.uk](https://avsworklog.mpdee.uk)
+3. Tap menu (⋮) → "Add to Home screen" or "Install app"
+4. Follow the prompts
+
+### Offline Features
+
+Once installed, the app works **completely offline**:
+
+✅ **Create timesheets offline** - saved locally, synced when online  
+✅ **Create inspections offline** - queued for automatic sync  
+✅ **View existing data** - cached for offline access  
+✅ **Automatic sync** - happens seamlessly when connection restored  
+✅ **Persistent queue** - survives browser restarts  
+✅ **Visual feedback** - offline indicator in navbar shows pending items  
+
+### Testing Offline Mode
+
+**On iPhone:**
+1. Install the PWA from production site
+2. Enable **Airplane Mode** ✈️
+3. Open the **Squires app** from home screen
+4. Create a timesheet or inspection
+5. Notice **"1 pending"** in the navbar
+6. Disable Airplane Mode
+7. Watch it **sync automatically**! 🎉
+
+**Note**: The offline icon will change immediately when you go offline, but you need an active service worker (only available in production) to actually load pages and create forms offline.
 
 ## Development
 
@@ -218,9 +254,11 @@ In Vercel dashboard:
 - Manually create profile if needed
 
 ### Offline sync not working
+- **Must use production site** (https://avsworklog.mpdee.uk) - localhost/dev won't work!
 - Check browser console for errors
+- Verify service worker is registered: open DevTools → Application → Service Workers
 - Clear browser cache and reload
-- Ensure service worker is registered
+- Make sure PWA is installed from home screen, not Safari tab
 
 ### RLS policy errors
 - Verify user role in database
@@ -246,12 +284,23 @@ Proprietary - A&V Squires Plant Co. Ltd.
 
 ## Version
 
-**v1.0.0** - MVP Release
+**v1.1.0** - Complete Offline PWA Release (October 30, 2025)
+- ✅ Full offline PWA functionality
+- ✅ Automatic sync when reconnected
+- ✅ Real-time updates across devices
+- ✅ Toast notifications for all status changes
+- ✅ Vehicle management system
+- ✅ Password management with email notifications
+- ✅ Bank holiday detection
+- ✅ Night shift automatic detection
+- ✅ Comprehensive Excel & PDF reporting
+
+**v1.0.0** - MVP Release (October 24, 2025)
 - Employee timesheets
 - Vehicle inspections
 - Basic reporting
-- Offline support
-- Real-time sync
+- Manager approval workflow
+- Digital signatures
 
 ---
 
