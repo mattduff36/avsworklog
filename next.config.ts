@@ -28,42 +28,10 @@ export default withPWA({
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === "development",
-  runtimeCaching: [
-    // Cache pages (HTML)
-    {
-      urlPattern: /^https?:\/\/avsworklog\.mpdee\.uk\/.*/i,
-      handler: "NetworkFirst",
-      options: {
-        cacheName: "pages-cache",
-        expiration: {
-          maxEntries: 64,
-          maxAgeSeconds: 24 * 60 * 60, // 24 hours
-        },
-      },
-    },
-    // Cache static resources (JS, CSS, images)
-    {
-      urlPattern: /\.(?:js|css|png|jpg|jpeg|svg|gif|webp|woff|woff2)$/i,
-      handler: "CacheFirst",
-      options: {
-        cacheName: "static-resources",
-        expiration: {
-          maxEntries: 64,
-          maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
-        },
-      },
-    },
-    // Cache Supabase API calls
-    {
-      urlPattern: /^https:\/\/.*\.supabase\.co\/.*$/,
-      handler: "NetworkFirst",
-      options: {
-        cacheName: "supabase-cache",
-        expiration: {
-          maxEntries: 32,
-          maxAgeSeconds: 24 * 60 * 60, // 24 hours
-        },
-      },
-    },
-  ],
+  // Use custom service worker
+  sw: "sw-custom.js",
+  // Fallback for offline navigation
+  fallbacks: {
+    document: "/offline",
+  },
 })(nextConfig);
