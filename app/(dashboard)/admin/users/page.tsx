@@ -33,6 +33,9 @@ import {
   Calendar,
   Loader2,
   AlertTriangle,
+  KeyRound,
+  Copy,
+  CheckCircle2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -42,7 +45,7 @@ type Profile = Database['public']['Tables']['profiles']['Row'];
 type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
 
 export default function UsersAdminPage() {
-  const { user, isAdmin } = useAuth();
+  const { user: currentUser, isAdmin } = useAuth();
   const supabase = createClient();
 
   // State
@@ -55,12 +58,19 @@ export default function UsersAdminPage() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
+  const [passwordDisplayDialogOpen, setPasswordDisplayDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  
+  // Password display states
+  const [temporaryPassword, setTemporaryPassword] = useState('');
+  const [emailSent, setEmailSent] = useState(false);
+  const [passwordCopied, setPasswordCopied] = useState(false);
+  const [isNewUser, setIsNewUser] = useState(false);
 
   // Form states
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
     full_name: '',
     employee_id: '',
     role: 'employee' as 'admin' | 'manager' | 'employee',
@@ -119,7 +129,7 @@ export default function UsersAdminPage() {
 
   // Handle add user
   async function handleAddUser() {
-    if (!formData.email || !formData.password || !formData.full_name) {
+    if (!formData.email || !formData.full_name) {
       setFormError('Please fill in all required fields');
       return;
     }
@@ -134,7 +144,6 @@ export default function UsersAdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: formData.email,
-          password: formData.password,
           full_name: formData.full_name,
           employee_id: formData.employee_id,
           role: formData.role,
@@ -156,10 +165,16 @@ export default function UsersAdminPage() {
       setUsers(data || []);
       setFilteredUsers(data || []);
 
+      // Show password to admin
+      setTemporaryPassword(result.temporaryPassword);
+      setEmailSent(result.emailSent);
+      setIsNewUser(true);
+      setPasswordCopied(false);
+      setPasswordDisplayDialogOpen(true);
+
       // Reset form and close dialog
       setFormData({
         email: '',
-        password: '',
         full_name: '',
         employee_id: '',
         role: 'employee',
@@ -175,7 +190,7 @@ export default function UsersAdminPage() {
 
   // Handle edit user
   async function handleEditUser() {
-    if (!selectedUser || !formData.full_name) {
+    if (!selectedUser || !formData.full_name || !formData.email) {
       setFormError('Please fill in all required fields');
       return;
     }
@@ -184,16 +199,23 @@ export default function UsersAdminPage() {
       setFormLoading(true);
       setFormError('');
 
-      const { error } = await supabase
-        .from('profiles')
-        .update({
+      // Update via API route (handles both auth and profile)
+      const response = await fetch(`/api/admin/users/${selectedUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
           full_name: formData.full_name,
           employee_id: formData.employee_id,
           role: formData.role,
-        })
-        .eq('id', selectedUser.id);
+        }),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update user');
+      }
 
       // Refresh users list
       const { data } = await supabase
@@ -208,7 +230,7 @@ export default function UsersAdminPage() {
       setSelectedUser(null);
     } catch (error) {
       console.error('Error updating user:', error);
-      setFormError('Failed to update user');
+      setFormError(error instanceof Error ? error.message : 'Failed to update user');
     } finally {
       setFormLoading(false);
     }
@@ -256,7 +278,6 @@ export default function UsersAdminPage() {
     setSelectedUser(user);
     setFormData({
       email: user.email || '',
-      password: '',
       full_name: user.full_name || '',
       employee_id: user.employee_id || '',
       role: user.role as 'admin' | 'manager' | 'employee',
@@ -270,6 +291,58 @@ export default function UsersAdminPage() {
     setSelectedUser(user);
     setFormError('');
     setDeleteDialogOpen(true);
+  }
+
+  // Open reset password dialog
+  function openResetPasswordDialog(user: Profile) {
+    setSelectedUser(user);
+    setFormError('');
+    setResetPasswordDialogOpen(true);
+  }
+
+  // Handle reset password
+  async function handleResetPassword() {
+    if (!selectedUser) return;
+
+    try {
+      setFormLoading(true);
+      setFormError('');
+
+      const response = await fetch(`/api/admin/users/${selectedUser.id}/reset-password`, {
+        method: 'POST',
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to reset password');
+      }
+
+      // Show new password to admin
+      setTemporaryPassword(result.temporaryPassword);
+      setEmailSent(result.emailSent);
+      setIsNewUser(false);
+      setPasswordCopied(false);
+      setPasswordDisplayDialogOpen(true);
+      setResetPasswordDialogOpen(false);
+      setSelectedUser(null);
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      setFormError('Failed to reset password');
+    } finally {
+      setFormLoading(false);
+    }
+  }
+
+  // Copy password to clipboard
+  async function copyPasswordToClipboard() {
+    try {
+      await navigator.clipboard.writeText(temporaryPassword);
+      setPasswordCopied(true);
+      setTimeout(() => setPasswordCopied(false), 3000);
+    } catch (error) {
+      console.error('Failed to copy password:', error);
+    }
   }
 
   // Check authorization
@@ -368,7 +441,6 @@ export default function UsersAdminPage() {
                 onClick={() => {
                   setFormData({
                     email: '',
-                    password: '',
                     full_name: '',
                     employee_id: '',
                     role: 'employee',
@@ -460,15 +532,26 @@ export default function UsersAdminPage() {
                               size="sm"
                               onClick={() => openEditDialog(user)}
                               className="text-blue-400 hover:text-blue-300 hover:bg-slate-800"
+                              title="Edit User"
                             >
                               <Edit className="h-3 w-3" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => openResetPasswordDialog(user)}
+                              className="text-amber-400 hover:text-amber-300 hover:bg-slate-800"
+                              title="Reset Password"
+                            >
+                              <KeyRound className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => openDeleteDialog(user)}
-                              disabled={user.id === user.id} // Prevent self-deletion
+                              disabled={user.id === currentUser?.id} // Prevent self-deletion
                               className="text-red-400 hover:text-red-300 hover:bg-slate-800 disabled:opacity-30"
+                              title="Delete User"
                             >
                               <Trash2 className="h-3 w-3" />
                             </Button>
@@ -499,6 +582,9 @@ export default function UsersAdminPage() {
                 {formError}
               </div>
             )}
+            <div className="bg-blue-500/10 border border-blue-500/50 rounded p-3 text-sm text-blue-400">
+              <strong>Note:</strong> A secure temporary password will be automatically generated and sent to the user's email address.
+            </div>
             <div className="space-y-2">
               <Label htmlFor="add-email">Email *</Label>
               <Input
@@ -507,18 +593,7 @@ export default function UsersAdminPage() {
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 placeholder="user@example.com"
-                className="bg-slate-800 border-slate-600 text-white"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="add-password">Password *</Label>
-              <Input
-                id="add-password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="Minimum 6 characters"
-                className="bg-slate-800 border-slate-600 text-white"
+                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
               />
             </div>
             <div className="space-y-2">
@@ -528,7 +603,7 @@ export default function UsersAdminPage() {
                 value={formData.full_name}
                 onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                 placeholder="John Smith"
-                className="bg-slate-800 border-slate-600 text-white"
+                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
               />
             </div>
             <div className="space-y-2">
@@ -538,7 +613,7 @@ export default function UsersAdminPage() {
                 value={formData.employee_id}
                 onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
                 placeholder="E001"
-                className="bg-slate-800 border-slate-600 text-white"
+                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
               />
             </div>
             <div className="space-y-2">
@@ -592,13 +667,15 @@ export default function UsersAdminPage() {
               </div>
             )}
             <div className="space-y-2">
-              <Label>Email</Label>
+              <Label htmlFor="edit-email">Email *</Label>
               <Input
+                id="edit-email"
+                type="email"
                 value={formData.email}
-                disabled
-                className="bg-slate-800 border-slate-600 text-slate-400"
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="bg-slate-800 border-slate-600 text-white"
               />
-              <p className="text-xs text-slate-500">Email cannot be changed</p>
+              <p className="text-xs text-amber-500">⚠️ Changing email will require the user to verify their new address</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-name">Full Name *</Label>
@@ -705,6 +782,146 @@ export default function UsersAdminPage() {
                   Delete User
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Confirmation Dialog */}
+      <Dialog open={resetPasswordDialogOpen} onOpenChange={setResetPasswordDialogOpen}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-amber-500" />
+              Reset User Password
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              This will generate a new temporary password for the user. They will be required to change it on their next login.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedUser && (
+            <div className="bg-slate-800 rounded p-4 space-y-2">
+              <p className="text-sm">
+                <span className="text-slate-400">Name:</span>{' '}
+                <span className="text-white font-medium">{selectedUser.full_name}</span>
+              </p>
+              <p className="text-sm">
+                <span className="text-slate-400">Email:</span>{' '}
+                <span className="text-white">{selectedUser.email}</span>
+              </p>
+            </div>
+          )}
+          {formError && (
+            <div className="bg-red-500/10 border border-red-500/50 rounded p-3 text-sm text-red-400">
+              {formError}
+            </div>
+          )}
+          <div className="bg-amber-500/10 border border-amber-500/50 rounded p-3 text-sm text-amber-400">
+            <strong>Note:</strong> The new password will be sent to the user's email address and displayed to you.
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setResetPasswordDialogOpen(false); setSelectedUser(null); }} className="border-slate-600 text-white hover:bg-slate-800">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleResetPassword}
+              disabled={formLoading}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              {formLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Resetting...
+                </>
+              ) : (
+                <>
+                  <KeyRound className="h-4 w-4 mr-2" />
+                  Reset Password
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Password Display Dialog */}
+      <Dialog open={passwordDisplayDialogOpen} onOpenChange={setPasswordDisplayDialogOpen}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-500" />
+              {isNewUser ? 'User Created Successfully' : 'Password Reset Successfully'}
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              {isNewUser 
+                ? 'The user account has been created with a temporary password.'
+                : 'The user\'s password has been reset to a new temporary password.'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Email Status */}
+            {emailSent ? (
+              <div className="bg-green-500/10 border border-green-500/50 rounded p-3 text-sm text-green-400">
+                ✅ Email sent successfully to the user
+              </div>
+            ) : (
+              <div className="bg-amber-500/10 border border-amber-500/50 rounded p-3 text-sm text-amber-400">
+                ⚠️ Email failed to send - Please share the password with the user manually
+              </div>
+            )}
+
+            {/* Password Display */}
+            <div className="bg-slate-800 border-2 border-[#F1D64A] rounded-lg p-4">
+              <Label className="text-sm text-slate-400 mb-2 block">Temporary Password</Label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 bg-slate-950 rounded p-3 font-mono text-lg text-[#F1D64A] select-all">
+                  {temporaryPassword}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copyPasswordToClipboard}
+                  className="border-slate-600 hover:bg-slate-800"
+                >
+                  {passwordCopied ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 mr-1 text-green-500" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 mr-1" />
+                      Copy
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Important Notice */}
+            <div className="bg-blue-500/10 border border-blue-500/50 rounded p-4">
+              <p className="text-sm text-blue-400 font-medium mb-2">
+                📋 Important Information
+              </p>
+              <ul className="text-sm text-blue-400 space-y-1 list-disc list-inside">
+                <li>This password will only be shown once</li>
+                <li>The user must change this password on their first login</li>
+                <li>Password has been {emailSent ? 'emailed' : 'generated but not emailed'}</li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              onClick={() => {
+                setPasswordDisplayDialogOpen(false);
+                setTemporaryPassword('');
+                setPasswordCopied(false);
+              }}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Done
             </Button>
           </DialogFooter>
         </DialogContent>

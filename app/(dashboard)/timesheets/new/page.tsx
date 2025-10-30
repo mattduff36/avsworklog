@@ -18,6 +18,7 @@ import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
 import { DAY_NAMES } from '@/types/timesheet';
 import { Database } from '@/types/database';
 import { SignaturePad } from '@/components/forms/SignaturePad';
+import { fetchUKBankHolidays } from '@/lib/utils/bank-holidays';
 
 type Employee = {
   id: string;
@@ -42,6 +43,15 @@ export default function NewTimesheetPage() {
   // Manager-specific states
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
+  
+  // Bank holidays cache (fetched from GOV.UK API)
+  const [bankHolidays, setBankHolidays] = useState<Set<string>>(new Set());
+  
+  // Bank holiday warning modal
+  const [showBankHolidayWarning, setShowBankHolidayWarning] = useState(false);
+  const [bankHolidayDayIndex, setBankHolidayDayIndex] = useState<number | null>(null);
+  const [bankHolidayDate, setBankHolidayDate] = useState<string>('');
+  const [bankHolidayFieldType, setBankHolidayFieldType] = useState<'time' | 'job'>('time');
 
   // Initialize entries for all 7 days
   const [entries, setEntries] = useState(
@@ -52,10 +62,28 @@ export default function NewTimesheetPage() {
       job_number: '',
       working_in_yard: false,
       did_not_work: false,
+      night_shift: false,
+      bank_holiday: false,
       daily_total: null as number | null,
       remarks: '',
+      bankHolidayWarningShown: false, // Track if warning already shown for this day
     }))
   );
+
+  // Fetch bank holidays from GOV.UK API on mount
+  useEffect(() => {
+    const loadBankHolidays = async () => {
+      try {
+        const holidays = await fetchUKBankHolidays('england-and-wales');
+        setBankHolidays(holidays);
+      } catch (error) {
+        console.error('Failed to load bank holidays:', error);
+        // Continue without bank holidays - system will still work
+      }
+    };
+    
+    loadBankHolidays();
+  }, []);
 
   // Fetch employees if manager, and set initial selected employee
   useEffect(() => {
@@ -76,8 +104,97 @@ export default function NewTimesheetPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmployeeId]);
 
+  // Check if a specific day is a bank holiday
+  const isDayBankHoliday = (dayIndex: number): boolean => {
+    const weekEndingDate = new Date(weekEnding + 'T00:00:00');
+    const entryDate = new Date(weekEndingDate);
+    entryDate.setDate(weekEndingDate.getDate() - (7 - dayIndex));
+    
+    const year = entryDate.getFullYear();
+    const month = String(entryDate.getMonth() + 1).padStart(2, '0');
+    const day = String(entryDate.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${day}`;
+    
+    return bankHolidays.has(dateString);
+  };
+
+  // Get formatted date for display
+  const getFormattedDate = (dayIndex: number): string => {
+    const weekEndingDate = new Date(weekEnding + 'T00:00:00');
+    const entryDate = new Date(weekEndingDate);
+    entryDate.setDate(weekEndingDate.getDate() - (7 - dayIndex));
+    
+    return entryDate.toLocaleDateString('en-GB', { 
+      weekday: 'long',
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    });
+  };
+
+  // Show bank holiday warning if needed
+  const checkAndShowBankHolidayWarning = (dayIndex: number, value: string, fieldType: 'time' | 'job') => {
+    // Only show if:
+    // 1. It's a bank holiday
+    // 2. Warning hasn't been shown for this day yet
+    // 3. User has entered 2 or more characters
+    // 4. Day is not already marked as "did not work"
+    const entry = entries[dayIndex];
+    
+    if (
+      isDayBankHoliday(dayIndex) &&
+      !entry.bankHolidayWarningShown &&
+      !entry.did_not_work &&
+      value.length >= 2
+    ) {
+      setBankHolidayDayIndex(dayIndex);
+      setBankHolidayDate(getFormattedDate(dayIndex));
+      setBankHolidayFieldType(fieldType);
+      setShowBankHolidayWarning(true);
+    }
+  };
+
+  // Handle "Yes" on bank holiday warning - mark as shown and continue
+  const handleBankHolidayYes = () => {
+    if (bankHolidayDayIndex !== null) {
+      const newEntries = [...entries];
+      newEntries[bankHolidayDayIndex] = {
+        ...newEntries[bankHolidayDayIndex],
+        bankHolidayWarningShown: true,
+      };
+      setEntries(newEntries);
+    }
+    setShowBankHolidayWarning(false);
+    setBankHolidayDayIndex(null);
+  };
+
+  // Handle "No" on bank holiday warning - clear entries and enable "did not work"
+  const handleBankHolidayNo = () => {
+    if (bankHolidayDayIndex !== null) {
+      const newEntries = [...entries];
+      newEntries[bankHolidayDayIndex] = {
+        ...newEntries[bankHolidayDayIndex],
+        time_started: '',
+        time_finished: '',
+        job_number: '',
+        did_not_work: true,
+        working_in_yard: false,
+        daily_total: 0,
+        bankHolidayWarningShown: true, // Mark as shown so it doesn't pop up again
+      };
+      setEntries(newEntries);
+    }
+    setShowBankHolidayWarning(false);
+    setBankHolidayDayIndex(null);
+  };
+
   // Handle job number input with auto-dash formatting (NNNN-LL format)
   const handleJobNumberChange = (index: number, value: string) => {
+    // Check for bank holiday warning (only on 2nd character)
+    if (value.length === 2) {
+      checkAndShowBankHolidayWarning(index, value, 'job');
+    }
+    
     // Remove all non-alphanumeric characters except dash
     let cleaned = value.replace(/[^0-9A-Za-z-]/g, '').toUpperCase();
     
@@ -202,8 +319,12 @@ export default function NewTimesheetPage() {
         daily_total: 0,
       };
     } else {
-      // Round time inputs to 15-minute intervals
+      // Check for bank holiday warning on time fields (only on 2nd character)
       if ((field === 'time_started' || field === 'time_finished') && typeof value === 'string') {
+        if (value.length === 2) {
+          checkAndShowBankHolidayWarning(dayIndex, value, 'time');
+        }
+        // Round time inputs to 15-minute intervals
         value = roundToQuarterHour(value);
       }
       
@@ -275,6 +396,27 @@ export default function NewTimesheetPage() {
     await saveTimesheet('submitted', sig);
   };
 
+  // Helper function to detect if a shift is a night shift
+  // Night shift: Any shift over 9.5 hours that starts after 15:00
+  const isNightShift = (timeStarted: string, dailyTotal: number | null): boolean => {
+    if (!timeStarted || !dailyTotal) return false;
+    
+    const [hours] = timeStarted.split(':').map(Number);
+    return dailyTotal > 9.5 && hours >= 15;
+  };
+
+  // Helper function to check if a date is a UK bank holiday
+  // Uses data from GOV.UK API: https://www.gov.uk/bank-holidays.json
+  const isUKBankHoliday = (date: Date): boolean => {
+    // Format date as YYYY-MM-DD to match API format
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${day}`;
+    
+    return bankHolidays.has(dateString);
+  };
+
   const saveTimesheet = async (status: 'draft' | 'submitted', signatureData?: string) => {
     if (!user || !selectedEmployeeId) return;
 
@@ -307,21 +449,36 @@ export default function NewTimesheetPage() {
       if (timesheetError) throw timesheetError;
       if (!timesheet) throw new Error('Failed to create timesheet');
 
+      // Calculate the actual date for each day of the week
+      const weekEndingDate = new Date(weekEnding + 'T00:00:00');
+      
       // Insert entries (only those with data or marked as did_not_work)
       type TimesheetEntryInsert = Database['public']['Tables']['timesheet_entries']['Insert'];
       const entriesToInsert: TimesheetEntryInsert[] = entries
         .filter(entry => entry.time_started || entry.time_finished || entry.remarks || entry.did_not_work)
-        .map(entry => ({
-          timesheet_id: timesheet.id,
-          day_of_week: entry.day_of_week,
-          time_started: entry.time_started || null,
-          time_finished: entry.time_finished || null,
-          job_number: entry.job_number || null,
-          working_in_yard: entry.working_in_yard,
-          did_not_work: entry.did_not_work,
-          daily_total: entry.daily_total,
-          remarks: entry.remarks || null,
-        }));
+        .map((entry, index) => {
+          // Calculate the actual date for this day (week ending is Sunday, so go back 7-index days)
+          const entryDate = new Date(weekEndingDate);
+          entryDate.setDate(weekEndingDate.getDate() - (7 - index));
+          
+          // Automatically detect night shift and bank holiday
+          const isNight = !entry.did_not_work && isNightShift(entry.time_started, entry.daily_total);
+          const isBankHol = !entry.did_not_work && isUKBankHoliday(entryDate);
+          
+          return {
+            timesheet_id: timesheet.id,
+            day_of_week: entry.day_of_week,
+            time_started: entry.time_started || null,
+            time_finished: entry.time_finished || null,
+            job_number: entry.job_number || null,
+            working_in_yard: entry.working_in_yard,
+            did_not_work: entry.did_not_work,
+            night_shift: isNight,
+            bank_holiday: isBankHol,
+            daily_total: entry.daily_total,
+            remarks: entry.remarks || null,
+          };
+        });
 
       console.log('Entries to insert:', entriesToInsert);
 
@@ -818,6 +975,41 @@ export default function NewTimesheetPage() {
               className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold"
             >
               OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bank Holiday Warning Dialog */}
+      <Dialog open={showBankHolidayWarning} onOpenChange={setShowBankHolidayWarning}>
+        <DialogContent className="bg-slate-900 border-yellow-500/50 text-white max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-500/20 border border-yellow-500/50">
+                <AlertCircle className="h-5 w-5 text-yellow-400" />
+              </div>
+              <DialogTitle className="text-white text-xl">Bank Holiday Warning</DialogTitle>
+            </div>
+            <DialogDescription className="text-slate-300 text-base pt-2">
+              <span className="font-semibold text-yellow-400">{bankHolidayDate}</span> is a bank holiday.
+              <br />
+              <br />
+              Are you sure you worked on this day?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 flex gap-3 sm:gap-3">
+            <Button
+              onClick={handleBankHolidayNo}
+              variant="outline"
+              className="flex-1 border-slate-600 text-white hover:bg-slate-800"
+            >
+              No
+            </Button>
+            <Button
+              onClick={handleBankHolidayYes}
+              className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold"
+            >
+              Yes
             </Button>
           </DialogFooter>
         </DialogContent>

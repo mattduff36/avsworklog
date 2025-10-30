@@ -54,7 +54,9 @@ export async function GET(request: NextRequest) {
           daily_total,
           working_in_yard,
           did_not_work,
-          job_number
+          job_number,
+          night_shift,
+          bank_holiday
         )
       `)
       .eq('status', 'approved')
@@ -86,37 +88,68 @@ export async function GET(request: NextRequest) {
       const employee = timesheet.employee;
       const entries = timesheet.timesheet_entries || [];
 
-      // Calculate total hours and regular/overtime breakdown
-      const totalHours = entries.reduce((sum: number, entry: any) => {
-        return sum + (entry.did_not_work ? 0 : (entry.daily_total || 0));
-      }, 0);
+      // Calculate hours by category based on new payroll rules:
+      // - Mon-Fri: All hours at basic rate (no limit)
+      // - Sat-Sun: 1.5x rate
+      // - Night shifts: 2x rate
+      // - Bank holidays: 2x rate
+      
+      let basicHours = 0;        // Mon-Fri regular hours
+      let overtime15Hours = 0;    // Sat-Sun hours at 1.5x
+      let overtime2Hours = 0;     // Night shifts + Bank holidays at 2x
 
-      // Assuming standard 40 hour week, anything over is overtime
-      const regularHours = Math.min(totalHours, 40);
-      const overtimeHours = Math.max(0, totalHours - 40);
+      entries.forEach((entry: any) => {
+        // Skip days not worked
+        if (entry.did_not_work) {
+          return;
+        }
+
+        const hours = entry.daily_total || 0;
+        const dayOfWeek = entry.day_of_week; // Integer: 1=Mon, 2=Tue, ..., 6=Sat, 7=Sun
+        const isNightShift = entry.night_shift || false;
+        const isBankHoliday = entry.bank_holiday || false;
+
+        // Priority: Night shift or Bank Holiday takes precedence (2x rate)
+        if (isNightShift || isBankHoliday) {
+          overtime2Hours += hours;
+        }
+        // Weekend work (Sat/Sun) at 1.5x rate - day 6 = Saturday, day 7 = Sunday
+        else if (dayOfWeek === 6 || dayOfWeek === 7) {
+          overtime15Hours += hours;
+        }
+        // Mon-Fri at basic rate (all hours, no cap) - days 1-5
+        else {
+          basicHours += hours;
+        }
+      });
+
+      const totalHours = basicHours + overtime15Hours + overtime2Hours;
 
       excelData.push({
         'Employee Name': employee?.full_name || 'Unknown',
         'Employee ID': employee?.employee_id || '-',
         'Week Ending': formatExcelDate(timesheet.week_ending),
-        'Regular Hours': formatExcelHours(regularHours),
-        'Overtime Hours': formatExcelHours(overtimeHours),
+        'Basic Hours (Mon-Fri)': formatExcelHours(basicHours),
+        'Overtime 1.5x (Weekend)': formatExcelHours(overtime15Hours),
+        'Overtime 2x (Night/Bank Holiday)': formatExcelHours(overtime2Hours),
         'Total Hours': formatExcelHours(totalHours),
         'Approved Date': formatExcelDate(timesheet.reviewed_at),
       });
     });
 
     // Add summary totals
-    const totalRegular = excelData.reduce((sum, row) => sum + (parseFloat(row['Regular Hours']) || 0), 0);
-    const totalOvertime = excelData.reduce((sum, row) => sum + (parseFloat(row['Overtime Hours']) || 0), 0);
+    const totalBasic = excelData.reduce((sum, row) => sum + (parseFloat(row['Basic Hours (Mon-Fri)']) || 0), 0);
+    const totalOvertime15 = excelData.reduce((sum, row) => sum + (parseFloat(row['Overtime 1.5x (Weekend)']) || 0), 0);
+    const totalOvertime2 = excelData.reduce((sum, row) => sum + (parseFloat(row['Overtime 2x (Night/Bank Holiday)']) || 0), 0);
     const totalHours = excelData.reduce((sum, row) => sum + (parseFloat(row['Total Hours']) || 0), 0);
 
     excelData.push({
       'Employee Name': '',
       'Employee ID': '',
       'Week Ending': '',
-      'Regular Hours': '',
-      'Overtime Hours': '',
+      'Basic Hours (Mon-Fri)': '',
+      'Overtime 1.5x (Weekend)': '',
+      'Overtime 2x (Night/Bank Holiday)': '',
       'Total Hours': '',
       'Approved Date': '',
     });
@@ -125,8 +158,9 @@ export async function GET(request: NextRequest) {
       'Employee Name': 'TOTALS',
       'Employee ID': `${timesheets.length} timesheets`,
       'Week Ending': '',
-      'Regular Hours': totalRegular.toFixed(2),
-      'Overtime Hours': totalOvertime.toFixed(2),
+      'Basic Hours (Mon-Fri)': totalBasic.toFixed(2),
+      'Overtime 1.5x (Weekend)': totalOvertime15.toFixed(2),
+      'Overtime 2x (Night/Bank Holiday)': totalOvertime2.toFixed(2),
       'Total Hours': totalHours.toFixed(2),
       'Approved Date': '',
     });
@@ -139,8 +173,9 @@ export async function GET(request: NextRequest) {
           { header: 'Employee Name', key: 'Employee Name', width: 20 },
           { header: 'Employee ID', key: 'Employee ID', width: 12 },
           { header: 'Week Ending', key: 'Week Ending', width: 12 },
-          { header: 'Regular Hours', key: 'Regular Hours', width: 14 },
-          { header: 'Overtime Hours', key: 'Overtime Hours', width: 14 },
+          { header: 'Basic Hours (Mon-Fri)', key: 'Basic Hours (Mon-Fri)', width: 18 },
+          { header: 'Overtime 1.5x (Weekend)', key: 'Overtime 1.5x (Weekend)', width: 20 },
+          { header: 'Overtime 2x (Night/Bank Holiday)', key: 'Overtime 2x (Night/Bank Holiday)', width: 26 },
           { header: 'Total Hours', key: 'Total Hours', width: 12 },
           { header: 'Approved Date', key: 'Approved Date', width: 14 },
         ],

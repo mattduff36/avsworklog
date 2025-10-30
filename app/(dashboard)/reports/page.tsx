@@ -169,14 +169,9 @@ export default function ReportsPage() {
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
                       Weekly Timesheet Summary
                     </h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
                       Export timesheet summary with daily breakdown and totals
                     </p>
-                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-500">
-                      <Badge variant="outline" className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700">
-                        Approved Items
-                      </Badge>
-                    </div>
                   </div>
                   <Button
                     size="lg"
@@ -204,14 +199,9 @@ export default function ReportsPage() {
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
                       Payroll Export
                     </h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
                       Export approved hours for payroll processing
                     </p>
-                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-500">
-                      <Badge variant="outline" className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800">
-                        Payroll Ready
-                      </Badge>
-                    </div>
                   </div>
                   <Button
                     size="lg"
@@ -243,14 +233,9 @@ export default function ReportsPage() {
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
                       Compliance Summary
                     </h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
                       Vehicle safety compliance with statistics and trends
                     </p>
-                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-500">
-                      <Badge variant="outline" className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700">
-                        All Inspections
-                      </Badge>
-                    </div>
                   </div>
                   <Button
                     size="lg"
@@ -278,14 +263,9 @@ export default function ReportsPage() {
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
                       Defects Log
                     </h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
                       All failed items requiring immediate attention
                     </p>
-                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-500">
-                      <Badge variant="outline" className="bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800">
-                        Action Required
-                      </Badge>
-                    </div>
                   </div>
                   <Button
                     size="lg"

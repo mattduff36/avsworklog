@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -42,6 +43,27 @@ export default function LoginPage() {
       } else {
         // Store remember me preference
         localStorage.setItem('rememberMe', rememberMe ? 'true' : 'false');
+        
+        // Check if user needs to change password
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('must_change_password')
+            .eq('id', user.id)
+            .single();
+
+          if (profile?.must_change_password) {
+            // Redirect to password change page
+            router.push('/change-password');
+            router.refresh();
+            return;
+          }
+        }
         
         router.push('/dashboard');
         router.refresh();
