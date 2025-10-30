@@ -12,10 +12,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Clock, CheckCircle2, XCircle, User, Download } from 'lucide-react';
+import { Plus, FileText, Clock, CheckCircle2, XCircle, User, Download, Trash2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 type Employee = {
   id: string;
@@ -31,6 +41,9 @@ export default function TimesheetsPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [timesheetToDelete, setTimesheetToDelete] = useState<{ id: string; weekEnding: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const supabase = createClient();
 
   // Fetch employees if manager
@@ -169,6 +182,41 @@ export default function TimesheetsPage() {
     }
   };
 
+  const openDeleteDialog = (e: React.MouseEvent, timesheet: Timesheet) => {
+    e.stopPropagation(); // Prevent card click
+    setTimesheetToDelete({
+      id: timesheet.id,
+      weekEnding: formatDate(timesheet.week_ending),
+    });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!timesheetToDelete) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/timesheets/${timesheetToDelete.id}/delete`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete timesheet');
+      }
+
+      toast.success('Timesheet deleted successfully');
+      setDeleteDialogOpen(false);
+      setTimesheetToDelete(null);
+      fetchTimesheets(); // Refresh list
+    } catch (err: any) {
+      console.error('Error deleting timesheet:', err);
+      toast.error(err.message || 'Failed to delete timesheet');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
@@ -280,7 +328,20 @@ export default function TimesheetsPage() {
                       </CardDescription>
                     </div>
                   </div>
-                  {getStatusBadge(timesheet.status)}
+                  <div className="flex items-center gap-2">
+                    {getStatusBadge(timesheet.status)}
+                    {isManager && (
+                      <Button
+                        onClick={(e) => openDeleteDialog(e, timesheet)}
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                        title="Delete timesheet"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -314,6 +375,32 @@ export default function TimesheetsPage() {
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Timesheet</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the timesheet for week ending{' '}
+              <span className="font-semibold">{timesheetToDelete?.weekEnding}</span>?
+              <br />
+              <br />
+              This action cannot be undone. All timesheet entries will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

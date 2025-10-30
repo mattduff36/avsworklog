@@ -12,10 +12,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Clipboard, CheckCircle2, XCircle, Clock, AlertCircle, User, Download } from 'lucide-react';
+import { Plus, Clipboard, CheckCircle2, XCircle, Clock, AlertCircle, User, Download, Trash2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import { VehicleInspection } from '@/types/inspection';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 type Employee = {
   id: string;
@@ -38,6 +48,9 @@ export default function InspectionsPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [inspectionToDelete, setInspectionToDelete] = useState<{ id: string; vehicleReg: string; date: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const supabase = createClient();
 
   // Fetch employees if manager
@@ -180,6 +193,42 @@ export default function InspectionsPage() {
     }
   };
 
+  const openDeleteDialog = (e: React.MouseEvent, inspection: InspectionWithVehicle) => {
+    e.stopPropagation(); // Prevent card click
+    setInspectionToDelete({
+      id: inspection.id,
+      vehicleReg: inspection.vehicles?.reg_number || 'Unknown',
+      date: formatDate(inspection.inspection_date),
+    });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!inspectionToDelete) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/inspections/${inspectionToDelete.id}/delete`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete inspection');
+      }
+
+      toast.success('Inspection deleted successfully');
+      setDeleteDialogOpen(false);
+      setInspectionToDelete(null);
+      fetchInspections(); // Refresh list
+    } catch (err: any) {
+      console.error('Error deleting inspection:', err);
+      toast.error(err.message || 'Failed to delete inspection');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
@@ -295,7 +344,20 @@ export default function InspectionsPage() {
                       </CardDescription>
                     </div>
                   </div>
-                  {getStatusBadge(inspection.status)}
+                  <div className="flex items-center gap-2">
+                    {getStatusBadge(inspection.status)}
+                    {isManager && (
+                      <Button
+                        onClick={(e) => openDeleteDialog(e, inspection)}
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                        title="Delete inspection"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -329,6 +391,33 @@ export default function InspectionsPage() {
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Inspection</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the inspection for{' '}
+              <span className="font-semibold">{inspectionToDelete?.vehicleReg}</span> on{' '}
+              <span className="font-semibold">{inspectionToDelete?.date}</span>?
+              <br />
+              <br />
+              This action cannot be undone. All inspection items will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
