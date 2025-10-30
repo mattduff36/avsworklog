@@ -47,14 +47,41 @@ export const useOfflineStore = create<OfflineStore>()(
 
         type TimesheetInsert = Database['public']['Tables']['timesheets']['Insert'];
         type TimesheetUpdate = Database['public']['Tables']['timesheets']['Update'];
+        type TimesheetEntryInsert = Database['public']['Tables']['timesheet_entries']['Insert'];
         type InspectionInsert = Database['public']['Tables']['vehicle_inspections']['Insert'];
         type InspectionUpdate = Database['public']['Tables']['vehicle_inspections']['Update'];
+        type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
 
         for (const item of queue) {
           try {
             if (item.type === 'timesheet') {
               if (item.action === 'create') {
-                await supabase.from('timesheets').insert(item.data as TimesheetInsert);
+                // Extract entries from data
+                const { entries, ...timesheetData } = item.data as TimesheetInsert & { entries?: unknown[] };
+                
+                // Insert timesheet
+                const { data: timesheet, error: timesheetError } = await supabase
+                  .from('timesheets')
+                  .insert(timesheetData as TimesheetInsert)
+                  .select()
+                  .single();
+                
+                if (timesheetError) throw timesheetError;
+                if (!timesheet) throw new Error('Failed to create timesheet');
+
+                // Insert entries if they exist
+                if (entries && Array.isArray(entries) && entries.length > 0) {
+                  const entriesToInsert = entries.map((entry: Record<string, unknown>) => ({
+                    ...entry,
+                    timesheet_id: timesheet.id,
+                  })) as TimesheetEntryInsert[];
+
+                  const { error: entriesError } = await supabase
+                    .from('timesheet_entries')
+                    .insert(entriesToInsert);
+
+                  if (entriesError) throw entriesError;
+                }
               } else if (item.action === 'update') {
                 await supabase
                   .from('timesheets')
@@ -65,7 +92,32 @@ export const useOfflineStore = create<OfflineStore>()(
               }
             } else if (item.type === 'inspection') {
               if (item.action === 'create') {
-                await supabase.from('vehicle_inspections').insert(item.data as InspectionInsert);
+                // Extract items from data
+                const { items, ...inspectionData } = item.data as InspectionInsert & { items?: unknown[] };
+                
+                // Insert inspection
+                const { data: inspection, error: inspectionError } = await supabase
+                  .from('vehicle_inspections')
+                  .insert(inspectionData as InspectionInsert)
+                  .select()
+                  .single();
+                
+                if (inspectionError) throw inspectionError;
+                if (!inspection) throw new Error('Failed to create inspection');
+
+                // Insert items if they exist
+                if (items && Array.isArray(items) && items.length > 0) {
+                  const itemsToInsert = items.map((inspItem: Record<string, unknown>) => ({
+                    ...inspItem,
+                    inspection_id: inspection.id,
+                  })) as InspectionItemInsert[];
+
+                  const { error: itemsError } = await supabase
+                    .from('inspection_items')
+                    .insert(itemsToInsert);
+
+                  if (itemsError) throw itemsError;
+                }
               } else if (item.action === 'update') {
                 await supabase
                   .from('vehicle_inspections')

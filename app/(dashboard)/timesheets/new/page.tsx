@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
+import { useOfflineStore } from '@/lib/stores/offline-queue';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User } from 'lucide-react';
+import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User, WifiOff } from 'lucide-react';
 import Link from 'next/link';
 import { getWeekEnding, formatDateISO } from '@/lib/utils/date';
 import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
@@ -19,6 +21,7 @@ import { DAY_NAMES } from '@/types/timesheet';
 import { Database } from '@/types/database';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { fetchUKBankHolidays } from '@/lib/utils/bank-holidays';
+import { toast } from 'sonner';
 
 type Employee = {
   id: string;
@@ -29,6 +32,8 @@ type Employee = {
 export default function NewTimesheetPage() {
   const router = useRouter();
   const { user, profile, isManager } = useAuth();
+  const { isOnline } = useOfflineSync();
+  const { addToQueue } = useOfflineStore();
   const supabase = createClient();
   
   const [regNumber] = useState('');
@@ -437,6 +442,27 @@ export default function NewTimesheetPage() {
       };
 
       console.log('Attempting to insert timesheet:', timesheetData);
+
+      // Check if offline
+      if (!isOnline) {
+        // Save to offline queue
+        addToQueue({
+          type: 'timesheet',
+          action: 'create',
+          data: {
+            ...timesheetData,
+            entries: entries.filter(entry => entry.time_started || entry.time_finished || entry.remarks || entry.did_not_work),
+          },
+        });
+        
+        toast.success('Timesheet saved offline', {
+          description: 'Your timesheet will be submitted when you are back online.',
+          icon: <WifiOff className="h-4 w-4" />,
+        });
+        
+        router.push('/timesheets');
+        return;
+      }
 
       const { data: timesheet, error: timesheetError } = await supabase
         .from('timesheets')

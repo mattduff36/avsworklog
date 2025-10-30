@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useInspectionRealtime } from '@/lib/hooks/useRealtime';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, Clipboard, CheckCircle2, XCircle, Clock, AlertCircle, User, Download } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
+import { toast } from 'sonner';
 import { VehicleInspection } from '@/types/inspection';
 
 type Employee = {
@@ -48,6 +50,30 @@ export default function InspectionsPage() {
   useEffect(() => {
     fetchInspections();
   }, [user, isManager, selectedEmployeeId]);
+
+  // Listen for realtime updates to inspections
+  useInspectionRealtime((payload) => {
+    console.log('Realtime inspection update:', payload);
+    
+    // Refetch inspections when changes occur
+    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+      fetchInspections();
+      
+      // Show toast notification for significant changes
+      if (payload.eventType === 'UPDATE' && payload.new && 'status' in payload.new) {
+        const status = (payload.new as { status?: string }).status;
+        if (status === 'approved') {
+          toast.success('Inspection approved!', {
+            description: 'A vehicle inspection has been approved by your manager.',
+          });
+        } else if (status === 'rejected') {
+          toast.error('Inspection rejected', {
+            description: 'A vehicle inspection has been rejected. Please review the comments.',
+          });
+        }
+      }
+    }
+  });
 
   const fetchEmployees = async () => {
     try {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useTimesheetRealtime } from '@/lib/hooks/useRealtime';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, FileText, Clock, CheckCircle2, XCircle, User, Download } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
+import { toast } from 'sonner';
 
 type Employee = {
   id: string;
@@ -41,6 +43,30 @@ export default function TimesheetsPage() {
   useEffect(() => {
     fetchTimesheets();
   }, [user, isManager, selectedEmployeeId]);
+
+  // Listen for realtime updates to timesheets
+  useTimesheetRealtime((payload) => {
+    console.log('Realtime timesheet update:', payload);
+    
+    // Refetch timesheets when changes occur
+    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+      fetchTimesheets();
+      
+      // Show toast notification for significant changes
+      if (payload.eventType === 'UPDATE' && payload.new && 'status' in payload.new) {
+        const status = (payload.new as { status?: string }).status;
+        if (status === 'approved') {
+          toast.success('Timesheet approved!', {
+            description: 'A timesheet has been approved by your manager.',
+          });
+        } else if (status === 'rejected') {
+          toast.error('Timesheet rejected', {
+            description: 'A timesheet has been rejected. Please review the comments.',
+          });
+        }
+      }
+    }
+  });
 
   const fetchEmployees = async () => {
     try {

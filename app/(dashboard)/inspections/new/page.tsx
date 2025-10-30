@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
+import { useOfflineStore } from '@/lib/stores/offline-queue';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,12 +14,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus, Check } from 'lucide-react';
+import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus, Check, WifiOff } from 'lucide-react';
 import Link from 'next/link';
 import { formatDateISO, formatDate, getWeekEnding } from '@/lib/utils/date';
 import { INSPECTION_ITEMS, InspectionStatus } from '@/types/inspection';
 import { Database } from '@/types/database';
 import { SignaturePad } from '@/components/forms/SignaturePad';
+import { toast } from 'sonner';
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -30,6 +33,8 @@ type Employee = {
 export default function NewInspectionPage() {
   const router = useRouter();
   const { user, isManager } = useAuth();
+  const { isOnline } = useOfflineSync();
+  const { addToQueue } = useOfflineStore();
   const supabase = createClient();
   
   const [vehicles, setVehicles] = useState<Array<{ id: string; reg_number: string; vehicle_type: string }>>([]);
@@ -251,6 +256,43 @@ export default function NewInspectionPage() {
         signature_data: signatureData || null,
         signed_at: signatureData ? new Date().toISOString() : null,
       };
+
+      // Check if offline
+      if (!isOnline) {
+        // Prepare items data
+        type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
+        const items: Omit<InspectionItemInsert, 'inspection_id'>[] = [];
+        
+        for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
+          INSPECTION_ITEMS.forEach((item, index) => {
+            const itemNumber = index + 1;
+            const key = `${dayOfWeek}-${itemNumber}`;
+            items.push({
+              item_number: itemNumber,
+              day_of_week: dayOfWeek,
+              status: checkboxStates[key] || 'ok',
+            });
+          });
+        }
+
+        // Save to offline queue
+        addToQueue({
+          type: 'inspection',
+          action: 'create',
+          data: {
+            ...inspectionData,
+            items,
+          },
+        });
+        
+        toast.success('Inspection saved offline', {
+          description: 'Your inspection will be submitted when you are back online.',
+          icon: <WifiOff className="h-4 w-4" />,
+        });
+        
+        router.push('/inspections');
+        return;
+      }
 
       const { data: inspection, error: inspectionError } = await supabase
         .from('vehicle_inspections')
