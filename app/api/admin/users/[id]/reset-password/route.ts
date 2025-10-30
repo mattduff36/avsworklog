@@ -20,7 +20,7 @@ function getSupabaseAdmin() {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check if requester is admin
@@ -47,7 +47,7 @@ export async function POST(
       );
     }
 
-    const userId = params.id;
+    const userId = (await params).id;
 
     // Get target user's profile
     const { data: targetProfile, error: profileError } = await supabase

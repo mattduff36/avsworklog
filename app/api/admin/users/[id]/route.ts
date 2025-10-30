@@ -18,7 +18,7 @@ function getSupabaseAdmin() {
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check if requester is admin
@@ -45,7 +45,7 @@ export async function PUT(
       );
     }
 
-    const userId = params.id;
+    const userId = (await params).id;
     const body = await request.json();
     const { email, full_name, employee_id, role } = body;
 
@@ -115,7 +115,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check if requester is admin
@@ -139,7 +139,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
-    const userId = params.id;
+    const userId = (await params).id;
 
     // Prevent self-deletion
     if (userId === user.id) {

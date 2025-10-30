@@ -26,7 +26,8 @@ import {
   CheckSquare,
   ListTodo,
   FolderOpen,
-  ChevronDown
+  ChevronDown,
+  Truck
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -60,6 +61,7 @@ export function Navbar() {
   
   const adminNav = isAdmin ? [
     { href: '/admin/users', label: 'Users', icon: Users },
+    { href: '/admin/vehicles', label: 'Vehicles', icon: Truck },
   ] : [];
 
   const navItems = [

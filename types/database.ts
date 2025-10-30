@@ -44,6 +44,7 @@ export interface Database {
           id: string
           reg_number: string
           vehicle_type: string | null
+          category_id: string | null
           status: string
           created_at: string
         }
@@ -51,6 +52,7 @@ export interface Database {
           id?: string
           reg_number: string
           vehicle_type?: string | null
+          category_id?: string | null
           status?: string
           created_at?: string
         }
@@ -58,8 +60,32 @@ export interface Database {
           id?: string
           reg_number?: string
           vehicle_type?: string | null
+          category_id?: string | null
           status?: string
           created_at?: string
+        }
+      }
+      vehicle_categories: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          created_at?: string
+          updated_at?: string
         }
       }
       timesheets: {

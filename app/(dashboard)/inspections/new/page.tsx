@@ -33,6 +33,7 @@ export default function NewInspectionPage() {
   const supabase = createClient();
   
   const [vehicles, setVehicles] = useState<Array<{ id: string; reg_number: string; vehicle_type: string }>>([]);
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [vehicleId, setVehicleId] = useState('');
   const [weekEnding, setWeekEnding] = useState(formatDateISO(getWeekEnding()));
   const [activeDay, setActiveDay] = useState('0'); // 0-6 for Monday-Sunday
@@ -46,7 +47,7 @@ export default function NewInspectionPage() {
   const [signature, setSignature] = useState<string | null>(null);
   const [showAddVehicleDialog, setShowAddVehicleDialog] = useState(false);
   const [newVehicleReg, setNewVehicleReg] = useState('');
-  const [newVehicleType, setNewVehicleType] = useState('');
+  const [newVehicleCategoryId, setNewVehicleCategoryId] = useState('');
   const [addingVehicle, setAddingVehicle] = useState(false);
   
   // Manager-specific states
@@ -55,6 +56,7 @@ export default function NewInspectionPage() {
 
   useEffect(() => {
     fetchVehicles();
+    fetchCategories();
   }, []);
 
   // Fetch employees if manager, and set initial selected employee
@@ -100,6 +102,20 @@ export default function NewInspectionPage() {
     } catch (err) {
       console.error('Error fetching vehicles:', err);
       setError('Failed to load vehicles');
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('vehicle_categories')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      setCategories(data || []);
+    } catch (err) {
+      console.error('Error fetching categories:', err);
     }
   };
 
@@ -161,8 +177,8 @@ export default function NewInspectionPage() {
   };
 
   const handleAddVehicle = async () => {
-    if (!newVehicleReg.trim() || !newVehicleType.trim()) {
-      setError('Please enter both registration number and vehicle type');
+    if (!newVehicleReg.trim()) {
+      setError('Please enter a registration number');
       return;
     }
 
@@ -173,7 +189,7 @@ export default function NewInspectionPage() {
       type VehicleInsert = Database['public']['Tables']['vehicles']['Insert'];
       const vehicleData: VehicleInsert = {
         reg_number: newVehicleReg.trim().toUpperCase(),
-        vehicle_type: newVehicleType.trim(),
+        category_id: newVehicleCategoryId || null,
         status: 'active',
       };
 
@@ -201,7 +217,7 @@ export default function NewInspectionPage() {
       // Close dialog and reset form
       setShowAddVehicleDialog(false);
       setNewVehicleReg('');
-      setNewVehicleType('');
+      setNewVehicleCategoryId('');
     } catch (err) {
       console.error('Error adding vehicle:', err);
       setError(err instanceof Error ? err.message : 'Failed to add vehicle');
@@ -765,17 +781,26 @@ export default function NewInspectionPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="newVehicleType" className="text-slate-900 dark:text-white">
-                Vehicle Type <span className="text-red-400">*</span>
+              <Label htmlFor="newVehicleCategory" className="text-slate-900 dark:text-white">
+                Vehicle Category (Optional)
               </Label>
-              <Input
-                id="newVehicleType"
-                value={newVehicleType}
-                onChange={(e) => setNewVehicleType(e.target.value)}
-                placeholder="e.g., Van, Truck, Car"
-                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
+              <Select 
+                value={newVehicleCategoryId} 
+                onValueChange={setNewVehicleCategoryId}
                 disabled={addingVehicle}
-              />
+              >
+                <SelectTrigger className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
+                  <SelectValue placeholder="Select category (optional)" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-slate-700">
+                  <SelectItem value="">None</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter className="gap-2">
@@ -784,7 +809,7 @@ export default function NewInspectionPage() {
               onClick={() => {
                 setShowAddVehicleDialog(false);
                 setNewVehicleReg('');
-                setNewVehicleType('');
+                setNewVehicleCategoryId('');
               }}
               disabled={addingVehicle}
               className="border-slate-600 text-white hover:bg-slate-800"
@@ -793,7 +818,7 @@ export default function NewInspectionPage() {
             </Button>
             <Button
               onClick={handleAddVehicle}
-              disabled={addingVehicle || !newVehicleReg.trim() || !newVehicleType.trim()}
+              disabled={addingVehicle || !newVehicleReg.trim()}
               className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 font-semibold"
             >
               {addingVehicle ? 'Adding...' : 'Add Vehicle'}
