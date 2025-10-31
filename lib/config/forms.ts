@@ -5,6 +5,7 @@ import {
   Wrench,
   PackageCheck,
   Clipboard,
+  FileCheck2,
   LucideIcon
 } from 'lucide-react';
 
@@ -54,6 +55,16 @@ export const FORM_TYPES: FormType[] = [
     href: '/inspections/new',
     listHref: '/inspections',
     color: 'inspection',
+    enabled: true,
+  },
+  {
+    id: 'rams',
+    title: 'RAMS Documents',
+    description: 'Risk Assessment & Method Statement',
+    icon: FileCheck2,
+    href: '/rams',
+    listHref: '/rams',
+    color: 'rams',
     enabled: true,
   },
   // Future forms - uncomment and configure as needed:

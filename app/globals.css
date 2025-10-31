@@ -45,6 +45,11 @@
     --inspection-light: 30 100% 96%;
     --inspection-dark: 30 95% 40%;
     
+    /* RAMS Documents - Rose/Red (replacing Risk Assessment) */
+    --rams-primary: 350 89% 60%;
+    --rams-light: 350 100% 97%;
+    --rams-dark: 350 89% 45%;
+    
     /* Reports - Professional Green */
     --report-primary: 150 70% 45%;
     --report-light: 150 100% 96%;
@@ -225,6 +230,23 @@
   
   .border-admin {
     border-color: hsl(var(--admin-primary));
+  }
+  
+  /* RAMS Colors */
+  .bg-rams {
+    background-color: hsl(var(--rams-primary));
+  }
+  
+  .bg-rams-light {
+    background-color: hsl(var(--rams-light));
+  }
+  
+  .text-rams {
+    color: hsl(var(--rams-primary));
+  }
+  
+  .border-rams {
+    border-color: hsl(var(--rams-primary));
   }
 }
 
