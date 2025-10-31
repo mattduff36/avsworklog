@@ -402,6 +402,25 @@
 }
 
 /*
+ * MODAL & DIALOG STYLING
+ * =======================
+ * All modals and dialogs should have solid backgrounds for better
+ * visibility and consistent experience across all pages.
+ */
+
+[role="dialog"],
+[data-radix-dialog-content],
+.dialog-content {
+  background: rgb(15 23 42) !important; /* slate-900 */
+  border: 1px solid rgb(51 65 85) !important; /* slate-700 */
+}
+
+/* Ensure dialog overlays are visible but not too dark */
+[data-radix-dialog-overlay] {
+  background: rgba(0, 0, 0, 0.7) !important;
+}
+
+/*
  * STANDARD PAGE LAYOUT PATTERN
  * ============================
  * All list/index pages should follow this consistent pattern:

@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, UserCheck, Search, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 import { Database } from '@/types/database';
 
 interface Employee {
@@ -39,7 +39,7 @@ export function AssignEmployeesModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createClient();
 
   useEffect(() => {
     if (open) {
@@ -172,7 +172,7 @@ export function AssignEmployeesModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh]">
+      <DialogContent className="sm:max-w-[600px] max-h-[80vh] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Assign RAMS Document</DialogTitle>

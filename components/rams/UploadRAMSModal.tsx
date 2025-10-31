@@ -98,7 +98,7 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[600px] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Upload RAMS Document</DialogTitle>
