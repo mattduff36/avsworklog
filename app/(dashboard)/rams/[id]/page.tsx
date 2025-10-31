@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 import { Database } from '@/types/database';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -83,7 +83,7 @@ export default function RAMSDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
 
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createClient();
 
   // Redirect non-managers/admins
   useEffect(() => {
@@ -94,7 +94,7 @@ export default function RAMSDetailsPage() {
 
   useEffect(() => {
     // Only fetch if auth is loaded and user IS a manager/admin
-    if (!authLoading && (isManager || isAdmin)) {
+    if (!authLoading && (isManager || isAdmin) && documentId) {
       fetchDocumentDetails();
     }
   }, [documentId, authLoading, isManager, isAdmin]);
