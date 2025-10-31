@@ -387,10 +387,10 @@ export default function RAMSDetailsPage() {
 
         {/* Employees Tab */}
         <TabsContent value="employees" className="space-y-4">
-          <Card>
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
             <CardHeader>
-              <CardTitle>Employee Assignments</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-slate-900 dark:text-white">Employee Assignments</CardTitle>
+              <CardDescription className="text-slate-600 dark:text-slate-400">
                 Track which employees have been assigned and signed this RAMS document
               </CardDescription>
             </CardHeader>
@@ -468,10 +468,10 @@ export default function RAMSDetailsPage() {
 
         {/* Visitors Tab */}
         <TabsContent value="visitors" className="space-y-4">
-          <Card>
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
             <CardHeader>
-              <CardTitle>Visitor Signatures</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-slate-900 dark:text-white">Visitor Signatures</CardTitle>
+              <CardDescription className="text-slate-600 dark:text-slate-400">
                 Signatures captured from visitors and contractors
               </CardDescription>
             </CardHeader>
