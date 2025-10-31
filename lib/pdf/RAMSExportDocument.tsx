@@ -9,19 +9,30 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 20,
-    borderBottom: '2pt solid #e11d48',
-    paddingBottom: 10,
+    borderBottom: '3pt solid #F9D71C',
+    paddingBottom: 15,
+  },
+  logo: {
+    width: 120,
+    height: 'auto',
+  },
+  headerText: {
+    flex: 1,
+    marginLeft: 15,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#e11d48',
+    color: '#5A6C7D',
     marginBottom: 5,
   },
   subtitle: {
     fontSize: 12,
-    color: '#64748b',
+    color: '#5A6C7D',
     marginBottom: 3,
   },
   section: {
@@ -32,9 +43,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     marginBottom: 10,
-    color: '#1e293b',
-    borderBottom: '1pt solid #e2e8f0',
-    paddingBottom: 5,
+    color: '#5A6C7D',
+    backgroundColor: '#F9D71C',
+    padding: 8,
+    borderRadius: 3,
   },
   infoRow: {
     flexDirection: 'row',
@@ -43,7 +55,7 @@ const styles = StyleSheet.create({
   label: {
     fontWeight: 'bold',
     width: 120,
-    color: '#475569',
+    color: '#5A6C7D',
   },
   value: {
     flex: 1,
@@ -54,10 +66,10 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#F9D71C',
     padding: 8,
     fontWeight: 'bold',
-    borderBottom: '1pt solid #cbd5e1',
+    borderBottom: '2pt solid #5A6C7D',
   },
   tableRow: {
     flexDirection: 'row',
@@ -66,12 +78,14 @@ const styles = StyleSheet.create({
   },
   tableCell: {
     flex: 1,
+    color: '#5A6C7D',
   },
   signatureBox: {
     marginTop: 10,
     padding: 10,
-    border: '1pt solid #cbd5e1',
+    border: '2pt solid #F9D71C',
     borderRadius: 4,
+    backgroundColor: '#fffef5',
   },
   signatureImage: {
     width: 200,
@@ -98,10 +112,32 @@ const styles = StyleSheet.create({
     left: 40,
     right: 40,
     textAlign: 'center',
-    color: '#94a3b8',
+    color: '#5A6C7D',
     fontSize: 8,
-    borderTop: '0.5pt solid #e2e8f0',
+    borderTop: '2pt solid #F9D71C',
     paddingTop: 10,
+  },
+  statsCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 15,
+    backgroundColor: '#fffef5',
+    border: '2pt solid #F9D71C',
+    borderRadius: 5,
+    marginBottom: 15,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#5A6C7D',
+    marginBottom: 3,
+  },
+  statLabel: {
+    fontSize: 9,
+    color: '#5A6C7D',
   },
 });
 
@@ -154,11 +190,14 @@ export function RAMSExportDocument({
       {/* Cover Page */}
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
-          <Text style={styles.title}>{document.title}</Text>
-          <Text style={styles.subtitle}>Risk Assessment & Method Statement - Signature Record</Text>
-          <Text style={styles.subtitle}>
-            Exported on {format(new Date(), 'PPP')} at {format(new Date(), 'p')}
-          </Text>
+          <Image src="/images/logo.png" style={styles.logo} />
+          <View style={styles.headerText}>
+            <Text style={styles.title}>{document.title}</Text>
+            <Text style={styles.subtitle}>Risk Assessment & Method Statement - Signature Record</Text>
+            <Text style={styles.subtitle}>
+              Exported on {format(new Date(), 'PPP')} at {format(new Date(), 'p')}
+            </Text>
+          </View>
         </View>
 
         {/* Document Information */}
@@ -193,21 +232,23 @@ export function RAMSExportDocument({
         {/* Compliance Summary */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Compliance Summary</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Total Assigned:</Text>
-            <Text style={styles.value}>{assignments.length} employees</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Total Signed:</Text>
-            <Text style={styles.value}>{totalSigned} employees</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Compliance Rate:</Text>
-            <Text style={styles.value}>{complianceRate}%</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Visitor Signatures:</Text>
-            <Text style={styles.value}>{visitorSignatures.length}</Text>
+          <View style={styles.statsCard}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{assignments.length}</Text>
+              <Text style={styles.statLabel}>Total Assigned</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{totalSigned}</Text>
+              <Text style={styles.statLabel}>Total Signed</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{complianceRate}%</Text>
+              <Text style={styles.statLabel}>Compliance Rate</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{visitorSignatures.length}</Text>
+              <Text style={styles.statLabel}>Visitor Signatures</Text>
+            </View>
           </View>
         </View>
 
@@ -223,8 +264,11 @@ export function RAMSExportDocument({
       {signedAssignments.length > 0 && (
         <Page size="A4" style={styles.page}>
           <View style={styles.header}>
-            <Text style={styles.title}>Employee Signatures</Text>
-            <Text style={styles.subtitle}>{document.title}</Text>
+            <Image src="/images/logo.png" style={styles.logo} />
+            <View style={styles.headerText}>
+              <Text style={styles.title}>Employee Signatures</Text>
+              <Text style={styles.subtitle}>{document.title}</Text>
+            </View>
           </View>
 
           {signedAssignments.map((assignment, index) => (
@@ -268,8 +312,11 @@ export function RAMSExportDocument({
       {visitorSignatures.length > 0 && (
         <Page size="A4" style={styles.page}>
           <View style={styles.header}>
-            <Text style={styles.title}>Visitor Signatures</Text>
-            <Text style={styles.subtitle}>{document.title}</Text>
+            <Image src="/images/logo.png" style={styles.logo} />
+            <View style={styles.headerText}>
+              <Text style={styles.title}>Visitor Signatures</Text>
+              <Text style={styles.subtitle}>{document.title}</Text>
+            </View>
           </View>
 
           {visitorSignatures.map((signature, index) => (
