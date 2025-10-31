@@ -27,6 +27,7 @@ import {
   Eye,
   Download,
   FileDown,
+  UserPlus,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -226,16 +227,21 @@ export default function RAMSDetailsPage() {
 
   if (!document) {
     return (
-      <div className="container mx-auto p-6 max-w-7xl">
-        <Card className="p-6 text-center">
-          <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">Document not found</p>
-          <Button asChild className="mt-4">
+      <div className="space-y-6 max-w-6xl">
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <FileText className="h-16 w-16 text-slate-400 mb-4" />
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Document not found</h3>
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
+              This document may have been deleted or you don't have permission to view it.
+            </p>
             <Link href="/rams">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to RAMS
+              <Button className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to RAMS
+              </Button>
             </Link>
-          </Button>
+          </CardContent>
         </Card>
       </div>
     );
@@ -247,105 +253,119 @@ export default function RAMSDetailsPage() {
   const complianceRate = totalAssigned > 0 ? Math.round((totalSigned / totalAssigned) * 100) : 0;
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <Button asChild variant="ghost" size="icon">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
             <Link href="/rams">
-              <ArrowLeft className="h-5 w-5" />
+              <Button variant="ghost" size="sm" className="hover:bg-slate-800/50 text-slate-300 hover:text-white">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
             </Link>
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">{document.title}</h1>
-            <p className="text-muted-foreground mt-1">
-              Uploaded {formatDistanceToNow(new Date(document.created_at), { addSuffix: true })} by{' '}
-              {document.uploader_name}
-            </p>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">{document.title}</h1>
+              <p className="text-slate-600 dark:text-slate-400">
+                Uploaded {formatDistanceToNow(new Date(document.created_at), { addSuffix: true })} by{' '}
+                {document.uploader_name}
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={exportPDF}>
-            <FileDown className="h-4 w-4 mr-2" />
-            Export PDF
-          </Button>
-          <Button variant="outline" onClick={downloadDocument}>
-            <Download className="h-4 w-4 mr-2" />
-            Download
-          </Button>
-          <Button onClick={() => setAssignModalOpen(true)}>
-            <Users className="h-4 w-4 mr-2" />
-            Assign Employees
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={exportPDF}
+              className="border-slate-600 text-slate-300 hover:bg-slate-700/50"
+            >
+              <FileDown className="h-4 w-4 mr-2" />
+              Export PDF
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={downloadDocument}
+              className="border-slate-600 text-slate-300 hover:bg-slate-700/50"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download
+            </Button>
+            <Button 
+              onClick={() => setAssignModalOpen(true)}
+              className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95"
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Assign Employees
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
-        <Card>
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Assigned</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-slate-900 dark:text-white">Total Assigned</CardTitle>
+            <Users className="h-4 w-4 text-slate-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalAssigned}</div>
-            <p className="text-xs text-muted-foreground">Employees</p>
+            <div className="text-2xl font-bold text-slate-900 dark:text-white">{totalAssigned}</div>
+            <p className="text-xs text-slate-600 dark:text-slate-400">Employees</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Signed</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <CardTitle className="text-sm font-medium text-slate-900 dark:text-white">Signed</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-green-400" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{totalSigned}</div>
             <p className="text-xs text-muted-foreground">Completed</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            <Clock className="h-4 w-4 text-orange-600" />
+            <CardTitle className="text-sm font-medium text-slate-900 dark:text-white">Pending</CardTitle>
+            <Clock className="h-4 w-4 text-orange-400" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">{totalPending}</div>
-            <p className="text-xs text-muted-foreground">Awaiting signature</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400">Awaiting signature</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Compliance</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-slate-900 dark:text-white">Compliance</CardTitle>
+            <FileText className="h-4 w-4 text-slate-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{complianceRate}%</div>
-            <p className="text-xs text-muted-foreground">Completion rate</p>
+            <div className="text-2xl font-bold text-slate-900 dark:text-white">{complianceRate}%</div>
+            <p className="text-xs text-slate-600 dark:text-slate-400">Completion rate</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Document Info */}
-      <Card className="mb-6">
+      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
         <CardHeader>
-          <CardTitle>Document Information</CardTitle>
+          <CardTitle className="text-slate-900 dark:text-white">Document Information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {document.description && (
             <div>
-              <span className="font-semibold">Description: </span>
-              <span className="text-muted-foreground">{document.description}</span>
+              <span className="font-semibold text-slate-900 dark:text-white">Description: </span>
+              <span className="text-slate-600 dark:text-slate-400">{document.description}</span>
             </div>
           )}
           <div>
-            <span className="font-semibold">File: </span>
-            <span className="text-muted-foreground">
+            <span className="font-semibold text-slate-900 dark:text-white">File: </span>
+            <span className="text-slate-600 dark:text-slate-400">
               {document.file_name} ({document.file_type.toUpperCase()} •{' '}
               {formatFileSize(document.file_size)})
             </span>
           </div>
           <div>
-            <span className="font-semibold">Created: </span>
-            <span className="text-muted-foreground">
+            <span className="font-semibold text-slate-900 dark:text-white">Created: </span>
+            <span className="text-slate-600 dark:text-slate-400">
               {new Date(document.created_at).toLocaleString()}
             </span>
           </div>
