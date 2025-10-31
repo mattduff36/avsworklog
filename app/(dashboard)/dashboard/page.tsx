@@ -59,6 +59,7 @@ export default function DashboardPage() {
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [topActions, setTopActions] = useState<Action[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingRAMSCount, setPendingRAMSCount] = useState(0);
 
   // Placeholder forms for future development (only shown to managers/admins)
   const placeholderForms = [
@@ -78,7 +79,8 @@ export default function DashboardPage() {
       fetchRecentActivity();
       fetchTopActions();
     }
-  }, [isManager, isAdmin]);
+    fetchPendingRAMS();
+  }, [isManager, isAdmin, profile]);
 
   const fetchRecentActivity = async () => {
     try {
@@ -184,6 +186,23 @@ export default function DashboardPage() {
     }
   };
 
+  const fetchPendingRAMS = async () => {
+    if (!profile?.id) return;
+    
+    try {
+      const { count, error } = await supabase
+        .from('rams_assignments')
+        .select('*', { count: 'exact', head: true })
+        .eq('employee_id', profile.id)
+        .in('status', ['pending', 'read']);
+
+      if (error) throw error;
+      setPendingRAMSCount(count || 0);
+    } catch (error) {
+      console.error('Error fetching pending RAMS:', error);
+    }
+  };
+
   return (
     <div className="space-y-8 max-w-6xl">
       {/* Welcome Section */}
@@ -205,9 +224,16 @@ export default function DashboardPage() {
             {/* Active Forms */}
             {formTypes.map((formType) => {
               const Icon = formType.icon;
+              const showBadge = formType.id === 'rams' && pendingRAMSCount > 0;
+              
               return (
                 <Link key={formType.id} href={formType.href}>
-                  <div className={`bg-${formType.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3 cursor-pointer`}>
+                  <div className={`relative bg-${formType.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3 cursor-pointer`}>
+                    {showBadge && (
+                      <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full h-8 w-8 flex items-center justify-center text-sm font-bold shadow-lg">
+                        {pendingRAMSCount}
+                      </div>
+                    )}
                     <Icon className="h-8 w-8 text-white" />
                     <span className="text-white font-semibold text-sm leading-tight">
                       {formType.title}

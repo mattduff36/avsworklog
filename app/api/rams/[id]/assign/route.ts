@@ -3,10 +3,11 @@ import { createClient } from '@/lib/supabase/server';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient();
+    const { id } = await params;
 
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -47,7 +48,7 @@ export async function POST(
     const { data: document, error: docError } = await supabase
       .from('rams_documents')
       .select('id, title')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (docError || !document) {
@@ -73,7 +74,7 @@ export async function POST(
 
     // Create assignments (using upsert to handle duplicates)
     const assignmentsToCreate = employee_ids.map(employee_id => ({
-      rams_document_id: params.id,
+      rams_document_id: id,
       employee_id: employee_id,
       assigned_by: user.id,
       status: 'pending' as const,
@@ -115,10 +116,11 @@ export async function POST(
 // GET endpoint to fetch current assignments for a document
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient();
+    const { id } = await params;
 
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -152,7 +154,7 @@ export async function GET(
         *,
         employee:profiles!rams_assignments_employee_id_fkey(id, full_name, role)
       `)
-      .eq('rams_document_id', params.id)
+      .eq('rams_document_id', id)
       .order('assigned_at', { ascending: false });
 
     if (error) {
