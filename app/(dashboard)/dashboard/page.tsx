@@ -60,6 +60,7 @@ export default function DashboardPage() {
   const [topActions, setTopActions] = useState<Action[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingRAMSCount, setPendingRAMSCount] = useState(0);
+  const [hasRAMSAssignments, setHasRAMSAssignments] = useState(false);
 
   // Placeholder forms for future development (only shown to managers/admins)
   const placeholderForms = [
@@ -190,16 +191,26 @@ export default function DashboardPage() {
     if (!profile?.id) return;
     
     try {
-      const { count, error } = await supabase
+      // Get total count of all assignments
+      const { count: totalCount, error: totalError } = await supabase
+        .from('rams_assignments')
+        .select('*', { count: 'exact', head: true })
+        .eq('employee_id', profile.id);
+
+      if (totalError) throw totalError;
+      setHasRAMSAssignments((totalCount || 0) > 0);
+
+      // Get count of pending assignments for badge
+      const { count: pendingCount, error: pendingError } = await supabase
         .from('rams_assignments')
         .select('*', { count: 'exact', head: true })
         .eq('employee_id', profile.id)
         .in('status', ['pending', 'read']);
 
-      if (error) throw error;
-      setPendingRAMSCount(count || 0);
+      if (pendingError) throw pendingError;
+      setPendingRAMSCount(pendingCount || 0);
     } catch (error) {
-      console.error('Error fetching pending RAMS:', error);
+      console.error('Error fetching RAMS assignments:', error);
     }
   };
 
@@ -222,7 +233,15 @@ export default function DashboardPage() {
         <TooltipProvider>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {/* Active Forms */}
-            {formTypes.map((formType) => {
+            {formTypes
+              .filter(formType => {
+                // Hide RAMS for employees with no assignments
+                if (formType.id === 'rams' && !isManager && !isAdmin && !hasRAMSAssignments) {
+                  return false;
+                }
+                return true;
+              })
+              .map((formType) => {
               const Icon = formType.icon;
               const showBadge = formType.id === 'rams' && pendingRAMSCount > 0;
               
@@ -326,7 +345,15 @@ export default function DashboardPage() {
                   </Link>
                 ))}
                 <div className="flex justify-center gap-2 pt-4">
-                  {formTypes.map((formType) => (
+                  {formTypes
+                    .filter(formType => {
+                      // Hide RAMS for employees with no assignments
+                      if (formType.id === 'rams' && !isManager && !isAdmin && !hasRAMSAssignments) {
+                        return false;
+                      }
+                      return true;
+                    })
+                    .map((formType) => (
                     <Link key={formType.id} href={formType.listHref}>
                       <Button 
                         variant="outline" 
@@ -347,7 +374,15 @@ export default function DashboardPage() {
                   Recent form submissions will appear here
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
-                  {formTypes.map((formType) => (
+                  {formTypes
+                    .filter(formType => {
+                      // Hide RAMS for employees with no assignments
+                      if (formType.id === 'rams' && !isManager && !isAdmin && !hasRAMSAssignments) {
+                        return false;
+                      }
+                      return true;
+                    })
+                    .map((formType) => (
                     <Link key={formType.id} href={formType.listHref}>
                       <Button 
                         variant="outline" 
