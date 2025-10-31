@@ -33,10 +33,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning style={{ colorScheme: 'dark' }}>
       <head>
         <link rel="icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
+        <meta name="color-scheme" content="dark" />
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
         {children}

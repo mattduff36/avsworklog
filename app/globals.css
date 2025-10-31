@@ -1,35 +1,36 @@
 @import "tailwindcss";
 
 /* AVS Squires Brand Colors - Inspired by avs.mpdee.co.uk */
+/* FORCED DARK MODE - All variables set to match slate-900 exactly */
 @layer base {
   :root {
-    /* Base colors - clean interface matching AVS website */
-    --background: 0 0% 100%;
-    --foreground: 0 0% 14.5%; /* Dark grey from AVS */
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 14.5%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 14.5%;
+    /* Force dark theme colors matching Tailwind slate palette exactly */
+    --background: 222 47% 11%; /* slate-900: rgb(15 23 42) */
+    --foreground: 210 40% 98%; /* slate-50 */
+    --card: 222 47% 11%; /* slate-900 */
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
     
     /* Primary - AVS Signature Yellow (#F1D64A) */
     --primary: 48 87% 69%;
-    --primary-foreground: 0 0% 14.5%;
+    --primary-foreground: 222 47% 11%;
     
-    /* Secondary - Dark grey from AVS */
-    --secondary: 0 0% 20.5%;
-    --secondary-foreground: 0 0% 100%;
+    /* Secondary - slate-800 */
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
     
-    /* Muted */
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
+    /* Muted - slate-800 */
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%; /* slate-400 */
     
-    /* Accent - Lighter yellow */
-    --accent: 48 100% 94%;
-    --accent-foreground: 0 0% 14.5%;
+    /* Accent - slate-800 */
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
     
     /* Status colors */
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
     --success: 142 71% 45%;
     --warning: 38 92% 50%;
     --error: 0 84% 60%;
@@ -60,9 +61,9 @@
     --admin-light: 260 100% 96%;
     --admin-dark: 260 60% 35%;
     
-    /* UI Elements */
-    --border: 0 0% 92%;
-    --input: 0 0% 92%;
+    /* UI Elements - matching slate palette */
+    --border: 217 33% 17%; /* slate-800 */
+    --input: 217 33% 17%;
     --ring: 48 87% 69%;
     --radius: 0.625rem;
     
@@ -73,24 +74,25 @@
   }
 
   .dark {
-    --background: 0 0% 14.5%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 20.5%;
-    --card-foreground: 0 0% 98%;
-    --popover: 222 47% 8%;
-    --popover-foreground: 0 0% 98%;
+    /* Dark mode variables (same as root for consistency) */
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
     --primary: 48 87% 69%;
-    --primary-foreground: 0 0% 14.5%;
-    --secondary: 0 0% 27%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 27%;
-    --muted-foreground: 0 0% 70%;
-    --accent: 0 0% 27%;
-    --accent-foreground: 0 0% 98%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 10% / 0.1;
-    --input: 0 0% 15% / 0.1;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
     --ring: 48 87% 69%;
     --success: 142 71% 45%;
     --warning: 38 92% 50%;
@@ -104,12 +106,141 @@
   }
   
   body {
-    background: linear-gradient(135deg, #fafafa 0%, #ffffff 50%, #fef9e7 100%);
+    background: linear-gradient(135deg, rgb(15 23 42) 0%, rgb(30 41 59) 50%, rgb(51 65 85) 100%);
     background-attachment: fixed;
     color: hsl(var(--foreground));
     font-family: var(--font-inter), Inter, system-ui, -apple-system, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
     position: relative;
+  }
+  
+  /* Force all white and light backgrounds to dark - override light mode classes */
+  .bg-white {
+    background-color: rgb(15 23 42) !important; /* slate-900 */
+  }
+  
+  /* Force all light slate backgrounds to dark */
+  .bg-slate-50 {
+    background-color: rgb(30 41 59) !important; /* slate-800 */
+  }
+  
+  .bg-slate-100 {
+    background-color: rgb(30 41 59) !important; /* slate-800 */
+  }
+  
+  .bg-slate-200 {
+    background-color: rgb(51 65 85) !important; /* slate-700 */
+  }
+  
+  .bg-slate-300 {
+    background-color: rgb(51 65 85) !important; /* slate-700 */
+  }
+  
+  /* Ensure dark slate backgrounds are consistent */
+  .bg-slate-700 {
+    background-color: rgb(51 65 85) !important; /* slate-700 */
+  }
+  
+  .bg-slate-800 {
+    background-color: rgb(30 41 59) !important; /* slate-800 */
+  }
+  
+  .bg-slate-900 {
+    background-color: rgb(15 23 42) !important; /* slate-900 */
+  }
+  
+  /* Force light red backgrounds to dark red */
+  .bg-red-50 {
+    background-color: rgba(239, 68, 68, 0.1) !important; /* red-500/10 */
+  }
+  
+  .bg-red-100 {
+    background-color: rgba(239, 68, 68, 0.15) !important; /* red-500/15 */
+  }
+  
+  /* Force light gray backgrounds to dark (if any gray classes exist) */
+  .bg-gray-50 {
+    background-color: rgb(30 41 59) !important; /* slate-800 */
+  }
+  
+  .bg-gray-100 {
+    background-color: rgb(30 41 59) !important; /* slate-800 */
+  }
+  
+  .bg-gray-200 {
+    background-color: rgb(51 65 85) !important; /* slate-700 */
+  }
+  
+  /* Force light borders to dark slate colors */
+  .border-slate-200 {
+    border-color: rgb(51 65 85) !important; /* slate-700 */
+  }
+  
+  .border-slate-300 {
+    border-color: rgb(51 65 85) !important; /* slate-700 */
+  }
+  
+  .border-slate-600 {
+    border-color: rgb(71 85 105) !important; /* slate-600 */
+  }
+  
+  .border-slate-700 {
+    border-color: rgb(51 65 85) !important; /* slate-700 */
+  }
+  
+  /* Force light text to appropriate dark mode colors */
+  .text-slate-300 {
+    color: rgb(203 213 225) !important; /* slate-300 */
+  }
+  
+  .text-slate-400 {
+    color: rgb(148 163 184) !important; /* slate-400 */
+  }
+  
+  .text-slate-500 {
+    color: rgb(148 163 184) !important; /* slate-400 */
+  }
+  
+  .text-slate-600 {
+    color: rgb(148 163 184) !important; /* slate-400 */
+  }
+  
+  .text-slate-700 {
+    color: rgb(203 213 225) !important; /* slate-300 - lighter for visibility */
+  }
+  
+  .text-slate-800 {
+    color: rgb(226 232 240) !important; /* slate-200 - very light */
+  }
+  
+  .text-slate-900 {
+    color: rgb(248 250 252) !important; /* slate-50 - white text */
+  }
+  
+  .text-white {
+    color: rgb(255 255 255) !important;
+  }
+  
+  /* Force gray text colors too */
+  .text-gray-600 {
+    color: rgb(148 163 184) !important; /* slate-400 */
+  }
+  
+  .text-gray-700 {
+    color: rgb(203 213 225) !important; /* slate-300 */
+  }
+  
+  .text-gray-900 {
+    color: rgb(248 250 252) !important; /* slate-50 */
+  }
+  
+  /* Force hover states to dark */
+  .hover\:bg-slate-100:hover {
+    background-color: rgb(51 65 85) !important; /* slate-700 */
+  }
+  
+  .hover\:bg-slate-800:hover {
+    background-color: rgb(30 41 59) !important; /* slate-800 */
   }
   
   /* Mobile View - 20% Smaller */
