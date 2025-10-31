@@ -5,10 +5,11 @@ import { RAMSExportDocument } from '@/lib/pdf/RAMSExportDocument';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient();
+    const { id } = await params;
 
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -42,7 +43,7 @@ export async function GET(
         *,
         uploader:profiles!rams_documents_uploaded_by_fkey(full_name)
       `)
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (docError || !document) {
@@ -56,7 +57,7 @@ export async function GET(
         *,
         employee:profiles!rams_assignments_employee_id_fkey(id, full_name, role)
       `)
-      .eq('rams_document_id', params.id)
+      .eq('rams_document_id', id)
       .order('signed_at', { ascending: false });
 
     if (assignError) {
@@ -74,7 +75,7 @@ export async function GET(
         *,
         recorder:profiles!rams_visitor_signatures_recorded_by_fkey(full_name)
       `)
-      .eq('rams_document_id', params.id)
+      .eq('rams_document_id', id)
       .order('signed_at', { ascending: false });
 
     if (visitorError) {

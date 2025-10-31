@@ -259,7 +259,7 @@ export function RAMSExportDocument({
           ))}
 
           <View style={styles.footer}>
-            <Text>Page {index + 2} • Employee Signatures</Text>
+            <Text>Employee Signatures • {format(new Date(), 'PPP')}</Text>
           </View>
         </Page>
       )}
