@@ -23,12 +23,61 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to verify user' }, { status: 403 });
     }
 
+    const isManagerOrAdmin = profile.role === 'admin' || profile.role === 'manager';
+
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get('status'); // 'pending' | 'signed' | 'all'
+    const showAll = searchParams.get('all') === 'true'; // For manage page
 
-    // All users (including managers/admins): Get only assigned documents
-    // The /rams/manage page has separate logic for viewing all documents
+    // Managers/Admins requesting all documents (for /rams/manage page)
+    if (isManagerOrAdmin && showAll) {
+      const { data: documents, error } = await supabase
+        .from('rams_documents')
+        .select(`
+          *,
+          uploader:profiles!rams_documents_uploaded_by_fkey(full_name)
+        `)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching documents:', error);
+        return NextResponse.json(
+          { error: 'Failed to fetch documents' },
+          { status: 500 }
+        );
+      }
+
+      // Get assignment stats for each document
+      const documentsWithStats = await Promise.all(
+        documents.map(async (doc) => {
+          const { data: assignments } = await supabase
+            .from('rams_assignments')
+            .select('status')
+            .eq('rams_document_id', doc.id);
+
+          const totalAssigned = assignments?.length || 0;
+          const totalSigned = assignments?.filter(a => a.status === 'signed').length || 0;
+          const totalPending = assignments?.filter(a => a.status === 'pending' || a.status === 'read').length || 0;
+
+          return {
+            ...doc,
+            uploader_name: doc.uploader?.full_name || 'Unknown',
+            total_assigned: totalAssigned,
+            total_signed: totalSigned,
+            total_pending: totalPending,
+          };
+        })
+      );
+
+      return NextResponse.json({
+        success: true,
+        documents: documentsWithStats,
+      });
+    }
+
+    // All users: Get only assigned documents (default behavior)
     let query = supabase
       .from('rams_assignments')
       .select(`

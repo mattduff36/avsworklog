@@ -69,7 +69,7 @@ export default function RAMSManagePage() {
     
     setLoading(true);
     try {
-      const response = await fetch('/api/rams');
+      const response = await fetch('/api/rams?all=true');
       const data = await response.json();
 
       if (data.success) {
