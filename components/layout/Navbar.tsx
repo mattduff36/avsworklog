@@ -27,7 +27,8 @@ import {
   ListTodo,
   FolderOpen,
   ChevronDown,
-  Truck
+  Truck,
+  FileCheck2
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -132,7 +133,7 @@ export function Navbar() {
                   <DropdownMenuTrigger asChild>
                     <button
                       className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                        pathname?.startsWith('/timesheets') || pathname?.startsWith('/inspections')
+                        pathname?.startsWith('/timesheets') || pathname?.startsWith('/inspections') || pathname?.startsWith('/rams')
                           ? 'bg-avs-yellow text-slate-900'
                           : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
                       }`}
@@ -153,6 +154,12 @@ export function Navbar() {
                       <Link href="/inspections" className="flex items-center cursor-pointer">
                         <ClipboardCheck className="w-4 h-4 mr-2" />
                         Inspections
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/rams" className="flex items-center cursor-pointer">
+                        <FileCheck2 className="w-4 h-4 mr-2" />
+                        RAMS Documents
                       </Link>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -308,6 +315,18 @@ export function Navbar() {
                 >
                   <ClipboardCheck className="w-5 h-5 mr-3" />
                   Inspections
+                </Link>
+                <Link
+                  href="/rams"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center px-3 py-2 pl-6 text-base font-medium rounded-md ${
+                    pathname?.startsWith('/rams')
+                      ? 'bg-avs-yellow text-slate-900'
+                      : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                  }`}
+                >
+                  <FileCheck2 className="w-5 h-5 mr-3" />
+                  RAMS Documents
                 </Link>
               </>
             )}
