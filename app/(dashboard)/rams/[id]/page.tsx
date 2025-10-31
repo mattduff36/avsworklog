@@ -78,7 +78,7 @@ export default function RAMSDetailsPage() {
   const { isManager, isAdmin, loading: authLoading } = useAuth();
   const documentId = params.id as string;
 
-  const [document, setDocument] = useState<RAMSDocument | null>(null);
+  const [ramsDocument, setRamsDocument] = useState<RAMSDocument | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [visitorSignatures, setVisitorSignatures] = useState<VisitorSignature[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,7 +132,7 @@ export default function RAMSDetailsPage() {
         return;
       }
 
-      setDocument({
+      setRamsDocument({
         ...doc,
         uploader_name: doc.uploader?.full_name || 'Unknown',
       });
@@ -177,12 +177,12 @@ export default function RAMSDetailsPage() {
   };
 
   const downloadDocument = async () => {
-    if (!document) return;
+    if (!ramsDocument) return;
 
     try {
       const { data } = await supabase.storage
         .from('rams-documents')
-        .createSignedUrl(document.file_path, 3600);
+        .createSignedUrl(ramsDocument.file_path, 3600);
 
       if (data?.signedUrl) {
         window.open(data.signedUrl, '_blank');
@@ -193,7 +193,7 @@ export default function RAMSDetailsPage() {
   };
 
   const exportPDF = async () => {
-    if (!document) return;
+    if (!ramsDocument) return;
 
     try {
       const response = await fetch(`/api/rams/${documentId}/export`);
@@ -206,7 +206,7 @@ export default function RAMSDetailsPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${document.title.replace(/[^a-z0-9]/gi, '_')}_signatures.pdf`;
+      a.download = `${ramsDocument.title.replace(/[^a-z0-9]/gi, '_')}_signatures.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -225,7 +225,7 @@ export default function RAMSDetailsPage() {
     );
   }
 
-  if (!document) {
+  if (!ramsDocument) {
     return (
       <div className="space-y-6 max-w-6xl">
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
@@ -265,10 +265,10 @@ export default function RAMSDetailsPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">{document.title}</h1>
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">{ramsDocument.title}</h1>
               <p className="text-slate-600 dark:text-slate-400">
-                Uploaded {formatDistanceToNow(new Date(document.created_at), { addSuffix: true })} by{' '}
-                {document.uploader_name}
+                Uploaded {formatDistanceToNow(new Date(ramsDocument.created_at), { addSuffix: true })} by{' '}
+                {ramsDocument.uploader_name}
               </p>
             </div>
           </div>
@@ -350,23 +350,23 @@ export default function RAMSDetailsPage() {
           <CardTitle className="text-slate-900 dark:text-white">Document Information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {document.description && (
+          {ramsDocument.description && (
             <div>
               <span className="font-semibold text-slate-900 dark:text-white">Description: </span>
-              <span className="text-slate-600 dark:text-slate-400">{document.description}</span>
+              <span className="text-slate-600 dark:text-slate-400">{ramsDocument.description}</span>
             </div>
           )}
           <div>
             <span className="font-semibold text-slate-900 dark:text-white">File: </span>
             <span className="text-slate-600 dark:text-slate-400">
-              {document.file_name} ({document.file_type.toUpperCase()} •{' '}
-              {formatFileSize(document.file_size)})
+              {ramsDocument.file_name} ({ramsDocument.file_type.toUpperCase()} •{' '}
+              {formatFileSize(ramsDocument.file_size)})
             </span>
           </div>
           <div>
             <span className="font-semibold text-slate-900 dark:text-white">Created: </span>
             <span className="text-slate-600 dark:text-slate-400">
-              {new Date(document.created_at).toLocaleString()}
+              {new Date(ramsDocument.created_at).toLocaleString()}
             </span>
           </div>
         </CardContent>
@@ -522,7 +522,7 @@ export default function RAMSDetailsPage() {
         onClose={() => setAssignModalOpen(false)}
         onSuccess={handleAssignSuccess}
         documentId={documentId}
-        documentTitle={document.title}
+        documentTitle={ramsDocument.title}
       />
     </div>
   );
