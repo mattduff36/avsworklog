@@ -369,6 +369,117 @@ export interface Database {
           updated_at?: string
         }
       }
+      rams_documents: {
+        Row: {
+          id: string
+          title: string
+          description: string | null
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type: 'pdf' | 'docx'
+          uploaded_by: string | null
+          created_at: string
+          updated_at: string
+          is_active: boolean
+          version: number
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string | null
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type: 'pdf' | 'docx'
+          uploaded_by?: string | null
+          created_at?: string
+          updated_at?: string
+          is_active?: boolean
+          version?: number
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          file_type?: 'pdf' | 'docx'
+          uploaded_by?: string | null
+          created_at?: string
+          updated_at?: string
+          is_active?: boolean
+          version?: number
+        }
+      }
+      rams_assignments: {
+        Row: {
+          id: string
+          rams_document_id: string
+          employee_id: string
+          assigned_at: string
+          assigned_by: string | null
+          status: 'pending' | 'read' | 'signed'
+          read_at: string | null
+          signed_at: string | null
+          signature_data: string | null
+        }
+        Insert: {
+          id?: string
+          rams_document_id: string
+          employee_id: string
+          assigned_at?: string
+          assigned_by?: string | null
+          status?: 'pending' | 'read' | 'signed'
+          read_at?: string | null
+          signed_at?: string | null
+          signature_data?: string | null
+        }
+        Update: {
+          id?: string
+          rams_document_id?: string
+          employee_id?: string
+          assigned_at?: string
+          assigned_by?: string | null
+          status?: 'pending' | 'read' | 'signed'
+          read_at?: string | null
+          signed_at?: string | null
+          signature_data?: string | null
+        }
+      }
+      rams_visitor_signatures: {
+        Row: {
+          id: string
+          rams_document_id: string
+          visitor_name: string
+          visitor_company: string | null
+          visitor_role: string | null
+          signature_data: string
+          signed_at: string
+          recorded_by: string | null
+        }
+        Insert: {
+          id?: string
+          rams_document_id: string
+          visitor_name: string
+          visitor_company?: string | null
+          visitor_role?: string | null
+          signature_data: string
+          signed_at?: string
+          recorded_by?: string | null
+        }
+        Update: {
+          id?: string
+          rams_document_id?: string
+          visitor_name?: string
+          visitor_company?: string | null
+          visitor_role?: string | null
+          signature_data?: string
+          signed_at?: string
+          recorded_by?: string | null
+        }
+      }
     }
     Views: {
       [_ in never]: never
