@@ -1,15 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 import { Database } from '@/types/database';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Loader2, Search, FileText, CheckCircle2, Clock } from 'lucide-react';
+import { Loader2, Search, FileText, CheckCircle2, Clock, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { formatFileSize } from '@/lib/utils/file-validation';
@@ -32,7 +31,6 @@ interface RAMSDocument {
 }
 
 export default function RAMSPage() {
-  const router = useRouter();
   const { isManager, isAdmin, loading: authLoading } = useAuth();
   const [documents, setDocuments] = useState<RAMSDocument[]>([]);
   const [filteredDocuments, setFilteredDocuments] = useState<RAMSDocument[]>([]);
@@ -40,22 +38,12 @@ export default function RAMSPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'signed'>('all');
 
-  const supabase = createClientComponentClient<Database>();
-
-  // Redirect managers/admins to the manage page
-  useEffect(() => {
-    if (!authLoading && (isManager || isAdmin)) {
-      router.push('/rams/manage');
-    }
-  }, [isManager, isAdmin, authLoading, router]);
+  const supabase = createClient();
 
   const fetchDocuments = async () => {
-    // Don't fetch if user is manager/admin (they'll be redirected)
-    if (isManager || isAdmin) return;
-    
     setLoading(true);
     try {
-      // Fetch documents
+      // Fetch documents for all users (API handles permissions)
       const response = await fetch('/api/rams');
       const data = await response.json();
 
@@ -71,11 +59,11 @@ export default function RAMSPage() {
   };
 
   useEffect(() => {
-    // Only fetch if auth is loaded and user is NOT a manager/admin
-    if (!authLoading && !isManager && !isAdmin) {
+    // Fetch documents once auth is loaded
+    if (!authLoading) {
       fetchDocuments();
     }
-  }, [authLoading, isManager, isAdmin]);
+  }, [authLoading]);
 
   useEffect(() => {
     let filtered = documents;
@@ -105,8 +93,8 @@ export default function RAMSPage() {
     doc.assignment_status === 'pending' || doc.assignment_status === 'read'
   ).length;
 
-  // Show loading while checking auth or redirecting
-  if (authLoading || isManager || isAdmin || loading) {
+  // Show loading while checking auth
+  if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -121,15 +109,31 @@ export default function RAMSPage() {
         <div>
           <h1 className="text-3xl font-bold">RAMS Documents</h1>
           <p className="text-muted-foreground mt-1">
-            Review and sign safety documents
+            {isManager || isAdmin 
+              ? 'View and manage risk assessments & method statements'
+              : 'Review and sign safety documents'
+            }
           </p>
         </div>
 
-        {pendingCount > 0 && (
-          <Badge variant="destructive" className="text-lg px-4 py-2">
-            {pendingCount} to sign
-          </Badge>
-        )}
+        <div className="flex items-center gap-3">
+          {/* Manage RAMS link for managers/admins */}
+          {(isManager || isAdmin) && (
+            <Button asChild variant="default">
+              <Link href="/rams/manage">
+                <Settings className="h-4 w-4 mr-2" />
+                Manage RAMS Documents
+              </Link>
+            </Button>
+          )}
+
+          {/* Pending count badge for employees */}
+          {!isManager && !isAdmin && pendingCount > 0 && (
+            <Badge variant="destructive" className="text-lg px-4 py-2">
+              {pendingCount} to sign
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Search and Filters */}
