@@ -230,7 +230,7 @@ export default function DashboardPage() {
                 <Link key={formType.id} href={formType.href}>
                   <div className={`relative bg-${formType.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3 cursor-pointer`}>
                     {showBadge && (
-                      <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full h-8 w-8 flex items-center justify-center text-sm font-bold shadow-lg">
+                      <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-10 w-10 flex items-center justify-center text-base font-bold shadow-lg ring-2 ring-white">
                         {pendingRAMSCount}
                       </div>
                     )}
