@@ -8,11 +8,22 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Loader2, Upload, Search, FileText, Users, ArrowLeft } from 'lucide-react';
+import { Loader2, Upload, Search, FileText, Users, ArrowLeft, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { UploadRAMSModal } from '@/components/rams/UploadRAMSModal';
 import { formatFileSize } from '@/lib/utils/file-validation';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface RAMSDocument {
   id: string;
@@ -36,6 +47,12 @@ export default function RAMSManagePage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
   const supabase = createClient();
 
@@ -89,6 +106,42 @@ export default function RAMSManagePage() {
   const handleUploadSuccess = () => {
     setUploadModalOpen(false);
     fetchDocuments();
+  };
+
+  const openDeleteDialog = (e: React.MouseEvent, document: RAMSDocument) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDocumentToDelete({
+      id: document.id,
+      title: document.title,
+    });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!documentToDelete) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/rams/${documentToDelete.id}/delete`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete document');
+      }
+
+      toast.success('Document deleted successfully');
+      setDeleteDialogOpen(false);
+      setDocumentToDelete(null);
+      fetchDocuments();
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to delete document');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   // Show loading while checking auth or redirecting
@@ -185,6 +238,15 @@ export default function RAMSManagePage() {
                       <CardDescription className="mt-2">{doc.description}</CardDescription>
                     )}
                   </div>
+                  <Button
+                    onClick={(e) => openDeleteDialog(e, doc)}
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                    title="Delete document"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent>

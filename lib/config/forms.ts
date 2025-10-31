@@ -39,7 +39,7 @@ export interface FormType {
 export const FORM_TYPES: FormType[] = [
   {
     id: 'timesheet',
-    title: 'Timesheet',
+    title: 'Timesheets',
     description: 'Weekly time tracking',
     icon: FileText,
     href: '/timesheets',
@@ -49,7 +49,7 @@ export const FORM_TYPES: FormType[] = [
   },
   {
     id: 'inspection',
-    title: 'Vehicle Inspection',
+    title: 'Vehicle Inspections',
     description: 'Safety checklist',
     icon: ClipboardCheck,
     href: '/inspections',
