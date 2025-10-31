@@ -304,6 +304,10 @@
     background-color: hsl(var(--timesheet-light));
   }
   
+  .bg-timesheet-dark {
+    background-color: hsl(var(--timesheet-dark));
+  }
+  
   .text-timesheet {
     color: hsl(var(--timesheet-primary));
   }
@@ -319,6 +323,10 @@
   
   .bg-inspection-light {
     background-color: hsl(var(--inspection-light));
+  }
+  
+  .bg-inspection-dark {
+    background-color: hsl(var(--inspection-dark));
   }
   
   .text-inspection {
@@ -338,6 +346,10 @@
     background-color: hsl(var(--report-light));
   }
   
+  .bg-report-dark {
+    background-color: hsl(var(--report-dark));
+  }
+  
   .text-report {
     color: hsl(var(--report-primary));
   }
@@ -353,6 +365,10 @@
   
   .bg-admin-light {
     background-color: hsl(var(--admin-light));
+  }
+  
+  .bg-admin-dark {
+    background-color: hsl(var(--admin-dark));
   }
   
   .text-admin {
@@ -372,6 +388,10 @@
     background-color: hsl(var(--rams-light));
   }
   
+  .bg-rams-dark {
+    background-color: hsl(var(--rams-dark));
+  }
+  
   .text-rams {
     color: hsl(var(--rams-primary));
   }
@@ -380,6 +400,38 @@
     border-color: hsl(var(--rams-primary));
   }
 }
+
+/*
+ * STANDARD PAGE LAYOUT PATTERN
+ * ============================
+ * All list/index pages should follow this consistent pattern:
+ * 
+ * 1. Outer Container:
+ *    <div className="space-y-6 max-w-6xl">
+ * 
+ * 2. Header Card:
+ *    <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+ *      - Title: text-3xl font-bold text-slate-900 dark:text-white mb-2
+ *      - Description: text-slate-600 dark:text-slate-400
+ *      - Buttons: bg-{formtype} hover:bg-{formtype}-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg
+ * 
+ * 3. Search/Filter Card (if needed):
+ *    <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+ *      - Input: bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white
+ * 
+ * 4. Empty State Card:
+ *    <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+ *      <CardContent className="flex flex-col items-center justify-center py-12">
+ *        - Icon: h-16 w-16 text-slate-400 mb-4
+ *        - Title: text-lg font-semibold text-slate-900 dark:text-white mb-2
+ *        - Description: text-slate-600 dark:text-slate-400 mb-4
+ * 
+ * 5. List Items Card:
+ *    <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-{formtype}/50 transition-all duration-200 cursor-pointer">
+ * 
+ * Form type colors available: timesheet, inspection, rams, report, admin
+ * Each has: --{formtype}-primary, --{formtype}-light, --{formtype}-dark
+ */
 
 /* Custom scrollbar with AVS Yellow */
 ::-webkit-scrollbar {
