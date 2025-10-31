@@ -65,7 +65,7 @@ export default function DashboardPage() {
   const placeholderForms = [
     { id: 'incident', title: 'Incident Report', icon: AlertTriangle, color: 'bg-red-500' },
     { id: 'maintenance', title: 'Maintenance Request', icon: Wrench, color: 'bg-purple-500' },
-    { id: 'delivery', title: 'Delivery Note', icon: PackageCheck, color: 'bg-green-500' },
+    { id: 'delivery', title: 'Delivery Note', icon: PackageCheck, color: 'bg-rose-500' },
     { id: 'site-diary', title: 'Site Diary', icon: Clipboard, color: 'bg-cyan-500' },
     { id: 'plant-hire', title: 'Plant Hire', icon: Truck, color: 'bg-indigo-500' },
     { id: 'quality-check', title: 'Quality Check', icon: FileCheck, color: 'bg-emerald-500' },

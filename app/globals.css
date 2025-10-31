@@ -46,10 +46,10 @@
     --inspection-light: 30 100% 96%;
     --inspection-dark: 30 95% 40%;
     
-    /* RAMS Documents - Rose/Red (replacing Risk Assessment) */
-    --rams-primary: 350 89% 60%;
-    --rams-light: 350 100% 97%;
-    --rams-dark: 350 89% 45%;
+    /* RAMS Documents - Professional Green */
+    --rams-primary: 142 76% 36%;
+    --rams-light: 142 76% 95%;
+    --rams-dark: 142 76% 28%;
     
     /* Reports - Professional Green */
     --report-primary: 150 70% 45%;
