@@ -188,16 +188,14 @@ export default function RAMSPage() {
             <p className="text-slate-600 dark:text-slate-400 mb-4 text-center">
               {searchQuery || statusFilter !== 'all'
                 ? 'Try adjusting your search or filters'
-                : isManager || isAdmin
-                ? 'Upload your first RAMS document to get started'
                 : 'No documents have been assigned to you yet'
               }
             </p>
-            {(isManager || isAdmin) && (
+            {(isManager || isAdmin) && !searchQuery && statusFilter === 'all' && (
               <Link href="/rams/manage">
                 <Button className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Upload Document
+                  <Settings className="h-4 w-4 mr-2" />
+                  Manage RAMS Documents
                 </Button>
               </Link>
             )}
