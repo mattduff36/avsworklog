@@ -93,6 +93,16 @@ const styles = StyleSheet.create({
     objectFit: 'contain',
     marginTop: 5,
   },
+  signatureRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 10,
+  },
+  signatureColumn: {
+    flex: 1,
+    maxWidth: '48%',
+  },
   badge: {
     padding: '3pt 8pt',
     borderRadius: 4,
@@ -188,6 +198,17 @@ export function RAMSExportDocument({
   const complianceRate =
     assignments.length > 0 ? Math.round((totalSigned / assignments.length) * 100) : 0;
 
+  // Helper function to chunk assignments into pairs for 2-column layout
+  const chunkSignatures = (arr: typeof signedAssignments, size: number) => {
+    const chunks = [];
+    for (let i = 0; i < arr.length; i += size) {
+      chunks.push(arr.slice(i, i + size));
+    }
+    return chunks;
+  };
+
+  const signatureRows = chunkSignatures(signedAssignments, 2);
+
   return (
     <Document>
       {/* Cover Page */}
@@ -274,51 +295,63 @@ export function RAMSExportDocument({
             </View>
           </View>
 
-          {signedAssignments.map((assignment, index) => (
-            <View key={assignment.id} style={styles.section}>
-              <View style={styles.signatureBox}>
-                <View style={styles.infoRow}>
-                  <Text style={styles.label}>Employee Name:</Text>
-                  <Text style={styles.value}>{assignment.employee.full_name}</Text>
-                </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.label}>Role:</Text>
-                  <Text style={styles.value}>{assignment.employee.role}</Text>
-                </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.label}>Signed Date:</Text>
-                  <Text style={styles.value}>
-                    {assignment.signed_at
-                      ? format(new Date(assignment.signed_at), 'PPP p')
-                      : 'N/A'}
-                  </Text>
-                </View>
-                {assignment.comments && (
-                  <View style={{ marginTop: 10, marginBottom: 10 }}>
-                    <Text style={{ ...styles.label, marginBottom: 5 }}>
-                      Comments:
-                    </Text>
-                    <View style={{ 
-                      padding: 8, 
-                      backgroundColor: '#f8fafc',
-                      border: '1pt solid #e2e8f0',
-                      borderRadius: 3 
-                    }}>
-                      <Text style={{ fontSize: 9, color: '#334155', lineHeight: 1.5 }}>
-                        {assignment.comments}
+          {signatureRows.map((row, rowIndex) => (
+            <View key={`row-${rowIndex}`} style={styles.signatureRow}>
+              {row.map((assignment) => (
+                <View key={assignment.id} style={styles.signatureColumn}>
+                  <View style={styles.signatureBox}>
+                    <View style={styles.infoRow}>
+                      <Text style={styles.label}>Employee Name:</Text>
+                      <Text style={styles.value}>{assignment.employee.full_name}</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <Text style={styles.label}>Role:</Text>
+                      <Text style={styles.value}>{assignment.employee.role}</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <Text style={styles.label}>Signed Date:</Text>
+                      <Text style={styles.value}>
+                        {assignment.signed_at
+                          ? format(new Date(assignment.signed_at), 'PPP p')
+                          : 'N/A'}
                       </Text>
                     </View>
+                    {assignment.comments && (
+                      <View style={{ marginTop: 8, marginBottom: 8 }}>
+                        <Text style={{ ...styles.label, marginBottom: 3, fontSize: 8 }}>
+                          Comments:
+                        </Text>
+                        <View style={{ 
+                          padding: 6, 
+                          backgroundColor: '#f8fafc',
+                          border: '1pt solid #e2e8f0',
+                          borderRadius: 3 
+                        }}>
+                          <Text style={{ fontSize: 7, color: '#334155', lineHeight: 1.4 }}>
+                            {assignment.comments}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                    {assignment.signature_data && (
+                      <View>
+                        <Text style={{ ...styles.label, marginTop: 8, marginBottom: 3, fontSize: 8 }}>
+                          Signature:
+                        </Text>
+                        <Image 
+                          src={assignment.signature_data} 
+                          style={{ 
+                            width: 150, 
+                            height: 50, 
+                            objectFit: 'contain',
+                            marginTop: 3 
+                          }} 
+                        />
+                      </View>
+                    )}
                   </View>
-                )}
-                {assignment.signature_data && (
-                  <View>
-                    <Text style={{ ...styles.label, marginTop: 10, marginBottom: 5 }}>
-                      Signature:
-                    </Text>
-                    <Image src={assignment.signature_data} style={styles.signatureImage} />
-                  </View>
-                )}
-              </View>
+                </View>
+              ))}
             </View>
           ))}
 
