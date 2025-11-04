@@ -86,6 +86,11 @@ export async function GET(
       );
     }
 
+    // Construct absolute logo URL
+    const protocol = request.headers.get('x-forwarded-proto') || 'https';
+    const host = request.headers.get('host') || 'localhost:3000';
+    const logoUrl = `${protocol}://${host}/images/logo.png`;
+
     // Generate PDF
     const pdfDocument = RAMSExportDocument({
       document: {
@@ -94,6 +99,7 @@ export async function GET(
       },
       assignments: assignments || [],
       visitorSignatures: visitorSignatures || [],
+      logoUrl,
     });
 
     const pdfBuffer = await renderToBuffer(pdfDocument);

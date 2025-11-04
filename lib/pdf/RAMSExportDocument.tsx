@@ -174,12 +174,14 @@ interface RAMSExportDocumentProps {
       full_name: string;
     };
   }>;
+  logoUrl: string;
 }
 
 export function RAMSExportDocument({
   document,
   assignments,
   visitorSignatures,
+  logoUrl,
 }: RAMSExportDocumentProps) {
   const signedAssignments = assignments.filter(a => a.status === 'signed');
   const totalSigned = signedAssignments.length;
@@ -191,7 +193,7 @@ export function RAMSExportDocument({
       {/* Cover Page */}
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
-          <Image src="/images/logo.png" style={styles.logo} />
+          <Image src={logoUrl} style={styles.logo} />
           <View style={styles.headerText}>
             <Text style={styles.title}>{document.title}</Text>
             <Text style={styles.subtitle}>Risk Assessment & Method Statement - Signature Record</Text>
@@ -265,7 +267,7 @@ export function RAMSExportDocument({
       {signedAssignments.length > 0 && (
         <Page size="A4" style={styles.page}>
           <View style={styles.header}>
-            <Image src="/images/logo.png" style={styles.logo} />
+            <Image src={logoUrl} style={styles.logo} />
             <View style={styles.headerText}>
               <Text style={styles.title}>Employee Signatures</Text>
               <Text style={styles.subtitle}>{document.title}</Text>
@@ -330,7 +332,7 @@ export function RAMSExportDocument({
       {visitorSignatures.length > 0 && (
         <Page size="A4" style={styles.page}>
           <View style={styles.header}>
-            <Image src="/images/logo.png" style={styles.logo} />
+            <Image src={logoUrl} style={styles.logo} />
             <View style={styles.headerText}>
               <Text style={styles.title}>Visitor Signatures</Text>
               <Text style={styles.subtitle}>{document.title}</Text>
