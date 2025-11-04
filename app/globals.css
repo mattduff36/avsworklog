@@ -158,6 +158,19 @@
     background-color: rgba(239, 68, 68, 0.15) !important; /* red-500/15 */
   }
   
+  /* Force light blue backgrounds to dark blue */
+  .bg-blue-50 {
+    background-color: rgba(59, 130, 246, 0.1) !important; /* blue-500/10 */
+  }
+  
+  .bg-blue-100 {
+    background-color: rgba(59, 130, 246, 0.15) !important; /* blue-500/15 */
+  }
+  
+  .bg-blue-200 {
+    background-color: rgba(59, 130, 246, 0.2) !important; /* blue-500/20 */
+  }
+  
   /* Force light gray backgrounds to dark (if any gray classes exist) */
   .bg-gray-50 {
     background-color: rgb(30 41 59) !important; /* slate-800 */
@@ -186,6 +199,15 @@
   
   .border-slate-700 {
     border-color: rgb(51 65 85) !important; /* slate-700 */
+  }
+  
+  /* Force light blue borders to dark blue */
+  .border-blue-200 {
+    border-color: rgba(59, 130, 246, 0.3) !important; /* blue-500/30 */
+  }
+  
+  .border-blue-300 {
+    border-color: rgba(59, 130, 246, 0.4) !important; /* blue-500/40 */
   }
   
   /* Force light text to appropriate dark mode colors */
@@ -232,6 +254,27 @@
   
   .text-gray-900 {
     color: rgb(248 250 252) !important; /* slate-50 */
+  }
+  
+  /* Force blue text colors to light blue for dark theme */
+  .text-blue-100 {
+    color: rgb(219 234 254) !important; /* blue-100 */
+  }
+  
+  .text-blue-200 {
+    color: rgb(191 219 254) !important; /* blue-200 */
+  }
+  
+  .text-blue-600 {
+    color: rgb(147 197 253) !important; /* blue-300 - lighter for visibility */
+  }
+  
+  .text-blue-700 {
+    color: rgb(191 219 254) !important; /* blue-200 - lighter for visibility */
+  }
+  
+  .text-blue-900 {
+    color: rgb(219 234 254) !important; /* blue-100 - light text */
   }
   
   /* Force hover states to dark */

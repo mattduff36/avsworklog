@@ -155,8 +155,21 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
                     accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     onChange={handleFileChange}
                     disabled={uploading}
-                    className="cursor-pointer"
+                    className="hidden"
                   />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById('file-upload')?.click()}
+                    disabled={uploading}
+                    className="w-full h-24 border-2 border-dashed border-rams/40 hover:border-rams hover:bg-rams/5 text-slate-600 dark:text-slate-300 hover:text-rams transition-all duration-200"
+                  >
+                    <div className="flex flex-col items-center gap-2">
+                      <Upload className="h-8 w-8" />
+                      <span className="font-medium">Choose file to upload</span>
+                      <span className="text-xs text-muted-foreground">Click to browse</span>
+                    </div>
+                  </Button>
                 </div>
               ) : (
                 <div className="flex items-center gap-3 p-3 border rounded-md bg-muted/50">
@@ -180,8 +193,8 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
               )}
             </div>
 
-            <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 p-3">
-              <p className="text-sm text-blue-900 dark:text-blue-100">
+            <div className="rounded-md bg-blue-900/20 border border-blue-800/30 p-3">
+              <p className="text-sm text-blue-100">
                 ℹ️ After uploading, you can assign this document to specific employees
               </p>
             </div>
@@ -196,7 +209,11 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={uploading || !file || !title.trim()}>
+            <Button 
+              type="submit" 
+              disabled={uploading || !file || !title.trim()}
+              className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
+            >
               {uploading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
