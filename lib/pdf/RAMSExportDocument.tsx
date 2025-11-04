@@ -157,6 +157,7 @@ interface RAMSExportDocumentProps {
     status: 'pending' | 'read' | 'signed';
     signed_at: string | null;
     signature_data: string | null;
+    comments: string | null;
     employee: {
       full_name: string;
       role: string;
@@ -290,6 +291,23 @@ export function RAMSExportDocument({
                       : 'N/A'}
                   </Text>
                 </View>
+                {assignment.comments && (
+                  <View style={{ marginTop: 10, marginBottom: 10 }}>
+                    <Text style={{ ...styles.label, marginBottom: 5 }}>
+                      Comments:
+                    </Text>
+                    <View style={{ 
+                      padding: 8, 
+                      backgroundColor: '#f8fafc',
+                      border: '1pt solid #e2e8f0',
+                      borderRadius: 3 
+                    }}>
+                      <Text style={{ fontSize: 9, color: '#334155', lineHeight: 1.5 }}>
+                        {assignment.comments}
+                      </Text>
+                    </View>
+                  </View>
+                )}
                 {assignment.signature_data && (
                   <View>
                     <Text style={{ ...styles.label, marginTop: 10, marginBottom: 5 }}>

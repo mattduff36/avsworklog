@@ -3,6 +3,8 @@
 import { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import SignaturePad from '@/components/forms/SignaturePad';
@@ -23,6 +25,7 @@ export function SignRAMSModal({
   documentTitle,
 }: SignRAMSModalProps) {
   const [loading, setLoading] = useState(false);
+  const [comments, setComments] = useState('');
 
   const handleSaveSignature = async (signature: string) => {
     if (!signature) {
@@ -41,6 +44,7 @@ export function SignRAMSModal({
         body: JSON.stringify({
           assignment_id: assignmentId,
           signature_data: signature,
+          comments: comments.trim() || null,
         }),
       });
 
@@ -78,8 +82,8 @@ export function SignRAMSModal({
 
         <div className="grid gap-6 py-4">
           {/* Confirmation Text */}
-          <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 p-4">
-            <div className="text-sm text-blue-900 dark:text-blue-100 space-y-1">
+          <div className="rounded-md bg-blue-900/20 border border-blue-800/30 p-4">
+            <div className="text-sm text-blue-100 space-y-1">
               <p>By signing, you confirm that you have:</p>
               <ul className="list-disc ml-5 mt-2 space-y-1">
                 <li>Read the entire document</li>
@@ -89,9 +93,28 @@ export function SignRAMSModal({
             </div>
           </div>
 
+          {/* Comments (Optional) */}
+          <div className="grid gap-2">
+            <Label htmlFor="comments" className="text-sm font-medium text-slate-900 dark:text-white">
+              Comments (Optional)
+            </Label>
+            <Textarea
+              id="comments"
+              placeholder="Add any comments, observations, or questions about this RAMS document..."
+              value={comments}
+              onChange={(e) => setComments(e.target.value)}
+              disabled={loading}
+              rows={3}
+              className="resize-none bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
+            />
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              This is optional. Add comments if you have any questions or observations.
+            </p>
+          </div>
+
           {/* Signature Pad */}
           <div className="grid gap-2">
-            <label className="text-sm font-medium">
+            <label className="text-sm font-medium text-slate-900 dark:text-white">
               Your Signature <span className="text-destructive">*</span>
             </label>
             <SignaturePad

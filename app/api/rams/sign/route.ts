@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse request body
-    const { assignment_id, signature_data } = await request.json();
+    const { assignment_id, signature_data, comments } = await request.json();
 
     if (!assignment_id || !signature_data) {
       return NextResponse.json(
@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
         status: 'signed',
         signed_at: new Date().toISOString(),
         signature_data,
+        comments: comments || null,
       })
       .eq('id', assignment_id)
       .select()
