@@ -81,7 +81,7 @@ export function Navbar() {
           <div className="flex items-center">
             <Link href="/dashboard" className="flex items-center space-x-2 group">
               <div className="text-xl font-bold text-white group-hover:text-avs-yellow transition-colors">
-                Squires
+                SQUIRES
               </div>
             </Link>
 
