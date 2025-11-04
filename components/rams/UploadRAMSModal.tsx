@@ -172,10 +172,10 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
                   </Button>
                 </div>
               ) : (
-                <div className="flex items-center gap-3 p-3 border rounded-md bg-muted/50">
+                <div className="flex items-center gap-3 p-3 border rounded-md bg-muted/50 overflow-hidden">
                   <File className="h-8 w-8 text-primary shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{file.name}</p>
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <p className="text-sm font-medium truncate overflow-hidden text-ellipsis whitespace-nowrap">{file.name}</p>
                     <p className="text-xs text-muted-foreground">
                       {formatFileSize(file.size)}
                     </p>
@@ -186,6 +186,7 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
                     size="icon"
                     onClick={handleRemoveFile}
                     disabled={uploading}
+                    className="shrink-0"
                   >
                     <X className="h-4 w-4" />
                   </Button>
