@@ -42,6 +42,7 @@ export default function ReadRAMSPage() {
   const [showSignButton, setShowSignButton] = useState(false);
   const [signModalOpen, setSignModalOpen] = useState(false);
   const [visitorSignModalOpen, setVisitorSignModalOpen] = useState(false);
+  const [hasDownloaded, setHasDownloaded] = useState(false);
   
   const viewerRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
@@ -170,6 +171,12 @@ export default function ReadRAMSPage() {
     // Could show a success message or update UI
   };
 
+  const handleDownload = () => {
+    // Mark as downloaded to enable sign button
+    setHasDownloaded(true);
+    markAsRead();
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -181,10 +188,13 @@ export default function ReadRAMSPage() {
   if (!document) {
     return (
       <div className="container mx-auto p-6 max-w-4xl">
-        <Card className="p-6 text-center">
-          <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">Document not found</p>
-          <Button asChild className="mt-4">
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 p-12 text-center">
+          <div className="p-4 rounded-full bg-red-100 dark:bg-red-900/20 w-24 h-24 flex items-center justify-center mx-auto mb-4">
+            <FileText className="h-12 w-12 text-red-600 dark:text-red-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Document not found</h2>
+          <p className="text-slate-600 dark:text-slate-400 mb-6">The document you're looking for doesn't exist or has been removed.</p>
+          <Button asChild className="bg-rams hover:bg-rams-dark text-white">
             <Link href="/rams">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to RAMS
@@ -201,41 +211,47 @@ export default function ReadRAMSPage() {
   return (
     <div className="flex flex-col h-screen">
       {/* Header */}
-      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 shadow-sm">
+        <div className="container mx-auto px-4 py-4 max-w-6xl">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-4">
-              <Button asChild variant="ghost" size="icon">
+              <Button asChild variant="ghost" size="sm" className="hover:bg-slate-800/50 text-slate-300 hover:text-white">
                 <Link href="/rams">
-                  <ArrowLeft className="h-5 w-5" />
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
                 </Link>
               </Button>
               <div>
-                <h1 className="text-xl font-bold">{document.title}</h1>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{document.title}</h1>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
                   {document.file_type.toUpperCase()} Document
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
               {isSigned && (
-                <Badge variant="default" className="gap-1">
+                <Badge className="bg-green-600 hover:bg-green-700 gap-1">
                   <CheckCircle2 className="h-3 w-3" />
                   Signed
                 </Badge>
               )}
               {fileUrl && (
-                <Button asChild variant="outline" size="sm">
-                  <a href={fileUrl} download={document.file_name}>
+                <Button 
+                  asChild 
+                  variant="outline" 
+                  size="sm"
+                  className="border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white"
+                >
+                  <a href={fileUrl} download={document.file_name} onClick={handleDownload}>
                     <Download className="h-4 w-4 mr-2" />
                     Download
                   </a>
                 </Button>
               )}
               <Button
-                variant="outline"
                 size="sm"
                 onClick={() => setVisitorSignModalOpen(true)}
+                className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
               >
                 <UserPlus className="h-4 w-4 mr-2" />
                 Record Visitor
@@ -251,9 +267,9 @@ export default function ReadRAMSPage() {
           ref={viewerRef}
           className="h-full overflow-auto"
         >
-          <div className="container mx-auto py-6 max-w-5xl">
+          <div className="container mx-auto py-8 max-w-5xl px-4">
             {document.file_type === 'pdf' && fileUrl ? (
-              <div className="bg-white rounded-lg shadow-lg overflow-hidden" style={{ height: 'calc(100vh - 200px)' }}>
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg overflow-hidden border border-slate-200 dark:border-slate-700" style={{ height: 'calc(100vh - 220px)' }}>
                 <iframe
                   src={`${fileUrl}#toolbar=1&navpanes=0&scrollbar=1`}
                   className="w-full h-full"
@@ -261,35 +277,49 @@ export default function ReadRAMSPage() {
                 />
               </div>
             ) : document.file_type === 'docx' && fileUrl ? (
-              <Card className="p-8">
-                <div className="text-center space-y-4">
-                  <FileText className="h-16 w-16 text-primary mx-auto" />
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 p-8 md:p-12">
+                <div className="text-center space-y-6 max-w-2xl mx-auto">
+                  <div className="p-4 rounded-full bg-rams/10 w-24 h-24 flex items-center justify-center mx-auto">
+                    <FileText className="h-12 w-12 text-rams" />
+                  </div>
                   <div>
-                    <h3 className="text-lg font-semibold mb-2">Microsoft Word Document</h3>
-                    <p className="text-muted-foreground mb-4">
+                    <h3 className="text-2xl font-bold mb-3 text-slate-900 dark:text-white">Microsoft Word Document</h3>
+                    <p className="text-slate-600 dark:text-slate-400 mb-4">
                       Word documents must be downloaded and opened in Microsoft Word or a compatible application.
                     </p>
-                    <p className="text-sm text-muted-foreground mb-6">
+                    <p className="text-sm text-slate-500 dark:text-slate-500 mb-6">
                       Please review the entire document before signing.
                     </p>
                   </div>
-                  <Button asChild size="lg">
-                    <a href={fileUrl} download={document.file_name}>
+                  <Button 
+                    asChild 
+                    size="lg"
+                    className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg text-base px-8 py-6"
+                  >
+                    <a href={fileUrl} download={document.file_name} onClick={handleDownload}>
                       <Download className="h-5 w-5 mr-2" />
                       Download and Review
                     </a>
                   </Button>
                   {canSign && (
-                    <div className="mt-8 pt-8 border-t">
-                      <p className="text-sm text-muted-foreground mb-4">
+                    <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
                         After reviewing the document, click below to sign
                       </p>
                       <Button
                         size="lg"
                         onClick={() => setSignModalOpen(true)}
+                        disabled={!hasDownloaded}
+                        className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 text-base px-8 py-6"
                       >
+                        <CheckCircle2 className="h-5 w-5 mr-2" />
                         I have read and understood - Sign Document
                       </Button>
+                      {!hasDownloaded && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-3">
+                          ⚠️ Please download and review the document first
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -301,23 +331,30 @@ export default function ReadRAMSPage() {
 
       {/* Sign Button - Sticky Banner (for PDFs) */}
       {canSign && showSignButton && document.file_type === 'pdf' && (
-        <div className="fixed bottom-0 left-0 right-0 bg-primary text-primary-foreground shadow-lg animate-slide-up">
-          <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center justify-between">
+        <div className="fixed bottom-0 left-0 right-0 bg-rams border-t-4 border-rams-dark shadow-2xl animate-slide-up z-50">
+          <div className="container mx-auto px-4 py-4 max-w-6xl">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-3">
-                <CheckCircle2 className="h-5 w-5" />
+                <div className="p-2 bg-white/20 rounded-full">
+                  <CheckCircle2 className="h-5 w-5 text-white" />
+                </div>
                 <div>
-                  <p className="font-semibold">Document Review Complete</p>
-                  <p className="text-sm opacity-90">
-                    Click to confirm you've read and understood the safety requirements
+                  <p className="font-semibold text-white text-lg">Document Review Complete</p>
+                  <p className="text-sm text-white/90">
+                    {hasDownloaded 
+                      ? "Click to confirm you've read and understood the safety requirements"
+                      : "Please download the document first to enable signing"
+                    }
                   </p>
                 </div>
               </div>
               <Button
                 size="lg"
-                variant="secondary"
                 onClick={() => setSignModalOpen(true)}
+                disabled={!hasDownloaded}
+                className="bg-white text-rams hover:bg-slate-100 font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed px-8 py-6"
               >
+                <CheckCircle2 className="h-5 w-5 mr-2" />
                 Sign Document
               </Button>
             </div>
