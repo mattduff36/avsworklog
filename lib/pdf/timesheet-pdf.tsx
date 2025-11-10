@@ -243,8 +243,8 @@ export function TimesheetPDF({ timesheet, employeeName, employeeEmail }: Timeshe
         <View style={{ marginBottom: 20 }}>
           <View style={styles.infoField}>
             <Text style={styles.infoLabel}>Driver</Text>
-            <View style={styles.infoDots}>
-              <Text style={{ fontSize: 9, paddingLeft: 5 }}>{employeeName || ''}</Text>
+            <View style={[styles.infoDots, { justifyContent: 'flex-start', alignItems: 'center' }]}>
+              <Text style={{ fontSize: 9, paddingLeft: 5, color: '#000' }}>{employeeName || ''}</Text>
             </View>
           </View>
         </View>

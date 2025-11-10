@@ -4,7 +4,9 @@ export interface TimesheetEntry {
   day_of_week: number; // 1-7 (Monday-Sunday)
   time_started: string | null;
   time_finished: string | null;
+  job_number: string | null;
   working_in_yard: boolean;
+  did_not_work: boolean;
   daily_total: number | null; // Hours (e.g., 8.5)
   remarks: string | null;
   created_at?: string;

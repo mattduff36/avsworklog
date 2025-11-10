@@ -307,7 +307,14 @@ export default function TimesheetsPage() {
             <Card 
               key={timesheet.id} 
               className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-timesheet/50 transition-all duration-200 cursor-pointer"
-              onClick={() => router.push(`/timesheets/${timesheet.id}`)}
+              onClick={() => {
+                // Redirect draft timesheets to /timesheets/new for editing with validation
+                if (timesheet.status === 'draft' || timesheet.status === 'rejected') {
+                  router.push(`/timesheets/new?id=${timesheet.id}`);
+                } else {
+                  router.push(`/timesheets/${timesheet.id}`);
+                }
+              }}
             >
               <CardHeader>
                 <div className="flex items-start justify-between">

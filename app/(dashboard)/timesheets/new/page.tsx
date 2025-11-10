@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { useOfflineStore } from '@/lib/stores/offline-queue';
@@ -17,7 +17,7 @@ import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User, WifiOff } fro
 import Link from 'next/link';
 import { getWeekEnding, formatDateISO } from '@/lib/utils/date';
 import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
-import { DAY_NAMES } from '@/types/timesheet';
+import { DAY_NAMES, Timesheet, TimesheetEntry } from '@/types/timesheet';
 import { Database } from '@/types/database';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { fetchUKBankHolidays } from '@/lib/utils/bank-holidays';
@@ -31,12 +31,14 @@ type Employee = {
 
 export default function NewTimesheetPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, profile, isManager } = useAuth();
   const { isOnline } = useOfflineSync();
   const { addToQueue } = useOfflineStore();
   const supabase = createClient();
   
-  const [regNumber] = useState('');
+  const [existingTimesheetId, setExistingTimesheetId] = useState<string | null>(null);
+  const [regNumber, setRegNumber] = useState('');
   const [weekEnding, setWeekEnding] = useState(formatDateISO(getWeekEnding()));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -44,6 +46,7 @@ export default function NewTimesheetPage() {
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   const [existingWeeks, setExistingWeeks] = useState<string[]>([]);
   const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [loadingExisting, setLoadingExisting] = useState(false);
   
   // Manager-specific states
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -108,6 +111,15 @@ export default function NewTimesheetPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmployeeId]);
+
+  // Load existing draft timesheet if ID is provided in query params
+  useEffect(() => {
+    const timesheetId = searchParams.get('id');
+    if (timesheetId && user) {
+      loadExistingTimesheet(timesheetId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, user]);
 
   // Check if a specific day is a bank holiday
   const isDayBankHoliday = (dayIndex: number): boolean => {
@@ -248,11 +260,103 @@ export default function NewTimesheetPage() {
       
       if (error) throw error;
       
-      // Store existing week ending dates
-      const weeks = data?.map(t => t.week_ending) || [];
+      // Store existing week ending dates (excluding the current draft being edited)
+      const weeks = data?.filter(t => t.id !== existingTimesheetId).map(t => t.week_ending) || [];
       setExistingWeeks(weeks);
     } catch (err) {
       console.error('Error fetching existing timesheets:', err);
+    }
+  };
+
+  const loadExistingTimesheet = async (timesheetId: string) => {
+    if (!user) return;
+    
+    setLoadingExisting(true);
+    setError('');
+    
+    try {
+      // Fetch timesheet
+      const { data: timesheetData, error: timesheetError } = await supabase
+        .from('timesheets')
+        .select('*')
+        .eq('id', timesheetId)
+        .single();
+      
+      if (timesheetError) throw timesheetError;
+      
+      // Check if user has access and timesheet is draft or rejected
+      if (!isManager && timesheetData.user_id !== user.id) {
+        setError('You do not have permission to edit this timesheet');
+        setLoadingExisting(false);
+        return;
+      }
+      
+      if (timesheetData.status !== 'draft' && timesheetData.status !== 'rejected') {
+        setError('This timesheet cannot be edited. Only draft or rejected timesheets can be edited.');
+        setLoadingExisting(false);
+        router.push(`/timesheets/${timesheetId}`);
+        return;
+      }
+      
+      // Set timesheet data
+      setExistingTimesheetId(timesheetData.id);
+      setRegNumber(timesheetData.reg_number || '');
+      setWeekEnding(timesheetData.week_ending);
+      setSelectedEmployeeId(timesheetData.user_id);
+      
+      // Fetch entries
+      const { data: entriesData, error: entriesError } = await supabase
+        .from('timesheet_entries')
+        .select('*')
+        .eq('timesheet_id', timesheetId)
+        .order('day_of_week');
+      
+      if (entriesError) throw entriesError;
+      
+      // Create full week array with all 7 days, preserving all fields
+      const fullWeek = Array.from({ length: 7 }, (_, i) => {
+        const existingEntry = entriesData?.find(e => e.day_of_week === i + 1);
+        if (existingEntry) {
+          return {
+            day_of_week: i + 1,
+            time_started: existingEntry.time_started || '',
+            time_finished: existingEntry.time_finished || '',
+            job_number: existingEntry.job_number || '',
+            working_in_yard: existingEntry.working_in_yard || false,
+            did_not_work: existingEntry.did_not_work || false,
+            daily_total: existingEntry.daily_total,
+            remarks: existingEntry.remarks || '',
+            bankHolidayWarningShown: false,
+          };
+        } else {
+          return {
+            day_of_week: i + 1,
+            time_started: '',
+            time_finished: '',
+            job_number: '',
+            working_in_yard: false,
+            did_not_work: false,
+            night_shift: false,
+            bank_holiday: false,
+            daily_total: null,
+            remarks: '',
+            bankHolidayWarningShown: false,
+          };
+        }
+      });
+      
+      setEntries(fullWeek);
+      
+      // Refresh existing weeks list (excluding this one)
+      if (selectedEmployeeId) {
+        await fetchExistingTimesheets();
+      }
+    } catch (err) {
+      console.error('Error loading existing timesheet:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load timesheet');
+      setShowErrorDialog(true);
+    } finally {
+      setLoadingExisting(false);
     }
   };
 
@@ -262,8 +366,12 @@ export default function NewTimesheetPage() {
     return date.getDay() === 0;
   };
 
-  // Check if week already has a timesheet
+  // Check if week already has a timesheet (excluding current draft being edited)
   const weekExists = (dateString: string): boolean => {
+    // If we're editing an existing draft, allow the same week ending
+    if (existingTimesheetId) {
+      return false;
+    }
     return existingWeeks.includes(dateString);
   };
 
@@ -429,30 +537,36 @@ export default function NewTimesheetPage() {
     setSaving(true);
 
     try {
-      // Insert timesheet
-      type TimesheetInsert = Database['public']['Tables']['timesheets']['Insert'];
-      const timesheetData: TimesheetInsert = {
-        user_id: selectedEmployeeId, // Use selected employee ID (can be manager's own ID or another employee's)
-        reg_number: regNumber || null,
-        week_ending: weekEnding,
-        status,
-        submitted_at: status === 'submitted' ? new Date().toISOString() : null,
-        signature_data: signatureData || null,
-        signed_at: signatureData ? new Date().toISOString() : null,
-      };
-
-      console.log('Attempting to insert timesheet:', timesheetData);
+      let timesheetId: string;
 
       // Check if offline
       if (!isOnline) {
         // Save to offline queue
+        const timesheetData = {
+          id: existingTimesheetId || undefined,
+          user_id: selectedEmployeeId,
+          reg_number: regNumber || null,
+          week_ending: weekEnding,
+          status,
+          submitted_at: status === 'submitted' ? new Date().toISOString() : null,
+          signature_data: signatureData || null,
+          signed_at: signatureData ? new Date().toISOString() : null,
+          entries: entries.filter(entry => entry.time_started || entry.time_finished || entry.remarks || entry.did_not_work).map(entry => ({
+            day_of_week: entry.day_of_week,
+            time_started: entry.time_started || null,
+            time_finished: entry.time_finished || null,
+            job_number: entry.job_number || null,
+            working_in_yard: entry.working_in_yard,
+            did_not_work: entry.did_not_work,
+            daily_total: entry.daily_total,
+            remarks: entry.remarks || null,
+          })),
+        };
+        
         addToQueue({
           type: 'timesheet',
-          action: 'create',
-          data: {
-            ...timesheetData,
-            entries: entries.filter(entry => entry.time_started || entry.time_finished || entry.remarks || entry.did_not_work),
-          },
+          action: existingTimesheetId ? 'update' : 'create',
+          data: timesheetData,
         });
         
         toast.success('Timesheet saved offline', {
@@ -464,25 +578,72 @@ export default function NewTimesheetPage() {
         return;
       }
 
-      const { data: timesheet, error: timesheetError } = await supabase
-        .from('timesheets')
-        .insert(timesheetData)
-        .select()
-        .single();
+      // Update existing timesheet or create new one
+      if (existingTimesheetId) {
+        // Update existing timesheet
+        type TimesheetUpdate = Database['public']['Tables']['timesheets']['Update'];
+        const timesheetData: TimesheetUpdate = {
+          reg_number: regNumber || null,
+          week_ending: weekEnding,
+          status,
+          submitted_at: status === 'submitted' ? new Date().toISOString() : null,
+          signature_data: signatureData || null,
+          signed_at: signatureData ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        };
 
-      console.log('Timesheet insert result:', { timesheet, timesheetError });
+        const { data: timesheet, error: timesheetError } = await supabase
+          .from('timesheets')
+          .update(timesheetData)
+          .eq('id', existingTimesheetId)
+          .select()
+          .single();
 
-      if (timesheetError) throw timesheetError;
-      if (!timesheet) throw new Error('Failed to create timesheet');
+        if (timesheetError) throw timesheetError;
+        if (!timesheet) throw new Error('Failed to update timesheet');
+        
+        timesheetId = timesheet.id;
+      } else {
+        // Insert new timesheet
+        type TimesheetInsert = Database['public']['Tables']['timesheets']['Insert'];
+        const timesheetData: TimesheetInsert = {
+          user_id: selectedEmployeeId,
+          reg_number: regNumber || null,
+          week_ending: weekEnding,
+          status,
+          submitted_at: status === 'submitted' ? new Date().toISOString() : null,
+          signature_data: signatureData || null,
+          signed_at: signatureData ? new Date().toISOString() : null,
+        };
+
+        const { data: timesheet, error: timesheetError } = await supabase
+          .from('timesheets')
+          .insert(timesheetData)
+          .select()
+          .single();
+
+        if (timesheetError) throw timesheetError;
+        if (!timesheet) throw new Error('Failed to create timesheet');
+        
+        timesheetId = timesheet.id;
+      }
+
+      // Delete existing entries if updating
+      if (existingTimesheetId) {
+        const { error: deleteError } = await supabase
+          .from('timesheet_entries')
+          .delete()
+          .eq('timesheet_id', timesheetId);
+        
+        if (deleteError) throw deleteError;
+      }
 
       // Calculate the actual date for each day of the week
       const weekEndingDate = new Date(weekEnding + 'T00:00:00');
       
-      // Insert entries (only those with data or marked as did_not_work)
+      // Prepare entries - save all 7 days (including those marked as did_not_work)
       type TimesheetEntryInsert = Database['public']['Tables']['timesheet_entries']['Insert'];
-      const entriesToInsert: TimesheetEntryInsert[] = entries
-        .filter(entry => entry.time_started || entry.time_finished || entry.remarks || entry.did_not_work)
-        .map((entry, index) => {
+      const entriesToInsert: TimesheetEntryInsert[] = entries.map((entry, index) => {
           // Calculate the actual date for this day (week ending is Sunday, so go back 7-index days)
           const entryDate = new Date(weekEndingDate);
           entryDate.setDate(weekEndingDate.getDate() - (7 - index));
@@ -492,7 +653,7 @@ export default function NewTimesheetPage() {
           const isBankHol = !entry.did_not_work && isUKBankHoliday(entryDate);
           
           return {
-            timesheet_id: timesheet.id,
+            timesheet_id: timesheetId,
             day_of_week: entry.day_of_week,
             time_started: entry.time_started || null,
             time_finished: entry.time_finished || null,
@@ -506,14 +667,11 @@ export default function NewTimesheetPage() {
           };
         });
 
-      console.log('Entries to insert:', entriesToInsert);
-
+      // Insert entries (all entries including those with did_not_work=true)
       if (entriesToInsert.length > 0) {
         const { error: entriesError } = await supabase
           .from('timesheet_entries')
           .insert(entriesToInsert);
-
-        console.log('Entries insert result:', { entriesError });
 
         if (entriesError) throw entriesError;
       }
@@ -527,7 +685,12 @@ export default function NewTimesheetPage() {
       const error = err as { code?: string; message?: string; details?: string; hint?: string };
       
       if (error?.code === '23505' || error?.message?.includes('duplicate key') || error?.message?.includes('timesheets_user_id_week_ending_key')) {
-        setError('A timesheet already exists for this week. Please go back to the timesheets list to view or edit the existing timesheet, or select a different week ending date.');
+        // Only show duplicate error if we're not updating an existing timesheet
+        if (!existingTimesheetId) {
+          setError('A timesheet already exists for this week. Please go back to the timesheets list to view or edit the existing timesheet, or select a different week ending date.');
+        } else {
+          setError('Failed to update timesheet. Please try again or contact support if the problem persists.');
+        }
       } else if (error?.code === '42501' || error?.message?.includes('row-level security')) {
         setError('Permission denied. You may not have permission to create this timesheet. Please contact your administrator.');
       } else if (error?.message) {
@@ -554,7 +717,9 @@ export default function NewTimesheetPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white">New Timesheet</h1>
+              <h1 className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white">
+                {existingTimesheetId ? 'Edit Timesheet' : 'New Timesheet'}
+              </h1>
               <p className="text-sm text-slate-600 dark:text-slate-400 hidden md:block">
                 {profile?.full_name}
               </p>
