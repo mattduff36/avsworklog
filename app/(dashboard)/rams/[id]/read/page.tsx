@@ -171,10 +171,52 @@ export default function ReadRAMSPage() {
     // Could show a success message or update UI
   };
 
-  const handleDownload = () => {
-    // Mark as downloaded to enable sign button
-    setHasDownloaded(true);
-    markAsRead();
+  const handleDownload = async (e?: React.MouseEvent<HTMLAnchorElement>) => {
+    // Prevent default anchor behavior on mobile
+    if (e) {
+      e.preventDefault();
+    }
+    
+    if (!fileUrl || !document) return;
+    
+    try {
+      // Use proper download method that works on mobile
+      // Fetch the file and create a blob URL for download
+      const response = await fetch(fileUrl);
+      if (!response.ok) throw new Error('Failed to fetch file');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = document.file_name || 'rams-document.pdf';
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }, 100);
+      
+      // Mark as downloaded to enable sign button
+      setHasDownloaded(true);
+      markAsRead();
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      // Fallback: try direct download link
+      if (fileUrl) {
+        const a = document.createElement('a');
+        a.href = fileUrl;
+        a.download = document.file_name || 'rams-document.pdf';
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setHasDownloaded(true);
+        markAsRead();
+      }
+    }
   };
 
   if (loading) {
@@ -236,16 +278,14 @@ export default function ReadRAMSPage() {
                 </Badge>
               )}
               {fileUrl && (
-                <Button 
-                  asChild 
+                <Button
                   variant="outline" 
                   size="sm"
+                  onClick={() => handleDownload()}
                   className="border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white"
                 >
-                  <a href={fileUrl} download={document.file_name} onClick={handleDownload}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Download
-                  </a>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
                 </Button>
               )}
               <Button
@@ -292,14 +332,12 @@ export default function ReadRAMSPage() {
                     </p>
                   </div>
                   <Button 
-                    asChild 
                     size="lg"
+                    onClick={() => handleDownload()}
                     className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg text-base px-8 py-6"
                   >
-                    <a href={fileUrl} download={document.file_name} onClick={handleDownload}>
-                      <Download className="h-5 w-5 mr-2" />
-                      Download and Review
-                    </a>
+                    <Download className="h-5 w-5 mr-2" />
+                    Download and Review
                   </Button>
                   {canSign && (
                     <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">

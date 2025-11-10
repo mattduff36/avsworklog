@@ -185,10 +185,32 @@ export default function RAMSDetailsPage() {
         .createSignedUrl(ramsDocument.file_path, 3600);
 
       if (data?.signedUrl) {
-        window.open(data.signedUrl, '_blank');
+        // Use proper download method that works on mobile
+        // Fetch the file and create a blob URL for download
+        const response = await fetch(data.signedUrl);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = ramsDocument.file_name || 'rams-document.pdf';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
       }
     } catch (error) {
       console.error('Error downloading document:', error);
+      // Fallback to opening in new tab if download fails
+      try {
+        const { data } = await supabase.storage
+          .from('rams-documents')
+          .createSignedUrl(ramsDocument.file_path, 3600);
+        if (data?.signedUrl) {
+          window.open(data.signedUrl, '_blank');
+        }
+      } catch (fallbackError) {
+        console.error('Fallback download also failed:', fallbackError);
+      }
     }
   };
 

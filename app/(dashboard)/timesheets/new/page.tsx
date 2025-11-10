@@ -93,7 +93,7 @@ export default function NewTimesheetPage() {
     loadBankHolidays();
   }, []);
 
-  // Fetch employees if manager, and set initial selected employee
+  // Fetch employees if manager
   useEffect(() => {
     if (user && isManager) {
       fetchEmployees();
@@ -104,22 +104,24 @@ export default function NewTimesheetPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isManager]);
 
-  // Fetch existing timesheets when selected employee changes
-  useEffect(() => {
-    if (selectedEmployeeId) {
-      fetchExistingTimesheets();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEmployeeId]);
-
   // Load existing draft timesheet if ID is provided in query params
+  // The loadExistingTimesheet function will ensure employees are loaded for managers
   useEffect(() => {
     const timesheetId = searchParams.get('id');
-    if (timesheetId && user) {
+    if (timesheetId && user && !loadingExisting && existingTimesheetId !== timesheetId) {
       loadExistingTimesheet(timesheetId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, user]);
+
+  // Fetch existing timesheets when selected employee changes
+  useEffect(() => {
+    if (selectedEmployeeId && !searchParams.get('id')) {
+      // Only fetch existing timesheets if we're not loading an existing one
+      fetchExistingTimesheets();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmployeeId]);
 
   // Check if a specific day is a bank holiday
   const isDayBankHoliday = (dayIndex: number): boolean => {
@@ -240,8 +242,9 @@ export default function NewTimesheetPage() {
       
       setEmployees(data || []);
       
-      // Set default to current user
-      if (user) {
+      // Set default to current user only if we're not loading an existing timesheet
+      const timesheetId = searchParams.get('id');
+      if (user && !timesheetId) {
         setSelectedEmployeeId(user.id);
       }
     } catch (err) {
@@ -251,12 +254,15 @@ export default function NewTimesheetPage() {
 
   const fetchExistingTimesheets = async () => {
     if (!selectedEmployeeId) return;
-    
+    await fetchExistingTimesheetsForEmployee(selectedEmployeeId);
+  };
+
+  const fetchExistingTimesheetsForEmployee = async (employeeId: string) => {
     try {
       const { data, error } = await supabase
         .from('timesheets')
-        .select('week_ending')
-        .eq('user_id', selectedEmployeeId);
+        .select('week_ending, id')
+        .eq('user_id', employeeId);
       
       if (error) throw error;
       
@@ -271,10 +277,28 @@ export default function NewTimesheetPage() {
   const loadExistingTimesheet = async (timesheetId: string) => {
     if (!user) return;
     
+    // Don't load if already loading or already loaded this timesheet
+    if (loadingExisting) return;
+    if (existingTimesheetId === timesheetId) return;
+    
     setLoadingExisting(true);
     setError('');
     
     try {
+      // For managers, ensure employees are loaded first
+      if (isManager) {
+        // If employees haven't been loaded yet, fetch them now
+        if (employees.length === 0) {
+          const { data: employeesData, error: employeesError } = await supabase
+            .from('profiles')
+            .select('id, full_name, employee_id')
+            .order('full_name');
+          
+          if (employeesError) throw employeesError;
+          setEmployees(employeesData || []);
+        }
+      }
+      
       // Fetch timesheet
       const { data: timesheetData, error: timesheetError } = await supabase
         .from('timesheets')
@@ -302,6 +326,8 @@ export default function NewTimesheetPage() {
       setExistingTimesheetId(timesheetData.id);
       setRegNumber(timesheetData.reg_number || '');
       setWeekEnding(timesheetData.week_ending);
+      
+      // Set selected employee - employees are now guaranteed to be loaded for managers
       setSelectedEmployeeId(timesheetData.user_id);
       
       // Fetch entries
@@ -347,10 +373,9 @@ export default function NewTimesheetPage() {
       
       setEntries(fullWeek);
       
-      // Refresh existing weeks list (excluding this one)
-      if (selectedEmployeeId) {
-        await fetchExistingTimesheets();
-      }
+      // Refresh existing weeks list for the employee (excluding this timesheet)
+      // Use the timesheet's user_id directly since selectedEmployeeId might not be updated yet
+      await fetchExistingTimesheetsForEmployee(timesheetData.user_id);
     } catch (err) {
       console.error('Error loading existing timesheet:', err);
       setError(err instanceof Error ? err.message : 'Failed to load timesheet');
@@ -635,7 +660,10 @@ export default function NewTimesheetPage() {
           .delete()
           .eq('timesheet_id', timesheetId);
         
-        if (deleteError) throw deleteError;
+        if (deleteError) {
+          console.error('Error deleting timesheet entries:', deleteError);
+          throw new Error(`Failed to delete timesheet entries: ${deleteError.message}`);
+        }
       }
 
       // Calculate the actual date for each day of the week
@@ -667,13 +695,14 @@ export default function NewTimesheetPage() {
           };
         });
 
-      // Insert entries (all entries including those with did_not_work=true)
-      if (entriesToInsert.length > 0) {
-        const { error: entriesError } = await supabase
-          .from('timesheet_entries')
-          .insert(entriesToInsert);
+      // Insert all entries (all 7 days)
+      const { error: entriesError } = await supabase
+        .from('timesheet_entries')
+        .insert(entriesToInsert);
 
-        if (entriesError) throw entriesError;
+      if (entriesError) {
+        console.error('Error inserting timesheet entries:', entriesError);
+        throw new Error(`Failed to insert timesheet entries: ${entriesError.message}`);
       }
 
       router.push('/timesheets');
@@ -692,7 +721,8 @@ export default function NewTimesheetPage() {
           setError('Failed to update timesheet. Please try again or contact support if the problem persists.');
         }
       } else if (error?.code === '42501' || error?.message?.includes('row-level security')) {
-        setError('Permission denied. You may not have permission to create this timesheet. Please contact your administrator.');
+        const errorMessage = error?.message || 'Unknown permission error';
+        setError(`Permission denied: ${errorMessage}. This may be due to missing database permissions. Please contact your administrator to run the RLS policy migration.`);
       } else if (error?.message) {
         setError(`${error.message}${error.details ? ` - ${error.details}` : ''}`);
       } else {

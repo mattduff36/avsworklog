@@ -220,9 +220,12 @@ export default function NewInspectionPage() {
       }
 
       // Close dialog and reset form
-      setShowAddVehicleDialog(false);
-      setNewVehicleReg('');
-      setNewVehicleCategoryId('');
+      // Use setTimeout to ensure dialog closes properly on mobile
+      setTimeout(() => {
+        setShowAddVehicleDialog(false);
+        setNewVehicleReg('');
+        setNewVehicleCategoryId('');
+      }, 100);
     } catch (err) {
       console.error('Error adding vehicle:', err);
       setError(err instanceof Error ? err.message : 'Failed to add vehicle');
@@ -475,17 +478,27 @@ export default function NewInspectionPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="vehicle" className="text-slate-900 dark:text-white text-base">Vehicle</Label>
-              <Select value={vehicleId} onValueChange={(value) => {
-                if (value === 'add-new') {
-                  setShowAddVehicleDialog(true);
-                } else {
-                  setVehicleId(value);
-                }
-              }}>
+              <Select 
+                value={vehicleId} 
+                onValueChange={(value) => {
+                  if (value === 'add-new') {
+                    // Don't set the value, just open the dialog
+                    setShowAddVehicleDialog(true);
+                  } else {
+                    setVehicleId(value);
+                  }
+                }}
+                onOpenChange={(open) => {
+                  // Ensure select closes when dialog opens
+                  if (open && showAddVehicleDialog) {
+                    return;
+                  }
+                }}
+              >
                 <SelectTrigger id="vehicle" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
                   <SelectValue placeholder="Select a vehicle" />
                 </SelectTrigger>
-                <SelectContent className="bg-slate-900 border-slate-700">
+                <SelectContent className="bg-slate-900 border-slate-700 max-h-[300px] md:max-h-[400px]">
                   <SelectItem value="add-new" className="text-avs-yellow font-semibold border-b border-slate-700">
                     <div className="flex items-center gap-2">
                       <Plus className="h-4 w-4" />
@@ -834,7 +847,7 @@ export default function NewInspectionPage() {
                 <SelectTrigger className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
                   <SelectValue placeholder="Select category (optional)" />
                 </SelectTrigger>
-                <SelectContent className="bg-slate-900 border-slate-700">
+                <SelectContent className="bg-slate-900 border-slate-700 max-h-[300px] md:max-h-[400px]">
                   <SelectItem value="">None</SelectItem>
                   {categories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
