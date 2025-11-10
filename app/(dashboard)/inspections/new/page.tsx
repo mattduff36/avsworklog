@@ -840,15 +840,14 @@ export default function NewInspectionPage() {
                 Vehicle Category (Optional)
               </Label>
               <Select 
-                value={newVehicleCategoryId} 
-                onValueChange={setNewVehicleCategoryId}
+                value={newVehicleCategoryId || undefined} 
+                onValueChange={(value) => setNewVehicleCategoryId(value || '')}
                 disabled={addingVehicle}
               >
                 <SelectTrigger className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
                   <SelectValue placeholder="Select category (optional)" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-900 border-slate-700 max-h-[300px] md:max-h-[400px]">
-                  <SelectItem value="">None</SelectItem>
                   {categories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
