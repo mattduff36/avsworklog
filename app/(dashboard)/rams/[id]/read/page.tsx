@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Loader2, FileText, Download, CheckCircle2, Mail, ExternalLink, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { SignRAMSModal } from '@/components/rams/SignRAMSModal';
+import { toast } from 'sonner';
 
 interface RAMSDocument {
   id: string;
@@ -235,6 +236,9 @@ export default function ReadRAMSPage() {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to send email');
       }
+
+      // Show success notification
+      toast.success('Email sent successfully - check your inbox to view the document');
 
       // Record action (only if assignment exists, not required for signed docs)
       await recordAction('emailed', !!assignment);

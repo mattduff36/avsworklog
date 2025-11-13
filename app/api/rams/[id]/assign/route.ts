@@ -35,11 +35,12 @@ export async function POST(
     }
 
     // Parse request body
-    const { employee_ids } = await request.json();
+    const { employee_ids, unassign_ids } = await request.json();
 
-    if (!employee_ids || !Array.isArray(employee_ids) || employee_ids.length === 0) {
+    // employee_ids can be empty (to unassign everyone)
+    if (!employee_ids || !Array.isArray(employee_ids)) {
       return NextResponse.json(
-        { error: 'employee_ids array is required and must not be empty' },
+        { error: 'employee_ids array is required' },
         { status: 400 }
       );
     }
@@ -55,54 +56,126 @@ export async function POST(
       return NextResponse.json({ error: 'Document not found' }, { status: 404 });
     }
 
-    // Verify all employee IDs exist
-    const { data: employees, error: empError } = await supabase
-      .from('profiles')
-      .select('id')
-      .in('id', employee_ids);
-
-    if (empError || !employees) {
-      return NextResponse.json({ error: 'Failed to verify employees' }, { status: 400 });
-    }
-
-    if (employees.length !== employee_ids.length) {
-      return NextResponse.json(
-        { error: 'One or more employee IDs are invalid' },
-        { status: 400 }
-      );
-    }
-
-    // Create assignments (using upsert to handle duplicates)
-    const assignmentsToCreate = employee_ids.map(employee_id => ({
-      rams_document_id: id,
-      employee_id: employee_id,
-      assigned_by: user.id,
-      status: 'pending' as const,
-    }));
-
-    const { data: assignments, error: assignError } = await supabase
+    // Get current assignments BEFORE making changes to calculate accurate counts
+    const { data: currentAssignments } = await supabase
       .from('rams_assignments')
-      .upsert(assignmentsToCreate, {
-        onConflict: 'rams_document_id,employee_id',
-        ignoreDuplicates: false,
-      })
-      .select();
+      .select('employee_id')
+      .eq('rams_document_id', id);
+    
+    const currentAssignedIds = new Set(
+      currentAssignments?.map(a => a.employee_id) || []
+    );
 
-    if (assignError) {
-      console.error('Assignment error:', assignError);
-      return NextResponse.json(
-        { error: `Failed to create assignments: ${assignError.message}` },
-        { status: 500 }
+    // Calculate counts before making changes
+    const newlyAssignedIds = employee_ids.filter(id => !currentAssignedIds.has(id));
+    const addedCount = newlyAssignedIds.length;
+
+    // Handle unassignments first (but exclude employees who have signed)
+    let actualRemovedCount = 0;
+    if (unassign_ids && Array.isArray(unassign_ids) && unassign_ids.length > 0) {
+      // Check which employees have signed - they cannot be unassigned
+      const { data: signedAssignments } = await supabase
+        .from('rams_assignments')
+        .select('employee_id')
+        .eq('rams_document_id', id)
+        .eq('status', 'signed')
+        .in('employee_id', unassign_ids);
+
+      const signedEmployeeIds = new Set(
+        signedAssignments?.map(a => a.employee_id) || []
       );
+
+      // Filter out signed employees from unassign list
+      const unassignableIds = unassign_ids.filter(id => !signedEmployeeIds.has(id));
+      actualRemovedCount = unassignableIds.length;
+
+      if (unassignableIds.length > 0) {
+        const { error: unassignError } = await supabase
+          .from('rams_assignments')
+          .delete()
+          .eq('rams_document_id', id)
+          .in('employee_id', unassignableIds);
+
+        if (unassignError) {
+          console.error('Unassignment error:', unassignError);
+          return NextResponse.json(
+            { error: `Failed to unassign employees: ${unassignError.message}` },
+            { status: 500 }
+          );
+        }
+      }
+    }
+    
+    const removedCount = actualRemovedCount;
+
+    // Only process assignments if there are employees to assign
+    if (employee_ids.length > 0) {
+      // Verify all employee IDs exist
+      const { data: employees, error: empError } = await supabase
+        .from('profiles')
+        .select('id')
+        .in('id', employee_ids);
+
+      if (empError || !employees) {
+        return NextResponse.json({ error: 'Failed to verify employees' }, { status: 400 });
+      }
+
+      if (employees.length !== employee_ids.length) {
+        return NextResponse.json(
+          { error: 'One or more employee IDs are invalid' },
+          { status: 400 }
+        );
+      }
+
+      // Get existing assignments to preserve status for already assigned employees
+      const { data: existingAssignments } = await supabase
+        .from('rams_assignments')
+        .select('employee_id, status')
+        .eq('rams_document_id', id)
+        .in('employee_id', employee_ids);
+
+      const existingStatusMap = new Map(
+        existingAssignments?.map(a => [a.employee_id, a.status]) || []
+      );
+
+      // Create assignments (using upsert to handle duplicates)
+      // Preserve existing status if employee is already assigned, otherwise set to pending
+      const assignmentsToCreate = employee_ids.map(employee_id => ({
+        rams_document_id: id,
+        employee_id: employee_id,
+        assigned_by: user.id,
+        status: (existingStatusMap.get(employee_id) || 'pending') as 'pending' | 'read' | 'signed',
+      }));
+
+      const { data: assignments, error: assignError } = await supabase
+        .from('rams_assignments')
+        .upsert(assignmentsToCreate, {
+          onConflict: 'rams_document_id,employee_id',
+          ignoreDuplicates: false,
+        })
+        .select();
+
+      if (assignError) {
+        console.error('Assignment error:', assignError);
+        return NextResponse.json(
+          { error: `Failed to create assignments: ${assignError.message}` },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json(
       {
         success: true,
-        assignments,
-        message: `Document assigned to ${employee_ids.length} employee(s)`,
+        message: addedCount > 0 && removedCount > 0
+          ? `Document assigned to ${addedCount} employee(s) and unassigned from ${removedCount} employee(s)`
+          : addedCount > 0
+          ? `Document assigned to ${addedCount} employee(s)`
+          : removedCount > 0
+          ? `Document unassigned from ${removedCount} employee(s)`
+          : 'Assignments updated',
       },
-      { status: 201 }
+      { status: 200 }
     );
   } catch (error) {
     console.error('Unexpected error in assign:', error);

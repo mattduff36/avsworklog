@@ -16,6 +16,7 @@ interface Employee {
   full_name: string;
   role: 'admin' | 'manager' | 'employee';
   alreadySigned?: boolean;
+  isAssigned?: boolean;
 }
 
 interface AssignEmployeesModalProps {
@@ -36,6 +37,7 @@ export function AssignEmployeesModal({
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [originalAssignedIds, setOriginalAssignedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -83,9 +85,21 @@ export function AssignEmployeesModal({
         assignments?.filter(a => a.status === 'signed').map(a => a.employee_id) || []
       );
 
+      // Mark employees who are currently assigned (regardless of status)
+      const assignedEmployeeIds = new Set(
+        assignments?.map(a => a.employee_id) || []
+      );
+
+      // Set original assigned IDs for comparison
+      setOriginalAssignedIds(assignedEmployeeIds);
+
+      // Pre-select all currently assigned employees
+      setSelectedIds(assignedEmployeeIds);
+
       const employeesWithStatus = allEmployees?.map(emp => ({
         ...emp,
         alreadySigned: signedEmployeeIds.has(emp.id),
+        isAssigned: assignedEmployeeIds.has(emp.id),
       })) || [];
 
       setEmployees(employeesWithStatus);
@@ -99,6 +113,13 @@ export function AssignEmployeesModal({
   };
 
   const handleToggleEmployee = (id: string) => {
+    // Prevent unchecking employees who have already signed
+    const employee = employees.find(emp => emp.id === id);
+    if (employee?.alreadySigned && selectedIds.has(id)) {
+      // Cannot unassign employees who have signed
+      return;
+    }
+    
     const newSelected = new Set(selectedIds);
     if (newSelected.has(id)) {
       newSelected.delete(id);
@@ -110,26 +131,28 @@ export function AssignEmployeesModal({
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      const allSelectableIds = filteredEmployees
-        .filter(emp => !emp.alreadySigned)
-        .map(emp => emp.id);
-      setSelectedIds(new Set(allSelectableIds));
+      // Select all employees (including those who have signed - they can't be unselected)
+      const allIds = filteredEmployees.map(emp => emp.id);
+      setSelectedIds(new Set(allIds));
     } else {
-      setSelectedIds(new Set());
+      // Only deselect employees who haven't signed
+      const signedIds = filteredEmployees
+        .filter(emp => emp.alreadySigned)
+        .map(emp => emp.id);
+      setSelectedIds(new Set(signedIds));
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (selectedIds.size === 0) {
-      toast.error('Please select at least one employee');
-      return;
-    }
-
     setLoading(true);
 
     try {
+      // Calculate which employees to add and which to remove
+      const toAdd = Array.from(selectedIds).filter(id => !originalAssignedIds.has(id));
+      const toRemove = Array.from(originalAssignedIds).filter(id => !selectedIds.has(id));
+
       const response = await fetch(`/api/rams/${documentId}/assign`, {
         method: 'POST',
         headers: {
@@ -137,19 +160,30 @@ export function AssignEmployeesModal({
         },
         body: JSON.stringify({
           employee_ids: Array.from(selectedIds),
+          unassign_ids: toRemove,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to assign document');
+        throw new Error(data.error || 'Failed to update assignments');
       }
 
-      toast.success(`Document assigned to ${selectedIds.size} employee(s)`);
+      // Show appropriate success message
+      if (toAdd.length > 0 && toRemove.length > 0) {
+        toast.success(`Document assigned to ${toAdd.length} employee(s) and unassigned from ${toRemove.length} employee(s)`);
+      } else if (toAdd.length > 0) {
+        toast.success(`Document assigned to ${toAdd.length} employee(s)`);
+      } else if (toRemove.length > 0) {
+        toast.success(`Document unassigned from ${toRemove.length} employee(s)`);
+      } else {
+        toast.success('Assignments updated');
+      }
 
       // Reset and close
       setSelectedIds(new Set());
+      setOriginalAssignedIds(new Set());
       setSearchQuery('');
       onSuccess();
     } catch (error) {
@@ -163,12 +197,12 @@ export function AssignEmployeesModal({
   const handleClose = () => {
     if (loading) return;
     setSelectedIds(new Set());
+    setOriginalAssignedIds(new Set());
     setSearchQuery('');
     onClose();
   };
 
-  const selectableCount = filteredEmployees.filter(emp => !emp.alreadySigned).length;
-  const allSelected = selectableCount > 0 && selectedIds.size === selectableCount;
+  const allSelected = filteredEmployees.length > 0 && selectedIds.size === filteredEmployees.length;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -202,7 +236,7 @@ export function AssignEmployeesModal({
                 id="select-all"
                 checked={allSelected}
                 onCheckedChange={handleSelectAll}
-                disabled={loading || fetching || selectableCount === 0}
+                disabled={loading || fetching || filteredEmployees.length === 0}
               />
               <label
                 htmlFor="select-all"
@@ -283,18 +317,18 @@ export function AssignEmployeesModal({
             <Button 
               type="submit" 
               variant="outline"
-              disabled={loading || selectedIds.size === 0}
+              disabled={loading}
               className="border-rams text-rams hover:bg-rams hover:text-white"
             >
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Assigning...
+                  Updating...
                 </>
               ) : (
                 <>
                   <UserCheck className="h-4 w-4 mr-2" />
-                  Assign to {selectedIds.size} Employee{selectedIds.size !== 1 ? 's' : ''}
+                  Update Assignments ({selectedIds.size} selected)
                 </>
               )}
             </Button>
