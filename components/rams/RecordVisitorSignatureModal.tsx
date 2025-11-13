@@ -1,11 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { useState, useRef } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, UserPlus } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { toast } from 'sonner';
 
@@ -29,6 +28,7 @@ export function RecordVisitorSignatureModal({
   const [visitorRole, setVisitorRole] = useState('');
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +98,7 @@ export function RecordVisitorSignatureModal({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
           {/* Visitor Details */}
           <div className="space-y-4">
             <div className="space-y-2">
@@ -112,6 +112,7 @@ export function RecordVisitorSignatureModal({
                 placeholder="e.g., John Smith"
                 required
                 disabled={submitting}
+                className="text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
               />
             </div>
 
@@ -123,6 +124,7 @@ export function RecordVisitorSignatureModal({
                 onChange={(e) => setVisitorCompany(e.target.value)}
                 placeholder="e.g., ABC Construction Ltd"
                 disabled={submitting}
+                className="text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
               />
             </div>
 
@@ -134,6 +136,7 @@ export function RecordVisitorSignatureModal({
                 onChange={(e) => setVisitorRole(e.target.value)}
                 placeholder="e.g., Site Supervisor, Contractor"
                 disabled={submitting}
+                className="text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
               />
             </div>
           </div>
@@ -144,34 +147,22 @@ export function RecordVisitorSignatureModal({
               Signature <span className="text-destructive">*</span>
             </Label>
             <SignaturePad
-              onSave={setSignatureData}
+              onSave={(signature) => {
+                setSignatureData(signature);
+                // Validate and submit form
+                if (!visitorName.trim()) {
+                  toast.error('Please enter visitor name');
+                  return;
+                }
+                // Trigger form submission
+                if (formRef.current) {
+                  formRef.current.requestSubmit();
+                }
+              }}
+              onCancel={handleClose}
               disabled={submitting}
             />
           </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={submitting || !signatureData}>
-              {submitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Recording...
-                </>
-              ) : (
-                <>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Record Signature
-                </>
-              )}
-            </Button>
-          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

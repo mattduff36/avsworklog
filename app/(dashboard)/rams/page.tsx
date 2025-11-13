@@ -8,10 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Loader2, Search, FileText, CheckCircle2, Clock, Settings, Plus } from 'lucide-react';
+import { Loader2, Search, FileText, CheckCircle2, Clock, Settings, Plus, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { formatFileSize } from '@/lib/utils/file-validation';
+import { RecordVisitorSignatureModal } from '@/components/rams/RecordVisitorSignatureModal';
 
 interface RAMSDocument {
   id: string;
@@ -37,6 +38,9 @@ export default function RAMSPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'signed'>('all');
+  const [visitorSignModalOpen, setVisitorSignModalOpen] = useState(false);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+  const [selectedDocumentTitle, setSelectedDocumentTitle] = useState<string>('');
 
   const supabase = createClient();
 
@@ -253,16 +257,51 @@ export default function RAMSPage() {
                     )}
                   </div>
 
-                  <Link href={`/rams/${doc.id}/read`}>
-                    <Button className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95">
-                      {doc.assignment_status === 'signed' ? 'View Document' : 'Read & Sign'}
+                  <div className="flex items-center gap-3">
+                    <Link href={`/rams/${doc.id}/read`}>
+                      <Button className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95">
+                        {doc.assignment_status === 'signed' ? 'View Document' : 'Read & Sign'}
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedDocumentId(doc.id);
+                        setSelectedDocumentTitle(doc.title);
+                        setVisitorSignModalOpen(true);
+                      }}
+                      disabled={doc.assignment_status !== 'signed'}
+                      className="border-rams text-rams hover:bg-rams hover:text-white transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-rams"
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Record Visitor
                     </Button>
-                  </Link>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
+      )}
+
+      {/* Visitor Signature Modal */}
+      {selectedDocumentId && (
+        <RecordVisitorSignatureModal
+          open={visitorSignModalOpen}
+          onClose={() => {
+            setVisitorSignModalOpen(false);
+            setSelectedDocumentId(null);
+            setSelectedDocumentTitle('');
+          }}
+          onSuccess={() => {
+            setVisitorSignModalOpen(false);
+            setSelectedDocumentId(null);
+            setSelectedDocumentTitle('');
+            fetchDocuments(); // Refresh the documents list
+          }}
+          documentId={selectedDocumentId}
+          documentTitle={selectedDocumentTitle}
+        />
       )}
     </div>
   );

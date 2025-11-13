@@ -40,8 +40,21 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
-    await signOut();
-    router.push('/login');
+    try {
+      // Close mobile menu if open
+      setMobileMenuOpen(false);
+      
+      // Sign out and wait for completion
+      await signOut();
+      
+      // Force a hard redirect to ensure all state is cleared (especially important for admin accounts)
+      // This ensures the sign out works on first click
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('Error during sign out:', error);
+      // Still redirect on error to ensure user can log out
+      window.location.href = '/login';
+    }
   };
 
   // Split navigation for proper ordering with Forms dropdown
@@ -353,13 +366,7 @@ export function Navbar() {
             })}
           </div>
           <div className="pt-4 pb-3 border-t border-slate-700/50">
-            <div className="px-4 space-y-1">
-              <div className="text-base font-medium text-white">{profile?.full_name}</div>
-              <div className="text-sm text-slate-400 capitalize">
-                {profile?.role}
-              </div>
-            </div>
-            <div className="mt-3 px-2">
+            <div className="px-2">
               <Button
                 variant="ghost"
                 className="w-full justify-start text-slate-300 hover:text-white hover:bg-slate-800/50"

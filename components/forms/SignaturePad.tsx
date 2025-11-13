@@ -10,9 +10,10 @@ interface SignaturePadProps {
   onSave: (signature: string) => void;
   onCancel: () => void;
   initialValue?: string | null;
+  disabled?: boolean;
 }
 
-export function SignaturePad({ onSave, onCancel, initialValue }: SignaturePadProps) {
+export function SignaturePad({ onSave, onCancel, initialValue, disabled = false }: SignaturePadProps) {
   const sigCanvas = useRef<SignatureCanvas>(null);
 
   useEffect(() => {
@@ -61,7 +62,8 @@ export function SignaturePad({ onSave, onCancel, initialValue }: SignaturePadPro
           variant="outline"
           size="sm"
           onClick={handleClear}
-          className="border-slate-600 text-white hover:bg-slate-700"
+          disabled={disabled}
+          className="border-slate-600 text-white hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <RotateCcw className="h-4 w-4 mr-2" />
           Clear
@@ -71,7 +73,8 @@ export function SignaturePad({ onSave, onCancel, initialValue }: SignaturePadPro
           variant="outline"
           size="sm"
           onClick={onCancel}
-          className="border-slate-600 text-white hover:bg-slate-700"
+          disabled={disabled}
+          className="border-slate-600 text-white hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <X className="h-4 w-4 mr-2" />
           Cancel
@@ -81,7 +84,8 @@ export function SignaturePad({ onSave, onCancel, initialValue }: SignaturePadPro
           variant="outline"
           size="sm"
           onClick={handleSave}
-          className="border-slate-600 text-white hover:bg-slate-700"
+          disabled={disabled}
+          className="border-rams text-rams hover:bg-rams hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Check className="h-4 w-4 mr-2" />
           Save Signature

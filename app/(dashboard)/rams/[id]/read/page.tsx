@@ -6,10 +6,9 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Loader2, FileText, Download, CheckCircle2, UserPlus, Mail, ExternalLink, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, FileText, Download, CheckCircle2, Mail, ExternalLink, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { SignRAMSModal } from '@/components/rams/SignRAMSModal';
-import { RecordVisitorSignatureModal } from '@/components/rams/RecordVisitorSignatureModal';
 
 interface RAMSDocument {
   id: string;
@@ -41,7 +40,6 @@ export default function ReadRAMSPage() {
   const [loading, setLoading] = useState(true);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [signModalOpen, setSignModalOpen] = useState(false);
-  const [visitorSignModalOpen, setVisitorSignModalOpen] = useState(false);
   const [actionTaken, setActionTaken] = useState<ActionType>(null);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -112,33 +110,45 @@ export default function ReadRAMSPage() {
     }
   };
 
-  const recordAction = async (action: 'downloaded' | 'opened' | 'emailed') => {
-    if (!assignment) return;
+  const recordAction = async (action: 'downloaded' | 'opened' | 'emailed', requireAssignment: boolean = true) => {
+    // For signed documents, we don't require assignment to exist
+    if (requireAssignment && !assignment) return;
 
-    try {
-      const { error: updateError } = await supabase
-        .from('rams_assignments')
-        .update({
+    // For signed documents, we can still track the action but don't update status
+    if (assignment) {
+      try {
+        const updateData: any = {
           action_taken: action,
-          status: 'read',
-          read_at: new Date().toISOString(),
-        })
-        .eq('id', assignment.id);
+        };
 
-      if (updateError) {
-        console.error('Error recording action:', updateError);
-        return;
+        // Only update status and read_at if not already signed
+        if (assignment.status !== 'signed') {
+          updateData.status = 'read';
+          updateData.read_at = new Date().toISOString();
+        }
+
+        const { error: updateError } = await supabase
+          .from('rams_assignments')
+          .update(updateData)
+          .eq('id', assignment.id);
+
+        if (updateError) {
+          console.error('Error recording action:', updateError);
+          return;
+        }
+
+        setActionTaken(action);
+        setAssignment(prev => prev ? { 
+          ...prev, 
+          action_taken: action,
+          ...(prev.status !== 'signed' ? {
+            status: 'read' as const,
+            read_at: new Date().toISOString()
+          } : {})
+        } : null);
+      } catch (error) {
+        console.error('Error recording action:', error);
       }
-
-      setActionTaken(action);
-      setAssignment(prev => prev ? { 
-        ...prev, 
-        action_taken: action,
-        status: 'read',
-        read_at: new Date().toISOString()
-      } : null);
-    } catch (error) {
-      console.error('Error recording action:', error);
     }
   };
 
@@ -167,8 +177,8 @@ export default function ReadRAMSPage() {
         window.document.body.removeChild(a);
       }, 100);
       
-      // Record action and enable sign button
-      await recordAction('downloaded');
+      // Record action (only if assignment exists, not required for signed docs)
+      await recordAction('downloaded', !!assignment);
     } catch (error) {
       console.error('Error downloading document:', error);
       setError('Failed to download document. Please try again or select a different option.');
@@ -200,8 +210,8 @@ export default function ReadRAMSPage() {
         throw new Error('Document window closed unexpectedly. Please try again or select a different option.');
       }
 
-      // Record action and enable sign button
-      await recordAction('opened');
+      // Record action (only if assignment exists, not required for signed docs)
+      await recordAction('opened', !!assignment);
     } catch (error: any) {
       console.error('Error opening document:', error);
       setError(error.message || 'Failed to open document. Please try again or select a different option.');
@@ -226,8 +236,8 @@ export default function ReadRAMSPage() {
         throw new Error(errorData.error || 'Failed to send email');
       }
 
-      // Record action and enable sign button
-      await recordAction('emailed');
+      // Record action (only if assignment exists, not required for signed docs)
+      await recordAction('emailed', !!assignment);
     } catch (error: any) {
       console.error('Error sending email:', error);
       setError(error.message || 'Failed to send email. Please try again or select a different option.');
@@ -242,9 +252,6 @@ export default function ReadRAMSPage() {
     router.push('/rams');
   };
 
-  const handleVisitorSignSuccess = () => {
-    setVisitorSignModalOpen(false);
-  };
 
   if (loading) {
     return (
@@ -277,6 +284,8 @@ export default function ReadRAMSPage() {
   const isSigned = assignment?.status === 'signed';
   const canSign = assignment && !isSigned;
   const canTakeAction = canSign && !actionTaken;
+  // For signed documents, allow viewing without requiring action tracking
+  const canViewSigned = isSigned;
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -299,27 +308,13 @@ export default function ReadRAMSPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {isSigned && (
-                <Badge className="bg-green-600 hover:bg-green-700 gap-1">
-                  <CheckCircle2 className="h-3 w-3" />
-                  Signed
-                </Badge>
-              )}
-              {actionTaken && (
+              {!isSigned && actionTaken && (
                 <Badge variant="outline" className="gap-1">
                   {actionTaken === 'downloaded' && 'Downloaded'}
                   {actionTaken === 'opened' && 'Opened'}
                   {actionTaken === 'emailed' && 'Viewed via email'}
                 </Badge>
               )}
-              <Button
-                size="sm"
-                onClick={() => setVisitorSignModalOpen(true)}
-                className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
-              >
-                <UserPlus className="h-4 w-4 mr-2" />
-                Record Visitor
-              </Button>
             </div>
           </div>
         </div>
@@ -341,11 +336,67 @@ export default function ReadRAMSPage() {
                 </div>
               )}
 
-              {/* Action Buttons */}
+              {/* Action Buttons - For unsigned documents */}
               {canTakeAction && (
                 <div className="space-y-4 pt-6">
                   <p className="text-slate-600 dark:text-slate-400 mb-4">
                     Please choose how you would like to access this document:
+                  </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Download Button */}
+                    <Button
+                      size="lg"
+                      onClick={handleDownload}
+                      disabled={actionInProgress !== null}
+                      className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed h-auto py-6 flex flex-col items-center gap-2"
+                    >
+                      {actionInProgress === 'download' ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <Download className="h-5 w-5" />
+                      )}
+                      <span>Download</span>
+                    </Button>
+
+                    {/* Open Button */}
+                    <Button
+                      size="lg"
+                      onClick={handleOpen}
+                      disabled={actionInProgress !== null}
+                      className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed h-auto py-6 flex flex-col items-center gap-2"
+                    >
+                      {actionInProgress === 'open' ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <ExternalLink className="h-5 w-5" />
+                      )}
+                      <span>Open</span>
+                    </Button>
+
+                    {/* Email Button */}
+                    <Button
+                      size="lg"
+                      onClick={handleEmail}
+                      disabled={actionInProgress !== null}
+                      className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed h-auto py-6 flex flex-col items-center gap-2"
+                    >
+                      {actionInProgress === 'email' ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <Mail className="h-5 w-5" />
+                      )}
+                      <span>Email</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons - For signed documents (view again) */}
+              {canViewSigned && (
+                <div className="space-y-4 pt-6">
+                  <p className="text-slate-600 dark:text-slate-400 mb-4">
+                    Choose how you would like to access this document:
                   </p>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -441,14 +492,6 @@ export default function ReadRAMSPage() {
         />
       )}
 
-      {/* Visitor Signature Modal */}
-      <RecordVisitorSignatureModal
-        open={visitorSignModalOpen}
-        onClose={() => setVisitorSignModalOpen(false)}
-        onSuccess={handleVisitorSignSuccess}
-        documentId={documentId}
-        documentTitle={ramsDocument.title}
-      />
     </div>
   );
 }
