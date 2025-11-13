@@ -171,6 +171,7 @@ interface RAMSExportDocumentProps {
     signed_at: string | null;
     signature_data: string | null;
     comments: string | null;
+    action_taken: string | null;
     employee: {
       full_name: string;
       role: string;
@@ -310,6 +311,20 @@ export function RAMSExportDocument({
                           : 'N/A'}
                       </Text>
                     </View>
+                    {assignment.action_taken && (
+                      <View style={styles.infoRow}>
+                        <Text style={styles.label}>Document Viewed:</Text>
+                        <Text style={styles.value}>
+                          {assignment.action_taken === 'downloaded' 
+                            ? 'Downloaded'
+                            : assignment.action_taken === 'opened'
+                            ? 'Opened in browser'
+                            : assignment.action_taken === 'emailed'
+                            ? 'Email'
+                            : assignment.action_taken}
+                        </Text>
+                      </View>
+                    )}
                   </View>
 
                   {/* Right Column - Signature */}
@@ -366,37 +381,48 @@ export function RAMSExportDocument({
           {visitorSignatures.map((signature, index) => (
             <View key={signature.id} style={styles.section}>
               <View style={styles.signatureBox}>
-                <View style={styles.infoRow}>
-                  <Text style={styles.label}>Visitor Name:</Text>
-                  <Text style={styles.value}>{signature.visitor_name}</Text>
-                </View>
-                {signature.visitor_company && (
-                  <View style={styles.infoRow}>
-                    <Text style={styles.label}>Company:</Text>
-                    <Text style={styles.value}>{signature.visitor_company}</Text>
+                {/* Two column layout: Info on left, Signature on right */}
+                <View style={styles.signatureContentRow}>
+                  {/* Left Column - Visitor Info */}
+                  <View style={styles.signatureLeftColumn}>
+                    <View style={styles.infoRow}>
+                      <Text style={styles.label}>Visitor Name:</Text>
+                      <Text style={styles.value}>{signature.visitor_name}</Text>
+                    </View>
+                    {signature.visitor_company && (
+                      <View style={styles.infoRow}>
+                        <Text style={styles.label}>Company:</Text>
+                        <Text style={styles.value}>{signature.visitor_company}</Text>
+                      </View>
+                    )}
+                    {signature.visitor_role && (
+                      <View style={styles.infoRow}>
+                        <Text style={styles.label}>Role:</Text>
+                        <Text style={styles.value}>{signature.visitor_role}</Text>
+                      </View>
+                    )}
+                    <View style={styles.infoRow}>
+                      <Text style={styles.label}>Signed Date:</Text>
+                      <Text style={styles.value}>
+                        {format(new Date(signature.signed_at), 'PPP p')}
+                      </Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <Text style={styles.label}>Recorded By:</Text>
+                      <Text style={styles.value}>{signature.recorder.full_name}</Text>
+                    </View>
                   </View>
-                )}
-                {signature.visitor_role && (
-                  <View style={styles.infoRow}>
-                    <Text style={styles.label}>Role:</Text>
-                    <Text style={styles.value}>{signature.visitor_role}</Text>
+
+                  {/* Right Column - Signature */}
+                  <View style={styles.signatureRightColumn}>
+                    <Text style={{ ...styles.label, marginBottom: 5 }}>Signature:</Text>
+                    {signature.signature_data && (
+                      <Image 
+                        src={signature.signature_data} 
+                        style={styles.signatureImage} 
+                      />
+                    )}
                   </View>
-                )}
-                <View style={styles.infoRow}>
-                  <Text style={styles.label}>Signed Date:</Text>
-                  <Text style={styles.value}>
-                    {format(new Date(signature.signed_at), 'PPP p')}
-                  </Text>
-                </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.label}>Recorded By:</Text>
-                  <Text style={styles.value}>{signature.recorder.full_name}</Text>
-                </View>
-                <View>
-                  <Text style={{ ...styles.label, marginTop: 10, marginBottom: 5 }}>
-                    Signature:
-                  </Text>
-                  <Image src={signature.signature_data} style={styles.signatureImage} />
                 </View>
               </View>
             </View>
