@@ -111,7 +111,11 @@ export async function POST(
 
     const fileBlob = await fileResponse.blob();
     const fileBuffer = await fileBlob.arrayBuffer();
-    const fileBase64 = Buffer.from(fileBuffer).toString('base64');
+    
+    // Convert ArrayBuffer to base64
+    const bytes = new Uint8Array(fileBuffer);
+    const binary = bytes.reduce((acc, byte) => acc + String.fromCharCode(byte), '');
+    const fileBase64 = btoa(binary);
 
     // Determine MIME type
     const mimeType = doc.file_type === 'pdf' 

@@ -280,7 +280,12 @@ export function AssignEmployeesModal({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || selectedIds.size === 0}>
+            <Button 
+              type="submit" 
+              variant="outline"
+              disabled={loading || selectedIds.size === 0}
+              className="border-rams text-rams hover:bg-rams hover:text-white"
+            >
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

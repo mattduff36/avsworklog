@@ -323,45 +323,45 @@ export default function RAMSDetailsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-900 dark:text-white">Total Assigned</CardTitle>
-            <Users className="h-4 w-4 text-slate-400" />
+      <div className="grid gap-2 md:gap-4 grid-cols-4 md:grid-cols-4">
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 p-1 md:p-6">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 md:pb-2 p-1 md:p-6">
+            <CardTitle className="text-[10px] md:text-sm font-medium text-slate-900 dark:text-white leading-tight">Total Assigned</CardTitle>
+            <Users className="h-2.5 w-2.5 md:h-4 md:w-4 text-slate-400" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900 dark:text-white">{totalAssigned}</div>
-            <p className="text-xs text-slate-600 dark:text-slate-400">Employees</p>
+          <CardContent className="p-1 md:p-6 pt-0">
+            <div className="text-sm md:text-2xl font-bold text-slate-900 dark:text-white">{totalAssigned}</div>
+            <p className="text-[9px] md:text-xs text-slate-600 dark:text-slate-400 leading-tight">Employees</p>
           </CardContent>
         </Card>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-900 dark:text-white">Signed</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-green-400" />
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 p-1 md:p-6">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 md:pb-2 p-1 md:p-6">
+            <CardTitle className="text-[10px] md:text-sm font-medium text-slate-900 dark:text-white leading-tight">Signed</CardTitle>
+            <CheckCircle2 className="h-2.5 w-2.5 md:h-4 md:w-4 text-green-400" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{totalSigned}</div>
-            <p className="text-xs text-muted-foreground">Completed</p>
+          <CardContent className="p-1 md:p-6 pt-0">
+            <div className="text-sm md:text-2xl font-bold text-green-600">{totalSigned}</div>
+            <p className="text-[9px] md:text-xs text-muted-foreground leading-tight">Completed</p>
           </CardContent>
         </Card>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-900 dark:text-white">Pending</CardTitle>
-            <Clock className="h-4 w-4 text-orange-400" />
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 p-1 md:p-6">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 md:pb-2 p-1 md:p-6">
+            <CardTitle className="text-[10px] md:text-sm font-medium text-slate-900 dark:text-white leading-tight">Pending</CardTitle>
+            <Clock className="h-2.5 w-2.5 md:h-4 md:w-4 text-orange-400" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{totalPending}</div>
-            <p className="text-xs text-slate-600 dark:text-slate-400">Awaiting signature</p>
+          <CardContent className="p-1 md:p-6 pt-0">
+            <div className="text-sm md:text-2xl font-bold text-orange-600">{totalPending}</div>
+            <p className="text-[9px] md:text-xs text-slate-600 dark:text-slate-400 leading-tight">Awaiting signature</p>
           </CardContent>
         </Card>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-slate-900 dark:text-white">Compliance</CardTitle>
-            <FileText className="h-4 w-4 text-slate-400" />
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 p-1 md:p-6">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 md:pb-2 p-1 md:p-6">
+            <CardTitle className="text-[10px] md:text-sm font-medium text-slate-900 dark:text-white leading-tight">Compliance</CardTitle>
+            <FileText className="h-2.5 w-2.5 md:h-4 md:w-4 text-slate-400" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900 dark:text-white">{complianceRate}%</div>
-            <p className="text-xs text-slate-600 dark:text-slate-400">Completion rate</p>
+          <CardContent className="p-1 md:p-6 pt-0">
+            <div className="text-sm md:text-2xl font-bold text-slate-900 dark:text-white">{complianceRate}%</div>
+            <p className="text-[9px] md:text-xs text-slate-600 dark:text-slate-400 leading-tight">Completion rate</p>
           </CardContent>
         </Card>
       </div>
