@@ -430,6 +430,7 @@ export interface Database {
           read_at: string | null
           signed_at: string | null
           signature_data: string | null
+          action_taken: string | null
         }
         Insert: {
           id?: string
@@ -441,6 +442,7 @@ export interface Database {
           read_at?: string | null
           signed_at?: string | null
           signature_data?: string | null
+          action_taken?: string | null
         }
         Update: {
           id?: string
@@ -452,6 +454,7 @@ export interface Database {
           read_at?: string | null
           signed_at?: string | null
           signature_data?: string | null
+          action_taken?: string | null
         }
       }
       rams_visitor_signatures: {

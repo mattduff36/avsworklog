@@ -31,6 +31,7 @@ export interface RAMSAssignment {
   read_at: string | null;
   signed_at: string | null;
   signature_data: string | null;
+  action_taken: 'downloaded' | 'opened' | 'emailed' | null;
 }
 
 export interface RAMSVisitorSignature {

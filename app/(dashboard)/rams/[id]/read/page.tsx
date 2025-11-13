@@ -1,13 +1,12 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Database } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Loader2, FileText, Download, CheckCircle2, UserPlus } from 'lucide-react';
+import { ArrowLeft, Loader2, FileText, Download, CheckCircle2, UserPlus, Mail, ExternalLink, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { SignRAMSModal } from '@/components/rams/SignRAMSModal';
 import { RecordVisitorSignatureModal } from '@/components/rams/RecordVisitorSignatureModal';
@@ -27,71 +26,36 @@ interface Assignment {
   status: 'pending' | 'read' | 'signed';
   signed_at: string | null;
   signature_data: string | null;
+  action_taken: string | null;
 }
+
+type ActionType = 'downloaded' | 'opened' | 'emailed' | null;
 
 export default function ReadRAMSPage() {
   const params = useParams();
   const router = useRouter();
   const documentId = params.id as string;
   
-  const [document, setDocument] = useState<RAMSDocument | null>(null);
+  const [ramsDocument, setRamsDocument] = useState<RAMSDocument | null>(null);
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [loading, setLoading] = useState(true);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const [scrollProgress, setScrollProgress] = useState(0);
-  const [showSignButton, setShowSignButton] = useState(false);
   const [signModalOpen, setSignModalOpen] = useState(false);
   const [visitorSignModalOpen, setVisitorSignModalOpen] = useState(false);
-  const [hasDownloaded, setHasDownloaded] = useState(false);
+  const [actionTaken, setActionTaken] = useState<ActionType>(null);
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   
-  const viewerRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
 
   useEffect(() => {
     fetchDocument();
   }, [documentId]);
 
-  useEffect(() => {
-    if (fileUrl && document?.file_type === 'pdf') {
-      // For PDFs in iframe, we'll show the sign button after a delay
-      // since we can't track scroll in iframe
-      const timer = setTimeout(() => {
-        setShowSignButton(true);
-      }, 5000); // Show after 5 seconds
-
-      return () => clearTimeout(timer);
-    }
-  }, [fileUrl, document?.file_type]);
-
-  useEffect(() => {
-    // Track scroll for non-iframe content
-    const handleScroll = () => {
-      if (!viewerRef.current) return;
-
-      const element = viewerRef.current;
-      const scrollTop = element.scrollTop;
-      const scrollHeight = element.scrollHeight - element.clientHeight;
-      const progress = (scrollTop / scrollHeight) * 100;
-
-      setScrollProgress(progress);
-
-      // Show sign button when scrolled to 90% or more
-      if (progress >= 90) {
-        setShowSignButton(true);
-        markAsRead();
-      }
-    };
-
-    const viewer = viewerRef.current;
-    if (viewer) {
-      viewer.addEventListener('scroll', handleScroll);
-      return () => viewer.removeEventListener('scroll', handleScroll);
-    }
-  }, [viewerRef.current]);
-
   const fetchDocument = async () => {
     try {
       setLoading(true);
+      setError(null);
 
       // Get user session
       const { data: { session } } = await supabase.auth.getSession();
@@ -109,10 +73,11 @@ export default function ReadRAMSPage() {
 
       if (docError || !doc) {
         console.error('Error fetching document:', docError);
+        setError('Document not found');
         return;
       }
 
-      setDocument(doc);
+      setRamsDocument(doc);
 
       // Fetch assignment (for employees)
       const { data: assignmentData } = await supabase
@@ -124,6 +89,10 @@ export default function ReadRAMSPage() {
 
       if (assignmentData) {
         setAssignment(assignmentData);
+        // If action was already taken, enable sign button
+        if (assignmentData.action_taken) {
+          setActionTaken(assignmentData.action_taken as ActionType);
+        }
       }
 
       // Get file URL from storage
@@ -137,26 +106,133 @@ export default function ReadRAMSPage() {
 
     } catch (error) {
       console.error('Error:', error);
+      setError('Failed to load document');
     } finally {
       setLoading(false);
     }
   };
 
-  const markAsRead = async () => {
-    if (!assignment || assignment.status !== 'pending') return;
+  const recordAction = async (action: 'downloaded' | 'opened' | 'emailed') => {
+    if (!assignment) return;
 
     try {
-      await supabase
+      const { error: updateError } = await supabase
         .from('rams_assignments')
         .update({
+          action_taken: action,
           status: 'read',
           read_at: new Date().toISOString(),
         })
         .eq('id', assignment.id);
 
-      setAssignment(prev => prev ? { ...prev, status: 'read' } : null);
+      if (updateError) {
+        console.error('Error recording action:', updateError);
+        return;
+      }
+
+      setActionTaken(action);
+      setAssignment(prev => prev ? { 
+        ...prev, 
+        action_taken: action,
+        status: 'read',
+        read_at: new Date().toISOString()
+      } : null);
     } catch (error) {
-      console.error('Error marking as read:', error);
+      console.error('Error recording action:', error);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!fileUrl || !ramsDocument) return;
+
+    setActionInProgress('download');
+    setError(null);
+
+    try {
+      // Fetch the file and create a blob URL for download
+      const response = await fetch(fileUrl);
+      if (!response.ok) throw new Error('Failed to fetch file');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = window.document.createElement('a');
+      a.href = url;
+      a.download = ramsDocument.file_name || 'rams-document.pdf';
+      window.document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        window.document.body.removeChild(a);
+      }, 100);
+      
+      // Record action and enable sign button
+      await recordAction('downloaded');
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      setError('Failed to download document. Please try again or select a different option.');
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handleOpen = async () => {
+    if (!fileUrl) return;
+
+    setActionInProgress('open');
+    setError(null);
+
+    try {
+      // Open in new tab
+      const newWindow = window.open(fileUrl, '_blank');
+      
+      // Check if popup was blocked or window failed to open
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        throw new Error('Failed to open document. Please check your popup blocker settings.');
+      }
+
+      // Wait a moment to see if the window loads successfully
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Check if window is still open (basic check)
+      if (newWindow.closed) {
+        throw new Error('Document window closed unexpectedly. Please try again or select a different option.');
+      }
+
+      // Record action and enable sign button
+      await recordAction('opened');
+    } catch (error: any) {
+      console.error('Error opening document:', error);
+      setError(error.message || 'Failed to open document. Please try again or select a different option.');
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handleEmail = async () => {
+    if (!ramsDocument) return;
+
+    setActionInProgress('email');
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/rams/${documentId}/email`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send email');
+      }
+
+      // Record action and enable sign button
+      await recordAction('emailed');
+    } catch (error: any) {
+      console.error('Error sending email:', error);
+      setError(error.message || 'Failed to send email. Please try again or select a different option.');
+    } finally {
+      setActionInProgress(null);
     }
   };
 
@@ -168,55 +244,6 @@ export default function ReadRAMSPage() {
 
   const handleVisitorSignSuccess = () => {
     setVisitorSignModalOpen(false);
-    // Could show a success message or update UI
-  };
-
-  const handleDownload = async (e?: React.MouseEvent<HTMLAnchorElement>) => {
-    // Prevent default anchor behavior on mobile
-    if (e) {
-      e.preventDefault();
-    }
-    
-    if (!fileUrl || !document) return;
-    
-    try {
-      // Use proper download method that works on mobile
-      // Fetch the file and create a blob URL for download
-      const response = await fetch(fileUrl);
-      if (!response.ok) throw new Error('Failed to fetch file');
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = document.file_name || 'rams-document.pdf';
-      document.body.appendChild(a);
-      a.click();
-      
-      // Clean up
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      }, 100);
-      
-      // Mark as downloaded to enable sign button
-      setHasDownloaded(true);
-      markAsRead();
-    } catch (error) {
-      console.error('Error downloading document:', error);
-      // Fallback: try direct download link
-      if (fileUrl) {
-        const a = document.createElement('a');
-        a.href = fileUrl;
-        a.download = document.file_name || 'rams-document.pdf';
-        a.target = '_blank';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setHasDownloaded(true);
-        markAsRead();
-      }
-    }
   };
 
   if (loading) {
@@ -227,7 +254,7 @@ export default function ReadRAMSPage() {
     );
   }
 
-  if (!document) {
+  if (!ramsDocument) {
     return (
       <div className="container mx-auto p-6 max-w-4xl">
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 p-12 text-center">
@@ -249,9 +276,10 @@ export default function ReadRAMSPage() {
 
   const isSigned = assignment?.status === 'signed';
   const canSign = assignment && !isSigned;
+  const canTakeAction = canSign && !actionTaken;
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col min-h-screen">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 shadow-sm">
         <div className="container mx-auto px-4 py-4 max-w-6xl">
@@ -264,9 +292,9 @@ export default function ReadRAMSPage() {
                 </Link>
               </Button>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{document.title}</h1>
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{ramsDocument.title}</h1>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                  {document.file_type.toUpperCase()} Document
+                  {ramsDocument.file_type.toUpperCase()} Document
                 </p>
               </div>
             </div>
@@ -277,16 +305,12 @@ export default function ReadRAMSPage() {
                   Signed
                 </Badge>
               )}
-              {fileUrl && (
-                <Button
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => handleDownload()}
-                  className="border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </Button>
+              {actionTaken && (
+                <Badge variant="outline" className="gap-1">
+                  {actionTaken === 'downloaded' && 'Downloaded'}
+                  {actionTaken === 'opened' && 'Opened'}
+                  {actionTaken === 'emailed' && 'Viewed via email'}
+                </Badge>
               )}
               <Button
                 size="sm"
@@ -301,104 +325,110 @@ export default function ReadRAMSPage() {
         </div>
       </div>
 
-      {/* Document Viewer */}
-      <div className="flex-1 overflow-hidden bg-slate-100 dark:bg-slate-900">
-        <div
-          ref={viewerRef}
-          className="h-full overflow-auto"
-        >
-          <div className="container mx-auto py-8 max-w-5xl px-4">
-            {document.file_type === 'pdf' && fileUrl ? (
-              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg overflow-hidden border border-slate-200 dark:border-slate-700" style={{ height: 'calc(100vh - 220px)' }}>
-                <iframe
-                  src={`${fileUrl}#toolbar=1&navpanes=0&scrollbar=1`}
-                  className="w-full h-full"
-                  title={document.title}
-                />
-              </div>
-            ) : document.file_type === 'docx' && fileUrl ? (
-              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 p-8 md:p-12">
-                <div className="text-center space-y-6 max-w-2xl mx-auto">
-                  <div className="p-4 rounded-full bg-rams/10 w-24 h-24 flex items-center justify-center mx-auto">
-                    <FileText className="h-12 w-12 text-rams" />
+      {/* Main Content */}
+      <div className="flex-1 bg-slate-100 dark:bg-slate-900">
+        <div className="container mx-auto py-8 max-w-4xl px-4">
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 p-8 md:p-12">
+            <div className="text-center space-y-6 max-w-2xl mx-auto">
+
+              {/* Error Message */}
+              {error && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-medium text-red-800 dark:text-red-300">{error}</p>
                   </div>
-                  <div>
-                    <h3 className="text-2xl font-bold mb-3 text-slate-900 dark:text-white">Microsoft Word Document</h3>
-                    <p className="text-slate-600 dark:text-slate-400 mb-4">
-                      Word documents must be downloaded and opened in Microsoft Word or a compatible application.
-                    </p>
-                    <p className="text-sm text-slate-500 dark:text-slate-500 mb-6">
-                      Please review the entire document before signing.
-                    </p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              {canTakeAction && (
+                <div className="space-y-4 pt-6">
+                  <p className="text-slate-600 dark:text-slate-400 mb-4">
+                    Please choose how you would like to access this document:
+                  </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Download Button */}
+                    <Button
+                      size="lg"
+                      onClick={handleDownload}
+                      disabled={actionInProgress !== null}
+                      className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed h-auto py-6 flex flex-col items-center gap-2"
+                    >
+                      {actionInProgress === 'download' ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <Download className="h-5 w-5" />
+                      )}
+                      <span>Download</span>
+                    </Button>
+
+                    {/* Open Button */}
+                    <Button
+                      size="lg"
+                      onClick={handleOpen}
+                      disabled={actionInProgress !== null}
+                      className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed h-auto py-6 flex flex-col items-center gap-2"
+                    >
+                      {actionInProgress === 'open' ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <ExternalLink className="h-5 w-5" />
+                      )}
+                      <span>Open</span>
+                    </Button>
+
+                    {/* Email Button */}
+                    <Button
+                      size="lg"
+                      onClick={handleEmail}
+                      disabled={actionInProgress !== null}
+                      className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed h-auto py-6 flex flex-col items-center gap-2"
+                    >
+                      {actionInProgress === 'email' ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <Mail className="h-5 w-5" />
+                      )}
+                      <span>Email</span>
+                    </Button>
                   </div>
-                  <Button 
+                </div>
+              )}
+
+              {/* Sign Button */}
+              {canSign && actionTaken && (
+                <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                    You have accessed this document via <strong>{actionTaken === 'downloaded' ? 'download' : actionTaken === 'opened' ? 'opening in browser' : 'email'}</strong>. 
+                    Please review it carefully, then click below to sign and acknowledge that you have read and understood the safety requirements.
+                  </p>
+                  <Button
                     size="lg"
-                    onClick={() => handleDownload()}
+                    onClick={() => setSignModalOpen(true)}
                     className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg text-base px-8 py-6"
                   >
-                    <Download className="h-5 w-5 mr-2" />
-                    Download and Review
+                    <CheckCircle2 className="h-5 w-5 mr-2" />
+                    I have read and understood - Sign Document
                   </Button>
-                  {canSign && (
-                    <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
-                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-                        After reviewing the document, click below to sign
-                      </p>
-                      <Button
-                        size="lg"
-                        onClick={() => setSignModalOpen(true)}
-                        disabled={!hasDownloaded}
-                        className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 text-base px-8 py-6"
-                      >
-                        <CheckCircle2 className="h-5 w-5 mr-2" />
-                        I have read and understood - Sign Document
-                      </Button>
-                      {!hasDownloaded && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-3">
-                          ⚠️ Please download and review the document first
-                        </p>
-                      )}
-                    </div>
-                  )}
                 </div>
-              </Card>
-            ) : null}
-          </div>
+              )}
+
+              {/* Already Signed Message */}
+              {isSigned && (
+                <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                    <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                      ✓ You have signed this document on {assignment?.signed_at ? new Date(assignment.signed_at).toLocaleDateString() : 'previously'}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
         </div>
       </div>
-
-      {/* Sign Button - Sticky Banner (for PDFs) */}
-      {canSign && showSignButton && document.file_type === 'pdf' && (
-        <div className="fixed bottom-0 left-0 right-0 bg-rams border-t-4 border-rams-dark shadow-2xl animate-slide-up z-50">
-          <div className="container mx-auto px-4 py-4 max-w-6xl">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-full">
-                  <CheckCircle2 className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="font-semibold text-white text-lg">Document Review Complete</p>
-                  <p className="text-sm text-white/90">
-                    {hasDownloaded 
-                      ? "Click to confirm you've read and understood the safety requirements"
-                      : "Please download the document first to enable signing"
-                    }
-                  </p>
-                </div>
-              </div>
-              <Button
-                size="lg"
-                onClick={() => setSignModalOpen(true)}
-                disabled={!hasDownloaded}
-                className="bg-white text-rams hover:bg-slate-100 font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed px-8 py-6"
-              >
-                <CheckCircle2 className="h-5 w-5 mr-2" />
-                Sign Document
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Sign Modal */}
       {assignment && (
@@ -407,7 +437,7 @@ export default function ReadRAMSPage() {
           onClose={() => setSignModalOpen(false)}
           onSuccess={handleSignSuccess}
           assignmentId={assignment.id}
-          documentTitle={document.title}
+          documentTitle={ramsDocument.title}
         />
       )}
 
@@ -417,9 +447,8 @@ export default function ReadRAMSPage() {
         onClose={() => setVisitorSignModalOpen(false)}
         onSuccess={handleVisitorSignSuccess}
         documentId={documentId}
-        documentTitle={document.title}
+        documentTitle={ramsDocument.title}
       />
     </div>
   );
 }
-
