@@ -454,19 +454,21 @@ export default function ReadRAMSPage() {
 
               {/* Sign Button */}
               {canSign && actionTaken && (
-                <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
+                <div className="mt-4 pt-4">
                   <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
                     You have accessed this document via <strong>{actionTaken === 'downloaded' ? 'download' : actionTaken === 'opened' ? 'opening in browser' : 'email'}</strong>. 
                     Please review it carefully, then click below to sign and acknowledge that you have read and understood the safety requirements.
                   </p>
-                  <Button
-                    size="lg"
-                    onClick={() => setSignModalOpen(true)}
-                    className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg text-base px-8 py-6"
-                  >
-                    <CheckCircle2 className="h-5 w-5 mr-2" />
-                    I have read and understood - Sign Document
-                  </Button>
+                  <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
+                    <Button
+                      size="lg"
+                      onClick={() => setSignModalOpen(true)}
+                      className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg text-base px-8 py-6"
+                    >
+                      <CheckCircle2 className="h-5 w-5 mr-2" />
+                      I have read and understood - Sign Document
+                    </Button>
+                  </div>
                 </div>
               )}
 
