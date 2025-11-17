@@ -45,19 +45,33 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    // Get employee details
-    const { data: employee } = await supabase
+    // Get employee name from profiles table (full_name is the correct field)
+    const { data: employee, error: employeeError } = await supabase
       .from('profiles')
-      .select('full_name, email')
+      .select('full_name')
       .eq('id', timesheet.user_id)
       .single();
+
+    if (employeeError) {
+      console.error('Error fetching employee details:', employeeError);
+    }
+
+    const employeeName = employee?.full_name || null;
+
+    console.log('PDF Generation Debug:', {
+      timesheetId: id,
+      userId: timesheet.user_id,
+      employeeName,
+      hasEmployee: !!employee,
+      employeeError: employeeError?.message
+    });
 
     // Generate PDF
     const stream = await renderToStream(
       TimesheetPDF({
         timesheet,
-        employeeName: employee?.full_name,
-        employeeEmail: employee?.email,
+        employeeName: employeeName,
+        employeeEmail: undefined,
       })
     );
 

@@ -59,6 +59,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#666',
     borderBottomStyle: 'dotted',
     marginRight: 10,
+    minHeight: 12,
+    justifyContent: 'flex-end',
+    paddingBottom: 1,
   },
   // Table
   table: {
@@ -142,21 +145,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 10,
+    justifyContent: 'space-between',
+  },
+  signatureLeftSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   signatureLabel: {
     fontSize: 9,
     marginRight: 10,
   },
+  signatureRightSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   signatureDots: {
-    flex: 1,
+    width: 180,
     borderBottomWidth: 1,
     borderBottomColor: '#000',
     borderBottomStyle: 'dotted',
     height: 40,
+    marginRight: 10,
   },
   signatureImage: {
     width: 180,
     height: 40,
+    marginRight: 10,
+  },
+  signatureRightLabel: {
+    fontSize: 9,
   },
 });
 
@@ -243,8 +260,8 @@ export function TimesheetPDF({ timesheet, employeeName, employeeEmail }: Timeshe
         <View style={{ marginBottom: 20 }}>
           <View style={styles.infoField}>
             <Text style={styles.infoLabel}>Driver</Text>
-            <View style={[styles.infoDots, { justifyContent: 'flex-start', alignItems: 'center' }]}>
-              <Text style={{ fontSize: 9, paddingLeft: 5, color: '#000' }}>{employeeName || ''}</Text>
+            <View style={styles.infoDots}>
+              <Text style={{ fontSize: 9, paddingLeft: 5 }}>{employeeName || ''}</Text>
             </View>
           </View>
         </View>
@@ -337,13 +354,18 @@ export function TimesheetPDF({ timesheet, employeeName, employeeEmail }: Timeshe
           </Text>
 
           <View style={styles.signatureRow}>
-            <Text style={styles.signatureLabel}>Driver: {employeeName || ''}</Text>
-            {timesheet.signature_data ? (
-              <Image style={styles.signatureImage} src={timesheet.signature_data} alt="Driver signature" />
-            ) : (
-              <View style={styles.signatureDots} />
-            )}
-            <Text style={[styles.signatureLabel, { marginLeft: 10 }]}>Signature</Text>
+            <View style={styles.signatureLeftSection}>
+              <Text style={styles.signatureLabel}>Driver:</Text>
+              <Text style={{ fontSize: 9 }}>{employeeName || ''}</Text>
+            </View>
+            <View style={styles.signatureRightSection}>
+              <Text style={styles.signatureRightLabel}>Signature</Text>
+              {timesheet.signature_data ? (
+                <Image style={styles.signatureImage} src={timesheet.signature_data} alt="Driver signature" />
+              ) : (
+                <View style={styles.signatureDots} />
+              )}
+            </View>
           </View>
         </View>
       </Page>
