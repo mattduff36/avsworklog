@@ -95,6 +95,11 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) and sign in with your admin account.
 
+## Recent Enhancements
+
+- **RAMS documents**: Simplified read flow with explicit **Download**, **Open**, and **Email** actions, and action tracking for how each document was accessed in RAMS PDF exports.
+- **Timesheet PDFs**: Driver name now comes from the employee profile and displays correctly in both the top **Driver** field and the footer signature row.
+
 ## Project Structure
 
 \`\`\`
