@@ -159,7 +159,7 @@ export default function AbsenceReasonsPage() {
   
   if (authLoading || isLoading) {
     return (
-      <div className="space-y-6 max-w-4xl">
+      <div className="space-y-6 max-w-6xl">
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardContent className="flex items-center justify-center py-12">
             <p className="text-slate-400">Loading...</p>
@@ -172,7 +172,7 @@ export default function AbsenceReasonsPage() {
   if (!isAdmin) return null;
   
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-6xl">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
         <div className="flex items-start justify-between">
