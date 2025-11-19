@@ -66,6 +66,7 @@ export function Navbar() {
   const employeeNav = !isManager ? [
     { href: '/timesheets', label: 'Timesheets', icon: FileText },
     { href: '/inspections', label: 'Inspections', icon: ClipboardCheck },
+    { href: '/absence', label: 'Absence & Leave', icon: Calendar },
   ] : [];
   
   const managerNav = isManager ? [
@@ -347,6 +348,18 @@ export function Navbar() {
                 >
                   <FileCheck2 className="w-5 h-5 mr-3" />
                   RAMS Documents
+                </Link>
+                <Link
+                  href="/absence"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center px-3 py-2 pl-6 text-base font-medium rounded-md ${
+                    pathname?.startsWith('/absence')
+                      ? 'bg-avs-yellow text-slate-900'
+                      : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                  }`}
+                >
+                  <Calendar className="w-5 h-5 mr-3" />
+                  Absence & Leave
                 </Link>
               </>
             )}
