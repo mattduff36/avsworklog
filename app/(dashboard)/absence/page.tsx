@@ -175,7 +175,7 @@ export default function AbsencePage() {
               className={`
                 relative aspect-square p-1 rounded-lg border
                 ${dayAbsences.length > 0 
-                  ? 'border-red-500/30 bg-red-500/5' 
+                  ? 'border-purple-500/30 bg-purple-500/5' 
                   : 'border-slate-700 bg-slate-800/30'
                 }
                 hover:bg-slate-700/30 transition-colors
@@ -188,7 +188,7 @@ export default function AbsencePage() {
               {/* Indicators */}
               <div className="absolute bottom-1 left-1 right-1 flex gap-0.5 justify-center">
                 {annualLeave.length > 0 && (
-                  <div className="h-1.5 w-1.5 rounded-full bg-red-500" title="Annual Leave" />
+                  <div className="h-1.5 w-1.5 rounded-full bg-purple-500" title="Annual Leave" />
                 )}
                 {pending.length > 0 && (
                   <div className="h-1.5 w-1.5 rounded-full bg-amber-500" title="Pending" />
@@ -236,7 +236,7 @@ export default function AbsencePage() {
           {/* Manage Absence link for managers/admins */}
           {(isManager || isAdmin) && (
             <Link href="/absence/manage">
-              <Button className="bg-red-500 hover:bg-red-600 text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg">
+              <Button className="bg-purple-500 hover:bg-purple-600 text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg">
                 <Settings className="h-4 w-4 mr-2" />
                 Manage Absence
               </Button>
@@ -246,37 +246,37 @@ export default function AbsencePage() {
       </div>
       
       {/* Summary Card */}
-      <Card className="bg-gradient-to-br from-red-500 to-red-600 border-0 text-white">
+      <Card className="bg-gradient-to-br from-purple-500 to-purple-600 border-0 text-white">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-white">
             <CalendarIcon className="h-5 w-5" />
             Annual Leave Summary ({financialYear.label})
           </CardTitle>
-          <CardDescription className="text-red-100">
+          <CardDescription className="text-purple-100">
             UK Financial Year: {formatDate(financialYear.start)} - {formatDate(financialYear.end)}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <p className="text-sm text-red-100 mb-1">Total Allowance</p>
+              <p className="text-sm text-purple-100 mb-1">Total Allowance</p>
               <p className="text-3xl font-bold">{summary?.allowance || 28}</p>
-              <p className="text-xs text-red-100">days</p>
+              <p className="text-xs text-purple-100">days</p>
             </div>
             <div>
-              <p className="text-sm text-red-100 mb-1">Approved Taken</p>
+              <p className="text-sm text-purple-100 mb-1">Approved Taken</p>
               <p className="text-3xl font-bold">{summary?.approved_taken || 0}</p>
-              <p className="text-xs text-red-100">days</p>
+              <p className="text-xs text-purple-100">days</p>
             </div>
             <div>
-              <p className="text-sm text-red-100 mb-1">Pending</p>
+              <p className="text-sm text-purple-100 mb-1">Pending</p>
               <p className="text-3xl font-bold">{summary?.pending_total || 0}</p>
-              <p className="text-xs text-red-100">days</p>
+              <p className="text-xs text-purple-100">days</p>
             </div>
             <div>
-              <p className="text-sm text-red-100 mb-1">Remaining</p>
+              <p className="text-sm text-purple-100 mb-1">Remaining</p>
               <p className="text-3xl font-bold">{summary?.remaining || 0}</p>
-              <p className="text-xs text-red-100">days</p>
+              <p className="text-xs text-purple-100">days</p>
             </div>
           </div>
         </CardContent>
@@ -322,7 +322,7 @@ export default function AbsencePage() {
               {/* Legend */}
               <div className="flex flex-wrap gap-4 pt-4 text-sm">
                 <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-red-500" />
+                  <div className="h-3 w-3 rounded-full bg-purple-500" />
                   <span className="text-slate-400">Annual Leave (Approved)</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -490,7 +490,7 @@ export default function AbsencePage() {
                     <Button
                       type="submit"
                       disabled={submitting || projectedRemaining < 0 || !startDate}
-                      className="bg-red-500 hover:bg-red-600 text-white"
+                      className="bg-purple-500 hover:bg-purple-600 text-white"
                     >
                       {submitting ? 'Submitting...' : 'Submit Request'}
                     </Button>
@@ -558,7 +558,7 @@ export default function AbsencePage() {
                                     : absence.status === 'pending'
                                     ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
                                     : absence.status === 'rejected'
-                                    ? 'border-red-500/30 text-red-400 bg-red-500/10'
+                                    ? 'border-purple-500/30 text-purple-400 bg-purple-500/10'
                                     : 'border-slate-600 text-slate-400'
                                 }
                               >
@@ -604,7 +604,7 @@ export default function AbsencePage() {
                               variant="outline"
                               size="sm"
                               onClick={() => handleCancel(absence.id, absence.status)}
-                              className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                              className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
                             >
                               Cancel
                             </Button>

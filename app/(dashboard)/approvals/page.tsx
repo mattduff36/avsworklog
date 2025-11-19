@@ -365,7 +365,7 @@ export default function ApprovalsPage() {
               value="absences" 
               className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
               style={activeTab === 'absences' ? {
-                backgroundColor: 'hsl(0 84% 60%)', // Red for absences
+                backgroundColor: 'hsl(260 60% 50%)', // Purple for absences
                 color: 'white',
                 boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
               } : {}}
@@ -608,11 +608,11 @@ function AbsenceApprovalCard({
     : null;
   
   return (
-    <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-red-500/50 transition-all duration-200">
+    <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-purple-500/50 transition-all duration-200">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-3">
-            <Calendar className="h-5 w-5 text-red-600" />
+            <Calendar className="h-5 w-5 text-purple-600" />
             <div>
               <CardTitle className="text-lg">
                 {absence.profiles.full_name}

@@ -64,8 +64,8 @@ export default function DashboardPage() {
 
   // Placeholder forms for future development (only shown to managers/admins)
   const placeholderForms = [
-    { id: 'absence', title: 'Absence & Leave', icon: AlertTriangle, color: 'bg-red-500', href: '/absence' },
-    { id: 'maintenance', title: 'Maintenance Request', icon: Wrench, color: 'bg-purple-500' },
+    { id: 'absence', title: 'Absence & Leave', icon: AlertTriangle, color: 'bg-purple-500', href: '/absence' },
+    { id: 'maintenance', title: 'Maintenance Request', icon: Wrench, color: 'bg-red-500' },
     { id: 'delivery', title: 'Delivery Note', icon: PackageCheck, color: 'bg-rose-500' },
     { id: 'site-diary', title: 'Site Diary', icon: Clipboard, color: 'bg-cyan-500' },
     { id: 'plant-hire', title: 'Plant Hire', icon: Truck, color: 'bg-indigo-500' },

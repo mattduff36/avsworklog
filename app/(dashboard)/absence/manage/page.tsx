@@ -28,8 +28,7 @@ import {
   useAllAbsences, 
   useAllAbsenceReasons,
   useCreateAbsence,
-  useDeleteAbsence,
-  useApproveAbsence 
+  useDeleteAbsence
 } from '@/lib/hooks/useAbsence';
 import { formatDate, calculateDurationDays } from '@/lib/utils/date';
 import { createClient } from '@/lib/supabase/client';
@@ -212,7 +211,7 @@ export default function AdminAbsencePage() {
             </Link>
             <Button
               onClick={() => setShowCreateDialog(true)}
-              className="bg-red-500 hover:bg-red-600 text-white"
+              className="bg-purple-500 hover:bg-purple-600 text-white"
             >
               <Plus className="h-4 w-4 mr-2" />
               Create Absence
@@ -360,11 +359,11 @@ export default function AdminAbsencePage() {
                           className={
                             absence.status === 'approved'
                               ? 'border-green-500/30 text-green-400 bg-green-500/10'
-                              : absence.status === 'pending'
-                              ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
-                              : absence.status === 'rejected'
-                              ? 'border-red-500/30 text-red-400 bg-red-500/10'
-                              : 'border-slate-600 text-slate-400'
+                            : absence.status === 'pending'
+                            ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
+                            : absence.status === 'rejected'
+                            ? 'border-purple-500/30 text-purple-400 bg-purple-500/10'
+                            : 'border-slate-600 text-slate-400'
                           }
                         >
                           {absence.status}
@@ -425,7 +424,7 @@ export default function AdminAbsencePage() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleDelete(absence.id)}
-                        className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                        className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -593,7 +592,7 @@ export default function AdminAbsencePage() {
             <Button
               onClick={handleCreate}
               disabled={submitting || !selectedProfileId || !selectedReasonId || !startDate}
-              className="bg-red-500 hover:bg-red-600 text-white"
+              className="bg-purple-500 hover:bg-purple-600 text-white"
             >
               {submitting ? 'Creating...' : 'Create'}
             </Button>

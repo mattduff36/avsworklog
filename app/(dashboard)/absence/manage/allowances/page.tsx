@@ -269,7 +269,7 @@ export default function AllowancesPage() {
             <Button
               onClick={handleUpdate}
               disabled={submitting}
-              className="bg-red-500 hover:bg-red-600 text-white"
+              className="bg-purple-500 hover:bg-purple-600 text-white"
             >
               {submitting ? 'Updating...' : 'Update'}
             </Button>

@@ -194,7 +194,7 @@ export default function AbsenceReasonsPage() {
               setIsPaid(true);
               setShowCreateDialog(true);
             }}
-            className="bg-red-500 hover:bg-red-600 text-white"
+            className="bg-purple-500 hover:bg-purple-600 text-white"
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Reason
@@ -247,7 +247,7 @@ export default function AbsenceReasonsPage() {
                         className={
                           reason.is_active
                             ? 'border-green-500/30 text-green-400 bg-green-500/10'
-                            : 'border-red-500/30 text-red-400 bg-red-500/10'
+                            : 'border-purple-500/30 text-purple-400 bg-purple-500/10'
                         }
                       >
                         {reason.is_active ? 'Active' : 'Inactive'}
@@ -276,7 +276,7 @@ export default function AbsenceReasonsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleDelete(reason)}
-                          className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                          className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -337,7 +337,7 @@ export default function AbsenceReasonsPage() {
             <Button
               onClick={handleCreate}
               disabled={submitting || !name.trim()}
-              className="bg-red-500 hover:bg-red-600 text-white"
+              className="bg-purple-500 hover:bg-purple-600 text-white"
             >
               {submitting ? 'Creating...' : 'Create'}
             </Button>
@@ -395,7 +395,7 @@ export default function AbsenceReasonsPage() {
             <Button
               onClick={handleUpdate}
               disabled={submitting || !name.trim()}
-              className="bg-red-500 hover:bg-red-600 text-white"
+              className="bg-purple-500 hover:bg-purple-600 text-white"
             >
               {submitting ? 'Updating...' : 'Update'}
             </Button>
