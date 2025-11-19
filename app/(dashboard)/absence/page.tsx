@@ -12,8 +12,10 @@ import {
   Calendar as CalendarIcon, 
   ChevronLeft, 
   ChevronRight,
-  AlertTriangle
+  AlertTriangle,
+  Settings
 } from 'lucide-react';
+import Link from 'next/link';
 import { 
   useAbsencesForCurrentUser, 
   useAbsenceSummaryForCurrentUser,
@@ -26,7 +28,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'dat
 import { toast } from 'sonner';
 
 export default function AbsencePage() {
-  const { profile } = useAuth();
+  const { profile, isManager, isAdmin } = useAuth();
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
   
@@ -218,12 +220,29 @@ export default function AbsencePage() {
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-          Absence & Leave
-        </h1>
-        <p className="text-slate-600 dark:text-slate-400">
-          Manage your annual leave and view absence records
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+              Absence & Leave
+            </h1>
+            <p className="text-slate-600 dark:text-slate-400">
+              {isManager || isAdmin 
+                ? 'Manage annual leave and view absence records'
+                : 'Request annual leave and view your absence records'
+              }
+            </p>
+          </div>
+          
+          {/* Manage Absence link for managers/admins */}
+          {(isManager || isAdmin) && (
+            <Link href="/absence/manage">
+              <Button className="bg-red-500 hover:bg-red-600 text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg">
+                <Settings className="h-4 w-4 mr-2" />
+                Manage Absence
+              </Button>
+            </Link>
+          )}
+        </div>
       </div>
       
       {/* Summary Card */}

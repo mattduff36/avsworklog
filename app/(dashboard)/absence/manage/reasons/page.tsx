@@ -177,7 +177,7 @@ export default function AbsenceReasonsPage() {
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
         <div className="flex items-start justify-between">
           <div>
-            <Link href="/admin/absence" className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-2">
+            <Link href="/absence/manage" className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-2">
               <ArrowLeft className="h-4 w-4" />
               Back to Absence Management
             </Link>

@@ -77,7 +77,6 @@ export function Navbar() {
   const adminNav = isAdmin ? [
     { href: '/admin/users', label: 'Users', icon: Users },
     { href: '/admin/vehicles', label: 'Vehicles', icon: Truck },
-    { href: '/admin/absence', label: 'Absence', icon: Calendar },
   ] : [];
 
   const navItems = [
@@ -148,7 +147,7 @@ export function Navbar() {
                   <DropdownMenuTrigger asChild>
                     <button
                       className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                        pathname?.startsWith('/timesheets') || pathname?.startsWith('/inspections') || pathname?.startsWith('/rams')
+                        pathname?.startsWith('/timesheets') || pathname?.startsWith('/inspections') || pathname?.startsWith('/rams') || pathname?.startsWith('/absence')
                           ? 'bg-avs-yellow text-slate-900'
                           : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
                       }`}
@@ -175,6 +174,12 @@ export function Navbar() {
                       <Link href="/rams" className="flex items-center cursor-pointer">
                         <FileCheck2 className="w-4 h-4 mr-2" />
                         RAMS Documents
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/absence" className="flex items-center cursor-pointer">
+                        <Calendar className="w-4 h-4 mr-2" />
+                        Absence & Leave
                       </Link>
                     </DropdownMenuItem>
                   </DropdownMenuContent>

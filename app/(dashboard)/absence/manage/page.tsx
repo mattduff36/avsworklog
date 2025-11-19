@@ -198,13 +198,13 @@ export default function AdminAbsencePage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Link href="/admin/absence/reasons">
+            <Link href="/absence/manage/reasons">
               <Button variant="outline" className="border-slate-600 text-slate-300">
                 <Settings className="h-4 w-4 mr-2" />
                 Manage Reasons
               </Button>
             </Link>
-            <Link href="/admin/absence/allowances">
+            <Link href="/absence/manage/allowances">
               <Button variant="outline" className="border-slate-600 text-slate-300">
                 <Users className="h-4 w-4 mr-2" />
                 Manage Allowances
