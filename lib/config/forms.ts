@@ -6,6 +6,7 @@ import {
   PackageCheck,
   Clipboard,
   FileCheck2,
+  CalendarDays,
   LucideIcon
 } from 'lucide-react';
 
@@ -65,6 +66,16 @@ export const FORM_TYPES: FormType[] = [
     href: '/rams',
     listHref: '/rams',
     color: 'rams',
+    enabled: true,
+  },
+  {
+    id: 'absence',
+    title: 'Absence & Leave',
+    description: 'Request and manage annual leave',
+    icon: CalendarDays,
+    href: '/absence',
+    listHref: '/absence',
+    color: 'absence',
     enabled: true,
   },
   // Future forms - uncomment and configure as needed:

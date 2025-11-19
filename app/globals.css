@@ -51,6 +51,11 @@
     --rams-light: 142 76% 95%;
     --rams-dark: 142 76% 28%;
     
+    /* Absence & Leave - Purple */
+    --absence-primary: 260 60% 50%;
+    --absence-light: 260 60% 96%;
+    --absence-dark: 260 60% 40%;
+    
     /* Reports - Professional Green */
     --report-primary: 150 70% 45%;
     --report-light: 150 100% 96%;
@@ -441,6 +446,27 @@
   
   .border-rams {
     border-color: hsl(var(--rams-primary));
+  }
+  
+  /* Absence Colors */
+  .bg-absence {
+    background-color: hsl(var(--absence-primary));
+  }
+  
+  .bg-absence-light {
+    background-color: hsl(var(--absence-light));
+  }
+  
+  .bg-absence-dark {
+    background-color: hsl(var(--absence-dark));
+  }
+  
+  .text-absence {
+    color: hsl(var(--absence-primary));
+  }
+  
+  .border-absence {
+    border-color: hsl(var(--absence-primary));
   }
 }
 
