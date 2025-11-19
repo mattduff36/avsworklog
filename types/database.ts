@@ -21,6 +21,7 @@ export interface Database {
           phone_number: string | null
           role: 'admin' | 'manager' | 'employee-civils' | 'employee-plant' | 'employee-transport' | 'employee-office' | 'employee-workshop'
           must_change_password: boolean
+          annual_holiday_allowance_days: number | null
           created_at: string
           updated_at: string
         }
@@ -31,6 +32,7 @@ export interface Database {
           phone_number?: string | null
           role: 'admin' | 'manager' | 'employee-civils' | 'employee-plant' | 'employee-transport' | 'employee-office' | 'employee-workshop'
           must_change_password?: boolean
+          annual_holiday_allowance_days?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -41,6 +43,7 @@ export interface Database {
           phone_number?: string | null
           role?: 'admin' | 'manager' | 'employee-civils' | 'employee-plant' | 'employee-transport' | 'employee-office' | 'employee-workshop'
           must_change_password?: boolean
+          annual_holiday_allowance_days?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -487,6 +490,85 @@ export interface Database {
           signature_data?: string
           signed_at?: string
           recorded_by?: string | null
+        }
+      }
+      absence_reasons: {
+        Row: {
+          id: string
+          name: string
+          is_paid: boolean
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          is_paid?: boolean
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          is_paid?: boolean
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      absences: {
+        Row: {
+          id: string
+          profile_id: string
+          date: string
+          end_date: string | null
+          reason_id: string
+          duration_days: number
+          is_half_day: boolean
+          half_day_session: 'AM' | 'PM' | null
+          notes: string | null
+          status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+          created_by: string | null
+          approved_by: string | null
+          approved_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          date: string
+          end_date?: string | null
+          reason_id: string
+          duration_days: number
+          is_half_day?: boolean
+          half_day_session?: 'AM' | 'PM' | null
+          notes?: string | null
+          status?: 'pending' | 'approved' | 'rejected' | 'cancelled'
+          created_by?: string | null
+          approved_by?: string | null
+          approved_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          date?: string
+          end_date?: string | null
+          reason_id?: string
+          duration_days?: number
+          is_half_day?: boolean
+          half_day_session?: 'AM' | 'PM' | null
+          notes?: string | null
+          status?: 'pending' | 'approved' | 'rejected' | 'cancelled'
+          created_by?: string | null
+          approved_by?: string | null
+          approved_at?: string | null
+          created_at?: string
+          updated_at?: string
         }
       }
     }

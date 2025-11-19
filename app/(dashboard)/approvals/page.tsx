@@ -7,12 +7,16 @@ import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, Clipboard, Clock, CheckCircle2, XCircle, User, Filter } from 'lucide-react';
+import { FileText, Clipboard, Clock, CheckCircle2, XCircle, User, Filter, Calendar } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 import { VehicleInspection } from '@/types/inspection';
+import { AbsenceWithRelations } from '@/types/absence';
+import { usePendingAbsences, useApproveAbsence, useRejectAbsence, useAbsenceSummaryForEmployee } from '@/lib/hooks/useAbsence';
 
 type StatusFilter = 'pending' | 'approved' | 'rejected' | 'all';
 
@@ -43,6 +47,11 @@ export default function ApprovalsPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('timesheets');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
+  
+  // Absence hooks
+  const { data: absences, isLoading: absencesLoading } = usePendingAbsences();
+  const approveAbsence = useApproveAbsence();
+  const rejectAbsence = useRejectAbsence();
 
   const fetchApprovals = useCallback(async (filter: StatusFilter) => {
     try {
@@ -307,7 +316,7 @@ export default function ApprovalsPage() {
         </Card>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-2xl grid-cols-2 h-auto p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+          <TabsList className="grid w-full max-w-3xl grid-cols-3 h-auto p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
             <TabsTrigger 
               value="timesheets" 
               className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
@@ -348,6 +357,28 @@ export default function ApprovalsPage() {
                     className={activeTab === 'inspections' ? "bg-white/20 text-white border-white/30" : ""}
                   >
                     {inspections.length}
+                  </Badge>
+                )}
+              </div>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="absences" 
+              className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
+              style={activeTab === 'absences' ? {
+                backgroundColor: 'hsl(0 84% 60%)', // Red for absences
+                color: 'white',
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
+              } : {}}
+            >
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                <span className="text-sm font-medium">Absences</span>
+                {absences && absences.length > 0 && (
+                  <Badge 
+                    variant="secondary"
+                    className={activeTab === 'absences' ? "bg-white/20 text-white border-white/30" : ""}
+                  >
+                    {absences.length}
                   </Badge>
                 )}
               </div>
@@ -500,9 +531,234 @@ export default function ApprovalsPage() {
               ))
             )}
           </TabsContent>
+
+          <TabsContent value="absences" className="mt-6 space-y-4">
+            {!absences || absences.length === 0 ? (
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+                <CardContent className="py-12 text-center text-slate-600 dark:text-slate-400">
+                  No pending absence approvals
+                </CardContent>
+              </Card>
+            ) : (
+              absences.map((absence) => (
+                <AbsenceApprovalCard 
+                  key={absence.id} 
+                  absence={absence}
+                  onApprove={approveAbsence}
+                  onReject={rejectAbsence}
+                />
+              ))
+            )}
+          </TabsContent>
         </Tabs>
       )}
     </div>
+  );
+}
+
+// Absence Approval Card Component
+function AbsenceApprovalCard({ 
+  absence, 
+  onApprove, 
+  onReject 
+}: { 
+  absence: AbsenceWithRelations;
+  onApprove: ReturnType<typeof useApproveAbsence>;
+  onReject: ReturnType<typeof useRejectAbsence>;
+}) {
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const { data: summary } = useAbsenceSummaryForEmployee(absence.profile_id);
+  
+  async function handleApprove() {
+    // Check allowance for Annual Leave
+    if (absence.absence_reasons.name === 'Annual leave') {
+      const projectedRemaining = (summary?.remaining || 0) - absence.duration_days;
+      if (projectedRemaining < 0) {
+        if (!confirm('Warning: This request exceeds the employee\'s available allowance. Approve anyway?')) {
+          return;
+        }
+      }
+    }
+    
+    try {
+      await onApprove.mutateAsync(absence.id);
+    } catch (error) {
+      console.error('Error approving absence:', error);
+    }
+  }
+  
+  async function handleReject() {
+    if (!rejectionReason.trim()) {
+      alert('Please provide a reason for rejection');
+      return;
+    }
+    
+    try {
+      await onReject.mutateAsync({ id: absence.id, reason: rejectionReason });
+      setRejecting(false);
+      setRejectionReason('');
+    } catch (error) {
+      console.error('Error rejecting absence:', error);
+    }
+  }
+  
+  const projectedRemaining = absence.absence_reasons.name === 'Annual leave' 
+    ? (summary?.remaining || 0) - absence.duration_days 
+    : null;
+  
+  return (
+    <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-red-500/50 transition-all duration-200">
+      <CardHeader>
+        <div className="flex items-start justify-between">
+          <div className="flex items-center space-x-3">
+            <Calendar className="h-5 w-5 text-red-600" />
+            <div>
+              <CardTitle className="text-lg">
+                {absence.profiles.full_name}
+                {absence.profiles.employee_id && ` (${absence.profiles.employee_id})`}
+              </CardTitle>
+              <CardDescription className="mt-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="border-slate-600 text-slate-300">
+                    {absence.absence_reasons.name}
+                  </Badge>
+                  {absence.absence_reasons.is_paid ? (
+                    <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10">
+                      Paid
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-slate-600 text-slate-400">
+                      Unpaid
+                    </Badge>
+                  )}
+                </div>
+                <div className="text-xs mt-2">
+                  <div>
+                    {absence.end_date && absence.date !== absence.end_date
+                      ? `${formatDate(absence.date)} - ${formatDate(absence.end_date)}`
+                      : formatDate(absence.date)
+                    }
+                    {absence.is_half_day && ` (${absence.half_day_session})`}
+                  </div>
+                  <div className="text-slate-500">
+                    Duration: {absence.duration_days} days
+                  </div>
+                </div>
+              </CardDescription>
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {absence.notes && (
+            <div className="p-3 bg-slate-800/30 rounded-lg">
+              <p className="text-sm text-slate-400">
+                <span className="text-slate-500 font-medium">Notes:</span> {absence.notes}
+              </p>
+            </div>
+          )}
+          
+          {absence.absence_reasons.name === 'Annual leave' && summary && (
+            <div className="p-3 bg-slate-800/30 rounded-lg">
+              <h4 className="text-sm font-medium text-white mb-2">Employee Allowance Summary</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <p className="text-slate-500">Allowance</p>
+                  <p className="text-white font-medium">{summary.allowance} days</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Approved Taken</p>
+                  <p className="text-white font-medium">{summary.approved_taken} days</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Pending</p>
+                  <p className="text-amber-400 font-medium">{summary.pending_total} days</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">After Approval</p>
+                  <p className={`font-medium ${projectedRemaining !== null && projectedRemaining < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                    {projectedRemaining} days
+                  </p>
+                </div>
+              </div>
+              {projectedRemaining !== null && projectedRemaining < 0 && (
+                <div className="mt-2 p-2 bg-red-500/20 rounded border border-red-500/30">
+                  <p className="text-xs text-red-300">
+                    ⚠️ Warning: Approving will exceed available allowance
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {rejecting ? (
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="rejectionReason">Rejection Reason *</Label>
+                <Input
+                  id="rejectionReason"
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  placeholder="Provide a reason for rejection..."
+                  className="bg-white dark:bg-slate-900 border-slate-600"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setRejecting(false);
+                    setRejectionReason('');
+                  }}
+                  className="border-slate-600 text-slate-300"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReject}
+                  disabled={!rejectionReason.trim()}
+                  className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500"
+                >
+                  <XCircle className="h-4 w-4 mr-1" />
+                  Confirm Rejection
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Submitted {formatDate(absence.created_at)}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRejecting(true)}
+                  className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
+                >
+                  <XCircle className="h-4 w-4 mr-1" />
+                  Reject
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleApprove}
+                  className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                  Approve
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

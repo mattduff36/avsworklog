@@ -5,7 +5,7 @@ import { Database } from '@/types/database';
 
 export interface QueueItem {
   id: string;
-  type: 'timesheet' | 'inspection';
+  type: 'timesheet' | 'inspection' | 'absence';
   action: 'create' | 'update' | 'delete';
   data: Record<string, unknown>;
   timestamp: number;
@@ -51,6 +51,8 @@ export const useOfflineStore = create<OfflineStore>()(
         type InspectionInsert = Database['public']['Tables']['vehicle_inspections']['Insert'];
         type InspectionUpdate = Database['public']['Tables']['vehicle_inspections']['Update'];
         type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
+        type AbsenceInsert = Database['public']['Tables']['absences']['Insert'];
+        type AbsenceUpdate = Database['public']['Tables']['absences']['Update'];
 
         for (const item of queue) {
           try {
@@ -126,6 +128,26 @@ export const useOfflineStore = create<OfflineStore>()(
               } else if (item.action === 'delete') {
                 await supabase
                   .from('vehicle_inspections')
+                  .delete()
+                  .eq('id', (item.data as { id: string }).id);
+              }
+            } else if (item.type === 'absence') {
+              if (item.action === 'create') {
+                const { data, error } = await supabase
+                  .from('absences')
+                  .insert(item.data as AbsenceInsert)
+                  .select()
+                  .single();
+                
+                if (error) throw error;
+              } else if (item.action === 'update') {
+                await supabase
+                  .from('absences')
+                  .update(item.data as AbsenceUpdate)
+                  .eq('id', (item.data as { id: string }).id);
+              } else if (item.action === 'delete') {
+                await supabase
+                  .from('absences')
                   .delete()
                   .eq('id', (item.data as { id: string }).id);
               }

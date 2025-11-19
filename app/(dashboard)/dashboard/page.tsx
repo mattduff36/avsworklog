@@ -64,7 +64,7 @@ export default function DashboardPage() {
 
   // Placeholder forms for future development (only shown to managers/admins)
   const placeholderForms = [
-    { id: 'incident', title: 'Incident Report', icon: AlertTriangle, color: 'bg-red-500' },
+    { id: 'absence', title: 'Absence & Leave', icon: AlertTriangle, color: 'bg-red-500', href: '/absence' },
     { id: 'maintenance', title: 'Maintenance Request', icon: Wrench, color: 'bg-purple-500' },
     { id: 'delivery', title: 'Delivery Note', icon: PackageCheck, color: 'bg-rose-500' },
     { id: 'site-diary', title: 'Site Diary', icon: Clipboard, color: 'bg-cyan-500' },
@@ -265,6 +265,22 @@ export default function DashboardPage() {
             {/* Placeholder Forms - Only visible to managers/admins */}
             {showPlaceholders && placeholderForms.map((form) => {
               const Icon = form.icon;
+              
+              // Check if this form has a working href
+              if (form.href) {
+                return (
+                  <Link key={form.id} href={form.href}>
+                    <div className={`relative ${form.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3 cursor-pointer`}>
+                      <Icon className="h-8 w-8 text-white" />
+                      <span className="text-white font-semibold text-sm leading-tight">
+                        {form.title}
+                      </span>
+                    </div>
+                  </Link>
+                );
+              }
+              
+              // Disabled placeholder forms
               return (
                 <Tooltip key={form.id}>
                   <TooltipTrigger asChild>
