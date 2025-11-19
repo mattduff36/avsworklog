@@ -10,14 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Calendar as CalendarIcon, 
-  Plus, 
   ChevronLeft, 
   ChevronRight,
-  Check,
-  X,
-  Clock,
-  AlertTriangle,
-  Info
+  AlertTriangle
 } from 'lucide-react';
 import { 
   useAbsencesForCurrentUser, 
@@ -27,7 +22,7 @@ import {
   useCancelAbsence
 } from '@/lib/hooks/useAbsence';
 import { formatDate, formatDateISO, calculateDurationDays, getFinancialYearMonths, getCurrentFinancialYear } from '@/lib/utils/date';
-import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
 import { toast } from 'sonner';
 
 export default function AbsencePage() {
@@ -134,18 +129,6 @@ export default function AbsencePage() {
       toast.error('Failed to cancel absence');
     }
   }
-  
-  // Get absences for current month
-  const monthAbsences = useMemo(() => {
-    if (!absences) return [];
-    const monthStart = startOfMonth(currentMonth);
-    const monthEnd = endOfMonth(currentMonth);
-    
-    return absences.filter(a => {
-      const absenceDate = new Date(a.date);
-      return absenceDate >= monthStart && absenceDate <= monthEnd;
-    });
-  }, [absences, currentMonth]);
   
   // Render calendar
   function renderCalendar() {

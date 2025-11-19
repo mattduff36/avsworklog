@@ -49,7 +49,7 @@ export default function ApprovalsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
   
   // Absence hooks
-  const { data: absences, isLoading: absencesLoading } = usePendingAbsences();
+  const { data: absences } = usePendingAbsences();
   const approveAbsence = useApproveAbsence();
   const rejectAbsence = useRejectAbsence();
 

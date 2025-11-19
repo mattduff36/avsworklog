@@ -133,7 +133,7 @@ export const useOfflineStore = create<OfflineStore>()(
               }
             } else if (item.type === 'absence') {
               if (item.action === 'create') {
-                const { data, error } = await supabase
+                const { error } = await supabase
                   .from('absences')
                   .insert(item.data as AbsenceInsert)
                   .select()

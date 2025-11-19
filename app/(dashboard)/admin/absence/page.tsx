@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Calendar, Plus, Filter, Edit, Trash2, Settings, Users } from 'lucide-react';
+import { Calendar, Plus, Filter, Trash2, Settings, Users } from 'lucide-react';
 import { 
   useAllAbsences, 
   useAllAbsenceReasons,
@@ -31,7 +31,7 @@ import {
   useDeleteAbsence,
   useApproveAbsence 
 } from '@/lib/hooks/useAbsence';
-import { formatDate, formatDateISO, calculateDurationDays, getCurrentFinancialYear } from '@/lib/utils/date';
+import { formatDate, calculateDurationDays } from '@/lib/utils/date';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -62,7 +62,6 @@ export default function AdminAbsencePage() {
   // Mutations
   const createAbsence = useCreateAbsence();
   const deleteAbsence = useDeleteAbsence();
-  const approveAbsence = useApproveAbsence();
   
   // Dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -124,7 +123,7 @@ export default function AdminAbsencePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
       
-      const absence = await createAbsence.mutateAsync({
+      await createAbsence.mutateAsync({
         profile_id: selectedProfileId,
         date: startDate,
         end_date: endDate || null,
@@ -170,8 +169,6 @@ export default function AdminAbsencePage() {
       toast.error('Failed to delete absence');
     }
   }
-  
-  const financialYear = getCurrentFinancialYear();
   
   if (authLoading || isLoading) {
     return (
