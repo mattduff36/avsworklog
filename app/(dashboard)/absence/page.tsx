@@ -439,7 +439,10 @@ export default function AbsencePage() {
       
       {/* Request Annual Leave Form */}
       <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-        <CardHeader>
+        <CardHeader 
+          className="cursor-pointer hover:bg-slate-800/20 transition-colors"
+          onClick={() => setShowRequestForm(!showRequestForm)}
+        >
           <div className="flex items-center justify-between">
             <CardTitle className="text-slate-900 dark:text-white">
               Request Annual Leave
@@ -447,7 +450,10 @@ export default function AbsencePage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowRequestForm(!showRequestForm)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowRequestForm(!showRequestForm);
+              }}
               className="border-slate-600 text-slate-300"
             >
               {showRequestForm ? 'Hide Form' : 'Show Form'}
