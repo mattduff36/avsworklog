@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,12 +8,27 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { 
   Calendar as CalendarIcon, 
   ChevronLeft, 
   ChevronRight,
   AlertTriangle,
-  Settings
+  Settings,
+  Users
 } from 'lucide-react';
 import Link from 'next/link';
 import { 
@@ -21,28 +36,75 @@ import {
   useAbsenceSummaryForCurrentUser,
   useAbsenceReasons,
   useCreateAbsence,
-  useCancelAbsence
+  useCancelAbsence,
+  useAllAbsences
 } from '@/lib/hooks/useAbsence';
 import { formatDate, formatDateISO, calculateDurationDays, getFinancialYearMonths, getCurrentFinancialYear } from '@/lib/utils/date';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isThisMonth } from 'date-fns';
 import { toast } from 'sonner';
+import { createClient } from '@/lib/supabase/client';
+
+type Employee = {
+  id: string;
+  full_name: string;
+  employee_id: string | null;
+};
 
 export default function AbsencePage() {
   const { profile, isManager, isAdmin } = useAuth();
+  const supabase = createClient();
   const [showRequestForm, setShowRequestForm] = useState(false);
-  const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
   
-  // Fetch data
-  const { data: absences, isLoading: loadingAbsences } = useAbsencesForCurrentUser();
+  // Financial year months - calculate initial index for current month
+  const financialYear = getCurrentFinancialYear();
+  const months = useMemo(() => getFinancialYearMonths(), []);
+  
+  // Find current month index in financial year
+  const initialMonthIndex = useMemo(() => {
+    const index = months.findIndex(m => isThisMonth(m));
+    return index >= 0 ? index : 0;
+  }, [months]);
+  
+  const [currentMonthIndex, setCurrentMonthIndex] = useState(initialMonthIndex);
+  const currentMonth = months[currentMonthIndex];
+  
+  // Employee filter for managers/admins
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
+  const [showDayModal, setShowDayModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  
+  // Fetch data - use all absences for managers/admins
+  const { data: userAbsences, isLoading: loadingUserAbsences } = useAbsencesForCurrentUser();
+  const { data: allAbsencesData, isLoading: loadingAllAbsences } = useAllAbsences(
+    isManager || isAdmin ? {} : undefined,
+    { enabled: isManager || isAdmin }
+  );
   const { data: summary, isLoading: loadingSummary } = useAbsenceSummaryForCurrentUser();
   const { data: reasons } = useAbsenceReasons();
   const createAbsence = useCreateAbsence();
   const cancelAbsence = useCancelAbsence();
   
-  // Financial year months
-  const financialYear = getCurrentFinancialYear();
-  const months = useMemo(() => getFinancialYearMonths(), []);
-  const currentMonth = months[currentMonthIndex];
+  // Determine which absences to show on calendar
+  const calendarAbsences = useMemo(() => {
+    if (!(isManager || isAdmin)) {
+      // Regular users only see their own absences
+      return userAbsences?.filter(a => a.status !== 'cancelled') || [];
+    }
+    
+    // Managers/admins see filtered employees' absences (exclude cancelled)
+    const allAbsences = allAbsencesData?.filter(a => a.status !== 'cancelled') || [];
+    
+    if (selectedEmployeeIds.length === 0) {
+      // Show all employees if none selected
+      return allAbsences;
+    }
+    
+    // Filter by selected employees
+    return allAbsences.filter(a => selectedEmployeeIds.includes(a.profile_id));
+  }, [isManager, isAdmin, userAbsences, allAbsencesData, selectedEmployeeIds]);
+  
+  const loadingAbsences = isManager || isAdmin ? loadingAllAbsences : loadingUserAbsences;
   
   // Form state
   const [startDate, setStartDate] = useState('');
@@ -51,6 +113,47 @@ export default function AbsencePage() {
   const [halfDaySession, setHalfDaySession] = useState<'AM' | 'PM'>('AM');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  
+  // Fetch employees for managers/admins
+  useEffect(() => {
+    if (isManager || isAdmin) {
+      fetchEmployees();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isManager, isAdmin]);
+  
+  async function fetchEmployees() {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, employee_id')
+        .order('full_name');
+      
+      if (error) throw error;
+      setEmployees(data || []);
+      // Pre-select all employees
+      setSelectedEmployeeIds((data || []).map(e => e.id));
+    } catch (err) {
+      console.error('Error fetching employees:', err);
+    }
+  }
+  
+  // Toggle employee selection
+  function toggleEmployee(employeeId: string) {
+    setSelectedEmployeeIds(prev => 
+      prev.includes(employeeId)
+        ? prev.filter(id => id !== employeeId)
+        : [...prev, employeeId]
+    );
+  }
+  
+  function toggleAllEmployees() {
+    if (selectedEmployeeIds.length === employees.length) {
+      setSelectedEmployeeIds([]);
+    } else {
+      setSelectedEmployeeIds(employees.map(e => e.id));
+    }
+  }
   
   // Get Annual Leave reason
   const annualLeaveReason = reasons?.find(r => r.name === 'Annual leave');
@@ -107,13 +210,32 @@ export default function AbsencePage() {
       setStartDate('');
       setEndDate('');
       setIsHalfDay(false);
+      setHalfDaySession('AM');
       setNotes('');
       setShowRequestForm(false);
+      setShowDayModal(false);
     } catch (error) {
       console.error('Error submitting request:', error);
       toast.error('Failed to submit request');
     } finally {
       setSubmitting(false);
+    }
+  }
+  
+  // Handle day click
+  function handleDayClick(day: Date) {
+    setSelectedDate(day);
+    setShowDayModal(true);
+  }
+  
+  // Handle request from day modal
+  function handleRequestFromDay() {
+    if (selectedDate) {
+      setStartDate(formatDateISO(selectedDate));
+      setEndDate('');
+      setIsHalfDay(false);
+      setShowDayModal(false);
+      setShowRequestForm(true);
     }
   }
   
@@ -158,11 +280,11 @@ export default function AbsencePage() {
         
         {/* Day cells */}
         {days.map(day => {
-          const dayAbsences = absences?.filter(a => {
+          const dayAbsences = calendarAbsences.filter(a => {
             const absenceStart = new Date(a.date);
             const absenceEnd = a.end_date ? new Date(a.end_date) : absenceStart;
             return day >= absenceStart && day <= absenceEnd;
-          }) || [];
+          });
           
           const approved = dayAbsences.filter(a => a.status === 'approved');
           const pending = dayAbsences.filter(a => a.status === 'pending');
@@ -172,31 +294,64 @@ export default function AbsencePage() {
           return (
             <div
               key={day.toISOString()}
+              onClick={() => handleDayClick(day)}
               className={`
-                relative aspect-square p-1 rounded-lg border
+                relative min-h-[80px] p-2 rounded-lg border cursor-pointer
                 ${dayAbsences.length > 0 
                   ? 'border-purple-500/30 bg-purple-500/5' 
                   : 'border-slate-700 bg-slate-800/30'
                 }
-                hover:bg-slate-700/30 transition-colors
+                hover:bg-slate-700/30 hover:border-purple-500/50 transition-colors
               `}
             >
-              <div className="text-xs text-slate-300 font-medium">
+              <div className="text-xs text-slate-300 font-medium mb-1">
                 {format(day, 'd')}
               </div>
               
-              {/* Indicators */}
-              <div className="absolute bottom-1 left-1 right-1 flex gap-0.5 justify-center">
-                {annualLeave.length > 0 && (
-                  <div className="h-1.5 w-1.5 rounded-full bg-purple-500" title="Annual Leave" />
-                )}
-                {pending.length > 0 && (
-                  <div className="h-1.5 w-1.5 rounded-full bg-amber-500" title="Pending" />
-                )}
-                {otherAbsences.length > 0 && (
-                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500" title="Other Absence" />
-                )}
-              </div>
+              {/* Employee list with bullet points */}
+              {(isManager || isAdmin) && dayAbsences.length > 0 && (
+                <div className="space-y-0.5 text-[10px]">
+                  {annualLeave.map(absence => (
+                    <div key={absence.id} className="flex items-start gap-1">
+                      <div className="h-1.5 w-1.5 rounded-full bg-purple-500 mt-1 flex-shrink-0" />
+                      <span className="text-slate-300 leading-tight truncate">
+                        {absence.profiles?.full_name || 'Unknown'}
+                      </span>
+                    </div>
+                  ))}
+                  {pending.map(absence => (
+                    <div key={absence.id} className="flex items-start gap-1">
+                      <div className="h-1.5 w-1.5 rounded-full bg-amber-500 mt-1 flex-shrink-0" />
+                      <span className="text-slate-300 leading-tight truncate">
+                        {absence.profiles?.full_name || 'Unknown'}
+                      </span>
+                    </div>
+                  ))}
+                  {otherAbsences.map(absence => (
+                    <div key={absence.id} className="flex items-start gap-1">
+                      <div className="h-1.5 w-1.5 rounded-full bg-blue-500 mt-1 flex-shrink-0" />
+                      <span className="text-slate-300 leading-tight truncate">
+                        {absence.profiles?.full_name || 'Unknown'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Regular user - just indicators */}
+              {!(isManager || isAdmin) && (
+                <div className="absolute bottom-2 left-2 right-2 flex gap-0.5 justify-center">
+                  {annualLeave.length > 0 && (
+                    <div className="h-1.5 w-1.5 rounded-full bg-purple-500" title="Annual Leave" />
+                  )}
+                  {pending.length > 0 && (
+                    <div className="h-1.5 w-1.5 rounded-full bg-amber-500" title="Pending" />
+                  )}
+                  {otherAbsences.length > 0 && (
+                    <div className="h-1.5 w-1.5 rounded-full bg-blue-500" title="Other Absence" />
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
@@ -282,22 +437,241 @@ export default function AbsencePage() {
         </CardContent>
       </Card>
       
+      {/* Request Annual Leave Form */}
+      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-slate-900 dark:text-white">
+              Request Annual Leave
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowRequestForm(!showRequestForm)}
+              className="border-slate-600 text-slate-300"
+            >
+              {showRequestForm ? 'Hide Form' : 'Show Form'}
+            </Button>
+          </div>
+        </CardHeader>
+        
+        {showRequestForm && (
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="startDate">Start Date</Label>
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      // Reset end date if before start
+                      if (endDate && endDate < e.target.value) {
+                        setEndDate('');
+                      }
+                    }}
+                    min={formatDateISO(new Date())}
+                    required
+                    className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="endDate">End Date (optional for multi-day)</Label>
+                  <Input
+                    id="endDate"
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    min={startDate || formatDateISO(new Date())}
+                    disabled={!startDate || isHalfDay}
+                    className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isHalfDay}
+                    onChange={(e) => {
+                      setIsHalfDay(e.target.checked);
+                      if (e.target.checked) {
+                        setEndDate(''); // Clear end date for half-day
+                      }
+                    }}
+                    className="rounded border-slate-600"
+                  />
+                  <span className="text-sm text-slate-300">Half Day</span>
+                </label>
+                
+                {isHalfDay && (
+                  <div className="flex gap-2">
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="session"
+                        value="AM"
+                        checked={halfDaySession === 'AM'}
+                        onChange={() => setHalfDaySession('AM')}
+                        className="text-purple-500"
+                      />
+                      <span className="text-sm text-slate-300">AM</span>
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="session"
+                        value="PM"
+                        checked={halfDaySession === 'PM'}
+                        onChange={() => setHalfDaySession('PM')}
+                        className="text-purple-500"
+                      />
+                      <span className="text-sm text-slate-300">PM</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+              
+              <div>
+                <Label htmlFor="notes">Notes (optional)</Label>
+                <Input
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Add any additional information..."
+                  className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
+                />
+              </div>
+              
+              {/* Summary */}
+              {startDate && (
+                <div className="bg-slate-800/30 p-4 rounded-lg space-y-2">
+                  <h4 className="font-semibold text-white">Request Summary</h4>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-slate-400">Requested Days:</span>
+                      <span className="ml-2 text-white font-medium">{requestedDays}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Approved Taken:</span>
+                      <span className="ml-2 text-white font-medium">{summary?.approved_taken || 0}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Pending:</span>
+                      <span className="ml-2 text-white font-medium">{summary?.pending_total || 0}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Projected Remaining:</span>
+                      <span className={`ml-2 font-medium ${projectedRemaining < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                        {projectedRemaining}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {projectedRemaining < 0 && (
+                    <div className="flex items-start gap-2 bg-red-500/20 p-3 rounded border border-red-500/30">
+                      <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-red-300">
+                        This request exceeds your available allowance. Please adjust the dates or contact your manager.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              <div className="flex gap-3">
+                <Button
+                  type="submit"
+                  disabled={submitting || projectedRemaining < 0 || !startDate}
+                  className="bg-purple-500 hover:bg-purple-600 text-white"
+                >
+                  {submitting ? 'Submitting...' : 'Submit Request'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setStartDate('');
+                    setEndDate('');
+                    setIsHalfDay(false);
+                    setHalfDaySession('AM');
+                    setNotes('');
+                  }}
+                  className="border-slate-600 text-slate-300"
+                >
+                  Clear
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        )}
+      </Card>
+      
       <Tabs defaultValue="calendar" className="w-full">
         <TabsList className="grid w-full grid-cols-2 bg-slate-800/50">
-          <TabsTrigger value="calendar">Calendar & Request</TabsTrigger>
+          <TabsTrigger value="calendar">Calendar</TabsTrigger>
           <TabsTrigger value="bookings">My Bookings</TabsTrigger>
         </TabsList>
         
-        {/* Calendar & Request Form Tab */}
+        {/* Calendar Tab */}
         <TabsContent value="calendar" className="space-y-6">
           {/* Calendar */}
           <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-4">
                 <CardTitle className="text-slate-900 dark:text-white">
                   {format(currentMonth, 'MMMM yyyy')}
                 </CardTitle>
                 <div className="flex gap-2">
+                  {/* Employee Filter for Managers/Admins */}
+                  {(isManager || isAdmin) && employees.length > 0 && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="border-slate-600 text-slate-300">
+                          <Users className="h-4 w-4 mr-2" />
+                          Filter ({selectedEmployeeIds.length}/{employees.length})
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 bg-slate-900 border-slate-700" align="end">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between pb-2 border-b border-slate-700">
+                            <h4 className="font-semibold text-white text-sm">Filter Employees</h4>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={toggleAllEmployees}
+                              className="h-7 text-xs text-purple-400 hover:text-purple-300"
+                            >
+                              {selectedEmployeeIds.length === employees.length ? 'Deselect All' : 'Select All'}
+                            </Button>
+                          </div>
+                          <div className="max-h-60 overflow-y-auto space-y-2">
+                            {employees.map(emp => (
+                              <div key={emp.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`emp-${emp.id}`}
+                                  checked={selectedEmployeeIds.includes(emp.id)}
+                                  onCheckedChange={() => toggleEmployee(emp.id)}
+                                  className="border-slate-600"
+                                />
+                                <label
+                                  htmlFor={`emp-${emp.id}`}
+                                  className="text-sm text-slate-300 cursor-pointer flex-1"
+                                >
+                                  {emp.full_name}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                  
                   <Button
                     variant="outline"
                     size="sm"
@@ -320,7 +694,7 @@ export default function AbsencePage() {
               </div>
               
               {/* Legend */}
-              <div className="flex flex-wrap gap-4 pt-4 text-sm">
+              <div className="flex flex-wrap gap-4 pt-4 text-sm border-t border-slate-700">
                 <div className="flex items-center gap-2">
                   <div className="h-3 w-3 rounded-full bg-purple-500" />
                   <span className="text-slate-400">Annual Leave (Approved)</span>
@@ -339,179 +713,6 @@ export default function AbsencePage() {
               {renderCalendar()}
             </CardContent>
           </Card>
-          
-          {/* Request Form */}
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-slate-900 dark:text-white">
-                  Request Annual Leave
-                </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowRequestForm(!showRequestForm)}
-                  className="border-slate-600 text-slate-300"
-                >
-                  {showRequestForm ? 'Hide Form' : 'Show Form'}
-                </Button>
-              </div>
-            </CardHeader>
-            
-            {showRequestForm && (
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="startDate">Start Date</Label>
-                      <Input
-                        id="startDate"
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => {
-                          setStartDate(e.target.value);
-                          // Reset end date if before start
-                          if (endDate && endDate < e.target.value) {
-                            setEndDate('');
-                          }
-                        }}
-                        min={formatDateISO(new Date())}
-                        required
-                        className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="endDate">End Date (optional for multi-day)</Label>
-                      <Input
-                        id="endDate"
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        min={startDate || formatDateISO(new Date())}
-                        disabled={!startDate || isHalfDay}
-                        className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isHalfDay}
-                        onChange={(e) => {
-                          setIsHalfDay(e.target.checked);
-                          if (e.target.checked) {
-                            setEndDate(''); // Clear end date for half-day
-                          }
-                        }}
-                        className="rounded border-slate-600"
-                      />
-                      <span className="text-sm text-slate-300">Half Day</span>
-                    </label>
-                    
-                    {isHalfDay && (
-                      <div className="flex gap-2">
-                        <label className="flex items-center gap-1 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="session"
-                            value="AM"
-                            checked={halfDaySession === 'AM'}
-                            onChange={() => setHalfDaySession('AM')}
-                            className="text-red-500"
-                          />
-                          <span className="text-sm text-slate-300">AM</span>
-                        </label>
-                        <label className="flex items-center gap-1 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="session"
-                            value="PM"
-                            checked={halfDaySession === 'PM'}
-                            onChange={() => setHalfDaySession('PM')}
-                            className="text-red-500"
-                          />
-                          <span className="text-sm text-slate-300">PM</span>
-                        </label>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="notes">Notes (optional)</Label>
-                    <Input
-                      id="notes"
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Add any additional information..."
-                      className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
-                    />
-                  </div>
-                  
-                  {/* Summary */}
-                  {startDate && (
-                    <div className="bg-slate-800/30 p-4 rounded-lg space-y-2">
-                      <h4 className="font-semibold text-white">Request Summary</h4>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <span className="text-slate-400">Requested Days:</span>
-                          <span className="ml-2 text-white font-medium">{requestedDays}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400">Approved Taken:</span>
-                          <span className="ml-2 text-white font-medium">{summary?.approved_taken || 0}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400">Pending:</span>
-                          <span className="ml-2 text-white font-medium">{summary?.pending_total || 0}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400">Projected Remaining:</span>
-                          <span className={`ml-2 font-medium ${projectedRemaining < 0 ? 'text-red-400' : 'text-green-400'}`}>
-                            {projectedRemaining}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      {projectedRemaining < 0 && (
-                        <div className="flex items-start gap-2 bg-red-500/20 p-3 rounded border border-red-500/30">
-                          <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
-                          <p className="text-sm text-red-300">
-                            This request exceeds your available allowance. Please adjust the dates or contact your manager.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  <div className="flex gap-3">
-                    <Button
-                      type="submit"
-                      disabled={submitting || projectedRemaining < 0 || !startDate}
-                      className="bg-purple-500 hover:bg-purple-600 text-white"
-                    >
-                      {submitting ? 'Submitting...' : 'Submit Request'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setStartDate('');
-                        setEndDate('');
-                        setIsHalfDay(false);
-                        setNotes('');
-                      }}
-                      className="border-slate-600 text-slate-300"
-                    >
-                      Clear
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            )}
-          </Card>
         </TabsContent>
         
         {/* Bookings List Tab */}
@@ -526,7 +727,7 @@ export default function AbsencePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {!absences || absences.length === 0 ? (
+              {!userAbsences || userAbsences.filter(a => a.status !== 'cancelled').length === 0 ? (
                 <div className="text-center py-12">
                   <CalendarIcon className="h-16 w-16 text-slate-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-white mb-2">No absences recorded</h3>
@@ -534,7 +735,7 @@ export default function AbsencePage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {absences.map(absence => {
+                  {userAbsences.filter(a => a.status !== 'cancelled').map(absence => {
                     const canCancel = 
                       (absence.status === 'pending' && new Date(absence.date) >= new Date()) ||
                       (absence.status === 'approved' && new Date(absence.date) >= new Date());
@@ -619,6 +820,91 @@ export default function AbsencePage() {
           </Card>
         </TabsContent>
       </Tabs>
+      
+      {/* Day Click Modal */}
+      <Dialog open={showDayModal} onOpenChange={setShowDayModal}>
+        <DialogContent className="bg-slate-900 border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-white">
+              {selectedDate && format(selectedDate, 'EEEE, MMMM d, yyyy')}
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              What would you like to do?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {selectedDate && (() => {
+              const dayAbsences = (isManager || isAdmin ? calendarAbsences : userAbsences || []).filter(a => {
+                const absenceStart = new Date(a.date);
+                const absenceEnd = a.end_date ? new Date(a.end_date) : absenceStart;
+                return selectedDate >= absenceStart && selectedDate <= absenceEnd && a.status !== 'cancelled';
+              });
+              
+              if (dayAbsences.length > 0) {
+                return (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-white">Absences on this day:</h4>
+                    {dayAbsences.map(absence => (
+                      <div key={absence.id} className="p-3 rounded bg-slate-800/50 border border-slate-700">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-medium text-white">{absence.absence_reasons.name}</p>
+                            {(isManager || isAdmin) && absence.profiles && (
+                              <p className="text-sm text-slate-400">{absence.profiles.full_name}</p>
+                            )}
+                            <p className="text-xs text-slate-500 mt-1">
+                              Status: <span className="capitalize">{absence.status}</span>
+                            </p>
+                            {absence.notes && (
+                              <p className="text-xs text-slate-400 mt-1">{absence.notes}</p>
+                            )}
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className={
+                              absence.status === 'approved'
+                                ? 'border-green-500/30 text-green-400 bg-green-500/10'
+                                : absence.status === 'pending'
+                                ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
+                                : 'border-slate-600 text-slate-400'
+                            }
+                          >
+                            {absence.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              } else {
+                return (
+                  <div className="py-6 text-center">
+                    <CalendarIcon className="h-12 w-12 text-slate-500 mx-auto mb-3" />
+                    <p className="text-slate-400 mb-4">No absences on this day</p>
+                    <Button
+                      onClick={handleRequestFromDay}
+                      className="bg-purple-500 hover:bg-purple-600 text-white"
+                    >
+                      Request Annual Leave
+                    </Button>
+                  </div>
+                );
+              }
+            })()}
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDayModal(false)}
+              className="border-slate-600 text-slate-300"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
