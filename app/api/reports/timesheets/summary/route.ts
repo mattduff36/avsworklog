@@ -74,14 +74,83 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: timesheets, error } = await query;
+    
+    // Fetch approved absences in the date range
+    let absenceQuery = supabase
+      .from('absences')
+      .select(`
+        id,
+        profile_id,
+        date,
+        end_date,
+        duration_days,
+        status,
+        absence_reasons (
+          name,
+          is_paid
+        ),
+        profiles (
+          id,
+          full_name,
+          employee_id
+        )
+      `)
+      .eq('status', 'approved');
+    
+    // Apply date filters for absences
+    if (dateFrom) {
+      absenceQuery = absenceQuery.gte('date', dateFrom);
+    }
+    if (dateTo) {
+      absenceQuery = absenceQuery.lte('date', dateTo);
+    }
+    if (employeeId) {
+      absenceQuery = absenceQuery.eq('profile_id', employeeId);
+    }
+    
+    const { data: absences, error: absenceError } = await absenceQuery;
 
     if (error) {
       console.error('Error fetching timesheets:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+    
+    if (absenceError) {
+      console.error('Error fetching absences:', absenceError);
+      // Continue without absences rather than fail completely
+    }
 
     if (!timesheets || timesheets.length === 0) {
       return NextResponse.json({ error: 'No timesheets found for the specified criteria' }, { status: 404 });
+    }
+    
+    // Group absences by employee for easier lookup
+    const HOURS_PER_DAY = 7.5;
+    const absencesByEmployee = new Map<string, { paidDays: number; unpaidDays: number; reasons: string[] }>();
+    
+    if (absences && absences.length > 0) {
+      absences.forEach((absence: any) => {
+        const employeeId = absence.profile_id;
+        const isPaid = absence.absence_reasons?.is_paid || false;
+        const days = absence.duration_days || 0;
+        const reasonName = absence.absence_reasons?.name || 'Unknown';
+        
+        if (!absencesByEmployee.has(employeeId)) {
+          absencesByEmployee.set(employeeId, { paidDays: 0, unpaidDays: 0, reasons: [] });
+        }
+        
+        const employeeAbsences = absencesByEmployee.get(employeeId)!;
+        if (isPaid) {
+          employeeAbsences.paidDays += days;
+        } else {
+          employeeAbsences.unpaidDays += days;
+        }
+        
+        // Track unique reasons
+        if (!employeeAbsences.reasons.includes(reasonName)) {
+          employeeAbsences.reasons.push(reasonName);
+        }
+      });
     }
 
     // Transform data for Excel
@@ -131,6 +200,15 @@ export async function GET(request: NextRequest) {
       
       // Add job numbers column (unique, comma-separated)
       row['Job Numbers'] = [...new Set(jobNumbers)].join(', ') || '-';
+      
+      // Get absence data for this employee
+      const employeeAbsences = absencesByEmployee.get(timesheet.user_id) || { paidDays: 0, unpaidDays: 0, reasons: [] };
+      const paidAbsenceHours = employeeAbsences.paidDays * HOURS_PER_DAY;
+      const unpaidAbsenceHours = employeeAbsences.unpaidDays * HOURS_PER_DAY;
+      
+      row['Paid Absence (Days)'] = employeeAbsences.paidDays > 0 ? employeeAbsences.paidDays.toFixed(1) : '-';
+      row['Unpaid Absence (Days)'] = employeeAbsences.unpaidDays > 0 ? employeeAbsences.unpaidDays.toFixed(1) : '-';
+      row['Absence Reasons'] = employeeAbsences.reasons.join(', ') || '-';
 
       row['Submitted'] = timesheet.submitted_at ? formatExcelDate(timesheet.submitted_at) : '-';
       row['Reviewed'] = timesheet.reviewed_at ? formatExcelDate(timesheet.reviewed_at) : '-';
@@ -160,6 +238,9 @@ export async function GET(request: NextRequest) {
         'Sat Hours': '',
         'Sun Hours': '',
         'Job Numbers': '',
+        'Paid Absence (Days)': '',
+        'Unpaid Absence (Days)': '',
+        'Absence Reasons': '',
         'Submitted': '',
         'Reviewed': '',
       });
@@ -178,6 +259,9 @@ export async function GET(request: NextRequest) {
         'Sat Hours': '',
         'Sun Hours': '',
         'Job Numbers': '',
+        'Paid Absence (Days)': '',
+        'Unpaid Absence (Days)': '',
+        'Absence Reasons': '',
         'Submitted': '',
         'Reviewed': '',
       });
@@ -201,6 +285,9 @@ export async function GET(request: NextRequest) {
           { header: 'Sat Hours', key: 'Sat Hours', width: 12 },
           { header: 'Sun Hours', key: 'Sun Hours', width: 12 },
           { header: 'Job Numbers', key: 'Job Numbers', width: 20 },
+          { header: 'Paid Absence (Days)', key: 'Paid Absence (Days)', width: 16 },
+          { header: 'Unpaid Absence (Days)', key: 'Unpaid Absence (Days)', width: 18 },
+          { header: 'Absence Reasons', key: 'Absence Reasons', width: 25 },
           { header: 'Submitted', key: 'Submitted', width: 12 },
           { header: 'Reviewed', key: 'Reviewed', width: 12 },
         ],

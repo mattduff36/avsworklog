@@ -71,14 +71,75 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: timesheets, error } = await query;
+    
+    // Fetch approved paid absences in the date range
+    let absenceQuery = supabase
+      .from('absences')
+      .select(`
+        id,
+        profile_id,
+        date,
+        end_date,
+        duration_days,
+        status,
+        absence_reasons (
+          name,
+          is_paid
+        ),
+        profiles (
+          id,
+          full_name,
+          employee_id
+        )
+      `)
+      .eq('status', 'approved');
+    
+    // Apply date filters for absences
+    if (dateFrom) {
+      absenceQuery = absenceQuery.gte('date', dateFrom);
+    }
+    if (dateTo) {
+      absenceQuery = absenceQuery.lte('date', dateTo);
+    }
+    
+    const { data: absences, error: absenceError } = await absenceQuery;
 
     if (error) {
       console.error('Error fetching timesheets:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+    
+    if (absenceError) {
+      console.error('Error fetching absences:', absenceError);
+      // Continue without absences rather than fail completely
+    }
 
     if (!timesheets || timesheets.length === 0) {
       return NextResponse.json({ error: 'No approved timesheets found for the specified criteria' }, { status: 404 });
+    }
+    
+    // Group absences by employee for easier lookup
+    // Convert absence days to hours (assuming 7.5 hours per day as standard working day)
+    const HOURS_PER_DAY = 7.5;
+    const absencesByEmployee = new Map<string, { paidDays: number; unpaidDays: number }>();
+    
+    if (absences && absences.length > 0) {
+      absences.forEach((absence: any) => {
+        const employeeId = absence.profile_id;
+        const isPaid = absence.absence_reasons?.is_paid || false;
+        const days = absence.duration_days || 0;
+        
+        if (!absencesByEmployee.has(employeeId)) {
+          absencesByEmployee.set(employeeId, { paidDays: 0, unpaidDays: 0 });
+        }
+        
+        const employeeAbsences = absencesByEmployee.get(employeeId)!;
+        if (isPaid) {
+          employeeAbsences.paidDays += days;
+        } else {
+          employeeAbsences.unpaidDays += days;
+        }
+      });
     }
 
     // Transform data for Excel - Payroll format
@@ -124,6 +185,11 @@ export async function GET(request: NextRequest) {
       });
 
       const totalHours = basicHours + overtime15Hours + overtime2Hours;
+      
+      // Get absence data for this employee
+      const employeeAbsences = absencesByEmployee.get(timesheet.user_id) || { paidDays: 0, unpaidDays: 0 };
+      const paidAbsenceHours = employeeAbsences.paidDays * HOURS_PER_DAY;
+      const unpaidAbsenceHours = employeeAbsences.unpaidDays * HOURS_PER_DAY;
 
       excelData.push({
         'Employee Name': employee?.full_name || 'Unknown',
@@ -132,6 +198,8 @@ export async function GET(request: NextRequest) {
         'Basic Hours (Mon-Fri)': formatExcelHours(basicHours),
         'Overtime 1.5x (Weekend)': formatExcelHours(overtime15Hours),
         'Overtime 2x (Night/Bank Holiday)': formatExcelHours(overtime2Hours),
+        'Paid Absence Hours': formatExcelHours(paidAbsenceHours),
+        'Unpaid Absence Hours': formatExcelHours(unpaidAbsenceHours),
         'Total Hours': formatExcelHours(totalHours),
         'Approved Date': formatExcelDate(timesheet.reviewed_at),
       });
@@ -141,6 +209,8 @@ export async function GET(request: NextRequest) {
     const totalBasic = excelData.reduce((sum, row) => sum + (parseFloat(row['Basic Hours (Mon-Fri)']) || 0), 0);
     const totalOvertime15 = excelData.reduce((sum, row) => sum + (parseFloat(row['Overtime 1.5x (Weekend)']) || 0), 0);
     const totalOvertime2 = excelData.reduce((sum, row) => sum + (parseFloat(row['Overtime 2x (Night/Bank Holiday)']) || 0), 0);
+    const totalPaidAbsence = excelData.reduce((sum, row) => sum + (parseFloat(row['Paid Absence Hours']) || 0), 0);
+    const totalUnpaidAbsence = excelData.reduce((sum, row) => sum + (parseFloat(row['Unpaid Absence Hours']) || 0), 0);
     const totalHours = excelData.reduce((sum, row) => sum + (parseFloat(row['Total Hours']) || 0), 0);
 
     excelData.push({
@@ -150,6 +220,8 @@ export async function GET(request: NextRequest) {
       'Basic Hours (Mon-Fri)': '',
       'Overtime 1.5x (Weekend)': '',
       'Overtime 2x (Night/Bank Holiday)': '',
+      'Paid Absence Hours': '',
+      'Unpaid Absence Hours': '',
       'Total Hours': '',
       'Approved Date': '',
     });
@@ -161,6 +233,8 @@ export async function GET(request: NextRequest) {
       'Basic Hours (Mon-Fri)': totalBasic.toFixed(2),
       'Overtime 1.5x (Weekend)': totalOvertime15.toFixed(2),
       'Overtime 2x (Night/Bank Holiday)': totalOvertime2.toFixed(2),
+      'Paid Absence Hours': totalPaidAbsence.toFixed(2),
+      'Unpaid Absence Hours': totalUnpaidAbsence.toFixed(2),
       'Total Hours': totalHours.toFixed(2),
       'Approved Date': '',
     });
@@ -176,6 +250,8 @@ export async function GET(request: NextRequest) {
           { header: 'Basic Hours (Mon-Fri)', key: 'Basic Hours (Mon-Fri)', width: 18 },
           { header: 'Overtime 1.5x (Weekend)', key: 'Overtime 1.5x (Weekend)', width: 20 },
           { header: 'Overtime 2x (Night/Bank Holiday)', key: 'Overtime 2x (Night/Bank Holiday)', width: 26 },
+          { header: 'Paid Absence Hours', key: 'Paid Absence Hours', width: 18 },
+          { header: 'Unpaid Absence Hours', key: 'Unpaid Absence Hours', width: 20 },
           { header: 'Total Hours', key: 'Total Hours', width: 12 },
           { header: 'Approved Date', key: 'Approved Date', width: 14 },
         ],
