@@ -119,8 +119,8 @@ export async function GET(request: NextRequest) {
     }
     
     // Group absences by employee for easier lookup
-    // Convert absence days to hours (assuming 7.5 hours per day as standard working day)
-    const HOURS_PER_DAY = 7.5;
+    // Convert absence days to hours (9 hours per day as standard working day)
+    const HOURS_PER_DAY = 9;
     const absencesByEmployee = new Map<string, { paidDays: number; unpaidDays: number }>();
     
     if (absences && absences.length > 0) {

@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
     }
     
     // Group absences by employee for easier lookup
-    const HOURS_PER_DAY = 7.5;
+    const HOURS_PER_DAY = 9;
     const absencesByEmployee = new Map<string, { paidDays: number; unpaidDays: number; reasons: string[] }>();
     
     if (absences && absences.length > 0) {
