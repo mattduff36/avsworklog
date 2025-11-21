@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
+import { getProfileWithRole } from '@/lib/utils/permissions';
 
 // Helper to create admin client with service role key
 function getSupabaseAdmin() {
@@ -29,13 +30,9 @@ export async function GET() {
     }
 
     // Check if user is admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+    const profile = await getProfileWithRole(user.id);
 
-    if (!profile || profile.role !== 'admin') {
+    if (!profile || profile.role?.name !== 'admin') {
       return NextResponse.json(
         { error: 'Forbidden: Admin access required' },
         { status: 403 }

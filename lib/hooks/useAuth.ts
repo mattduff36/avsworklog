@@ -5,7 +5,14 @@ import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { Database } from '@/types/database';
 
-type Profile = Database['public']['Tables']['profiles']['Row'];
+type Profile = Database['public']['Tables']['profiles']['Row'] & {
+  role?: {
+    name: string;
+    display_name: string;
+    is_manager_admin: boolean;
+    is_super_admin: boolean;
+  } | null;
+};
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -44,7 +51,15 @@ export function useAuth() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          role:roles(
+            name,
+            display_name,
+            is_manager_admin,
+            is_super_admin
+          )
+        `)
         .eq('id', userId)
         .single();
 
@@ -55,7 +70,15 @@ export function useAuth() {
           await new Promise(resolve => setTimeout(resolve, 1000));
           const { data: retryData, error: retryError } = await supabase
             .from('profiles')
-            .select('*')
+            .select(`
+              *,
+              role:roles(
+                name,
+                display_name,
+                is_manager_admin,
+                is_super_admin
+              )
+            `)
             .eq('id', userId)
             .single();
           
@@ -63,14 +86,14 @@ export function useAuth() {
             console.error('Profile not found after retry:', retryError);
             setProfile(null);
           } else {
-            setProfile(retryData);
+            setProfile(retryData as Profile);
           }
         } else {
           console.error('Error fetching profile:', error);
           setProfile(null);
         }
       } else {
-        setProfile(data);
+        setProfile(data as Profile);
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -121,9 +144,10 @@ export function useAuth() {
     signIn,
     signOut,
     signUp,
-    isAdmin: profile?.role === 'admin',
-    isManager: profile?.role === 'manager' || profile?.role === 'admin',
-    isEmployee: profile?.role?.startsWith('employee-') || false,
+    isAdmin: profile?.role?.name === 'admin',
+    isManager: profile?.role?.is_manager_admin || false,
+    isEmployee: profile?.role?.name?.startsWith('employee-') || false,
+    isSuperAdmin: profile?.is_super_admin || profile?.role?.is_super_admin || false,
   };
 }
 

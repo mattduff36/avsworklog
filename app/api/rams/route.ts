@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getProfileWithRole } from '@/lib/utils/permissions';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,18 +13,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user profile
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, role, full_name')
-      .eq('id', user.id)
-      .single();
+    // Get user profile with role
+    const profile = await getProfileWithRole(user.id);
 
-    if (profileError || !profile) {
+    if (!profile) {
       return NextResponse.json({ error: 'Failed to verify user' }, { status: 403 });
     }
 
-    const isManagerOrAdmin = profile.role === 'admin' || profile.role === 'manager';
+    const isManagerOrAdmin = profile.role?.is_manager_admin || false;
 
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;

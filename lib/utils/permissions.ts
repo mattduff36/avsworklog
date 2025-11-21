@@ -1,6 +1,59 @@
 import { createClient } from '@/lib/supabase/server';
 import type { ModuleName, UserPermissions } from '@/types/roles';
 
+export type ProfileWithRole = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  phone_number: string | null;
+  employee_id: string | null;
+  role_id: string | null;
+  must_change_password: boolean | null;
+  is_super_admin: boolean | null;
+  created_at: string;
+  updated_at: string;
+  role: {
+    name: string;
+    display_name: string;
+    is_manager_admin: boolean;
+    is_super_admin: boolean;
+  } | null;
+};
+
+/**
+ * Fetch a profile with role information included
+ * Use this in API routes instead of direct profile fetch
+ */
+export async function getProfileWithRole(userId: string): Promise<ProfileWithRole | null> {
+  const supabase = await createClient();
+
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select(`
+        *,
+        role:roles(
+          name,
+          display_name,
+          is_manager_admin,
+          is_super_admin
+        )
+      `)
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching profile with role:', error);
+      return null;
+    }
+
+    return data as ProfileWithRole;
+  } catch (error) {
+    console.error('Error fetching profile with role:', error);
+    return null;
+  }
+}
+
 /**
  * Check if a user has permission to access a specific module
  */
