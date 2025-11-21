@@ -224,8 +224,6 @@ export default function DashboardPage() {
 
       {/* Quick Actions - Square Button Grid */}
       <div>
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">Create New Form</h2>
-        
         <TooltipProvider>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {/* Active Forms */}
