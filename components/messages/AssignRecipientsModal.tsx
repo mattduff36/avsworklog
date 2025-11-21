@@ -204,9 +204,13 @@ export function AssignRecipientsModal({
                       size="sm"
                       onClick={() => handleSelectRole(role.value)}
                       disabled={loading || fetching || roleCount === 0}
-                      className={`justify-start text-sm ${allRoleSelected ? 'bg-primary text-primary-foreground' : ''}`}
+                      className={`justify-start text-sm transition-all ${
+                        allRoleSelected 
+                          ? 'bg-avs-yellow text-slate-900 font-semibold border-2 border-avs-yellow shadow-lg' 
+                          : 'hover:bg-slate-800'
+                      }`}
                     >
-                      {role.label} ({roleCount})
+                      {allRoleSelected && '✓ '}{role.label} ({roleCount})
                     </Button>
                   );
                 })}
@@ -281,22 +285,6 @@ export function AssignRecipientsModal({
               </ScrollArea>
             )}
 
-            {selectedIds.size > 0 && (
-              <div className={`rounded-md p-3 ${
-                messageType === 'TOOLBOX_TALK' 
-                  ? 'bg-red-50 dark:bg-red-950/20' 
-                  : 'bg-blue-50 dark:bg-blue-950/20'
-              }`}>
-                <p className={`text-sm ${
-                  messageType === 'TOOLBOX_TALK'
-                    ? 'text-red-900 dark:text-red-100'
-                    : 'text-blue-900 dark:text-blue-100'
-                }`}>
-                  ℹ️ {selectedIds.size} employee{selectedIds.size !== 1 ? 's' : ''} will be notified
-                  {messageType === 'TOOLBOX_TALK' && ' and required to sign'}
-                </p>
-              </div>
-            )}
           </div>
 
           <DialogFooter className="gap-3">
