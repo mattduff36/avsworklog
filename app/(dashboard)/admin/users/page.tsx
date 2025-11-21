@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -393,29 +394,29 @@ export default function UsersAdminPage() {
             </p>
           </div>
         </div>
-
-        {/* Tabs */}
-        <div className="flex gap-2 mt-6 border-b border-slate-700">
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`tab ${activeTab === 'users' ? 'active' : ''}`}
-          >
-            <User className="h-4 w-4 mr-2" />
-            Users
-          </button>
-          <button
-            onClick={() => setActiveTab('roles')}
-            className={`tab ${activeTab === 'roles' ? 'active' : ''}`}
-          >
-            <Shield className="h-4 w-4 mr-2" />
-            Roles
-          </button>
-        </div>
       </div>
 
-      {/* Tab Content */}
-      {activeTab === 'users' && (
-        <>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full max-w-md grid-cols-2 bg-slate-100 dark:bg-slate-800 p-1">
+          <TabsTrigger 
+            value="users" 
+            className="gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+          >
+            <User className="h-4 w-4" />
+            Users
+          </TabsTrigger>
+          <TabsTrigger 
+            value="roles" 
+            className="gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+          >
+            <Shield className="h-4 w-4" />
+            Roles
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Users Tab Content */}
+        <TabsContent value="users" className="space-y-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
@@ -994,11 +995,13 @@ export default function UsersAdminPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-        </>
-      )}
+        </TabsContent>
 
-      {/* Roles Tab */}
-      {activeTab === 'roles' && <RoleManagement />}
+        {/* Roles Tab Content */}
+        <TabsContent value="roles">
+          <RoleManagement />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
