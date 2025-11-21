@@ -24,18 +24,11 @@ export function SidebarNav({ open, onClose }: SidebarNavProps) {
   const pathname = usePathname();
   const { isAdmin, isManager } = useAuth();
 
-  // Debug logging
-  useEffect(() => {
-    console.log('SidebarNav open state:', open);
-    console.log('SidebarNav isManager:', isManager);
-  }, [open, isManager]);
-
   // Close sidebar on route change
   useEffect(() => {
-    if (open) {
-      onClose();
-    }
-  }, [pathname, open, onClose]);
+    onClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   // Close on escape key
   useEffect(() => {

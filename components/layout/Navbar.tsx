@@ -117,10 +117,7 @@ export function Navbar() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    console.log('Sidebar button clicked, opening sidebar');
-                    setSidebarOpen(true);
-                  }}
+                  onClick={() => setSidebarOpen(true)}
                   className="mr-4 text-slate-300 hover:text-white hover:bg-slate-800/50 hidden md:flex items-center"
                   title="Open menu"
                 >
