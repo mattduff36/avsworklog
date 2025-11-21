@@ -22,8 +22,7 @@ import {
   Truck,
   Calendar,
   Bell,
-  MessageSquare,
-  PanelLeftOpen
+  MessageSquare
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { NotificationPanel } from '@/components/messages/NotificationPanel';
@@ -34,7 +33,7 @@ export function Navbar() {
   const { profile, signOut, isAdmin, isManager } = useAuth();
   const { isOnline, pendingCount } = useOfflineSync();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar starts collapsed
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -104,7 +103,7 @@ export function Navbar() {
   return (
     <>
       {/* Sidebar for Manager/Admin (desktop) */}
-      <SidebarNav open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <SidebarNav open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
 
       <nav className="bg-slate-900/50 backdrop-blur-xl border-b border-slate-700/50 sticky top-0 z-50">
         {/* AVS Yellow accent strip */}
@@ -112,19 +111,6 @@ export function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              {/* Sidebar trigger for managers/admins (desktop only) */}
-              {isManager && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSidebarOpen(true)}
-                  className="mr-4 text-slate-300 hover:text-white hover:bg-slate-800/50 hidden md:flex items-center"
-                  title="Open menu"
-                >
-                  <PanelLeftOpen className="w-5 h-5" />
-                </Button>
-              )}
-
               <Link href="/dashboard" className="flex items-center space-x-2 group">
                 <div className="text-xl font-bold text-white group-hover:text-avs-yellow transition-colors">
                   SQUIRES
