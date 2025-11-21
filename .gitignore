@@ -51,3 +51,6 @@ build-output.txt
 
 # data folder (scanned forms and reference files)
 /data
+
+# database backups
+/backups
