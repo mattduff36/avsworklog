@@ -20,7 +20,6 @@ import {
   CheckSquare,
   ListTodo,
   Truck,
-  FileCheck2,
   Calendar,
   Bell,
   MessageSquare,
@@ -90,13 +89,6 @@ export function Navbar() {
   ];
 
   // Manager/admin links for mobile menu only
-  const formsLinks = [
-    { href: '/timesheets', label: 'Timesheets', icon: FileText },
-    { href: '/inspections', label: 'Inspections', icon: ClipboardCheck },
-    { href: '/rams', label: 'RAMS Documents', icon: FileCheck2 },
-    { href: '/absence', label: 'Absence & Leave', icon: Calendar },
-  ];
-
   const managerLinks = [
     { href: '/approvals', label: 'Approvals', icon: CheckSquare },
     { href: '/actions', label: 'Actions', icon: ListTodo },
@@ -298,32 +290,8 @@ export function Navbar() {
                 <>
                   <div className="my-3 border-t border-slate-700/50"></div>
                   
-                  {/* Forms Section */}
-                  <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Forms
-                  </div>
-                  {formsLinks.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = pathname?.startsWith(item.href);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className={`flex items-center px-3 py-2 pl-6 text-base font-medium rounded-md ${
-                          isActive
-                            ? 'bg-avs-yellow text-slate-900'
-                            : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
-                        }`}
-                      >
-                        <Icon className="w-5 h-5 mr-3" />
-                        {item.label}
-                      </Link>
-                    );
-                  })}
-                  
                   {/* Management Section */}
-                  <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider mt-4">
+                  <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                     Management
                   </div>
                   {managerLinks.map((item) => {

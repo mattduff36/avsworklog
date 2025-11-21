@@ -5,18 +5,13 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import {
-  FileText,
-  ClipboardCheck,
   BarChart3,
   Users,
   CheckSquare,
   ListTodo,
   Truck,
-  FileCheck2,
-  Calendar,
   MessageSquare,
-  X,
-  FolderOpen
+  X
 } from 'lucide-react';
 import { useEffect } from 'react';
 
@@ -50,13 +45,6 @@ export function SidebarNav({ open, onClose }: SidebarNavProps) {
 
   if (!isManager) return null;
 
-  const formsLinks = [
-    { href: '/timesheets', label: 'Timesheets', icon: FileText },
-    { href: '/inspections', label: 'Inspections', icon: ClipboardCheck },
-    { href: '/rams', label: 'RAMS Documents', icon: FileCheck2 },
-    { href: '/absence', label: 'Absence & Leave', icon: Calendar },
-  ];
-
   const managerLinks = [
     { href: '/approvals', label: 'Approvals', icon: CheckSquare },
     { href: '/actions', label: 'Actions', icon: ListTodo },
@@ -73,16 +61,16 @@ export function SidebarNav({ open, onClose }: SidebarNavProps) {
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300 ${
-          open ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        className={`fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
+          open ? 'opacity-100 z-40' : 'opacity-0 pointer-events-none -z-10'
         }`}
         onClick={onClose}
       />
 
-      {/* Sidebar */}
+      {/* Sidebar - Full height, below navbar */}
       <div
-        className={`fixed left-0 top-0 h-full w-64 bg-slate-900 border-r border-slate-700 z-50 transform transition-transform duration-300 ease-in-out ${
-          open ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed left-0 top-0 bottom-0 w-64 bg-slate-900 border-r border-slate-700 transform transition-transform duration-300 ease-in-out ${
+          open ? 'translate-x-0 z-50' : '-translate-x-full z-50'
         }`}
       >
         {/* Header */}
@@ -99,35 +87,7 @@ export function SidebarNav({ open, onClose }: SidebarNavProps) {
         </div>
 
         {/* Navigation */}
-        <div className="overflow-y-auto h-[calc(100%-4rem)] py-4">
-          {/* Forms Section */}
-          <div className="px-3 mb-6">
-            <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              <FolderOpen className="w-4 h-4" />
-              Forms
-            </div>
-            <div className="space-y-1">
-              {formsLinks.map((link) => {
-                const Icon = link.icon;
-                const isActive = pathname?.startsWith(link.href);
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-avs-yellow text-slate-900'
-                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {link.label}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-
+        <div className="overflow-y-auto h-[calc(100vh-4rem)] py-4">
           {/* Manager Links */}
           <div className="px-3 mb-6">
             <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
