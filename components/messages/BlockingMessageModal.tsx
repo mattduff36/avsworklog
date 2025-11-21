@@ -67,7 +67,7 @@ export function BlockingMessageModal({
   return (
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent 
-        className="max-w-2xl max-h-[90vh] bg-white dark:bg-slate-900 border-red-600 dark:border-red-600"
+        className="max-w-2xl max-h-[90vh] bg-white dark:bg-slate-900 border-red-600 dark:border-red-600 flex flex-col"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
@@ -87,47 +87,50 @@ export function BlockingMessageModal({
           </div>
         )}
 
-        <div className="px-6 pb-6 space-y-4">
-          {/* Simple one-line warning */}
-          <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
-            <AlertCircle className="h-4 w-4 text-amber-600" />
-            <AlertDescription className="text-amber-900 dark:text-amber-100">
-              Please read and sign this Toolbox Talk to continue using the app.
-            </AlertDescription>
-          </Alert>
+        <ScrollArea className="flex-1 px-6">
+          <div className="pb-6 space-y-4">
+            {/* Simple one-line warning */}
+            <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-900 dark:text-amber-100">
+                Please read and sign this Toolbox Talk to continue using the app.
+              </AlertDescription>
+            </Alert>
 
-          {/* Message Subject */}
-          <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 border-l-4 border-red-600">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">{message.subject}</h3>
-          </div>
-
-          {/* Message Body */}
-          <ScrollArea className="h-[200px] w-full rounded-md border border-slate-200 dark:border-slate-700 p-4">
-            <div className="text-sm text-slate-900 dark:text-white whitespace-pre-wrap">
-              {message.body}
+            {/* Message Subject */}
+            <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 border-l-4 border-red-600">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">{message.subject}</h3>
             </div>
-          </ScrollArea>
 
-          {/* Signature Section - Always visible like RAMS */}
-          <div className="space-y-3">
-            <label className="text-sm font-medium text-slate-900 dark:text-white">
-              Your Signature <span className="text-destructive">*</span>
-            </label>
-            
-            <SignaturePad
-              onSave={handleSign}
-              onCancel={() => {}}
-              disabled={signing}
-            />
-
-            {signing && (
-              <div className="flex items-center justify-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Recording signature...
+            {/* Message Body - Dynamic height */}
+            <div className="max-h-[300px] overflow-y-auto w-full rounded-md border border-slate-200 dark:border-slate-700 p-4">
+              <div className="text-sm text-slate-900 dark:text-white whitespace-pre-wrap">
+                {message.body}
               </div>
-            )}
+            </div>
+
+            {/* Signature Section - Always visible like RAMS */}
+            <div className="space-y-3">
+              <label className="text-sm font-medium text-slate-900 dark:text-white">
+                Your Signature <span className="text-destructive">*</span>
+              </label>
+              
+              <SignaturePad
+                onSave={handleSign}
+                onCancel={() => {}}
+                disabled={signing}
+                variant="toolbox-talk"
+              />
+
+              {signing && (
+                <div className="flex items-center justify-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Recording signature...
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );

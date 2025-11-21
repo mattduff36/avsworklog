@@ -11,9 +11,10 @@ interface SignaturePadProps {
   onCancel: () => void;
   initialValue?: string | null;
   disabled?: boolean;
+  variant?: 'default' | 'toolbox-talk';
 }
 
-export function SignaturePad({ onSave, onCancel, initialValue, disabled = false }: SignaturePadProps) {
+export function SignaturePad({ onSave, onCancel, initialValue, disabled = false, variant = 'default' }: SignaturePadProps) {
   const sigCanvas = useRef<SignatureCanvas>(null);
 
   useEffect(() => {
@@ -85,7 +86,11 @@ export function SignaturePad({ onSave, onCancel, initialValue, disabled = false 
           size="sm"
           onClick={handleSave}
           disabled={disabled}
-          className="border-rams text-rams hover:bg-rams hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          className={
+            variant === 'toolbox-talk'
+              ? 'border-red-600 text-red-600 hover:bg-red-600 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed'
+              : 'border-rams text-rams hover:bg-rams hover:text-white disabled:opacity-50 disabled:cursor-not-allowed'
+          }
         >
           <Check className="h-4 w-4 mr-2" />
           Save Signature
