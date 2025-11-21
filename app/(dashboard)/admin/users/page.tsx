@@ -59,6 +59,7 @@ export default function UsersAdminPage() {
   const [filteredUsers, setFilteredUsers] = useState<ProfileWithEmail[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'manager' | 'employee'>('all');
   const [availableRoles, setAvailableRoles] = useState<Array<{ id: string; name: string; display_name: string }>>([]);
 
   // Dialog states
@@ -167,21 +168,32 @@ export default function UsersAdminPage() {
     }
   }, [isAdmin, supabase]);
 
-  // Search filter
+  // Search and role filter
   useEffect(function () {
-    if (!searchQuery.trim()) {
-      setFilteredUsers(users);
-      return;
+    let filtered = users;
+
+    // Apply role filter
+    if (roleFilter !== 'all') {
+      filtered = filtered.filter((user) => {
+        if (roleFilter === 'admin') return user.role?.name === 'admin';
+        if (roleFilter === 'manager') return user.role?.name === 'manager';
+        if (roleFilter === 'employee') return user.role?.name?.startsWith('employee-');
+        return true;
+      });
     }
 
-    const query = searchQuery.toLowerCase();
-    const filtered = users.filter((user) =>
-      user.full_name?.toLowerCase().includes(query) ||
-      user.email?.toLowerCase().includes(query) ||
-      user.employee_id?.toLowerCase().includes(query)
-    );
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((user) =>
+        user.full_name?.toLowerCase().includes(query) ||
+        user.email?.toLowerCase().includes(query) ||
+        user.employee_id?.toLowerCase().includes(query)
+      );
+    }
+
     setFilteredUsers(filtered);
-  }, [searchQuery, users]);
+  }, [searchQuery, roleFilter, users]);
 
   // Handle add user
   async function handleAddUser() {
@@ -447,20 +459,30 @@ export default function UsersAdminPage() {
 
         {/* Users Tab Content */}
         <TabsContent value="users" className="space-y-6">
-          {/* Stats Cards */}
+          {/* Stats Cards - Now Filter Buttons */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card 
+          className={`bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-lg transition-all ${
+            roleFilter === 'all' ? 'border-2 border-yellow-500' : ''
+          }`}
+          onClick={() => setRoleFilter('all')}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Total Users</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">All Users</p>
                 <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.total}</p>
               </div>
               <User className="h-8 w-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card 
+          className={`bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-lg transition-all ${
+            roleFilter === 'admin' ? 'border-2 border-yellow-500' : ''
+          }`}
+          onClick={() => setRoleFilter('admin')}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -471,7 +493,12 @@ export default function UsersAdminPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card 
+          className={`bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-lg transition-all ${
+            roleFilter === 'manager' ? 'border-2 border-yellow-500' : ''
+          }`}
+          onClick={() => setRoleFilter('manager')}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -482,7 +509,12 @@ export default function UsersAdminPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card 
+          className={`bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-lg transition-all ${
+            roleFilter === 'employee' ? 'border-2 border-yellow-500' : ''
+          }`}
+          onClick={() => setRoleFilter('employee')}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
