@@ -30,6 +30,8 @@ import {
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
 import { Database } from '@/types/database';
+import { getUserPermissions } from '@/lib/utils/permissions';
+import type { ModuleName } from '@/types/roles';
 
 type PendingApprovalCount = {
   type: 'timesheets' | 'inspections' | 'absences';
@@ -63,6 +65,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [pendingRAMSCount, setPendingRAMSCount] = useState(0);
   const [hasRAMSAssignments, setHasRAMSAssignments] = useState(false);
+  const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
 
   // Placeholder forms for future development (only shown to managers/admins)
   const placeholderForms = [
@@ -75,6 +78,16 @@ export default function DashboardPage() {
   ];
 
   const showPlaceholders = isManager || isAdmin;
+
+  // Fetch user permissions
+  useEffect(() => {
+    async function fetchPermissions() {
+      if (!profile?.id) return;
+      const permissions = await getUserPermissions(profile.id);
+      setUserPermissions(permissions);
+    }
+    fetchPermissions();
+  }, [profile?.id]);
 
   useEffect(() => {
     if (isManager || isAdmin) {
@@ -229,6 +242,22 @@ export default function DashboardPage() {
             {/* Active Forms */}
             {formTypes
               .filter(formType => {
+                // Map form IDs to module names for permission checking
+                const moduleMap: Record<string, ModuleName> = {
+                  'timesheet': 'timesheets',
+                  'inspection': 'inspections',
+                  'rams': 'rams',
+                  'absence': 'absence',
+                };
+                
+                const moduleName = moduleMap[formType.id];
+                
+                // Check if user has permission to this module
+                // Managers and admins always have access
+                if (!isManager && !isAdmin && moduleName && !userPermissions.has(moduleName)) {
+                  return false;
+                }
+                
                 // Hide RAMS for employees with no assignments
                 if (formType.id === 'rams' && !isManager && !isAdmin && !hasRAMSAssignments) {
                   return false;
