@@ -1,6 +1,7 @@
 import { Navbar } from '@/components/layout/Navbar';
 import { DashboardContent } from '@/components/layout/DashboardContent';
 import { MessageBlockingCheck } from '@/components/messages/MessageBlockingCheck';
+import { MobileNavBar } from '@/components/layout/MobileNavBar';
 
 // Force dynamic rendering to prevent build-time errors
 export const dynamic = 'force-dynamic';
@@ -22,6 +23,9 @@ export default function DashboardLayout({
       <DashboardContent>
         {children}
       </DashboardContent>
+      
+      {/* Mobile Navigation Bar - Bottom of screen on mobile only */}
+      <MobileNavBar />
     </div>
   );
 }
