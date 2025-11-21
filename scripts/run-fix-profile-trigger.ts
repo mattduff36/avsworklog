@@ -9,9 +9,26 @@ config({ path: '.env.local' });
 async function runMigration() {
   console.log('🔧 Fixing profile creation trigger for RBAC...\n');
 
+  const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
+  
+  if (!connectionString) {
+    console.error('❌ Missing database connection string');
+    console.error('Please ensure POSTGRES_URL_NON_POOLING is set in .env.local');
+    process.exit(1);
+  }
+
+  // Parse connection string and rebuild with explicit SSL config
+  const url = new URL(connectionString);
+  
   const client = new Client({
-    connectionString: process.env.POSTGRES_URL_NON_POOLING,
-    ssl: { rejectUnauthorized: false }
+    host: url.hostname,
+    port: parseInt(url.port) || 5432,
+    database: url.pathname.slice(1),
+    user: url.username,
+    password: url.password,
+    ssl: {
+      rejectUnauthorized: false
+    }
   });
 
   try {
