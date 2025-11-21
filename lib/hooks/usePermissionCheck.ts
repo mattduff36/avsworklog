@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from './useAuth';
-import { userHasPermission } from '../utils/permissions';
+import { createClient } from '@/lib/supabase/client';
 import type { ModuleName } from '@/types/roles';
 import { toast } from 'sonner';
 
@@ -41,13 +41,38 @@ export function usePermissionCheck(moduleName: ModuleName, redirectOnFail = true
         return;
       }
 
-      // Check user permission
+      // Check user permission via client Supabase
       try {
-        const permitted = await userHasPermission(user.id, moduleName);
-        setHasPermission(permitted);
+        const supabase = createClient();
+        
+        // Fetch role with permissions
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select(`
+            role_id,
+            role:roles!inner(
+              is_manager_admin,
+              role_permissions!inner(
+                module_name,
+                enabled
+              )
+            )
+          `)
+          .eq('id', user.id)
+          .single();
+
+        if (error) throw error;
+
+        // Check if user has permission for this module
+        const rolePerms = profileData?.role as any;
+        const hasModulePermission = rolePerms?.role_permissions?.some(
+          (p: any) => p.module_name === moduleName && p.enabled
+        );
+
+        setHasPermission(hasModulePermission || false);
 
         // Redirect if unauthorized
-        if (!permitted && redirectOnFail) {
+        if (!hasModulePermission && redirectOnFail) {
           toast.error(`You don't have access to ${moduleName.replace(/-/g, ' ')}`);
           router.push('/dashboard');
         }
