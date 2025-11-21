@@ -21,7 +21,6 @@ import { INSPECTION_ITEMS, InspectionStatus } from '@/types/inspection';
 import { Database } from '@/types/database';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { toast } from 'sonner';
-import { getUsersWithPermission } from '@/lib/utils/permissions';
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -78,11 +77,31 @@ export default function NewInspectionPage() {
   const fetchEmployees = async () => {
     try {
       // Get employees with inspections permission
-      const allEmployees = await getUsersWithPermission('inspections');
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          full_name,
+          role:roles!inner(
+            name,
+            is_manager_admin
+          ),
+          role_permissions!inner(
+            module_name,
+            enabled
+          )
+        `)
+        .eq('role_permissions.module_name', 'inspections')
+        .eq('role_permissions.enabled', true)
+        .order('full_name');
+
+      if (error) throw error;
+
+      const allEmployees = profiles || [];
       
       // Convert to expected format and sort
       const formattedEmployees: Employee[] = allEmployees
-        .map(emp => ({
+        .map((emp: any) => ({
           id: emp.id,
           full_name: emp.full_name || 'Unnamed User',
           employee_id: emp.employee_id || null,

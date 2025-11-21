@@ -22,7 +22,6 @@ import { Database } from '@/types/database';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { fetchUKBankHolidays } from '@/lib/utils/bank-holidays';
 import { toast } from 'sonner';
-import { getUsersWithPermission } from '@/lib/utils/permissions';
 
 type Employee = {
   id: string;
@@ -234,12 +233,32 @@ export default function NewTimesheetPage() {
 
   const fetchEmployees = async () => {
     try {
-      // Get all profiles and filter by permission
-      const allEmployees = await getUsersWithPermission('timesheets');
+      // Get all profiles with timesheets permission
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          full_name,
+          role:roles!inner(
+            name,
+            is_manager_admin
+          ),
+          role_permissions!inner(
+            module_name,
+            enabled
+          )
+        `)
+        .eq('role_permissions.module_name', 'timesheets')
+        .eq('role_permissions.enabled', true)
+        .order('full_name');
+
+      if (error) throw error;
+
+      const allEmployees = profiles || [];
       
       // Convert to expected format and sort
       const formattedEmployees: Employee[] = allEmployees
-        .map(emp => ({
+        .map((emp: any) => ({
           id: emp.id,
           full_name: emp.full_name || 'Unnamed User',
           employee_id: emp.employee_id || null,
