@@ -19,6 +19,11 @@ interface Employee {
   } | null;
 }
 
+interface Role {
+  name: string;
+  display_name: string;
+}
+
 interface AssignRecipientsModalProps {
   open: boolean;
   onClose: () => void;
@@ -26,16 +31,6 @@ interface AssignRecipientsModalProps {
   messageSubject: string;
   messageType: 'TOOLBOX_TALK' | 'REMINDER';
 }
-
-const ROLE_OPTIONS = [
-  { value: 'admin', label: 'Admins' },
-  { value: 'manager', label: 'Managers' },
-  { value: 'employee-civils', label: 'Civils Employees' },
-  { value: 'employee-plant', label: 'Plant Employees' },
-  { value: 'employee-transport', label: 'Transport Employees' },
-  { value: 'employee-office', label: 'Office Employees' },
-  { value: 'employee-workshop', label: 'Workshop Employees' },
-];
 
 export function AssignRecipientsModal({
   open,
@@ -45,6 +40,7 @@ export function AssignRecipientsModal({
   messageType,
 }: AssignRecipientsModalProps) {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
@@ -74,6 +70,16 @@ export function AssignRecipientsModal({
   const fetchEmployees = async () => {
     setFetching(true);
     try {
+      // Fetch all roles
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('roles')
+        .select('name, display_name')
+        .order('display_name');
+
+      if (rolesError) throw rolesError;
+      setRoles(rolesData || []);
+
+      // Fetch all employees with roles
       const { data: allEmployees, error: empError } = await supabase
         .from('profiles')
         .select(`
@@ -201,18 +207,18 @@ export function AssignRecipientsModal({
                 Quick Select by Role:
               </label>
               <div className="grid grid-cols-2 gap-2">
-                {ROLE_OPTIONS.map((role) => {
-                  const roleEmployees = employees.filter(emp => emp.role?.name === role.value);
+                {roles.map((role) => {
+                  const roleEmployees = employees.filter(emp => emp.role?.name === role.name);
                   const roleCount = roleEmployees.length;
                   const allRoleSelected = roleEmployees.length > 0 && roleEmployees.every(emp => selectedIds.has(emp.id));
                   
                   return (
                     <Button
-                      key={role.value}
+                      key={role.name}
                       type="button"
                       variant={allRoleSelected ? "default" : "outline"}
                       size="sm"
-                      onClick={() => handleSelectRole(role.value)}
+                      onClick={() => handleSelectRole(role.name)}
                       disabled={loading || fetching || roleCount === 0}
                       className={`justify-start text-sm transition-all ${
                         allRoleSelected 
@@ -220,7 +226,7 @@ export function AssignRecipientsModal({
                           : 'hover:bg-slate-800'
                       }`}
                     >
-                      {allRoleSelected && '✓ '}{role.label} ({roleCount})
+                      {allRoleSelected && '✓ '}{role.display_name} ({roleCount})
                     </Button>
                   );
                 })}

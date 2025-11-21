@@ -16,13 +16,32 @@ export async function POST(request: NextRequest) {
     // Check authentication
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
+      console.error('Auth error:', userError);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Check if user is manager/admin
     const profile = await getProfileWithRole(user.id);
+    console.log('Profile fetched:', { 
+      id: profile?.id, 
+      full_name: profile?.full_name,
+      role_id: profile?.role_id,
+      role: profile?.role,
+      is_manager_admin: profile?.role?.is_manager_admin 
+    });
 
-    if (!profile || !profile.role?.is_manager_admin) {
+    if (!profile) {
+      console.error('Profile not found for user:', user.id);
+      return NextResponse.json({ error: 'Profile not found' }, { status: 403 });
+    }
+
+    if (!profile.role) {
+      console.error('User has no role assigned:', user.id);
+      return NextResponse.json({ error: 'No role assigned to user' }, { status: 403 });
+    }
+
+    if (!profile.role.is_manager_admin) {
+      console.error('User is not manager/admin:', user.id, profile.role);
       return NextResponse.json({ error: 'Forbidden: Manager/Admin access required' }, { status: 403 });
     }
 

@@ -44,8 +44,18 @@ export async function getProfileWithRole(userId: string): Promise<ProfileWithRol
 
     if (error) {
       console.error('Error fetching profile with role:', error);
+      console.error('User ID:', userId);
       return null;
     }
+
+    console.log('getProfileWithRole result:', {
+      user_id: userId,
+      profile_id: data?.id,
+      role_id: data?.role_id,
+      role_name: (data as any)?.role?.name,
+      role_display_name: (data as any)?.role?.display_name,
+      is_manager_admin: (data as any)?.role?.is_manager_admin
+    });
 
     return data as ProfileWithRole;
   } catch (error) {
