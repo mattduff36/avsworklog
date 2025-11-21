@@ -40,14 +40,18 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import type { Database } from '@/types/database';
+import { RoleManagement } from '@/components/admin/RoleManagement';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
 type ProfileWithEmail = Profile & { email?: string };
 
+type TabType = 'users' | 'roles';
+
 export default function UsersAdminPage() {
   const { user: currentUser, isAdmin } = useAuth();
   const supabase = createClient();
+  const [activeTab, setActiveTab] = useState<TabType>('users');
 
   // State
   const [users, setUsers] = useState<ProfileWithEmail[]>([]);
@@ -389,10 +393,31 @@ export default function UsersAdminPage() {
             </p>
           </div>
         </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2 mt-6 border-b border-slate-700">
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`tab ${activeTab === 'users' ? 'active' : ''}`}
+          >
+            <User className="h-4 w-4 mr-2" />
+            Users
+          </button>
+          <button
+            onClick={() => setActiveTab('roles')}
+            className={`tab ${activeTab === 'roles' ? 'active' : ''}`}
+          >
+            <Shield className="h-4 w-4 mr-2" />
+            Roles
+          </button>
+        </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Tab Content */}
+      {activeTab === 'users' && (
+        <>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -969,6 +994,11 @@ export default function UsersAdminPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        </>
+      )}
+
+      {/* Roles Tab */}
+      {activeTab === 'roles' && <RoleManagement />}
     </div>
   );
 }
