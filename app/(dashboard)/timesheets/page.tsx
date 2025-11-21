@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useTimesheetRealtime } from '@/lib/hooks/useRealtime';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,6 +36,7 @@ type Employee = {
 
 export default function TimesheetsPage() {
   const { user, isManager } = useAuth();
+  const { hasPermission, loading: permissionLoading } = usePermissionCheck('timesheets');
   const router = useRouter();
   const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -216,6 +218,23 @@ export default function TimesheetsPage() {
       setDeleting(false);
     }
   };
+
+  // Show loading while checking permissions
+  if (permissionLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-slate-600 dark:text-slate-400">Checking permissions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if no permission (hook will redirect)
+  if (!hasPermission) {
+    return null;
+  }
 
   return (
     <div className="space-y-6 max-w-6xl">
