@@ -24,10 +24,18 @@ export function SidebarNav({ open, onClose }: SidebarNavProps) {
   const pathname = usePathname();
   const { isAdmin, isManager } = useAuth();
 
+  // Debug logging
+  useEffect(() => {
+    console.log('SidebarNav open state:', open);
+    console.log('SidebarNav isManager:', isManager);
+  }, [open, isManager]);
+
   // Close sidebar on route change
   useEffect(() => {
-    onClose();
-  }, [pathname, onClose]);
+    if (open) {
+      onClose();
+    }
+  }, [pathname, open, onClose]);
 
   // Close on escape key
   useEffect(() => {
@@ -61,16 +69,16 @@ export function SidebarNav({ open, onClose }: SidebarNavProps) {
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
-          open ? 'opacity-100 z-40' : 'opacity-0 pointer-events-none -z-10'
+        className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] transition-opacity duration-300 ${
+          open ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onClose}
       />
 
-      {/* Sidebar - Full height, below navbar */}
+      {/* Sidebar - Full height */}
       <div
-        className={`fixed left-0 top-0 bottom-0 w-64 bg-slate-900 border-r border-slate-700 transform transition-transform duration-300 ease-in-out ${
-          open ? 'translate-x-0 z-50' : '-translate-x-full z-50'
+        className={`fixed left-0 top-0 bottom-0 w-64 bg-slate-900 border-r border-slate-700 z-[70] transform transition-transform duration-300 ease-in-out ${
+          open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Header */}
