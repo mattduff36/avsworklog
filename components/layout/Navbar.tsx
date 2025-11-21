@@ -15,8 +15,6 @@ import {
   BarChart3, 
   Users, 
   LogOut,
-  WifiOff,
-  Wifi,
   CheckSquare,
   ListTodo,
   Truck,
@@ -163,21 +161,27 @@ export function Navbar() {
 
             {/* Right side */}
             <div className="flex items-center space-x-4">
-              {/* Offline/Online Status */}
-              <div className="flex items-center space-x-2">
-                {isOnline ? (
-                  <Wifi className="w-4 h-4 text-green-400" />
-                ) : (
-                  <div className="flex items-center space-x-2">
-                    <WifiOff className="w-4 h-4 text-amber-400" />
-                    {pendingCount > 0 && (
-                      <Badge variant="warning" className="text-xs bg-amber-500/20 text-amber-300 border-amber-500/30">
-                        {pendingCount} pending
-                      </Badge>
-                    )}
-                  </div>
-                )}
-              </div>
+            {/* Offline/Online Status */}
+            <div className="flex items-center space-x-2">
+              {isOnline ? (
+                <div 
+                  className="w-2.5 h-2.5 rounded-full bg-green-400" 
+                  title="Online"
+                />
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <div 
+                    className="w-2.5 h-2.5 rounded-full bg-amber-400" 
+                    title="Offline"
+                  />
+                  {pendingCount > 0 && (
+                    <Badge variant="warning" className="text-xs bg-amber-500/20 text-amber-300 border-amber-500/30">
+                      {pendingCount} pending
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
 
               {/* Notification Bell */}
               <div className="relative">
