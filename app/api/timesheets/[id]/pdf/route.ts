@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { renderToStream } from '@react-pdf/renderer';
 import { TimesheetPDF } from '@/lib/pdf/timesheet-pdf';
+import { getProfileWithRole } from '@/lib/utils/permissions';
 
 export async function GET(
   request: NextRequest,
@@ -32,14 +33,10 @@ export async function GET(
     }
 
     // Check authorization - user must be owner, manager, or admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+    const profile = await getProfileWithRole(user.id);
 
     const isOwner = timesheet.user_id === user.id;
-    const isManager = profile?.role === 'manager' || profile?.role === 'admin';
+    const isManager = profile?.role?.is_manager_admin || false;
 
     if (!isOwner && !isManager) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getProfileWithRole } from '@/lib/utils/permissions';
 
 /**
  * Send RAMS document via email to the logged-in user
@@ -63,14 +64,9 @@ export async function POST(
       .single();
 
     // Check if user is manager/admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', session.user.id)
-      .single();
+    const profile = await getProfileWithRole(session.user.id);
 
-    const isManagerOrAdmin = (profile as { role?: string } | null)?.role === 'manager' || 
-                             (profile as { role?: string } | null)?.role === 'admin';
+    const isManagerOrAdmin = profile?.role?.is_manager_admin || false;
 
     if (!assignment && !isManagerOrAdmin) {
       return NextResponse.json(

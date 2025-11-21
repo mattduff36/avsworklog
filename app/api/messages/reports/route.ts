@@ -19,11 +19,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user is manager/admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+    const profile = await getProfileWithRole(user.id);
 
     if (!profile || !profile.role?.is_manager_admin) {
       return NextResponse.json({ error: 'Forbidden: Manager/Admin access required' }, { status: 403 });

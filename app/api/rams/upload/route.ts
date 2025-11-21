@@ -15,13 +15,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Check user role (must be manager or admin)
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+    const profile = await getProfileWithRole(user.id);
 
-    if (profileError || !profile) {
+    if (!profile) {
       return NextResponse.json({ error: 'Failed to verify user role' }, { status: 403 });
     }
 
