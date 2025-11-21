@@ -59,6 +59,7 @@ export default function UsersAdminPage() {
   const [filteredUsers, setFilteredUsers] = useState<ProfileWithEmail[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [availableRoles, setAvailableRoles] = useState<Array<{ id: string; name: string; display_name: string }>>([]);
 
   // Dialog states
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -80,7 +81,7 @@ export default function UsersAdminPage() {
     full_name: '',
     phone_number: '',
     employee_id: '',
-    role: 'employee-civils' as 'admin' | 'manager' | 'employee-civils' | 'employee-plant' | 'employee-transport' | 'employee-office' | 'employee-workshop',
+    role_id: '',
   });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
@@ -116,6 +117,29 @@ export default function UsersAdminPage() {
       email: emailMap.get(profile.id) || ''
     })) || [];
   }
+
+  // Fetch available roles
+  useEffect(function () {
+    async function fetchRoles() {
+      try {
+        const { data, error } = await supabase
+          .from('roles')
+          .select('id, name, display_name')
+          .order('is_super_admin', { ascending: false })
+          .order('is_manager_admin', { ascending: false })
+          .order('display_name');
+        
+        if (error) throw error;
+        setAvailableRoles(data || []);
+      } catch (error) {
+        console.error('Error fetching roles:', error);
+      }
+    }
+
+    if (isAdmin) {
+      fetchRoles();
+    }
+  }, [isAdmin, supabase]);
 
   // Fetch users
   useEffect(function () {
@@ -173,7 +197,7 @@ export default function UsersAdminPage() {
           full_name: formData.full_name,
           phone_number: formData.phone_number,
           employee_id: formData.employee_id,
-          role: formData.role,
+          role_id: formData.role_id,
         }),
       });
 
@@ -201,7 +225,7 @@ export default function UsersAdminPage() {
         full_name: '',
         phone_number: '',
         employee_id: '',
-        role: 'employee-civils',
+        role_id: '',
       });
       setAddDialogOpen(false);
     } catch (error) {
@@ -232,7 +256,7 @@ export default function UsersAdminPage() {
           full_name: formData.full_name,
           phone_number: formData.phone_number,
           employee_id: formData.employee_id,
-          role: formData.role,
+          role_id: formData.role_id,
         }),
       });
 
@@ -298,7 +322,7 @@ export default function UsersAdminPage() {
       full_name: user.full_name || '',
       phone_number: user.phone_number || '',
       employee_id: user.employee_id || '',
-      role: user.role as 'admin' | 'manager' | 'employee-civils' | 'employee-plant' | 'employee-transport' | 'employee-office' | 'employee-workshop',
+      role_id: user.role_id || '',
     });
     setFormError('');
     setEditDialogOpen(true);
@@ -483,7 +507,7 @@ export default function UsersAdminPage() {
                     full_name: '',
                     phone_number: '',
                     employee_id: '',
-                    role: 'employee-civils',
+                    role_id: '',
                   });
                   setFormError('');
                   setAddDialogOpen(true);
@@ -669,18 +693,16 @@ export default function UsersAdminPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="add-role">Role *</Label>
-              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value as 'admin' | 'manager' | 'employee-civils' | 'employee-plant' | 'employee-transport' | 'employee-office' | 'employee-workshop' })}>
+              <Select value={formData.role_id} onValueChange={(value) => setFormData({ ...formData, role_id: value })}>
                 <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-                  <SelectValue />
+                  <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="employee-civils">Employee - Civils</SelectItem>
-                  <SelectItem value="employee-plant">Employee - Plant</SelectItem>
-                  <SelectItem value="employee-transport">Employee - Transport</SelectItem>
-                  <SelectItem value="employee-office">Employee - Office</SelectItem>
-                  <SelectItem value="employee-workshop">Employee - Workshop</SelectItem>
-                  <SelectItem value="manager">Manager</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  {availableRoles.map((role) => (
+                    <SelectItem key={role.id} value={role.id}>
+                      {role.display_name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -762,18 +784,16 @@ export default function UsersAdminPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-role">Role *</Label>
-              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value as 'admin' | 'manager' | 'employee-civils' | 'employee-plant' | 'employee-transport' | 'employee-office' | 'employee-workshop' })}>
+              <Select value={formData.role_id} onValueChange={(value) => setFormData({ ...formData, role_id: value })}>
                 <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-                  <SelectValue />
+                  <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="employee-civils">Employee - Civils</SelectItem>
-                  <SelectItem value="employee-plant">Employee - Plant</SelectItem>
-                  <SelectItem value="employee-transport">Employee - Transport</SelectItem>
-                  <SelectItem value="employee-office">Employee - Office</SelectItem>
-                  <SelectItem value="employee-workshop">Employee - Workshop</SelectItem>
-                  <SelectItem value="manager">Manager</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  {availableRoles.map((role) => (
+                    <SelectItem key={role.id} value={role.id}>
+                      {role.display_name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

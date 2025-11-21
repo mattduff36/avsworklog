@@ -48,7 +48,7 @@ export async function PUT(
 
     const userId = (await params).id;
     const body = await request.json();
-    const { email, full_name, phone_number, employee_id, role } = body;
+    const { email, full_name, phone_number, employee_id, role_id } = body;
 
     // Validate required fields
     if (!full_name) {
@@ -58,10 +58,9 @@ export async function PUT(
       );
     }
 
-    // Validate role
-    const validRoles = ['admin', 'manager', 'employee-civils', 'employee-plant', 'employee-transport', 'employee-office', 'employee-workshop'];
-    if (!validRoles.includes(role)) {
-      return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
+    // Validate role_id
+    if (!role_id) {
+      return NextResponse.json({ error: 'Role is required' }, { status: 400 });
     }
 
     // Fetch existing user data for change tracking and email notification
@@ -125,7 +124,7 @@ export async function PUT(
         full_name,
         phone_number: phone_number || null,
         employee_id: employee_id || null,
-        role,
+        role_id,
       })
       .eq('id', userId);
 
