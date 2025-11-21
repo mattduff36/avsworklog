@@ -492,7 +492,7 @@ async function runTests() {
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, role, email')
+      .select('id, full_name, role')
       .eq('role', 'employee-civils');
 
     logTest('Get users by specific role (employee-civils)', !error, error?.message);
@@ -504,7 +504,7 @@ async function runTests() {
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, role, email')
+      .select('id, full_name, role')
       .order('full_name');
 
     logTest('Get all staff (all roles)', !error && data && data.length > 0, 

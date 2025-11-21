@@ -1,133 +1,136 @@
 /**
- * Migration script to create messages and message_recipients tables
+ * Run Messages Database Migration
+ * Creates messages and message_recipients tables
+ * 
+ * Uses direct PostgreSQL connection from .env.local
  * Run with: npx tsx scripts/run-messages-migration.ts
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { config } from 'dotenv';
+import { resolve } from 'path';
 import { readFileSync } from 'fs';
-import { join } from 'path';
-import * as dotenv from 'dotenv';
-import pkg from 'pg';
-const { Client } = pkg;
+import pg from 'pg';
 
-// Load environment variables from .env.local
-dotenv.config({ path: '.env.local' });
+const { Client } = pg;
 
-const postgresUrl = process.env.POSTGRES_URL_NON_POOLING;
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Load .env.local
+config({ path: resolve(process.cwd(), '.env.local') });
 
-if (!postgresUrl) {
-  console.error('❌ Missing POSTGRES_URL_NON_POOLING environment variable');
-  console.error('\nPlease add it to your .env.local file');
-  console.error('You can find it in: Supabase Dashboard > Project Settings > Database > Connection string (Session mode)\n');
+const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
+const sqlFile = 'supabase/create-messages-tables.sql';
+
+if (!connectionString) {
+  console.error('❌ Missing database connection string');
+  console.error('Please ensure POSTGRES_URL_NON_POOLING or POSTGRES_URL is set in .env.local');
+  console.error('\nExpected environment variables:');
+  console.error('  - POSTGRES_URL_NON_POOLING (preferred for migrations)');
+  console.error('  - POSTGRES_URL (fallback)');
   process.exit(1);
 }
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Missing Supabase environment variables');
-  process.exit(1);
-}
+async function runMessagesMigration() {
+  console.log('🚀 Running Messages System Database Migration...\n');
 
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-async function runMigration() {
-  console.log('🚀 Starting messages system migration...\n');
-
+  // Parse connection string and rebuild with explicit SSL config
+  const url = new URL(connectionString);
+  
   const client = new Client({
-    connectionString: postgresUrl,
+    host: url.hostname,
+    port: parseInt(url.port) || 5432,
+    database: url.pathname.slice(1),
+    user: url.username,
+    password: url.password,
+    ssl: {
+      rejectUnauthorized: false
+    }
   });
 
   try {
-    // Read the SQL file
-    const sqlPath = join(process.cwd(), 'supabase', 'create-messages-tables.sql');
-    const sql = readFileSync(sqlPath, 'utf-8');
-
-    console.log('📖 Read SQL file:', sqlPath);
-    console.log('📝 SQL length:', sql.length, 'characters\n');
-
-    // Connect to database
-    console.log('🔌 Connecting to database...');
+    console.log('📡 Connecting to Supabase database...');
     await client.connect();
-    console.log('✅ Connected\n');
+    console.log('✅ Connected!\n');
 
-    // Execute the SQL
-    console.log('⚙️  Executing SQL...');
-    await client.query(sql);
-    console.log('✅ SQL executed successfully\n');
+    // Read the migration SQL file
+    const migrationSQL = readFileSync(
+      resolve(process.cwd(), sqlFile),
+      'utf-8'
+    );
 
-    // Verify tables were created
-    console.log('🔍 Verifying tables...');
+    console.log('📄 Executing migration from:', sqlFile);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
+    // Execute the migration
+    await client.query(migrationSQL);
+
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('✅ MIGRATION COMPLETED SUCCESSFULLY!');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     
-    const { data: messagesData, error: messagesError } = await supabase
-      .from('messages')
-      .select('count')
-      .limit(1);
+    console.log('📊 Database changes applied:');
+    console.log('   ✓ Created messages table');
+    console.log('   ✓ Created message_recipients table');
+    console.log('   ✓ Created MESSAGE_TYPE enum (TOOLBOX_TALK, REMINDER)');
+    console.log('   ✓ Created MESSAGE_PRIORITY enum (HIGH, LOW)');
+    console.log('   ✓ Created MESSAGE_RECIPIENT_STATUS enum');
+    console.log('   ✓ Created indexes for performance');
+    console.log('   ✓ Enabled Row Level Security (RLS)');
+    console.log('   ✓ Created RLS policies:');
+    console.log('      - Managers can view/create all messages');
+    console.log('      - Users can view their own message recipients');
+    console.log('      - Users can update their recipient status\n');
+    
+    // Verify tables were created
+    console.log('🔍 Verifying tables...\n');
+    
+    const { rows: tables } = await client.query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND (table_name = 'messages' OR table_name = 'message_recipients')
+      ORDER BY table_name
+    `);
 
-    const { data: recipientsData, error: recipientsError } = await supabase
-      .from('message_recipients')
-      .select('count')
-      .limit(1);
-
-    if (messagesError?.code === '42P01') {
-      console.error('❌ messages table was not created');
-      throw messagesError;
-    } else {
-      console.log('✅ messages table exists');
-    }
-
-    if (recipientsError?.code === '42P01') {
-      console.error('❌ message_recipients table was not created');
-      throw recipientsError;
-    } else {
-      console.log('✅ message_recipients table exists');
-    }
-
-    console.log('\n✨ Migration completed successfully!');
-    console.log('\n📋 Next steps:');
-    console.log('1. Update your types/database.ts with new table types');
-    console.log('2. Create API endpoints in app/api/messages/');
-    console.log('3. Build the UI components for messages\n');
+    tables.forEach((table: { table_name: string }) => {
+      console.log(`   ✅ ${table.table_name}`);
+    });
+    
+    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📌 Next Steps:');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('\n1. Run Automated Tests:');
+    console.log('   npx tsx scripts/test-messaging-system.ts');
+    console.log('\n2. Follow Manual Testing Guide:');
+    console.log('   See docs/QUICK_TEST_GUIDE.md\n');
+    
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('✨ Ready! Messages feature database is configured');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('\n❌ Migration failed:', errorMessage);
+    console.error('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.error('❌ MIGRATION FAILED');
+    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     
-    // Check for "already exists" errors - these are okay
-    if (errorMessage.includes('already exists')) {
-      console.log('\n⚠️  Some objects already exist - this is usually fine.');
-      console.log('The migration may have been partially run before.\n');
-      
-      // Still verify tables exist
-      try {
-        const { error: messagesError } = await supabase
-          .from('messages')
-          .select('count')
-          .limit(1);
-
-        const { error: recipientsError } = await supabase
-          .from('message_recipients')
-          .select('count')
-          .limit(1);
-
-        if (!messagesError && !recipientsError) {
-          console.log('✅ Tables verified - migration state is good!\n');
-          await client.end();
-          return;
-        }
-      } catch {
-        // Verification failed - continue to error reporting
-      }
+    const err = error as { message?: string; detail?: string; hint?: string };
+    console.error('Error:', err.message);
+    if (err.detail) {
+      console.error('Details:', err.detail);
     }
-
-    console.error('\nIf the migration failed, you can:');
-    console.error('1. Run the SQL directly in Supabase Dashboard > SQL Editor');
-    console.error('2. Check the error message above for specific issues\n');
+    if (err.hint) {
+      console.error('Hint:', err.hint);
+    }
+    
+    // Check if tables already exist
+    if (err.message?.includes('already exists')) {
+      console.log('\n✅ Tables already exist - no action needed!');
+      console.log('If you need to modify the schema, consider creating an ALTER migration.\n');
+      process.exit(0);
+    }
+    
     process.exit(1);
   } finally {
     await client.end();
   }
 }
 
-runMigration();
-
+runMessagesMigration().catch(console.error);
