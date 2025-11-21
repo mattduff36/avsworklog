@@ -30,7 +30,6 @@ import {
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
 import { Database } from '@/types/database';
-import { getUserPermissions } from '@/lib/utils/permissions';
 import type { ModuleName } from '@/types/roles';
 
 type PendingApprovalCount = {
@@ -83,11 +82,47 @@ export default function DashboardPage() {
   useEffect(() => {
     async function fetchPermissions() {
       if (!profile?.id) return;
-      const permissions = await getUserPermissions(profile.id);
-      setUserPermissions(permissions);
+      
+      // Managers and admins have all permissions
+      if (isManager || isAdmin) {
+        setUserPermissions(new Set([
+          'timesheets', 'inspections', 'rams', 'absence', 'toolbox-talks',
+          'approvals', 'actions', 'reports', 'admin-users', 'admin-vehicles'
+        ] as ModuleName[]));
+        return;
+      }
+      
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select(`
+            role_id,
+            roles!inner(
+              role_permissions(
+                module_name,
+                enabled
+              )
+            )
+          `)
+          .eq('id', profile.id)
+          .single();
+        
+        // Build Set of enabled permissions
+        const enabledModules = new Set<ModuleName>();
+        data?.roles?.role_permissions?.forEach((perm: any) => {
+          if (perm.enabled) {
+            enabledModules.add(perm.module_name as ModuleName);
+          }
+        });
+        
+        setUserPermissions(enabledModules);
+      } catch (error) {
+        console.error('Error fetching permissions:', error);
+        setUserPermissions(new Set());
+      }
     }
     fetchPermissions();
-  }, [profile?.id]);
+  }, [profile?.id, isManager, isAdmin, supabase]);
 
   useEffect(() => {
     if (isManager || isAdmin) {
