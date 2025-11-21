@@ -264,14 +264,8 @@ export function Navbar() {
               </Button>
             </div>
 
-            {/* User info */}
-            <div className="hidden md:flex items-center space-x-4">
-              <div className="text-sm">
-                <div className="font-medium text-white">{profile?.full_name}</div>
-                <div className="text-slate-400 capitalize">
-                  {profile?.role}
-                </div>
-              </div>
+            {/* Sign Out button only */}
+            <div className="hidden md:flex items-center">
               <Button
                 variant="ghost"
                 size="sm"
