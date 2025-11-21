@@ -177,13 +177,9 @@ export async function DELETE(
     }
 
     // Check if user is admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+    const profile = await getProfileWithRole(user.id);
 
-    if (!profile || profile.role !== 'admin') {
+    if (!profile || profile.role?.name !== 'admin') {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 

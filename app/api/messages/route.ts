@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { sendToolboxTalkEmail } from '@/lib/utils/email';
+import { getProfileWithRole } from '@/lib/utils/permissions';
 import type { CreateMessageInput, CreateMessageResponse } from '@/types/messages';
 
 /**
@@ -19,13 +20,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user is manager/admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, full_name')
-      .eq('id', user.id)
-      .single();
+    const profile = await getProfileWithRole(user.id);
 
-    if (!profile || !['admin', 'manager'].includes(profile.role)) {
+    if (!profile || !profile.role?.is_manager_admin) {
       return NextResponse.json({ error: 'Forbidden: Manager/Admin access required' }, { status: 403 });
     }
 

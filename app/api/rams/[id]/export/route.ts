@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getProfileWithRole } from '@/lib/utils/permissions';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { RAMSExportDocument } from '@/lib/pdf/RAMSExportDocument';
 
@@ -19,17 +20,13 @@ export async function GET(
     }
 
     // Check user role (must be manager or admin)
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+    const profile = await getProfileWithRole(user.id);
 
-    if (profileError || !profile) {
+    if (!profile) {
       return NextResponse.json({ error: 'Failed to verify user role' }, { status: 403 });
     }
 
-    if (profile.role !== 'admin' && profile.role !== 'manager') {
+    if (!profile.role?.is_manager_admin) {
       return NextResponse.json(
         { error: 'Only admins and managers can export RAMS documents' },
         { status: 403 }

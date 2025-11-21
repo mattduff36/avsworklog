@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getProfileWithRole } from '@/lib/utils/permissions';
 import { validateRAMSFile, generateSafeFilename } from '@/lib/utils/file-validation';
 
 export async function POST(request: NextRequest) {
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to verify user role' }, { status: 403 });
     }
 
-    if (profile.role !== 'admin' && profile.role !== 'manager') {
+    if (!profile.role?.is_manager_admin) {
       return NextResponse.json(
         { error: 'Only admins and managers can upload RAMS documents' },
         { status: 403 }

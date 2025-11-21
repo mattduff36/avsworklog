@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getProfileWithRole } from '@/lib/utils/permissions';
 
 export async function POST(
   request: NextRequest,
@@ -17,17 +18,13 @@ export async function POST(
     }
 
     // Check user role (must be manager or admin)
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+    const profile = await getProfileWithRole(user.id);
 
-    if (profileError || !profile) {
+    if (!profile) {
       return NextResponse.json({ error: 'Failed to verify user role' }, { status: 403 });
     }
 
-    if (profile.role !== 'admin' && profile.role !== 'manager') {
+    if (!profile.role?.is_manager_admin) {
       return NextResponse.json(
         { error: 'Only admins and managers can assign RAMS documents' },
         { status: 403 }
@@ -213,7 +210,7 @@ export async function GET(
       return NextResponse.json({ error: 'Failed to verify user role' }, { status: 403 });
     }
 
-    if (profile.role !== 'admin' && profile.role !== 'manager') {
+    if (!profile.role?.is_manager_admin) {
       return NextResponse.json(
         { error: 'Only admins and managers can view assignments' },
         { status: 403 }

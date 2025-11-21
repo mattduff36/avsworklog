@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getProfileWithRole } from '@/lib/utils/permissions';
 
 /**
  * DELETE /api/messages/[id]/delete
@@ -28,7 +29,7 @@ export async function DELETE(
       .eq('id', user.id)
       .single();
 
-    if (!profile || !['admin', 'manager'].includes(profile.role)) {
+    if (!profile || !profile.role?.is_manager_admin) {
       return NextResponse.json({ error: 'Forbidden: Manager/Admin access required' }, { status: 403 });
     }
 
