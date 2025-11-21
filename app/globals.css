@@ -468,6 +468,28 @@
   .border-absence {
     border-color: hsl(var(--absence-primary));
   }
+  
+  /* Tab Styling - Standard Approvals Page Pattern */
+  /* Use data-state="active" to match shadcn/ui tabs component */
+  [role="tab"][data-state="active"] {
+    background-color: hsl(var(--primary)) !important; /* AVS Yellow */
+    color: rgb(15 23 42) !important; /* Dark slate text */
+    border-bottom: 2px solid hsl(var(--primary)) !important;
+  }
+  
+  /* Custom tab colors for specific tabs */
+  [role="tab"][data-state="active"][data-tab="toolbox-talk"] {
+    background-color: rgb(220 38 38) !important; /* red-600 */
+    color: white !important;
+    border-bottom-color: rgb(220 38 38) !important;
+  }
+  
+  [role="tab"][data-state="active"][data-tab="reminder"],
+  [role="tab"][data-state="active"][data-tab="reports"] {
+    background-color: #F1D64A !important; /* AVS Yellow */
+    color: rgb(15 23 42) !important;
+    border-bottom-color: #F1D64A !important;
+  }
 }
 
 /*
@@ -552,6 +574,27 @@ h1, h2, h3, h4, h5, h6 {
 /* Default text color for all elements */
 p, span, label, div {
   @apply text-slate-300;
+}
+
+/* Placeholder text color - always grey */
+::placeholder {
+  color: rgb(148 163 184) !important; /* slate-400 - grey */
+  opacity: 0.8;
+}
+
+::-webkit-input-placeholder {
+  color: rgb(148 163 184) !important; /* slate-400 */
+  opacity: 0.8;
+}
+
+::-moz-placeholder {
+  color: rgb(148 163 184) !important; /* slate-400 */
+  opacity: 0.8;
+}
+
+:-ms-input-placeholder {
+  color: rgb(148 163 184) !important; /* slate-400 */
+  opacity: 0.8;
 }
 
 /* Override muted foreground globally */

@@ -97,6 +97,7 @@ export function Navbar() {
   const managerNav = isManager ? [
     { href: '/approvals', label: 'Approvals', icon: CheckSquare },
     { href: '/actions', label: 'Actions', icon: ListTodo },
+    { href: '/toolbox-talks', label: 'Toolbox Talks', icon: MessageSquare },
     { href: '/reports', label: 'Reports', icon: BarChart3 },
   ] : [];
   
@@ -193,12 +194,6 @@ export function Navbar() {
                       <Link href="/rams" className="flex items-center cursor-pointer">
                         <FileCheck2 className="w-4 h-4 mr-2" />
                         RAMS Documents
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/toolbox-talks" className="flex items-center cursor-pointer">
-                        <MessageSquare className="w-4 h-4 mr-2" />
-                        Toolbox Talks
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
@@ -390,18 +385,6 @@ export function Navbar() {
                 >
                   <FileCheck2 className="w-5 h-5 mr-3" />
                   RAMS Documents
-                </Link>
-                <Link
-                  href="/toolbox-talks"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center px-3 py-2 pl-6 text-base font-medium rounded-md ${
-                    pathname?.startsWith('/toolbox-talks')
-                      ? 'bg-avs-yellow text-slate-900'
-                      : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
-                  }`}
-                >
-                  <MessageSquare className="w-5 h-5 mr-3" />
-                  Toolbox Talks
                 </Link>
                 <Link
                   href="/absence"

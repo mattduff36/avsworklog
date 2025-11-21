@@ -50,16 +50,16 @@ export default function ToolboxTalksPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="create-toolbox-talk" className="gap-2">
+        <TabsList className="grid w-full grid-cols-3 bg-slate-800 p-1">
+          <TabsTrigger value="create-toolbox-talk" data-tab="toolbox-talk" className="gap-2 data-[state=active]:bg-red-600 data-[state=active]:text-white">
             <MessageSquare className="h-4 w-4" />
             Create Toolbox Talk
           </TabsTrigger>
-          <TabsTrigger value="create-reminder" className="gap-2">
+          <TabsTrigger value="create-reminder" data-tab="reminder" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
             <Bell className="h-4 w-4" />
             Create Reminder
           </TabsTrigger>
-          <TabsTrigger value="reports" className="gap-2">
+          <TabsTrigger value="reports" data-tab="reports" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
             <BarChart3 className="h-4 w-4" />
             Reports
           </TabsTrigger>
