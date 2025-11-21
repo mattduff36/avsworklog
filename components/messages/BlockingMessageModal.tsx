@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -74,7 +73,7 @@ export function BlockingMessageModal({
         <DialogHeader>
           <DialogTitle className="text-xl text-red-600">Toolbox Talk - Action Required</DialogTitle>
           <DialogDescription className="text-slate-600 dark:text-slate-400">
-            From: <strong>{message.sender_name}</strong> • {new Date(message.created_at).toLocaleDateString()}
+            {new Date(message.created_at).toLocaleDateString()}
           </DialogDescription>
         </DialogHeader>
 
@@ -90,12 +89,10 @@ export function BlockingMessageModal({
         <ScrollArea className="flex-1 px-6">
           <div className="pb-6 space-y-4">
             {/* Simple one-line warning */}
-            <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
-              <AlertCircle className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-900 dark:text-amber-100">
-                Please read and sign this Toolbox Talk to continue using the app.
-              </AlertDescription>
-            </Alert>
+            <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+              <p>Please read and sign this Toolbox Talk to continue using the app.</p>
+            </div>
 
             {/* Message Subject */}
             <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 border-l-4 border-red-600">
