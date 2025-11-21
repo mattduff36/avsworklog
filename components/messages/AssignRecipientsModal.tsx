@@ -285,8 +285,8 @@ export function AssignRecipientsModal({
                         >
                           {employee.full_name}
                         </label>
-                        <span className="text-xs text-muted-foreground capitalize">
-                          {employee.role}
+                        <span className="text-xs text-muted-foreground">
+                          {employee.role?.display_name || 'No Role'}
                         </span>
                       </div>
                     ))

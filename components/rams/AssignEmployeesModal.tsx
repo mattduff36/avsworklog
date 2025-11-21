@@ -14,7 +14,10 @@ import { Database } from '@/types/database';
 interface Employee {
   id: string;
   full_name: string;
-  role: 'admin' | 'manager' | 'employee';
+  role: {
+    name: string;
+    display_name: string;
+  } | null;
   alreadySigned?: boolean;
   isAssigned?: boolean;
 }
@@ -85,7 +88,7 @@ export function AssignEmployeesModal({
 
       if (profilesError) throw profilesError;
 
-      const allEmployees = profiles?.map((p: any) => p.id) || [];
+      const allEmployees = profiles || [];
 
       // Fetch existing assignments for this document
       const { data: assignments, error: assignError } = await supabase
@@ -111,8 +114,10 @@ export function AssignEmployeesModal({
       // Pre-select all currently assigned employees
       setSelectedIds(assignedEmployeeIds);
 
-      const employeesWithStatus = allEmployees?.map(emp => ({
-        ...emp,
+      const employeesWithStatus = allEmployees?.map((emp: any) => ({
+        id: emp.id,
+        full_name: emp.full_name,
+        role: emp.role,
         alreadySigned: signedEmployeeIds.has(emp.id),
         isAssigned: assignedEmployeeIds.has(emp.id),
       })) || [];
@@ -301,8 +306,8 @@ export function AssignEmployeesModal({
                             </span>
                           )}
                         </label>
-                        <span className="text-xs text-muted-foreground capitalize">
-                          {employee.role}
+                        <span className="text-xs text-muted-foreground">
+                          {employee.role?.display_name || 'No Role'}
                         </span>
                       </div>
                     ))
