@@ -206,24 +206,41 @@ export function MessagesReportView() {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-4 gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                <div>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">Total Assigned</p>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{selectedMessage.total_assigned}</p>
+              {selectedMessage.message.type === 'TOOLBOX_TALK' ? (
+                <div className="grid grid-cols-4 gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">Total Assigned</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{selectedMessage.total_assigned}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">Signed</p>
+                    <p className="text-2xl font-bold text-green-600">{selectedMessage.total_signed}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">Pending</p>
+                    <p className="text-2xl font-bold text-orange-600">{selectedMessage.total_pending}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">Compliance</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{selectedMessage.compliance_rate}%</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">Signed</p>
-                  <p className="text-2xl font-bold text-green-600">{selectedMessage.total_signed}</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">Total Assigned</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{selectedMessage.total_assigned}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">Dismissed</p>
+                    <p className="text-2xl font-bold text-green-600">{selectedMessage.total_signed}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">Not Viewed</p>
+                    <p className="text-2xl font-bold text-orange-600">{selectedMessage.total_pending}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">Pending</p>
-                  <p className="text-2xl font-bold text-orange-600">{selectedMessage.total_pending}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">Compliance</p>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{selectedMessage.compliance_rate}%</p>
-                </div>
-              </div>
+              )}
 
               {/* Message Body */}
               <div>
@@ -242,7 +259,9 @@ export function MessagesReportView() {
                       <TableHead>Employee</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Signed At</TableHead>
+                      <TableHead>
+                        {selectedMessage.message.type === 'TOOLBOX_TALK' ? 'Signed At' : 'Dismissed At'}
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -308,19 +327,36 @@ export function MessagesReportView() {
                     <span className="text-slate-600 dark:text-slate-400">
                       <strong>{msg.total_assigned}</strong> assigned
                     </span>
-                    <span className="text-green-600">
-                      <CheckCircle2 className="h-4 w-4 inline mr-1" />
-                      <strong>{msg.total_signed}</strong> signed
-                    </span>
-                    {msg.total_pending > 0 && (
-                      <span className="text-orange-600">
-                        <AlertTriangle className="h-4 w-4 inline mr-1" />
-                        <strong>{msg.total_pending}</strong> pending
-                      </span>
+                    {msg.message.type === 'TOOLBOX_TALK' ? (
+                      <>
+                        <span className="text-green-600">
+                          <CheckCircle2 className="h-4 w-4 inline mr-1" />
+                          <strong>{msg.total_signed}</strong> signed
+                        </span>
+                        {msg.total_pending > 0 && (
+                          <span className="text-orange-600">
+                            <AlertTriangle className="h-4 w-4 inline mr-1" />
+                            <strong>{msg.total_pending}</strong> pending
+                          </span>
+                        )}
+                        <span className="text-slate-600 dark:text-slate-400">
+                          {msg.compliance_rate}% compliance
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-green-600">
+                          <CheckCircle2 className="h-4 w-4 inline mr-1" />
+                          <strong>{msg.total_signed}</strong> dismissed
+                        </span>
+                        {msg.total_pending > 0 && (
+                          <span className="text-orange-600">
+                            <Clock className="h-4 w-4 inline mr-1" />
+                            <strong>{msg.total_pending}</strong> not viewed
+                          </span>
+                        )}
+                      </>
                     )}
-                    <span className="text-slate-600 dark:text-slate-400">
-                      {msg.compliance_rate}% compliance
-                    </span>
                   </div>
                 </div>
                 <Button
