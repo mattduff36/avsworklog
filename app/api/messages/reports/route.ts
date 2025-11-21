@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
 
     for (const message of messages || []) {
       // Fetch all recipients for this message
-      let recipientsQuery = supabase
+      const recipientsQuery = supabase
         .from('message_recipients')
         .select(`
           id,
@@ -140,10 +140,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(response);
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in GET /api/messages/reports:', error);
     return NextResponse.json({ 
-      error: error.message || 'Internal server error' 
+      error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });
   }
 }

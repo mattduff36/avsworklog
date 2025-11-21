@@ -89,11 +89,12 @@ async function runMigration() {
     console.log('2. Create API endpoints in app/api/messages/');
     console.log('3. Build the UI components for messages\n');
 
-  } catch (error: any) {
-    console.error('\n❌ Migration failed:', error.message);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('\n❌ Migration failed:', errorMessage);
     
     // Check for "already exists" errors - these are okay
-    if (error.message?.includes('already exists')) {
+    if (errorMessage.includes('already exists')) {
       console.log('\n⚠️  Some objects already exist - this is usually fine.');
       console.log('The migration may have been partially run before.\n');
       
@@ -114,8 +115,8 @@ async function runMigration() {
           await client.end();
           return;
         }
-      } catch (verifyError) {
-        // Verification failed
+      } catch {
+        // Verification failed - continue to error reporting
       }
     }
 

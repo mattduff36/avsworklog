@@ -7,7 +7,7 @@ import type { GetNotificationsResponse, NotificationItem } from '@/types/message
  * Fetch notification inbox for current user (last 60 days, not cleared)
  * Returns both Toolbox Talks and Reminders with their statuses
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient();
 
@@ -84,10 +84,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(response);
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in GET /api/messages/notifications:', error);
     return NextResponse.json({ 
-      error: error.message || 'Internal server error' 
+      error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });
   }
 }

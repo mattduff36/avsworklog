@@ -7,7 +7,7 @@ import type { GetPendingMessagesResponse } from '@/types/messages';
  * Fetch pending Toolbox Talks and Reminders for the current user
  * Used by blocking modal to check what messages need attention
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient();
 
@@ -104,10 +104,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(response);
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in GET /api/messages/pending:', error);
     return NextResponse.json({ 
-      error: error.message || 'Internal server error' 
+      error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });
   }
 }

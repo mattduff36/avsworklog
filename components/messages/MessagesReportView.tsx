@@ -43,6 +43,7 @@ export function MessagesReportView() {
 
   useEffect(() => {
     fetchReports();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typeFilter, statusFilter]);
 
   async function fetchReports() {
@@ -349,9 +350,9 @@ export function MessagesReportView() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Message</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{messageToDelete?.subject}"?
+              Are you sure you want to delete &quot;{messageToDelete?.subject}&quot;?
               <br /><br />
-              This will immediately remove the message from all unsigned employees' queues. Signed records will be kept for audit purposes.
+              This will immediately remove the message from all unsigned employees&apos; queues. Signed records will be kept for audit purposes.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

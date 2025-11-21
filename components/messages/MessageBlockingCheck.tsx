@@ -45,6 +45,7 @@ export function MessageBlockingCheck() {
 
   useEffect(() => {
     checkPendingMessages();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function checkPendingMessages() {

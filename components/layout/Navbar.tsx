@@ -38,7 +38,6 @@ import { NotificationPanel } from '@/components/messages/NotificationPanel';
 
 export function Navbar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { profile, signOut, isAdmin, isManager } = useAuth();
   const { isOnline, pendingCount } = useOfflineSync();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -105,13 +104,6 @@ export function Navbar() {
     { href: '/admin/users', label: 'Users', icon: Users },
     { href: '/admin/vehicles', label: 'Vehicles', icon: Truck },
   ] : [];
-
-  const navItems = [
-    ...dashboardNav,
-    ...employeeNav,
-    ...managerNav,
-    ...adminNav,
-  ];
 
   return (
     <nav className="bg-slate-900/50 backdrop-blur-xl border-b border-slate-700/50 sticky top-0 z-50">

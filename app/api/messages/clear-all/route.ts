@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/server';
  * Sets cleared_from_inbox_at timestamp for all user's message_recipients
  * Does not delete the actual data (for admin/audit purposes)
  */
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const supabase = await createClient();
 
@@ -38,10 +38,10 @@ export async function POST(request: NextRequest) {
       message: 'All notifications cleared'
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in POST /api/messages/clear-all:', error);
     return NextResponse.json({ 
-      error: error.message || 'Internal server error' 
+      error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });
   }
 }

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Bell, AlertTriangle, Loader2, CheckCircle2, X } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -143,7 +142,7 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
             <Bell className="h-12 w-12 text-slate-300 dark:text-slate-600 mb-3" />
             <p className="text-sm text-slate-600 dark:text-slate-400">No notifications</p>
             <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
-              You're all caught up!
+              You&apos;re all caught up!
             </p>
           </div>
         ) : (

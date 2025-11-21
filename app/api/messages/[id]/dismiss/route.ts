@@ -81,10 +81,10 @@ export async function POST(
 
     return NextResponse.json(response);
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in POST /api/messages/[id]/dismiss:', error);
     return NextResponse.json({ 
-      error: error.message || 'Internal server error' 
+      error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });
   }
 }
