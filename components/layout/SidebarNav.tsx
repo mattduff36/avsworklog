@@ -56,9 +56,9 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         onClick={onToggle}
       />
 
-      {/* Sidebar - Always visible, expands/collapses */}
+      {/* Sidebar - Always visible on desktop, hidden on mobile */}
       <div
-        className={`fixed left-0 top-0 bottom-0 bg-slate-900 border-r border-slate-700 z-[70] transition-all duration-300 ease-in-out ${
+        className={`hidden md:block fixed left-0 top-0 bottom-0 bg-slate-900 border-r border-slate-700 z-[70] transition-all duration-300 ease-in-out ${
           open ? 'w-64' : 'w-16'
         }`}
       >
