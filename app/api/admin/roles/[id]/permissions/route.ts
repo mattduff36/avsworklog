@@ -9,9 +9,10 @@ import type { UpdatePermissionsRequest } from '@/types/roles';
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
 
     // Check authentication
@@ -39,7 +40,7 @@ export async function PUT(
     const { data: existingRole, error: fetchError } = await supabase
       .from('roles')
       .select('is_super_admin, is_manager_admin')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (fetchError) {
@@ -58,7 +59,7 @@ export async function PUT(
 
     // Update permissions in bulk using upsert
     const permissionsToUpdate = body.permissions.map(perm => ({
-      role_id: params.id,
+      role_id: id,
       module_name: perm.module_name,
       enabled: perm.enabled,
     }));
@@ -67,7 +68,7 @@ export async function PUT(
     const { error: deleteError } = await supabase
       .from('role_permissions')
       .delete()
-      .eq('role_id', params.id);
+      .eq('role_id', id);
 
     if (deleteError) {
       throw deleteError;
@@ -86,7 +87,7 @@ export async function PUT(
     const { data: updatedPermissions, error: fetchPermsError } = await supabase
       .from('role_permissions')
       .select('*')
-      .eq('role_id', params.id);
+      .eq('role_id', id);
 
     if (fetchPermsError) {
       throw fetchPermsError;

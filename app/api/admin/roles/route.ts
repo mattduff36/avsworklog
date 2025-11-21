@@ -24,13 +24,13 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden - Manager/Admin access required' }, { status: 403 });
     }
 
-    // Get all roles with user counts and permission counts
+    // Get all roles with user counts and permissions
     const { data: roles, error: rolesError } = await supabase
       .from('roles')
       .select(`
         *,
         profiles:profiles(count),
-        role_permissions:role_permissions(count)
+        role_permissions:role_permissions(module_name, enabled)
       `)
       .order('is_super_admin', { ascending: false })
       .order('is_manager_admin', { ascending: false })
@@ -40,7 +40,7 @@ export async function GET() {
       throw rolesError;
     }
 
-    // Format response
+    // Format response - count only enabled permissions
     const formattedRoles: RoleWithUserCount[] = roles.map((role: any) => ({
       id: role.id,
       name: role.name,
@@ -51,7 +51,7 @@ export async function GET() {
       created_at: role.created_at,
       updated_at: role.updated_at,
       user_count: role.profiles[0]?.count || 0,
-      permission_count: role.role_permissions[0]?.count || 0,
+      permission_count: role.role_permissions?.filter((p: any) => p.enabled).length || 0,
     }));
 
     const response: GetRolesResponse = {

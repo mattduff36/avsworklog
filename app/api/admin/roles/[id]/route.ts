@@ -9,9 +9,10 @@ import type { GetRoleResponse, UpdateRoleRequest } from '@/types/roles';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
 
     // Check authentication
@@ -33,7 +34,7 @@ export async function GET(
         *,
         permissions:role_permissions(*)
       `)
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (roleError) {
@@ -47,7 +48,7 @@ export async function GET(
     const { count } = await supabase
       .from('profiles')
       .select('*', { count: 'exact', head: true })
-      .eq('role_id', params.id);
+      .eq('role_id', id);
 
     const response: GetRoleResponse = {
       success: true,
@@ -73,9 +74,10 @@ export async function GET(
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
 
     // Check authentication
@@ -96,7 +98,7 @@ export async function PATCH(
     const { data: existingRole, error: fetchError } = await supabase
       .from('roles')
       .select('is_super_admin')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (fetchError) {
@@ -118,7 +120,7 @@ export async function PATCH(
         .from('roles')
         .select('id')
         .eq('name', body.name)
-        .neq('id', params.id)
+        .neq('id', id)
         .single();
 
       if (conflictRole) {
@@ -138,7 +140,7 @@ export async function PATCH(
     const { data: updatedRole, error: updateError } = await supabase
       .from('roles')
       .update(updateData)
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single();
 
@@ -165,9 +167,10 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
 
     // Check authentication
@@ -186,7 +189,7 @@ export async function DELETE(
     const { data: existingRole, error: fetchError } = await supabase
       .from('roles')
       .select('is_super_admin, is_manager_admin')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (fetchError) {
@@ -206,7 +209,7 @@ export async function DELETE(
     const { count } = await supabase
       .from('profiles')
       .select('*', { count: 'exact', head: true })
-      .eq('role_id', params.id);
+      .eq('role_id', id);
 
     if (count && count > 0) {
       return NextResponse.json({ 
@@ -218,7 +221,7 @@ export async function DELETE(
     const { error: deleteError } = await supabase
       .from('roles')
       .delete()
-      .eq('id', params.id);
+      .eq('id', id);
 
     if (deleteError) {
       throw deleteError;
