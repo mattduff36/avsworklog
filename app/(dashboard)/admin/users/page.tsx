@@ -106,7 +106,7 @@ export default function UsersAdminPage() {
           display_name
         )
       `)
-      .order('created_at', { ascending: false });
+      .order('full_name', { ascending: true });
 
     if (profilesError) throw profilesError;
 
