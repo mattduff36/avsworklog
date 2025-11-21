@@ -89,17 +89,23 @@ export default function UsersAdminPage() {
   // Stats
   const stats = {
     total: users.length,
-    admins: users.filter((u) => u.role === 'admin').length,
-    managers: users.filter((u) => u.role === 'manager').length,
-    employees: users.filter((u) => u.role.startsWith('employee-')).length,
+    admins: users.filter((u) => u.role?.name === 'admin').length,
+    managers: users.filter((u) => u.role?.name === 'manager').length,
+    employees: users.filter((u) => u.role?.name?.startsWith('employee-')).length,
   };
 
   // Helper function to fetch users with emails
   async function fetchUsersWithEmails() {
-    // Fetch profiles from database
+    // Fetch profiles from database with role information
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('*')
+      .select(`
+        *,
+        role:roles(
+          name,
+          display_name
+        )
+      `)
       .order('created_at', { ascending: false });
 
     if (profilesError) throw profilesError;
@@ -577,10 +583,10 @@ export default function UsersAdminPage() {
                         <TableCell className="text-slate-700 dark:text-slate-300">{user.employee_id || '-'}</TableCell>
                         <TableCell>
                           <Badge variant={
-                            user.role === 'admin' ? 'destructive' :
-                            user.role === 'manager' ? 'default' : 'secondary'
+                            user.role?.name === 'admin' ? 'destructive' :
+                            user.role?.name === 'manager' ? 'default' : 'secondary'
                           }>
-                            {user.role}
+                            {user.role?.display_name || 'No Role'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-slate-700 dark:text-slate-300">
@@ -840,8 +846,8 @@ export default function UsersAdminPage() {
               </p>
               <p className="text-sm">
                 <span className="text-slate-400">Role:</span>{' '}
-                <Badge variant={selectedUser.role === 'admin' ? 'destructive' : 'default'}>
-                  {selectedUser.role}
+                <Badge variant={selectedUser.role?.name === 'admin' ? 'destructive' : 'default'}>
+                  {selectedUser.role?.display_name || 'No Role'}
                 </Badge>
               </p>
             </div>

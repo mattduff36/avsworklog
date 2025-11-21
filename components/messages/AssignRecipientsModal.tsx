@@ -13,7 +13,10 @@ import { createClient } from '@/lib/supabase/client';
 interface Employee {
   id: string;
   full_name: string;
-  role: string;
+  role: {
+    name: string;
+    display_name: string;
+  } | null;
 }
 
 interface AssignRecipientsModalProps {
@@ -73,7 +76,14 @@ export function AssignRecipientsModal({
     try {
       const { data: allEmployees, error: empError } = await supabase
         .from('profiles')
-        .select('id, full_name, role')
+        .select(`
+          id,
+          full_name,
+          role:roles(
+            name,
+            display_name
+          )
+        `)
         .order('full_name');
 
       if (empError) throw empError;
@@ -108,7 +118,7 @@ export function AssignRecipientsModal({
   };
 
   const handleSelectRole = (role: string) => {
-    const employeesWithRole = employees.filter(emp => emp.role === role);
+    const employeesWithRole = employees.filter(emp => emp.role?.name === role);
     const roleEmployeeIds = new Set(employeesWithRole.map(emp => emp.id));
     
     // Check if all employees in this role are already selected
@@ -192,7 +202,7 @@ export function AssignRecipientsModal({
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {ROLE_OPTIONS.map((role) => {
-                  const roleEmployees = employees.filter(emp => emp.role === role.value);
+                  const roleEmployees = employees.filter(emp => emp.role?.name === role.value);
                   const roleCount = roleEmployees.length;
                   const allRoleSelected = roleEmployees.length > 0 && roleEmployees.every(emp => selectedIds.has(emp.id));
                   
