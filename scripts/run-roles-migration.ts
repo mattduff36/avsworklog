@@ -86,9 +86,10 @@ async function runRolesMigration() {
 
     // Verify super admin
     const { rows: superAdmin } = await client.query(`
-      SELECT r.name, r.display_name, p.email 
+      SELECT r.name, r.display_name, u.email 
       FROM roles r 
       INNER JOIN profiles p ON p.role_id = r.id 
+      INNER JOIN auth.users u ON u.id = p.id
       WHERE r.is_super_admin = TRUE
     `);
     if (superAdmin.length > 0) {

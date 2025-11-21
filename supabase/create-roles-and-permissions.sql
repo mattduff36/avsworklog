@@ -104,13 +104,15 @@ FROM roles r
 WHERE p.role = r.name AND p.role_id IS NULL;
 
 -- Step 7: Mark super admin (admin@mpdee.co.uk)
+-- Email is in auth.users, need to join through id
 UPDATE roles
 SET is_super_admin = TRUE
 WHERE id IN (
   SELECT r.id 
   FROM roles r
   INNER JOIN profiles p ON p.role_id = r.id
-  WHERE p.email = 'admin@mpdee.co.uk'
+  INNER JOIN auth.users u ON u.id = p.id
+  WHERE u.email = 'admin@mpdee.co.uk'
   LIMIT 1
 );
 
