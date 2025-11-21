@@ -571,6 +571,82 @@ export interface Database {
           updated_at?: string
         }
       }
+      messages: {
+        Row: {
+          id: string
+          type: 'TOOLBOX_TALK' | 'REMINDER'
+          subject: string
+          body: string
+          priority: 'HIGH' | 'LOW'
+          sender_id: string | null
+          created_at: string
+          updated_at: string
+          deleted_at: string | null
+          created_via: string
+        }
+        Insert: {
+          id?: string
+          type: 'TOOLBOX_TALK' | 'REMINDER'
+          subject: string
+          body: string
+          priority: 'HIGH' | 'LOW'
+          sender_id?: string | null
+          created_at?: string
+          updated_at?: string
+          deleted_at?: string | null
+          created_via?: string
+        }
+        Update: {
+          id?: string
+          type?: 'TOOLBOX_TALK' | 'REMINDER'
+          subject?: string
+          body?: string
+          priority?: 'HIGH' | 'LOW'
+          sender_id?: string | null
+          created_at?: string
+          updated_at?: string
+          deleted_at?: string | null
+          created_via?: string
+        }
+      }
+      message_recipients: {
+        Row: {
+          id: string
+          message_id: string
+          user_id: string
+          status: 'PENDING' | 'SHOWN' | 'SIGNED' | 'DISMISSED'
+          signed_at: string | null
+          first_shown_at: string | null
+          cleared_from_inbox_at: string | null
+          signature_data: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          message_id: string
+          user_id: string
+          status?: 'PENDING' | 'SHOWN' | 'SIGNED' | 'DISMISSED'
+          signed_at?: string | null
+          first_shown_at?: string | null
+          cleared_from_inbox_at?: string | null
+          signature_data?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          message_id?: string
+          user_id?: string
+          status?: 'PENDING' | 'SHOWN' | 'SIGNED' | 'DISMISSED'
+          signed_at?: string | null
+          first_shown_at?: string | null
+          cleared_from_inbox_at?: string | null
+          signature_data?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

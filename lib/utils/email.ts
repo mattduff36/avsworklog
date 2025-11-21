@@ -352,3 +352,160 @@ export async function sendProfileUpdateEmail(params: SendProfileUpdateEmailParam
   }
 }
 
+/**
+ * Send Toolbox Talk notification email to recipient(s)
+ * @param params Email parameters
+ * @returns Promise with success status and counts
+ */
+interface SendToolboxTalkEmailParams {
+  to: string | string[];
+  senderName: string;
+  subject: string;
+  // Note: We don't include message body in email for GDPR reasons
+}
+
+export async function sendToolboxTalkEmail(params: SendToolboxTalkEmailParams): Promise<{
+  success: boolean;
+  sent?: number;
+  failed?: number;
+  error?: string;
+}> {
+  const { to, senderName, subject } = params;
+  
+  try {
+    // Check if Resend API key is configured
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      console.error('RESEND_API_KEY not configured');
+      return {
+        success: false,
+        error: 'Email service not configured'
+      };
+    }
+
+    // Convert single email to array for consistent handling
+    const recipients = Array.isArray(to) ? to : [to];
+    
+    // Resend allows up to 100 recipients per call, but we'll batch conservatively
+    // to avoid rate limits: 10 emails per batch with delays
+    const BATCH_SIZE = 10;
+    const BATCH_DELAY_MS = 1000; // 1 second between batches
+    
+    let sent = 0;
+    let failed = 0;
+
+    // Process in batches
+    for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
+      const batch = recipients.slice(i, i + BATCH_SIZE);
+      
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #DC2626; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+              <h1 style="margin: 0; color: white;">⚠️ New Toolbox Talk</h1>
+            </div>
+            
+            <div style="background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+              <h2 style="color: #252525; margin-top: 0;">Action Required</h2>
+              
+              <p>Hello,</p>
+              
+              <p><strong>${senderName}</strong> has sent you an important Toolbox Talk message that requires your immediate attention.</p>
+              
+              <div style="background-color: #fff; border: 2px solid #DC2626; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">Subject:</p>
+                <p style="margin: 0; font-size: 18px; font-weight: bold; color: #DC2626;">${subject}</p>
+              </div>
+              
+              <div style="background-color: #fef2f2; border-left: 4px solid #DC2626; padding: 15px; margin: 20px 0;">
+                <p style="margin: 0; font-weight: bold; color: #991b1b;">🔒 Important Safety Information</p>
+                <p style="margin: 5px 0 0 0; color: #991b1b;">You must read and sign this Toolbox Talk before continuing to use the app. The full message is available when you log in.</p>
+              </div>
+              
+              <p><strong>Next Steps:</strong></p>
+              <ol style="color: #4b5563;">
+                <li>Open the SquiresApp or log in at SquiresApp.com</li>
+                <li>Read the full Toolbox Talk message</li>
+                <li>Sign electronically to confirm you've read and understood it</li>
+              </ol>
+              
+              <div style="background-color: #dbeafe; border-radius: 8px; padding: 15px; margin: 20px 0;">
+                <p style="margin: 0; color: #1e40af;"><strong>📱 Note:</strong> For security and privacy reasons, the full message content is only available in the app, not in this email.</p>
+              </div>
+              
+              <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+                This is an automated notification. Please do not reply to this email.
+              </p>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px; color: #9ca3af; font-size: 12px;">
+              <p>© ${new Date().getFullYear()} A&V Squires Plant Co. Ltd. All rights reserved.</p>
+            </div>
+          </body>
+        </html>
+      `;
+
+      try {
+        // Send emails for this batch
+        const promises = batch.map(email => 
+          fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              from: process.env.RESEND_FROM_EMAIL || 'AVS Worklog <onboarding@resend.dev>',
+              to: [email],
+              subject: `New Toolbox Talk: ${subject}`,
+              html: htmlContent
+            })
+          })
+        );
+
+        const results = await Promise.allSettled(promises);
+        
+        // Count successes and failures
+        results.forEach((result, index) => {
+          if (result.status === 'fulfilled' && result.value.ok) {
+            sent++;
+          } else {
+            failed++;
+            console.error(`Failed to send to ${batch[index]}:`, 
+              result.status === 'rejected' ? result.reason : 'API error');
+          }
+        });
+
+        // Wait before next batch (unless this is the last batch)
+        if (i + BATCH_SIZE < recipients.length) {
+          await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+        }
+
+      } catch (batchError) {
+        console.error('Batch sending error:', batchError);
+        failed += batch.length;
+      }
+    }
+
+    console.log(`Toolbox Talk emails: ${sent} sent, ${failed} failed`);
+
+    return {
+      success: sent > 0,
+      sent,
+      failed
+    };
+    
+  } catch (error: any) {
+    console.error('Error sending Toolbox Talk emails:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to send emails'
+    };
+  }
+}
+

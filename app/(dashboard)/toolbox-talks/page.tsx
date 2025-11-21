@@ -1,0 +1,127 @@
+'use client';
+
+import { useState } from 'react';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2, MessageSquare, Bell, BarChart3 } from 'lucide-react';
+import { CreateToolboxTalkForm } from '@/components/messages/CreateToolboxTalkForm';
+import { CreateReminderForm } from '@/components/messages/CreateReminderForm';
+import { MessagesReportView } from '@/components/messages/MessagesReportView';
+
+export default function ToolboxTalksPage() {
+  const { isManager, isAdmin, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState('create-toolbox-talk');
+
+  // Redirect non-managers/admins
+  if (!authLoading && !isManager && !isAdmin) {
+    router.push('/dashboard');
+    return null;
+  }
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 max-w-6xl">
+      {/* Header */}
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-red-100 dark:bg-red-950 rounded-lg">
+            <MessageSquare className="h-6 w-6 text-red-600" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+              Toolbox Talks & Reminders
+            </h1>
+            <p className="text-slate-600 dark:text-slate-400">
+              Send important safety messages and reminders to employees
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="create-toolbox-talk" className="gap-2">
+            <MessageSquare className="h-4 w-4" />
+            Create Toolbox Talk
+          </TabsTrigger>
+          <TabsTrigger value="create-reminder" className="gap-2">
+            <Bell className="h-4 w-4" />
+            Create Reminder
+          </TabsTrigger>
+          <TabsTrigger value="reports" className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Reports
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Create Toolbox Talk Tab */}
+        <TabsContent value="create-toolbox-talk">
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-slate-900 dark:text-white">
+                Create Toolbox Talk Message
+              </CardTitle>
+              <CardDescription className="text-slate-600 dark:text-slate-400">
+                High priority safety message that requires employee signature. Recipients cannot use the app until signed.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CreateToolboxTalkForm onSuccess={() => {
+                // Optionally switch to reports tab after creation
+                // setActiveTab('reports');
+              }} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Create Reminder Tab */}
+        <TabsContent value="create-reminder">
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-slate-900 dark:text-white">
+                Create Reminder Message
+              </CardTitle>
+              <CardDescription className="text-slate-600 dark:text-slate-400">
+                Low priority informational message. Non-blocking - employees can dismiss after reading.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CreateReminderForm onSuccess={() => {
+                // Optionally switch to reports tab after creation
+              }} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Reports Tab */}
+        <TabsContent value="reports">
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-slate-900 dark:text-white">
+                Message Reports
+              </CardTitle>
+              <CardDescription className="text-slate-600 dark:text-slate-400">
+                View all sent messages, recipient status, and compliance rates
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <MessagesReportView />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+

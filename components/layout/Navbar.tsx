@@ -29,9 +29,12 @@ import {
   ChevronDown,
   Truck,
   FileCheck2,
-  Calendar
+  Calendar,
+  Bell,
+  MessageSquare
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { NotificationPanel } from '@/components/messages/NotificationPanel';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -39,6 +42,29 @@ export function Navbar() {
   const { profile, signOut, isAdmin, isManager } = useAuth();
   const { isOnline, pendingCount } = useOfflineSync();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch notification count
+  useEffect(() => {
+    async function fetchNotificationCount() {
+      try {
+        const response = await fetch('/api/messages/notifications');
+        const data = await response.json();
+        if (data.success) {
+          setUnreadCount(data.unread_count || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching notification count:', error);
+      }
+    }
+
+    fetchNotificationCount();
+    
+    // Poll every 60 seconds for new notifications
+    const interval = setInterval(fetchNotificationCount, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSignOut = async () => {
     try {
@@ -178,6 +204,12 @@ export function Navbar() {
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
+                      <Link href="/toolbox-talks" className="flex items-center cursor-pointer">
+                        <MessageSquare className="w-4 h-4 mr-2" />
+                        Toolbox Talks
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
                       <Link href="/absence" className="flex items-center cursor-pointer">
                         <Calendar className="w-4 h-4 mr-2" />
                         Absence & Leave
@@ -225,6 +257,24 @@ export function Navbar() {
                   )}
                 </div>
               )}
+            </div>
+
+            {/* Notification Bell */}
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setNotificationPanelOpen(!notificationPanelOpen)}
+                className="text-slate-300 hover:text-white hover:bg-slate-800/50 relative"
+                title="Notifications"
+              >
+                <Bell className="w-4 h-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </Button>
             </div>
 
             {/* User info */}
@@ -350,6 +400,18 @@ export function Navbar() {
                   RAMS Documents
                 </Link>
                 <Link
+                  href="/toolbox-talks"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center px-3 py-2 pl-6 text-base font-medium rounded-md ${
+                    pathname?.startsWith('/toolbox-talks')
+                      ? 'bg-avs-yellow text-slate-900'
+                      : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                  }`}
+                >
+                  <MessageSquare className="w-5 h-5 mr-3" />
+                  Toolbox Talks
+                </Link>
+                <Link
                   href="/absence"
                   onClick={() => setMobileMenuOpen(false)}
                   className={`flex items-center px-3 py-2 pl-6 text-base font-medium rounded-md ${
@@ -399,6 +461,23 @@ export function Navbar() {
           </div>
         </div>
       )}
+
+      {/* Notification Panel */}
+      <NotificationPanel
+        open={notificationPanelOpen}
+        onClose={() => {
+          setNotificationPanelOpen(false);
+          // Refresh unread count after closing
+          fetch('/api/messages/notifications')
+            .then(res => res.json())
+            .then(data => {
+              if (data.success) {
+                setUnreadCount(data.unread_count || 0);
+              }
+            })
+            .catch(console.error);
+        }}
+      />
     </nav>
   );
 }

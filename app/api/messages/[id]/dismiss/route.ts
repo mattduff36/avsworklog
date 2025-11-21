@@ -1,0 +1,91 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import type { SignMessageResponse } from '@/types/messages';
+
+/**
+ * POST /api/messages/[id]/dismiss
+ * Dismiss a Reminder message (mark as shown/dismissed)
+ * Updates recipient status to DISMISSED
+ */
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: recipientId } = await params;
+    const supabase = await createClient();
+
+    // Check authentication
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Fetch the recipient record to verify ownership
+    const { data: recipient, error: fetchError } = await supabase
+      .from('message_recipients')
+      .select(`
+        *,
+        messages!inner(
+          id,
+          type,
+          deleted_at
+        )
+      `)
+      .eq('id', recipientId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (fetchError || !recipient) {
+      return NextResponse.json({ 
+        error: 'Message recipient not found or unauthorized' 
+      }, { status: 404 });
+    }
+
+    // Check if message has been deleted
+    if (recipient.messages.deleted_at) {
+      return NextResponse.json({ 
+        error: 'This message has been deleted' 
+      }, { status: 410 });
+    }
+
+    // Verify this is a Reminder
+    if (recipient.messages.type !== 'REMINDER') {
+      return NextResponse.json({ 
+        error: 'Only Reminder messages can be dismissed' 
+      }, { status: 400 });
+    }
+
+    // Update recipient status to DISMISSED
+    const { data: updatedRecipient, error: updateError } = await supabase
+      .from('message_recipients')
+      .update({
+        status: 'DISMISSED',
+        first_shown_at: recipient.first_shown_at || new Date().toISOString()
+      })
+      .eq('id', recipientId)
+      .select()
+      .single();
+
+    if (updateError || !updatedRecipient) {
+      console.error('Error updating recipient:', updateError);
+      return NextResponse.json({ 
+        error: 'Failed to dismiss message' 
+      }, { status: 500 });
+    }
+
+    const response: SignMessageResponse = {
+      success: true,
+      recipient: updatedRecipient
+    };
+
+    return NextResponse.json(response);
+
+  } catch (error: any) {
+    console.error('Error in POST /api/messages/[id]/dismiss:', error);
+    return NextResponse.json({ 
+      error: error.message || 'Internal server error' 
+    }, { status: 500 });
+  }
+}
+
