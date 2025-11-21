@@ -18,8 +18,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Shield, Plus, Edit, Trash2, Loader2, AlertTriangle, Users, Lock } from 'lucide-react';
-import type { RoleWithUserCount, ModuleName, MODULE_DISPLAY_NAMES } from '@/types/roles';
-import { ALL_MODULES, MODULE_DESCRIPTIONS } from '@/types/roles';
+import type { RoleWithUserCount, ModuleName } from '@/types/roles';
+import { ALL_MODULES, MODULE_DESCRIPTIONS, MODULE_DISPLAY_NAMES } from '@/types/roles';
 import { toast } from 'sonner';
 
 export function RoleManagement() {
