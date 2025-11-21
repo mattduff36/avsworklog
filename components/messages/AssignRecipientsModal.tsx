@@ -108,15 +108,27 @@ export function AssignRecipientsModal({
   };
 
   const handleSelectRole = (role: string) => {
-    setSelectedRole(role);
-    
-    // Select all employees with this role
     const employeesWithRole = employees.filter(emp => emp.role === role);
+    const roleEmployeeIds = new Set(employeesWithRole.map(emp => emp.id));
+    
+    // Check if all employees in this role are already selected
+    const allRoleSelected = employeesWithRole.every(emp => selectedIds.has(emp.id));
+    
     const newSelected = new Set(selectedIds);
     
-    employeesWithRole.forEach(emp => {
-      newSelected.add(emp.id);
-    });
+    if (allRoleSelected) {
+      // Unselect all employees in this role
+      employeesWithRole.forEach(emp => {
+        newSelected.delete(emp.id);
+      });
+      setSelectedRole('');
+    } else {
+      // Select all employees in this role
+      employeesWithRole.forEach(emp => {
+        newSelected.add(emp.id);
+      });
+      setSelectedRole(role);
+    }
     
     setSelectedIds(newSelected);
   };
@@ -159,7 +171,7 @@ export function AssignRecipientsModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[85vh] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <DialogContent className="sm:max-w-[700px] max-h-[85vh] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 z-[100]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>
@@ -180,16 +192,19 @@ export function AssignRecipientsModal({
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {ROLE_OPTIONS.map((role) => {
-                  const roleCount = employees.filter(emp => emp.role === role.value).length;
+                  const roleEmployees = employees.filter(emp => emp.role === role.value);
+                  const roleCount = roleEmployees.length;
+                  const allRoleSelected = roleEmployees.length > 0 && roleEmployees.every(emp => selectedIds.has(emp.id));
+                  
                   return (
                     <Button
                       key={role.value}
                       type="button"
-                      variant="outline"
+                      variant={allRoleSelected ? "default" : "outline"}
                       size="sm"
                       onClick={() => handleSelectRole(role.value)}
                       disabled={loading || fetching || roleCount === 0}
-                      className="justify-start text-sm"
+                      className={`justify-start text-sm ${allRoleSelected ? 'bg-primary text-primary-foreground' : ''}`}
                     >
                       {role.label} ({roleCount})
                     </Button>

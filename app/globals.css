@@ -509,6 +509,12 @@
 /* Ensure dialog overlays are visible but not too dark */
 [data-radix-dialog-overlay] {
   background: rgba(0, 0, 0, 0.7) !important;
+  z-index: 90 !important;
+}
+
+/* Ensure dialog content is above overlay */
+[data-radix-dialog-content] {
+  z-index: 100 !important;
 }
 
 /*
