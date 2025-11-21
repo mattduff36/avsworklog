@@ -97,8 +97,8 @@ export async function PUT(
     if (employee_id !== existingUser.employee_id) {
       changes.employee_id = { old: existingUser.employee_id || '', new: employee_id || '' };
     }
-    if (role !== existingUser.role) {
-      changes.role = { old: existingUser.role, new: role };
+    if (role_id !== existingUser.role_id) {
+      changes.role_id = { old: existingUser.role_id, new: role_id };
     }
 
     // Update email in auth if it changed
