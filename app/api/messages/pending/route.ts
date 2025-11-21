@@ -33,7 +33,7 @@ export async function GET() {
           sender_id,
           created_at,
           deleted_at,
-          sender:profiles!messages_sender_id_fkey(
+          sender:sender_id(
             id,
             full_name
           )
@@ -66,7 +66,7 @@ export async function GET() {
           sender_id,
           created_at,
           deleted_at,
-          sender:profiles!messages_sender_id_fkey(
+          sender:sender_id(
             id,
             full_name
           )

@@ -2,11 +2,10 @@
 
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { SignaturePad } from '@/components/forms/SignaturePad';
-import { Loader2, AlertTriangle, Shield } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface BlockingMessageModalProps {
@@ -31,7 +30,6 @@ export function BlockingMessageModal({
   totalPending,
   currentIndex
 }: BlockingMessageModalProps) {
-  const [showSignature, setShowSignature] = useState(false);
   const [signing, setSigning] = useState(false);
 
   async function handleSign(signatureData: string) {
@@ -65,10 +63,6 @@ export function BlockingMessageModal({
     }
   }
 
-  function handleReadAndSign() {
-    setShowSignature(true);
-  }
-
   // This modal cannot be closed by user - they must sign
   return (
     <Dialog open={open} onOpenChange={() => {}}>
@@ -78,17 +72,10 @@ export function BlockingMessageModal({
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-red-100 dark:bg-red-950 rounded">
-              <Shield className="h-6 w-6 text-red-600" />
-            </div>
-            <div className="flex-1">
-              <DialogTitle className="text-xl text-red-600">⚠️ Toolbox Talk - Action Required</DialogTitle>
-              <DialogDescription className="text-slate-600 dark:text-slate-400">
-                From: <strong>{message.sender_name}</strong> • {new Date(message.created_at).toLocaleDateString()}
-              </DialogDescription>
-            </div>
-          </div>
+          <DialogTitle className="text-xl text-red-600">Toolbox Talk - Action Required</DialogTitle>
+          <DialogDescription className="text-slate-600 dark:text-slate-400">
+            From: <strong>{message.sender_name}</strong> • {new Date(message.created_at).toLocaleDateString()}
+          </DialogDescription>
         </DialogHeader>
 
         {/* Progress indicator if multiple */}
@@ -101,13 +88,11 @@ export function BlockingMessageModal({
         )}
 
         <div className="px-6 pb-6 space-y-4">
-          {/* Warning Alert */}
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              <strong>You must read and sign this Toolbox Talk before continuing to use the app.</strong>
-              <br />
-              This is important safety information that requires your acknowledgement.
+          {/* Simple one-line warning */}
+          <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-900 dark:text-amber-100">
+              Please read and sign this Toolbox Talk to continue using the app.
             </AlertDescription>
           </Alert>
 
@@ -123,44 +108,25 @@ export function BlockingMessageModal({
             </div>
           </ScrollArea>
 
-          {/* Signature Section */}
-          {!showSignature ? (
-            <div className="space-y-3">
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                By clicking below, you confirm that you have read and understood this Toolbox Talk. You will be asked to provide your electronic signature.
-              </p>
-              <Button 
-                onClick={handleReadAndSign}
-                className="w-full bg-red-600 hover:bg-red-700 text-white"
-                size="lg"
-              >
-                I Have Read This - Continue to Sign
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                <p className="text-sm text-blue-900 dark:text-blue-100">
-                  <strong>Electronic Signature Required</strong>
-                  <br />
-                  Please sign below to confirm you have read and understood this Toolbox Talk.
-                </p>
-              </div>
-              
-              <SignaturePad
-                onSave={handleSign}
-                onCancel={() => setShowSignature(false)}
-                disabled={signing}
-              />
+          {/* Signature Section - Always visible like RAMS */}
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-slate-900 dark:text-white">
+              Your Signature <span className="text-destructive">*</span>
+            </label>
+            
+            <SignaturePad
+              onSave={handleSign}
+              onCancel={() => {}}
+              disabled={signing}
+            />
 
-              {signing && (
-                <div className="flex items-center justify-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Recording signature...
-                </div>
-              )}
-            </div>
-          )}
+            {signing && (
+              <div className="flex items-center justify-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Recording signature...
+              </div>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
