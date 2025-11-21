@@ -21,6 +21,7 @@ import { INSPECTION_ITEMS, InspectionStatus } from '@/types/inspection';
 import { Database } from '@/types/database';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { toast } from 'sonner';
+import { getUsersWithPermission } from '@/lib/utils/permissions';
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -76,14 +77,19 @@ export default function NewInspectionPage() {
 
   const fetchEmployees = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, employee_id')
-        .order('full_name');
+      // Get employees with inspections permission
+      const allEmployees = await getUsersWithPermission('inspections');
       
-      if (error) throw error;
+      // Convert to expected format and sort
+      const formattedEmployees: Employee[] = allEmployees
+        .map(emp => ({
+          id: emp.id,
+          full_name: emp.full_name || 'Unnamed User',
+          employee_id: emp.employee_id || null,
+        }))
+        .sort((a, b) => a.full_name.localeCompare(b.full_name));
       
-      setEmployees(data || []);
+      setEmployees(formattedEmployees);
       
       // Set default to current user
       if (user) {

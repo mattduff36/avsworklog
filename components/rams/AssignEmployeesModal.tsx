@@ -10,6 +10,7 @@ import { Loader2, UserCheck, Search, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { Database } from '@/types/database';
+import { getUsersWithPermission } from '@/lib/utils/permissions';
 
 interface Employee {
   id: string;
@@ -64,13 +65,8 @@ export function AssignEmployeesModal({
   const fetchEmployees = async () => {
     setFetching(true);
     try {
-      // Fetch all employees
-      const { data: allEmployees, error: empError } = await supabase
-        .from('profiles')
-        .select('id, full_name, role')
-        .order('full_name');
-
-      if (empError) throw empError;
+      // Fetch employees with RAMS permission
+      const allEmployees = await getUsersWithPermission('rams');
 
       // Fetch existing assignments for this document
       const { data: assignments, error: assignError } = await supabase

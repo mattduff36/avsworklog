@@ -22,6 +22,7 @@ import { Database } from '@/types/database';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { fetchUKBankHolidays } from '@/lib/utils/bank-holidays';
 import { toast } from 'sonner';
+import { getUsersWithPermission } from '@/lib/utils/permissions';
 
 type Employee = {
   id: string;
@@ -233,14 +234,19 @@ export default function NewTimesheetPage() {
 
   const fetchEmployees = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, employee_id')
-        .order('full_name');
+      // Get all profiles and filter by permission
+      const allEmployees = await getUsersWithPermission('timesheets');
       
-      if (error) throw error;
+      // Convert to expected format and sort
+      const formattedEmployees: Employee[] = allEmployees
+        .map(emp => ({
+          id: emp.id,
+          full_name: emp.full_name || 'Unnamed User',
+          employee_id: emp.employee_id || null,
+        }))
+        .sort((a, b) => a.full_name.localeCompare(b.full_name));
       
-      setEmployees(data || []);
+      setEmployees(formattedEmployees);
       
       // Set default to current user only if we're not loading an existing timesheet
       const timesheetId = searchParams.get('id');
