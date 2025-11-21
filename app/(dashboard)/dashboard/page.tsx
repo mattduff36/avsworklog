@@ -24,18 +24,20 @@ import {
   FileCheck,
   ScrollText,
   CarFront,
-  FileText
+  FileText,
+  Calendar,
+  ChevronRight
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
 import { Database } from '@/types/database';
 
-type RecentActivity = {
-  id: string;
-  type: 'timesheet' | 'inspection';
-  title: string;
-  user: string;
-  status: string;
-  created_at: string;
+type PendingApprovalCount = {
+  type: 'timesheets' | 'inspections' | 'absences';
+  label: string;
+  count: number;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  href: string;
 };
 
 type Action = Database['public']['Tables']['actions']['Row'] & {
@@ -56,7 +58,7 @@ export default function DashboardPage() {
   const formTypes = getEnabledForms();
   const supabase = createClient();
 
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [pendingApprovals, setPendingApprovals] = useState<PendingApprovalCount[]>([]);
   const [topActions, setTopActions] = useState<Action[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingRAMSCount, setPendingRAMSCount] = useState(0);
@@ -76,76 +78,71 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (isManager || isAdmin) {
-      fetchRecentActivity();
+      fetchPendingApprovals();
       fetchTopActions();
     }
     fetchPendingRAMS();
   }, [isManager, isAdmin, profile]);
 
-  const fetchRecentActivity = async () => {
+  const fetchPendingApprovals = async () => {
     try {
       setLoading(true);
       
-      // Fetch recent timesheets
-      const { data: timesheets, error: timesheetsError } = await supabase
+      // Fetch pending timesheets count
+      const { count: timesheetsCount, error: timesheetsError } = await supabase
         .from('timesheets')
-        .select(`
-          id,
-          status,
-          created_at,
-          profiles:user_id (
-            full_name
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(5);
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'submitted');
 
       if (timesheetsError) throw timesheetsError;
 
-      // Fetch recent inspections
-      const { data: inspections, error: inspectionsError } = await supabase
+      // Fetch pending inspections count
+      const { count: inspectionsCount, error: inspectionsError } = await supabase
         .from('vehicle_inspections')
-        .select(`
-          id,
-          status,
-          created_at,
-          profiles:user_id (
-            full_name
-          ),
-          vehicles (
-            reg_number
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(5);
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'submitted');
 
       if (inspectionsError) throw inspectionsError;
 
-      // Combine and format the data
-      const combined: RecentActivity[] = [
-        ...(timesheets || []).map((ts: any) => ({
-          id: ts.id,
-          type: 'timesheet' as const,
-          title: 'Timesheet',
-          user: ts.profiles?.full_name || 'Unknown User',
-          status: ts.status,
-          created_at: ts.created_at,
-        })),
-        ...(inspections || []).map((insp: any) => ({
-          id: insp.id,
-          type: 'inspection' as const,
-          title: `Inspection - ${insp.vehicles?.reg_number || 'Unknown Vehicle'}`,
-          user: insp.profiles?.full_name || 'Unknown User',
-          status: insp.status,
-          created_at: insp.created_at,
-        })),
-      ]
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, 5);
+      // Fetch pending absences count
+      const { count: absencesCount, error: absencesError } = await supabase
+        .from('absences')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
 
-      setRecentActivity(combined);
+      if (absencesError) throw absencesError;
+
+      // Build dynamic approval types array
+      const approvalTypes: PendingApprovalCount[] = [
+        {
+          type: 'timesheets',
+          label: 'Timesheets',
+          count: timesheetsCount || 0,
+          icon: FileText,
+          color: 'hsl(210 90% 50%)', // Blue
+          href: '/approvals?tab=timesheets'
+        },
+        {
+          type: 'inspections',
+          label: 'Inspections',
+          count: inspectionsCount || 0,
+          icon: Clipboard,
+          color: 'hsl(30 95% 55%)', // Orange
+          href: '/approvals?tab=inspections'
+        },
+        {
+          type: 'absences',
+          label: 'Absences',
+          count: absencesCount || 0,
+          icon: Calendar,
+          color: 'hsl(260 60% 50%)', // Purple
+          href: '/approvals?tab=absences'
+        }
+      ];
+
+      setPendingApprovals(approvalTypes);
     } catch (error) {
-      console.error('Error fetching recent activity:', error);
+      console.error('Error fetching pending approvals:', error);
     } finally {
       setLoading(false);
     }
@@ -301,114 +298,83 @@ export default function DashboardPage() {
       </div>
 
 
-      {/* Recent Activity - Manager/Admin Only */}
+      {/* Pending Approvals Summary - Manager/Admin Only */}
       {isManager && (
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-slate-900 dark:text-white">
-              <span>Recent Activity</span>
-              <Badge variant="outline" className="text-slate-400 border-slate-600">
-                Last 5 Submissions
-              </Badge>
+              <span>Pending Approvals</span>
+              <Link href="/approvals">
+                <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-700/50">
+                  View All
+                </Button>
+              </Link>
             </CardTitle>
             <CardDescription className="text-slate-400">
-              Recent submissions across all form types
+              Outstanding approval requests across all types
             </CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="text-center py-8 text-slate-400">
-                <p>Loading recent activity...</p>
-              </div>
-            ) : recentActivity.length > 0 ? (
-              <div className="space-y-3">
-                {recentActivity.map((activity) => (
-                  <Link
-                    key={activity.id}
-                    href={activity.type === 'timesheet' ? `/timesheets/${activity.id}` : `/inspections/${activity.id}`}
-                    className="block"
-                  >
-                    <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-700/30 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors border border-slate-200 dark:border-slate-700/50">
-                      <div className="flex items-center gap-3">
-                        {activity.type === 'timesheet' ? (
-                          <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                        ) : (
-                          <CarFront className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                        )}
-                        <div>
-                          <p className="font-medium text-slate-900 dark:text-white">{activity.title}</p>
-                          <p className="text-sm text-slate-600 dark:text-slate-400">
-                            by {activity.user} • {formatDate(activity.created_at)}
-                          </p>
-                        </div>
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className={
-                          activity.status === 'submitted'
-                            ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
-                            : activity.status === 'approved'
-                            ? 'border-green-500/30 text-green-400 bg-green-500/10'
-                            : activity.status === 'rejected'
-                            ? 'border-red-500/30 text-red-400 bg-red-500/10'
-                            : 'border-slate-600 text-slate-400'
-                        }
-                      >
-                        {activity.status}
-                      </Badge>
-                    </div>
-                  </Link>
-                ))}
-                <div className="flex justify-center gap-2 pt-4">
-                  {formTypes
-                    .filter(formType => {
-                      // Hide RAMS for employees with no assignments
-                      if (formType.id === 'rams' && !isManager && !isAdmin && !hasRAMSAssignments) {
-                        return false;
-                      }
-                      return true;
-                    })
-                    .map((formType) => (
-                    <Link key={formType.id} href={formType.listHref}>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="border-slate-600 text-slate-300 hover:bg-slate-700/50"
-                      >
-                        View All {formType.title}s
-                      </Button>
-                    </Link>
-                  ))}
-                </div>
+                <p>Loading pending approvals...</p>
               </div>
             ) : (
-              <div className="text-center py-12 text-slate-400">
-                <FileSpreadsheet className="h-16 w-16 mx-auto mb-4 opacity-20 text-avs-yellow" />
-                <p className="text-lg mb-2">No activity yet</p>
-                <p className="text-sm text-slate-500 mb-6">
-                  Recent form submissions will appear here
-                </p>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {formTypes
-                    .filter(formType => {
-                      // Hide RAMS for employees with no assignments
-                      if (formType.id === 'rams' && !isManager && !isAdmin && !hasRAMSAssignments) {
-                        return false;
-                      }
-                      return true;
-                    })
-                    .map((formType) => (
-                    <Link key={formType.id} href={formType.listHref}>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="border-slate-600 text-slate-300 hover:bg-slate-700/50"
-                      >
-                        View All {formType.title}s
-                      </Button>
+              <div className="space-y-2">
+                {pendingApprovals.map((approval) => {
+                  const Icon = approval.icon;
+                  
+                  return (
+                    <Link
+                      key={approval.type}
+                      href={approval.href}
+                      className="block group"
+                    >
+                      <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-800/30 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-all duration-200 border border-slate-200 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600">
+                        <div className="flex items-center gap-4">
+                          <div 
+                            className="flex items-center justify-center w-10 h-10 rounded-lg"
+                            style={{ backgroundColor: `${approval.color}15` }}
+                          >
+                            <Icon 
+                              className="h-5 w-5" 
+                              style={{ color: approval.color }}
+                            />
+                          </div>
+                          <div>
+                            <p className="font-medium text-slate-900 dark:text-white group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
+                              {approval.label}
+                            </p>
+                            <p className="text-sm text-slate-600 dark:text-slate-400">
+                              {approval.count === 0 ? 'No' : approval.count} pending {approval.count === 1 ? 'request' : 'requests'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {approval.count > 0 && (
+                            <Badge 
+                              variant="outline" 
+                              className="text-base px-3 py-1 font-semibold border-amber-500/30 text-amber-400 bg-amber-500/10"
+                            >
+                              {approval.count}
+                            </Badge>
+                          )}
+                          <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors" />
+                        </div>
+                      </div>
                     </Link>
-                  ))}
-                </div>
+                  );
+                })}
+                
+                {pendingApprovals.reduce((sum, a) => sum + a.count, 0) === 0 && (
+                  <div className="text-center py-8 text-slate-400 mt-4">
+                    <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-20 text-green-400" />
+                    <p className="text-lg mb-1">All caught up!</p>
+                    <p className="text-sm text-slate-500">
+                      No pending approvals at the moment
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>

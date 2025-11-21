@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,12 +40,13 @@ interface InspectionWithDetails extends VehicleInspection {
 export default function ApprovalsPage() {
   const { isManager, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   
   const [timesheets, setTimesheets] = useState<TimesheetWithProfile[]>([]);
   const [inspections, setInspections] = useState<InspectionWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('timesheets');
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'timesheets');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
   
   // Absence hooks
