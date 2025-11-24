@@ -76,32 +76,19 @@ export default function NewInspectionPage() {
 
   const fetchEmployees = async () => {
     try {
-      // Get employees with inspections permission
+      // Get all profiles
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select(`
-          id,
-          full_name,
-          role:roles!inner(
-            name,
-            is_manager_admin
-          ),
-          role_permissions!inner(
-            module_name,
-            enabled
-          )
-        `)
-        .eq('role_permissions.module_name', 'inspections')
-        .eq('role_permissions.enabled', true)
+        .select('id, full_name, employee_id')
         .order('full_name');
 
       if (error) throw error;
 
       const allEmployees = profiles || [];
       
-      // Convert to expected format and sort
+      // Convert to expected format
       const formattedEmployees: Employee[] = allEmployees
-        .map((emp: any) => ({
+        .map((emp) => ({
           id: emp.id,
           full_name: emp.full_name || 'Unnamed User',
           employee_id: emp.employee_id || null,
