@@ -11,7 +11,14 @@ import dynamic from 'next/dynamic';
 // Dynamically import react-pdf components (client-side only)
 const Document = dynamic(
   () => import('react-pdf').then((mod) => mod.Document),
-  { ssr: false }
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+      </div>
+    )
+  }
 );
 
 const Page = dynamic(
@@ -45,10 +52,16 @@ export function BlockingMessageModal({
   const [signing, setSigning] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [numPages, setNumPages] = useState<number | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  // Ensure we're on client side
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Configure PDF.js worker and styles on client side only
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (isClient) {
       // Import CSS
       import('react-pdf/dist/Page/AnnotationLayer.css');
       import('react-pdf/dist/Page/TextLayer.css');
@@ -60,7 +73,7 @@ export function BlockingMessageModal({
         });
       });
     }
-  }, []);
+  }, [isClient]);
 
   // Set PDF URL if pdf_file_path exists
   useEffect(() => {
@@ -148,7 +161,7 @@ export function BlockingMessageModal({
             )}
 
             {/* PDF Viewer - Render each page separately */}
-            {pdfUrl && (
+            {pdfUrl && isClient && (
               <div className="w-full space-y-4">
                 <Document
                   file={pdfUrl}
@@ -180,6 +193,16 @@ export function BlockingMessageModal({
                     </div>
                   ))}
                 </Document>
+              </div>
+            )}
+
+            {/* Loading state while waiting for client-side mount */}
+            {pdfUrl && !isClient && (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                <span className="ml-2 text-sm text-slate-600 dark:text-slate-400">
+                  Preparing PDF viewer...
+                </span>
               </div>
             )}
 
