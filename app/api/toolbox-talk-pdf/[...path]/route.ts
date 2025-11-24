@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
     const supabase = await createClient();
@@ -19,8 +19,11 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Await params (Next.js 15 requirement)
+    const resolvedParams = await params;
+    
     // Reconstruct the file path
-    const filePath = params.path.join('/');
+    const filePath = resolvedParams.path.join('/');
 
     if (!filePath) {
       return NextResponse.json({ error: 'File path required' }, { status: 400 });
