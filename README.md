@@ -297,6 +297,11 @@ Proprietary - A&V Squires Plant Co. Ltd.
 
 ## Version
 
+**v1.1.1** - Bug Fixes & Improvements (November 2025)
+- Fixed admin account creation issues
+- Improved user management functionality
+- Enhanced error handling
+
 **v1.1.0** - Complete Offline PWA Release (October 30, 2025)
 - ✅ Full offline PWA functionality
 - ✅ Automatic sync when reconnected
