@@ -428,7 +428,7 @@ export default function ApprovalsPage() {
                     <CardContent>
                       <div className="flex items-center justify-between">
                         <div className="text-sm text-muted-foreground">
-                          Submitted {formatDate(timesheet.submitted_at || '')}
+                          {timesheet.submitted_at ? `Submitted ${formatDate(timesheet.submitted_at)}` : 'Not submitted'}
                           {timesheet.reg_number && ` • Reg: ${timesheet.reg_number}`}
                         </div>
                         {timesheet.status === 'submitted' && (
@@ -509,7 +509,7 @@ export default function ApprovalsPage() {
                     <CardContent>
                       <div className="flex items-center justify-between">
                         <div className="text-sm text-muted-foreground">
-                          Submitted {formatDate(inspection.submitted_at || '')}
+                          {inspection.submitted_at ? `Submitted ${formatDate(inspection.submitted_at)}` : 'Not submitted'}
                         </div>
                         {inspection.status === 'submitted' && (
                           <div className="flex gap-2" onClick={(e) => e.preventDefault()}>

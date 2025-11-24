@@ -25,17 +25,31 @@ export function getWeekDates(weekEnding: Date): Date[] {
 /**
  * Format date for display
  */
-export function formatDate(date: Date | string): string {
-  const d = typeof date === 'string' ? parseISO(date) : date;
-  return format(d, 'dd/MM/yyyy');
+export function formatDate(date: Date | string | null | undefined): string {
+  if (!date) return '';
+  
+  try {
+    const d = typeof date === 'string' ? parseISO(date) : date;
+    if (!isValid(d)) return '';
+    return format(d, 'dd/MM/yyyy');
+  } catch {
+    return '';
+  }
 }
 
 /**
  * Format date for ISO string (database storage)
  */
-export function formatDateISO(date: Date | string): string {
-  const d = typeof date === 'string' ? parseISO(date) : date;
-  return format(d, 'yyyy-MM-dd');
+export function formatDateISO(date: Date | string | null | undefined): string {
+  if (!date) return '';
+  
+  try {
+    const d = typeof date === 'string' ? parseISO(date) : date;
+    if (!isValid(d)) return '';
+    return format(d, 'yyyy-MM-dd');
+  } catch {
+    return '';
+  }
 }
 
 /**
