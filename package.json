@@ -15,7 +15,8 @@
     "seed:inspections-sql": "tsx scripts/seed-inspections-sql.ts",
     "migrate": "tsx scripts/run-migration.ts",
     "migrate:day-of-week": "tsx scripts/run-day-of-week-migration.ts",
-    "test:reports": "tsx scripts/test-reports.ts"
+    "test:reports": "tsx scripts/test-reports.ts",
+    "test:processed-status": "tsx scripts/test-processed-status.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
