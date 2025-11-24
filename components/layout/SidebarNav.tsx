@@ -11,9 +11,11 @@ import {
   ListTodo,
   Truck,
   MessageSquare,
-  PanelLeftClose
+  PanelLeftClose,
+  Bug
 } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
 interface SidebarNavProps {
   open: boolean;
@@ -23,6 +25,25 @@ interface SidebarNavProps {
 export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const pathname = usePathname();
   const { isAdmin, isManager } = useAuth();
+  const supabase = createClient();
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [viewAsRole, setViewAsRole] = useState<string>('actual');
+
+  // Fetch user email and view as role
+  useEffect(() => {
+    async function fetchUserData() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        setUserEmail(user.email);
+      }
+    }
+    fetchUserData();
+    
+    const storedViewAs = localStorage.getItem('viewAsRole');
+    if (storedViewAs) {
+      setViewAsRole(storedViewAs);
+    }
+  }, [supabase]);
 
   // Collapse sidebar on route change (don't close completely)
   useEffect(() => {
@@ -33,6 +54,9 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   }, [pathname]);
 
   if (!isManager) return null;
+
+  const isSuperAdmin = userEmail === 'admin@mpdee.co.uk';
+  const showDeveloperTools = isSuperAdmin && viewAsRole === 'actual';
 
   const managerLinks = [
     { href: '/approvals', label: 'Approvals', icon: CheckSquare },
@@ -120,7 +144,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
 
           {/* Admin Links */}
           {isAdmin && (
-            <div className={open ? 'px-3' : 'px-2'}>
+            <div className={open ? 'px-3 mb-6' : 'px-2 mb-6'}>
               <div className={`px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider transition-opacity duration-200 ${
                 open ? 'opacity-100 delay-300' : 'opacity-0 h-0 overflow-hidden'
               }`}>
@@ -152,6 +176,37 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                     </Link>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* Developer Tools - SuperAdmin Only */}
+          {showDeveloperTools && (
+            <div className={open ? 'px-3' : 'px-2'}>
+              <div className={`px-3 py-2 text-xs font-semibold text-orange-400 uppercase tracking-wider transition-opacity duration-200 ${
+                open ? 'opacity-100 delay-300' : 'opacity-0 h-0 overflow-hidden'
+              }`}>
+                Developer
+              </div>
+              <div className="space-y-1">
+                <Link
+                  href="/debug"
+                  title={!open ? 'Debug Console' : undefined}
+                  className={`flex items-center rounded-md text-sm font-medium transition-colors ${
+                    open ? 'gap-3 px-3 py-2' : 'justify-center py-3'
+                  } ${
+                    pathname === '/debug'
+                      ? 'bg-orange-500 text-white'
+                      : 'text-orange-300 hover:bg-slate-800 hover:text-orange-200'
+                  }`}
+                >
+                  <Bug className={open ? 'w-4 h-4' : 'w-5 h-5'} />
+                  <span className={`transition-opacity duration-200 whitespace-nowrap ${
+                    open ? 'opacity-100 delay-300' : 'opacity-0 w-0 overflow-hidden'
+                  }`}>
+                    Debug Console
+                  </span>
+                </Link>
               </div>
             </div>
           )}

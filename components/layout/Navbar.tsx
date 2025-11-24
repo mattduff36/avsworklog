@@ -22,8 +22,7 @@ import {
   Calendar,
   Bell,
   MessageSquare,
-  Eye,
-  Bug
+  Eye
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { NotificationPanel } from '@/components/messages/NotificationPanel';
@@ -347,20 +346,6 @@ export function Navbar() {
                 </Button>
               </div>
 
-              {/* Debug Link (SuperAdmin only, when viewing as actual role) */}
-              {isSuperAdmin && viewAsRole === 'actual' && (
-                <Link href="/debug">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-slate-300 hover:text-white hover:bg-slate-800/50"
-                    title="Debug Console"
-                  >
-                    <Bug className="w-4 h-4" />
-                  </Button>
-                </Link>
-              )}
-
               {/* View As Selector (SuperAdmin only) */}
               {isSuperAdmin && (
                 <div className="hidden lg:flex items-center gap-2">
@@ -521,18 +506,6 @@ export function Navbar() {
                 {/* SuperAdmin Tools (Mobile) */}
                 {isSuperAdmin && (
                   <>
-                    {viewAsRole === 'actual' && (
-                      <Link href="/debug" onClick={() => setMobileMenuOpen(false)}>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start text-orange-400 hover:text-orange-300 hover:bg-slate-800/50"
-                        >
-                          <Bug className="w-4 h-4 mr-2" />
-                          Debug Console
-                        </Button>
-                      </Link>
-                    )}
-                    
                     <div className="px-2 py-2">
                       <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">
                         View As
