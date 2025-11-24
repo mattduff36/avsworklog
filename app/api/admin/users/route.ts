@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
         email: authData.user.email,
         full_name,
         employee_id,
-        role,
+        role_id,
       },
       temporaryPassword, // Return password to show admin
       emailSent: emailResult.success,
