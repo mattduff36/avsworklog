@@ -21,6 +21,12 @@ const nextConfig: NextConfig = {
     // All other type errors have been properly fixed with Database types
     ignoreBuildErrors: true,
   },
+  webpack: (config) => {
+    // Handle canvas package for pdfjs-dist
+    config.resolve.alias.canvas = false;
+    
+    return config;
+  },
 };
 
 export default withPWA({
