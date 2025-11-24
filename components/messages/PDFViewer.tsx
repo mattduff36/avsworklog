@@ -10,14 +10,15 @@ interface PDFViewerProps {
 // Load PDF.js from CDN to avoid webpack bundling issues
 declare global {
   interface Window {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     pdfjsLib?: any;
   }
 }
 
 export function PDFViewer({ url }: PDFViewerProps) {
-  const [numPages, setNumPages] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -83,7 +84,6 @@ export function PDFViewer({ url }: PDFViewerProps) {
         if (!mounted) return;
         
         setPdfDoc(pdf);
-        setNumPages(pdf.numPages);
         setLoading(false);
       } catch (err) {
         console.error('Failed to load PDF document:', err);
@@ -98,11 +98,17 @@ export function PDFViewer({ url }: PDFViewerProps) {
 
     return () => {
       mounted = false;
+    };
+  }, [url]);
+
+  // Cleanup PDF document when component unmounts
+  useEffect(() => {
+    return () => {
       if (pdfDoc) {
         pdfDoc.destroy();
       }
     };
-  }, [url]);
+  }, [pdfDoc]);
 
   // Effect 2: Render PDF pages to canvas once container is available
   useEffect(() => {
