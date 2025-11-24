@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Menu, 
   X, 
@@ -20,13 +21,17 @@ import {
   Truck,
   Calendar,
   Bell,
-  MessageSquare
+  MessageSquare,
+  Eye,
+  Bug
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { NotificationPanel } from '@/components/messages/NotificationPanel';
 import { SidebarNav } from './SidebarNav';
 import { createClient } from '@/lib/supabase/client';
 import type { ModuleName } from '@/types/roles';
+
+type ViewAsRole = 'actual' | 'employee' | 'manager' | 'admin' | 'superadmin';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -38,12 +43,56 @@ export function Navbar() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
   const [permissionsLoading, setPermissionsLoading] = useState(true);
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [viewAsRole, setViewAsRole] = useState<ViewAsRole>('actual');
   const supabase = createClient();
+  
+  const isSuperAdmin = userEmail === 'admin@mpdee.co.uk';
 
-  // Fetch user permissions
+  // Fetch user email
+  useEffect(() => {
+    async function fetchUserEmail() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        setUserEmail(user.email);
+      }
+    }
+    fetchUserEmail();
+  }, [supabase]);
+
+  // Load persisted viewAs setting
+  useEffect(() => {
+    if (isSuperAdmin) {
+      const stored = localStorage.getItem('viewAsRole');
+      if (stored) {
+        setViewAsRole(stored as ViewAsRole);
+      }
+    }
+  }, [isSuperAdmin]);
+
+  // Persist viewAs setting
+  useEffect(() => {
+    if (isSuperAdmin) {
+      localStorage.setItem('viewAsRole', viewAsRole);
+    }
+  }, [viewAsRole, isSuperAdmin]);
+
+  // Fetch user permissions (adjusted for viewAs mode)
   useEffect(() => {
     async function fetchPermissions() {
       if (!profile?.id) {
+        setPermissionsLoading(false);
+        return;
+      }
+
+      // When viewing as different roles, simulate their permissions
+      if (isSuperAdmin && viewAsRole !== 'actual') {
+        if (viewAsRole === 'superadmin' || viewAsRole === 'admin' || viewAsRole === 'manager') {
+          setUserPermissions(new Set(['timesheets', 'inspections', 'absence', 'rams', 'approvals', 'actions', 'reports'] as ModuleName[]));
+        } else if (viewAsRole === 'employee') {
+          // Simulate basic employee permissions
+          setUserPermissions(new Set(['timesheets', 'inspections'] as ModuleName[]));
+        }
         setPermissionsLoading(false);
         return;
       }
@@ -89,7 +138,7 @@ export function Navbar() {
       }
     }
     fetchPermissions();
-  }, [profile?.id, isManager, isAdmin, supabase]);
+  }, [profile?.id, isManager, isAdmin, supabase, isSuperAdmin, viewAsRole]);
 
   // Fetch notification count
   useEffect(() => {
@@ -263,6 +312,39 @@ export function Navbar() {
                 </Button>
               </div>
 
+              {/* Debug Link (SuperAdmin only) */}
+              {isSuperAdmin && (
+                <Link href="/debug">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-slate-300 hover:text-white hover:bg-slate-800/50"
+                    title="Debug Console"
+                  >
+                    <Bug className="w-4 h-4" />
+                  </Button>
+                </Link>
+              )}
+
+              {/* View As Selector (SuperAdmin only) */}
+              {isSuperAdmin && (
+                <div className="hidden lg:flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-slate-400" />
+                  <Select value={viewAsRole} onValueChange={(value) => setViewAsRole(value as ViewAsRole)}>
+                    <SelectTrigger className="w-[140px] h-8 bg-slate-800/50 border-slate-600 text-slate-300 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="actual">Actual Role</SelectItem>
+                      <SelectItem value="employee">View as Employee</SelectItem>
+                      <SelectItem value="manager">View as Manager</SelectItem>
+                      <SelectItem value="admin">View as Admin</SelectItem>
+                      <SelectItem value="superadmin">View as SuperAdmin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               {/* Sign Out button only */}
               <div className="hidden md:flex items-center">
                 <Button
@@ -397,7 +479,42 @@ export function Navbar() {
               )}
             </div>
             <div className="pt-4 pb-3 border-t border-slate-700/50">
-              <div className="px-2">
+              <div className="px-2 space-y-2">
+                {/* SuperAdmin Tools (Mobile) */}
+                {isSuperAdmin && (
+                  <>
+                    <Link href="/debug" onClick={() => setMobileMenuOpen(false)}>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start text-orange-400 hover:text-orange-300 hover:bg-slate-800/50"
+                      >
+                        <Bug className="w-4 h-4 mr-2" />
+                        Debug Console
+                      </Button>
+                    </Link>
+                    
+                    <div className="px-2 py-2">
+                      <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">
+                        View As
+                      </label>
+                      <Select value={viewAsRole} onValueChange={(value) => setViewAsRole(value as ViewAsRole)}>
+                        <SelectTrigger className="w-full bg-slate-800/50 border-slate-600 text-slate-300">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="actual">Actual Role</SelectItem>
+                          <SelectItem value="employee">View as Employee</SelectItem>
+                          <SelectItem value="manager">View as Manager</SelectItem>
+                          <SelectItem value="admin">View as Admin</SelectItem>
+                          <SelectItem value="superadmin">View as SuperAdmin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="border-t border-slate-700/50 my-2"></div>
+                  </>
+                )}
+                
                 <Button
                   variant="ghost"
                   className="w-full justify-start text-slate-300 hover:text-white hover:bg-slate-800/50"
