@@ -144,7 +144,7 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
                 Upload File <span className="text-destructive">*</span>
               </Label>
               <p className="text-sm text-muted-foreground">
-                PDF or DOCX, maximum 10MB
+                PDF only, maximum 10MB
               </p>
 
               {!file ? (
@@ -152,7 +152,7 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
                   <Input
                     id="file-upload"
                     type="file"
-                    accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    accept=".pdf,application/pdf"
                     onChange={handleFileChange}
                     disabled={uploading}
                     className="hidden"

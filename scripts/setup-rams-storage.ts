@@ -55,8 +55,7 @@ async function setupRAMSStorage() {
         public: false,
         fileSizeLimit: 10485760, // 10MB in bytes
         allowedMimeTypes: [
-          'application/pdf',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          'application/pdf'
         ]
       });
 
@@ -71,7 +70,7 @@ async function setupRAMSStorage() {
     console.log('   - Name: rams-documents');
     console.log('   - Public: No (authenticated access only)');
     console.log('   - Max file size: 10MB');
-    console.log('   - Allowed types: PDF, DOCX');
+    console.log('   - Allowed types: PDF only');
 
     // Now create storage policies using SQL
     console.log('\n🔒 Creating Storage RLS Policies...\n');

@@ -4,7 +4,6 @@
 
 export const ALLOWED_FILE_TYPES = {
   'application/pdf': 'pdf',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
 } as const;
 
 export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
@@ -12,7 +11,7 @@ export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 export interface FileValidationResult {
   valid: boolean;
   error?: string;
-  fileType?: 'pdf' | 'docx';
+  fileType?: 'pdf';
 }
 
 /**
@@ -50,7 +49,7 @@ export function validateRAMSFile(file: File): FileValidationResult {
   if (!fileType) {
     return {
       valid: false,
-      error: 'Invalid file type. Only PDF and DOCX files are allowed',
+      error: 'Invalid file type. Only PDF files are allowed',
     };
   }
 
