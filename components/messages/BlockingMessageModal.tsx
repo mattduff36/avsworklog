@@ -115,11 +115,13 @@ export function BlockingMessageModal({
 
             {/* PDF Viewer - Embedded if PDF exists */}
             {pdfUrl && (
-              <div className="w-full" style={{ height: '500px' }}>
+              <div className="w-full overflow-hidden rounded-md border border-slate-200 dark:border-slate-700" style={{ height: '500px' }}>
                 <iframe
                   src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-                  className="w-full h-full border border-slate-200 dark:border-slate-700 rounded-md"
+                  className="w-full h-full"
+                  style={{ overflow: 'hidden' }}
                   title="Toolbox Talk PDF"
+                  scrolling="no"
                 />
               </div>
             )}
