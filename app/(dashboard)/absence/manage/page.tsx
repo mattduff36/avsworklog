@@ -187,7 +187,7 @@ export default function AdminAbsencePage() {
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
               Absence Management
@@ -196,22 +196,22 @@ export default function AdminAbsencePage() {
               View and manage all employee absences
             </p>
           </div>
-          <div className="flex gap-2">
-            <Link href="/absence/manage/reasons">
-              <Button variant="outline" className="border-slate-600 text-slate-300">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Link href="/absence/manage/reasons" className="w-full sm:w-auto">
+              <Button variant="outline" className="w-full border-slate-600 text-slate-300">
                 <Settings className="h-4 w-4 mr-2" />
                 Manage Reasons
               </Button>
             </Link>
-            <Link href="/absence/manage/allowances">
-              <Button variant="outline" className="border-slate-600 text-slate-300">
+            <Link href="/absence/manage/allowances" className="w-full sm:w-auto">
+              <Button variant="outline" className="w-full border-slate-600 text-slate-300">
                 <Users className="h-4 w-4 mr-2" />
                 Manage Allowances
               </Button>
             </Link>
             <Button
               onClick={() => setShowCreateDialog(true)}
-              className="bg-purple-500 hover:bg-purple-600 text-white"
+              className="w-full sm:w-auto bg-purple-500 hover:bg-purple-600 text-white"
             >
               <Plus className="h-4 w-4 mr-2" />
               Create Absence
