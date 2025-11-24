@@ -9,10 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Save, Send, Edit2, CheckCircle2, XCircle, Download, Package } from 'lucide-react';
 import Link from 'next/link';
-import { formatDate, formatDateISO } from '@/lib/utils/date';
+import { formatDate } from '@/lib/utils/date';
 import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
 import { DAY_NAMES, Timesheet, TimesheetEntry } from '@/types/timesheet';
 import SignaturePad from '@/components/forms/SignaturePad';
@@ -31,7 +30,7 @@ import {
 export default function ViewTimesheetPage() {
   const router = useRouter();
   const params = useParams();
-  const { user, profile, isManager, loading: authLoading } = useAuth();
+  const { user, isManager, loading: authLoading } = useAuth();
   const supabase = createClient();
   
   const [timesheet, setTimesheet] = useState<Timesheet | null>(null);

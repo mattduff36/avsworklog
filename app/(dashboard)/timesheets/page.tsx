@@ -36,11 +36,17 @@ type Employee = {
 
 type StatusFilter = 'all' | 'draft' | 'pending' | 'approved' | 'rejected' | 'processed';
 
+interface TimesheetWithProfile extends Timesheet {
+  profile?: {
+    full_name: string;
+  };
+}
+
 export default function TimesheetsPage() {
   const { user, isManager } = useAuth();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('timesheets');
   const router = useRouter();
-  const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
+  const [timesheets, setTimesheets] = useState<TimesheetWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
@@ -240,9 +246,9 @@ export default function TimesheetsPage() {
       setDeleteDialogOpen(false);
       setTimesheetToDelete(null);
       fetchTimesheets(); // Refresh list
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error deleting timesheet:', err);
-      toast.error(err.message || 'Failed to delete timesheet');
+      toast.error(err instanceof Error ? err.message : 'Failed to delete timesheet');
     } finally {
       setDeleting(false);
     }
@@ -401,9 +407,9 @@ export default function TimesheetsPage() {
                         Week Ending {formatDate(timesheet.week_ending)}
                       </CardTitle>
                       <CardDescription className="text-slate-600 dark:text-slate-400">
-                        {isManager && (timesheet as any).profile?.full_name && (
+                        {isManager && timesheet.profile?.full_name && (
                           <span className="font-medium text-slate-900 dark:text-white">
-                            {(timesheet as any).profile.full_name}
+                            {timesheet.profile.full_name}
                             {timesheet.reg_number && ' • '}
                           </span>
                         )}
