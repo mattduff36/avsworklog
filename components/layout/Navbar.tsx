@@ -25,6 +25,8 @@ import {
 import { useState, useEffect } from 'react';
 import { NotificationPanel } from '@/components/messages/NotificationPanel';
 import { SidebarNav } from './SidebarNav';
+import { createClient } from '@/lib/supabase/client';
+import type { ModuleName } from '@/types/roles';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -34,6 +36,60 @@ export function Navbar() {
   const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar starts collapsed
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
+  const [permissionsLoading, setPermissionsLoading] = useState(true);
+  const supabase = createClient();
+
+  // Fetch user permissions
+  useEffect(() => {
+    async function fetchPermissions() {
+      if (!profile?.id) {
+        setPermissionsLoading(false);
+        return;
+      }
+
+      // Managers and admins have all permissions
+      if (isManager || isAdmin) {
+        setUserPermissions(new Set(['timesheets', 'inspections', 'absence', 'rams', 'approvals', 'actions', 'reports'] as ModuleName[]));
+        setPermissionsLoading(false);
+        return;
+      }
+
+      // Fetch role permissions for regular users
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select(`
+            role_id,
+            roles!inner(
+              role_permissions(
+                module_name,
+                enabled
+              )
+            )
+          `)
+          .eq('id', profile.id)
+          .single();
+        
+        // Build Set of enabled permissions
+        const enabledModules = new Set<ModuleName>();
+        const rolePerms = data?.roles as any;
+        rolePerms?.role_permissions?.forEach((perm: any) => {
+          if (perm.enabled) {
+            enabledModules.add(perm.module_name as ModuleName);
+          }
+        });
+        
+        setUserPermissions(enabledModules);
+      } catch (error) {
+        console.error('Error fetching permissions:', error);
+        setUserPermissions(new Set());
+      } finally {
+        setPermissionsLoading(false);
+      }
+    }
+    fetchPermissions();
+  }, [profile?.id, isManager, isAdmin, supabase]);
 
   // Fetch notification count
   useEffect(() => {
@@ -74,16 +130,22 @@ export function Navbar() {
     }
   };
 
-  // All users see the same navigation in top bar
+  // Dashboard is always visible
   const dashboardNav = [
     { href: '/dashboard', label: 'Dashboard', icon: Home },
   ];
   
-  const employeeNav = [
-    { href: '/timesheets', label: 'Timesheets', icon: FileText },
-    { href: '/inspections', label: 'Inspections', icon: ClipboardCheck },
-    { href: '/absence', label: 'Absence & Leave', icon: Calendar },
+  // Employee navigation - filtered by permissions
+  const allEmployeeNav = [
+    { href: '/timesheets', label: 'Timesheets', icon: FileText, module: 'timesheets' as ModuleName },
+    { href: '/inspections', label: 'Inspections', icon: ClipboardCheck, module: 'inspections' as ModuleName },
+    { href: '/absence', label: 'Absence & Leave', icon: Calendar, module: 'absence' as ModuleName },
   ];
+
+  // Filter employee nav by permissions
+  const employeeNav = allEmployeeNav.filter(item => 
+    userPermissions.has(item.module)
+  );
 
   // Manager/admin links for mobile menu only
   const managerLinks = [

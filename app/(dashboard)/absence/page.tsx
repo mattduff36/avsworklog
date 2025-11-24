@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +53,7 @@ type Employee = {
 
 export default function AbsencePage() {
   const { profile, isManager, isAdmin } = useAuth();
+  const { hasPermission, loading: permissionLoading } = usePermissionCheck('absence');
   const supabase = createClient();
   const [showRequestForm, setShowRequestForm] = useState(false);
   
@@ -359,16 +361,25 @@ export default function AbsencePage() {
     );
   }
   
-  if (loadingAbsences || loadingSummary) {
+  // Show loading while checking permissions
+  if (permissionLoading || loadingAbsences || loadingSummary) {
     return (
       <div className="space-y-6 max-w-6xl">
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardContent className="flex items-center justify-center py-12">
-            <p className="text-slate-400">Loading absences...</p>
+            <p className="text-slate-400">
+              {permissionLoading ? 'Checking access...' : 'Loading absences...'}
+            </p>
           </CardContent>
         </Card>
       </div>
     );
+  }
+
+  // If permission check failed, the hook will redirect to dashboard
+  // This is just a safety check in case redirect fails
+  if (!hasPermission) {
+    return null;
   }
   
   return (
