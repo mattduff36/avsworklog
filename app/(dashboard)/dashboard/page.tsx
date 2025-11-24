@@ -81,6 +81,10 @@ export default function DashboardPage() {
   // Only show placeholders to superadmin when viewing as actual role
   const isSuperAdmin = userEmail === 'admin@mpdee.co.uk';
   const showPlaceholders = isSuperAdmin && viewAsRole === 'actual';
+  
+  // Determine if user should see manager/admin features based on View As mode
+  const effectiveIsManager = isManager && !(isSuperAdmin && viewAsRole === 'employee');
+  const effectiveIsAdmin = isAdmin && !(isSuperAdmin && viewAsRole === 'employee');
 
   // Fetch user email and view as role
   useEffect(() => {
@@ -99,10 +103,21 @@ export default function DashboardPage() {
     }
   }, [supabase]);
 
-  // Fetch user permissions
+  // Fetch user permissions (respects View As mode)
   useEffect(() => {
     async function fetchPermissions() {
       if (!profile?.id) return;
+      
+      // When viewing as different roles, simulate their permissions
+      if (isSuperAdmin && viewAsRole !== 'actual') {
+        if (viewAsRole === 'admin' || viewAsRole === 'manager') {
+          setUserPermissions(new Set(['timesheets', 'inspections', 'absence', 'rams', 'approvals', 'actions', 'reports'] as ModuleName[]));
+        } else if (viewAsRole === 'employee') {
+          // Simulate basic employee permissions (timesheets and inspections only)
+          setUserPermissions(new Set(['timesheets', 'inspections'] as ModuleName[]));
+        }
+        return;
+      }
       
       // Managers and admins have all permissions
       if (isManager || isAdmin) {
@@ -143,15 +158,18 @@ export default function DashboardPage() {
       }
     }
     fetchPermissions();
-  }, [profile?.id, isManager, isAdmin, supabase]);
+  }, [profile?.id, isManager, isAdmin, supabase, isSuperAdmin, viewAsRole]);
 
   useEffect(() => {
-    if (isManager || isAdmin) {
+    // Only fetch manager/admin data if actually a manager/admin and not viewing as employee
+    const shouldFetchManagerData = (isManager || isAdmin) && !(isSuperAdmin && viewAsRole === 'employee');
+    
+    if (shouldFetchManagerData) {
       fetchPendingApprovals();
       fetchTopActions();
     }
     fetchPendingRAMS();
-  }, [isManager, isAdmin, profile]);
+  }, [isManager, isAdmin, profile, isSuperAdmin, viewAsRole]);
 
   const fetchPendingApprovals = async () => {
     try {
@@ -309,13 +327,13 @@ export default function DashboardPage() {
                 const moduleName = moduleMap[formType.id];
                 
                 // Check if user has permission to this module
-                // Managers and admins always have access
-                if (!isManager && !isAdmin && moduleName && !userPermissions.has(moduleName)) {
+                // Managers and admins always have access (unless viewing as employee)
+                if (!effectiveIsManager && !effectiveIsAdmin && moduleName && !userPermissions.has(moduleName)) {
                   return false;
                 }
                 
                 // Hide RAMS for employees with no assignments
-                if (formType.id === 'rams' && !isManager && !isAdmin && !hasRAMSAssignments) {
+                if (formType.id === 'rams' && !effectiveIsManager && !effectiveIsAdmin && !hasRAMSAssignments) {
                   return false;
                 }
                 return true;
@@ -382,7 +400,7 @@ export default function DashboardPage() {
 
 
       {/* Pending Approvals Summary - Manager/Admin Only */}
-      {isManager && (
+      {effectiveIsManager && (
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-slate-900 dark:text-white">
@@ -465,7 +483,7 @@ export default function DashboardPage() {
       )}
 
       {/* Manager Actions Section */}
-      {isManager && (
+      {effectiveIsManager && (
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 border-t-2 border-t-red-500">
           <CardHeader className="bg-red-50 dark:bg-red-500/10">
             <CardTitle className="flex items-center justify-between text-slate-900 dark:text-white">
