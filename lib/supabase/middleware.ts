@@ -50,8 +50,19 @@ export async function updateSession(request: NextRequest) {
     // Continue without user
   }
 
-  // Protected routes
-  const protectedPaths = ['/dashboard', '/timesheets', '/inspections', '/reports', '/admin', '/approvals', '/actions']
+  // Protected routes - ALL dashboard routes require authentication
+  const protectedPaths = [
+    '/dashboard',
+    '/timesheets', 
+    '/inspections',
+    '/absence',      // CRITICAL: Added to prevent unauthenticated access
+    '/reports',
+    '/admin',
+    '/approvals',
+    '/actions',
+    '/toolbox-talks',
+    '/rams'
+  ]
   const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))
 
   if (isProtectedPath && !user) {
