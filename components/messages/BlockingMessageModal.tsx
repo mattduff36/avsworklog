@@ -56,6 +56,8 @@ export function BlockingMessageModal({
       // Use API route to serve PDF with authentication
       const url = `/api/toolbox-talk-pdf/${message.pdf_file_path}`;
       setPdfUrl(url);
+    } else {
+      setPdfUrl(null);
     }
 
     return () => {
