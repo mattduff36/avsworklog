@@ -21,6 +21,7 @@ export function PDFViewer({ url }: PDFViewerProps) {
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Effect 1: Load PDF.js library and fetch PDF document
   useEffect(() => {
     let mounted = true;
 
@@ -28,7 +29,7 @@ export function PDFViewer({ url }: PDFViewerProps) {
       try {
         // Check if PDF.js is already loaded
         if (window.pdfjsLib) {
-          await renderPdf();
+          await loadPdfDocument();
           return;
         }
 
@@ -45,7 +46,7 @@ export function PDFViewer({ url }: PDFViewerProps) {
             window.pdfjsLib.GlobalWorkerOptions.workerSrc = 
               'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
             
-            await renderPdf();
+            await loadPdfDocument();
           }
         };
 
@@ -72,11 +73,10 @@ export function PDFViewer({ url }: PDFViewerProps) {
       }
     }
 
-    async function renderPdf() {
+    async function loadPdfDocument() {
       try {
         if (!window.pdfjsLib || !mounted) return;
 
-        // Load the PDF document
         const loadingTask = window.pdfjsLib.getDocument(url);
         const pdf = await loadingTask.promise;
         
@@ -85,44 +85,10 @@ export function PDFViewer({ url }: PDFViewerProps) {
         setPdfDoc(pdf);
         setNumPages(pdf.numPages);
         setLoading(false);
-
-        // Render all pages
-        if (containerRef.current) {
-          containerRef.current.innerHTML = ''; // Clear container
-
-          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-            const page = await pdf.getPage(pageNum);
-            
-            // Create canvas for this page
-            const canvas = document.createElement('canvas');
-            canvas.className = 'mb-4 border border-slate-200 dark:border-slate-700 rounded-md w-full';
-            
-            const context = canvas.getContext('2d');
-            if (!context) continue;
-
-            // Calculate scale to fit width (520px)
-            const viewport = page.getViewport({ scale: 1 });
-            const scale = 520 / viewport.width;
-            const scaledViewport = page.getViewport({ scale });
-
-            canvas.height = scaledViewport.height;
-            canvas.width = scaledViewport.width;
-
-            // Render page
-            await page.render({
-              canvasContext: context,
-              viewport: scaledViewport,
-            }).promise;
-
-            if (mounted && containerRef.current) {
-              containerRef.current.appendChild(canvas);
-            }
-          }
-        }
       } catch (err) {
-        console.error('Failed to render PDF:', err);
+        console.error('Failed to load PDF document:', err);
         if (mounted) {
-          setError(err instanceof Error ? err.message : 'Failed to render PDF');
+          setError(err instanceof Error ? err.message : 'Failed to load PDF');
           setLoading(false);
         }
       }
@@ -137,6 +103,66 @@ export function PDFViewer({ url }: PDFViewerProps) {
       }
     };
   }, [url]);
+
+  // Effect 2: Render PDF pages to canvas once container is available
+  useEffect(() => {
+    // Wait until we have a PDF document, loading is done, and container ref is available
+    if (!pdfDoc || loading || !containerRef.current) {
+      return;
+    }
+
+    let mounted = true;
+
+    async function renderPages() {
+      try {
+        if (!containerRef.current) return;
+
+        containerRef.current.innerHTML = ''; // Clear container
+
+        for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+          if (!mounted) break;
+
+          const page = await pdfDoc.getPage(pageNum);
+          
+          // Create canvas for this page
+          const canvas = document.createElement('canvas');
+          canvas.className = 'mb-4 border border-slate-200 dark:border-slate-700 rounded-md w-full';
+          
+          const context = canvas.getContext('2d');
+          if (!context) continue;
+
+          // Calculate scale to fit width (520px)
+          const viewport = page.getViewport({ scale: 1 });
+          const scale = 520 / viewport.width;
+          const scaledViewport = page.getViewport({ scale });
+
+          canvas.height = scaledViewport.height;
+          canvas.width = scaledViewport.width;
+
+          // Render page to canvas
+          await page.render({
+            canvasContext: context,
+            viewport: scaledViewport,
+          }).promise;
+
+          if (mounted && containerRef.current) {
+            containerRef.current.appendChild(canvas);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to render PDF pages:', err);
+        if (mounted) {
+          setError(err instanceof Error ? err.message : 'Failed to render PDF pages');
+        }
+      }
+    }
+
+    renderPages();
+
+    return () => {
+      mounted = false;
+    };
+  }, [pdfDoc, loading]); // Re-run when pdfDoc is set or loading changes
 
   if (loading) {
     return (
@@ -164,4 +190,3 @@ export function PDFViewer({ url }: PDFViewerProps) {
     </div>
   );
 }
-
