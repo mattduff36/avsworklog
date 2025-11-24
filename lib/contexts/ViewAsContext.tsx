@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-type ViewAsRole = 'actual' | 'employee' | 'manager' | 'admin' | 'superadmin';
+type ViewAsRole = 'actual' | 'employee' | 'manager' | 'admin';
 
 interface ViewAsContextType {
   viewAsRole: ViewAsRole;

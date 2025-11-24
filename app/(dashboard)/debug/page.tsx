@@ -59,16 +59,25 @@ export default function DebugPage() {
   const [ramsDocuments, setRamsDocuments] = useState<EntityStatus[]>([]);
   const [updating, setUpdating] = useState<string | null>(null);
 
-  // Check if user is superadmin
+  // Check if user is superadmin and viewing as actual role
   useEffect(() => {
     async function checkAccess() {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (authUser?.email) {
         setUserEmail(authUser.email);
         
-        // Redirect if not superadmin
+        // Check if viewing as another role
+        const viewAsRole = localStorage.getItem('viewAsRole') || 'actual';
+        
+        // Redirect if not superadmin or if viewing as another role
         if (authUser.email !== 'admin@mpdee.co.uk') {
           toast.error('Access denied: SuperAdmin only');
+          router.push('/dashboard');
+          return;
+        }
+        
+        if (viewAsRole !== 'actual') {
+          toast.error('Debug console only available in Actual Role mode');
           router.push('/dashboard');
           return;
         }

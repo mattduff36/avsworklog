@@ -31,7 +31,7 @@ import { SidebarNav } from './SidebarNav';
 import { createClient } from '@/lib/supabase/client';
 import type { ModuleName } from '@/types/roles';
 
-type ViewAsRole = 'actual' | 'employee' | 'manager' | 'admin' | 'superadmin';
+type ViewAsRole = 'actual' | 'employee' | 'manager' | 'admin';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -87,7 +87,7 @@ export function Navbar() {
 
       // When viewing as different roles, simulate their permissions
       if (isSuperAdmin && viewAsRole !== 'actual') {
-        if (viewAsRole === 'superadmin' || viewAsRole === 'admin' || viewAsRole === 'manager') {
+        if (viewAsRole === 'admin' || viewAsRole === 'manager') {
           setUserPermissions(new Set(['timesheets', 'inspections', 'absence', 'rams', 'approvals', 'actions', 'reports'] as ModuleName[]));
         } else if (viewAsRole === 'employee') {
           // Simulate basic employee permissions
@@ -312,8 +312,8 @@ export function Navbar() {
                 </Button>
               </div>
 
-              {/* Debug Link (SuperAdmin only) */}
-              {isSuperAdmin && (
+              {/* Debug Link (SuperAdmin only, when viewing as actual role) */}
+              {isSuperAdmin && viewAsRole === 'actual' && (
                 <Link href="/debug">
                   <Button
                     variant="ghost"
@@ -330,7 +330,11 @@ export function Navbar() {
               {isSuperAdmin && (
                 <div className="hidden lg:flex items-center gap-2">
                   <Eye className="w-4 h-4 text-slate-400" />
-                  <Select value={viewAsRole} onValueChange={(value) => setViewAsRole(value as ViewAsRole)}>
+                  <Select value={viewAsRole} onValueChange={(value) => {
+                    setViewAsRole(value as ViewAsRole);
+                    // Refresh page to apply new view
+                    setTimeout(() => window.location.reload(), 100);
+                  }}>
                     <SelectTrigger className="w-[140px] h-8 bg-slate-800/50 border-slate-600 text-slate-300 text-xs">
                       <SelectValue />
                     </SelectTrigger>
@@ -339,7 +343,6 @@ export function Navbar() {
                       <SelectItem value="employee">View as Employee</SelectItem>
                       <SelectItem value="manager">View as Manager</SelectItem>
                       <SelectItem value="admin">View as Admin</SelectItem>
-                      <SelectItem value="superadmin">View as SuperAdmin</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -483,21 +486,28 @@ export function Navbar() {
                 {/* SuperAdmin Tools (Mobile) */}
                 {isSuperAdmin && (
                   <>
-                    <Link href="/debug" onClick={() => setMobileMenuOpen(false)}>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start text-orange-400 hover:text-orange-300 hover:bg-slate-800/50"
-                      >
-                        <Bug className="w-4 h-4 mr-2" />
-                        Debug Console
-                      </Button>
-                    </Link>
+                    {viewAsRole === 'actual' && (
+                      <Link href="/debug" onClick={() => setMobileMenuOpen(false)}>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start text-orange-400 hover:text-orange-300 hover:bg-slate-800/50"
+                        >
+                          <Bug className="w-4 h-4 mr-2" />
+                          Debug Console
+                        </Button>
+                      </Link>
+                    )}
                     
                     <div className="px-2 py-2">
                       <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">
                         View As
                       </label>
-                      <Select value={viewAsRole} onValueChange={(value) => setViewAsRole(value as ViewAsRole)}>
+                      <Select value={viewAsRole} onValueChange={(value) => {
+                        setViewAsRole(value as ViewAsRole);
+                        setMobileMenuOpen(false);
+                        // Refresh page to apply new view
+                        setTimeout(() => window.location.reload(), 100);
+                      }}>
                         <SelectTrigger className="w-full bg-slate-800/50 border-slate-600 text-slate-300">
                           <SelectValue />
                         </SelectTrigger>
@@ -506,7 +516,6 @@ export function Navbar() {
                           <SelectItem value="employee">View as Employee</SelectItem>
                           <SelectItem value="manager">View as Manager</SelectItem>
                           <SelectItem value="admin">View as Admin</SelectItem>
-                          <SelectItem value="superadmin">View as SuperAdmin</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

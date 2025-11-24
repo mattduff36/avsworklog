@@ -66,6 +66,7 @@ export default function DashboardPage() {
   const [hasRAMSAssignments, setHasRAMSAssignments] = useState(false);
   const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
   const [userEmail, setUserEmail] = useState<string>('');
+  const [viewAsRole, setViewAsRole] = useState<string>('actual');
 
   // Placeholder forms for future development (only shown to superadmin)
   const placeholderForms = [
@@ -77,10 +78,11 @@ export default function DashboardPage() {
     { id: 'daily-report', title: 'Daily Report', icon: ScrollText, color: 'bg-amber-500' },
   ];
 
-  // Only show placeholders to superadmin (admin@mpdee.co.uk)
-  const showPlaceholders = userEmail === 'admin@mpdee.co.uk';
+  // Only show placeholders to superadmin when viewing as actual role
+  const isSuperAdmin = userEmail === 'admin@mpdee.co.uk';
+  const showPlaceholders = isSuperAdmin && viewAsRole === 'actual';
 
-  // Fetch user email
+  // Fetch user email and view as role
   useEffect(() => {
     async function fetchUserEmail() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -89,6 +91,12 @@ export default function DashboardPage() {
       }
     }
     fetchUserEmail();
+    
+    // Check viewAs mode from localStorage
+    const storedViewAs = localStorage.getItem('viewAsRole');
+    if (storedViewAs) {
+      setViewAsRole(storedViewAs);
+    }
   }, [supabase]);
 
   // Fetch user permissions
