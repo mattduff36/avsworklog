@@ -60,6 +60,9 @@ export default function NewTimesheetPage() {
   const [bankHolidayDayIndex, setBankHolidayDayIndex] = useState<number | null>(null);
   const [bankHolidayDate, setBankHolidayDate] = useState<string>('');
   const [bankHolidayFieldType, setBankHolidayFieldType] = useState<'time' | 'job'>('time');
+  
+  // Track time validation errors per day
+  const [timeErrors, setTimeErrors] = useState<Record<number, string>>({});
 
   // Initialize entries for all 7 days
   const [entries, setEntries] = useState(
@@ -492,13 +495,35 @@ export default function NewTimesheetPage() {
         // Recalculate daily_total if times are present, otherwise set to null
         const entry = newEntries[dayIndex];
         if (entry.time_started && entry.time_finished) {
-          let hours = calculateHours(entry.time_started, entry.time_finished);
-          if (hours !== null && hours > 5) {
-            hours = hours - 0.5;
+          // Check if start and end times are the same
+          if (entry.time_started === entry.time_finished) {
+            setTimeErrors(prev => ({
+              ...prev,
+              [dayIndex]: 'Start time and end time cannot be the same'
+            }));
+            newEntries[dayIndex].daily_total = 0;
+          } else {
+            // Clear error for this day
+            setTimeErrors(prev => {
+              const newErrors = { ...prev };
+              delete newErrors[dayIndex];
+              return newErrors;
+            });
+            
+            let hours = calculateHours(entry.time_started, entry.time_finished);
+            if (hours !== null && hours > 5) {
+              hours = hours - 0.5;
+            }
+            newEntries[dayIndex].daily_total = hours;
           }
-          newEntries[dayIndex].daily_total = hours;
         } else {
           newEntries[dayIndex].daily_total = null;
+          // Clear error for this day
+          setTimeErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors[dayIndex];
+            return newErrors;
+          });
         }
       }
     } else {
@@ -519,18 +544,41 @@ export default function NewTimesheetPage() {
       // Auto-calculate daily total if both times are present
       if (field === 'time_started' || field === 'time_finished') {
         const entry = newEntries[dayIndex];
-        // If either time is empty, set daily_total to null
+        // If either time is empty, set daily_total to null and clear error
         if (!entry.time_started || !entry.time_finished) {
           newEntries[dayIndex].daily_total = null;
+          // Clear error for this day
+          setTimeErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors[dayIndex];
+            return newErrors;
+          });
         } else {
-          let hours = calculateHours(entry.time_started, entry.time_finished);
-          
-          // Auto-deduct 30 mins (0.5 hours) for lunch break if daily total > 5 hours
-          if (hours !== null && hours > 5) {
-            hours = hours - 0.5;
+          // Check if start and end times are the same
+          if (entry.time_started === entry.time_finished) {
+            // Set error for this day
+            setTimeErrors(prev => ({
+              ...prev,
+              [dayIndex]: 'Start time and end time cannot be the same'
+            }));
+            newEntries[dayIndex].daily_total = 0;
+          } else {
+            // Clear error for this day
+            setTimeErrors(prev => {
+              const newErrors = { ...prev };
+              delete newErrors[dayIndex];
+              return newErrors;
+            });
+            
+            let hours = calculateHours(entry.time_started, entry.time_finished);
+            
+            // Auto-deduct 30 mins (0.5 hours) for lunch break if daily total > 5 hours
+            if (hours !== null && hours > 5) {
+              hours = hours - 0.5;
+            }
+            
+            newEntries[dayIndex].daily_total = hours;
           }
-          
-          newEntries[dayIndex].daily_total = hours;
         }
       }
     }
@@ -548,6 +596,19 @@ export default function NewTimesheetPage() {
   };
 
   const handleSubmit = async () => {
+    // Check for time validation errors (same start/end time)
+    const daysWithTimeErrors = Object.keys(timeErrors).map(Number);
+    if (daysWithTimeErrors.length > 0) {
+      const dayName = DAY_NAMES[daysWithTimeErrors[0]];
+      setError(`Please fix the time entry for ${dayName}: ${timeErrors[daysWithTimeErrors[0]]}`);
+      setShowErrorDialog(true);
+      // Switch to the day with the error on mobile
+      if (daysWithTimeErrors[0] !== undefined) {
+        setActiveDay(String(daysWithTimeErrors[0]));
+      }
+      return;
+    }
+    
     // Validate that ALL days have either hours OR "did not work" marked
     const allDaysComplete = entries.every(entry => {
       const hasHours = entry.time_started && entry.time_finished;
@@ -927,7 +988,9 @@ export default function NewTimesheetPage() {
                           value={entry.time_started}
                           onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
                           disabled={entry.did_not_work}
-                          className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed"
+                          className={`h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed ${
+                            timeErrors[index] ? 'border-red-500' : ''
+                          }`}
                         />
                       </div>
                     </div>
@@ -941,9 +1004,17 @@ export default function NewTimesheetPage() {
                           value={entry.time_finished}
                           onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
                           disabled={entry.did_not_work}
-                          className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed"
+                          className={`h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed ${
+                            timeErrors[index] ? 'border-red-500' : ''
+                          }`}
                         />
                       </div>
+                      {timeErrors[index] && (
+                        <p className="text-sm text-red-400 flex items-center gap-1">
+                          <AlertCircle className="h-4 w-4" />
+                          {timeErrors[index]}
+                        </p>
+                      )}
                     </div>
 
                     <div className="space-y-2">
@@ -1045,18 +1116,30 @@ export default function NewTimesheetPage() {
                         value={entry.time_started}
                         onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
                         disabled={entry.did_not_work}
-                        className="w-32 bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                        className={`w-32 bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed ${
+                          timeErrors[index] ? 'border-red-500' : ''
+                        }`}
                       />
                     </td>
                     <td className="p-3">
-                      <Input
-                        type="time"
-                        step="900"
-                        value={entry.time_finished}
-                        onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
-                        disabled={entry.did_not_work}
-                        className="w-32 bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed"
-                      />
+                      <div className="space-y-1">
+                        <Input
+                          type="time"
+                          step="900"
+                          value={entry.time_finished}
+                          onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
+                          disabled={entry.did_not_work}
+                          className={`w-32 bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed ${
+                            timeErrors[index] ? 'border-red-500' : ''
+                          }`}
+                        />
+                        {timeErrors[index] && (
+                          <p className="text-xs text-red-400 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" />
+                            {timeErrors[index]}
+                          </p>
+                        )}
+                      </div>
                     </td>
                     <td className="p-3">
                       <Input
