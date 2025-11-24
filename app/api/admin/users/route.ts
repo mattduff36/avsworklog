@@ -55,12 +55,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Role is required' }, { status: 400 });
     }
 
+    // Validate role_id is a valid UUID and exists in database
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: roleData, error: roleError } = await supabaseAdmin
+      .from('roles')
+      .select('id')
+      .eq('id', role_id)
+      .single();
+
+    if (roleError || !roleData) {
+      console.error('Invalid role_id:', role_id, roleError);
+      return NextResponse.json({ 
+        error: 'Invalid role selected. Please select a valid role.',
+        details: roleError?.message || 'Role not found'
+      }, { status: 400 });
+    }
+
     // Generate secure random password
     const temporaryPassword = generateSecurePassword();
     console.log('Generated temporary password for', email);
 
     // Create auth user
-    const supabaseAdmin = getSupabaseAdmin();
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: temporaryPassword,
