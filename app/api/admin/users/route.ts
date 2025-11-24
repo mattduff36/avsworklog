@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       email_confirm: true, // Auto-confirm email
       user_metadata: {
         full_name,
-        role_id, // Pass role_id to trigger function
+        role_id: role_id, // Pass role_id as string to trigger function
         employee_id: employee_id || null,
       },
     });
