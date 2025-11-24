@@ -472,15 +472,35 @@ export default function NewTimesheetPage() {
     const newEntries = [...entries];
     
     // Special handling for "did_not_work" toggle
-    if (field === 'did_not_work' && value === true) {
-      newEntries[dayIndex] = {
-        ...newEntries[dayIndex],
-        did_not_work: true,
-        time_started: '',
-        time_finished: '',
-        working_in_yard: false,
-        daily_total: 0,
-      };
+    if (field === 'did_not_work') {
+      if (value === true) {
+        // Setting did_not_work to true
+        newEntries[dayIndex] = {
+          ...newEntries[dayIndex],
+          did_not_work: true,
+          time_started: '',
+          time_finished: '',
+          working_in_yard: false,
+          daily_total: 0,
+        };
+      } else {
+        // Setting did_not_work to false - reset daily_total if times are empty
+        newEntries[dayIndex] = {
+          ...newEntries[dayIndex],
+          did_not_work: false,
+        };
+        // Recalculate daily_total if times are present, otherwise set to null
+        const entry = newEntries[dayIndex];
+        if (entry.time_started && entry.time_finished) {
+          let hours = calculateHours(entry.time_started, entry.time_finished);
+          if (hours !== null && hours > 5) {
+            hours = hours - 0.5;
+          }
+          newEntries[dayIndex].daily_total = hours;
+        } else {
+          newEntries[dayIndex].daily_total = null;
+        }
+      }
     } else {
       // Check for bank holiday warning on time fields (only on 2nd character)
       if ((field === 'time_started' || field === 'time_finished') && typeof value === 'string') {
@@ -499,14 +519,19 @@ export default function NewTimesheetPage() {
       // Auto-calculate daily total if both times are present
       if (field === 'time_started' || field === 'time_finished') {
         const entry = newEntries[dayIndex];
-        let hours = calculateHours(entry.time_started, entry.time_finished);
-        
-        // Auto-deduct 30 mins (0.5 hours) for lunch break if daily total > 5 hours
-        if (hours !== null && hours > 5) {
-          hours = hours - 0.5;
+        // If either time is empty, set daily_total to null
+        if (!entry.time_started || !entry.time_finished) {
+          newEntries[dayIndex].daily_total = null;
+        } else {
+          let hours = calculateHours(entry.time_started, entry.time_finished);
+          
+          // Auto-deduct 30 mins (0.5 hours) for lunch break if daily total > 5 hours
+          if (hours !== null && hours > 5) {
+            hours = hours - 0.5;
+          }
+          
+          newEntries[dayIndex].daily_total = hours;
         }
-        
-        newEntries[dayIndex].daily_total = hours;
       }
     }
 
@@ -728,6 +753,17 @@ export default function NewTimesheetPage() {
       if (entriesError) {
         console.error('Error inserting timesheet entries:', entriesError);
         throw new Error(`Failed to insert timesheet entries: ${entriesError.message}`);
+      }
+
+      // Show success message
+      if (status === 'draft') {
+        toast.success('Timesheet saved as draft', {
+          description: 'Your timesheet has been saved and can be edited later.',
+        });
+      } else {
+        toast.success('Timesheet submitted', {
+          description: 'Your timesheet has been submitted for approval.',
+        });
       }
 
       router.push('/timesheets');
@@ -1134,9 +1170,11 @@ export default function NewTimesheetPage() {
           </Button>
           <Button
             onClick={() => {
-              // Check if all days are complete
+              // Check if all days are complete - use same logic as handleSubmit validation
               const allDaysComplete = entries.every(entry => {
-                return entry.did_not_work || (entry.daily_total && entry.daily_total > 0);
+                const hasHours = entry.time_started && entry.time_finished;
+                const markedDidNotWork = entry.did_not_work;
+                return hasHours || markedDidNotWork;
               });
 
               if (allDaysComplete) {
@@ -1145,13 +1183,17 @@ export default function NewTimesheetPage() {
                 // Find next incomplete day
                 const currentIndex = parseInt(activeDay);
                 const nextIncompleteIndex = entries.findIndex((entry, idx) => {
-                  return idx > currentIndex && !entry.did_not_work && (!entry.daily_total || entry.daily_total === 0);
+                  const hasHours = entry.time_started && entry.time_finished;
+                  return idx > currentIndex && !entry.did_not_work && !hasHours;
                 });
                 
                 // If no incomplete days after current, wrap to first incomplete
                 const finalIndex = nextIncompleteIndex !== -1 
                   ? nextIncompleteIndex 
-                  : entries.findIndex(entry => !entry.did_not_work && (!entry.daily_total || entry.daily_total === 0));
+                  : entries.findIndex(entry => {
+                    const hasHours = entry.time_started && entry.time_finished;
+                    return !entry.did_not_work && !hasHours;
+                  });
                 
                 if (finalIndex !== -1) {
                   setActiveDay(String(finalIndex));
@@ -1162,8 +1204,11 @@ export default function NewTimesheetPage() {
             className="flex-1 h-14 bg-timesheet hover:bg-timesheet/90 text-slate-900 font-semibold text-base"
           >
             {saving ? 'Submitting...' : (() => {
+              // Use same validation logic as handleSubmit
               const allDaysComplete = entries.every(entry => {
-                return entry.did_not_work || (entry.daily_total && entry.daily_total > 0);
+                const hasHours = entry.time_started && entry.time_finished;
+                const markedDidNotWork = entry.did_not_work;
+                return hasHours || markedDidNotWork;
               });
               return allDaysComplete ? 'Submit' : 'Next';
             })()}
