@@ -85,23 +85,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
     }
 
-    // Update profile with additional data and set must_change_password flag
-    const { error: profileError } = await supabase
+    // Wait a moment for the trigger to create the profile
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Upsert profile with additional data and set must_change_password flag
+    // Use admin client to bypass RLS policies
+    // Use upsert in case trigger hasn't created profile yet
+    const { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .update({
+      .upsert({
+        id: authData.user.id,
         full_name,
         phone_number: phone_number || null,
         employee_id: employee_id || null,
         role_id,
         must_change_password: true, // Force password change on first login
-      })
-      .eq('id', authData.user.id);
+      }, {
+        onConflict: 'id'
+      });
 
     if (profileError) {
       console.error('Profile error:', profileError);
+      console.error('Profile error details:', JSON.stringify(profileError, null, 2));
       // Try to delete the auth user if profile update fails
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-      return NextResponse.json({ error: 'Failed to create user profile' }, { status: 500 });
+      return NextResponse.json({ 
+        error: profileError.message || 'Database error creating new user',
+        details: profileError.details || 'Failed to create user profile',
+        code: profileError.code || profileError.hint || 'unknown_error'
+      }, { status: 500 });
     }
 
     // Send email to user with temporary password
