@@ -103,7 +103,7 @@ export interface Database {
           user_id: string
           reg_number: string | null
           week_ending: string
-          status: 'draft' | 'submitted' | 'approved' | 'rejected'
+          status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed'
           signature_data: string | null
           signed_at: string | null
           submitted_at: string | null
@@ -118,7 +118,7 @@ export interface Database {
           user_id: string
           reg_number?: string | null
           week_ending: string
-          status?: 'draft' | 'submitted' | 'approved' | 'rejected'
+          status?: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed'
           signature_data?: string | null
           signed_at?: string | null
           submitted_at?: string | null
@@ -133,7 +133,7 @@ export interface Database {
           user_id?: string
           reg_number?: string | null
           week_ending?: string
-          status?: 'draft' | 'submitted' | 'approved' | 'rejected'
+          status?: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed'
           signature_data?: string | null
           signed_at?: string | null
           submitted_at?: string | null

@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, Clipboard, Clock, CheckCircle2, XCircle, User, Filter, Calendar } from 'lucide-react';
+import { FileText, Clipboard, Clock, CheckCircle2, XCircle, User, Filter, Calendar, Package } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
@@ -18,7 +18,7 @@ import { VehicleInspection } from '@/types/inspection';
 import { AbsenceWithRelations } from '@/types/absence';
 import { usePendingAbsences, useApproveAbsence, useRejectAbsence, useAbsenceSummaryForEmployee } from '@/lib/hooks/useAbsence';
 
-type StatusFilter = 'pending' | 'approved' | 'rejected' | 'all';
+type StatusFilter = 'pending' | 'approved' | 'rejected' | 'processed' | 'all';
 
 interface TimesheetWithProfile extends Timesheet {
   user: {
@@ -76,6 +76,8 @@ export default function ApprovalsPage() {
         timesheetQuery = timesheetQuery.eq('status', 'approved');
       } else if (filter === 'rejected') {
         timesheetQuery = timesheetQuery.eq('status', 'rejected');
+      } else if (filter === 'processed') {
+        timesheetQuery = timesheetQuery.eq('status', 'processed');
       }
       // 'all' doesn't filter
 
@@ -208,6 +210,7 @@ export default function ApprovalsPage() {
       case 'pending': return 'Pending';
       case 'approved': return 'Approved';
       case 'rejected': return 'Rejected';
+      case 'processed': return 'Processed';
       case 'all': return 'All';
     }
   };
@@ -233,6 +236,12 @@ export default function ApprovalsPage() {
           <Badge variant="destructive">
             <XCircle className="h-3 w-3 mr-1" />
             Rejected
+          </Badge>
+        );
+      case 'processed':
+        return (
+          <Badge variant="default">
+            Processed
           </Badge>
         );
       case 'draft':
@@ -275,7 +284,7 @@ export default function ApprovalsPage() {
             <Filter className="h-4 w-4 text-slate-400" />
             <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
             <div className="flex gap-2 flex-wrap">
-              {(['pending', 'approved', 'rejected', 'all'] as StatusFilter[]).map((filter) => (
+              {(['pending', 'approved', 'rejected', 'processed', 'all'] as StatusFilter[]).map((filter) => (
                 <Button
                   key={filter}
                   variant={statusFilter === filter ? 'default' : 'outline'}
@@ -286,6 +295,7 @@ export default function ApprovalsPage() {
                   {filter === 'pending' && <Clock className="h-3 w-3 mr-1" />}
                   {filter === 'approved' && <CheckCircle2 className="h-3 w-3 mr-1" />}
                   {filter === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
+                  {filter === 'processed' && <Package className="h-3 w-3 mr-1" />}
                   {getFilterLabel(filter)}
                 </Button>
               ))}
@@ -395,38 +405,42 @@ export default function ApprovalsPage() {
               </Card>
             ) : (
               timesheets.map((timesheet) => (
-                <Card key={timesheet.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-timesheet/50 transition-all duration-200">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center space-x-3">
-                        <FileText className="h-5 w-5 text-amber-600" />
-                        <div>
-                          <CardTitle className="text-lg">
-                            Week Ending {formatDate(timesheet.week_ending)}
-                          </CardTitle>
-                          <CardDescription className="flex items-center gap-2 mt-1">
-                            <User className="h-3 w-3" />
-                            {timesheet.user?.full_name || 'Unknown'} 
-                            {timesheet.user?.employee_id && ` (${timesheet.user.employee_id})`}
-                          </CardDescription>
+                <Link key={timesheet.id} href={`/timesheets/${timesheet.id}`} className="block">
+                  <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-timesheet/50 transition-all duration-200 cursor-pointer">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-3">
+                          <FileText className="h-5 w-5 text-amber-600" />
+                          <div>
+                            <CardTitle className="text-lg">
+                              Week Ending {formatDate(timesheet.week_ending)}
+                            </CardTitle>
+                            <CardDescription className="flex items-center gap-2 mt-1">
+                              <User className="h-3 w-3" />
+                              {timesheet.user?.full_name || 'Unknown'} 
+                              {timesheet.user?.employee_id && ` (${timesheet.user.employee_id})`}
+                            </CardDescription>
+                          </div>
                         </div>
+                        {getStatusBadge(timesheet.status)}
                       </div>
-                      {getStatusBadge(timesheet.status)}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-muted-foreground">
-                        Submitted {formatDate(timesheet.submitted_at || '')}
-                        {timesheet.reg_number && ` • Reg: ${timesheet.reg_number}`}
-                      </div>
-                      <div className="flex gap-2">
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-muted-foreground">
+                          Submitted {formatDate(timesheet.submitted_at || '')}
+                          {timesheet.reg_number && ` • Reg: ${timesheet.reg_number}`}
+                        </div>
                         {timesheet.status === 'submitted' && (
-                          <>
+                          <div className="flex gap-2" onClick={(e) => e.preventDefault()}>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleQuickReject('timesheet', timesheet.id)}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleQuickReject('timesheet', timesheet.id);
+                              }}
                               className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
                             >
                               <XCircle className="h-4 w-4 mr-1" />
@@ -435,23 +449,22 @@ export default function ApprovalsPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleQuickApprove('timesheet', timesheet.id)}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleQuickApprove('timesheet', timesheet.id);
+                              }}
                               className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
                             >
                               <CheckCircle2 className="h-4 w-4 mr-1" />
                               Approve
                             </Button>
-                          </>
+                          </div>
                         )}
-                        <Link href={`/timesheets/${timesheet.id}`}>
-                          <Button size="sm">
-                            View Details
-                          </Button>
-                        </Link>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </Link>
               ))
             )}
           </TabsContent>
@@ -465,45 +478,49 @@ export default function ApprovalsPage() {
               </Card>
             ) : (
               inspections.map((inspection) => (
-                <Card key={inspection.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center space-x-3">
-                        <Clipboard className="h-5 w-5 text-amber-600" />
-                        <div>
-                          <CardTitle className="text-lg">
-                            {inspection.vehicles?.reg_number || 'Unknown Vehicle'}
-                          </CardTitle>
-                          <CardDescription className="mt-1">
-                            <div className="flex items-center gap-2">
-                              <User className="h-3 w-3" />
-                              {inspection.user?.full_name || 'Unknown'}
-                              {inspection.user?.employee_id && ` (${inspection.user.employee_id})`}
-                            </div>
-                            <div className="text-xs mt-1">
-                              {inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
-                                ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
-                                : formatDate(inspection.inspection_date)
-                              }
-                            </div>
-                          </CardDescription>
+                <Link key={inspection.id} href={`/inspections/${inspection.id}`} className="block">
+                  <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200 cursor-pointer">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-3">
+                          <Clipboard className="h-5 w-5 text-amber-600" />
+                          <div>
+                            <CardTitle className="text-lg">
+                              {inspection.vehicles?.reg_number || 'Unknown Vehicle'}
+                            </CardTitle>
+                            <CardDescription className="mt-1">
+                              <div className="flex items-center gap-2">
+                                <User className="h-3 w-3" />
+                                {inspection.user?.full_name || 'Unknown'}
+                                {inspection.user?.employee_id && ` (${inspection.user.employee_id})`}
+                              </div>
+                              <div className="text-xs mt-1">
+                                {inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
+                                  ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
+                                  : formatDate(inspection.inspection_date)
+                                }
+                              </div>
+                            </CardDescription>
+                          </div>
                         </div>
+                        {getStatusBadge(inspection.status)}
                       </div>
-                      {getStatusBadge(inspection.status)}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-muted-foreground">
-                        Submitted {formatDate(inspection.submitted_at || '')}
-                      </div>
-                      <div className="flex gap-2">
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-muted-foreground">
+                          Submitted {formatDate(inspection.submitted_at || '')}
+                        </div>
                         {inspection.status === 'submitted' && (
-                          <>
+                          <div className="flex gap-2" onClick={(e) => e.preventDefault()}>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleQuickReject('inspection', inspection.id)}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleQuickReject('inspection', inspection.id);
+                              }}
                               className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
                             >
                               <XCircle className="h-4 w-4 mr-1" />
@@ -512,23 +529,22 @@ export default function ApprovalsPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleQuickApprove('inspection', inspection.id)}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleQuickApprove('inspection', inspection.id);
+                              }}
                               className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
                             >
                               <CheckCircle2 className="h-4 w-4 mr-1" />
                               Approve
                             </Button>
-                          </>
+                          </div>
                         )}
-                        <Link href={`/inspections/${inspection.id}`}>
-                          <Button size="sm">
-                            View Details
-                          </Button>
-                        </Link>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </Link>
               ))
             )}
           </TabsContent>

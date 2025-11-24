@@ -10,13 +10,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Save, Send, Edit2, CheckCircle2, XCircle, Download } from 'lucide-react';
+import { ArrowLeft, Save, Send, Edit2, CheckCircle2, XCircle, Download, Package } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate, formatDateISO } from '@/lib/utils/date';
 import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
 import { DAY_NAMES, Timesheet, TimesheetEntry } from '@/types/timesheet';
 import SignaturePad from '@/components/forms/SignaturePad';
 import { Database } from '@/types/database';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function ViewTimesheetPage() {
   const router = useRouter();
@@ -32,6 +42,7 @@ export default function ViewTimesheetPage() {
   const [error, setError] = useState('');
   const [signature, setSignature] = useState<string | null>(null);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
+  const [showProcessedDialog, setShowProcessedDialog] = useState(false);
 
   useEffect(() => {
     if (params.id && !authLoading) {
@@ -262,12 +273,36 @@ export default function ViewTimesheetPage() {
     }
   };
 
+  const handleMarkAsProcessed = async () => {
+    if (!timesheet || !isManager) return;
+
+    setSaving(true);
+    setShowProcessedDialog(false);
+    try {
+      const { error } = await supabase
+        .from('timesheets')
+        .update({
+          status: 'processed',
+        })
+        .eq('id', timesheet.id);
+
+      if (error) throw error;
+      
+      await fetchTimesheet(timesheet.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to mark as processed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const variants = {
       draft: { variant: 'secondary' as const, label: 'Draft' },
       submitted: { variant: 'warning' as const, label: 'Pending Approval' },
       approved: { variant: 'success' as const, label: 'Approved' },
       rejected: { variant: 'destructive' as const, label: 'Rejected' },
+      processed: { variant: 'default' as const, label: 'Processed' },
     };
     const config = variants[status as keyof typeof variants] || variants.draft;
     return <Badge variant={config.variant}>{config.label}</Badge>;
@@ -304,6 +339,7 @@ export default function ViewTimesheetPage() {
   const canEdit = editing && (timesheet.status === 'draft' || timesheet.status === 'rejected');
   const canSubmit = timesheet.user_id === user?.id && (timesheet.status === 'draft' || timesheet.status === 'rejected');
   const canApprove = isManager && timesheet.status === 'submitted';
+  const canMarkAsProcessed = isManager && timesheet.status === 'approved';
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -618,22 +654,62 @@ export default function ViewTimesheetPage() {
                     }
                   }}
                   disabled={saving}
+                  className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
                 >
                   <XCircle className="h-4 w-4 mr-2" />
                   Reject
                 </Button>
                 <Button
+                  variant="outline"
                   onClick={handleApprove}
                   disabled={saving}
+                  className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
                 >
                   <CheckCircle2 className="h-4 w-4 mr-2" />
                   Approve
                 </Button>
               </>
             )}
+
+            {canMarkAsProcessed && (
+              <Button
+                variant="outline"
+                onClick={() => setShowProcessedDialog(true)}
+                disabled={saving}
+                className="border-blue-300 text-blue-600 hover:bg-blue-500 hover:text-white hover:border-blue-500 active:bg-blue-600 active:scale-95 transition-all"
+              >
+                <Package className="h-4 w-4 mr-2" />
+                Mark as Processed
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
+
+      {/* Mark as Processed Confirmation Dialog */}
+      <AlertDialog open={showProcessedDialog} onOpenChange={setShowProcessedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark Timesheet as Processed</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to mark this timesheet as processed?
+              <br />
+              <br />
+              <strong>Warning:</strong> Once marked as processed, this action cannot be undone. This indicates that the timesheet has been sent to payroll for payment.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleMarkAsProcessed}
+              disabled={saving}
+              className="bg-blue-600 hover:bg-blue-700 focus:ring-blue-600"
+            >
+              {saving ? 'Processing...' : 'Mark as Processed'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

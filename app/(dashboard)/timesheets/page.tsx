@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Clock, CheckCircle2, XCircle, User, Download, Trash2 } from 'lucide-react';
+import { Plus, FileText, Clock, CheckCircle2, XCircle, User, Download, Trash2, Filter, Package } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 import { toast } from 'sonner';
@@ -34,6 +34,8 @@ type Employee = {
   employee_id: string | null;
 };
 
+type StatusFilter = 'all' | 'draft' | 'pending' | 'approved' | 'rejected' | 'processed';
+
 export default function TimesheetsPage() {
   const { user, isManager } = useAuth();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('timesheets');
@@ -42,6 +44,7 @@ export default function TimesheetsPage() {
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [downloading, setDownloading] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [timesheetToDelete, setTimesheetToDelete] = useState<{ id: string; weekEnding: string } | null>(null);
@@ -57,7 +60,7 @@ export default function TimesheetsPage() {
 
   useEffect(() => {
     fetchTimesheets();
-  }, [user, isManager, selectedEmployeeId]);
+  }, [user, isManager, selectedEmployeeId, statusFilter]);
 
   // Listen for realtime updates to timesheets
   useTimesheetRealtime((payload) => {
@@ -77,6 +80,10 @@ export default function TimesheetsPage() {
         } else if (status === 'rejected') {
           toast.error('Timesheet rejected', {
             description: 'A timesheet has been rejected. Please review the comments.',
+          });
+        } else if (status === 'processed') {
+          toast.success('Timesheet processed!', {
+            description: 'A timesheet has been processed for payroll.',
           });
         }
       }
@@ -119,6 +126,14 @@ export default function TimesheetsPage() {
       }
       // If manager and 'all' selected, show all timesheets
 
+      // Apply status filter
+      if (statusFilter === 'pending') {
+        query = query.eq('status', 'submitted');
+      } else if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
+      }
+      // 'all' doesn't filter by status
+
       const { data, error } = await query;
 
       if (error) throw error;
@@ -136,11 +151,23 @@ export default function TimesheetsPage() {
       submitted: { variant: 'warning' as const, label: 'Pending' },
       approved: { variant: 'success' as const, label: 'Approved' },
       rejected: { variant: 'destructive' as const, label: 'Rejected' },
+      processed: { variant: 'default' as const, label: 'Processed' },
     };
 
     const config = variants[status as keyof typeof variants] || variants.draft;
 
     return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const getFilterLabel = (filter: StatusFilter) => {
+    switch (filter) {
+      case 'all': return 'All';
+      case 'draft': return 'Draft';
+      case 'pending': return 'Pending';
+      case 'approved': return 'Approved';
+      case 'rejected': return 'Rejected';
+      case 'processed': return 'Processed';
+    }
   };
 
   const getStatusIcon = (status: string) => {
@@ -151,6 +178,8 @@ export default function TimesheetsPage() {
         return <CheckCircle2 className="h-5 w-5 text-green-600" />;
       case 'rejected':
         return <XCircle className="h-5 w-5 text-red-600" />;
+      case 'processed':
+        return <Package className="h-5 w-5 text-blue-600" />;
       default:
         return <FileText className="h-5 w-5 text-muted-foreground" />;
     }
@@ -282,6 +311,34 @@ export default function TimesheetsPage() {
         )}
       </div>
 
+      {/* Status Filter */}
+      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-slate-400" />
+            <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
+            <div className="flex gap-2 flex-wrap">
+              {(['all', 'draft', 'pending', 'approved', 'rejected', 'processed'] as StatusFilter[]).map((filter) => (
+                <Button
+                  key={filter}
+                  variant={statusFilter === filter ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setStatusFilter(filter)}
+                  className={statusFilter === filter ? '' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50'}
+                >
+                  {filter === 'pending' && <Clock className="h-3 w-3 mr-1" />}
+                  {filter === 'approved' && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                  {filter === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
+                  {filter === 'processed' && <Package className="h-3 w-3 mr-1" />}
+                  {filter === 'draft' && <FileText className="h-3 w-3 mr-1" />}
+                  {getFilterLabel(filter)}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {loading ? (
         <div className="grid gap-4">
           {[1, 2, 3].map((i) => (
@@ -382,8 +439,8 @@ export default function TimesheetsPage() {
                       See manager comments
                     </div>
                   )}
-                  {/* Download PDF Button for Approved/Pending */}
-                  {(timesheet.status === 'approved' || timesheet.status === 'submitted') && (
+                  {/* Download PDF Button for Approved/Pending/Processed */}
+                  {(timesheet.status === 'approved' || timesheet.status === 'submitted' || timesheet.status === 'processed') && (
                     <Button
                       onClick={(e) => handleDownloadPDF(e, timesheet.id)}
                       disabled={downloading === timesheet.id}

@@ -18,7 +18,7 @@ export interface Timesheet {
   user_id: string;
   reg_number: string | null;
   week_ending: string; // Date string (Sunday of the week)
-  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed';
   signature_data: string | null;
   signed_at: string | null;
   submitted_at: string | null;
