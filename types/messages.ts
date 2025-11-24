@@ -19,6 +19,7 @@ export interface Message {
   updated_at: string;
   deleted_at: string | null;
   created_via: string;
+  pdf_file_path: string | null;
 }
 
 // Message recipient (per-user assignment)

@@ -33,6 +33,7 @@ export async function GET() {
           sender_id,
           created_at,
           deleted_at,
+          pdf_file_path,
           sender:sender_id(
             id,
             full_name

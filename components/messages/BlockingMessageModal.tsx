@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SignaturePad } from '@/components/forms/SignaturePad';
@@ -16,6 +16,7 @@ interface BlockingMessageModalProps {
     body: string;
     sender_name: string;
     created_at: string;
+    pdf_file_path?: string | null;
   };
   onSigned: () => void;
   totalPending: number;
@@ -30,6 +31,20 @@ export function BlockingMessageModal({
   currentIndex
 }: BlockingMessageModalProps) {
   const [signing, setSigning] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
+  // Set PDF URL if pdf_file_path exists
+  useEffect(() => {
+    if (message.pdf_file_path) {
+      // Use API route to serve PDF with authentication
+      const url = `/api/toolbox-talk-pdf/${message.pdf_file_path}`;
+      setPdfUrl(url);
+    }
+
+    return () => {
+      setPdfUrl(null);
+    };
+  }, [message.pdf_file_path]);
 
   async function handleSign(signatureData: string) {
     setSigning(true);
@@ -70,44 +85,47 @@ export function BlockingMessageModal({
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
-        <DialogHeader>
-          <DialogTitle className="text-xl text-red-600">Toolbox Talk - Action Required</DialogTitle>
-          <DialogDescription className="text-slate-600 dark:text-slate-400">
-            {new Date(message.created_at).toLocaleDateString()}
-          </DialogDescription>
+        <DialogHeader className="space-y-1">
+          <DialogTitle className="text-lg text-red-600">
+            Toolbox Talk - {message.subject}
+          </DialogTitle>
+          {totalPending > 1 && (
+            <DialogDescription className="text-xs text-slate-600 dark:text-slate-400">
+              Message {currentIndex + 1} of {totalPending}
+            </DialogDescription>
+          )}
         </DialogHeader>
 
-        {/* Progress indicator if multiple */}
-        {totalPending > 1 && (
-          <div className="px-6 -mt-2">
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Message {currentIndex + 1} of {totalPending}
-            </p>
-          </div>
-        )}
+        {/* Warning - compact */}
+        <div className="flex items-center gap-2 px-6 -mt-2 mb-2">
+          <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+          <p className="text-xs text-slate-700 dark:text-slate-300">
+            Read and sign to continue
+          </p>
+        </div>
 
         <ScrollArea className="flex-1 px-6">
           <div className="pb-6 space-y-4">
-            {/* Simple one-line warning */}
-            <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-              <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
-              <p>Please read and sign this Toolbox Talk to continue using the app.</p>
-            </div>
-
-            {/* Message Subject */}
-            <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 border-l-4 border-red-600">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">{message.subject}</h3>
-            </div>
-
-            {/* Message Body - Dynamic height */}
-            <div className="max-h-[300px] overflow-y-auto w-full rounded-md border border-slate-200 dark:border-slate-700 p-4">
+            {/* Message Body - No border, no padding */}
+            {message.body && (
               <div className="text-sm text-slate-900 dark:text-white whitespace-pre-wrap">
                 {message.body}
               </div>
-            </div>
+            )}
 
-            {/* Signature Section - Always visible like RAMS */}
-            <div className="space-y-3">
+            {/* PDF Viewer - Embedded if PDF exists */}
+            {pdfUrl && (
+              <div className="w-full" style={{ height: '500px' }}>
+                <iframe
+                  src={pdfUrl}
+                  className="w-full h-full border border-slate-200 dark:border-slate-700 rounded-md"
+                  title="Toolbox Talk PDF"
+                />
+              </div>
+            )}
+
+            {/* Signature Section - At the BOTTOM so users must scroll */}
+            <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-700">
               <label className="text-sm font-medium text-slate-900 dark:text-white">
                 Your Signature <span className="text-destructive">*</span>
               </label>

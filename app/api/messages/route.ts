@@ -45,9 +45,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden: Manager/Admin access required' }, { status: 403 });
     }
 
-    // Parse request body
-    const body: CreateMessageInput = await request.json();
-    const { type, subject, body: messageBody, recipient_type, recipient_user_ids, recipient_roles } = body;
+    // Parse request body (could be JSON or FormData)
+    const contentType = request.headers.get('content-type') || '';
+    let type: string;
+    let subject: string;
+    let messageBody: string;
+    let recipient_type: string;
+    let recipient_user_ids: string[] | undefined;
+    let recipient_roles: string[] | undefined;
+    let pdfFile: File | null = null;
+
+    if (contentType.includes('multipart/form-data')) {
+      // Handle FormData (with PDF upload)
+      const formData = await request.formData();
+      type = formData.get('type') as string;
+      subject = formData.get('subject') as string;
+      messageBody = formData.get('body') as string;
+      recipient_type = formData.get('recipient_type') as string;
+      
+      const recipientUserIdsStr = formData.get('recipient_user_ids') as string | null;
+      recipient_user_ids = recipientUserIdsStr ? JSON.parse(recipientUserIdsStr) : undefined;
+      
+      const recipientRolesStr = formData.get('recipient_roles') as string | null;
+      recipient_roles = recipientRolesStr ? JSON.parse(recipientRolesStr) : undefined;
+      
+      pdfFile = formData.get('pdf_file') as File | null;
+    } else {
+      // Handle JSON (for backwards compatibility)
+      const body: CreateMessageInput = await request.json();
+      type = body.type;
+      subject = body.subject;
+      messageBody = body.body;
+      recipient_type = body.recipient_type;
+      recipient_user_ids = body.recipient_user_ids;
+      recipient_roles = body.recipient_roles;
+    }
 
     // Validate required fields
     if (!type || !subject || !messageBody || !recipient_type) {
@@ -100,6 +132,42 @@ export async function POST(request: NextRequest) {
     // Set priority based on type
     const priority = type === 'TOOLBOX_TALK' ? 'HIGH' : 'LOW';
 
+    // Handle PDF upload if present
+    let pdfFilePath: string | null = null;
+    if (pdfFile) {
+      // Validate PDF file
+      if (pdfFile.type !== 'application/pdf') {
+        return NextResponse.json({ error: 'Only PDF files are allowed' }, { status: 400 });
+      }
+
+      if (pdfFile.size > 10 * 1024 * 1024) {
+        return NextResponse.json({ error: 'PDF file size must be less than 10MB' }, { status: 400 });
+      }
+
+      // Generate safe filename
+      const timestamp = Date.now();
+      const sanitizedFilename = pdfFile.name
+        .replace(/[^a-z0-9_.-]/gi, '_')
+        .substring(0, 50);
+      const fileName = `${user.id}/${timestamp}_${sanitizedFilename}`;
+
+      // Upload to Supabase Storage
+      const fileBuffer = await pdfFile.arrayBuffer();
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('toolbox-talk-pdfs')
+        .upload(fileName, fileBuffer, {
+          contentType: 'application/pdf',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('PDF upload error:', uploadError);
+        return NextResponse.json({ error: 'Failed to upload PDF file' }, { status: 500 });
+      }
+
+      pdfFilePath = uploadData.path;
+    }
+
     // Create message
     const { data: message, error: messageError } = await supabase
       .from('messages')
@@ -109,13 +177,20 @@ export async function POST(request: NextRequest) {
         body: messageBody,
         priority,
         sender_id: user.id,
-        created_via: 'web'
+        created_via: 'web',
+        pdf_file_path: pdfFilePath
       })
       .select()
       .single();
 
     if (messageError || !message) {
       console.error('Error creating message:', messageError);
+      
+      // Clean up uploaded PDF if message creation failed
+      if (pdfFilePath) {
+        await supabase.storage.from('toolbox-talk-pdfs').remove([pdfFilePath]);
+      }
+      
       return NextResponse.json({ error: 'Failed to create message' }, { status: 500 });
     }
 
@@ -132,8 +207,13 @@ export async function POST(request: NextRequest) {
 
     if (recipientsError) {
       console.error('Error creating recipients:', recipientsError);
-      // Clean up message if recipients creation failed
+      
+      // Clean up message and PDF if recipients creation failed
       await supabase.from('messages').delete().eq('id', message.id);
+      if (pdfFilePath) {
+        await supabase.storage.from('toolbox-talk-pdfs').remove([pdfFilePath]);
+      }
+      
       return NextResponse.json({ error: 'Failed to assign recipients' }, { status: 500 });
     }
 
