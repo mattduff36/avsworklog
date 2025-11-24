@@ -119,15 +119,9 @@ async function testTrigger() {
     console.log(`   ID: ${profile.id}`);
     console.log(`   Name: ${profile.full_name}`);
     console.log(`   Role ID: ${profile.role_id}`);
-    console.log(`   Role: ${profile.role}\n`);
+    console.log(`   Role (deprecated): ${profile.role || 'NULL'}\n`);
 
-    // Verify
-    if (profile.role !== adminRole.name) {
-      console.error(`❌ Role mismatch! Expected '${adminRole.name}', got '${profile.role}'`);
-      await client.query(`DELETE FROM auth.users WHERE id = $1`, [userId]);
-      process.exit(1);
-    }
-
+    // Verify role_id matches
     if (profile.role_id !== adminRole.id) {
       console.error(`❌ Role ID mismatch! Expected '${adminRole.id}', got '${profile.role_id}'`);
       await client.query(`DELETE FROM auth.users WHERE id = $1`, [userId]);

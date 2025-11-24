@@ -9,7 +9,7 @@ const { Client } = pg;
 config({ path: resolve(process.cwd(), '.env.local') });
 
 const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
-const sqlFile = 'supabase/fix-profile-trigger-no-role.sql';
+const sqlFile = 'supabase/remove-role-field-constraint.sql';
 
 if (!connectionString) {
   console.error('❌ Missing database connection string');
@@ -18,9 +18,8 @@ if (!connectionString) {
 }
 
 async function runMigration() {
-  console.log('🚀 Running Profile Trigger Fix Migration...\n');
+  console.log('🚀 Removing role field CHECK constraint...\n');
 
-  // Parse connection string with SSL config
   const url = new URL(connectionString);
   
   const client = new Client({
@@ -39,49 +38,30 @@ async function runMigration() {
     await client.connect();
     console.log('✅ Connected!\n');
 
-    // Read and execute migration
     const migrationSQL = readFileSync(
       resolve(process.cwd(), sqlFile),
       'utf-8'
     );
 
     console.log('📄 Executing migration...');
-    await client.query(migrationSQL);
-
-    console.log('✅ MIGRATION COMPLETED!\n');
+    const result = await client.query(migrationSQL);
     
-    // Verify trigger function exists
-    const { rows } = await client.query(`
-      SELECT routine_name 
-      FROM information_schema.routines 
-      WHERE routine_schema = 'public' 
-      AND routine_name = 'handle_new_user'
-    `);
+    console.log('✅ MIGRATION COMPLETED!\n');
 
-    if (rows.length > 0) {
-      console.log('✅ Trigger function updated successfully');
-    } else {
-      console.log('⚠️  Warning: Trigger function not found');
-    }
-
-    // Verify trigger exists
-    const { rows: triggerRows } = await client.query(`
-      SELECT tgname 
-      FROM pg_trigger 
-      WHERE tgname = 'on_auth_user_created'
-    `);
-
-    if (triggerRows.length > 0) {
-      console.log('✅ Trigger exists and is active');
-    } else {
-      console.log('⚠️  Warning: Trigger not found');
+    // Show results
+    if (result.rows && result.rows.length > 0) {
+      console.log('📊 Migration results:');
+      console.log(`   Status: ${result.rows[0].status}`);
+      console.log(`   Total profiles: ${result.rows[0].total_profiles}`);
+      console.log(`   Profiles with role_id: ${result.rows[0].profiles_with_role_id}`);
+      console.log(`   Profiles with NULL role: ${result.rows[0].profiles_with_null_role}\n`);
     }
 
   } catch (error: any) {
     console.error('❌ MIGRATION FAILED:', error.message);
     
-    if (error.message?.includes('already exists')) {
-      console.log('✅ Already applied - no action needed!');
+    if (error.message?.includes('does not exist')) {
+      console.log('✅ Constraint already removed - no action needed!');
       process.exit(0);
     }
     
