@@ -46,9 +46,14 @@ export function BlockingMessageModal({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [numPages, setNumPages] = useState<number | null>(null);
 
-  // Configure PDF.js worker on client side only
+  // Configure PDF.js worker and styles on client side only
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      // Import CSS
+      import('react-pdf/dist/Page/AnnotationLayer.css');
+      import('react-pdf/dist/Page/TextLayer.css');
+      
+      // Configure worker
       import('react-pdf').then((reactPdf) => {
         import('pdfjs-dist').then((pdfjs) => {
           reactPdf.pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
