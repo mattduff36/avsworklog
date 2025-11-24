@@ -32,6 +32,7 @@ export function BlockingMessageModal({
 }: BlockingMessageModalProps) {
   const [signing, setSigning] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfHeight, setPdfHeight] = useState<number>(3000);
 
   // Set PDF URL if pdf_file_path exists
   useEffect(() => {
@@ -115,14 +116,31 @@ export function BlockingMessageModal({
 
             {/* PDF Viewer - Embedded if PDF exists */}
             {pdfUrl && (
-              <div className="w-full overflow-hidden rounded-md border border-slate-200 dark:border-slate-700" style={{ height: '500px' }}>
-                <iframe
-                  src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-                  className="w-full h-full"
-                  style={{ overflow: 'hidden' }}
-                  title="Toolbox Talk PDF"
-                  scrolling="no"
-                />
+              <div className="w-full overflow-hidden rounded-md border border-slate-200 dark:border-slate-700">
+                <object
+                  data={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                  type="application/pdf"
+                  className="w-full"
+                  style={{ 
+                    height: `${pdfHeight}px`,
+                    minHeight: '2000px',
+                    border: 'none'
+                  }}
+                  aria-label="Toolbox Talk PDF"
+                >
+                  <iframe
+                    src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                    className="w-full"
+                    style={{ 
+                      height: `${pdfHeight}px`,
+                      minHeight: '2000px',
+                      overflow: 'hidden',
+                      border: 'none'
+                    }}
+                    title="Toolbox Talk PDF"
+                    scrolling="no"
+                  />
+                </object>
               </div>
             )}
 
