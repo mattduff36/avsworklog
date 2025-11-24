@@ -6,6 +6,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
+
+// Configure PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 interface BlockingMessageModalProps {
   open: boolean;
@@ -32,7 +38,7 @@ export function BlockingMessageModal({
 }: BlockingMessageModalProps) {
   const [signing, setSigning] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [pdfHeight, setPdfHeight] = useState<number>(3000);
+  const [numPages, setNumPages] = useState<number | null>(null);
 
   // Set PDF URL if pdf_file_path exists
   useEffect(() => {
@@ -44,8 +50,13 @@ export function BlockingMessageModal({
 
     return () => {
       setPdfUrl(null);
+      setNumPages(null);
     };
   }, [message.pdf_file_path]);
+
+  function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
+    setNumPages(numPages);
+  }
 
   async function handleSign(signatureData: string) {
     setSigning(true);
@@ -114,33 +125,39 @@ export function BlockingMessageModal({
               </div>
             )}
 
-            {/* PDF Viewer - Embedded if PDF exists */}
+            {/* PDF Viewer - Render each page separately */}
             {pdfUrl && (
-              <div className="w-full overflow-hidden rounded-md border border-slate-200 dark:border-slate-700">
-                <object
-                  data={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-                  type="application/pdf"
-                  className="w-full"
-                  style={{ 
-                    height: `${pdfHeight}px`,
-                    minHeight: '2000px',
-                    border: 'none'
-                  }}
-                  aria-label="Toolbox Talk PDF"
+              <div className="w-full space-y-4">
+                <Document
+                  file={pdfUrl}
+                  onLoadSuccess={onDocumentLoadSuccess}
+                  loading={
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                      <span className="ml-2 text-sm text-slate-600 dark:text-slate-400">
+                        Loading PDF...
+                      </span>
+                    </div>
+                  }
+                  error={
+                    <div className="flex items-center justify-center py-12 text-red-600">
+                      <AlertCircle className="h-6 w-6 mr-2" />
+                      <span className="text-sm">Failed to load PDF document</span>
+                    </div>
+                  }
                 >
-                  <iframe
-                    src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-                    className="w-full"
-                    style={{ 
-                      height: `${pdfHeight}px`,
-                      minHeight: '2000px',
-                      overflow: 'hidden',
-                      border: 'none'
-                    }}
-                    title="Toolbox Talk PDF"
-                    scrolling="no"
-                  />
-                </object>
+                  {numPages && Array.from(new Array(numPages), (el, index) => (
+                    <div key={`page_${index + 1}`} className="mb-4">
+                      <Page
+                        pageNumber={index + 1}
+                        width={520}
+                        renderTextLayer={false}
+                        renderAnnotationLayer={false}
+                        className="border border-slate-200 dark:border-slate-700 rounded-md overflow-hidden"
+                      />
+                    </div>
+                  ))}
+                </Document>
               </div>
             )}
 
