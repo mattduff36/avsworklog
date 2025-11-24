@@ -49,6 +49,9 @@ export function MobileNavBar() {
     }
   };
 
+  // Temporarily hidden until properly developed
+  return null;
+
   // Only render if in PWA mode
   if (!isPWA) {
     return null;
