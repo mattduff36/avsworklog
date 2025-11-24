@@ -42,6 +42,7 @@ interface InspectionWithVehicle extends VehicleInspection {
 
 export default function InspectionsPage() {
   const { user, isManager } = useAuth();
+  const { hasPermission, loading: permissionLoading } = usePermissionCheck('inspections');
   const router = useRouter();
   const [inspections, setInspections] = useState<InspectionWithVehicle[]>([]);
   const [loading, setLoading] = useState(true);
