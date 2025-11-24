@@ -11,6 +11,7 @@ DECLARE
   default_employee_role_id UUID;
   provided_role_id UUID;
   final_role_id UUID;
+  role_name TEXT;
 BEGIN
   -- Try to get the default employee role ID (fallback if no role_id provided)
   -- Try multiple common employee role names
@@ -45,14 +46,25 @@ BEGIN
     final_role_id := default_employee_role_id;
   END;
 
-  -- If still no role_id, we need to handle this gracefully
-  -- For now, we'll allow NULL and let the API update it later
-  INSERT INTO public.profiles (id, full_name, employee_id, role_id)
+  -- Get the role name from the roles table for the CHECK constraint
+  -- If role_id is NULL, use 'employee-civils' as default
+  IF final_role_id IS NOT NULL THEN
+    SELECT name INTO role_name
+    FROM roles
+    WHERE id = final_role_id;
+  END IF;
+  
+  -- Fallback to 'employee-civils' if role_name is still NULL
+  role_name := COALESCE(role_name, 'employee-civils');
+
+  -- Insert profile with both role_id and role (for backward compatibility with CHECK constraint)
+  INSERT INTO public.profiles (id, full_name, employee_id, role_id, role)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'full_name', 'New User'),
     NEW.raw_user_meta_data->>'employee_id',
-    final_role_id
+    final_role_id,
+    role_name
   )
   ON CONFLICT (id) DO NOTHING; -- Prevent errors if profile already exists
   
