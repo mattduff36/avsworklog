@@ -117,7 +117,7 @@ export function BlockingMessageModal({
             {pdfUrl && (
               <div className="w-full" style={{ height: '500px' }}>
                 <iframe
-                  src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
+                  src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
                   className="w-full h-full border border-slate-200 dark:border-slate-700 rounded-md"
                   title="Toolbox Talk PDF"
                 />
