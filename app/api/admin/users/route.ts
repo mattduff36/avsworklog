@@ -103,9 +103,27 @@ export async function POST(request: NextRequest) {
     // Wait a moment for the trigger to create the profile
     await new Promise(resolve => setTimeout(resolve, 500));
 
+    // Get the role name from the roles table (required for CHECK constraint)
+    const { data: roleData, error: roleLookupError } = await supabaseAdmin
+      .from('roles')
+      .select('name')
+      .eq('id', role_id)
+      .single();
+
+    if (roleLookupError || !roleData) {
+      console.error('Failed to lookup role name:', roleLookupError);
+      // Try to delete the auth user if we can't get role name
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      return NextResponse.json({ 
+        error: 'Invalid role selected',
+        details: roleLookupError?.message || 'Role not found'
+      }, { status: 400 });
+    }
+
     // Upsert profile with additional data and set must_change_password flag
     // Use admin client to bypass RLS policies
     // Use upsert in case trigger hasn't created profile yet
+    // IMPORTANT: Must set both role_id AND role (role is required by CHECK constraint)
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .upsert({
@@ -114,6 +132,7 @@ export async function POST(request: NextRequest) {
         phone_number: phone_number || null,
         employee_id: employee_id || null,
         role_id,
+        role: roleData.name, // Set role field from roles table (required by CHECK constraint)
         must_change_password: true, // Force password change on first login
       }, {
         onConflict: 'id'

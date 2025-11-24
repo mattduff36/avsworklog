@@ -9,7 +9,7 @@ const { Client } = pg;
 config({ path: resolve(process.cwd(), '.env.local') });
 
 const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
-const sqlFile = 'supabase/fix-profile-trigger-robust.sql';
+const sqlFile = 'supabase/fix-profile-trigger-final.sql';
 
 if (!connectionString) {
   console.error('❌ Missing database connection string');
