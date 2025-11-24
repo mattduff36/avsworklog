@@ -2,6 +2,7 @@ import { Navbar } from '@/components/layout/Navbar';
 import { DashboardContent } from '@/components/layout/DashboardContent';
 import { MessageBlockingCheck } from '@/components/messages/MessageBlockingCheck';
 import { MobileNavBar } from '@/components/layout/MobileNavBar';
+import { PullToRefresh } from '@/components/layout/PullToRefresh';
 
 // Force dynamic rendering to prevent build-time errors
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,7 @@ export default function DashboardLayout({
       <MessageBlockingCheck />
       
       <Navbar />
+      <PullToRefresh />
       <DashboardContent>
         {children}
       </DashboardContent>
