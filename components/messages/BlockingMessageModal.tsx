@@ -6,12 +6,18 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { Document, Page, pdfjs } from 'react-pdf';
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
+import dynamic from 'next/dynamic';
 
-// Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+// Dynamically import react-pdf components (client-side only)
+const Document = dynamic(
+  () => import('react-pdf').then((mod) => mod.Document),
+  { ssr: false }
+);
+
+const Page = dynamic(
+  () => import('react-pdf').then((mod) => mod.Page),
+  { ssr: false }
+);
 
 interface BlockingMessageModalProps {
   open: boolean;
@@ -39,6 +45,17 @@ export function BlockingMessageModal({
   const [signing, setSigning] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [numPages, setNumPages] = useState<number | null>(null);
+
+  // Configure PDF.js worker on client side only
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      import('react-pdf').then((reactPdf) => {
+        import('pdfjs-dist').then((pdfjs) => {
+          reactPdf.pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+        });
+      });
+    }
+  }, []);
 
   // Set PDF URL if pdf_file_path exists
   useEffect(() => {
