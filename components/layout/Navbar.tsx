@@ -45,9 +45,12 @@ export function Navbar() {
   const [permissionsLoading, setPermissionsLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string>('');
   const [viewAsRole, setViewAsRole] = useState<ViewAsRole>('actual');
+  const [hasRAMSAssignments, setHasRAMSAssignments] = useState(false);
   const supabase = createClient();
   
   const isSuperAdmin = userEmail === 'admin@mpdee.co.uk';
+  const effectiveIsManager = isManager && !(isSuperAdmin && viewAsRole === 'employee');
+  const effectiveIsAdmin = isAdmin && !(isSuperAdmin && viewAsRole === 'employee');
 
   // Fetch user email
   useEffect(() => {
@@ -140,6 +143,27 @@ export function Navbar() {
     fetchPermissions();
   }, [profile?.id, isManager, isAdmin, supabase, isSuperAdmin, viewAsRole]);
 
+  // Fetch RAMS assignments to determine if RAMS should be visible
+  useEffect(() => {
+    async function fetchRAMSAssignments() {
+      if (!profile?.id) return;
+      
+      try {
+        const { count } = await supabase
+          .from('rams_assignments')
+          .select('*', { count: 'exact', head: true })
+          .eq('employee_id', profile.id);
+        
+        setHasRAMSAssignments((count || 0) > 0);
+      } catch (error) {
+        console.error('Error fetching RAMS assignments:', error);
+        setHasRAMSAssignments(false);
+      }
+    }
+    
+    fetchRAMSAssignments();
+  }, [profile?.id, supabase]);
+
   // Fetch notification count
   useEffect(() => {
     async function fetchNotificationCount() {
@@ -188,13 +212,24 @@ export function Navbar() {
   const allEmployeeNav = [
     { href: '/timesheets', label: 'Timesheets', icon: FileText, module: 'timesheets' as ModuleName },
     { href: '/inspections', label: 'Inspections', icon: ClipboardCheck, module: 'inspections' as ModuleName },
-    { href: '/absence', label: 'Absence & Leave', icon: Calendar, module: 'absence' as ModuleName },
+    { href: '/rams', label: 'RAMS', icon: CheckSquare, module: 'rams' as ModuleName },
+    { href: '/absence', label: 'Absence', icon: Calendar, module: 'absence' as ModuleName },
   ];
 
   // Filter employee nav by permissions
-  const employeeNav = allEmployeeNav.filter(item => 
-    userPermissions.has(item.module)
-  );
+  const employeeNav = allEmployeeNav.filter(item => {
+    // Check basic permission
+    if (!userPermissions.has(item.module)) {
+      return false;
+    }
+    
+    // Special handling for RAMS - hide for employees with no assignments
+    if (item.module === 'rams' && !effectiveIsManager && !effectiveIsAdmin && !hasRAMSAssignments) {
+      return false;
+    }
+    
+    return true;
+  });
 
   // Manager/admin links for mobile menu only
   const managerLinks = [
