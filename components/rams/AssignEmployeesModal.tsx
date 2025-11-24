@@ -73,11 +73,15 @@ export function AssignEmployeesModal({
         .select(`
           id,
           full_name,
-          role:roles!inner(
+          role_id,
+          roles!inner(
+            id,
             name,
+            display_name,
             is_manager_admin
           ),
           role_permissions!inner(
+            role_id,
             module_name,
             enabled
           )
@@ -86,7 +90,10 @@ export function AssignEmployeesModal({
         .eq('role_permissions.enabled', true)
         .order('full_name');
 
-      if (profilesError) throw profilesError;
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        throw profilesError;
+      }
 
       const allEmployees = profiles || [];
 
@@ -117,7 +124,10 @@ export function AssignEmployeesModal({
       const employeesWithStatus = allEmployees?.map((emp: any) => ({
         id: emp.id,
         full_name: emp.full_name,
-        role: emp.role,
+        role: emp.roles ? {
+          name: emp.roles.name,
+          display_name: emp.roles.display_name,
+        } : null,
         alreadySigned: signedEmployeeIds.has(emp.id),
         isAssigned: assignedEmployeeIds.has(emp.id),
       })) || [];
