@@ -615,10 +615,11 @@ export default function UsersAdminPage() {
                         <TableCell className="text-slate-700 dark:text-slate-300">{user.employee_id || '-'}</TableCell>
                         <TableCell>
                           <Badge variant={
+                            user.email === 'admin@mpdee.co.uk' ? 'destructive' :
                             user.role?.name === 'admin' ? 'destructive' :
                             user.role?.name === 'manager' ? 'default' : 'secondary'
                           }>
-                            {user.role?.display_name || 'No Role'}
+                            {user.email === 'admin@mpdee.co.uk' ? 'SuperAdmin' : (user.role?.display_name || 'No Role')}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-slate-700 dark:text-slate-300">
@@ -878,8 +879,11 @@ export default function UsersAdminPage() {
               </p>
               <p className="text-sm">
                 <span className="text-slate-400">Role:</span>{' '}
-                <Badge variant={selectedUser.role?.name === 'admin' ? 'destructive' : 'default'}>
-                  {selectedUser.role?.display_name || 'No Role'}
+                <Badge variant={
+                  selectedUser.email === 'admin@mpdee.co.uk' ? 'destructive' :
+                  selectedUser.role?.name === 'admin' ? 'destructive' : 'default'
+                }>
+                  {selectedUser.email === 'admin@mpdee.co.uk' ? 'SuperAdmin' : (selectedUser.role?.display_name || 'No Role')}
                 </Badge>
               </p>
             </div>

@@ -65,8 +65,9 @@ export default function DashboardPage() {
   const [pendingRAMSCount, setPendingRAMSCount] = useState(0);
   const [hasRAMSAssignments, setHasRAMSAssignments] = useState(false);
   const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
+  const [userEmail, setUserEmail] = useState<string>('');
 
-  // Placeholder forms for future development (only shown to managers/admins)
+  // Placeholder forms for future development (only shown to superadmin)
   const placeholderForms = [
     { id: 'maintenance', title: 'Maintenance Request', icon: Wrench, color: 'bg-red-500' },
     { id: 'delivery', title: 'Delivery Note', icon: PackageCheck, color: 'bg-rose-500' },
@@ -76,7 +77,19 @@ export default function DashboardPage() {
     { id: 'daily-report', title: 'Daily Report', icon: ScrollText, color: 'bg-amber-500' },
   ];
 
-  const showPlaceholders = isManager || isAdmin;
+  // Only show placeholders to superadmin (admin@mpdee.co.uk)
+  const showPlaceholders = userEmail === 'admin@mpdee.co.uk';
+
+  // Fetch user email
+  useEffect(() => {
+    async function fetchUserEmail() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        setUserEmail(user.email);
+      }
+    }
+    fetchUserEmail();
+  }, [supabase]);
 
   // Fetch user permissions
   useEffect(() => {
