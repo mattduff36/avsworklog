@@ -961,7 +961,7 @@ export default function NewTimesheetPage() {
                       }`}
                     >
                       {day.substring(0, 3)}
-                      {!entries[index].did_not_work && entries[index].daily_total && entries[index].daily_total! > 0 && (
+                      {isComplete && (
                         <Check className="h-3 w-3 ml-1" />
                       )}
                     </TabsTrigger>
