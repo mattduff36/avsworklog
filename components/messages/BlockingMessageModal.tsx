@@ -8,22 +8,20 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
 
-// Dynamically import react-pdf components (client-side only)
-const Document = dynamic(
-  () => import('react-pdf').then((mod) => mod.Document),
+// Dynamically import PDF viewer component (client-side only)
+const PDFViewer = dynamic(
+  () => import('./PDFViewer').then((mod) => ({ default: mod.PDFViewer })),
   { 
     ssr: false,
     loading: () => (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        <span className="ml-2 text-sm text-slate-600 dark:text-slate-400">
+          Preparing PDF viewer...
+        </span>
       </div>
     )
   }
-);
-
-const Page = dynamic(
-  () => import('react-pdf').then((mod) => mod.Page),
-  { ssr: false }
 );
 
 interface BlockingMessageModalProps {
@@ -51,29 +49,6 @@ export function BlockingMessageModal({
 }: BlockingMessageModalProps) {
   const [signing, setSigning] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [numPages, setNumPages] = useState<number | null>(null);
-  const [isClient, setIsClient] = useState(false);
-
-  // Ensure we're on client side
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  // Configure PDF.js worker and styles on client side only
-  useEffect(() => {
-    if (isClient) {
-      // Import CSS
-      import('react-pdf/dist/Page/AnnotationLayer.css');
-      import('react-pdf/dist/Page/TextLayer.css');
-      
-      // Configure worker
-      import('react-pdf').then((reactPdf) => {
-        import('pdfjs-dist').then((pdfjs) => {
-          reactPdf.pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-        });
-      });
-    }
-  }, [isClient]);
 
   // Set PDF URL if pdf_file_path exists
   useEffect(() => {
@@ -85,13 +60,8 @@ export function BlockingMessageModal({
 
     return () => {
       setPdfUrl(null);
-      setNumPages(null);
     };
   }, [message.pdf_file_path]);
-
-  function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
-    setNumPages(numPages);
-  }
 
   async function handleSign(signatureData: string) {
     setSigning(true);
@@ -161,50 +131,7 @@ export function BlockingMessageModal({
             )}
 
             {/* PDF Viewer - Render each page separately */}
-            {pdfUrl && isClient && (
-              <div className="w-full space-y-4">
-                <Document
-                  file={pdfUrl}
-                  onLoadSuccess={onDocumentLoadSuccess}
-                  loading={
-                    <div className="flex items-center justify-center py-12">
-                      <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-                      <span className="ml-2 text-sm text-slate-600 dark:text-slate-400">
-                        Loading PDF...
-                      </span>
-                    </div>
-                  }
-                  error={
-                    <div className="flex items-center justify-center py-12 text-red-600">
-                      <AlertCircle className="h-6 w-6 mr-2" />
-                      <span className="text-sm">Failed to load PDF document</span>
-                    </div>
-                  }
-                >
-                  {numPages && Array.from(new Array(numPages), (el, index) => (
-                    <div key={`page_${index + 1}`} className="mb-4">
-                      <Page
-                        pageNumber={index + 1}
-                        width={520}
-                        renderTextLayer={false}
-                        renderAnnotationLayer={false}
-                        className="border border-slate-200 dark:border-slate-700 rounded-md overflow-hidden"
-                      />
-                    </div>
-                  ))}
-                </Document>
-              </div>
-            )}
-
-            {/* Loading state while waiting for client-side mount */}
-            {pdfUrl && !isClient && (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-                <span className="ml-2 text-sm text-slate-600 dark:text-slate-400">
-                  Preparing PDF viewer...
-                </span>
-              </div>
-            )}
+            {pdfUrl && <PDFViewer url={pdfUrl} />}
 
             {/* Signature Section - At the BOTTOM so users must scroll */}
             <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-700">
