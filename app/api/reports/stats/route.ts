@@ -70,11 +70,11 @@ export async function GET(request: NextRequest) {
         .select('id', { count: 'exact' })
         .eq('status', 'submitted'),
       
-      // Active employees
+      // Active employees (non-admin/manager roles)
       supabase
         .from('profiles')
-        .select('id', { count: 'exact' })
-        .eq('role', 'employee'),
+        .select('id, roles!inner(is_manager_admin)', { count: 'exact' })
+        .eq('roles.is_manager_admin', false),
       
       // Inspections completed this week
       supabase

@@ -68,6 +68,7 @@ export function AssignEmployeesModal({
     setFetching(true);
     try {
       // Fetch employees with RAMS permission
+      // Join: profiles -> roles -> role_permissions
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select(`
@@ -78,16 +79,16 @@ export function AssignEmployeesModal({
             id,
             name,
             display_name,
-            is_manager_admin
-          ),
-          role_permissions!inner(
-            role_id,
-            module_name,
-            enabled
+            is_manager_admin,
+            role_permissions!inner(
+              role_id,
+              module_name,
+              enabled
+            )
           )
         `)
-        .eq('role_permissions.module_name', 'rams')
-        .eq('role_permissions.enabled', true)
+        .eq('roles.role_permissions.module_name', 'rams')
+        .eq('roles.role_permissions.enabled', true)
         .order('full_name');
 
       if (profilesError) {
