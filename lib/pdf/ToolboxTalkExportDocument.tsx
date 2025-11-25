@@ -141,20 +141,6 @@ const styles = StyleSheet.create({
   },
   signatureRightColumn: {
     flex: 1,
-    alignItems: 'flex-end',
-  },
-  badge: {
-    padding: '3pt 8pt',
-    borderRadius: 4,
-    fontSize: 9,
-  },
-  badgeSigned: {
-    backgroundColor: '#22c55e',
-    color: '#ffffff',
-  },
-  badgePending: {
-    backgroundColor: '#ef4444',
-    color: '#ffffff',
   },
   footer: {
     position: 'absolute',
@@ -320,7 +306,9 @@ export function ToolboxTalkExportDocument({
 
             {signedRecipients.map((recipient) => (
               <View key={recipient.id} style={styles.signatureBox}>
+                {/* Two column layout: Info on left, Signature on right */}
                 <View style={styles.signatureContentRow}>
+                  {/* Left Column - Employee Info */}
                   <View style={styles.signatureLeftColumn}>
                     <View style={styles.infoRow}>
                       <Text style={styles.label}>Name:</Text>
@@ -339,7 +327,7 @@ export function ToolboxTalkExportDocument({
                       <Text style={styles.value}>{recipient.user?.role || '-'}</Text>
                     </View>
                     <View style={styles.infoRow}>
-                      <Text style={styles.label}>Signed At:</Text>
+                      <Text style={styles.label}>Signed Date:</Text>
                       <Text style={styles.value}>
                         {recipient.signed_at
                           ? format(new Date(recipient.signed_at), 'PPP p')
@@ -347,21 +335,18 @@ export function ToolboxTalkExportDocument({
                       </Text>
                     </View>
                   </View>
+
+                  {/* Right Column - Signature */}
                   <View style={styles.signatureRightColumn}>
-                    <View style={[styles.badge, styles.badgeSigned]}>
-                      <Text>✓ SIGNED</Text>
-                    </View>
+                    <Text style={{ ...styles.label, marginBottom: 5 }}>Signature:</Text>
+                    {recipient.signature_data && (
+                      <Image
+                        src={recipient.signature_data}
+                        style={styles.signatureImage}
+                      />
+                    )}
                   </View>
                 </View>
-                {recipient.signature_data && (
-                  <View>
-                    <Text style={[styles.label, { marginTop: 10 }]}>Signature:</Text>
-                    <Image
-                      src={recipient.signature_data}
-                      style={styles.signatureImage}
-                    />
-                  </View>
-                )}
               </View>
             ))}
           </View>
