@@ -706,7 +706,7 @@ export default function ViewTimesheetPage() {
                     Editing Approved Timesheet
                   </p>
                   <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
-                    You are editing an approved timesheet. When you finish, you must add a comment and mark it as "Adjusted" to notify the employee and selected managers.
+                    You are editing an approved timesheet. When you finish, you must add a comment and mark it as &ldquo;Adjusted&rdquo; to notify the employee and selected managers.
                   </p>
                 </div>
               </div>
@@ -861,7 +861,6 @@ export default function ViewTimesheetPage() {
           open={showAdjustmentModal}
           onClose={() => setShowAdjustmentModal(false)}
           onConfirm={handleAdjust}
-          timesheetId={timesheet.id}
           employeeName={timesheet.profile?.full_name || 'Employee'}
           weekEnding={formatDate(timesheet.week_ending)}
         />

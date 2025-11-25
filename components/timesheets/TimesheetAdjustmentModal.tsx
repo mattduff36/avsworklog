@@ -33,7 +33,6 @@ interface TimesheetAdjustmentModalProps {
   open: boolean;
   onClose: () => void;
   onConfirm: (selectedManagerIds: string[], comments: string) => Promise<void>;
-  timesheetId: string;
   employeeName: string;
   weekEnding: string;
 }
@@ -42,7 +41,6 @@ export function TimesheetAdjustmentModal({
   open,
   onClose,
   onConfirm,
-  timesheetId,
   employeeName,
   weekEnding,
 }: TimesheetAdjustmentModalProps) {
