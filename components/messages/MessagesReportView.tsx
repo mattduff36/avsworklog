@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Loader2, Search, Filter, CheckCircle2, Clock, AlertTriangle, Trash2 } from 'lucide-react';
+import { Loader2, Search, Filter, CheckCircle2, Clock, AlertTriangle, Trash2, FileDown } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import type { MessageReportData } from '@/types/messages';
@@ -98,6 +98,37 @@ export function MessagesReportView() {
       toast.error(error instanceof Error ? error.message : 'Failed to delete message');
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleExportPDF(messageId: string, subject: string) {
+    try {
+      toast.loading('Generating PDF report...');
+      
+      const response = await fetch(`/api/messages/${messageId}/export`);
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to generate PDF');
+      }
+
+      // Download the PDF
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Toolbox_Talk_${subject.replace(/[^a-z0-9]/gi, '_')}_Report.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.dismiss();
+      toast.success('PDF report downloaded successfully');
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast.dismiss();
+      toast.error(error instanceof Error ? error.message : 'Failed to export PDF');
     }
   }
 
@@ -189,20 +220,33 @@ export function MessagesReportView() {
                     From: {selectedMessage.message.sender_name} • {formatDistanceToNow(new Date(selectedMessage.message.created_at), { addSuffix: true })}
                   </p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setMessageToDelete({
-                      id: selectedMessage.message.id,
-                      subject: selectedMessage.message.subject
-                    });
-                    setDeleteDialogOpen(true);
-                  }}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {selectedMessage.message.type === 'TOOLBOX_TALK' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleExportPDF(selectedMessage.message.id, selectedMessage.message.subject)}
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
+                      title="Download PDF Report"
+                    >
+                      <FileDown className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setMessageToDelete({
+                        id: selectedMessage.message.id,
+                        subject: selectedMessage.message.subject
+                      });
+                      setDeleteDialogOpen(true);
+                    }}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
 
               {/* Stats */}
@@ -359,21 +403,37 @@ export function MessagesReportView() {
                     )}
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMessageToDelete({
-                      id: msg.message.id,
-                      subject: msg.message.subject
-                    });
-                    setDeleteDialogOpen(true);
-                  }}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {msg.message.type === 'TOOLBOX_TALK' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleExportPDF(msg.message.id, msg.message.subject);
+                      }}
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
+                      title="Download PDF Report"
+                    >
+                      <FileDown className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMessageToDelete({
+                        id: msg.message.id,
+                        subject: msg.message.subject
+                      });
+                      setDeleteDialogOpen(true);
+                    }}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </Card>
           ))}
