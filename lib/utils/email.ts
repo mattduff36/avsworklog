@@ -577,15 +577,8 @@ export async function sendTimesheetRejectionEmail(params: SendTimesheetRejection
               <li>Resubmit for approval</li>
             </ol>
             
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://avsworklog.mpdee.uk'}/timesheets" 
-                 style="display: inline-block; background-color: #F1D64A; color: #252525; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold;">
-                View Timesheet
-              </a>
-            </div>
-            
             <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
-              If you have questions about the rejection, please contact your manager.
+              Please log in to SquiresApp to make the necessary corrections. If you have questions about the rejection, please contact your manager.
             </p>
           </div>
           
@@ -682,7 +675,7 @@ export async function sendTimesheetAdjustmentEmail(params: SendTimesheetAdjustme
             
             <p>Hello ${recipientName},</p>
             
-            <p>A timesheet has been adjusted and requires your attention.</p>
+            <p>A timesheet has been adjusted and may require your attention.</p>
             
             <div style="background-color: #fff; border: 2px solid #F1D64A; border-radius: 8px; padding: 20px; margin: 20px 0;">
               <table style="width: 100%; border-collapse: collapse;">
@@ -704,18 +697,6 @@ export async function sendTimesheetAdjustmentEmail(params: SendTimesheetAdjustme
             <div style="background-color: #fff; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 20px; margin: 20px 0;">
               <p style="margin: 0 0 10px 0; font-weight: bold; color: #f59e0b;">Adjustment Details:</p>
               <p style="margin: 0; color: #4b5563; white-space: pre-wrap;">${adjustmentComments}</p>
-            </div>
-            
-            <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
-              <p style="margin: 0; font-weight: bold; color: #92400e;">ℹ️ Next Steps</p>
-              <p style="margin: 5px 0 0 0; color: #92400e;">Please log in to SquiresApp to review the adjusted timesheet and the details of the changes made.</p>
-            </div>
-            
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://avsworklog.mpdee.uk'}/timesheets" 
-                 style="display: inline-block; background-color: #F1D64A; color: #252525; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold;">
-                Log In to Review
-              </a>
             </div>
             
             <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
