@@ -56,24 +56,25 @@ export async function GET(request: NextRequest) {
     // For each vehicle, get the last inspector
     const vehiclesWithInspector = await Promise.all(
       (vehicles || []).map(async (vehicle) => {
-        const { data: lastInspection } = await supabase
+        const { data: inspections } = await supabase
           .from('vehicle_inspections')
           .select(`
             user_id,
-            created_at,
-            profiles (
+            inspection_date,
+            profiles!vehicle_inspections_user_id_fkey (
               full_name
             )
           `)
           .eq('vehicle_id', vehicle.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+          .order('inspection_date', { ascending: false })
+          .limit(1);
+
+        const lastInspection = inspections?.[0] || null;
 
         return {
           ...vehicle,
           last_inspector: lastInspection?.profiles?.full_name || null,
-          last_inspection_date: lastInspection?.created_at || null,
+          last_inspection_date: lastInspection?.inspection_date || null,
         };
       })
     );
