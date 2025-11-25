@@ -65,10 +65,11 @@ export async function GET(
       .from('message_recipients')
       .select(`
         id,
+        user_id,
         status,
         signed_at,
         signature_data,
-        user:profiles!message_recipients_recipient_id_fkey(
+        user:profiles!message_recipients_user_id_fkey(
           id,
           full_name,
           role,
