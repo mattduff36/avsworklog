@@ -220,17 +220,7 @@ export function MessagesReportView() {
                     From: {selectedMessage.message.sender_name} • {formatDistanceToNow(new Date(selectedMessage.message.created_at), { addSuffix: true })}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  {selectedMessage.message.type === 'TOOLBOX_TALK' && (
-                    <Button
-                      size="sm"
-                      onClick={() => handleExportPDF(selectedMessage.message.id, selectedMessage.message.subject)}
-                      className="bg-red-600 hover:bg-red-700 text-white gap-2"
-                    >
-                      <FileDown className="h-4 w-4" />
-                      Download Report
-                    </Button>
-                  )}
+                <div className="flex flex-col items-end gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -245,6 +235,16 @@ export function MessagesReportView() {
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
+                  {selectedMessage.message.type === 'TOOLBOX_TALK' && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleExportPDF(selectedMessage.message.id, selectedMessage.message.subject)}
+                      className="bg-red-600 hover:bg-red-700 text-white gap-2"
+                    >
+                      <FileDown className="h-4 w-4" />
+                      Download Report
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -402,20 +402,7 @@ export function MessagesReportView() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {msg.message.type === 'TOOLBOX_TALK' && (
-                    <Button
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleExportPDF(msg.message.id, msg.message.subject);
-                      }}
-                      className="bg-red-600 hover:bg-red-700 text-white gap-2"
-                    >
-                      <FileDown className="h-4 w-4" />
-                      Download Report
-                    </Button>
-                  )}
+                <div className="flex flex-col items-end gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -431,6 +418,19 @@ export function MessagesReportView() {
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
+                  {msg.message.type === 'TOOLBOX_TALK' && (
+                    <Button
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleExportPDF(msg.message.id, msg.message.subject);
+                      }}
+                      className="bg-red-600 hover:bg-red-700 text-white gap-2"
+                    >
+                      <FileDown className="h-4 w-4" />
+                      Download Report
+                    </Button>
+                  )}
                 </div>
               </div>
             </Card>
