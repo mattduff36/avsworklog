@@ -223,13 +223,12 @@ export function MessagesReportView() {
                 <div className="flex items-center gap-2">
                   {selectedMessage.message.type === 'TOOLBOX_TALK' && (
                     <Button
-                      variant="ghost"
                       size="sm"
                       onClick={() => handleExportPDF(selectedMessage.message.id, selectedMessage.message.subject)}
-                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
-                      title="Download PDF Report"
+                      className="bg-red-600 hover:bg-red-700 text-white gap-2"
                     >
                       <FileDown className="h-4 w-4" />
+                      Download Report
                     </Button>
                   )}
                   <Button
@@ -406,16 +405,15 @@ export function MessagesReportView() {
                 <div className="flex items-center gap-2">
                   {msg.message.type === 'TOOLBOX_TALK' && (
                     <Button
-                      variant="ghost"
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleExportPDF(msg.message.id, msg.message.subject);
                       }}
-                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
-                      title="Download PDF Report"
+                      className="bg-red-600 hover:bg-red-700 text-white gap-2"
                     >
                       <FileDown className="h-4 w-4" />
+                      Download Report
                     </Button>
                   )}
                   <Button
