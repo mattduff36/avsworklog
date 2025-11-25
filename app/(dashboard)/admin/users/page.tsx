@@ -617,7 +617,7 @@ export default function UsersAdminPage() {
                           <Badge variant={
                             user.email === 'admin@mpdee.co.uk' ? 'destructive' :
                             user.role?.name === 'admin' ? 'destructive' :
-                            user.role?.name === 'manager' ? 'default' : 'secondary'
+                            user.role?.name === 'manager' ? 'warning' : 'secondary'
                           }>
                             {user.email === 'admin@mpdee.co.uk' ? 'SuperAdmin' : (user.role?.display_name || 'No Role')}
                           </Badge>
