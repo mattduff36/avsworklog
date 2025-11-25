@@ -123,6 +123,7 @@ const styles = StyleSheet.create({
     border: '2pt solid #dc2626',
     borderRadius: 4,
     backgroundColor: '#fef2f2',
+    breakInside: 'avoid',
   },
   signatureImage: {
     width: 200,
@@ -305,7 +306,7 @@ export function ToolboxTalkExportDocument({
             </Text>
 
             {signedRecipients.map((recipient) => (
-              <View key={recipient.id} style={styles.signatureBox}>
+              <View key={recipient.id} style={styles.signatureBox} wrap={false}>
                 {/* Two column layout: Info on left, Signature on right */}
                 <View style={styles.signatureContentRow}>
                   {/* Left Column - Employee Info */}
