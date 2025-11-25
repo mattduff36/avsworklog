@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from "@/lib/providers/query-provider";
+import { NuqsAdapter } from 'nuqs/adapters/next/app';
 import "./globals.css";
 
 const inter = Inter({
@@ -42,11 +43,13 @@ export default function RootLayout({
         <meta name="color-scheme" content="dark" />
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
-        <QueryProvider>
-          {children}
-          <Toaster />
-          <Analytics />
-        </QueryProvider>
+        <NuqsAdapter>
+          <QueryProvider>
+            {children}
+            <Toaster />
+            <Analytics />
+          </QueryProvider>
+        </NuqsAdapter>
       </body>
     </html>
   );
