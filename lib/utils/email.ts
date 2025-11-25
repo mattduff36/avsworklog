@@ -509,3 +509,305 @@ export async function sendToolboxTalkEmail(params: SendToolboxTalkEmailParams): 
   }
 }
 
+/**
+ * Timesheet Notification Email Templates
+ */
+
+interface SendTimesheetRejectionEmailParams {
+  to: string;
+  employeeName: string;
+  weekEnding: string;
+  managerComments: string;
+}
+
+/**
+ * Send timesheet rejection notification email
+ * @param params Email parameters
+ * @returns Promise with success status
+ */
+export async function sendTimesheetRejectionEmail(params: SendTimesheetRejectionEmailParams): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  const { to, employeeName, weekEnding, managerComments } = params;
+  
+  try {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      console.error('RESEND_API_KEY not configured');
+      return {
+        success: false,
+        error: 'Email service not configured'
+      };
+    }
+    
+    const subject = '⚠️ Timesheet Rejected - Action Required';
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #F1D64A; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0; color: #252525;">SquiresApp</h1>
+          </div>
+          
+          <div style="background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+            <h2 style="color: #dc2626; margin-top: 0;">⚠️ Timesheet Rejected</h2>
+            
+            <p>Hello ${employeeName},</p>
+            
+            <p>Your timesheet for <strong>week ending ${weekEnding}</strong> has been rejected by your manager.</p>
+            
+            ${managerComments ? `
+            <div style="background-color: #fff; border-left: 4px solid #dc2626; border-radius: 8px; padding: 20px; margin: 20px 0;">
+              <p style="margin: 0 0 10px 0; font-weight: bold; color: #dc2626;">Manager's Comments:</p>
+              <p style="margin: 0; color: #4b5563;">${managerComments}</p>
+            </div>
+            ` : ''}
+            
+            <p><strong>What You Need to Do:</strong></p>
+            <ol style="color: #4b5563;">
+              <li>Log in to SquiresApp</li>
+              <li>Review the manager's comments</li>
+              <li>Make the necessary corrections to your timesheet</li>
+              <li>Resubmit for approval</li>
+            </ol>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://avsworklog.mpdee.uk'}/timesheets" 
+                 style="display: inline-block; background-color: #F1D64A; color: #252525; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold;">
+                View Timesheet
+              </a>
+            </div>
+            
+            <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+              If you have questions about the rejection, please contact your manager.
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin-top: 20px; color: #9ca3af; font-size: 12px;">
+            <p>© ${new Date().getFullYear()} A&V Squires Plant Co. Ltd. All rights reserved.</p>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: process.env.RESEND_FROM_EMAIL || 'AVS Worklog <onboarding@resend.dev>',
+        to: [to],
+        subject,
+        html: htmlContent
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('Resend API error:', error);
+      return {
+        success: false,
+        error: `Failed to send email: ${error.message || 'Unknown error'}`
+      };
+    }
+    
+    const data = await response.json();
+    console.log('Timesheet rejection email sent successfully:', data);
+    
+    return { success: true };
+    
+  } catch (error: any) {
+    console.error('Error sending timesheet rejection email:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to send email'
+    };
+  }
+}
+
+interface SendTimesheetAdjustmentEmailParams {
+  to: string;
+  recipientName: string;
+  employeeName: string;
+  weekEnding: string;
+  adjustmentComments: string;
+  adjustedBy: string;
+}
+
+/**
+ * Send timesheet adjustment notification email
+ * @param params Email parameters
+ * @returns Promise with success status
+ */
+export async function sendTimesheetAdjustmentEmail(params: SendTimesheetAdjustmentEmailParams): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  const { to, recipientName, employeeName, weekEnding, adjustmentComments, adjustedBy } = params;
+  
+  try {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      console.error('RESEND_API_KEY not configured');
+      return {
+        success: false,
+        error: 'Email service not configured'
+      };
+    }
+    
+    const subject = '📝 Timesheet Adjusted - Please Review';
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #F1D64A; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0; color: #252525;">SquiresApp</h1>
+          </div>
+          
+          <div style="background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+            <h2 style="color: #f59e0b; margin-top: 0;">📝 Timesheet Adjusted</h2>
+            
+            <p>Hello ${recipientName},</p>
+            
+            <p>A timesheet has been adjusted and requires your attention.</p>
+            
+            <div style="background-color: #fff; border: 2px solid #F1D64A; border-radius: 8px; padding: 20px; margin: 20px 0;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Employee:</td>
+                  <td style="padding: 8px 0; font-weight: bold; color: #252525;">${employeeName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Week Ending:</td>
+                  <td style="padding: 8px 0; font-weight: bold; color: #252525;">${weekEnding}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Adjusted By:</td>
+                  <td style="padding: 8px 0; font-weight: bold; color: #252525;">${adjustedBy}</td>
+                </tr>
+              </table>
+            </div>
+            
+            <div style="background-color: #fff; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 20px; margin: 20px 0;">
+              <p style="margin: 0 0 10px 0; font-weight: bold; color: #f59e0b;">Adjustment Details:</p>
+              <p style="margin: 0; color: #4b5563; white-space: pre-wrap;">${adjustmentComments}</p>
+            </div>
+            
+            <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
+              <p style="margin: 0; font-weight: bold; color: #92400e;">ℹ️ Next Steps</p>
+              <p style="margin: 5px 0 0 0; color: #92400e;">Please log in to SquiresApp to review the adjusted timesheet and the details of the changes made.</p>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://avsworklog.mpdee.uk'}/timesheets" 
+                 style="display: inline-block; background-color: #F1D64A; color: #252525; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold;">
+                Log In to Review
+              </a>
+            </div>
+            
+            <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+              This is an automated notification. If you have questions about this adjustment, please contact the person who made the adjustment.
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin-top: 20px; color: #9ca3af; font-size: 12px;">
+            <p>© ${new Date().getFullYear()} A&V Squires Plant Co. Ltd. All rights reserved.</p>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: process.env.RESEND_FROM_EMAIL || 'AVS Worklog <onboarding@resend.dev>',
+        to: [to],
+        subject,
+        html: htmlContent
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('Resend API error:', error);
+      return {
+        success: false,
+        error: `Failed to send email: ${error.message || 'Unknown error'}`
+      };
+    }
+    
+    const data = await response.json();
+    console.log('Timesheet adjustment email sent successfully:', data);
+    
+    return { success: true };
+    
+  } catch (error: any) {
+    console.error('Error sending timesheet adjustment email:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to send email'
+    };
+  }
+}
+
+/**
+ * Send test emails to admin for template approval
+ */
+export async function sendTestTimesheetEmails(adminEmail: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    // Test rejection email
+    const rejectionResult = await sendTimesheetRejectionEmail({
+      to: adminEmail,
+      employeeName: 'John Smith',
+      weekEnding: 'Sunday, 1st December 2024',
+      managerComments: 'Please correct the hours for Wednesday - they do not match the job sheet records. Also, the Friday entry is missing break times.'
+    });
+
+    if (!rejectionResult.success) {
+      return rejectionResult;
+    }
+
+    // Wait a moment between emails
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Test adjustment email
+    const adjustmentResult = await sendTimesheetAdjustmentEmail({
+      to: adminEmail,
+      recipientName: 'Admin',
+      employeeName: 'Jane Doe',
+      weekEnding: 'Sunday, 1st December 2024',
+      adjustmentComments: 'Adjusted Thursday hours from 9.5 to 8.0 hours to match the confirmed job completion time with the client. Break time was not properly recorded, so this has been corrected.',
+      adjustedBy: 'Sarah Manager'
+    });
+
+    return adjustmentResult;
+    
+  } catch (error: any) {
+    console.error('Error sending test emails:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to send test emails'
+    };
+  }
+}
+

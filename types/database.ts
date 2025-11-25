@@ -103,13 +103,17 @@ export interface Database {
           user_id: string
           reg_number: string | null
           week_ending: string
-          status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed'
+          status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted'
           signature_data: string | null
           signed_at: string | null
           submitted_at: string | null
           reviewed_by: string | null
           reviewed_at: string | null
           manager_comments: string | null
+          adjusted_by: string | null
+          adjusted_at: string | null
+          adjustment_recipients: string[] | null
+          processed_at: string | null
           created_at: string
           updated_at: string
         }
@@ -118,13 +122,17 @@ export interface Database {
           user_id: string
           reg_number?: string | null
           week_ending: string
-          status?: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed'
+          status?: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted'
           signature_data?: string | null
           signed_at?: string | null
           submitted_at?: string | null
           reviewed_by?: string | null
           reviewed_at?: string | null
           manager_comments?: string | null
+          adjusted_by?: string | null
+          adjusted_at?: string | null
+          adjustment_recipients?: string[] | null
+          processed_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -133,13 +141,17 @@ export interface Database {
           user_id?: string
           reg_number?: string | null
           week_ending?: string
-          status?: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed'
+          status?: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted'
           signature_data?: string | null
           signed_at?: string | null
           submitted_at?: string | null
           reviewed_by?: string | null
           reviewed_at?: string | null
           manager_comments?: string | null
+          adjusted_by?: string | null
+          adjusted_at?: string | null
+          adjustment_recipients?: string[] | null
+          processed_at?: string | null
           created_at?: string
           updated_at?: string
         }

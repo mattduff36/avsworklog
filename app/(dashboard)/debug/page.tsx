@@ -25,6 +25,13 @@ import {
   XCircle,
   Clock,
   Package,
+  History,
+  Edit,
+  Trash,
+  Plus,
+  Send,
+  Check,
+  Ban,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -44,6 +51,17 @@ type EntityStatus = {
   date: string;
 };
 
+type AuditLogEntry = {
+  id: string;
+  table_name: string;
+  record_id: string;
+  user_id: string | null;
+  user_name: string;
+  action: string;
+  changes: Record<string, { old?: unknown; new?: unknown }> | null;
+  created_at: string;
+};
+
 export default function DebugPage() {
   const { profile, user } = useAuth();
   const router = useRouter();
@@ -57,6 +75,7 @@ export default function DebugPage() {
   const [inspections, setInspections] = useState<EntityStatus[]>([]);
   const [absences, setAbsences] = useState<EntityStatus[]>([]);
   const [ramsDocuments, setRamsDocuments] = useState<EntityStatus[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [updating, setUpdating] = useState<string | null>(null);
 
   // Check if user is superadmin and viewing as actual role
@@ -93,6 +112,7 @@ export default function DebugPage() {
     if (userEmail === 'admin@mpdee.co.uk') {
       fetchDebugInfo();
       fetchAllEntities();
+      fetchAuditLogs();
     }
   }, [userEmail]);
 
@@ -191,6 +211,33 @@ export default function DebugPage() {
     }
   };
 
+  const fetchAuditLogs = async () => {
+    try {
+      const { data: auditData } = await supabase
+        .from('audit_log')
+        .select('*, profiles!audit_log_user_id_fkey(full_name)')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (auditData) {
+        setAuditLogs(
+          auditData.map((log: Database['public']['Tables']['audit_log']['Row'] & { profiles?: { full_name: string } | null }) => ({
+            id: log.id,
+            table_name: log.table_name,
+            record_id: log.record_id,
+            user_id: log.user_id,
+            user_name: log.profiles?.full_name || 'System',
+            action: log.action,
+            changes: log.changes as Record<string, { old?: unknown; new?: unknown }> | null,
+            created_at: log.created_at,
+          }))
+        );
+      }
+    } catch (error) {
+      console.error('Error fetching audit logs:', error);
+    }
+  };
+
   const updateStatus = async (id: string, type: string, newStatus: string) => {
     setUpdating(id);
     try {
@@ -254,6 +301,64 @@ export default function DebugPage() {
       return ['pending', 'approved', 'rejected'];
     }
     return [];
+  };
+
+  const getActionIcon = (action: string) => {
+    switch (action.toLowerCase()) {
+      case 'created':
+      case 'insert':
+        return <Plus className="h-4 w-4 text-green-500" />;
+      case 'updated':
+      case 'update':
+        return <Edit className="h-4 w-4 text-blue-500" />;
+      case 'deleted':
+      case 'delete':
+        return <Trash className="h-4 w-4 text-red-500" />;
+      case 'submitted':
+        return <Send className="h-4 w-4 text-amber-500" />;
+      case 'approved':
+        return <Check className="h-4 w-4 text-green-500" />;
+      case 'rejected':
+        return <Ban className="h-4 w-4 text-red-500" />;
+      default:
+        return <History className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const getActionColor = (action: string) => {
+    switch (action.toLowerCase()) {
+      case 'created':
+      case 'insert':
+        return 'text-green-500';
+      case 'updated':
+      case 'update':
+        return 'text-blue-500';
+      case 'deleted':
+      case 'delete':
+        return 'text-red-500';
+      case 'submitted':
+        return 'text-amber-500';
+      case 'approved':
+        return 'text-green-500';
+      case 'rejected':
+        return 'text-red-500';
+      default:
+        return 'text-gray-500';
+    }
+  };
+
+  const formatTableName = (tableName: string) => {
+    return tableName
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  const formatValue = (value: unknown): string => {
+    if (value === null || value === undefined) return 'null';
+    if (typeof value === 'object') return JSON.stringify(value, null, 2);
+    if (typeof value === 'boolean') return value ? 'true' : 'false';
+    return String(value);
   };
 
   if (loading) {
@@ -336,8 +441,12 @@ export default function DebugPage() {
       </div>
 
       {/* Developer Tools Tabs */}
-      <Tabs defaultValue="timesheets" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[600px]">
+      <Tabs defaultValue="audit" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-5 lg:w-[800px]">
+          <TabsTrigger value="audit">
+            <History className="h-4 w-4 mr-2" />
+            Audit Log
+          </TabsTrigger>
           <TabsTrigger value="timesheets">
             <FileText className="h-4 w-4 mr-2" />
             Timesheets
@@ -355,6 +464,133 @@ export default function DebugPage() {
             System
           </TabsTrigger>
         </TabsList>
+
+        {/* Audit Log Tab */}
+        <TabsContent value="audit">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Database Change Log</CardTitle>
+                  <CardDescription>
+                    Track all database changes and modifications (Last 100 entries)
+                  </CardDescription>
+                </div>
+                <Button
+                  onClick={fetchAuditLogs}
+                  variant="outline"
+                  size="sm"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {auditLogs.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <History className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No audit log entries found</p>
+                  <p className="text-sm mt-1">Database changes will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {auditLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="border rounded-lg p-4 hover:bg-accent transition-colors"
+                    >
+                      {/* Header Row */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3 flex-1">
+                          {getActionIcon(log.action)}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge variant="outline" className="font-mono text-xs">
+                                {formatTableName(log.table_name)}
+                              </Badge>
+                              <span className={`font-semibold ${getActionColor(log.action)}`}>
+                                {log.action.toUpperCase()}
+                              </span>
+                              <span className="text-muted-foreground text-sm">by</span>
+                              <Badge variant="secondary" className="gap-1">
+                                <Users className="h-3 w-3" />
+                                {log.user_name}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              {new Date(log.created_at).toLocaleString('en-GB', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                              })}
+                              <span className="ml-2">•</span>
+                              <span className="font-mono text-xs">ID: {log.record_id.slice(0, 8)}...</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Changes Details */}
+                      {log.changes && Object.keys(log.changes).length > 0 && (
+                        <div className="mt-3 pt-3 border-t">
+                          <p className="text-xs font-semibold text-muted-foreground mb-2">
+                            CHANGES:
+                          </p>
+                          <div className="space-y-2">
+                            {Object.entries(log.changes).map(([field, change]) => (
+                              <div
+                                key={field}
+                                className="bg-muted/50 rounded p-2 text-xs font-mono"
+                              >
+                                <div className="font-semibold text-foreground mb-1">
+                                  {field}:
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                  {change.old !== undefined && (
+                                    <div className="bg-red-500/10 border border-red-500/20 rounded p-2">
+                                      <div className="text-red-500 font-semibold mb-1">
+                                        - Old:
+                                      </div>
+                                      <div className="text-red-700 dark:text-red-300 whitespace-pre-wrap break-all">
+                                        {formatValue(change.old)}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {change.new !== undefined && (
+                                    <div className="bg-green-500/10 border border-green-500/20 rounded p-2">
+                                      <div className="text-green-500 font-semibold mb-1">
+                                        + New:
+                                      </div>
+                                      <div className="text-green-700 dark:text-green-300 whitespace-pre-wrap break-all">
+                                        {formatValue(change.new)}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* No changes data */}
+                      {(!log.changes || Object.keys(log.changes).length === 0) && (
+                        <div className="mt-2 text-xs text-muted-foreground italic">
+                          No detailed changes recorded
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Timesheets Tab */}
         <TabsContent value="timesheets">
@@ -543,7 +779,10 @@ export default function DebugPage() {
               
               <div className="pt-4 border-t">
                 <Button
-                  onClick={fetchAllEntities}
+                  onClick={() => {
+                    fetchAllEntities();
+                    fetchAuditLogs();
+                  }}
                   className="w-full"
                   variant="outline"
                 >
