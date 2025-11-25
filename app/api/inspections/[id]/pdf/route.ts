@@ -25,7 +25,11 @@ export async function GET(
       .from('vehicle_inspections')
       .select(`
         *,
-        vehicle:vehicles(reg_number, vehicle_type),
+        vehicle:vehicles(
+          reg_number, 
+          vehicle_type,
+          vehicle_categories(name)
+        ),
         profile:profiles!vehicle_inspections_user_id_fkey(full_name)
       `)
       .eq('id', id)
@@ -63,8 +67,12 @@ export async function GET(
     }
 
     // Determine which PDF template to use based on vehicle category
-    const vehicleType = (inspection as any).vehicle?.vehicle_type || '';
+    // Check vehicle_categories.name first, fall back to vehicle_type
+    const categoryName = (inspection as any).vehicle?.vehicle_categories?.name;
+    const vehicleType = categoryName || (inspection as any).vehicle?.vehicle_type || '';
     const useVanTemplate = isVanCategory(vehicleType);
+    
+    console.log(`PDF Generation - Category: ${categoryName}, Vehicle Type: ${vehicleType}, Using Van Template: ${useVanTemplate}`);
     
     // Generate PDF using the appropriate template
     const pdfComponent = useVanTemplate
