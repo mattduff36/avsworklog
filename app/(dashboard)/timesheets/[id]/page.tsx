@@ -9,13 +9,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Save, Send, Edit2, CheckCircle2, XCircle, Download, Package } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { ArrowLeft, Save, Send, Edit2, CheckCircle2, XCircle, Download, Package, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
 import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
 import { DAY_NAMES, Timesheet, TimesheetEntry } from '@/types/timesheet';
 import SignaturePad from '@/components/forms/SignaturePad';
 import { Database } from '@/types/database';
+import { TimesheetAdjustmentModal } from '@/components/timesheets/TimesheetAdjustmentModal';
+import { toast } from 'sonner';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,6 +45,11 @@ export default function ViewTimesheetPage() {
   const [signature, setSignature] = useState<string | null>(null);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [showProcessedDialog, setShowProcessedDialog] = useState(false);
+  const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectionComments, setRejectionComments] = useState('');
+  const [originalData, setOriginalData] = useState<{entries: TimesheetEntry[], regNumber: string | null} | null>(null);
+  const [dataChanged, setDataChanged] = useState(false);
 
   useEffect(() => {
     if (params.id && !authLoading) {
@@ -97,6 +105,14 @@ export default function ViewTimesheetPage() {
 
       setEntries(fullWeek);
       
+      // Store original data if this is an approved timesheet (for change tracking)
+      if (timesheetData.status === 'approved') {
+        setOriginalData({
+          entries: JSON.parse(JSON.stringify(fullWeek)),
+          regNumber: timesheetData.reg_number
+        });
+      }
+      
       // Enable editing for draft or rejected timesheets
       if (timesheetData.status === 'draft' || timesheetData.status === 'rejected') {
         setEditing(true);
@@ -124,6 +140,11 @@ export default function ViewTimesheetPage() {
     }
 
     setEntries(newEntries);
+    
+    // Track if data has changed (for approved timesheets)
+    if (timesheet?.status === 'approved' && originalData) {
+      setDataChanged(true);
+    }
   };
 
   const weeklyTotal = entries.reduce((sum, entry) => {
@@ -247,26 +268,40 @@ export default function ViewTimesheetPage() {
     }
   };
 
-  const handleReject = async (comments: string) => {
+  const handleReject = async () => {
     if (!timesheet || !isManager) return;
+    if (rejectionComments.trim().length === 0) {
+      toast.error('Please provide a reason for rejection');
+      return;
+    }
 
     setSaving(true);
+    setShowRejectDialog(false);
+    
     try {
-      const { error } = await supabase
-        .from('timesheets')
-        .update({
-          status: 'rejected',
-          reviewed_by: user?.id,
-          reviewed_at: new Date().toISOString(),
-          manager_comments: comments,
-        })
-        .eq('id', timesheet.id);
+      // Call API endpoint to handle rejection with notifications
+      const response = await fetch(`/api/timesheets/${timesheet.id}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          comments: rejectionComments.trim(),
+        }),
+      });
 
-      if (error) throw error;
-      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to reject timesheet');
+      }
+
+      toast.success('Timesheet rejected and employee notified');
+      setRejectionComments('');
       await fetchTimesheet(timesheet.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reject');
+      console.error('Rejection error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to reject timesheet');
+      toast.error(err instanceof Error ? err.message : 'Failed to reject timesheet');
     } finally {
       setSaving(false);
     }
@@ -282,16 +317,55 @@ export default function ViewTimesheetPage() {
         .from('timesheets')
         .update({
           status: 'processed',
+          processed_at: new Date().toISOString(),
         })
         .eq('id', timesheet.id);
 
       if (error) throw error;
       
+      toast.success('Timesheet marked as processed');
       await fetchTimesheet(timesheet.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to mark as processed');
+      toast.error(err instanceof Error ? err.message : 'Failed to mark as processed');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAdjust = async (selectedManagerIds: string[], comments: string) => {
+    if (!timesheet || !isManager || !user) return;
+
+    try {
+      // Save the entries first
+      await handleSave();
+
+      // Call API endpoint to handle adjustment with notifications
+      const response = await fetch(`/api/timesheets/${timesheet.id}/adjust`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          comments,
+          notifyManagerIds: selectedManagerIds,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to mark as adjusted');
+      }
+
+      toast.success('Timesheet marked as adjusted and notifications sent');
+      setShowAdjustmentModal(false);
+      setEditing(false);
+      setDataChanged(false);
+      await fetchTimesheet(timesheet.id);
+    } catch (err) {
+      console.error('Adjustment error:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to mark as adjusted');
+      throw err; // Re-throw to let modal handle it
     }
   };
 
@@ -302,6 +376,7 @@ export default function ViewTimesheetPage() {
       approved: { variant: 'success' as const, label: 'Approved' },
       rejected: { variant: 'destructive' as const, label: 'Rejected' },
       processed: { variant: 'default' as const, label: 'Processed' },
+      adjusted: { variant: 'warning' as const, label: 'Adjusted' },
     };
     const config = variants[status as keyof typeof variants] || variants.draft;
     return <Badge variant={config.variant}>{config.label}</Badge>;
@@ -335,10 +410,12 @@ export default function ViewTimesheetPage() {
 
   if (!timesheet) return null;
 
-  const canEdit = editing && (timesheet.status === 'draft' || timesheet.status === 'rejected');
+  const canEdit = editing && (timesheet.status === 'draft' || timesheet.status === 'rejected' || (isManager && timesheet.status === 'approved'));
   const canSubmit = timesheet.user_id === user?.id && (timesheet.status === 'draft' || timesheet.status === 'rejected');
   const canApprove = isManager && timesheet.status === 'submitted';
   const canMarkAsProcessed = isManager && timesheet.status === 'approved';
+  const canEditApproved = isManager && timesheet.status === 'approved';
+  const isEndState = timesheet.status === 'processed' || timesheet.status === 'adjusted';
 
   return (
     <div className="space-y-6 max-w-5xl">

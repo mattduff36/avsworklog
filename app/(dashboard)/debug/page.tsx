@@ -114,6 +114,7 @@ export default function DebugPage() {
       fetchAllEntities();
       fetchAuditLogs();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userEmail]);
 
   const fetchDebugInfo = async () => {
