@@ -147,6 +147,18 @@ export default function VehiclesAdminPage() {
     }
   }
 
+  // Format UK registration plates (LLNNLLL -> LLNN LLL)
+  function formatRegistration(reg: string): string {
+    const cleaned = reg.replace(/\s/g, '').toUpperCase();
+    
+    // Check if it matches UK format: 2 letters, 2 numbers, 3 letters (7 chars total)
+    if (cleaned.length === 7 && /^[A-Z]{2}\d{2}[A-Z]{3}$/.test(cleaned)) {
+      return `${cleaned.slice(0, 4)} ${cleaned.slice(4)}`;
+    }
+    
+    return cleaned;
+  }
+
   // Vehicle CRUD operations
   async function handleAddVehicle() {
     if (!vehicleFormData.reg_number) {
@@ -158,10 +170,16 @@ export default function VehiclesAdminPage() {
       setFormLoading(true);
       setFormError('');
 
+      // Format registration before sending
+      const formattedData = {
+        ...vehicleFormData,
+        reg_number: formatRegistration(vehicleFormData.reg_number),
+      };
+
       const response = await fetch('/api/admin/vehicles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(vehicleFormData),
+        body: JSON.stringify(formattedData),
       });
 
       const result = await response.json();
@@ -191,10 +209,16 @@ export default function VehiclesAdminPage() {
       setFormLoading(true);
       setFormError('');
 
+      // Format registration before sending
+      const formattedData = {
+        ...vehicleFormData,
+        reg_number: formatRegistration(vehicleFormData.reg_number),
+      };
+
       const response = await fetch(`/api/admin/vehicles/${selectedVehicle.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(vehicleFormData),
+        body: JSON.stringify(formattedData),
       });
 
       const result = await response.json();
@@ -737,9 +761,12 @@ export default function VehiclesAdminPage() {
                 id="add-reg"
                 value={vehicleFormData.reg_number}
                 onChange={(e) =>
-                  setVehicleFormData({ ...vehicleFormData, reg_number: e.target.value })
+                  setVehicleFormData({ ...vehicleFormData, reg_number: e.target.value.toUpperCase() })
                 }
-                placeholder="e.g., YX65ABC"
+                onBlur={(e) =>
+                  setVehicleFormData({ ...vehicleFormData, reg_number: formatRegistration(e.target.value) })
+                }
+                placeholder="e.g., BG21 EXH"
                 className="bg-slate-800 border-slate-600 text-white uppercase"
               />
             </div>
@@ -814,7 +841,10 @@ export default function VehiclesAdminPage() {
                 id="edit-reg"
                 value={vehicleFormData.reg_number}
                 onChange={(e) =>
-                  setVehicleFormData({ ...vehicleFormData, reg_number: e.target.value })
+                  setVehicleFormData({ ...vehicleFormData, reg_number: e.target.value.toUpperCase() })
+                }
+                onBlur={(e) =>
+                  setVehicleFormData({ ...vehicleFormData, reg_number: formatRegistration(e.target.value) })
                 }
                 className="bg-slate-800 border-slate-600 text-white uppercase"
               />

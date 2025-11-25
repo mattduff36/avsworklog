@@ -37,7 +37,12 @@ export default function NewInspectionPage() {
   const { addToQueue } = useOfflineStore();
   const supabase = createClient();
   
-  const [vehicles, setVehicles] = useState<Array<{ id: string; reg_number: string; vehicle_type: string }>>([]);
+  const [vehicles, setVehicles] = useState<Array<{ 
+    id: string; 
+    reg_number: string; 
+    vehicle_type: string;
+    vehicle_categories?: { name: string } | null;
+  }>>([]);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [vehicleId, setVehicleId] = useState('');
   const [weekEnding, setWeekEnding] = useState(formatDateISO(getWeekEnding()));
@@ -112,7 +117,12 @@ export default function NewInspectionPage() {
     try {
       const { data, error } = await supabase
         .from('vehicles')
-        .select('*')
+        .select(`
+          *,
+          vehicle_categories (
+            name
+          )
+        `)
         .eq('status', 'active')
         .order('reg_number');
 
@@ -136,6 +146,18 @@ export default function NewInspectionPage() {
     } catch (err) {
       console.error('Error fetching categories:', err);
     }
+  };
+
+  // Format UK registration plates (LLNNLLL -> LLNN LLL)
+  const formatRegistration = (reg: string): string => {
+    const cleaned = reg.replace(/\s/g, '').toUpperCase();
+    
+    // Check if it matches UK format: 2 letters, 2 numbers, 3 letters (7 chars total)
+    if (cleaned.length === 7 && /^[A-Z]{2}\d{2}[A-Z]{3}$/.test(cleaned)) {
+      return `${cleaned.slice(0, 4)} ${cleaned.slice(4)}`;
+    }
+    
+    return cleaned;
   };
 
   const handleStatusChange = (itemNumber: number, status: InspectionStatus) => {
@@ -201,14 +223,22 @@ export default function NewInspectionPage() {
       return;
     }
 
+    if (!newVehicleCategoryId) {
+      setError('Please select a vehicle category');
+      return;
+    }
+
     setAddingVehicle(true);
     setError('');
 
     try {
+      // Format the registration before saving
+      const formattedReg = formatRegistration(newVehicleReg.trim());
+      
       type VehicleInsert = Database['public']['Tables']['vehicles']['Insert'];
       const vehicleData: VehicleInsert = {
-        reg_number: newVehicleReg.trim().toUpperCase(),
-        category_id: newVehicleCategoryId || null,
+        reg_number: formattedReg,
+        category_id: newVehicleCategoryId,
         status: 'active',
       };
 
@@ -228,9 +258,16 @@ export default function NewInspectionPage() {
       // Refresh vehicles list
       await fetchVehicles();
       
-      // Select the new vehicle
+      // Select the new vehicle and update checklist based on its category
       if (newVehicle) {
         setVehicleId(newVehicle.id);
+        
+        // Find the category name and update checklist
+        const category = categories.find(c => c.id === newVehicleCategoryId);
+        if (category) {
+          const checklist = getChecklistForCategory(category.name);
+          setCurrentChecklist(checklist);
+        }
       }
 
       // Close dialog and reset form
@@ -505,7 +542,8 @@ export default function NewInspectionPage() {
                     // Update checklist based on vehicle category
                     const selectedVehicle = vehicles.find(v => v.id === value);
                     if (selectedVehicle) {
-                      const checklist = getChecklistForCategory(selectedVehicle.vehicle_type);
+                      const categoryName = selectedVehicle.vehicle_categories?.name || selectedVehicle.vehicle_type || '';
+                      const checklist = getChecklistForCategory(categoryName);
                       setCurrentChecklist(checklist);
                     }
                   }
@@ -529,7 +567,7 @@ export default function NewInspectionPage() {
                   </SelectItem>
                   {vehicles.map((vehicle) => (
                     <SelectItem key={vehicle.id} value={vehicle.id} className="text-white">
-                      {vehicle.reg_number} - {vehicle.vehicle_type}
+                      {vehicle.reg_number} - {vehicle.vehicle_categories?.name || vehicle.vehicle_type || 'Uncategorized'}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -582,7 +620,8 @@ export default function NewInspectionPage() {
         </CardContent>
       </Card>
 
-      {/* Safety Check */}
+      {/* Safety Check - Only shown when vehicle is selected */}
+      {vehicleId && (
       <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
         <CardHeader className="pb-3">
           <CardTitle className="text-slate-900 dark:text-white">{currentChecklist.length}-Point Safety Check</CardTitle>
@@ -810,6 +849,7 @@ export default function NewInspectionPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Mobile Sticky Footer */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-slate-700/50 p-4 z-20">
@@ -840,7 +880,7 @@ export default function NewInspectionPage() {
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Add New Vehicle</DialogTitle>
             <DialogDescription className="text-slate-400">
-              Enter the vehicle registration number and type
+              Enter the vehicle registration number and select its category
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -852,14 +892,15 @@ export default function NewInspectionPage() {
                 id="newVehicleReg"
                 value={newVehicleReg}
                 onChange={(e) => setNewVehicleReg(e.target.value.toUpperCase())}
-                placeholder="e.g., ABC123"
+                onBlur={(e) => setNewVehicleReg(formatRegistration(e.target.value))}
+                placeholder="e.g., BG21 EXH"
                 className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 uppercase"
                 disabled={addingVehicle}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="newVehicleCategory" className="text-slate-900 dark:text-white">
-                Vehicle Category (Optional)
+                Vehicle Category <span className="text-red-400">*</span>
               </Label>
               <Select 
                 value={newVehicleCategoryId || undefined} 
@@ -867,7 +908,7 @@ export default function NewInspectionPage() {
                 disabled={addingVehicle}
               >
                 <SelectTrigger className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
-                  <SelectValue placeholder="Select category (optional)" />
+                  <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-900 border-slate-700 max-h-[300px] md:max-h-[400px]">
                   {categories.map((category) => (
@@ -894,7 +935,7 @@ export default function NewInspectionPage() {
             </Button>
             <Button
               onClick={handleAddVehicle}
-              disabled={addingVehicle || !newVehicleReg.trim()}
+              disabled={addingVehicle || !newVehicleReg.trim() || !newVehicleCategoryId}
               className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 font-semibold"
             >
               {addingVehicle ? 'Adding...' : 'Add Vehicle'}
