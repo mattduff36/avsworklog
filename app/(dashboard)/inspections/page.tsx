@@ -13,10 +13,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Clipboard, CheckCircle2, XCircle, Clock, AlertCircle, User, Download, Trash2 } from 'lucide-react';
+import { Plus, Clipboard, CheckCircle2, XCircle, Clock, AlertCircle, User, Download, Trash2, Filter, FileText } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import { VehicleInspection } from '@/types/inspection';
+import { useQueryState } from 'nuqs';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +35,8 @@ type Employee = {
   employee_id: string | null;
 };
 
+type StatusFilter = 'all' | 'draft' | 'pending' | 'approved' | 'rejected';
+
 interface InspectionWithVehicle extends VehicleInspection {
   vehicles: {
     reg_number: string;
@@ -48,7 +51,15 @@ export default function InspectionsPage() {
   const [inspections, setInspections] = useState<InspectionWithVehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
+  // Use URL search params to persist filter selection across navigations
+  const [selectedEmployeeId, setSelectedEmployeeId] = useQueryState('employee', { 
+    defaultValue: 'all',
+    shallow: false,
+  });
+  const [statusFilter, setStatusFilter] = useQueryState<StatusFilter>('status', {
+    defaultValue: 'all',
+    shallow: false,
+  });
   const [downloading, setDownloading] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [inspectionToDelete, setInspectionToDelete] = useState<{ id: string; vehicleReg: string; date: string } | null>(null);
@@ -64,7 +75,7 @@ export default function InspectionsPage() {
 
   useEffect(() => {
     fetchInspections();
-  }, [user, isManager, selectedEmployeeId]);
+  }, [user, isManager, selectedEmployeeId, statusFilter]);
 
   // Listen for realtime updates to inspections
   useInspectionRealtime((payload) => {
@@ -124,11 +135,23 @@ export default function InspectionsPage() {
       if (!isManager) {
         // Regular employees only see their own
         query = query.eq('user_id', user.id);
-      } else if (selectedEmployeeId && selectedEmployeeId !== 'all') {
-        // Manager filtering by specific employee
-        query = query.eq('user_id', selectedEmployeeId);
+      } else {
+        // Manager: filter by selected employee or show all
+        const employeeFilter = selectedEmployeeId || 'all';
+        if (employeeFilter !== 'all') {
+          query = query.eq('user_id', employeeFilter);
+        }
+        // If 'all' selected, show all inspections (no filter)
       }
-      // If manager and 'all' selected, show all inspections
+
+      // Apply status filter
+      const currentStatusFilter = statusFilter || 'all';
+      if (currentStatusFilter === 'pending') {
+        query = query.eq('status', 'submitted');
+      } else if (currentStatusFilter !== 'all') {
+        query = query.eq('status', currentStatusFilter);
+      }
+      // 'all' doesn't filter by status
 
       const { data, error } = await query;
 
@@ -138,6 +161,16 @@ export default function InspectionsPage() {
       console.error('Error fetching inspections:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getFilterLabel = (filter: StatusFilter) => {
+    switch (filter) {
+      case 'all': return 'All';
+      case 'draft': return 'Draft';
+      case 'pending': return 'Pending';
+      case 'approved': return 'Approved';
+      case 'rejected': return 'Rejected';
     }
   };
 
@@ -276,6 +309,33 @@ export default function InspectionsPage() {
           </div>
         )}
       </div>
+
+      {/* Status Filter */}
+      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-slate-400" />
+            <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
+            <div className="flex gap-2 flex-wrap">
+              {(['all', 'draft', 'pending', 'approved', 'rejected'] as StatusFilter[]).map((filter) => (
+                <Button
+                  key={filter}
+                  variant={statusFilter === filter ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setStatusFilter(filter)}
+                  className={statusFilter === filter ? '' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50'}
+                >
+                  {filter === 'pending' && <Clock className="h-3 w-3 mr-1" />}
+                  {filter === 'approved' && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                  {filter === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
+                  {filter === 'draft' && <FileText className="h-3 w-3 mr-1" />}
+                  {getFilterLabel(filter)}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {loading ? (
         <div className="grid gap-4">

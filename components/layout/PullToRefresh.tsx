@@ -105,13 +105,13 @@ export function PullToRefresh() {
 
   return (
     <div
-      className="fixed top-16 left-0 right-0 z-[100] pointer-events-none transition-opacity duration-200 ease-out"
+      className="fixed top-0 left-0 right-0 z-[100] pointer-events-none transition-opacity duration-200 ease-out"
       style={{
         transform: `translateY(${translateY}px)`,
         opacity: pullDistance > 0 ? opacity : 0,
       }}
     >
-      <div className="flex items-center justify-center py-4">
+      <div className="flex items-center justify-center pt-2 pb-2">
         <div className="bg-slate-900/90 backdrop-blur-xl rounded-full p-3 border border-slate-700/50 shadow-lg">
           <RefreshCw
             className={`h-6 w-6 text-avs-yellow transition-transform duration-200 ${
