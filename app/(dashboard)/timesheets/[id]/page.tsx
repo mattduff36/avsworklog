@@ -473,7 +473,7 @@ export default function ViewTimesheetPage() {
                 {timesheet.reg_number && `Registration: ${timesheet.reg_number}`}
               </CardDescription>
             </div>
-            {canEdit && !editing && (
+            {!editing && ((timesheet.status === 'draft' || timesheet.status === 'rejected') || canEditApproved) && !isEndState && (
               <Button variant="outline" onClick={() => setEditing(true)}>
                 <Edit2 className="h-4 w-4 mr-2" />
                 Edit
@@ -696,8 +696,26 @@ export default function ViewTimesheetPage() {
             </p>
           </div>
 
+          {/* Warning for Approved Timesheet Editing */}
+          {editing && timesheet.status === 'approved' && dataChanged && (
+            <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                    Editing Approved Timesheet
+                  </p>
+                  <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
+                    You are editing an approved timesheet. When you finish, you must add a comment and mark it as "Adjusted" to notify the employee and selected managers.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-3 justify-end">
+            {/* Save button for draft/rejected/approved editing */}
             {canEdit && (
               <Button
                 variant="outline"
@@ -708,7 +726,21 @@ export default function ViewTimesheetPage() {
                 {saving ? 'Saving...' : 'Save Changes'}
               </Button>
             )}
+
+            {/* Mark as Adjusted button (for managers editing approved timesheets) */}
+            {editing && timesheet.status === 'approved' && dataChanged && isManager && (
+              <Button
+                variant="outline"
+                onClick={() => setShowAdjustmentModal(true)}
+                disabled={saving}
+                className="border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white active:scale-95 transition-all"
+              >
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Mark as Adjusted
+              </Button>
+            )}
             
+            {/* Submit button for employees */}
             {canSubmit && (
               <Button
                 onClick={handleSubmit}
@@ -719,16 +751,12 @@ export default function ViewTimesheetPage() {
               </Button>
             )}
 
+            {/* Approve/Reject buttons for pending timesheets */}
             {canApprove && (
               <>
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    const comments = prompt('Enter rejection reason (optional):');
-                    if (comments !== null) {
-                      handleReject(comments);
-                    }
-                  }}
+                  onClick={() => setShowRejectDialog(true)}
                   disabled={saving}
                   className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
                 >
@@ -747,7 +775,8 @@ export default function ViewTimesheetPage() {
               </>
             )}
 
-            {canMarkAsProcessed && (
+            {/* Mark as Processed button (only if NOT editing) */}
+            {canMarkAsProcessed && !editing && (
               <Button
                 variant="outline"
                 onClick={() => setShowProcessedDialog(true)}
@@ -786,6 +815,57 @@ export default function ViewTimesheetPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Rejection Dialog */}
+      <AlertDialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject Timesheet</AlertDialogTitle>
+            <AlertDialogDescription>
+              Please provide a reason for rejecting this timesheet. The employee will be notified via email and in-app notification.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Label htmlFor="rejection-comments" className="text-sm font-medium">
+              Rejection Reason <span className="text-red-600">*</span>
+            </Label>
+            <Textarea
+              id="rejection-comments"
+              placeholder="Explain why this timesheet is being rejected..."
+              value={rejectionComments}
+              onChange={(e) => setRejectionComments(e.target.value)}
+              disabled={saving}
+              rows={4}
+              className="mt-2 resize-none"
+              required
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving} onClick={() => setRejectionComments('')}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleReject}
+              disabled={saving || rejectionComments.trim().length === 0}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {saving ? 'Rejecting...' : 'Reject Timesheet'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Adjustment Modal */}
+      {timesheet && (
+        <TimesheetAdjustmentModal
+          open={showAdjustmentModal}
+          onClose={() => setShowAdjustmentModal(false)}
+          onConfirm={handleAdjust}
+          timesheetId={timesheet.id}
+          employeeName={timesheet.profile?.full_name || 'Employee'}
+          weekEnding={formatDate(timesheet.week_ending)}
+        />
+      )}
     </div>
   );
 }

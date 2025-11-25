@@ -41,6 +41,9 @@ async function runMigration() {
 
   const client = new Client({
     connectionString: requiredVars.POSTGRES_URL_NON_POOLING,
+    ssl: {
+      rejectUnauthorized: false
+    }
   });
 
   try {

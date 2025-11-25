@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Clock, CheckCircle2, XCircle, User, Download, Trash2, Filter, Package } from 'lucide-react';
+import { Plus, FileText, Clock, CheckCircle2, XCircle, User, Download, Trash2, Filter, Package, AlertTriangle } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 import { toast } from 'sonner';
@@ -34,7 +34,7 @@ type Employee = {
   employee_id: string | null;
 };
 
-type StatusFilter = 'all' | 'draft' | 'pending' | 'approved' | 'rejected' | 'processed';
+type StatusFilter = 'all' | 'draft' | 'pending' | 'approved' | 'rejected' | 'processed' | 'adjusted';
 
 interface TimesheetWithProfile extends Timesheet {
   profile?: {
@@ -158,6 +158,7 @@ export default function TimesheetsPage() {
       approved: { variant: 'success' as const, label: 'Approved' },
       rejected: { variant: 'destructive' as const, label: 'Rejected' },
       processed: { variant: 'default' as const, label: 'Processed' },
+      adjusted: { variant: 'warning' as const, label: 'Adjusted' },
     };
 
     const config = variants[status as keyof typeof variants] || variants.draft;
@@ -173,6 +174,7 @@ export default function TimesheetsPage() {
       case 'approved': return 'Approved';
       case 'rejected': return 'Rejected';
       case 'processed': return 'Processed';
+      case 'adjusted': return 'Adjusted';
     }
   };
 
@@ -324,7 +326,7 @@ export default function TimesheetsPage() {
             <Filter className="h-4 w-4 text-slate-400" />
             <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
             <div className="flex gap-2 flex-wrap">
-              {(['all', 'draft', 'pending', 'approved', 'rejected', 'processed'] as StatusFilter[]).map((filter) => (
+              {(['all', 'draft', 'pending', 'approved', 'rejected', 'processed', 'adjusted'] as StatusFilter[]).map((filter) => (
                 <Button
                   key={filter}
                   variant={statusFilter === filter ? 'default' : 'outline'}
@@ -336,6 +338,7 @@ export default function TimesheetsPage() {
                   {filter === 'approved' && <CheckCircle2 className="h-3 w-3 mr-1" />}
                   {filter === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
                   {filter === 'processed' && <Package className="h-3 w-3 mr-1" />}
+                  {filter === 'adjusted' && <AlertTriangle className="h-3 w-3 mr-1" />}
                   {filter === 'draft' && <FileText className="h-3 w-3 mr-1" />}
                   {getFilterLabel(filter)}
                 </Button>
