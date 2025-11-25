@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Save, Send, Edit2, CheckCircle2, XCircle, AlertCircle, Camera, Download } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
-import { INSPECTION_ITEMS, InspectionStatus, VehicleInspection, InspectionItem } from '@/types/inspection';
+import { InspectionStatus, VehicleInspection, InspectionItem } from '@/types/inspection';
 import PhotoUpload from '@/components/forms/PhotoUpload';
 import { Database } from '@/types/database';
 
