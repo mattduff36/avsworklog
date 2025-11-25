@@ -37,31 +37,12 @@ export interface InspectionPhoto {
   created_at: string;
 }
 
-export const INSPECTION_ITEMS = [
-  'Fuel - and ad-blu',
-  'Mirrors - includes Class V & Class VI',
-  'Safety Equipment - Cameras & Audible Alerts',
-  'Warning Signage - VRU Sign',
-  'FORS Stickers',
-  'Oil',
-  'Water',
-  'Battery',
-  'Tyres',
-  'Brakes',
-  'Steering',
-  'Lights',
-  'Reflectors',
-  'Indicators',
-  'Wipers',
-  'Washers',
-  'Horn',
-  'Markers',
-  'Sheets / Ropes / Chains',
-  'Security of Load',
-  'Side underbar/Rails',
-  'Brake Hoses',
-  'Couplings Secure',
-  'Electrical Connections',
-  'Trailer No. Plate',
-  'Nil Defects',
-];
+// Re-export checklist utilities from the centralized configuration
+export { 
+  INSPECTION_ITEMS,
+  getChecklistForCategory,
+  isVanCategory,
+  type VehicleCategory,
+  TRUCK_CHECKLIST_ITEMS,
+  VAN_CHECKLIST_ITEMS,
+} from '@/lib/checklists/vehicle-checklists';

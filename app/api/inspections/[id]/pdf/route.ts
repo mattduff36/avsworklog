@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { renderToStream } from '@react-pdf/renderer';
 import { InspectionPDF } from '@/lib/pdf/inspection-pdf';
+import { VanInspectionPDF } from '@/lib/pdf/van-inspection-pdf';
+import { isVanCategory } from '@/lib/checklists/vehicle-checklists';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 
 export async function GET(
@@ -23,7 +25,7 @@ export async function GET(
       .from('vehicle_inspections')
       .select(`
         *,
-        vehicle:vehicles(reg_number),
+        vehicle:vehicles(reg_number, vehicle_type),
         profile:profiles!vehicle_inspections_user_id_fkey(full_name)
       `)
       .eq('id', id)
@@ -60,15 +62,26 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    // Generate PDF
-    const stream = await renderToStream(
-      InspectionPDF({
-        inspection,
-        items,
-        vehicleReg: (inspection as any).vehicle?.reg_number,
-        employeeName: (inspection as any).profile?.full_name,
-      })
-    );
+    // Determine which PDF template to use based on vehicle category
+    const vehicleType = (inspection as any).vehicle?.vehicle_type || '';
+    const useVanTemplate = isVanCategory(vehicleType);
+    
+    // Generate PDF using the appropriate template
+    const pdfComponent = useVanTemplate
+      ? VanInspectionPDF({
+          inspection,
+          items,
+          vehicleReg: (inspection as any).vehicle?.reg_number,
+          employeeName: (inspection as any).profile?.full_name,
+        })
+      : InspectionPDF({
+          inspection,
+          items,
+          vehicleReg: (inspection as any).vehicle?.reg_number,
+          employeeName: (inspection as any).profile?.full_name,
+        });
+    
+    const stream = await renderToStream(pdfComponent);
 
     // Convert stream to buffer
     const chunks: Uint8Array[] = [];

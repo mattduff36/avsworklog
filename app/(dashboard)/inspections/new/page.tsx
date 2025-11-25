@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus, Check, WifiOff } from 'lucide-react';
 import Link from 'next/link';
 import { formatDateISO, formatDate, getWeekEnding } from '@/lib/utils/date';
-import { INSPECTION_ITEMS, InspectionStatus } from '@/types/inspection';
+import { INSPECTION_ITEMS, InspectionStatus, getChecklistForCategory } from '@/types/inspection';
 import { Database } from '@/types/database';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { toast } from 'sonner';
@@ -46,6 +46,8 @@ export default function NewInspectionPage() {
   // Store checkbox states as "dayOfWeek-itemNumber": status (e.g., "1-5": "ok")
   const [checkboxStates, setCheckboxStates] = useState<Record<string, InspectionStatus>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
+  // Dynamic checklist items based on selected vehicle category
+  const [currentChecklist, setCurrentChecklist] = useState<string[]>(INSPECTION_ITEMS);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
@@ -151,14 +153,14 @@ export default function NewInspectionPage() {
   const handleMarkAllPass = () => {
     const dayOfWeek = parseInt(activeDay) + 1; // Convert 0-6 to 1-7
     const allPassStates: Record<string, InspectionStatus> = {};
-    INSPECTION_ITEMS.forEach((_, index) => {
+    currentChecklist.forEach((_, index) => {
       const key = `${dayOfWeek}-${index + 1}`;
       allPassStates[key] = 'ok';
     });
     setCheckboxStates(prev => ({ ...prev, ...allPassStates }));
     // Clear comments for this day
     const updatedComments = { ...comments };
-    INSPECTION_ITEMS.forEach((_, index) => {
+    currentChecklist.forEach((_, index) => {
       const key = `${dayOfWeek}-${index + 1}`;
       delete updatedComments[key];
     });
@@ -279,12 +281,13 @@ export default function NewInspectionPage() {
         const items: Omit<InspectionItemInsert, 'inspection_id'>[] = [];
         
         for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
-          INSPECTION_ITEMS.forEach((item, index) => {
+          currentChecklist.forEach((item, index) => {
             const itemNumber = index + 1;
             const key = `${dayOfWeek}-${itemNumber}`;
             items.push({
               item_number: itemNumber,
               day_of_week: dayOfWeek,
+              item_description: item,
               status: checkboxStates[key] || 'ok',
             });
           });
@@ -323,12 +326,13 @@ export default function NewInspectionPage() {
       const items: InspectionItemInsert[] = [];
       
       for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
-        INSPECTION_ITEMS.forEach((item, index) => {
+        currentChecklist.forEach((item, index) => {
           const itemNumber = index + 1;
           const key = `${dayOfWeek}-${itemNumber}`;
           items.push({
             inspection_id: inspection.id,
             item_number: itemNumber,
+            item_description: item,
             day_of_week: dayOfWeek,
             status: checkboxStates[key] || 'ok',
             // comments: comments[key] || null, // Comments not in current schema
@@ -350,7 +354,7 @@ export default function NewInspectionPage() {
         if (failedItems.length > 0) {
           type ActionInsert = Database['public']['Tables']['actions']['Insert'];
           const actions: ActionInsert[] = failedItems.map((item: any) => {
-            const itemName = INSPECTION_ITEMS[item.item_number - 1] || `Item ${item.item_number}`;
+            const itemName = item.item_description || `Item ${item.item_number}`;
             const dayName = DAY_NAMES[item.day_of_week - 1] || `Day ${item.day_of_week}`;
             return {
               inspection_id: inspection.id,
@@ -407,8 +411,8 @@ export default function NewInspectionPage() {
     }
   };
 
-  // Calculate progress (7 days × 26 items = 182 total)
-  const totalItems = INSPECTION_ITEMS.length * 7;
+  // Calculate progress (7 days × number of items)
+  const totalItems = currentChecklist.length * 7;
   const completedItems = Object.keys(checkboxStates).length;
   const progressPercent = Math.round((completedItems / totalItems) * 100);
 
@@ -498,6 +502,12 @@ export default function NewInspectionPage() {
                     setShowAddVehicleDialog(true);
                   } else {
                     setVehicleId(value);
+                    // Update checklist based on vehicle category
+                    const selectedVehicle = vehicles.find(v => v.id === value);
+                    if (selectedVehicle) {
+                      const checklist = getChecklistForCategory(selectedVehicle.vehicle_type);
+                      setCurrentChecklist(checklist);
+                    }
                   }
                 }}
                 onOpenChange={(open) => {
@@ -572,10 +582,10 @@ export default function NewInspectionPage() {
         </CardContent>
       </Card>
 
-      {/* 26-Point Safety Check */}
+      {/* Safety Check */}
       <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
         <CardHeader className="pb-3">
-          <CardTitle className="text-slate-900 dark:text-white">26-Point Safety Check</CardTitle>
+          <CardTitle className="text-slate-900 dark:text-white">{currentChecklist.length}-Point Safety Check</CardTitle>
           <CardDescription className="text-slate-600 dark:text-slate-400">
             Mark each item as Pass or Fail for each day
           </CardDescription>
@@ -587,7 +597,7 @@ export default function NewInspectionPage() {
               {DAY_NAMES.map((day, index) => {
                 const dayOfWeek = index + 1;
                 // Check if all items for this day have a status
-                const isComplete = INSPECTION_ITEMS.every((_, itemIndex) => {
+                const isComplete = currentChecklist.every((_, itemIndex) => {
                   const itemNumber = itemIndex + 1;
                   const key = `${dayOfWeek}-${itemNumber}`;
                   return checkboxStates[key] !== undefined;
@@ -629,7 +639,7 @@ export default function NewInspectionPage() {
 
                 {/* Mobile View - Card-based */}
                 <div className="md:hidden space-y-3">
-                  {INSPECTION_ITEMS.map((item, index) => {
+                  {currentChecklist.map((item, index) => {
                     const itemNumber = index + 1;
                     const dayOfWeek = dayIndex + 1;
                     const key = `${dayOfWeek}-${itemNumber}`;
@@ -710,7 +720,7 @@ export default function NewInspectionPage() {
                 </tr>
               </thead>
               <tbody>
-                {INSPECTION_ITEMS.map((item, index) => {
+                {currentChecklist.map((item, index) => {
                   const itemNumber = index + 1;
                   const dayOfWeek = dayIndex + 1;
                   const key = `${dayOfWeek}-${itemNumber}`;
