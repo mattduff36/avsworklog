@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
 import { SignaturePad } from '@/components/forms/SignaturePad';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
 
@@ -134,6 +135,21 @@ export function BlockingMessageModal({
 
             {/* PDF Viewer - Render each page separately */}
             {pdfUrl && <PDFViewer url={pdfUrl} />}
+
+            {/* Open in Browser Button (if PDF attached) */}
+            {pdfUrl && (
+              <div className="flex justify-center pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(pdfUrl, '_blank')}
+                  className="gap-2"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Open PDF in Browser
+                </Button>
+              </div>
+            )}
 
             {/* Signature Section - At the BOTTOM so users must scroll */}
             <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-700">
