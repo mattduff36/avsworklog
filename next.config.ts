@@ -40,4 +40,84 @@ export default withPWA({
   fallbacks: {
     document: "/offline",
   },
+  // Custom runtime caching - disable page caching for navigation
+  runtimeCaching: [
+    {
+      urlPattern: /^https:\/\/fonts\.(?:gstatic)\.com\/.*/i,
+      handler: "CacheFirst",
+      options: {
+        cacheName: "google-fonts-webfonts",
+        expiration: {
+          maxEntries: 4,
+          maxAgeSeconds: 365 * 24 * 60 * 60, // 1 year
+        },
+      },
+    },
+    {
+      urlPattern: /^https:\/\/fonts\.(?:googleapis)\.com\/.*/i,
+      handler: "StaleWhileRevalidate",
+      options: {
+        cacheName: "google-fonts-stylesheets",
+        expiration: {
+          maxEntries: 4,
+          maxAgeSeconds: 7 * 24 * 60 * 60, // 1 week
+        },
+      },
+    },
+    {
+      urlPattern: /\.(?:eot|otf|ttc|ttf|woff|woff2|font.css)$/i,
+      handler: "StaleWhileRevalidate",
+      options: {
+        cacheName: "static-font-assets",
+        expiration: {
+          maxEntries: 4,
+          maxAgeSeconds: 7 * 24 * 60 * 60, // 1 week
+        },
+      },
+    },
+    {
+      urlPattern: /\.(?:jpg|jpeg|gif|png|svg|ico|webp)$/i,
+      handler: "StaleWhileRevalidate",
+      options: {
+        cacheName: "static-image-assets",
+        expiration: {
+          maxEntries: 64,
+          maxAgeSeconds: 24 * 60 * 60, // 1 day
+        },
+      },
+    },
+    {
+      urlPattern: /\.(?:js)$/i,
+      handler: "StaleWhileRevalidate",
+      options: {
+        cacheName: "static-js-assets",
+        expiration: {
+          maxEntries: 32,
+          maxAgeSeconds: 24 * 60 * 60, // 1 day
+        },
+      },
+    },
+    {
+      urlPattern: /\.(?:css|less)$/i,
+      handler: "StaleWhileRevalidate",
+      options: {
+        cacheName: "static-style-assets",
+        expiration: {
+          maxEntries: 32,
+          maxAgeSeconds: 24 * 60 * 60, // 1 day
+        },
+      },
+    },
+    // For navigation requests (pages): NetworkOnly with 10-second timeout
+    // Falls back to /offline page when offline
+    {
+      urlPattern: ({ request, url }: { request: Request; url: URL }) => {
+        return request.mode === "navigate" && url.pathname !== "/offline";
+      },
+      handler: "NetworkOnly",
+      options: {
+        networkTimeoutSeconds: 10,
+      },
+    },
+  ],
 })(nextConfig);

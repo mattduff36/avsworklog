@@ -824,9 +824,9 @@ export default function NewTimesheetPage() {
       
       // Check if this is a network/offline error
       if (!isOnline || error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError') || error?.message?.includes('network')) {
-        setError('Unable to save timesheet - you appear to be offline. Your changes have been saved locally and will be submitted when you reconnect to the internet.');
+        setError('Unable to save timesheet - no internet connection. Please connect to the internet to submit your timesheet.');
         toast.error('Cannot save while offline', {
-          description: 'Please connect to the internet to submit your timesheet.',
+          description: 'Please check your internet connection and try again.',
         });
       } else if (error?.code === '23505' || error?.message?.includes('duplicate key') || error?.message?.includes('timesheets_user_id_week_ending_key')) {
         // Only show duplicate error if we're not updating an existing timesheet

@@ -165,7 +165,7 @@ export default function InspectionsPage() {
       // Show friendly message if offline
       if (!online) {
         toast.error('Unable to load inspections', {
-          description: 'You are offline. Showing cached data if available.',
+          description: 'Please check your internet connection.',
         });
       }
     } finally {

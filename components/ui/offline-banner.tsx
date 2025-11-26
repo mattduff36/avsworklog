@@ -14,7 +14,7 @@ export function OfflineBanner() {
       <WifiOff className="h-4 w-4" />
       <AlertDescription className="flex items-center justify-between gap-4">
         <div>
-          <strong>You are offline.</strong> Data shown here might be out of date. New submissions will fail until connection returns.
+          <strong>No Internet Connection.</strong> This app requires an active connection to work. Please check your WiFi or mobile data.
         </div>
         <Button 
           size="sm" 

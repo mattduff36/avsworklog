@@ -576,9 +576,9 @@ export default function NewInspectionPage() {
       
       // Check if this is a network/offline error
       if (!isOnline || (err instanceof Error && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('network')))) {
-        setError('Unable to save inspection - you appear to be offline. Your changes have been saved locally and will be submitted when you reconnect to the internet.');
+        setError('Unable to save inspection - no internet connection. Please connect to the internet to submit your inspection.');
         toast.error('Cannot save while offline', {
-          description: 'Please connect to the internet to submit your inspection.',
+          description: 'Please check your internet connection and try again.',
         });
       } else {
         setError(err instanceof Error ? err.message : 'Failed to save inspection. Please check your internet connection and try again.');
