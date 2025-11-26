@@ -407,7 +407,7 @@ export default function DashboardPage() {
               <span>Pending Approvals</span>
               <Link href="/approvals">
                 <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-700/50">
-                  View All
+                  View All Approvals
                 </Button>
               </Link>
             </CardTitle>
@@ -484,10 +484,10 @@ export default function DashboardPage() {
 
       {/* Manager Actions Section */}
       {effectiveIsManager && (
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 border-t-2 border-t-red-500">
-          <CardHeader className="bg-red-50 dark:bg-red-500/10">
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <CardHeader>
             <CardTitle className="flex items-center justify-between text-slate-900 dark:text-white">
-              <span>High Priority Actions</span>
+              <span>Manager Actions</span>
               <Link href="/actions">
                 <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-700/50">
                   View All Actions
@@ -495,7 +495,7 @@ export default function DashboardPage() {
               </Link>
             </CardTitle>
             <CardDescription className="text-slate-400">
-              Highest priority items requiring attention
+              Action items requiring attention
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -562,7 +562,7 @@ export default function DashboardPage() {
                 <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-20 text-amber-400" />
                 <p className="text-lg mb-2">No pending actions</p>
                 <p className="text-sm text-slate-500">
-                  High priority items will appear here
+                  Action items will appear here
                 </p>
               </div>
             )}
