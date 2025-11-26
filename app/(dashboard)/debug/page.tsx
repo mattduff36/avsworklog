@@ -214,15 +214,21 @@ export default function DebugPage() {
 
   const fetchAuditLogs = async () => {
     try {
-      const { data: auditData } = await supabase
+      const { data: auditData, error } = await supabase
         .from('audit_log')
         .select('*, profiles!audit_log_user_id_fkey(full_name)')
         .order('created_at', { ascending: false })
         .limit(100);
 
+      if (error) {
+        console.error('Error fetching audit logs:', error);
+        toast.error('Failed to fetch audit logs: ' + error.message);
+        return;
+      }
+
       if (auditData) {
         setAuditLogs(
-          auditData.map((log: Database['public']['Tables']['audit_log']['Row'] & { profiles?: { full_name: string } | null }) => ({
+          auditData.map((log: any) => ({
             id: log.id,
             table_name: log.table_name,
             record_id: log.record_id,
@@ -236,6 +242,7 @@ export default function DebugPage() {
       }
     } catch (error) {
       console.error('Error fetching audit logs:', error);
+      toast.error('Failed to fetch audit logs');
     }
   };
 
@@ -286,6 +293,8 @@ export default function DebugPage() {
         return <XCircle className="h-4 w-4 text-red-500" />;
       case 'processed':
         return <Package className="h-4 w-4 text-blue-500" />;
+      case 'adjusted':
+        return <Edit className="h-4 w-4 text-purple-500" />;
       case 'pending':
         return <Clock className="h-4 w-4 text-amber-500" />;
       default:
@@ -295,7 +304,7 @@ export default function DebugPage() {
 
   const getAvailableStatuses = (type: string) => {
     if (type === 'timesheet') {
-      return ['draft', 'submitted', 'approved', 'rejected', 'processed'];
+      return ['draft', 'submitted', 'approved', 'rejected', 'processed', 'adjusted'];
     } else if (type === 'inspection') {
       return ['draft', 'submitted', 'approved', 'rejected'];
     } else if (type === 'absence') {

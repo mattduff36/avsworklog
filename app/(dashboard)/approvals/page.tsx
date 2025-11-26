@@ -18,7 +18,9 @@ import { VehicleInspection } from '@/types/inspection';
 import { AbsenceWithRelations } from '@/types/absence';
 import { usePendingAbsences, useApproveAbsence, useRejectAbsence, useAbsenceSummaryForEmployee } from '@/lib/hooks/useAbsence';
 
-type StatusFilter = 'pending' | 'approved' | 'rejected' | 'processed' | 'all';
+type TimesheetStatusFilter = 'pending' | 'approved' | 'rejected' | 'processed' | 'adjusted' | 'all';
+type InspectionStatusFilter = 'pending' | 'approved' | 'rejected' | 'all';
+type StatusFilter = TimesheetStatusFilter | InspectionStatusFilter;
 
 interface TimesheetWithProfile extends Timesheet {
   user: {
@@ -47,7 +49,11 @@ export default function ApprovalsPage() {
   const [inspections, setInspections] = useState<InspectionWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'timesheets');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
+  const [timesheetFilter, setTimesheetFilter] = useState<TimesheetStatusFilter>('pending');
+  const [inspectionFilter, setInspectionFilter] = useState<InspectionStatusFilter>('pending');
+  
+  // Get current filter based on active tab
+  const statusFilter = activeTab === 'timesheets' ? timesheetFilter : inspectionFilter;
   
   // Absence hooks
   const { data: absences } = usePendingAbsences();
@@ -78,6 +84,8 @@ export default function ApprovalsPage() {
         timesheetQuery = timesheetQuery.eq('status', 'rejected');
       } else if (filter === 'processed') {
         timesheetQuery = timesheetQuery.eq('status', 'processed');
+      } else if (filter === 'adjusted') {
+        timesheetQuery = timesheetQuery.eq('status', 'adjusted');
       }
       // 'all' doesn't filter
 
@@ -130,7 +138,7 @@ export default function ApprovalsPage() {
       }
       fetchApprovals(statusFilter);
     }
-  }, [isManager, authLoading, router, fetchApprovals, statusFilter]);
+  }, [isManager, authLoading, router, fetchApprovals, statusFilter, activeTab]);
 
   const handleQuickApprove = async (type: 'timesheet' | 'inspection', id: string) => {
     try {
@@ -211,7 +219,28 @@ export default function ApprovalsPage() {
       case 'approved': return 'Approved';
       case 'rejected': return 'Rejected';
       case 'processed': return 'Processed';
+      case 'adjusted': return 'Adjusted';
       case 'all': return 'All';
+    }
+  };
+
+  // Get filter options based on active tab
+  const getFilterOptions = (): StatusFilter[] => {
+    if (activeTab === 'timesheets') {
+      return ['pending', 'approved', 'rejected', 'processed', 'adjusted', 'all'];
+    } else if (activeTab === 'inspections') {
+      return ['pending', 'approved', 'rejected', 'all'];
+    } else {
+      return ['pending', 'approved', 'rejected'];
+    }
+  };
+
+  // Handle filter change based on active tab
+  const handleFilterChange = (filter: StatusFilter) => {
+    if (activeTab === 'timesheets') {
+      setTimesheetFilter(filter as TimesheetStatusFilter);
+    } else if (activeTab === 'inspections') {
+      setInspectionFilter(filter as InspectionStatusFilter);
     }
   };
 
@@ -242,6 +271,12 @@ export default function ApprovalsPage() {
         return (
           <Badge variant="default">
             Processed
+          </Badge>
+        );
+      case 'adjusted':
+        return (
+          <Badge variant="default" className="bg-purple-500/10 text-purple-600 border-purple-500/20">
+            Adjusted
           </Badge>
         );
       case 'draft':
@@ -276,33 +311,6 @@ export default function ApprovalsPage() {
           </Badge>
         </div>
       </div>
-
-      {/* Status Filter Buttons */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-slate-400" />
-            <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
-            <div className="flex gap-2 flex-wrap">
-              {(['pending', 'approved', 'rejected', 'processed', 'all'] as StatusFilter[]).map((filter) => (
-                <Button
-                  key={filter}
-                  variant={statusFilter === filter ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setStatusFilter(filter)}
-                  className={statusFilter === filter ? '' : 'border-slate-600 text-slate-300 hover:bg-slate-700/50'}
-                >
-                  {filter === 'pending' && <Clock className="h-3 w-3 mr-1" />}
-                  {filter === 'approved' && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                  {filter === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
-                  {filter === 'processed' && <Package className="h-3 w-3 mr-1" />}
-                  {getFilterLabel(filter)}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {totalCount === 0 ? (
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
@@ -395,6 +403,34 @@ export default function ApprovalsPage() {
               </div>
             </TabsTrigger>
           </TabsList>
+
+          {/* Status Filter Buttons - Now below tabs */}
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 mt-6">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-slate-400" />
+                <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
+                <div className="flex gap-2 flex-wrap">
+                  {getFilterOptions().map((filter) => (
+                    <Button
+                      key={filter}
+                      variant={statusFilter === filter ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleFilterChange(filter)}
+                      className={statusFilter === filter ? '' : 'border-slate-600 text-slate-300 hover:bg-slate-700/50'}
+                    >
+                      {filter === 'pending' && <Clock className="h-3 w-3 mr-1" />}
+                      {filter === 'approved' && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                      {filter === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
+                      {filter === 'processed' && <Package className="h-3 w-3 mr-1" />}
+                      {filter === 'adjusted' && <Package className="h-3 w-3 mr-1" />}
+                      {getFilterLabel(filter)}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           <TabsContent value="timesheets" className="mt-6 space-y-4">
             {timesheets.length === 0 ? (
