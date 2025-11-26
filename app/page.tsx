@@ -8,14 +8,23 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    // Auto-redirect to dashboard if online
-    if (typeof navigator !== 'undefined' && navigator.onLine) {
-      router.push('/dashboard');
+    // Auto-redirect based on online status
+    if (typeof navigator !== 'undefined') {
+      if (navigator.onLine) {
+        router.push('/dashboard');
+      } else {
+        // Redirect to offline page when offline
+        router.push('/offline');
+      }
     }
   }, [router]);
 
   const handleGoToDashboard = () => {
-    router.push('/dashboard');
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      router.push('/offline');
+    } else {
+      router.push('/dashboard');
+    }
   };
 
   return (
@@ -34,10 +43,10 @@ export default function Home() {
         {/* Info Card */}
         <div className="bg-slate-800/30 backdrop-blur border border-slate-700 rounded-lg p-6 space-y-4">
           <p className="text-slate-300 text-sm">
-            This app opens the dashboard when you're online.
+            Opening your dashboard...
           </p>
           <p className="text-slate-400 text-xs">
-            If you're offline, pages you've previously visited will still be available.
+            This app requires an internet connection to work.
           </p>
         </div>
 
@@ -49,11 +58,6 @@ export default function Home() {
         >
           Go to Dashboard
         </Button>
-
-        {/* Note */}
-        <div className="text-xs text-slate-500">
-          <p>If this button doesn't work while offline, the offline page will appear.</p>
-        </div>
       </div>
     </div>
   );
