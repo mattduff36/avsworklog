@@ -40,4 +40,22 @@ export default withPWA({
   fallbacks: {
     document: "/offline",
   },
+  // Runtime caching with explicit fallback handling
+  runtimeCaching: [
+    // Special handling for the start URL (/)
+    {
+      urlPattern: ({ url }: { url: URL }) => url.pathname === "/",
+      handler: "NetworkFirst",
+      options: {
+        cacheName: "start-url",
+        networkTimeoutSeconds: 10,
+        plugins: [
+          {
+            // Redirect to offline page on failure
+            handlerDidError: async () => Response.redirect('/offline', 302),
+          },
+        ],
+      },
+    },
+  ],
 })(nextConfig);
