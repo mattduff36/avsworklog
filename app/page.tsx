@@ -4,6 +4,9 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 
+// Force static generation for offline availability
+export const dynamic = 'force-static';
+
 export default function Home() {
   const router = useRouter();
 
