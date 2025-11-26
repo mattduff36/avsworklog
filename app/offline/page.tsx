@@ -4,11 +4,14 @@ import { WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 
+// Force static generation for this page
+export const dynamic = 'force-static';
+
 export default function OfflinePage() {
   const router = useRouter();
 
   const handleRetry = () => {
-    if (navigator.onLine) {
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
       router.push('/dashboard');
     } else {
       alert('Still offline. Please connect to the internet.');
