@@ -76,8 +76,12 @@ export default function NewInspectionPage() {
 
   // Load draft inspection if ID is provided in URL
   useEffect(() => {
-    if (draftId && user) {
-      loadDraftInspection(draftId);
+    if (draftId && user && !loading) {
+      // Wait a bit for isManager to be set
+      const timer = setTimeout(() => {
+        loadDraftInspection(draftId);
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [draftId, user]);
 
@@ -163,6 +167,21 @@ export default function NewInspectionPage() {
       setLoading(true);
       setError('');
 
+      // Fetch user's profile to check if they're a manager (bypasses hook timing issues)
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          role:roles (
+            name,
+            is_manager_admin
+          )
+        `)
+        .eq('id', user?.id)
+        .single();
+
+      const userIsManager = (profileData as any)?.role?.is_manager_admin || false;
+
       // Fetch inspection
       const { data: inspection, error: inspectionError } = await supabase
         .from('vehicle_inspections')
@@ -181,7 +200,7 @@ export default function NewInspectionPage() {
       if (inspectionError) throw inspectionError;
 
       // Check if user has access (must be owner or manager)
-      if (!isManager && inspection.user_id !== user?.id) {
+      if (!userIsManager && inspection.user_id !== user?.id) {
         setError('You do not have permission to edit this inspection');
         return;
       }
@@ -190,6 +209,14 @@ export default function NewInspectionPage() {
       if (inspection.status !== 'draft') {
         setError('Only draft inspections can be edited here');
         return;
+      }
+
+      // Update checklist FIRST based on vehicle category (important for progress calculation)
+      let checklist = INSPECTION_ITEMS;
+      if ((inspection as any).vehicles?.vehicle_categories?.name || (inspection as any).vehicles?.vehicle_type) {
+        const categoryName = (inspection as any).vehicles?.vehicle_categories?.name || (inspection as any).vehicles?.vehicle_type;
+        checklist = getChecklistForCategory(categoryName);
+        setCurrentChecklist(checklist);
       }
 
       // Fetch inspection items
@@ -206,6 +233,8 @@ export default function NewInspectionPage() {
       setVehicleId((inspection as any).vehicles?.id || '');
       setWeekEnding(inspection.inspection_end_date || formatDateISO(getWeekEnding()));
       setCurrentMileage(inspection.current_mileage?.toString() || '');
+      
+      // Set the employee (for managers creating inspections for others)
       setSelectedEmployeeId(inspection.user_id);
 
       // Populate checkbox states and comments from items
@@ -222,13 +251,6 @@ export default function NewInspectionPage() {
 
       setCheckboxStates(newCheckboxStates);
       setComments(newComments);
-
-      // Update checklist based on vehicle category
-      if ((inspection as any).vehicles?.vehicle_categories?.name || (inspection as any).vehicles?.vehicle_type) {
-        const categoryName = (inspection as any).vehicles?.vehicle_categories?.name || (inspection as any).vehicles?.vehicle_type;
-        const checklist = getChecklistForCategory(categoryName);
-        setCurrentChecklist(checklist);
-      }
 
       toast.success('Draft inspection loaded');
     } catch (err) {
