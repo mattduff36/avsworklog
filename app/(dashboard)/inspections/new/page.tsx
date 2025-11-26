@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { OfflineBanner } from '@/components/ui/offline-banner';
 import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus, Check, WifiOff } from 'lucide-react';
 import Link from 'next/link';
 import { formatDateISO, formatDate, getWeekEnding } from '@/lib/utils/date';
@@ -609,6 +610,9 @@ export default function NewInspectionPage() {
 
   return (
     <div className="space-y-4 pb-32 md:pb-6 max-w-5xl">
+      {/* Offline Banner */}
+      {!isOnline && <OfflineBanner />}
+      
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between mb-3">

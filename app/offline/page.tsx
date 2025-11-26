@@ -34,7 +34,7 @@ export default function OfflinePage() {
             You're Offline
           </h1>
           <p className="text-slate-400 text-lg">
-            This page hasn't been cached yet
+            You need to be online to view this page
           </p>
         </div>
 

@@ -1,10 +1,12 @@
 'use client';
 
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useOnlineStatus } from '@/lib/hooks/use-online-status';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { OfflineBanner } from '@/components/ui/offline-banner';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -56,6 +58,7 @@ type Action = Database['public']['Tables']['actions']['Row'] & {
 
 export default function DashboardPage() {
   const { profile, isManager, isAdmin } = useAuth();
+  const online = useOnlineStatus();
   const formTypes = getEnabledForms();
   const supabase = createClient();
 
@@ -299,6 +302,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 max-w-6xl">
+      {/* Offline Banner */}
+      {!online && <OfflineBanner />}
+      
       {/* Welcome Section */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-white">

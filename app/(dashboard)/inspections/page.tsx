@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useOnlineStatus } from '@/lib/hooks/use-online-status';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useInspectionRealtime } from '@/lib/hooks/useRealtime';
 import { createClient } from '@/lib/supabase/client';
@@ -11,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { OfflineBanner } from '@/components/ui/offline-banner';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, Clipboard, CheckCircle2, XCircle, Clock, AlertCircle, User, Download, Trash2, Filter, FileText } from 'lucide-react';
@@ -46,6 +48,7 @@ interface InspectionWithVehicle extends VehicleInspection {
 
 export default function InspectionsPage() {
   const { user, isManager } = useAuth();
+  const online = useOnlineStatus();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('inspections');
   const router = useRouter();
   const [inspections, setInspections] = useState<InspectionWithVehicle[]>([]);
@@ -266,6 +269,9 @@ export default function InspectionsPage() {
 
   return (
     <div className="space-y-6 max-w-6xl">
+      {/* Offline Banner */}
+      {!online && <OfflineBanner />}
+      
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between mb-4">

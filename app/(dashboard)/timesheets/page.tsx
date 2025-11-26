@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useOnlineStatus } from '@/lib/hooks/use-online-status';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useTimesheetRealtime } from '@/lib/hooks/useRealtime';
 import { createClient } from '@/lib/supabase/client';
@@ -11,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { OfflineBanner } from '@/components/ui/offline-banner';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, FileText, Clock, CheckCircle2, XCircle, User, Download, Trash2, Filter, Package, AlertTriangle } from 'lucide-react';
@@ -44,6 +46,7 @@ interface TimesheetWithProfile extends Timesheet {
 
 export default function TimesheetsPage() {
   const { user, isManager } = useAuth();
+  const online = useOnlineStatus();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('timesheets');
   const router = useRouter();
   const [timesheets, setTimesheets] = useState<TimesheetWithProfile[]>([]);
@@ -275,6 +278,9 @@ export default function TimesheetsPage() {
 
   return (
     <div className="space-y-6 max-w-6xl">
+      {/* Offline Banner */}
+      {!online && <OfflineBanner />}
+      
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between mb-4">
