@@ -149,6 +149,12 @@ export default function TimesheetsPage() {
       setTimesheets(data || []);
     } catch (error) {
       console.error('Error fetching timesheets:', error);
+      // Show friendly message if offline
+      if (!online) {
+        toast.error('Unable to load timesheets', {
+          description: 'You are offline. Showing cached data if available.',
+        });
+      }
     } finally {
       setLoading(false);
     }

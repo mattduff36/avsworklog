@@ -33,6 +33,7 @@ import {
 import { getEnabledForms } from '@/lib/config/forms';
 import { Database } from '@/types/database';
 import type { ModuleName } from '@/types/roles';
+import { toast } from 'sonner';
 
 type PendingApprovalCount = {
   type: 'timesheets' | 'inspections' | 'absences';
@@ -175,6 +176,12 @@ export default function DashboardPage() {
   }, [isManager, isAdmin, profile, isSuperAdmin, viewAsRole]);
 
   const fetchPendingApprovals = async () => {
+    // Skip fetching if offline - rely on cached page data
+    if (!online) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       
@@ -233,6 +240,9 @@ export default function DashboardPage() {
       setPendingApprovals(approvalTypes);
     } catch (error) {
       console.error('Error fetching pending approvals:', error);
+      toast.error('Unable to load dashboard data', {
+        description: 'Please check your internet connection and try again.',
+      });
     } finally {
       setLoading(false);
     }

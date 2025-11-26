@@ -573,7 +573,19 @@ export default function NewInspectionPage() {
       router.push('/inspections');
     } catch (err) {
       console.error('Error saving inspection:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save inspection');
+      
+      // Check if this is a network/offline error
+      if (!isOnline || (err instanceof Error && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('network')))) {
+        setError('Unable to save inspection - you appear to be offline. Your changes have been saved locally and will be submitted when you reconnect to the internet.');
+        toast.error('Cannot save while offline', {
+          description: 'Please connect to the internet to submit your inspection.',
+        });
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to save inspection. Please check your internet connection and try again.');
+        toast.error('Failed to save inspection', {
+          description: err instanceof Error ? err.message : 'Please try again or contact support if the problem persists.',
+        });
+      }
     } finally {
       setLoading(false);
     }

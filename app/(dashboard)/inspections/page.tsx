@@ -162,6 +162,12 @@ export default function InspectionsPage() {
       setInspections(data || []);
     } catch (error) {
       console.error('Error fetching inspections:', error);
+      // Show friendly message if offline
+      if (!online) {
+        toast.error('Unable to load inspections', {
+          description: 'You are offline. Showing cached data if available.',
+        });
+      }
     } finally {
       setLoading(false);
     }
