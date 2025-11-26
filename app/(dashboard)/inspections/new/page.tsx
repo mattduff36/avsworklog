@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { useOfflineStore } from '@/lib/stores/offline-queue';
@@ -32,6 +32,8 @@ type Employee = {
 
 export default function NewInspectionPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const draftId = searchParams.get('id'); // Get draft ID from URL if editing
   const { user, isManager } = useAuth();
   const { isOnline } = useOfflineSync();
   const { addToQueue } = useOfflineStore();
@@ -61,6 +63,7 @@ export default function NewInspectionPage() {
   const [newVehicleReg, setNewVehicleReg] = useState('');
   const [newVehicleCategoryId, setNewVehicleCategoryId] = useState('');
   const [addingVehicle, setAddingVehicle] = useState(false);
+  const [existingInspectionId, setExistingInspectionId] = useState<string | null>(null);
   
   // Manager-specific states
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -70,6 +73,13 @@ export default function NewInspectionPage() {
     fetchVehicles();
     fetchCategories();
   }, []);
+
+  // Load draft inspection if ID is provided in URL
+  useEffect(() => {
+    if (draftId && user) {
+      loadDraftInspection(draftId);
+    }
+  }, [draftId, user]);
 
   // Fetch employees if manager, and set initial selected employee
   useEffect(() => {
@@ -145,6 +155,87 @@ export default function NewInspectionPage() {
       setCategories(data || []);
     } catch (err) {
       console.error('Error fetching categories:', err);
+    }
+  };
+
+  const loadDraftInspection = async (id: string) => {
+    try {
+      setLoading(true);
+      setError('');
+
+      // Fetch inspection
+      const { data: inspection, error: inspectionError } = await supabase
+        .from('vehicle_inspections')
+        .select(`
+          *,
+          vehicles (
+            id,
+            reg_number,
+            vehicle_type,
+            vehicle_categories (name)
+          )
+        `)
+        .eq('id', id)
+        .single();
+
+      if (inspectionError) throw inspectionError;
+
+      // Check if user has access (must be owner or manager)
+      if (!isManager && inspection.user_id !== user?.id) {
+        setError('You do not have permission to edit this inspection');
+        return;
+      }
+
+      // Only allow loading drafts
+      if (inspection.status !== 'draft') {
+        setError('Only draft inspections can be edited here');
+        return;
+      }
+
+      // Fetch inspection items
+      const { data: items, error: itemsError } = await supabase
+        .from('inspection_items')
+        .select('*')
+        .eq('inspection_id', id)
+        .order('item_number');
+
+      if (itemsError) throw itemsError;
+
+      // Populate form with inspection data
+      setExistingInspectionId(id);
+      setVehicleId((inspection as any).vehicles?.id || '');
+      setWeekEnding(inspection.inspection_end_date || formatDateISO(getWeekEnding()));
+      setCurrentMileage(inspection.current_mileage?.toString() || '');
+      setSelectedEmployeeId(inspection.user_id);
+
+      // Populate checkbox states and comments from items
+      const newCheckboxStates: Record<string, InspectionStatus> = {};
+      const newComments: Record<string, string> = {};
+      
+      items?.forEach((item: any) => {
+        const key = `${item.day_of_week}-${item.item_number}`;
+        newCheckboxStates[key] = item.status;
+        if (item.comments) {
+          newComments[key] = item.comments;
+        }
+      });
+
+      setCheckboxStates(newCheckboxStates);
+      setComments(newComments);
+
+      // Update checklist based on vehicle category
+      if ((inspection as any).vehicles?.vehicle_categories?.name || (inspection as any).vehicles?.vehicle_type) {
+        const categoryName = (inspection as any).vehicles?.vehicle_categories?.name || (inspection as any).vehicles?.vehicle_type;
+        const checklist = getChecklistForCategory(categoryName);
+        setCurrentChecklist(checklist);
+      }
+
+      toast.success('Draft inspection loaded');
+    } catch (err) {
+      console.error('Error loading draft inspection:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load draft inspection');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -349,14 +440,55 @@ export default function NewInspectionPage() {
         return;
       }
 
-      const { data: inspection, error: inspectionError } = await supabase
-        .from('vehicle_inspections')
-        .insert(inspectionData)
-        .select()
-        .single();
+      let inspection: any;
 
-      if (inspectionError) throw inspectionError;
-      if (!inspection) throw new Error('Failed to create inspection');
+      // Update existing draft or create new inspection
+      if (existingInspectionId) {
+        // Update existing inspection
+        type InspectionUpdate = Database['public']['Tables']['vehicle_inspections']['Update'];
+        const inspectionUpdate: InspectionUpdate = {
+          vehicle_id: vehicleId,
+          user_id: selectedEmployeeId,
+          inspection_date: formatDateISO(startDate),
+          inspection_end_date: weekEnding,
+          current_mileage: parseInt(currentMileage),
+          status,
+          submitted_at: status === 'submitted' ? new Date().toISOString() : null,
+          signature_data: signatureData || null,
+          signed_at: signatureData ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        };
+
+        const { data: updatedInspection, error: updateError } = await supabase
+          .from('vehicle_inspections')
+          .update(inspectionUpdate)
+          .eq('id', existingInspectionId)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        inspection = updatedInspection;
+
+        // Delete existing items
+        const { error: deleteError } = await supabase
+          .from('inspection_items')
+          .delete()
+          .eq('inspection_id', existingInspectionId);
+
+        if (deleteError) throw deleteError;
+      } else {
+        // Create new inspection
+        const { data: newInspection, error: insertError } = await supabase
+          .from('vehicle_inspections')
+          .insert(inspectionData)
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+        inspection = newInspection;
+      }
+
+      if (!inspection) throw new Error('Failed to save inspection');
 
       // Create inspection items for all 7 days
       type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
@@ -466,8 +598,12 @@ export default function NewInspectionPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white">New Inspection</h1>
-              <p className="text-sm text-slate-600 dark:text-slate-400 hidden md:block">Daily safety check</p>
+              <h1 className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white">
+                {existingInspectionId ? 'Edit Inspection' : 'New Inspection'}
+              </h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400 hidden md:block">
+                {existingInspectionId ? 'Continue editing your draft' : 'Daily safety check'}
+              </p>
             </div>
           </div>
           {/* Progress Badge */}

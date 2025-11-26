@@ -381,7 +381,14 @@ export default function InspectionsPage() {
             <Card 
               key={inspection.id} 
               className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200 cursor-pointer"
-              onClick={() => router.push(`/inspections/${inspection.id}`)}
+              onClick={() => {
+                // Draft inspections open in the new/edit page, others in view page
+                if (inspection.status === 'draft') {
+                  router.push(`/inspections/new?id=${inspection.id}`);
+                } else {
+                  router.push(`/inspections/${inspection.id}`);
+                }
+              }}
             >
               <CardHeader>
                 <div className="flex items-start justify-between">

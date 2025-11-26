@@ -96,3 +96,4 @@ export const INSPECTION_ITEMS = TRUCK_CHECKLIST_ITEMS;
 // Named exports for specific checklists
 export { TRUCK_CHECKLIST_ITEMS, VAN_CHECKLIST_ITEMS };
 
+

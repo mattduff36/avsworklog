@@ -315,6 +315,34 @@ export default function ViewInspectionPage() {
   const okCount = items.filter(item => item.status === 'ok').length;
   const naCount = items.filter(item => item.status === 'na').length;
 
+  // Check if this is a weekly inspection (has day_of_week data)
+  const isWeeklyInspection = items.length > 0 && items[0].day_of_week !== null;
+
+  // For weekly inspections, group items by item_number to show in table format
+  const uniqueItems: Array<{ number: number; description: string }> = [];
+  if (isWeeklyInspection) {
+    const seenNumbers = new Set<number>();
+    items.forEach(item => {
+      if (!seenNumbers.has(item.item_number)) {
+        seenNumbers.add(item.item_number);
+        uniqueItems.push({
+          number: item.item_number,
+          description: item.item_description,
+        });
+      }
+    });
+    uniqueItems.sort((a, b) => a.number - b.number);
+  }
+
+  // Helper to get item status for a specific day
+  const getItemStatusForDay = (itemNumber: number, dayOfWeek: number): InspectionStatus | null => {
+    const item = items.find(i => i.item_number === itemNumber && i.day_of_week === dayOfWeek);
+    return item ? item.status : null;
+  };
+
+  // Day names for weekly view
+  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
   return (
     <div className="space-y-6 max-w-5xl">
       <div className="flex items-center justify-between">
@@ -408,136 +436,216 @@ export default function ViewInspectionPage() {
         <CardContent className="space-y-6">
           {/* Desktop Table View */}
           <div className="hidden md:block overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2 w-12 font-medium">#</th>
-                  <th className="text-left p-2 font-medium">Item</th>
-                  <th className="text-center p-2 w-48 font-medium">Status</th>
-                  <th className="text-left p-2 font-medium">Comments</th>
-                  <th className="text-center p-2 w-24 font-medium">Photo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr key={item.id} className="border-b hover:bg-secondary/20">
-                    <td className="p-2 text-sm text-muted-foreground">{item.item_number}</td>
-                    <td className="p-2 text-sm">{item.item_description}</td>
-                    <td className="p-2">
-                      {canEdit ? (
-                        <div className="flex items-center justify-center gap-2">
-                          {(['ok', 'defect', 'na'] as InspectionStatus[]).map((status) => (
-                            <button
-                              key={status}
-                              type="button"
-                              onClick={() => updateItem(item.item_number, 'status', status)}
-                              className={`flex items-center justify-center w-10 h-10 rounded border-2 transition-all ${
-                                getStatusColor(status, item.status === status)
-                              }`}
-                              title={status.toUpperCase()}
-                            >
-                              {getStatusIcon(status)}
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center">
-                          {getStatusIcon(item.status)}
-                          <span className="ml-2 text-sm font-medium">
-                            {item.status.toUpperCase()}
-                          </span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-2">
-                      {canEdit ? (
-                        <Input
-                          value={item.comments || ''}
-                          onChange={(e) => updateItem(item.item_number, 'comments', e.target.value)}
-                          placeholder={item.status === 'defect' ? 'Required for defects' : 'Optional notes'}
-                          className={item.status === 'defect' && !item.comments ? 'border-red-300' : ''}
-                        />
-                      ) : (
-                        <span className="text-sm">{item.comments || '-'}</span>
-                      )}
-                    </td>
-                    <td className="p-2 text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setPhotoUploadItem(item.item_number)}
-                        disabled={!canEdit}
-                      >
-                        <Camera className="h-4 w-4" />
-                      </Button>
-                    </td>
+            {isWeeklyInspection ? (
+              /* Weekly Inspection Table - grouped by day */
+              <table className="w-full border-collapse border border-slate-300 dark:border-slate-600">
+                <thead>
+                  <tr className="bg-slate-100 dark:bg-slate-800 border-b border-slate-300 dark:border-slate-600">
+                    <th className="text-left p-2 w-12 font-medium border-r border-slate-300 dark:border-slate-600">#</th>
+                    <th className="text-left p-2 font-medium border-r border-slate-300 dark:border-slate-600">Item</th>
+                    {dayNames.map((day, index) => (
+                      <th key={index} className="text-center p-2 w-16 font-medium border-r border-slate-300 dark:border-slate-600 last:border-r-0">
+                        {day}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {uniqueItems.map((item) => (
+                    <tr key={item.number} className="border-b border-slate-300 dark:border-slate-600 hover:bg-secondary/20">
+                      <td className="p-2 text-sm text-muted-foreground font-medium border-r border-slate-300 dark:border-slate-600">
+                        {item.number}
+                      </td>
+                      <td className="p-2 text-sm border-r border-slate-300 dark:border-slate-600">
+                        {item.description}
+                      </td>
+                      {[1, 2, 3, 4, 5, 6, 7].map((dayOfWeek) => {
+                        const status = getItemStatusForDay(item.number, dayOfWeek);
+                        return (
+                          <td key={dayOfWeek} className="p-2 text-center border-r border-slate-300 dark:border-slate-600 last:border-r-0">
+                            {status ? (
+                              <div className="flex items-center justify-center">
+                                {getStatusIcon(status)}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              /* Standard Inspection Table - flat list */
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-2 w-12 font-medium">#</th>
+                    <th className="text-left p-2 font-medium">Item</th>
+                    <th className="text-center p-2 w-48 font-medium">Status</th>
+                    <th className="text-left p-2 font-medium">Comments</th>
+                    <th className="text-center p-2 w-24 font-medium">Photo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => (
+                    <tr key={item.id} className="border-b hover:bg-secondary/20">
+                      <td className="p-2 text-sm text-muted-foreground">{item.item_number}</td>
+                      <td className="p-2 text-sm">{item.item_description}</td>
+                      <td className="p-2">
+                        {canEdit ? (
+                          <div className="flex items-center justify-center gap-2">
+                            {(['ok', 'defect', 'na'] as InspectionStatus[]).map((status) => (
+                              <button
+                                key={status}
+                                type="button"
+                                onClick={() => updateItem(item.item_number, 'status', status)}
+                                className={`flex items-center justify-center w-10 h-10 rounded border-2 transition-all ${
+                                  getStatusColor(status, item.status === status)
+                                }`}
+                                title={status.toUpperCase()}
+                              >
+                                {getStatusIcon(status)}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center">
+                            {getStatusIcon(item.status)}
+                            <span className="ml-2 text-sm font-medium">
+                              {item.status.toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-2">
+                        {canEdit ? (
+                          <Input
+                            value={item.comments || ''}
+                            onChange={(e) => updateItem(item.item_number, 'comments', e.target.value)}
+                            placeholder={item.status === 'defect' ? 'Required for defects' : 'Optional notes'}
+                            className={item.status === 'defect' && !item.comments ? 'border-red-300' : ''}
+                          />
+                        ) : (
+                          <span className="text-sm">{item.comments || '-'}</span>
+                        )}
+                      </td>
+                      <td className="p-2 text-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPhotoUploadItem(item.item_number)}
+                          disabled={!canEdit}
+                        >
+                          <Camera className="h-4 w-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
 
           {/* Mobile Card View */}
           <div className="md:hidden space-y-4">
-            {items.map((item) => (
-              <Card key={item.id}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">
-                    {item.item_number}. {item.item_description}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {canEdit ? (
-                    <div className="flex items-center justify-center gap-3">
-                      {(['ok', 'defect', 'na'] as InspectionStatus[]).map((status) => (
-                        <button
-                          key={status}
-                          type="button"
-                          onClick={() => updateItem(item.item_number, 'status', status)}
-                          className={`flex flex-col items-center justify-center w-20 h-20 rounded border-2 transition-all ${
-                            getStatusColor(status, item.status === status)
-                          }`}
-                        >
-                          {getStatusIcon(status)}
-                          <span className="text-xs mt-1 font-medium">
-                            {status.toUpperCase()}
-                          </span>
-                        </button>
-                      ))}
+            {isWeeklyInspection ? (
+              /* Weekly Inspection - show items grouped by item number with days */
+              uniqueItems.map((item) => (
+                <Card key={item.number}>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">
+                      {item.number}. {item.description}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="grid grid-cols-7 gap-1">
+                      {dayNames.map((day, index) => {
+                        const dayOfWeek = index + 1;
+                        const status = getItemStatusForDay(item.number, dayOfWeek);
+                        return (
+                          <div key={index} className="flex flex-col items-center p-2 border border-slate-200 dark:border-slate-700 rounded">
+                            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                              {day}
+                            </span>
+                            {status ? (
+                              <div className="flex items-center justify-center">
+                                {getStatusIcon(status)}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-xs">-</span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-center py-4">
-                      {getStatusIcon(item.status)}
-                      <span className="ml-2 font-medium">
-                        {item.status.toUpperCase()}
-                      </span>
-                    </div>
-                  )}
-                  {canEdit ? (
-                    <Input
-                      value={item.comments || ''}
-                      onChange={(e) => updateItem(item.item_number, 'comments', e.target.value)}
-                      placeholder={item.status === 'defect' ? 'Required for defects' : 'Optional notes'}
-                      className={item.status === 'defect' && !item.comments ? 'border-red-300' : ''}
-                    />
-                  ) : (
-                    item.comments && (
-                      <p className="text-sm text-muted-foreground">{item.comments}</p>
-                    )
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => setPhotoUploadItem(item.item_number)}
-                    disabled={!canEdit}
-                  >
-                    <Camera className="h-4 w-4 mr-2" />
-                    Add Photo
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              /* Standard Inspection - show flat list */
+              items.map((item) => (
+                <Card key={item.id}>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">
+                      {item.item_number}. {item.item_description}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {canEdit ? (
+                      <div className="flex items-center justify-center gap-3">
+                        {(['ok', 'defect', 'na'] as InspectionStatus[]).map((status) => (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => updateItem(item.item_number, 'status', status)}
+                            className={`flex flex-col items-center justify-center w-20 h-20 rounded border-2 transition-all ${
+                              getStatusColor(status, item.status === status)
+                            }`}
+                          >
+                            {getStatusIcon(status)}
+                            <span className="text-xs mt-1 font-medium">
+                              {status.toUpperCase()}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center py-4">
+                        {getStatusIcon(item.status)}
+                        <span className="ml-2 font-medium">
+                          {item.status.toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    {canEdit ? (
+                      <Input
+                        value={item.comments || ''}
+                        onChange={(e) => updateItem(item.item_number, 'comments', e.target.value)}
+                        placeholder={item.status === 'defect' ? 'Required for defects' : 'Optional notes'}
+                        className={item.status === 'defect' && !item.comments ? 'border-red-300' : ''}
+                      />
+                    ) : (
+                      item.comments && (
+                        <p className="text-sm text-muted-foreground">{item.comments}</p>
+                      )
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setPhotoUploadItem(item.item_number)}
+                      disabled={!canEdit}
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      Add Photo
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
 
           {/* Action Buttons */}
