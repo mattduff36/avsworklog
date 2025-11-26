@@ -108,15 +108,20 @@ export default withPWA({
         },
       },
     },
-    // For navigation requests (pages): NetworkOnly with 10-second timeout
-    // Falls back to /offline page when offline
+    // For navigation requests (pages): NetworkFirst with 10-second timeout
+    // Falls back to /offline page when offline or timeout
     {
       urlPattern: ({ request, url }: { request: Request; url: URL }) => {
         return request.mode === "navigate" && url.pathname !== "/offline";
       },
-      handler: "NetworkOnly",
+      handler: "NetworkFirst",
       options: {
+        cacheName: "pages",
         networkTimeoutSeconds: 10,
+        expiration: {
+          maxEntries: 1, // Only cache 1 entry (effectively no caching since pages change)
+          maxAgeSeconds: 1, // Expire after 1 second (effectively force network)
+        },
       },
     },
   ],
