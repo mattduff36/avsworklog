@@ -122,22 +122,35 @@ export default function ViewInspectionPage() {
 
       if (inspectionError) throw inspectionError;
 
-      // Update items
-      type InspectionItemUpdate = Database['public']['Tables']['inspection_items']['Update'];
-      for (const item of items) {
-        if (item.id) {
-          const itemUpdate: InspectionItemUpdate = {
-            status: item.status,
-            comments: item.comments,
-          };
+      // Delete all existing items and re-insert them
+      // This handles both updating existing items and adding new items
+      const { error: deleteError } = await supabase
+        .from('inspection_items')
+        .delete()
+        .eq('inspection_id', inspection.id);
 
-          const { error: updateError } = await supabase
-            .from('inspection_items')
-            .update(itemUpdate)
-            .eq('id', item.id);
+      if (deleteError) throw deleteError;
 
-          if (updateError) throw updateError;
-        }
+      // Re-insert all items (both existing and new)
+      // Only insert items that have been explicitly set (non-null status)
+      type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
+      const itemsToInsert: InspectionItemInsert[] = items
+        .filter(item => item.status) // Only save items with a status set
+        .map(item => ({
+          inspection_id: inspection.id,
+          item_number: item.item_number,
+          item_description: item.item_description,
+          day_of_week: item.day_of_week,
+          status: item.status,
+          comments: item.comments || null,
+        }));
+
+      if (itemsToInsert.length > 0) {
+        const { error: insertError } = await supabase
+          .from('inspection_items')
+          .insert(itemsToInsert);
+
+        if (insertError) throw insertError;
       }
 
       // Refresh data
