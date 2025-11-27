@@ -67,11 +67,11 @@ export default function InspectionsPage() {
     if (user && isManager) {
       fetchEmployees();
     }
-  }, [user, isManager]);
+  }, [user?.id, isManager]);
 
   useEffect(() => {
     fetchInspections();
-  }, [user, isManager, selectedEmployeeId, statusFilter]);
+  }, [user?.id, isManager, selectedEmployeeId, statusFilter]);
 
   // Listen for realtime updates to inspections
   useInspectionRealtime((payload) => {

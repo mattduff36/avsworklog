@@ -58,11 +58,11 @@ export default function TimesheetsPage() {
     if (user && isManager) {
       fetchEmployees();
     }
-  }, [user, isManager]);
+  }, [user?.id, isManager]);
 
   useEffect(() => {
     fetchTimesheets();
-  }, [user, isManager, selectedEmployeeId, statusFilter]);
+  }, [user?.id, isManager, selectedEmployeeId, statusFilter]);
 
   // Listen for realtime updates to timesheets
   useTimesheetRealtime((payload) => {
