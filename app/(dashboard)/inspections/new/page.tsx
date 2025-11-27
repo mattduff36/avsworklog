@@ -496,13 +496,19 @@ export default function NewInspectionPage() {
         if (updateError) throw updateError;
         inspection = updatedInspection;
 
-        // Delete existing items
-        const { error: deleteError } = await supabase
+        // Delete existing items before inserting new ones
+        console.log(`Deleting existing items for inspection ${existingInspectionId}...`);
+        const { data: deletedData, error: deleteError } = await supabase
           .from('inspection_items')
           .delete()
-          .eq('inspection_id', existingInspectionId);
+          .eq('inspection_id', existingInspectionId)
+          .select();
 
-        if (deleteError) throw deleteError;
+        if (deleteError) {
+          console.error('Error deleting existing items:', deleteError);
+          throw new Error(`Failed to delete existing items: ${deleteError.message}`);
+        }
+        console.log(`Deleted ${deletedData?.length || 0} existing items`);
       } else {
         // Create new inspection
         const { data: newInspection, error: insertError } = await supabase
