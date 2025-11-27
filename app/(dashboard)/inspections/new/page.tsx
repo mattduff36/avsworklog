@@ -535,18 +535,30 @@ export default function NewInspectionPage() {
               item_description: item,
               day_of_week: dayOfWeek,
               status: checkboxStates[key],
-              // comments: comments[key] || null, // Comments not in current schema
+              comments: comments[key] || null,
             });
           }
         });
       }
 
-      const { data: insertedItems, error: itemsError } = await supabase
-        .from('inspection_items')
-        .insert(items)
-        .select();
+      // Only insert if there are items to save
+      let insertedItems: any[] = [];
+      if (items.length > 0) {
+        console.log(`Saving ${items.length} inspection items...`);
+        const { data, error: itemsError } = await supabase
+          .from('inspection_items')
+          .insert(items)
+          .select();
 
-      if (itemsError) throw itemsError;
+        if (itemsError) {
+          console.error('Error inserting items:', itemsError);
+          throw new Error(`Failed to save inspection items: ${itemsError.message}`);
+        }
+        
+        insertedItems = data || [];
+      } else {
+        console.warn('No items to save - inspection has no completed items');
+      }
 
       // Auto-create actions for failed items (only when submitting, not drafting)
       if (status === 'submitted' && insertedItems) {
@@ -582,6 +594,16 @@ export default function NewInspectionPage() {
       router.push('/inspections');
     } catch (err) {
       console.error('Error saving inspection:', err);
+      console.error('Error details:', JSON.stringify(err, null, 2));
+      
+      // Get detailed error message
+      let errorMessage = 'Failed to save inspection';
+      let errorDescription = 'Please try again';
+      
+      if (err instanceof Error) {
+        errorMessage = err.message;
+        console.error('Error stack:', err.stack);
+      }
       
       // Check if this is a network/offline error
       if (!isOnline || (err instanceof Error && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('network')))) {
@@ -590,9 +612,9 @@ export default function NewInspectionPage() {
           description: 'Please check your internet connection and try again.',
         });
       } else {
-        setError(err instanceof Error ? err.message : 'Failed to save inspection. Please check your internet connection and try again.');
+        setError(errorMessage);
         toast.error('Failed to save inspection', {
-          description: err instanceof Error ? err.message : 'Please try again or contact support if the problem persists.',
+          description: errorMessage,
         });
       }
     } finally {
