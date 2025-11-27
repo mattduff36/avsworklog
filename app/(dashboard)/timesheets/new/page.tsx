@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
@@ -25,7 +25,7 @@ import { fetchUKBankHolidays } from '@/lib/utils/bank-holidays';
 import { Employee } from '@/types/common';
 import { toast } from 'sonner';
 
-export default function NewTimesheetPage() {
+function NewTimesheetContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, profile, isManager } = useAuth();
@@ -1380,6 +1380,14 @@ export default function NewTimesheetPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function NewTimesheetPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><p className="text-muted-foreground">Loading...</p></div>}>
+      <NewTimesheetContent />
+    </Suspense>
   );
 }
 

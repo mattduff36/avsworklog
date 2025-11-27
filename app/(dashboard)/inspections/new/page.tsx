@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
@@ -26,7 +26,7 @@ import { toast } from 'sonner';
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-export default function NewInspectionPage() {
+function NewInspectionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const draftId = searchParams.get('id'); // Get draft ID from URL if editing
@@ -1189,5 +1189,13 @@ export default function NewInspectionPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function NewInspectionPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><p className="text-muted-foreground">Loading...</p></div>}>
+      <NewInspectionContent />
+    </Suspense>
   );
 }

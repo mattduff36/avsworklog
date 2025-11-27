@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -36,7 +36,7 @@ interface InspectionWithDetails extends VehicleInspection {
   };
 }
 
-export default function ApprovalsPage() {
+function ApprovalsContent() {
   const { isManager, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -809,6 +809,14 @@ function AbsenceApprovalCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+export default function ApprovalsPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><p className="text-muted-foreground">Loading...</p></div>}>
+      <ApprovalsContent />
+    </Suspense>
   );
 }
 

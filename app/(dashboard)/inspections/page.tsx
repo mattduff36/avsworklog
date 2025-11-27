@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
@@ -39,7 +39,7 @@ interface InspectionWithVehicle extends VehicleInspection {
   };
 }
 
-export default function InspectionsPage() {
+function InspectionsContent() {
   const { user, isManager } = useAuth();
   const { isOnline } = useOfflineSync();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('inspections');
@@ -493,5 +493,13 @@ export default function InspectionsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+export default function InspectionsPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><p className="text-muted-foreground">Loading...</p></div>}>
+      <InspectionsContent />
+    </Suspense>
   );
 }
