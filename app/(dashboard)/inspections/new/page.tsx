@@ -597,6 +597,18 @@ export default function NewInspectionPage() {
         }
       }
 
+      // Show success message based on status
+      if (status === 'draft') {
+        toast.success('Draft saved successfully', {
+          description: 'Your inspection has been saved as a draft.',
+        });
+      } else {
+        toast.success('Inspection submitted successfully', {
+          description: 'Your inspection has been submitted for review.',
+        });
+      }
+
+      // Navigate back to inspections list
       router.push('/inspections');
     } catch (err) {
       console.error('Error saving inspection:', err);
