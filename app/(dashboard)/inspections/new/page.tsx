@@ -427,7 +427,7 @@ export default function NewInspectionPage() {
 
       // Check if offline
       if (!isOnline) {
-        // Prepare items data
+        // Prepare items data - ONLY items that have been explicitly set by the user
         type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
         const items: Omit<InspectionItemInsert, 'inspection_id'>[] = [];
         
@@ -435,12 +435,16 @@ export default function NewInspectionPage() {
           currentChecklist.forEach((item, index) => {
             const itemNumber = index + 1;
             const key = `${dayOfWeek}-${itemNumber}`;
-            items.push({
-              item_number: itemNumber,
-              day_of_week: dayOfWeek,
-              item_description: item,
-              status: checkboxStates[key] || 'ok',
-            });
+            
+            // Only save items that have been explicitly set by the user
+            if (checkboxStates[key]) {
+              items.push({
+                item_number: itemNumber,
+                day_of_week: dayOfWeek,
+                item_description: item,
+                status: checkboxStates[key],
+              });
+            }
           });
         }
 
@@ -513,7 +517,8 @@ export default function NewInspectionPage() {
 
       if (!inspection) throw new Error('Failed to save inspection');
 
-      // Create inspection items for all 7 days
+      // Create inspection items ONLY for items that have been explicitly set by the user
+      // This prevents drafts from showing all items as 'ok' when they haven't been completed
       type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
       const items: InspectionItemInsert[] = [];
       
@@ -521,14 +526,18 @@ export default function NewInspectionPage() {
         currentChecklist.forEach((item, index) => {
           const itemNumber = index + 1;
           const key = `${dayOfWeek}-${itemNumber}`;
-          items.push({
-            inspection_id: inspection.id,
-            item_number: itemNumber,
-            item_description: item,
-            day_of_week: dayOfWeek,
-            status: checkboxStates[key] || 'ok',
-            // comments: comments[key] || null, // Comments not in current schema
-          });
+          
+          // Only save items that have been explicitly set by the user
+          if (checkboxStates[key]) {
+            items.push({
+              inspection_id: inspection.id,
+              item_number: itemNumber,
+              item_description: item,
+              day_of_week: dayOfWeek,
+              status: checkboxStates[key],
+              // comments: comments[key] || null, // Comments not in current schema
+            });
+          }
         });
       }
 
