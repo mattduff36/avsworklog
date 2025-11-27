@@ -16,11 +16,8 @@ import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 import { VehicleInspection } from '@/types/inspection';
 import { AbsenceWithRelations } from '@/types/absence';
+import { TimesheetStatusFilter, InspectionStatusFilter, StatusFilter } from '@/types/common';
 import { usePendingAbsences, useApproveAbsence, useRejectAbsence, useAbsenceSummaryForEmployee } from '@/lib/hooks/useAbsence';
-
-type TimesheetStatusFilter = 'pending' | 'approved' | 'rejected' | 'processed' | 'adjusted' | 'all';
-type InspectionStatusFilter = 'pending' | 'approved' | 'rejected' | 'all';
-type StatusFilter = TimesheetStatusFilter | InspectionStatusFilter;
 
 interface TimesheetWithProfile extends Timesheet {
   user: {

@@ -22,13 +22,8 @@ import { DAY_NAMES, Timesheet, TimesheetEntry } from '@/types/timesheet';
 import { Database } from '@/types/database';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { fetchUKBankHolidays } from '@/lib/utils/bank-holidays';
+import { Employee } from '@/types/common';
 import { toast } from 'sonner';
-
-type Employee = {
-  id: string;
-  full_name: string;
-  employee_id: string | null;
-};
 
 export default function NewTimesheetPage() {
   const router = useRouter();

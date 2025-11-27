@@ -21,15 +21,10 @@ import { formatDateISO, formatDate, getWeekEnding } from '@/lib/utils/date';
 import { INSPECTION_ITEMS, InspectionStatus, getChecklistForCategory } from '@/types/inspection';
 import { Database } from '@/types/database';
 import { SignaturePad } from '@/components/forms/SignaturePad';
+import { Employee } from '@/types/common';
 import { toast } from 'sonner';
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
-type Employee = {
-  id: string;
-  full_name: string;
-  employee_id: string | null;
-};
 
 export default function NewInspectionPage() {
   const router = useRouter();

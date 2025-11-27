@@ -18,6 +18,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, FileText, Clock, CheckCircle2, XCircle, User, Download, Trash2, Filter, Package, AlertTriangle } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
+import { Employee, TimesheetStatusFilter } from '@/types/common';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -29,14 +30,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-
-type Employee = {
-  id: string;
-  full_name: string;
-  employee_id: string | null;
-};
-
-type StatusFilter = 'all' | 'draft' | 'pending' | 'approved' | 'rejected' | 'processed' | 'adjusted';
 
 interface TimesheetWithProfile extends Timesheet {
   profile?: {
@@ -53,7 +46,7 @@ export default function TimesheetsPage() {
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<TimesheetStatusFilter>('all');
   const [downloading, setDownloading] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [timesheetToDelete, setTimesheetToDelete] = useState<{ id: string; weekEnding: string } | null>(null);
@@ -175,7 +168,7 @@ export default function TimesheetsPage() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const getFilterLabel = (filter: StatusFilter) => {
+  const getFilterLabel = (filter: TimesheetStatusFilter) => {
     switch (filter) {
       case 'all': return 'All';
       case 'draft': return 'Draft';
@@ -338,7 +331,7 @@ export default function TimesheetsPage() {
             <Filter className="h-4 w-4 text-slate-400" />
             <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
             <div className="flex gap-2 flex-wrap">
-              {(['all', 'draft', 'pending', 'approved', 'rejected', 'processed', 'adjusted'] as StatusFilter[]).map((filter) => (
+              {(['all', 'draft', 'pending', 'approved', 'rejected', 'processed', 'adjusted'] as TimesheetStatusFilter[]).map((filter) => (
                 <Button
                   key={filter}
                   variant={statusFilter === filter ? 'default' : 'outline'}

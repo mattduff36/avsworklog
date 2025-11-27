@@ -19,6 +19,7 @@ import { Plus, Clipboard, CheckCircle2, XCircle, Clock, AlertCircle, User, Downl
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import { VehicleInspection } from '@/types/inspection';
+import { Employee, InspectionStatusFilter } from '@/types/common';
 import { useQueryState } from 'nuqs';
 import {
   AlertDialog,
@@ -30,14 +31,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-
-type Employee = {
-  id: string;
-  full_name: string;
-  employee_id: string | null;
-};
-
-type StatusFilter = 'all' | 'draft' | 'pending' | 'approved' | 'rejected';
 
 interface InspectionWithVehicle extends VehicleInspection {
   vehicles: {
@@ -59,7 +52,7 @@ export default function InspectionsPage() {
     defaultValue: 'all',
     shallow: false,
   });
-  const [statusFilter, setStatusFilter] = useQueryState<StatusFilter>('status', {
+  const [statusFilter, setStatusFilter] = useQueryState<InspectionStatusFilter>('status', {
     defaultValue: 'all',
     shallow: false,
   });
@@ -173,7 +166,7 @@ export default function InspectionsPage() {
     }
   };
 
-  const getFilterLabel = (filter: StatusFilter) => {
+  const getFilterLabel = (filter: InspectionStatusFilter) => {
     switch (filter) {
       case 'all': return 'All';
       case 'draft': return 'Draft';
@@ -329,7 +322,7 @@ export default function InspectionsPage() {
             <Filter className="h-4 w-4 text-slate-400" />
             <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
             <div className="flex gap-2 flex-wrap">
-              {(['all', 'draft', 'pending', 'approved', 'rejected'] as StatusFilter[]).map((filter) => (
+              {(['all', 'draft', 'pending', 'approved', 'rejected'] as InspectionStatusFilter[]).map((filter) => (
                 <Button
                   key={filter}
                   variant={statusFilter === filter ? 'default' : 'outline'}
