@@ -1,8 +1,12 @@
+'use client';
+
 import { Navbar } from '@/components/layout/Navbar';
 import { DashboardContent } from '@/components/layout/DashboardContent';
 import { MessageBlockingCheck } from '@/components/messages/MessageBlockingCheck';
 import { MobileNavBar } from '@/components/layout/MobileNavBar';
 import { PullToRefresh } from '@/components/layout/PullToRefresh';
+import { OfflineBanner } from '@/components/ui/offline-banner';
+import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 
 // Force dynamic rendering to prevent build-time errors
 export const dynamic = 'force-dynamic';
@@ -12,6 +16,8 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const { isOnline } = useOfflineSync();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 relative">
       {/* Subtle background pattern */}
@@ -23,6 +29,8 @@ export default function DashboardLayout({
       <Navbar />
       <PullToRefresh />
       <DashboardContent>
+        {/* Global Offline Banner - shown on all dashboard pages */}
+        {!isOnline && <OfflineBanner />}
         {children}
       </DashboardContent>
       
