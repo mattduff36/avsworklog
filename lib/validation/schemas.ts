@@ -88,22 +88,27 @@ export const DateRangeSchema = z.object({
 /**
  * Helper function to validate request body
  * Usage: const result = await validateRequest(req, schema);
+ * Note: This clones the request to allow reading the body multiple times
  */
 export async function validateRequest<T>(
   req: Request,
   schema: z.ZodSchema<T>
 ): Promise<{ success: true; data: T } | { success: false; error: string }> {
   try {
-    const body = await req.json();
+    // Clone the request to allow reading body multiple times
+    const clonedReq = req.clone();
+    const body = await clonedReq.json();
     const data = schema.parse(body);
     return { success: true, data };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const firstError = error.errors[0];
-      return {
-        success: false,
-        error: `${firstError.path.join('.')}: ${firstError.message}`,
-      };
+      const firstError = error.errors?.[0];
+      if (firstError) {
+        return {
+          success: false,
+          error: `${firstError.path.join('.')}: ${firstError.message}`,
+        };
+      }
     }
     return { success: false, error: 'Invalid request data' };
   }
@@ -121,11 +126,13 @@ export function validateParams<T>(
     return { success: true, data };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const firstError = error.errors[0];
-      return {
-        success: false,
-        error: `${firstError.path.join('.')}: ${firstError.message}`,
-      };
+      const firstError = error.errors?.[0];
+      if (firstError) {
+        return {
+          success: false,
+          error: `${firstError.path.join('.')}: ${firstError.message}`,
+        };
+      }
     }
     return { success: false, error: 'Invalid parameters' };
   }

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { sendTimesheetAdjustmentEmail } from '@/lib/utils/email';
-import { validateRequest, validateParams, IdParamsSchema, TimesheetAdjustSchema } from '@/lib/validation/schemas';
 
 export async function POST(
   request: NextRequest,
@@ -9,26 +8,15 @@ export async function POST(
 ) {
   try {
     const supabase = await createClient();
-    
-    // Validate params
-    const paramsResult = validateParams(await params, IdParamsSchema);
-    if (!paramsResult.success) {
-      return NextResponse.json(
-        { success: false, error: paramsResult.error },
-        { status: 400 }
-      );
-    }
-    const { id: timesheetId } = paramsResult.data;
+    const { id: timesheetId } = await params;
+    const { comments, notifyManagerIds } = await request.json();
 
-    // Validate request body
-    const bodyResult = await validateRequest(request, TimesheetAdjustSchema);
-    if (!bodyResult.success) {
+    if (!comments || typeof comments !== 'string' || comments.trim().length === 0) {
       return NextResponse.json(
-        { success: false, error: bodyResult.error },
+        { error: 'Adjustment comments are required' },
         { status: 400 }
       );
     }
-    const { comments, notifyManagerIds } = bodyResult.data;
 
     // Get current user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -216,7 +204,7 @@ export async function POST(
   } catch (error) {
     console.error('Error adjusting timesheet:', error);
     return NextResponse.json(
-      { success: false, error: 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
