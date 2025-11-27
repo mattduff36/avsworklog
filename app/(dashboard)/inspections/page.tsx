@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useOnlineStatus } from '@/lib/hooks/use-online-status';
+import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useInspectionRealtime } from '@/lib/hooks/useRealtime';
 import { createClient } from '@/lib/supabase/client';
@@ -41,7 +41,7 @@ interface InspectionWithVehicle extends VehicleInspection {
 
 export default function InspectionsPage() {
   const { user, isManager } = useAuth();
-  const online = useOnlineStatus();
+  const { isOnline } = useOfflineSync();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('inspections');
   const router = useRouter();
   const [inspections, setInspections] = useState<InspectionWithVehicle[]>([]);
@@ -156,7 +156,7 @@ export default function InspectionsPage() {
     } catch (error) {
       console.error('Error fetching inspections:', error);
       // Show friendly message if offline
-      if (!online) {
+      if (!isOnline) {
         toast.error('Unable to load inspections', {
           description: 'Please check your internet connection.',
         });
@@ -269,7 +269,7 @@ export default function InspectionsPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Offline Banner */}
-      {!online && <OfflineBanner />}
+      {!isOnline && <OfflineBanner />}
       
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">

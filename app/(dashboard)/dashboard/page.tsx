@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useOnlineStatus } from '@/lib/hooks/use-online-status';
+import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -59,7 +59,7 @@ type Action = Database['public']['Tables']['actions']['Row'] & {
 
 export default function DashboardPage() {
   const { profile, isManager, isAdmin } = useAuth();
-  const online = useOnlineStatus();
+  const { isOnline } = useOfflineSync();
   const formTypes = getEnabledForms();
   const supabase = createClient();
 
@@ -177,7 +177,7 @@ export default function DashboardPage() {
 
   const fetchPendingApprovals = async () => {
     // Skip fetching if offline - rely on cached page data
-    if (!online) {
+    if (!isOnline) {
       setLoading(false);
       return;
     }
@@ -313,7 +313,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8 max-w-6xl">
       {/* Offline Banner */}
-      {!online && <OfflineBanner />}
+      {!isOnline && <OfflineBanner />}
       
       {/* Welcome Section */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">

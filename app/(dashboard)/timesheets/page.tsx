@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useOnlineStatus } from '@/lib/hooks/use-online-status';
+import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useTimesheetRealtime } from '@/lib/hooks/useRealtime';
 import { createClient } from '@/lib/supabase/client';
@@ -39,7 +39,7 @@ interface TimesheetWithProfile extends Timesheet {
 
 export default function TimesheetsPage() {
   const { user, isManager } = useAuth();
-  const online = useOnlineStatus();
+  const { isOnline } = useOfflineSync();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('timesheets');
   const router = useRouter();
   const [timesheets, setTimesheets] = useState<TimesheetWithProfile[]>([]);
@@ -143,7 +143,7 @@ export default function TimesheetsPage() {
     } catch (error) {
       console.error('Error fetching timesheets:', error);
       // Show friendly message if offline
-      if (!online) {
+      if (!isOnline) {
         toast.error('Unable to load timesheets', {
           description: 'Please check your internet connection.',
         });
@@ -278,7 +278,7 @@ export default function TimesheetsPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Offline Banner */}
-      {!online && <OfflineBanner />}
+      {!isOnline && <OfflineBanner />}
       
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
