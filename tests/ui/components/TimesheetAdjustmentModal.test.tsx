@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { TimesheetAdjustmentModal } from '@/components/timesheets/TimesheetAdjustmentModal';
 import { createSuzanneSquires, createMockManager } from '../../utils/factories';
-import { resetAllMocks } from '../../utils/test-helpers';
+import { resetAllMocks, mockFetch } from '../../utils/test-helpers';
 
 describe('TimesheetAdjustmentModal', () => {
   const mockOnClose = vi.fn();
@@ -65,21 +65,8 @@ describe('TimesheetAdjustmentModal', () => {
     });
 
     it('should enable submission when comment is provided', async () => {
-      const { createClient } = await import('@/lib/supabase/client');
       const suzanne = createSuzanneSquires();
-      
-      vi.mocked(createClient).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [suzanne],
-                error: null,
-              }),
-            }),
-          }),
-        }),
-      } as any);
+      mockFetch({ managers: [suzanne] });
 
       render(
         <TimesheetAdjustmentModal
@@ -115,25 +102,12 @@ describe('TimesheetAdjustmentModal', () => {
 
   describe('Suzanne Squires prioritization', () => {
     it('should show Suzanne Squires at the top of the list', async () => {
-      const { createClient } = await import('@/lib/supabase/client');
       const suzanne = createSuzanneSquires();
       const manager2 = createMockManager();
       manager2.id = 'manager2-id';
       manager2.full_name = 'Alice Manager';
       manager2.email = 'alice@example.com';
-      
-      vi.mocked(createClient).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [suzanne, manager2],
-                error: null,
-              }),
-            }),
-          }),
-        }),
-      } as any);
+      mockFetch({ managers: [suzanne, manager2] });
 
       render(
         <TimesheetAdjustmentModal
@@ -157,24 +131,11 @@ describe('TimesheetAdjustmentModal', () => {
 
   describe('Recipient selection', () => {
     it('should allow selecting multiple recipients', async () => {
-      const { createClient } = await import('@/lib/supabase/client');
       const suzanne = createSuzanneSquires();
       const manager2 = createMockManager();
       manager2.id = 'manager2-id';
       manager2.full_name = 'Alice Manager';
-      
-      vi.mocked(createClient).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [suzanne, manager2],
-                error: null,
-              }),
-            }),
-          }),
-        }),
-      } as any);
+      mockFetch({ managers: [suzanne, manager2] });
 
       render(
         <TimesheetAdjustmentModal
@@ -201,21 +162,8 @@ describe('TimesheetAdjustmentModal', () => {
     });
 
     it('should show count of selected recipients', async () => {
-      const { createClient } = await import('@/lib/supabase/client');
       const suzanne = createSuzanneSquires();
-      
-      vi.mocked(createClient).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [suzanne],
-                error: null,
-              }),
-            }),
-          }),
-        }),
-      } as any);
+      mockFetch({ managers: [suzanne] });
 
       render(
         <TimesheetAdjustmentModal
@@ -243,22 +191,8 @@ describe('TimesheetAdjustmentModal', () => {
   describe('Form submission', () => {
     it('should call onConfirm with selected recipients and comments', async () => {
       mockOnConfirm.mockResolvedValue(undefined);
-      
-      const { createClient } = await import('@/lib/supabase/client');
       const suzanne = createSuzanneSquires();
-      
-      vi.mocked(createClient).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [suzanne],
-                error: null,
-              }),
-            }),
-          }),
-        }),
-      } as any);
+      mockFetch({ managers: [suzanne] });
 
       render(
         <TimesheetAdjustmentModal
@@ -294,24 +228,11 @@ describe('TimesheetAdjustmentModal', () => {
 
   describe('Search functionality', () => {
     it('should filter managers by search query', async () => {
-      const { createClient } = await import('@/lib/supabase/client');
       const suzanne = createSuzanneSquires();
       const manager2 = createMockManager();
       manager2.id = 'manager2-id';
       manager2.full_name = 'Alice Manager';
-      
-      vi.mocked(createClient).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              order: vi.fn().mockResolvedValue({
-                data: [suzanne, manager2],
-                error: null,
-              }),
-            }),
-          }),
-        }),
-      } as any);
+      mockFetch({ managers: [suzanne, manager2] });
 
       render(
         <TimesheetAdjustmentModal

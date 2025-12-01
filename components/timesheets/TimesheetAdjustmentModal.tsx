@@ -17,7 +17,6 @@ import { Label } from '@/components/ui/label';
 import { Loader2, UserCheck, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { createClient } from '@/lib/supabase/client';
 
 interface Manager {
   id: string;
@@ -27,6 +26,18 @@ interface Manager {
     name: string;
     display_name: string;
   } | null;
+}
+
+const SUZANNE_EMAIL = 'suzanne@avsquires.co.uk';
+
+function compareManagers(a: Manager, b: Manager): number {
+  if (a.email === SUZANNE_EMAIL) return -1;
+  if (b.email === SUZANNE_EMAIL) return 1;
+  return a.full_name.localeCompare(b.full_name);
+}
+
+function sortManagersWithSuzanneFirst(managers: Manager[]): Manager[] {
+  return [...managers].sort(compareManagers);
 }
 
 interface TimesheetAdjustmentModalProps {
@@ -51,7 +62,6 @@ export function TimesheetAdjustmentModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const supabase = createClient();
 
   useEffect(() => {
     if (open) {
@@ -76,61 +86,39 @@ export function TimesheetAdjustmentModal({
   const fetchManagers = async () => {
     setFetching(true);
     try {
-      // Fetch all managers and admins with their emails
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          full_name,
-          email,
-          roles!inner(
-            id,
-            name,
-            display_name,
-            is_manager_admin
-          )
-        `)
-        .eq('roles.is_manager_admin', true)
-        .order('full_name');
+      const response = await fetch('/api/timesheets/managers');
 
-      if (profilesError) {
-        console.error('Error fetching managers:', profilesError);
-        throw profilesError;
+      if (!response.ok) {
+        let errorMessage = 'Failed to load managers';
+        try {
+          const errorBody = await response.json();
+          if (errorBody?.error) {
+            errorMessage = errorBody.error;
+          }
+        } catch {
+          // Ignore JSON parse errors and use default message
+        }
+
+        console.error('Error fetching managers:', response.status, response.statusText);
+        throw new Error(errorMessage);
       }
 
-      const managersWithEmail = profiles || [];
+      const { managers: apiManagers } = (await response.json()) as {
+        managers: Manager[] | undefined;
+      };
 
-      // Sort managers: Put Suzanne Squires at the top
-      const sortedManagers = managersWithEmail.sort((a, b) => {
-        const suzanneEmail = 'suzanne@avsquires.co.uk';
-        if (a.email === suzanneEmail) return -1;
-        if (b.email === suzanneEmail) return 1;
-        return a.full_name.localeCompare(b.full_name);
-      });
+      const managersList = apiManagers ?? [];
 
-      const transformedManagers = sortedManagers.map((mgr: unknown) => {
-        const m = mgr as {
-          id: string;
-          full_name: string;
-          email: string;
-          roles: { name: string; display_name: string };
-        };
-        return {
-          id: m.id,
-          full_name: m.full_name,
-          email: m.email,
-          role: m.roles ? {
-            name: m.roles.name,
-            display_name: m.roles.display_name,
-          } : null,
-        };
-      });
+      // Ensure Suzanne Squires is always at the top of the list
+      const sortedManagers = sortManagersWithSuzanneFirst(managersList);
 
-      setManagers(transformedManagers);
-      setFilteredManagers(transformedManagers);
+      setManagers(sortedManagers);
+      setFilteredManagers(sortedManagers);
     } catch (error) {
       console.error('Error fetching managers:', error);
       toast.error('Failed to load managers');
+      setManagers([]);
+      setFilteredManagers([]);
     } finally {
       setFetching(false);
     }
