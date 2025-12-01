@@ -90,3 +90,26 @@ export const createSuzanneSquires = () =>
     },
   });
 
+// API response format factories (transformed from database schema)
+// These match the shape returned by /api/timesheets/managers
+export const createManagerApiResponse = (overrides?: any) => ({
+  id: 'manager-id',
+  full_name: 'Test Manager',
+  email: 'manager@example.com',
+  role: {
+    name: 'manager',
+    display_name: 'Manager',
+  },
+  ...overrides,
+});
+
+export const createSuzanneSquiresApiResponse = () => ({
+  id: 'suzanne-id',
+  full_name: 'Suzanne Squires',
+  email: 'suzanne@avsquires.co.uk',
+  role: {
+    name: 'manager',
+    display_name: 'Manager',
+  },
+});
+

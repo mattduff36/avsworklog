@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { TimesheetAdjustmentModal } from '@/components/timesheets/TimesheetAdjustmentModal';
-import { createSuzanneSquires, createMockManager } from '../../utils/factories';
+import { createSuzanneSquiresApiResponse, createManagerApiResponse } from '../../utils/factories';
 import { resetAllMocks, mockFetch } from '../../utils/test-helpers';
 
 describe('TimesheetAdjustmentModal', () => {
@@ -65,7 +65,7 @@ describe('TimesheetAdjustmentModal', () => {
     });
 
     it('should enable submission when comment is provided', async () => {
-      const suzanne = createSuzanneSquires();
+      const suzanne = createSuzanneSquiresApiResponse();
       mockFetch({ managers: [suzanne] });
 
       render(
@@ -102,11 +102,12 @@ describe('TimesheetAdjustmentModal', () => {
 
   describe('Suzanne Squires prioritization', () => {
     it('should show Suzanne Squires at the top of the list', async () => {
-      const suzanne = createSuzanneSquires();
-      const manager2 = createMockManager();
-      manager2.id = 'manager2-id';
-      manager2.full_name = 'Alice Manager';
-      manager2.email = 'alice@example.com';
+      const suzanne = createSuzanneSquiresApiResponse();
+      const manager2 = createManagerApiResponse({
+        id: 'manager2-id',
+        full_name: 'Alice Manager',
+        email: 'alice@example.com',
+      });
       mockFetch({ managers: [suzanne, manager2] });
 
       render(
@@ -131,10 +132,11 @@ describe('TimesheetAdjustmentModal', () => {
 
   describe('Recipient selection', () => {
     it('should allow selecting multiple recipients', async () => {
-      const suzanne = createSuzanneSquires();
-      const manager2 = createMockManager();
-      manager2.id = 'manager2-id';
-      manager2.full_name = 'Alice Manager';
+      const suzanne = createSuzanneSquiresApiResponse();
+      const manager2 = createManagerApiResponse({
+        id: 'manager2-id',
+        full_name: 'Alice Manager',
+      });
       mockFetch({ managers: [suzanne, manager2] });
 
       render(
@@ -162,7 +164,7 @@ describe('TimesheetAdjustmentModal', () => {
     });
 
     it('should show count of selected recipients', async () => {
-      const suzanne = createSuzanneSquires();
+      const suzanne = createSuzanneSquiresApiResponse();
       mockFetch({ managers: [suzanne] });
 
       render(
@@ -191,7 +193,7 @@ describe('TimesheetAdjustmentModal', () => {
   describe('Form submission', () => {
     it('should call onConfirm with selected recipients and comments', async () => {
       mockOnConfirm.mockResolvedValue(undefined);
-      const suzanne = createSuzanneSquires();
+      const suzanne = createSuzanneSquiresApiResponse();
       mockFetch({ managers: [suzanne] });
 
       render(
@@ -228,10 +230,11 @@ describe('TimesheetAdjustmentModal', () => {
 
   describe('Search functionality', () => {
     it('should filter managers by search query', async () => {
-      const suzanne = createSuzanneSquires();
-      const manager2 = createMockManager();
-      manager2.id = 'manager2-id';
-      manager2.full_name = 'Alice Manager';
+      const suzanne = createSuzanneSquiresApiResponse();
+      const manager2 = createManagerApiResponse({
+        id: 'manager2-id',
+        full_name: 'Alice Manager',
+      });
       mockFetch({ managers: [suzanne, manager2] });
 
       render(
