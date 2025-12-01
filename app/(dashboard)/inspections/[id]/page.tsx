@@ -109,6 +109,13 @@ export default function ViewInspectionPage() {
     setError('');
 
     try {
+      console.log('[Mobile Debug] Starting save...', {
+        inspectionId: inspection.id,
+        totalItems: items.length,
+        itemsWithStatus: items.filter(item => item.status).length,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A',
+      });
+
       // Update inspection
       type InspectionUpdate = Database['public']['Tables']['vehicle_inspections']['Update'];
       const inspectionUpdate: InspectionUpdate = {
@@ -120,16 +127,25 @@ export default function ViewInspectionPage() {
         .update(inspectionUpdate)
         .eq('id', inspection.id);
 
-      if (inspectionError) throw inspectionError;
+      if (inspectionError) {
+        console.error('[Mobile Debug] Inspection update error:', inspectionError);
+        throw inspectionError;
+      }
+      console.log('[Mobile Debug] Inspection updated successfully');
 
       // Delete all existing items and re-insert them
       // This handles both updating existing items and adding new items
+      console.log('[Mobile Debug] Deleting existing items...');
       const { error: deleteError } = await supabase
         .from('inspection_items')
         .delete()
         .eq('inspection_id', inspection.id);
 
-      if (deleteError) throw deleteError;
+      if (deleteError) {
+        console.error('[Mobile Debug] Delete error:', deleteError);
+        throw deleteError;
+      }
+      console.log('[Mobile Debug] Existing items deleted successfully');
 
       // Re-insert all items (both existing and new)
       // Only insert items that have been explicitly set (non-null status)
@@ -145,20 +161,47 @@ export default function ViewInspectionPage() {
           comments: item.comments || null,
         }));
 
-      if (itemsToInsert.length > 0) {
-        const { error: insertError } = await supabase
-          .from('inspection_items')
-          .insert(itemsToInsert);
+      console.log('[Mobile Debug] Items to insert:', {
+        count: itemsToInsert.length,
+        sample: itemsToInsert.length > 0 ? itemsToInsert[0] : null,
+      });
 
-        if (insertError) throw insertError;
+      if (itemsToInsert.length > 0) {
+        const { error: insertError, data: insertedData } = await supabase
+          .from('inspection_items')
+          .insert(itemsToInsert)
+          .select();
+
+        if (insertError) {
+          console.error('[Mobile Debug] Insert error:', insertError);
+          throw insertError;
+        }
+        console.log('[Mobile Debug] Items inserted successfully:', insertedData?.length);
       }
 
+      console.log('[Mobile Debug] Save completed, refreshing data...');
       // Refresh data
       await fetchInspection(inspection.id);
       setEditing(false);
+      console.log('[Mobile Debug] Save process complete!');
     } catch (err) {
-      console.error('Error saving inspection:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save inspection');
+      console.error('[Mobile Debug] Error saving inspection:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save inspection';
+      setError(errorMessage);
+      
+      // Log to error logger if available
+      if (typeof window !== 'undefined' && (window as any).errorLogger) {
+        (window as any).errorLogger.logError({
+          error: err,
+          componentName: 'InspectionEditPage - handleSave',
+          additionalData: {
+            inspectionId: inspection.id,
+            itemCount: items.length,
+            itemsWithStatus: items.filter(item => item.status).length,
+            isMobile: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent),
+          },
+        });
+      }
     } finally {
       setSaving(false);
     }

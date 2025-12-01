@@ -9,9 +9,12 @@ alwaysApply: true
 - Before running tests, confirm branch and scope in one line.
 
 ## 2. Git pushes
-- Push to GitHub only when the user says to push.
-- Local commits allowed.
-- State what will be pushed before pushing.
+- Push to GitHub only when the user writes exactly: `push to GitHub`.
+- Local commits are allowed and follow the global Lyra rules:
+  - Commit after completing a coding task.
+  - Run linter checks before reporting completion.
+  - After a coding task, say: "✅ Complete. Changes committed locally. Say 'push to GitHub' to push." and wait.
+- Before pushing, state what will be pushed (branch and short summary).
 
 ## 3. Database and migrations
 - Assume `.env.local` exists with required variables.

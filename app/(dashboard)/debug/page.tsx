@@ -62,6 +62,20 @@ type AuditLogEntry = {
   created_at: string;
 };
 
+type ErrorLogEntry = {
+  id: string;
+  timestamp: string;
+  error_message: string;
+  error_stack: string | null;
+  error_type: string;
+  user_id: string | null;
+  user_email: string | null;
+  page_url: string;
+  user_agent: string;
+  component_name: string | null;
+  additional_data: Record<string, unknown> | null;
+};
+
 export default function DebugPage() {
   const { profile, user } = useAuth();
   const router = useRouter();
@@ -76,7 +90,9 @@ export default function DebugPage() {
   const [absences, setAbsences] = useState<EntityStatus[]>([]);
   const [ramsDocuments, setRamsDocuments] = useState<EntityStatus[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([]);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [clearingErrors, setClearingErrors] = useState(false);
 
   // Check if user is superadmin and viewing as actual role
   useEffect(() => {
@@ -113,6 +129,7 @@ export default function DebugPage() {
       fetchDebugInfo();
       fetchAllEntities();
       fetchAuditLogs();
+      fetchErrorLogs();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userEmail]);
@@ -243,6 +260,55 @@ export default function DebugPage() {
     } catch (error) {
       console.error('Error fetching audit logs:', error);
       toast.error('Failed to fetch audit logs');
+    }
+  };
+
+  const fetchErrorLogs = async () => {
+    try {
+      const { data: errorData, error } = await supabase
+        .from('error_logs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(100);
+
+      if (error) {
+        console.error('Error fetching error logs:', error);
+        // Don't show toast if table doesn't exist yet
+        if (!error.message.includes('does not exist')) {
+          toast.error('Failed to fetch error logs: ' + error.message);
+        }
+        return;
+      }
+
+      if (errorData) {
+        setErrorLogs(errorData as ErrorLogEntry[]);
+      }
+    } catch (error) {
+      console.error('Error fetching error logs:', error);
+    }
+  };
+
+  const clearAllErrorLogs = async () => {
+    if (!confirm('Are you sure you want to clear ALL error logs? This cannot be undone.')) {
+      return;
+    }
+
+    setClearingErrors(true);
+    try {
+      const { error } = await supabase
+        .from('error_logs')
+        .delete()
+        .gte('timestamp', '1970-01-01');
+
+      if (error) throw error;
+
+      toast.success('All error logs cleared successfully');
+      fetchErrorLogs();
+    } catch (error) {
+      console.error('Error clearing error logs:', error);
+      toast.error('Failed to clear error logs');
+    } finally {
+      setClearingErrors(false);
     }
   };
 
@@ -451,8 +517,12 @@ export default function DebugPage() {
       </div>
 
       {/* Developer Tools Tabs */}
-      <Tabs defaultValue="audit" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5 lg:w-[800px]">
+      <Tabs defaultValue="errors" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-6 lg:w-[900px]">
+          <TabsTrigger value="errors">
+            <Bug className="h-4 w-4 mr-2" />
+            Error Log
+          </TabsTrigger>
           <TabsTrigger value="audit">
             <History className="h-4 w-4 mr-2" />
             Audit Log
@@ -474,6 +544,154 @@ export default function DebugPage() {
             System
           </TabsTrigger>
         </TabsList>
+
+        {/* Error Log Tab */}
+        <TabsContent value="errors">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Application Error Log</CardTitle>
+                  <CardDescription>
+                    Track all application errors and exceptions (Last 100 entries)
+                  </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={fetchErrorLogs}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh
+                  </Button>
+                  <Button
+                    onClick={clearAllErrorLogs}
+                    variant="destructive"
+                    size="sm"
+                    disabled={clearingErrors || errorLogs.length === 0}
+                  >
+                    {clearingErrors ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash className="h-4 w-4 mr-2" />
+                    )}
+                    Clear All
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {errorLogs.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-50 text-green-500" />
+                  <p className="font-semibold">No errors logged</p>
+                  <p className="text-sm mt-1">Application errors will appear here when they occur</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {errorLogs.map((log) => {
+                    const isMobile = log.user_agent.includes('Mobile') || log.user_agent.includes('iPhone') || log.user_agent.includes('Android');
+                    const browserMatch = log.user_agent.match(/(Chrome|Safari|Firefox|Edge)\/[\d.]+/);
+                    const browser = browserMatch ? browserMatch[0] : 'Unknown';
+
+                    return (
+                      <div
+                        key={log.id}
+                        className="border border-red-200 dark:border-red-900 rounded-lg p-4 hover:bg-red-50/50 dark:hover:bg-red-950/20 transition-colors"
+                      >
+                        {/* Header Row */}
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-start gap-3 flex-1">
+                            <XCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <Badge variant="destructive" className="font-mono text-xs">
+                                  {log.error_type}
+                                </Badge>
+                                {log.component_name && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {log.component_name}
+                                  </Badge>
+                                )}
+                                {isMobile && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    📱 Mobile
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="font-semibold text-red-700 dark:text-red-400 mb-2">
+                                {log.error_message}
+                              </p>
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                                <div className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {new Date(log.timestamp).toLocaleString('en-GB', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit',
+                                  })}
+                                </div>
+                                {log.user_email && (
+                                  <>
+                                    <span>•</span>
+                                    <div className="flex items-center gap-1">
+                                      <Users className="h-3 w-3" />
+                                      {log.user_email}
+                                    </div>
+                                  </>
+                                )}
+                                <span>•</span>
+                                <span className="font-mono">{browser}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Page URL */}
+                        <div className="mt-3 pt-3 border-t border-red-200 dark:border-red-900">
+                          <p className="text-xs font-semibold text-muted-foreground mb-1">
+                            PAGE URL:
+                          </p>
+                          <p className="text-xs font-mono bg-muted/50 rounded p-2 break-all">
+                            {log.page_url}
+                          </p>
+                        </div>
+
+                        {/* Stack Trace */}
+                        {log.error_stack && (
+                          <details className="mt-3 pt-3 border-t border-red-200 dark:border-red-900">
+                            <summary className="text-xs font-semibold text-muted-foreground mb-2 cursor-pointer hover:text-foreground">
+                              STACK TRACE (click to expand)
+                            </summary>
+                            <pre className="text-xs font-mono bg-red-500/10 border border-red-500/20 rounded p-3 overflow-x-auto whitespace-pre-wrap break-all">
+                              {log.error_stack}
+                            </pre>
+                          </details>
+                        )}
+
+                        {/* Additional Data */}
+                        {log.additional_data && Object.keys(log.additional_data).length > 0 && (
+                          <details className="mt-3 pt-3 border-t border-red-200 dark:border-red-900">
+                            <summary className="text-xs font-semibold text-muted-foreground mb-2 cursor-pointer hover:text-foreground">
+                              ADDITIONAL DATA (click to expand)
+                            </summary>
+                            <pre className="text-xs font-mono bg-muted/50 rounded p-3 overflow-x-auto">
+                              {JSON.stringify(log.additional_data, null, 2)}
+                            </pre>
+                          </details>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Audit Log Tab */}
         <TabsContent value="audit">
@@ -792,6 +1010,7 @@ export default function DebugPage() {
                   onClick={() => {
                     fetchAllEntities();
                     fetchAuditLogs();
+                    fetchErrorLogs();
                   }}
                   className="w-full"
                   variant="outline"
