@@ -287,16 +287,20 @@ export async function DELETE(
         .eq('adjusted_by', userId);
 
     // Step 2: Delete user's own records
+    // First get all timesheet IDs for this user
+    const { data: userTimesheets } = await supabase
+      .from('timesheets')
+      .select('id')
+      .eq('user_id', userId);
+
     // Delete timesheet entries (must delete before timesheets due to FK)
-    await supabase
-      .from('timesheet_entries')
-      .delete()
-      .in('timesheet_id', 
-        supabase
-          .from('timesheets')
-          .select('id')
-          .eq('user_id', userId)
-      );
+    if (userTimesheets && userTimesheets.length > 0) {
+      const timesheetIds = userTimesheets.map(t => t.id);
+      await supabase
+        .from('timesheet_entries')
+        .delete()
+        .in('timesheet_id', timesheetIds);
+    }
 
     // Delete timesheets created by this user
     await supabase
@@ -304,16 +308,20 @@ export async function DELETE(
       .delete()
       .eq('user_id', userId);
 
+    // First get all inspection IDs for this user
+    const { data: userInspections } = await supabase
+      .from('vehicle_inspections')
+      .select('id')
+      .eq('user_id', userId);
+
     // Delete inspection items (must delete before inspections due to FK)
-    await supabase
-      .from('inspection_items')
-      .delete()
-      .in('inspection_id',
-        supabase
-          .from('vehicle_inspections')
-          .select('id')
-          .eq('user_id', userId)
-      );
+    if (userInspections && userInspections.length > 0) {
+      const inspectionIds = userInspections.map(i => i.id);
+      await supabase
+        .from('inspection_items')
+        .delete()
+        .in('inspection_id', inspectionIds);
+    }
 
     // Delete vehicle inspections created by this user
     await supabase
