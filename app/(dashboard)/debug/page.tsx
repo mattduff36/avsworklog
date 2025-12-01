@@ -814,13 +814,21 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                                                 second: '2-digit',
                                               })}
                                             </div>
-                                            {log.user_email && (
+                                            {log.user_name && (
                                               <>
                                                 <span>•</span>
                                                 <div className="flex items-center gap-1">
                                                   <Users className="h-3 w-3" />
-                                                  {log.user_name || log.user_email}
+                                                  {log.user_name}
                                                 </div>
+                                              </>
+                                            )}
+                                            {log.user_email && (
+                                              <>
+                                                <span>•</span>
+                                                <span className="font-mono text-xs">
+                                                  {log.user_email}
+                                                </span>
                                               </>
                                             )}
                                             <span>•</span>
@@ -950,13 +958,21 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                                     second: '2-digit',
                                   })}
                                 </div>
-                                {log.user_email && (
+                                {log.user_name && (
                                   <>
                                     <span>•</span>
                                     <div className="flex items-center gap-1">
                                       <Users className="h-3 w-3" />
-                                      {log.user_name || log.user_email}
+                                      {log.user_name}
                                     </div>
+                                  </>
+                                )}
+                                {log.user_email && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="font-mono text-xs">
+                                      {log.user_email}
+                                    </span>
                                   </>
                                 )}
                                 <span>•</span>
