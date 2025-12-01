@@ -61,7 +61,7 @@ export async function sendPasswordEmail(params: SendPasswordEmailParams): Promis
             </div>
             
             <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
-              <p style="margin: 0; font-weight: bold; color: #92400e;">⚠️ Important</p>
+              <p style="margin: 0; font-weight: bold; color: #92400e;">Important</p>
               <p style="margin: 5px 0 0 0; color: #92400e;">You will be required to change this password when you first log in.</p>
             </div>
             
@@ -110,7 +110,7 @@ export async function sendPasswordEmail(params: SendPasswordEmailParams): Promis
             </div>
             
             <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
-              <p style="margin: 0; font-weight: bold; color: #92400e;">⚠️ Important</p>
+              <p style="margin: 0; font-weight: bold; color: #92400e;">Important</p>
               <p style="margin: 5px 0 0 0; color: #92400e;">You will be required to change this password when you first log in.</p>
             </div>
             
@@ -122,7 +122,7 @@ export async function sendPasswordEmail(params: SendPasswordEmailParams): Promis
             </ol>
             
             <p style="background-color: #dbeafe; border-radius: 8px; padding: 15px; margin: 20px 0;">
-              <strong style="color: #1e40af;">💡 Tip:</strong><br>
+              <strong style="color: #1e40af;">Tip:</strong><br>
               <span style="color: #1e3a8a;">Choose a password that's secure but easy for you to remember. We recommend using a combination of words and numbers.</span>
             </p>
             
@@ -295,7 +295,7 @@ export async function sendProfileUpdateEmail(params: SendProfileUpdateEmailParam
             
             ${changes.email ? `
               <div style="background-color: #dbeafe; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0;">
-                <p style="margin: 0; font-weight: bold; color: #1e40af;">📧 Email Address Changed</p>
+                <p style="margin: 0; font-weight: bold; color: #1e40af;">Email Address Changed</p>
                 <p style="margin: 5px 0 0 0; color: #1e40af;">Your email address has been updated. Please use <strong>${changes.email.new}</strong> to log in from now on.</p>
               </div>
             ` : ''}
@@ -407,7 +407,7 @@ export async function sendToolboxTalkEmail(params: SendToolboxTalkEmailParams): 
           </head>
           <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
             <div style="background-color: #DC2626; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: white;">⚠️ New Toolbox Talk</h1>
+              <h1 style="margin: 0; color: white;">New Toolbox Talk</h1>
             </div>
             
             <div style="background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
@@ -423,7 +423,7 @@ export async function sendToolboxTalkEmail(params: SendToolboxTalkEmailParams): 
               </div>
               
               <div style="background-color: #fef2f2; border-left: 4px solid #DC2626; padding: 15px; margin: 20px 0;">
-                <p style="margin: 0; font-weight: bold; color: #991b1b;">🔒 Important Safety Information</p>
+                <p style="margin: 0; font-weight: bold; color: #991b1b;">Important Safety Information</p>
                 <p style="margin: 5px 0 0 0; color: #991b1b;">You must read and sign this Toolbox Talk before continuing to use the app. The full message is available when you log in.</p>
               </div>
               
@@ -435,7 +435,7 @@ export async function sendToolboxTalkEmail(params: SendToolboxTalkEmailParams): 
               </ol>
               
               <div style="background-color: #dbeafe; border-radius: 8px; padding: 15px; margin: 20px 0;">
-                <p style="margin: 0; color: #1e40af;"><strong>📱 Note:</strong> For security and privacy reasons, the full message content is only available in the app, not in this email.</p>
+                <p style="margin: 0; color: #1e40af;"><strong>Note:</strong> For security and privacy reasons, the full message content is only available in the app, not in this email.</p>
               </div>
               
               <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
@@ -541,7 +541,7 @@ export async function sendTimesheetRejectionEmail(params: SendTimesheetRejection
       };
     }
     
-    const subject = '⚠️ Timesheet Rejected - Action Required';
+    const subject = 'Timesheet Rejected - Action Required';
     
     const htmlContent = `
       <!DOCTYPE html>
@@ -556,7 +556,7 @@ export async function sendTimesheetRejectionEmail(params: SendTimesheetRejection
           </div>
           
           <div style="background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
-            <h2 style="color: #dc2626; margin-top: 0;">⚠️ Timesheet Rejected</h2>
+            <h2 style="color: #dc2626; margin-top: 0;">Timesheet Rejected</h2>
             
             <p>Hello ${employeeName},</p>
             
@@ -656,7 +656,7 @@ export async function sendTimesheetAdjustmentEmail(params: SendTimesheetAdjustme
       };
     }
     
-    const subject = '📝 Timesheet Adjusted - Please Review';
+    const subject = 'Timesheet Adjusted - Please Review';
     
     const htmlContent = `
       <!DOCTYPE html>
@@ -671,7 +671,7 @@ export async function sendTimesheetAdjustmentEmail(params: SendTimesheetAdjustme
           </div>
           
           <div style="background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
-            <h2 style="color: #f59e0b; margin-top: 0;">📝 Timesheet Adjusted</h2>
+            <h2 style="color: #f59e0b; margin-top: 0;">Timesheet Adjusted</h2>
             
             <p>Hello ${recipientName},</p>
             

@@ -115,7 +115,7 @@ export async function POST(
     const { error: messageError } = await supabase
       .from('messages')
       .insert({
-        title: '⚠️ Timesheet Rejected',
+        title: 'Timesheet Rejected',
         content: `Your timesheet for week ending ${new Date(timesheet.week_ending).toLocaleDateString('en-GB', {
           day: 'numeric',
           month: 'short',

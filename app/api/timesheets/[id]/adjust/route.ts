@@ -191,7 +191,7 @@ export async function POST(
     const { data: employeeMessage } = await supabase
       .from('messages')
       .insert({
-        title: '📝 Your Timesheet Has Been Adjusted',
+        title: 'Your Timesheet Has Been Adjusted',
         content: `Your timesheet for week ending ${new Date(typedTimesheet.week_ending).toLocaleDateString('en-GB', {
           day: 'numeric',
           month: 'short',
@@ -220,7 +220,7 @@ export async function POST(
       const { data: managerMessage } = await supabase
         .from('messages')
         .insert({
-          title: '📝 Timesheet Adjusted',
+          title: 'Timesheet Adjusted',
           content: `A timesheet for ${employeeProfile.full_name} (week ending ${new Date(typedTimesheet.week_ending).toLocaleDateString('en-GB', {
             day: 'numeric',
             month: 'short',
