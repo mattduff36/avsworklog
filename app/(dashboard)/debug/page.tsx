@@ -33,6 +33,7 @@ import {
   Ban,
   ChevronDown,
   ChevronRight,
+  Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -330,6 +331,69 @@ export default function DebugPage() {
     setExpandedAudits(prev => 
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
+  };
+
+  const copyErrorToClipboard = async (log: ErrorLogEntry, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent toggling when clicking copy button
+    
+    const isMobile = log.user_agent.includes('Mobile') || log.user_agent.includes('iPhone') || log.user_agent.includes('Android');
+    const browserMatch = log.user_agent.match(/(Chrome|Safari|Firefox|Edge)\/[\d.]+/);
+    const browser = browserMatch ? browserMatch[0] : 'Unknown';
+
+    const content = `ERROR LOG ENTRY
+=================
+
+Type: ${log.error_type}
+Component: ${log.component_name || 'N/A'}
+Device: ${isMobile ? 'Mobile' : 'Desktop'}
+Browser: ${browser}
+
+ERROR MESSAGE:
+${log.error_message}
+
+TIMESTAMP: ${new Date(log.timestamp).toLocaleString('en-GB')}
+USER: ${log.user_email || 'Anonymous'}
+PAGE URL: ${log.page_url}
+
+${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional_data ? `ADDITIONAL DATA:\n${JSON.stringify(log.additional_data, null, 2)}` : ''}`;
+
+    try {
+      await navigator.clipboard.writeText(content);
+      toast.success('Error log copied to clipboard');
+    } catch (err) {
+      toast.error('Failed to copy to clipboard');
+    }
+  };
+
+  const copyAuditToClipboard = async (log: AuditLogEntry, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent toggling when clicking copy button
+
+    const content = `AUDIT LOG ENTRY
+================
+
+Table: ${formatTableName(log.table_name)}
+Action: ${log.action.toUpperCase()}
+User: ${log.user_name}
+Timestamp: ${new Date(log.created_at).toLocaleString('en-GB')}
+Record ID: ${log.record_id}
+
+${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entries(log.changes).map(([field, change]) => {
+  let fieldChanges = `\n${field}:`;
+  if (change.old !== undefined) {
+    fieldChanges += `\n  - Old: ${formatValue(change.old)}`;
+  }
+  if (change.new !== undefined) {
+    fieldChanges += `\n  + New: ${formatValue(change.new)}`;
+  }
+  return fieldChanges;
+}).join('\n')}` : 'No detailed changes recorded'}`;
+
+    try {
+      await navigator.clipboard.writeText(content);
+      toast.success('Audit log copied to clipboard');
+    } catch (err) {
+      toast.error('Failed to copy to clipboard');
+    }
   };
 
   const updateStatus = async (id: string, type: string, newStatus: string) => {
@@ -633,7 +697,7 @@ export default function DebugPage() {
                               <ChevronRight className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
                             )}
                             <XCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
-                            <div className="flex-1">
+                            <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap mb-1">
                                 <Badge variant="destructive" className="font-mono text-xs">
                                   {log.error_type}
@@ -677,6 +741,15 @@ export default function DebugPage() {
                                 <span className="font-mono">{browser}</span>
                               </div>
                             </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 flex-shrink-0 hover:bg-red-100 dark:hover:bg-red-950"
+                              onClick={(e) => copyErrorToClipboard(log, e)}
+                              title="Copy to clipboard"
+                            >
+                              <Copy className="h-4 w-4 text-red-600 dark:text-red-400" />
+                            </Button>
                           </div>
                         </div>
 
@@ -777,7 +850,7 @@ export default function DebugPage() {
                               <ChevronRight className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                             )}
                             {getActionIcon(log.action)}
-                            <div className="flex-1">
+                            <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <Badge variant="outline" className="font-mono text-xs">
                                   {formatTableName(log.table_name)}
@@ -805,6 +878,15 @@ export default function DebugPage() {
                                 <span className="font-mono text-xs">ID: {log.record_id.slice(0, 8)}...</span>
                               </div>
                             </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 flex-shrink-0 hover:bg-accent"
+                              onClick={(e) => copyAuditToClipboard(log, e)}
+                              title="Copy to clipboard"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
 
