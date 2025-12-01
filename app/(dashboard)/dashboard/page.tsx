@@ -367,7 +367,7 @@ export default function DashboardPage() {
                       </div>
                     )}
                     <Icon className="h-8 w-8 text-white" />
-                    <span className="text-white font-semibold text-sm leading-tight">
+                    <span className="text-white font-semibold text-2xl leading-tight">
                       {formType.title}
                     </span>
                   </div>
@@ -385,7 +385,7 @@ export default function DashboardPage() {
                   <Link key={form.id} href={form.href}>
                     <div className={`relative ${form.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3 cursor-pointer`}>
                       <Icon className="h-8 w-8 text-white" />
-                      <span className="text-white font-semibold text-sm leading-tight">
+                      <span className="text-white font-semibold text-2xl leading-tight">
                         {form.title}
                       </span>
                     </div>
@@ -399,7 +399,7 @@ export default function DashboardPage() {
                   <TooltipTrigger asChild>
                     <div className={`${form.color} opacity-50 cursor-not-allowed rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3`}>
                       <Icon className="h-8 w-8 text-white" />
-                      <span className="text-white font-semibold text-sm leading-tight">
+                      <span className="text-white font-semibold text-2xl leading-tight">
                         {form.title}
                       </span>
                     </div>
