@@ -72,6 +72,7 @@ type ErrorLogEntry = {
   error_type: string;
   user_id: string | null;
   user_email: string | null;
+  user_name: string | null;
   page_url: string;
   user_agent: string;
   component_name: string | null;
@@ -130,15 +131,36 @@ export default function DebugPage() {
 
   // Load viewed errors from localStorage on mount
   useEffect(() => {
+    // Load previously viewed errors
     const stored = localStorage.getItem('viewedErrorLogs');
+    let viewedSet = new Set<string>();
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        setViewedErrors(new Set(parsed));
+        viewedSet = new Set(parsed);
       } catch (err) {
         console.error('Failed to parse viewed errors:', err);
       }
     }
+
+    // Move pending viewed errors to viewed (from previous session)
+    const pendingStored = localStorage.getItem('pendingViewedErrorLogs');
+    if (pendingStored) {
+      try {
+        const pending = JSON.parse(pendingStored);
+        pending.forEach((id: string) => viewedSet.add(id));
+        
+        // Update viewed errors in localStorage
+        localStorage.setItem('viewedErrorLogs', JSON.stringify(Array.from(viewedSet)));
+        
+        // Clear pending
+        localStorage.removeItem('pendingViewedErrorLogs');
+      } catch (err) {
+        console.error('Failed to parse pending viewed errors:', err);
+      }
+    }
+
+    setViewedErrors(viewedSet);
   }, []);
 
   // Fetch debug info
@@ -303,7 +325,25 @@ export default function DebugPage() {
       }
 
       if (errorData) {
-        setErrorLogs(errorData as ErrorLogEntry[]);
+        // Fetch user names for all unique emails
+        const uniqueEmails = [...new Set(errorData.map(e => e.user_email).filter(Boolean))];
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('email, name')
+          .in('email', uniqueEmails);
+
+        // Create a map of email -> name
+        const emailToName = new Map(
+          profilesData?.map(p => [p.email, p.name]) || []
+        );
+
+        // Add user names to error logs
+        const enrichedErrorData = errorData.map(log => ({
+          ...log,
+          user_name: log.user_email ? emailToName.get(log.user_email) || null : null,
+        }));
+
+        setErrorLogs(enrichedErrorData as ErrorLogEntry[]);
       }
     } catch (error) {
       // Silent fail - don't want to create error logging loops
@@ -338,18 +378,20 @@ export default function DebugPage() {
   const toggleErrorExpanded = (id: string) => {
     const isExpanding = !expandedErrors.includes(id);
     
-    setExpandedErrors(prev => 
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
-
-    // Mark as viewed when expanding for the first time
-    if (isExpanding && !viewedErrors.has(id)) {
-      const newViewedErrors = new Set(viewedErrors);
-      newViewedErrors.add(id);
-      setViewedErrors(newViewedErrors);
+    if (isExpanding) {
+      // Auto-collapse all others and expand only this one
+      setExpandedErrors([id]);
       
-      // Persist to localStorage
-      localStorage.setItem('viewedErrorLogs', JSON.stringify(Array.from(newViewedErrors)));
+      // Mark as "pending viewed" - will move to viewed on next page load
+      const pendingViewed = localStorage.getItem('pendingViewedErrorLogs');
+      const pending = pendingViewed ? JSON.parse(pendingViewed) : [];
+      if (!pending.includes(id)) {
+        pending.push(id);
+        localStorage.setItem('pendingViewedErrorLogs', JSON.stringify(pending));
+      }
+    } else {
+      // Collapse this one
+      setExpandedErrors(prev => prev.filter(x => x !== id));
     }
   };
 
@@ -378,7 +420,7 @@ ERROR MESSAGE:
 ${log.error_message}
 
 TIMESTAMP: ${new Date(log.timestamp).toLocaleString('en-GB')}
-USER: ${log.user_email || 'Anonymous'}
+USER: ${log.user_name && log.user_email ? `${log.user_name} (${log.user_email})` : log.user_email || 'Anonymous'}
 PAGE URL: ${log.page_url}
 
 ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional_data ? `ADDITIONAL DATA:\n${JSON.stringify(log.additional_data, null, 2)}` : ''}`;
@@ -777,7 +819,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                                                 <span>•</span>
                                                 <div className="flex items-center gap-1">
                                                   <Users className="h-3 w-3" />
-                                                  {log.user_email}
+                                                  {log.user_name || log.user_email}
                                                 </div>
                                               </>
                                             )}
@@ -913,7 +955,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                                     <span>•</span>
                                     <div className="flex items-center gap-1">
                                       <Users className="h-3 w-3" />
-                                      {log.user_email}
+                                      {log.user_name || log.user_email}
                                     </div>
                                   </>
                                 )}
