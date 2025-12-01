@@ -47,11 +47,7 @@ export function useInspections({ userId, isManager, selectedEmployeeId, statusFi
 
       // Apply status filter
       if (statusFilter && statusFilter !== 'all') {
-        if (statusFilter === 'pending') {
-          query = query.eq('status', 'submitted');
-        } else {
-          query = query.eq('status', statusFilter);
-        }
+        query = query.eq('status', statusFilter);
       }
 
       const { data, error } = await query;

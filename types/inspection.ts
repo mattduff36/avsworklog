@@ -7,7 +7,7 @@ export interface VehicleInspection {
   inspection_date: string;
   inspection_end_date: string;
   current_mileage: number | null;
-  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  status: 'draft' | 'submitted';
   submitted_at: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;

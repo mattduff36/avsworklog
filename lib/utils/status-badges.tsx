@@ -7,7 +7,7 @@ import { CheckCircle2, Clock, XCircle, Package, Edit2 } from 'lucide-react';
  */
 
 export type TimesheetStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted';
-export type InspectionStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
+export type InspectionStatus = 'draft' | 'submitted';
 export type AbsenceStatus = 'pending' | 'approved' | 'rejected';
 
 interface StatusConfig {
@@ -56,19 +56,9 @@ const inspectionStatusConfig: Record<InspectionStatus, StatusConfig> = {
     icon: <Clock className="h-3 w-3 mr-1" />,
   },
   submitted: {
-    label: 'Pending',
+    label: 'Submitted',
     variant: 'default',
     icon: <Clock className="h-3 w-3 mr-1" />,
-  },
-  approved: {
-    label: 'Approved',
-    variant: 'default',
-    icon: <CheckCircle2 className="h-3 w-3 mr-1" />,
-  },
-  rejected: {
-    label: 'Rejected',
-    variant: 'destructive',
-    icon: <XCircle className="h-3 w-3 mr-1" />,
   },
 };
 

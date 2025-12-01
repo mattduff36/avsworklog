@@ -16,23 +16,13 @@ import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 import { VehicleInspection } from '@/types/inspection';
 import { AbsenceWithRelations } from '@/types/absence';
-import { TimesheetStatusFilter, InspectionStatusFilter, StatusFilter } from '@/types/common';
+import { TimesheetStatusFilter, StatusFilter } from '@/types/common';
 import { usePendingAbsences, useApproveAbsence, useRejectAbsence, useAbsenceSummaryForEmployee } from '@/lib/hooks/useAbsence';
 
 interface TimesheetWithProfile extends Timesheet {
   user: {
     full_name: string;
     employee_id: string;
-  };
-}
-
-interface InspectionWithDetails extends VehicleInspection {
-  user: {
-    full_name: string;
-    employee_id: string;
-  };
-  vehicles: {
-    reg_number: string;
   };
 }
 
@@ -43,14 +33,10 @@ function ApprovalsContent() {
   const supabase = createClient();
   
   const [timesheets, setTimesheets] = useState<TimesheetWithProfile[]>([]);
-  const [inspections, setInspections] = useState<InspectionWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'timesheets');
   const [timesheetFilter, setTimesheetFilter] = useState<TimesheetStatusFilter>('pending');
-  const [inspectionFilter, setInspectionFilter] = useState<InspectionStatusFilter>('pending');
-  
-  // Get current filter based on active tab
-  const statusFilter = activeTab === 'timesheets' ? timesheetFilter : inspectionFilter;
+  const statusFilter: StatusFilter = timesheetFilter;
   
   // Absence hooks
   const { data: absences } = usePendingAbsences();
@@ -91,35 +77,6 @@ function ApprovalsContent() {
 
       if (timesheetError) throw timesheetError;
       setTimesheets(timesheetData || []);
-
-      // Build query for inspections
-      let inspectionQuery = supabase
-        .from('vehicle_inspections')
-        .select(`
-          *,
-          user:profiles!user_id (
-            full_name,
-            employee_id
-          ),
-          vehicles (
-            reg_number
-          )
-        `);
-
-      // Apply status filter
-      if (filter === 'pending') {
-        inspectionQuery = inspectionQuery.eq('status', 'submitted');
-      } else if (filter === 'approved') {
-        inspectionQuery = inspectionQuery.eq('status', 'approved');
-      } else if (filter === 'rejected') {
-        inspectionQuery = inspectionQuery.eq('status', 'rejected');
-      }
-
-      const { data: inspectionData, error: inspectionError } = await inspectionQuery
-        .order('submitted_at', { ascending: false });
-
-      if (inspectionError) throw inspectionError;
-      setInspections(inspectionData || []);
     } catch (error) {
       console.error('Error fetching approvals:', error);
     } finally {
@@ -137,27 +94,16 @@ function ApprovalsContent() {
     }
   }, [isManager, authLoading, router, fetchApprovals, statusFilter, activeTab]);
 
-  const handleQuickApprove = async (type: 'timesheet' | 'inspection', id: string) => {
+  const handleQuickApprove = async (type: 'timesheet', id: string) => {
     try {
-      if (type === 'timesheet') {
-        const { error } = await supabase
-          .from('timesheets')
-          .update({
-            status: 'approved',
-            reviewed_at: new Date().toISOString(),
-          })
-          .eq('id', id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('vehicle_inspections')
-          .update({
-            status: 'approved',
-            reviewed_at: new Date().toISOString(),
-          })
-          .eq('id', id);
-        if (error) throw error;
-      }
+      const { error } = await supabase
+        .from('timesheets')
+        .update({
+          status: 'approved',
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+      if (error) throw error;
 
       // Refresh data
       await fetchApprovals(statusFilter);
@@ -166,32 +112,20 @@ function ApprovalsContent() {
     }
   };
 
-  const handleQuickReject = async (type: 'timesheet' | 'inspection', id: string) => {
+  const handleQuickReject = async (type: 'timesheet', id: string) => {
     const comments = prompt('Enter rejection reason:');
     if (!comments) return;
 
     try {
-      if (type === 'timesheet') {
-        const { error } = await supabase
-          .from('timesheets')
-          .update({
-            status: 'rejected',
-            reviewed_at: new Date().toISOString(),
-            manager_comments: comments,
-          })
-          .eq('id', id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('vehicle_inspections')
-          .update({
-            status: 'rejected',
-            reviewed_at: new Date().toISOString(),
-            manager_comments: comments,
-          })
-          .eq('id', id);
-        if (error) throw error;
-      }
+      const { error } = await supabase
+        .from('timesheets')
+        .update({
+          status: 'rejected',
+          reviewed_at: new Date().toISOString(),
+          manager_comments: comments,
+        })
+        .eq('id', id);
+      if (error) throw error;
 
       // Refresh data
       await fetchApprovals(statusFilter);
@@ -208,7 +142,7 @@ function ApprovalsContent() {
     );
   }
 
-  const totalCount = timesheets.length + inspections.length;
+  const totalCount = timesheets.length;
 
   const getFilterLabel = (filter: StatusFilter) => {
     switch (filter) {
@@ -221,23 +155,19 @@ function ApprovalsContent() {
     }
   };
 
-  // Get filter options based on active tab
+  // Get filter options (timesheet-focused approvals)
   const getFilterOptions = (): StatusFilter[] => {
     if (activeTab === 'timesheets') {
       return ['pending', 'approved', 'rejected', 'processed', 'adjusted', 'all'];
-    } else if (activeTab === 'inspections') {
-      return ['pending', 'approved', 'rejected', 'all'];
-    } else {
-      return ['pending', 'approved', 'rejected'];
     }
+    // Absences tab still reuses the same label set, but only 'pending' is relevant there
+    return ['pending', 'approved', 'rejected'];
   };
 
-  // Handle filter change based on active tab
+  // Handle filter change (timesheet approvals only)
   const handleFilterChange = (filter: StatusFilter) => {
     if (activeTab === 'timesheets') {
       setTimesheetFilter(filter as TimesheetStatusFilter);
-    } else if (activeTab === 'inspections') {
-      setInspectionFilter(filter as InspectionStatusFilter);
     }
   };
 
@@ -332,7 +262,7 @@ function ApprovalsContent() {
         </Card>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-3xl grid-cols-3 h-auto p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+          <TabsList className="grid w-full max-w-3xl grid-cols-2 h-auto p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
             <TabsTrigger 
               value="timesheets" 
               className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
@@ -351,28 +281,6 @@ function ApprovalsContent() {
                     className={activeTab === 'timesheets' ? "bg-white/20 text-white border-white/30" : ""}
                   >
                     {timesheets.length}
-                  </Badge>
-                )}
-              </div>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="inspections" 
-              className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
-              style={activeTab === 'inspections' ? {
-                backgroundColor: 'hsl(30 95% 55%)', // Inspection Orange
-                color: 'white',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
-              } : {}}
-            >
-              <div className="flex items-center gap-2">
-                <Clipboard className="h-5 w-5" />
-                <span className="text-sm font-medium">Inspections</span>
-                {inspections.length > 0 && (
-                  <Badge 
-                    variant="secondary"
-                    className={activeTab === 'inspections' ? "bg-white/20 text-white border-white/30" : ""}
-                  >
-                    {inspections.length}
                   </Badge>
                 )}
               </div>
@@ -502,85 +410,7 @@ function ApprovalsContent() {
             )}
           </TabsContent>
 
-          <TabsContent value="inspections" className="mt-6 space-y-4">
-            {inspections.length === 0 ? (
-              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-                <CardContent className="py-12 text-center text-slate-600 dark:text-slate-400">
-                  No pending inspection approvals
-                </CardContent>
-              </Card>
-            ) : (
-              inspections.map((inspection) => (
-                <Link key={inspection.id} href={`/inspections/${inspection.id}`} className="block">
-                  <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200 cursor-pointer">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center space-x-3">
-                          <Clipboard className="h-5 w-5 text-amber-600" />
-                          <div>
-                            <CardTitle className="text-lg">
-                              {inspection.vehicles?.reg_number || 'Unknown Vehicle'}
-                            </CardTitle>
-                            <CardDescription className="mt-1">
-                              <div className="flex items-center gap-2">
-                                <User className="h-3 w-3" />
-                                {inspection.user?.full_name || 'Unknown'}
-                                {inspection.user?.employee_id && ` (${inspection.user.employee_id})`}
-                              </div>
-                              <div className="text-xs mt-1">
-                                {inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
-                                  ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
-                                  : formatDate(inspection.inspection_date)
-                                }
-                              </div>
-                            </CardDescription>
-                          </div>
-                        </div>
-                        {getStatusBadge(inspection.status)}
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm text-muted-foreground">
-                          {inspection.submitted_at ? `Submitted ${formatDate(inspection.submitted_at)}` : 'Not submitted'}
-                        </div>
-                        {inspection.status === 'submitted' && (
-                          <div className="flex gap-2" onClick={(e) => e.preventDefault()}>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleQuickReject('inspection', inspection.id);
-                              }}
-                              className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Reject
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleQuickApprove('inspection', inspection.id);
-                              }}
-                              className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
-                            >
-                              <CheckCircle2 className="h-4 w-4 mr-1" />
-                              Approve
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))
-            )}
-          </TabsContent>
+          {/* Inspections tab removed - inspections no longer require approvals */}
 
           <TabsContent value="absences" className="mt-6 space-y-4">
             {!absences || absences.length === 0 ? (

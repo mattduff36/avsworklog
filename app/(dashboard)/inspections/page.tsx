@@ -77,24 +77,20 @@ function InspectionsContent() {
   useInspectionRealtime((payload) => {
     console.log('Realtime inspection update:', payload);
     
-    // Refetch inspections when changes occur
-    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
-      fetchInspections();
-      
-      // Show toast notification for significant changes
-      if (payload.eventType === 'UPDATE' && payload.new && 'status' in payload.new) {
-        const status = (payload.new as { status?: string }).status;
-        if (status === 'approved') {
-          toast.success('Inspection approved!', {
-            description: 'A vehicle inspection has been approved by your manager.',
-          });
-        } else if (status === 'rejected') {
-          toast.error('Inspection rejected', {
-            description: 'A vehicle inspection has been rejected. Please review the comments.',
-          });
+      // Refetch inspections when changes occur
+      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+        fetchInspections();
+        
+        // Show toast notification when inspection is submitted
+        if (payload.eventType === 'UPDATE' && payload.new && 'status' in payload.new) {
+          const status = (payload.new as { status?: string }).status;
+          if (status === 'submitted') {
+            toast.success('Inspection submitted', {
+              description: 'A vehicle inspection has been submitted.',
+            });
+          }
         }
       }
-    }
   });
 
   const fetchEmployees = async () => {
@@ -142,9 +138,7 @@ function InspectionsContent() {
 
       // Apply status filter
       const currentStatusFilter = statusFilter || 'all';
-      if (currentStatusFilter === 'pending') {
-        query = query.eq('status', 'submitted');
-      } else if (currentStatusFilter !== 'all') {
+      if (currentStatusFilter !== 'all') {
         query = query.eq('status', currentStatusFilter);
       }
       // 'all' doesn't filter by status
@@ -170,18 +164,14 @@ function InspectionsContent() {
     switch (filter) {
       case 'all': return 'All';
       case 'draft': return 'Draft';
-      case 'pending': return 'Pending';
-      case 'approved': return 'Approved';
-      case 'rejected': return 'Rejected';
+      case 'submitted': return 'Submitted';
     }
   };
 
   const getStatusBadge = (status: string) => {
     const variants = {
       draft: { variant: 'secondary' as const, label: 'Draft' },
-      submitted: { variant: 'warning' as const, label: 'Pending' },
-      approved: { variant: 'success' as const, label: 'Approved' },
-      rejected: { variant: 'destructive' as const, label: 'Rejected' },
+      submitted: { variant: 'default' as const, label: 'Submitted' },
     };
 
     const config = variants[status as keyof typeof variants] || variants.draft;
@@ -193,10 +183,6 @@ function InspectionsContent() {
     switch (status) {
       case 'submitted':
         return <Clock className="h-5 w-5 text-amber-600" />;
-      case 'approved':
-        return <CheckCircle2 className="h-5 w-5 text-green-600" />;
-      case 'rejected':
-        return <XCircle className="h-5 w-5 text-red-600" />;
       default:
         return <Clipboard className="h-5 w-5 text-muted-foreground" />;
     }

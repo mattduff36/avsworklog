@@ -508,7 +508,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
     if (type === 'timesheet') {
       return ['draft', 'submitted', 'approved', 'rejected', 'processed', 'adjusted'];
     } else if (type === 'inspection') {
-      return ['draft', 'submitted', 'approved', 'rejected'];
+      return ['draft', 'submitted'];
     } else if (type === 'absence') {
       return ['pending', 'approved', 'rejected'];
     }

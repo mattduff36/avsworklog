@@ -193,14 +193,6 @@ export default function DashboardPage() {
 
       if (timesheetsError) throw timesheetsError;
 
-      // Fetch pending inspections count
-      const { count: inspectionsCount, error: inspectionsError } = await supabase
-        .from('vehicle_inspections')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'submitted');
-
-      if (inspectionsError) throw inspectionsError;
-
       // Fetch pending absences count
       const { count: absencesCount, error: absencesError } = await supabase
         .from('absences')
@@ -218,14 +210,6 @@ export default function DashboardPage() {
           icon: FileText,
           color: 'hsl(210 90% 50%)', // Blue
           href: '/approvals?tab=timesheets'
-        },
-        {
-          type: 'inspections',
-          label: 'Inspections',
-          count: inspectionsCount || 0,
-          icon: Clipboard,
-          color: 'hsl(30 95% 55%)', // Orange
-          href: '/approvals?tab=inspections'
         },
         {
           type: 'absences',

@@ -37,7 +37,6 @@ export async function GET(request: NextRequest) {
       weekTimesheetsResult,
       monthTimesheetsResult,
       pendingTimesheetsResult,
-      pendingInspectionsResult,
       activeEmployeesResult,
       weekInspectionsResult,
       monthInspectionsResult,
@@ -61,12 +60,6 @@ export async function GET(request: NextRequest) {
       // Pending timesheet approvals
       supabase
         .from('timesheets')
-        .select('id', { count: 'exact' })
-        .eq('status', 'submitted'),
-      
-      // Pending inspection approvals
-      supabase
-        .from('vehicle_inspections')
         .select('id', { count: 'exact' })
         .eq('status', 'submitted'),
       
@@ -142,7 +135,7 @@ export async function GET(request: NextRequest) {
       inspections: {
         weekCompleted: weekInspectionsResult.count || 0,
         monthCompleted: monthInspectionsResult.count || 0,
-        pendingApprovals: pendingInspectionsResult.count || 0,
+        pendingApprovals: 0,
         passRate: parseFloat(passRate),
         outstandingDefects,
       },
@@ -150,7 +143,7 @@ export async function GET(request: NextRequest) {
         active: activeEmployeesResult.count || 0,
       },
       summary: {
-        totalPendingApprovals: (pendingTimesheetsResult.count || 0) + (pendingInspectionsResult.count || 0),
+        totalPendingApprovals: (pendingTimesheetsResult.count || 0),
         needsAttention: outstandingDefects,
       },
     });

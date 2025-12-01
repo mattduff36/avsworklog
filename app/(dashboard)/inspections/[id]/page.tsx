@@ -81,8 +81,8 @@ export default function ViewInspectionPage() {
 
       setItems(itemsData || []);
       
-      // Enable editing for draft or rejected inspections
-      if (inspectionData && (inspectionData.status === 'draft' || inspectionData.status === 'rejected')) {
+      // Enable editing only for draft inspections
+      if (inspectionData && inspectionData.status === 'draft') {
         setEditing(true);
       }
     } catch (err) {
@@ -247,61 +247,10 @@ export default function ViewInspectionPage() {
     }
   };
 
-  const handleApprove = async () => {
-    if (!inspection || !isManager) return;
-
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from('vehicle_inspections')
-        .update({
-          status: 'approved',
-          reviewed_by: user?.id,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq('id', inspection.id);
-
-      if (error) throw error;
-      
-      await fetchInspection(inspection.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to approve');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleReject = async (comments: string) => {
-    if (!inspection || !isManager) return;
-
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from('vehicle_inspections')
-        .update({
-          status: 'rejected',
-          reviewed_by: user?.id,
-          reviewed_at: new Date().toISOString(),
-          manager_comments: comments,
-        })
-        .eq('id', inspection.id);
-
-      if (error) throw error;
-      
-      await fetchInspection(inspection.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reject');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     const variants = {
       draft: { variant: 'secondary' as const, label: 'Draft' },
-      submitted: { variant: 'warning' as const, label: 'Pending Approval' },
-      approved: { variant: 'success' as const, label: 'Approved' },
-      rejected: { variant: 'destructive' as const, label: 'Rejected' },
+      submitted: { variant: 'warning' as const, label: 'Submitted' },
     };
     const config = variants[status as keyof typeof variants] || variants.draft;
     return <Badge variant={config.variant}>{config.label}</Badge>;
@@ -363,9 +312,8 @@ export default function ViewInspectionPage() {
 
   if (!inspection) return null;
 
-  const canEdit = editing && (inspection.status === 'draft' || inspection.status === 'rejected');
-  const canSubmit = inspection.user_id === user?.id && (inspection.status === 'draft' || inspection.status === 'rejected');
-  const canApprove = isManager && inspection.status === 'submitted';
+  const canEdit = editing && inspection.status === 'draft';
+  const canSubmit = inspection.user_id === user?.id && inspection.status === 'draft';
 
   const defectCount = items.filter(item => item.status === 'defect').length;
   const okCount = items.filter(item => item.status === 'ok').length;
