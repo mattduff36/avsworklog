@@ -7,10 +7,6 @@ const nextConfig: NextConfig = {
   images: {
     domains: [], // Add Supabase storage domain when configured
   },
-  // Disable Turbopack for build as PWA plugin may not be compatible yet
-  experimental: {
-    turbo: {},
-  },
   eslint: {
     // Warning: This allows production builds to successfully complete even if
     // your project has ESLint errors.
