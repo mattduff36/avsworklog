@@ -376,7 +376,7 @@ export default function ViewTimesheetPage() {
       approved: { variant: 'success' as const, label: 'Approved' },
       rejected: { variant: 'destructive' as const, label: 'Rejected' },
       processed: { variant: 'default' as const, label: 'Processed' },
-      adjusted: { variant: 'warning' as const, label: 'Adjusted' },
+      adjusted: { variant: 'default' as const, label: 'Adjusted' },
     };
     const config = variants[status as keyof typeof variants] || variants.draft;
     return <Badge variant={config.variant}>{config.label}</Badge>;

@@ -160,7 +160,7 @@ export default function TimesheetsPage() {
       approved: { variant: 'success' as const, label: 'Approved' },
       rejected: { variant: 'destructive' as const, label: 'Rejected' },
       processed: { variant: 'default' as const, label: 'Processed' },
-      adjusted: { variant: 'warning' as const, label: 'Adjusted' },
+      adjusted: { variant: 'default' as const, label: 'Adjusted' },
     };
 
     const config = variants[status as keyof typeof variants] || variants.draft;
@@ -453,8 +453,8 @@ export default function TimesheetsPage() {
                       See manager comments
                     </div>
                   )}
-                  {/* Download PDF Button for Approved/Pending/Processed */}
-                  {(timesheet.status === 'approved' || timesheet.status === 'submitted' || timesheet.status === 'processed') && (
+                  {/* Download PDF Button for all non-draft statuses */}
+                  {(timesheet.status !== 'draft') && (
                     <Button
                       onClick={(e) => handleDownloadPDF(e, timesheet.id)}
                       disabled={downloading === timesheet.id}

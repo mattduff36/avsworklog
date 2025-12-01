@@ -44,7 +44,7 @@ const timesheetStatusConfig: Record<TimesheetStatus, StatusConfig> = {
   },
   adjusted: {
     label: 'Adjusted',
-    variant: 'secondary',
+    variant: 'outline',
     icon: <Edit2 className="h-3 w-3 mr-1" />,
   },
 };
