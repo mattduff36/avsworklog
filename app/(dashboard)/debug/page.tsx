@@ -672,10 +672,6 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
             <Calendar className="h-4 w-4 mr-2" />
             Absences
           </TabsTrigger>
-          <TabsTrigger value="system">
-            <Database className="h-4 w-4 mr-2" />
-            System
-          </TabsTrigger>
         </TabsList>
 
         {/* Error Log Tab */}
@@ -1326,57 +1322,6 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
         </TabsContent>
 
         {/* System Tab */}
-        <TabsContent value="system">
-          <Card>
-            <CardHeader>
-              <CardTitle>System Information</CardTitle>
-              <CardDescription>Runtime and environment details</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Environment</Label>
-                  <p className="text-sm font-mono bg-accent p-2 rounded mt-1">
-                    {debugInfo?.environment}
-                  </p>
-                </div>
-                <div>
-                  <Label>Next.js Version</Label>
-                  <p className="text-sm font-mono bg-accent p-2 rounded mt-1">
-                    {debugInfo?.nextVersion}
-                  </p>
-                </div>
-                <div>
-                  <Label>User ID</Label>
-                  <p className="text-sm font-mono bg-accent p-2 rounded mt-1 truncate">
-                    {user?.id || 'N/A'}
-                  </p>
-                </div>
-                <div>
-                  <Label>Profile Role</Label>
-                  <p className="text-sm font-mono bg-accent p-2 rounded mt-1">
-                    {profile?.role?.name || 'N/A'}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="pt-4 border-t">
-                <Button
-                  onClick={() => {
-                    fetchAllEntities();
-                    fetchAuditLogs();
-                    fetchErrorLogs();
-                  }}
-                  className="w-full"
-                  variant="outline"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh All Data
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   );
