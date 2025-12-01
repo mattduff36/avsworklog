@@ -66,6 +66,8 @@ export default function UsersAdminPage() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteOptionsDialogOpen, setDeleteOptionsDialogOpen] = useState(false);
+  const [deletionMode, setDeletionMode] = useState<'keep-data' | 'delete-all'>('keep-data');
   const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
   const [passwordDisplayDialogOpen, setPasswordDisplayDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
@@ -300,6 +302,12 @@ export default function UsersAdminPage() {
   }
 
   // Handle delete user
+  function openDeleteOptionsDialog() {
+    setDeleteDialogOpen(false);
+    setDeleteOptionsDialogOpen(true);
+    setDeletionMode('keep-data'); // Default to safer option
+  }
+
   async function handleDeleteUser() {
     if (!selectedUser) return;
 
@@ -307,8 +315,8 @@ export default function UsersAdminPage() {
       setFormLoading(true);
       setFormError('');
 
-      // Delete via API route (handles auth user deletion)
-      const response = await fetch(`/api/admin/users/${selectedUser.id}`, {
+      // Delete via API route with deletion mode parameter
+      const response = await fetch(`/api/admin/users/${selectedUser.id}?mode=${deletionMode}`, {
         method: 'DELETE',
       });
 
@@ -329,8 +337,14 @@ export default function UsersAdminPage() {
       setUsers(usersWithEmails);
       setFilteredUsers(usersWithEmails);
 
-      setDeleteDialogOpen(false);
+      setDeleteOptionsDialogOpen(false);
       setSelectedUser(null);
+      
+      // Show success message
+      const successMsg = deletionMode === 'delete-all' 
+        ? 'User and all data deleted successfully'
+        : 'User deleted - company data preserved';
+      setFormError(''); // Clear any previous errors
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete user';
       console.error('Error deleting user:', errorMessage, error);
@@ -358,7 +372,7 @@ export default function UsersAdminPage() {
   function openDeleteDialog(user: Profile) {
     setSelectedUser(user);
     setFormError('');
-    setDeleteDialogOpen(true);
+    setDeleteOptionsDialogOpen(true);
   }
 
   // Open reset password dialog
@@ -863,52 +877,138 @@ export default function UsersAdminPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete User Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+      {/* Delete Options Dialog */}
+      <Dialog open={deleteOptionsDialogOpen} onOpenChange={setDeleteOptionsDialogOpen}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-red-500" />
-              Delete User
+              Delete User Account
             </DialogTitle>
             <DialogDescription className="text-slate-400">
-              Are you sure you want to delete this user? This action cannot be undone.
+              Choose how to handle this user's company data (timesheets, inspections, etc.)
             </DialogDescription>
           </DialogHeader>
+          
           {selectedUser && (
-            <div className="bg-slate-800 rounded p-4 space-y-2">
-              <p className="text-sm">
-                <span className="text-slate-400">Name:</span>{' '}
-                <span className="text-white font-medium">{selectedUser.full_name}</span>
-              </p>
-              <p className="text-sm">
-                <span className="text-slate-400">Email:</span>{' '}
-                <span className="text-white">{selectedUser.email}</span>
-              </p>
-              <p className="text-sm">
-                <span className="text-slate-400">Role:</span>{' '}
-                <Badge variant={
-                  selectedUser.email === 'admin@mpdee.co.uk' ? 'destructive' :
-                  selectedUser.role?.name === 'admin' ? 'destructive' : 'default'
-                }>
-                  {selectedUser.email === 'admin@mpdee.co.uk' ? 'SuperAdmin' : (selectedUser.role?.display_name || 'No Role')}
-                </Badge>
-              </p>
+            <div className="space-y-4">
+              {/* User Info */}
+              <div className="bg-slate-800 rounded p-4 space-y-2">
+                <p className="text-sm">
+                  <span className="text-slate-400">Name:</span>{' '}
+                  <span className="text-white font-medium">{selectedUser.full_name}</span>
+                </p>
+                <p className="text-sm">
+                  <span className="text-slate-400">Email:</span>{' '}
+                  <span className="text-white">{selectedUser.email}</span>
+                </p>
+                <p className="text-sm">
+                  <span className="text-slate-400">Role:</span>{' '}
+                  <Badge variant={
+                    selectedUser.email === 'admin@mpdee.co.uk' ? 'destructive' :
+                    selectedUser.role?.name === 'admin' ? 'destructive' : 'default'
+                  }>
+                    {selectedUser.email === 'admin@mpdee.co.uk' ? 'SuperAdmin' : (selectedUser.role?.display_name || 'No Role')}
+                  </Badge>
+                </p>
+              </div>
+
+              {/* Deletion Options */}
+              <div className="space-y-3">
+                <Label className="text-white font-semibold">What should happen to this user's company data?</Label>
+                
+                {/* Option 1: Keep Data (Recommended) */}
+                <div 
+                  onClick={() => setDeletionMode('keep-data')}
+                  className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                    deletionMode === 'keep-data' 
+                      ? 'border-green-500 bg-green-500/10' 
+                      : 'border-slate-600 hover:border-slate-500'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`mt-1 h-5 w-5 rounded-full border-2 flex items-center justify-center ${
+                      deletionMode === 'keep-data' ? 'border-green-500' : 'border-slate-500'
+                    }`}>
+                      {deletionMode === 'keep-data' && (
+                        <div className="h-3 w-3 rounded-full bg-green-500" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-white">Keep Company Data</p>
+                        <Badge variant="outline" className="text-green-500 border-green-500">
+                          Recommended
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-slate-400 mt-1">
+                        Preserve timesheets, inspections, and other submitted work for audits and reporting.
+                        User will be marked as "{selectedUser.full_name} (Deleted User)" in all records.
+                      </p>
+                      <div className="mt-2 text-xs text-slate-500">
+                        ✓ Personal account deleted  • ✓ Company data preserved  • ✓ Audit trail maintained
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Option 2: Delete All */}
+                <div 
+                  onClick={() => setDeletionMode('delete-all')}
+                  className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                    deletionMode === 'delete-all' 
+                      ? 'border-red-500 bg-red-500/10' 
+                      : 'border-slate-600 hover:border-slate-500'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`mt-1 h-5 w-5 rounded-full border-2 flex items-center justify-center ${
+                      deletionMode === 'delete-all' ? 'border-red-500' : 'border-slate-500'
+                    }`}>
+                      {deletionMode === 'delete-all' && (
+                        <div className="h-3 w-3 rounded-full bg-red-500" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-white">Delete All User Data</p>
+                        <Badge variant="destructive">
+                          Permanent
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-slate-400 mt-1">
+                        Completely remove all data including timesheets, inspections, and submitted work.
+                        This may impact reports and audit trails.
+                      </p>
+                      <div className="mt-2 text-xs text-red-400">
+                        ⚠ Cannot be undone  • ⚠ Affects reporting  • ⚠ Removes audit history
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {formError && (
+                <div className="bg-red-500/10 border border-red-500/50 rounded p-3 text-sm text-red-400">
+                  {formError}
+                </div>
+              )}
             </div>
           )}
-          {formError && (
-            <div className="bg-red-500/10 border border-red-500/50 rounded p-3 text-sm text-red-400">
-              {formError}
-            </div>
-          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} className="border-slate-600 text-white hover:bg-slate-800">
+            <Button 
+              variant="outline" 
+              onClick={() => setDeleteOptionsDialogOpen(false)} 
+              className="border-slate-600 text-white hover:bg-slate-800"
+              disabled={formLoading}
+            >
               Cancel
             </Button>
             <Button
               onClick={handleDeleteUser}
               disabled={formLoading}
-              className="bg-red-600 hover:bg-red-700"
+              className={deletionMode === 'delete-all' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}
             >
               {formLoading ? (
                 <>
@@ -918,7 +1018,7 @@ export default function UsersAdminPage() {
               ) : (
                 <>
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Delete User
+                  {deletionMode === 'keep-data' ? 'Delete User (Keep Data)' : 'Delete User & All Data'}
                 </>
               )}
             </Button>

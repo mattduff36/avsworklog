@@ -190,26 +190,101 @@ export async function DELETE(
       return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 });
     }
 
+    // Get deletion mode from query parameter (default: keep-data)
+    const { searchParams } = new URL(request.url);
+    const mode = searchParams.get('mode') || 'keep-data';
+
     const supabaseAdmin = getSupabaseAdmin();
 
-    // Step 1: Handle foreign key references before deletion
-    // Set reviewed_by to NULL in timesheets where this user was the reviewer
-    await supabase
-      .from('timesheets')
-      .update({ reviewed_by: null })
-      .eq('reviewed_by', userId);
+    // Get user's current name for the "(Deleted User)" suffix
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', userId)
+      .single();
 
-    // Set reviewed_by to NULL in vehicle_inspections where this user was the reviewer
-    await supabase
-      .from('vehicle_inspections')
-      .update({ reviewed_by: null })
-      .eq('reviewed_by', userId);
+    if (!userProfile) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
 
-    // Set adjusted_by to NULL in timesheets if it exists
-    await supabase
-      .from('timesheets')
-      .update({ adjusted_by: null })
-      .eq('adjusted_by', userId);
+    if (mode === 'keep-data') {
+      // MODE 1: Keep company data, only delete user account
+      // Update user's name to mark as deleted
+      const deletedName = userProfile.full_name.includes('(Deleted User)') 
+        ? userProfile.full_name 
+        : `${userProfile.full_name} (Deleted User)`;
+
+      await supabase
+        .from('profiles')
+        .update({ full_name: deletedName })
+        .eq('id', userId);
+
+      // Nullify reviewer/assigner references (keeps audit trail of who created data)
+      await supabase
+        .from('timesheets')
+        .update({ reviewed_by: null })
+        .eq('reviewed_by', userId);
+
+      await supabase
+        .from('vehicle_inspections')
+        .update({ reviewed_by: null })
+        .eq('reviewed_by', userId);
+
+      await supabase
+        .from('timesheets')
+        .update({ adjusted_by: null })
+        .eq('adjusted_by', userId);
+
+      await supabase
+        .from('actions')
+        .update({ actioned_by: null })
+        .eq('actioned_by', userId);
+
+      // Disable the auth user (ban until far future) instead of deleting
+      // This prevents cascade deletion of profile while making account inaccessible
+      const farFuture = new Date('2099-12-31').toISOString();
+      const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        banned_until: farFuture,
+        user_metadata: {
+          ...userProfile,
+          deleted_at: new Date().toISOString(),
+          account_status: 'deleted'
+        }
+      });
+
+      if (banError) {
+        console.error('Error disabling user:', banError);
+        return NextResponse.json(
+          { error: `Failed to disable account: ${banError.message}` },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'User account deleted - company data preserved',
+        mode: 'keep-data'
+      });
+    } else {
+      // MODE 2: Delete all user data
+      // Step 1: Handle foreign key references before deletion
+      // Set reviewed_by to NULL in timesheets where this user was the reviewer
+      await supabase
+        .from('timesheets')
+        .update({ reviewed_by: null })
+        .eq('reviewed_by', userId);
+
+      // Set reviewed_by to NULL in vehicle_inspections where this user was the reviewer
+      await supabase
+        .from('vehicle_inspections')
+        .update({ reviewed_by: null })
+        .eq('reviewed_by', userId);
+
+      // Set adjusted_by to NULL in timesheets if it exists
+      await supabase
+        .from('timesheets')
+        .update({ adjusted_by: null })
+        .eq('adjusted_by', userId);
 
     // Step 2: Delete user's own records
     // Delete timesheet entries (must delete before timesheets due to FK)
@@ -301,21 +376,36 @@ export async function DELETE(
       );
     }
 
-    // Step 4: Delete the auth user last
-    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+      // Step 4: Delete the profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
 
-    if (authError) {
-      console.error('Auth deletion error:', authError);
-      return NextResponse.json(
-        { error: `Failed to delete authentication: ${authError.message}` }, 
-        { status: 400 }
-      );
+      if (profileError) {
+        console.error('Profile deletion error:', profileError);
+        return NextResponse.json(
+          { error: `Database error deleting user: ${profileError.message}` },
+          { status: 500 }
+        );
+      }
+
+      // Step 5: Delete the auth user last
+      const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+
+      if (authError) {
+        console.error('Auth deletion error:', authError);
+        return NextResponse.json(
+          { error: `Failed to delete authentication: ${authError.message}` },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'User and all related data deleted successfully'
+      });
     }
-
-    return NextResponse.json({ 
-      success: true,
-      message: 'User and all related data deleted successfully'
-    });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     console.error('Error deleting user:', errorMessage, error);
