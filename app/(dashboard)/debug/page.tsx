@@ -31,6 +31,8 @@ import {
   Send,
   Check,
   Ban,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -92,6 +94,8 @@ export default function DebugPage() {
   const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([]);
   const [updating, setUpdating] = useState<string | null>(null);
   const [clearingErrors, setClearingErrors] = useState(false);
+  const [expandedErrors, setExpandedErrors] = useState<string[]>([]);
+  const [expandedAudits, setExpandedAudits] = useState<string[]>([]);
 
   // Check if user is superadmin and viewing as actual role
   useEffect(() => {
@@ -314,6 +318,18 @@ export default function DebugPage() {
     } finally {
       setClearingErrors(false);
     }
+  };
+
+  const toggleErrorExpanded = (id: string) => {
+    setExpandedErrors(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleAuditExpanded = (id: string) => {
+    setExpandedAudits(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
   };
 
   const updateStatus = async (id: string, type: string, newStatus: string) => {
@@ -593,20 +609,29 @@ export default function DebugPage() {
                   <p className="text-sm mt-1">Application errors will appear here when they occur</p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {errorLogs.map((log) => {
                     const isMobile = log.user_agent.includes('Mobile') || log.user_agent.includes('iPhone') || log.user_agent.includes('Android');
                     const browserMatch = log.user_agent.match(/(Chrome|Safari|Firefox|Edge)\/[\d.]+/);
                     const browser = browserMatch ? browserMatch[0] : 'Unknown';
+                    const isExpanded = expandedErrors.includes(log.id);
 
                     return (
                       <div
                         key={log.id}
-                        className="border border-red-200 dark:border-red-900 rounded-lg p-4 hover:bg-red-50/50 dark:hover:bg-red-950/20 transition-colors"
+                        className="border border-red-200 dark:border-red-900 rounded-lg overflow-hidden hover:border-red-300 dark:hover:border-red-800 transition-colors"
                       >
-                        {/* Header Row */}
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-start gap-3 flex-1">
+                        {/* Collapsed Header - Always Visible */}
+                        <div
+                          className="p-4 cursor-pointer hover:bg-red-50/50 dark:hover:bg-red-950/20 transition-colors"
+                          onClick={() => toggleErrorExpanded(log.id)}
+                        >
+                          <div className="flex items-start gap-3">
+                            {isExpanded ? (
+                              <ChevronDown className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                            ) : (
+                              <ChevronRight className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                            )}
                             <XCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
                             <div className="flex-1">
                               <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -655,38 +680,43 @@ export default function DebugPage() {
                           </div>
                         </div>
 
-                        {/* Page URL */}
-                        <div className="mt-3 pt-3 border-t border-red-200 dark:border-red-900">
-                          <p className="text-xs font-semibold text-muted-foreground mb-1">
-                            PAGE URL:
-                          </p>
-                          <p className="text-xs font-mono bg-muted/50 rounded p-2 break-all">
-                            {log.page_url}
-                          </p>
-                        </div>
+                        {/* Expanded Details - Only When Clicked */}
+                        {isExpanded && (
+                          <div className="border-t border-red-200 dark:border-red-900 bg-red-50/30 dark:bg-red-950/10 p-4 space-y-3">
+                            {/* Page URL */}
+                            <div>
+                              <p className="text-xs font-semibold text-muted-foreground mb-1">
+                                PAGE URL:
+                              </p>
+                              <p className="text-xs font-mono bg-muted/50 rounded p-2 break-all">
+                                {log.page_url}
+                              </p>
+                            </div>
 
-                        {/* Stack Trace */}
-                        {log.error_stack && (
-                          <details className="mt-3 pt-3 border-t border-red-200 dark:border-red-900">
-                            <summary className="text-xs font-semibold text-muted-foreground mb-2 cursor-pointer hover:text-foreground">
-                              STACK TRACE (click to expand)
-                            </summary>
-                            <pre className="text-xs font-mono bg-red-500/10 border border-red-500/20 rounded p-3 overflow-x-auto whitespace-pre-wrap break-all">
-                              {log.error_stack}
-                            </pre>
-                          </details>
-                        )}
+                            {/* Stack Trace */}
+                            {log.error_stack && (
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground mb-1">
+                                  STACK TRACE:
+                                </p>
+                                <pre className="text-xs font-mono bg-red-500/10 border border-red-500/20 rounded p-3 overflow-x-auto whitespace-pre-wrap break-all max-h-64 overflow-y-auto">
+                                  {log.error_stack}
+                                </pre>
+                              </div>
+                            )}
 
-                        {/* Additional Data */}
-                        {log.additional_data && Object.keys(log.additional_data).length > 0 && (
-                          <details className="mt-3 pt-3 border-t border-red-200 dark:border-red-900">
-                            <summary className="text-xs font-semibold text-muted-foreground mb-2 cursor-pointer hover:text-foreground">
-                              ADDITIONAL DATA (click to expand)
-                            </summary>
-                            <pre className="text-xs font-mono bg-muted/50 rounded p-3 overflow-x-auto">
-                              {JSON.stringify(log.additional_data, null, 2)}
-                            </pre>
-                          </details>
+                            {/* Additional Data */}
+                            {log.additional_data && Object.keys(log.additional_data).length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground mb-1">
+                                  ADDITIONAL DATA:
+                                </p>
+                                <pre className="text-xs font-mono bg-muted/50 rounded p-3 overflow-x-auto max-h-64 overflow-y-auto">
+                                  {JSON.stringify(log.additional_data, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     );
@@ -726,98 +756,112 @@ export default function DebugPage() {
                   <p className="text-sm mt-1">Database changes will appear here</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {auditLogs.map((log) => (
-                    <div
-                      key={log.id}
-                      className="border rounded-lg p-4 hover:bg-accent transition-colors"
-                    >
-                      {/* Header Row */}
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-3 flex-1">
-                          {getActionIcon(log.action)}
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Badge variant="outline" className="font-mono text-xs">
-                                {formatTableName(log.table_name)}
-                              </Badge>
-                              <span className={`font-semibold ${getActionColor(log.action)}`}>
-                                {log.action.toUpperCase()}
-                              </span>
-                              <span className="text-muted-foreground text-sm">by</span>
-                              <Badge variant="secondary" className="gap-1">
-                                <Users className="h-3 w-3" />
-                                {log.user_name}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              {new Date(log.created_at).toLocaleString('en-GB', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                second: '2-digit',
-                              })}
-                              <span className="ml-2">•</span>
-                              <span className="font-mono text-xs">ID: {log.record_id.slice(0, 8)}...</span>
+                <div className="space-y-2">
+                  {auditLogs.map((log) => {
+                    const isExpanded = expandedAudits.includes(log.id);
+
+                    return (
+                      <div
+                        key={log.id}
+                        className="border rounded-lg overflow-hidden hover:border-primary/50 transition-colors"
+                      >
+                        {/* Collapsed Header - Always Visible */}
+                        <div
+                          className="p-4 cursor-pointer hover:bg-accent transition-colors"
+                          onClick={() => toggleAuditExpanded(log.id)}
+                        >
+                          <div className="flex items-start gap-3">
+                            {isExpanded ? (
+                              <ChevronDown className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                            ) : (
+                              <ChevronRight className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                            )}
+                            {getActionIcon(log.action)}
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge variant="outline" className="font-mono text-xs">
+                                  {formatTableName(log.table_name)}
+                                </Badge>
+                                <span className={`font-semibold ${getActionColor(log.action)}`}>
+                                  {log.action.toUpperCase()}
+                                </span>
+                                <span className="text-muted-foreground text-sm">by</span>
+                                <Badge variant="secondary" className="gap-1">
+                                  <Users className="h-3 w-3" />
+                                  {log.user_name}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                                <Clock className="h-3 w-3" />
+                                {new Date(log.created_at).toLocaleString('en-GB', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  second: '2-digit',
+                                })}
+                                <span className="ml-2">•</span>
+                                <span className="font-mono text-xs">ID: {log.record_id.slice(0, 8)}...</span>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Changes Details */}
-                      {log.changes && Object.keys(log.changes).length > 0 && (
-                        <div className="mt-3 pt-3 border-t">
-                          <p className="text-xs font-semibold text-muted-foreground mb-2">
-                            CHANGES:
-                          </p>
-                          <div className="space-y-2">
-                            {Object.entries(log.changes).map(([field, change]) => (
-                              <div
-                                key={field}
-                                className="bg-muted/50 rounded p-2 text-xs font-mono"
-                              >
-                                <div className="font-semibold text-foreground mb-1">
-                                  {field}:
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                  {change.old !== undefined && (
-                                    <div className="bg-red-500/10 border border-red-500/20 rounded p-2">
-                                      <div className="text-red-500 font-semibold mb-1">
-                                        - Old:
+                        {/* Expanded Details - Only When Clicked */}
+                        {isExpanded && (
+                          <div className="border-t bg-accent/30 p-4">
+                            {/* Changes Details */}
+                            {log.changes && Object.keys(log.changes).length > 0 ? (
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground mb-2">
+                                  CHANGES:
+                                </p>
+                                <div className="space-y-2">
+                                  {Object.entries(log.changes).map(([field, change]) => (
+                                    <div
+                                      key={field}
+                                      className="bg-muted/50 rounded p-2 text-xs font-mono"
+                                    >
+                                      <div className="font-semibold text-foreground mb-1">
+                                        {field}:
                                       </div>
-                                      <div className="text-red-700 dark:text-red-300 whitespace-pre-wrap break-all">
-                                        {formatValue(change.old)}
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                        {change.old !== undefined && (
+                                          <div className="bg-red-500/10 border border-red-500/20 rounded p-2">
+                                            <div className="text-red-500 font-semibold mb-1">
+                                              - Old:
+                                            </div>
+                                            <div className="text-red-700 dark:text-red-300 whitespace-pre-wrap break-all">
+                                              {formatValue(change.old)}
+                                            </div>
+                                          </div>
+                                        )}
+                                        {change.new !== undefined && (
+                                          <div className="bg-green-500/10 border border-green-500/20 rounded p-2">
+                                            <div className="text-green-500 font-semibold mb-1">
+                                              + New:
+                                            </div>
+                                            <div className="text-green-700 dark:text-green-300 whitespace-pre-wrap break-all">
+                                              {formatValue(change.new)}
+                                            </div>
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
-                                  )}
-                                  {change.new !== undefined && (
-                                    <div className="bg-green-500/10 border border-green-500/20 rounded p-2">
-                                      <div className="text-green-500 font-semibold mb-1">
-                                        + New:
-                                      </div>
-                                      <div className="text-green-700 dark:text-green-300 whitespace-pre-wrap break-all">
-                                        {formatValue(change.new)}
-                                      </div>
-                                    </div>
-                                  )}
+                                  ))}
                                 </div>
                               </div>
-                            ))}
+                            ) : (
+                              <div className="text-xs text-muted-foreground italic">
+                                No detailed changes recorded
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      )}
-
-                      {/* No changes data */}
-                      {(!log.changes || Object.keys(log.changes).length === 0) && (
-                        <div className="mt-2 text-xs text-muted-foreground italic">
-                          No detailed changes recorded
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
