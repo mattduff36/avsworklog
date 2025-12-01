@@ -361,14 +361,17 @@ export default function DebugPage() {
       // Auto-collapse all others and expand only this one
       setExpandedErrors([id]);
       
-      // Mark as viewed immediately (both in state and localStorage)
+      // Mark as viewed in localStorage only (will move to "Viewed" section on next page load)
       if (!viewedErrors.has(id)) {
-        const newViewedErrors = new Set(viewedErrors);
-        newViewedErrors.add(id);
-        setViewedErrors(newViewedErrors);
-        
-        // Persist to localStorage
-        localStorage.setItem('viewedErrorLogs', JSON.stringify(Array.from(newViewedErrors)));
+        try {
+          const storedViewed = localStorage.getItem('viewedErrorLogs');
+          const currentViewed = storedViewed ? new Set(JSON.parse(storedViewed)) : new Set<string>();
+          currentViewed.add(id);
+          localStorage.setItem('viewedErrorLogs', JSON.stringify(Array.from(currentViewed)));
+        } catch (error) {
+          console.warn('Failed to update viewed errors in localStorage:', error);
+        }
+        // Note: NOT updating viewedErrors state here, so error stays in "New" section until reload
       }
     } else {
       // Collapse this one
