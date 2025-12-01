@@ -401,7 +401,7 @@ ERROR MESSAGE:
 ${log.error_message}
 
 TIMESTAMP: ${new Date(log.timestamp).toLocaleString('en-GB')}
-USER: ${log.user_name && log.user_email ? `${log.user_name} (${log.user_email})` : log.user_email || 'Anonymous'}
+USER: ${log.user_name && log.user_email ? `${log.user_name} (${log.user_email})` : log.user_name || log.user_email || 'Anonymous'}
 PAGE URL: ${log.page_url}
 
 ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional_data ? `ADDITIONAL DATA:\n${JSON.stringify(log.additional_data, null, 2)}` : ''}`;
