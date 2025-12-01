@@ -371,41 +371,28 @@ export async function DELETE(
     if (profileError) {
       console.error('Profile deletion error:', profileError);
       return NextResponse.json(
-        { error: `Database error deleting user: ${profileError.message}` }, 
+        { error: `Database error deleting user: ${profileError.message}` },
         { status: 500 }
       );
     }
 
-      // Step 4: Delete the profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', userId);
+    // Step 4: Delete the auth user last
+    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
-      if (profileError) {
-        console.error('Profile deletion error:', profileError);
-        return NextResponse.json(
-          { error: `Database error deleting user: ${profileError.message}` },
-          { status: 500 }
-        );
-      }
-
-      // Step 5: Delete the auth user last
-      const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
-
-      if (authError) {
-        console.error('Auth deletion error:', authError);
-        return NextResponse.json(
-          { error: `Failed to delete authentication: ${authError.message}` },
-          { status: 400 }
-        );
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: 'User and all related data deleted successfully'
-      });
+    if (authError) {
+      console.error('Auth deletion error:', authError);
+      return NextResponse.json(
+        { error: `Failed to delete authentication: ${authError.message}` },
+        { status: 400 }
+      );
     }
+
+    return NextResponse.json({
+      success: true,
+      message: 'User and all related data deleted successfully',
+      mode: 'delete-all'
+    });
+  }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     console.error('Error deleting user:', errorMessage, error);
