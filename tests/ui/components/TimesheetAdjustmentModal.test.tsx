@@ -132,10 +132,11 @@ describe('TimesheetAdjustmentModal', () => {
 
   describe('Recipient selection', () => {
     it('should allow selecting multiple recipients', async () => {
-      const suzanne = createSuzanneSquires();
-      const manager2 = createMockManager();
-      manager2.id = 'manager2-id';
-      manager2.full_name = 'Alice Manager';
+      const suzanne = createSuzanneSquiresApiResponse();
+      const manager2 = createManagerApiResponse({
+        id: 'manager2-id',
+        full_name: 'Alice Manager',
+      });
       mockFetch({ managers: [suzanne, manager2] });
 
       render(
