@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { OfflineBanner } from '@/components/ui/offline-banner';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Clipboard, CheckCircle2, XCircle, Clock, AlertCircle, User, Download, Trash2, Filter, FileText } from 'lucide-react';
+import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, FileText } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import { VehicleInspection } from '@/types/inspection';
@@ -42,7 +42,7 @@ interface InspectionWithVehicle extends VehicleInspection {
 function InspectionsContent() {
   const { user, isManager } = useAuth();
   const { isOnline } = useOfflineSync();
-  const { hasPermission, loading: permissionLoading } = usePermissionCheck('inspections');
+  usePermissionCheck('inspections'); // Check permissions but don't use loading state
   const router = useRouter();
   const [inspections, setInspections] = useState<InspectionWithVehicle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,8 +52,8 @@ function InspectionsContent() {
     defaultValue: 'all',
     shallow: false,
   });
-  const [statusFilter, setStatusFilter] = useQueryState<InspectionStatusFilter>('status', {
-    defaultValue: 'all',
+  const [statusFilter, setStatusFilter] = useQueryState('status', {
+    defaultValue: 'all' as InspectionStatusFilter,
     shallow: false,
   });
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -165,6 +165,7 @@ function InspectionsContent() {
       case 'all': return 'All';
       case 'draft': return 'Draft';
       case 'submitted': return 'Submitted';
+      default: return filter; // Fallback for any unexpected values
     }
   };
 
@@ -308,7 +309,7 @@ function InspectionsContent() {
             <Filter className="h-4 w-4 text-slate-400" />
             <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
             <div className="flex gap-2 flex-wrap">
-              {(['all', 'draft', 'pending', 'approved', 'rejected'] as InspectionStatusFilter[]).map((filter) => (
+              {(['all', 'draft', 'submitted'] as InspectionStatusFilter[]).map((filter) => (
                 <Button
                   key={filter}
                   variant={statusFilter === filter ? 'default' : 'outline'}
@@ -316,9 +317,7 @@ function InspectionsContent() {
                   onClick={() => setStatusFilter(filter)}
                   className={statusFilter === filter ? '' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50'}
                 >
-                  {filter === 'pending' && <Clock className="h-3 w-3 mr-1" />}
-                  {filter === 'approved' && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                  {filter === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
+                  {filter === 'submitted' && <Clock className="h-3 w-3 mr-1" />}
                   {filter === 'draft' && <FileText className="h-3 w-3 mr-1" />}
                   {getFilterLabel(filter)}
                 </Button>
