@@ -23,6 +23,7 @@ import { Database } from '@/types/database';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { Employee } from '@/types/common';
 import { toast } from 'sonner';
+import { showErrorWithReport } from '@/lib/utils/error-reporting';
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -617,8 +618,7 @@ function NewInspectionContent() {
       console.error('Error details:', JSON.stringify(err, null, 2));
       
       // Get detailed error message
-      let errorMessage = 'Failed to save inspection';
-      let errorDescription = 'Please try again';
+      let errorMessage = 'An unexpected error occurred';
       
       if (err instanceof Error) {
         errorMessage = err.message;
@@ -627,15 +627,25 @@ function NewInspectionContent() {
       
       // Check if this is a network/offline error
       if (!isOnline || (err instanceof Error && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('network')))) {
-        setError('Unable to save inspection - no internet connection. Please connect to the internet to submit your inspection.');
-        toast.error('Cannot save while offline', {
-          description: 'Please check your internet connection and try again.',
-        });
+        showErrorWithReport(
+          'Cannot save while offline',
+          'No internet connection detected. Please check your connection and try again.',
+          {
+            offline: true,
+            vehicleId,
+            weekEnding,
+          }
+        );
       } else {
-        setError(errorMessage);
-        toast.error('Failed to save inspection', {
-          description: errorMessage,
-        });
+        showErrorWithReport(
+          'Failed to save inspection',
+          errorMessage,
+          {
+            vehicleId,
+            weekEnding,
+            existingInspectionId: existingInspectionId || null,
+          }
+        );
       }
     } finally {
       setLoading(false);
