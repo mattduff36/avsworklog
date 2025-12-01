@@ -164,30 +164,25 @@ export async function POST(
 
       if (managers) {
         // Get emails from auth.users for these managers
-        const { data: usersData, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
-        
-        if (usersError || !usersData) {
-          console.error('Error fetching manager emails:', usersError);
-          // Continue without sending emails to managers rather than failing the entire request
-        } else {
-          const emailMap = new Map(
-            usersData.users
-              .filter((u) => notifyManagerIds.includes(u.id))
-              .map((u) => [u.id, u.email])
-          );
-
-          for (const manager of managers) {
-            const managerEmail = emailMap.get(manager.id);
-            if (managerEmail) {
+        // Fetch each user by ID to avoid pagination limits of listUsers()
+        for (const manager of managers) {
+          try {
+            const { data: { user: managerUser }, error: managerUserError } = await supabaseAdmin.auth.admin.getUserById(manager.id);
+            
+            if (!managerUserError && managerUser?.email) {
               await sendTimesheetAdjustmentEmail({
-                to: managerEmail,
+                to: managerUser.email,
                 recipientName: manager.full_name,
                 employeeName: employeeProfile.full_name,
                 weekEnding,
                 adjustmentComments: comments.trim(),
                 adjustedBy: typedProfile!.full_name,
               });
+            } else {
+              console.error(`Error fetching email for manager ${manager.id}:`, managerUserError);
             }
+          } catch (err) {
+            console.error(`Exception fetching email for manager ${manager.id}:`, err);
           }
         }
       }

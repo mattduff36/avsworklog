@@ -84,24 +84,23 @@ export async function GET() {
     }
 
     // Get emails from auth.users for these profiles
-    const profileIds = (profilesData ?? []).map((p) => p.id);
+    // Fetch each user by ID to avoid pagination limits of listUsers()
+    const emailMap = new Map<string, string | null>();
     
-    const { data: usersData, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
-    
-    if (usersError) {
-      console.error('Error fetching user emails:', usersError);
-      return NextResponse.json(
-        { error: 'Failed to fetch user details' },
-        { status: 500 }
-      );
+    for (const profile of profilesData ?? []) {
+      try {
+        const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.getUserById(profile.id);
+        if (!userError && user?.email) {
+          emailMap.set(profile.id, user.email);
+        } else {
+          console.error(`Error fetching email for user ${profile.id}:`, userError);
+          emailMap.set(profile.id, null);
+        }
+      } catch (err) {
+        console.error(`Exception fetching email for user ${profile.id}:`, err);
+        emailMap.set(profile.id, null);
+      }
     }
-
-    // Create a map of user_id -> email
-    const emailMap = new Map(
-      usersData.users
-        .filter((u) => profileIds.includes(u.id))
-        .map((u) => [u.id, u.email])
-    );
 
     // Merge profiles with emails
     const data = (profilesData ?? []).map((profile) => ({
