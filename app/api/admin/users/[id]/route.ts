@@ -190,19 +190,104 @@ export async function DELETE(
       return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 });
     }
 
-    // Delete auth user (this will cascade to profile via database trigger/RLS)
     const supabaseAdmin = getSupabaseAdmin();
-    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
-    if (authError) {
-      console.error('Auth deletion error:', authError);
-      return NextResponse.json(
-        { error: `Failed to delete user: ${authError.message}` }, 
-        { status: 400 }
+    // Step 1: Handle foreign key references before deletion
+    // Set reviewed_by to NULL in timesheets where this user was the reviewer
+    await supabase
+      .from('timesheets')
+      .update({ reviewed_by: null })
+      .eq('reviewed_by', userId);
+
+    // Set reviewed_by to NULL in vehicle_inspections where this user was the reviewer
+    await supabase
+      .from('vehicle_inspections')
+      .update({ reviewed_by: null })
+      .eq('reviewed_by', userId);
+
+    // Set adjusted_by to NULL in timesheets if it exists
+    await supabase
+      .from('timesheets')
+      .update({ adjusted_by: null })
+      .eq('adjusted_by', userId);
+
+    // Step 2: Delete user's own records
+    // Delete timesheet entries (must delete before timesheets due to FK)
+    await supabase
+      .from('timesheet_entries')
+      .delete()
+      .in('timesheet_id', 
+        supabase
+          .from('timesheets')
+          .select('id')
+          .eq('user_id', userId)
       );
-    }
 
-    // Also delete profile directly (in case cascade doesn't work)
+    // Delete timesheets created by this user
+    await supabase
+      .from('timesheets')
+      .delete()
+      .eq('user_id', userId);
+
+    // Delete inspection items (must delete before inspections due to FK)
+    await supabase
+      .from('inspection_items')
+      .delete()
+      .in('inspection_id',
+        supabase
+          .from('vehicle_inspections')
+          .select('id')
+          .eq('user_id', userId)
+      );
+
+    // Delete vehicle inspections created by this user
+    await supabase
+      .from('vehicle_inspections')
+      .delete()
+      .eq('user_id', userId);
+
+    // Delete or nullify actions
+    await supabase
+      .from('actions')
+      .delete()
+      .eq('created_by', userId);
+
+    await supabase
+      .from('actions')
+      .update({ actioned_by: null })
+      .eq('actioned_by', userId);
+
+    // Delete absences
+    await supabase
+      .from('absences')
+      .delete()
+      .eq('profile_id', userId);
+
+    // Delete RAMS assignments
+    await supabase
+      .from('rams_assignments')
+      .delete()
+      .eq('employee_id', userId);
+
+    // Nullify audit log references
+    await supabase
+      .from('audit_log')
+      .update({ user_id: null })
+      .eq('user_id', userId);
+
+    // Nullify message references
+    await supabase
+      .from('messages')
+      .update({ sender_id: null })
+      .eq('sender_id', userId);
+
+    // Delete message recipients
+    await supabase
+      .from('message_recipients')
+      .delete()
+      .eq('user_id', userId);
+
+    // Step 3: Delete the profile
     const { error: profileError } = await supabase
       .from('profiles')
       .delete()
@@ -210,12 +295,26 @@ export async function DELETE(
 
     if (profileError) {
       console.error('Profile deletion error:', profileError);
-      // Continue anyway, auth user is deleted
+      return NextResponse.json(
+        { error: `Database error deleting user: ${profileError.message}` }, 
+        { status: 500 }
+      );
+    }
+
+    // Step 4: Delete the auth user last
+    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+
+    if (authError) {
+      console.error('Auth deletion error:', authError);
+      return NextResponse.json(
+        { error: `Failed to delete authentication: ${authError.message}` }, 
+        { status: 400 }
+      );
     }
 
     return NextResponse.json({ 
       success: true,
-      message: 'User deleted successfully'
+      message: 'User and all related data deleted successfully'
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
