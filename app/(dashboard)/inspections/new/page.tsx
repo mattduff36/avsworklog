@@ -397,6 +397,12 @@ function NewInspectionContent() {
 
   const saveInspection = async (status: 'draft' | 'submitted', signatureData?: string) => {
     if (!user || !selectedEmployeeId || !vehicleId) return;
+    
+    // Prevent duplicate saves
+    if (loading) {
+      console.log('Save already in progress, ignoring duplicate request');
+      return;
+    }
 
     setError('');
     setLoading(true);
@@ -500,18 +506,34 @@ function NewInspectionContent() {
         inspection = updatedInspection[0];
 
         // Delete existing items before inserting new ones
-        console.log(`Deleting existing items for inspection ${existingInspectionId}...`);
-        const { data: deletedData, error: deleteError } = await supabase
+        // First, get all existing items to determine which ones to remove
+        console.log(`Fetching existing items for inspection ${existingInspectionId}...`);
+        const { data: existingItems, error: fetchError } = await supabase
           .from('inspection_items')
-          .delete()
-          .eq('inspection_id', existingInspectionId)
-          .select();
+          .select('id, item_number, day_of_week')
+          .eq('inspection_id', existingInspectionId);
 
-        if (deleteError) {
-          console.error('Error deleting existing items:', deleteError);
-          throw new Error(`Failed to delete existing items: ${deleteError.message}`);
+        if (fetchError) {
+          console.error('Error fetching existing items:', fetchError);
+          throw new Error(`Failed to fetch existing items: ${fetchError.message}`);
         }
-        console.log(`Deleted ${deletedData?.length || 0} existing items`);
+
+        // Delete all existing items - we'll use upsert for the new ones
+        if (existingItems && existingItems.length > 0) {
+          console.log(`Deleting ${existingItems.length} existing items...`);
+          const { error: deleteError } = await supabase
+            .from('inspection_items')
+            .delete()
+            .eq('inspection_id', existingInspectionId);
+
+          if (deleteError) {
+            console.error('Error deleting existing items:', deleteError);
+            throw new Error(`Failed to delete existing items: ${deleteError.message}`);
+          }
+          console.log(`Successfully deleted existing items`);
+        } else {
+          console.log('No existing items to delete');
+        }
       } else {
         // Create new inspection
         const { data: newInspection, error: insertError } = await supabase
@@ -553,18 +575,26 @@ function NewInspectionContent() {
       // Only insert if there are items to save
       let insertedItems: any[] = [];
       if (items.length > 0) {
-        console.log(`Saving ${items.length} inspection items...`);
+        console.log(`Saving ${items.length} inspection items for inspection ${inspection.id}...`);
+        
+        // Use upsert to handle any potential duplicates gracefully
+        // onConflict parameter specifies which columns to check for conflicts
         const { data, error: itemsError } = await supabase
           .from('inspection_items')
-          .insert(items)
+          .upsert(items, {
+            onConflict: 'inspection_id,item_number,day_of_week',
+            ignoreDuplicates: false, // Update existing records instead of ignoring
+          })
           .select();
 
         if (itemsError) {
-          console.error('Error inserting items:', itemsError);
+          console.error('Error saving items:', itemsError);
+          console.error('Items that failed:', JSON.stringify(items.slice(0, 3))); // Log first 3 for debugging
           throw new Error(`Failed to save inspection items: ${itemsError.message}`);
         }
         
         insertedItems = data || [];
+        console.log(`Successfully saved ${insertedItems.length} items`);
       } else {
         console.warn('No items to save - inspection has no completed items');
       }
