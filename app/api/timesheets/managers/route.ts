@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database';
@@ -14,6 +14,8 @@ type Manager = {
   } | null;
 };
 
+const SUZANNE_EMAIL = 'suzanne@avsquires.co.uk';
+
 function getSupabaseAdmin() {
   return createSupabaseAdmin<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,7 +29,13 @@ function getSupabaseAdmin() {
   );
 }
 
-export async function GET(_request: NextRequest) {
+function compareManagers(a: Manager, b: Manager): number {
+  if (a.email === SUZANNE_EMAIL) return -1;
+  if (b.email === SUZANNE_EMAIL) return 1;
+  return (a.full_name || '').localeCompare(b.full_name || '');
+}
+
+export async function GET() {
   try {
     const supabase = await createServerClient();
 
@@ -96,12 +104,7 @@ export async function GET(_request: NextRequest) {
     }));
 
     // Ensure Suzanne Squires is first in the response
-    const suzanneEmail = 'suzanne@avsquires.co.uk';
-    managers.sort((a, b) => {
-      if (a.email === suzanneEmail) return -1;
-      if (b.email === suzanneEmail) return 1;
-      return a.full_name.localeCompare(b.full_name);
-    });
+    managers.sort(compareManagers);
 
     return NextResponse.json({ managers });
   } catch (error) {
