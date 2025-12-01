@@ -196,7 +196,10 @@ export async function DELETE(
 
     if (authError) {
       console.error('Auth deletion error:', authError);
-      return NextResponse.json({ error: authError.message }, { status: 400 });
+      return NextResponse.json(
+        { error: `Failed to delete user: ${authError.message}` }, 
+        { status: 400 }
+      );
     }
 
     // Also delete profile directly (in case cascade doesn't work)
@@ -210,10 +213,17 @@ export async function DELETE(
       // Continue anyway, auth user is deleted
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ 
+      success: true,
+      message: 'User deleted successfully'
+    });
   } catch (error) {
-    console.error('Error deleting user:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error('Error deleting user:', errorMessage, error);
+    return NextResponse.json(
+      { error: `Internal server error: ${errorMessage}` }, 
+      { status: 500 }
+    );
   }
 }
 

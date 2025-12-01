@@ -313,8 +313,15 @@ export default function UsersAdminPage() {
       });
 
       if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result.error || 'Failed to delete user');
+        let errorMessage = 'Failed to delete user';
+        try {
+          const result = await response.json();
+          errorMessage = result.error || errorMessage;
+        } catch (jsonError) {
+          // If JSON parsing fails, use the response status text
+          errorMessage = `Failed to delete user: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
 
       // Refresh users list
@@ -325,8 +332,9 @@ export default function UsersAdminPage() {
       setDeleteDialogOpen(false);
       setSelectedUser(null);
     } catch (error) {
-      console.error('Error deleting user:', error);
-      setFormError('Failed to delete user');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete user';
+      console.error('Error deleting user:', errorMessage, error);
+      setFormError(errorMessage);
     } finally {
       setFormLoading(false);
     }
