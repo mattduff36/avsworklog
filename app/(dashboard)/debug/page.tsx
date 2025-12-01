@@ -97,6 +97,7 @@ export default function DebugPage() {
   const [clearingErrors, setClearingErrors] = useState(false);
   const [expandedErrors, setExpandedErrors] = useState<string[]>([]);
   const [expandedAudits, setExpandedAudits] = useState<string[]>([]);
+  const [viewedErrors, setViewedErrors] = useState<Set<string>>(new Set());
 
   // Check if user is superadmin and viewing as actual role
   useEffect(() => {
@@ -126,6 +127,19 @@ export default function DebugPage() {
     }
     checkAccess();
   }, [supabase, router]);
+
+  // Load viewed errors from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('viewedErrorLogs');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setViewedErrors(new Set(parsed));
+      } catch (err) {
+        console.error('Failed to parse viewed errors:', err);
+      }
+    }
+  }, []);
 
   // Fetch debug info
   useEffect(() => {
@@ -322,9 +336,21 @@ export default function DebugPage() {
   };
 
   const toggleErrorExpanded = (id: string) => {
+    const isExpanding = !expandedErrors.includes(id);
+    
     setExpandedErrors(prev => 
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
+
+    // Mark as viewed when expanding for the first time
+    if (isExpanding && !viewedErrors.has(id)) {
+      const newViewedErrors = new Set(viewedErrors);
+      newViewedErrors.add(id);
+      setViewedErrors(newViewedErrors);
+      
+      // Persist to localStorage
+      localStorage.setItem('viewedErrorLogs', JSON.stringify(Array.from(newViewedErrors)));
+    }
   };
 
   const toggleAuditExpanded = (id: string) => {
@@ -673,8 +699,162 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                   <p className="text-sm mt-1">Application errors will appear here when they occur</p>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {errorLogs.map((log) => {
+                <div className="space-y-6">
+                  {/* New Errors Section */}
+                  {(() => {
+                    const newErrors = errorLogs.filter(log => !viewedErrors.has(log.id));
+                    const viewedErrorsList = errorLogs.filter(log => viewedErrors.has(log.id));
+
+                    return (
+                      <>
+                        {newErrors.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-red-200 dark:border-red-900">
+                              <Badge variant="destructive" className="font-semibold">
+                                New
+                              </Badge>
+                              <span className="text-sm text-muted-foreground">
+                                {newErrors.length} unread error{newErrors.length !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                            <div className="space-y-2">
+                              {newErrors.map((log) => {
+                                const isMobile = log.user_agent.includes('Mobile') || log.user_agent.includes('iPhone') || log.user_agent.includes('Android');
+                                const browserMatch = log.user_agent.match(/(Chrome|Safari|Firefox|Edge)\/[\d.]+/);
+                                const browser = browserMatch ? browserMatch[0] : 'Unknown';
+                                const isExpanded = expandedErrors.includes(log.id);
+
+                                return (
+                                  <div
+                                    key={log.id}
+                                    className="border border-red-200 dark:border-red-900 rounded-lg overflow-hidden hover:border-red-300 dark:hover:border-red-800 transition-colors"
+                                  >
+                                    {/* Collapsed Header - Always Visible */}
+                                    <div
+                                      className="p-4 cursor-pointer hover:bg-red-50/50 dark:hover:bg-red-950/20 transition-colors"
+                                      onClick={() => toggleErrorExpanded(log.id)}
+                                    >
+                                      <div className="flex items-start gap-3">
+                                        {isExpanded ? (
+                                          <ChevronDown className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                                        ) : (
+                                          <ChevronRight className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                                        )}
+                                        <XCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                                            <Badge variant="destructive" className="font-mono text-xs">
+                                              {log.error_type}
+                                            </Badge>
+                                            {log.component_name && (
+                                              <Badge variant="outline" className="text-xs">
+                                                {log.component_name}
+                                              </Badge>
+                                            )}
+                                            {isMobile && (
+                                              <Badge variant="secondary" className="text-xs">
+                                                📱 Mobile
+                                              </Badge>
+                                            )}
+                                          </div>
+                                          <p className="font-semibold text-red-700 dark:text-red-400 mb-2">
+                                            {log.error_message}
+                                          </p>
+                                          <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                                            <div className="flex items-center gap-1">
+                                              <Clock className="h-3 w-3" />
+                                              {new Date(log.timestamp).toLocaleString('en-GB', {
+                                                day: '2-digit',
+                                                month: '2-digit',
+                                                year: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                                second: '2-digit',
+                                              })}
+                                            </div>
+                                            {log.user_email && (
+                                              <>
+                                                <span>•</span>
+                                                <div className="flex items-center gap-1">
+                                                  <Users className="h-3 w-3" />
+                                                  {log.user_email}
+                                                </div>
+                                              </>
+                                            )}
+                                            <span>•</span>
+                                            <span className="font-mono">{browser}</span>
+                                          </div>
+                                        </div>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 w-8 p-0 flex-shrink-0 hover:bg-red-100 dark:hover:bg-red-950"
+                                          onClick={(e) => copyErrorToClipboard(log, e)}
+                                          title="Copy to clipboard"
+                                        >
+                                          <Copy className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                        </Button>
+                                      </div>
+                                    </div>
+
+                                    {/* Expanded Details - Only When Clicked */}
+                                    {isExpanded && (
+                                      <div className="border-t border-red-200 dark:border-red-900 bg-red-50/30 dark:bg-red-950/10 p-4 space-y-3">
+                                        {/* Page URL */}
+                                        <div>
+                                          <p className="text-xs font-semibold text-muted-foreground mb-1">
+                                            PAGE URL:
+                                          </p>
+                                          <p className="text-xs font-mono bg-muted/50 rounded p-2 break-all">
+                                            {log.page_url}
+                                          </p>
+                                        </div>
+
+                                        {/* Stack Trace */}
+                                        {log.error_stack && (
+                                          <div>
+                                            <p className="text-xs font-semibold text-muted-foreground mb-1">
+                                              STACK TRACE:
+                                            </p>
+                                            <pre className="text-xs font-mono bg-muted/50 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap break-words">
+                                              {log.error_stack}
+                                            </pre>
+                                          </div>
+                                        )}
+
+                                        {/* Additional Data */}
+                                        {log.additional_data && (
+                                          <div>
+                                            <p className="text-xs font-semibold text-muted-foreground mb-1">
+                                              ADDITIONAL DATA:
+                                            </p>
+                                            <pre className="text-xs font-mono bg-muted/50 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap break-words">
+                                              {JSON.stringify(log.additional_data, null, 2)}
+                                            </pre>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Viewed Errors Section */}
+                        {viewedErrorsList.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-muted">
+                              <Badge variant="secondary" className="font-semibold">
+                                Viewed
+                              </Badge>
+                              <span className="text-sm text-muted-foreground">
+                                {viewedErrorsList.length} viewed error{viewedErrorsList.length !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                            <div className="space-y-2">
+                              {viewedErrorsList.map((log) => {
                     const isMobile = log.user_agent.includes('Mobile') || log.user_agent.includes('iPhone') || log.user_agent.includes('Android');
                     const browserMatch = log.user_agent.match(/(Chrome|Safari|Firefox|Edge)\/[\d.]+/);
                     const browser = browserMatch ? browserMatch[0] : 'Unknown';
@@ -795,7 +975,13 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                     );
                   })}
                 </div>
-              )}
+              </div>
+            )}
+          </>
+        );
+      })()}
+    </div>
+  )}
             </CardContent>
           </Card>
         </TabsContent>
