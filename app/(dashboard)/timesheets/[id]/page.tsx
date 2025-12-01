@@ -454,12 +454,12 @@ export default function ViewTimesheetPage() {
       )}
 
       {timesheet.manager_comments && (
-        <Card className="border-amber-200 bg-amber-50">
+        <Card className="manager-notice">
           <CardHeader>
-            <CardTitle className="text-amber-900">Manager Comments</CardTitle>
+            <CardTitle className="manager-notice-title">Manager Comments</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-amber-800">{timesheet.manager_comments}</p>
+            <p className="manager-notice-content">{timesheet.manager_comments}</p>
           </CardContent>
         </Card>
       )}

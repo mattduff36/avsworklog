@@ -176,6 +176,23 @@
     background-color: rgba(59, 130, 246, 0.2) !important; /* blue-500/20 */
   }
   
+  /* Force light amber/yellow backgrounds to dark amber */
+  .bg-amber-50 {
+    background-color: rgba(245, 158, 11, 0.1) !important; /* amber-500/10 */
+  }
+  
+  .bg-amber-100 {
+    background-color: rgba(245, 158, 11, 0.15) !important; /* amber-500/15 */
+  }
+  
+  .bg-yellow-50 {
+    background-color: rgba(234, 179, 8, 0.1) !important; /* yellow-500/10 */
+  }
+  
+  .bg-yellow-100 {
+    background-color: rgba(234, 179, 8, 0.15) !important; /* yellow-500/15 */
+  }
+  
   /* Force light gray backgrounds to dark (if any gray classes exist) */
   .bg-gray-50 {
     background-color: rgb(30 41 59) !important; /* slate-800 */
@@ -213,6 +230,23 @@
   
   .border-blue-300 {
     border-color: rgba(59, 130, 246, 0.4) !important; /* blue-500/40 */
+  }
+  
+  /* Force light amber borders to dark amber */
+  .border-amber-200 {
+    border-color: rgba(245, 158, 11, 0.3) !important; /* amber-500/30 */
+  }
+  
+  .border-amber-300 {
+    border-color: rgba(245, 158, 11, 0.4) !important; /* amber-500/40 */
+  }
+  
+  .border-yellow-200 {
+    border-color: rgba(234, 179, 8, 0.3) !important; /* yellow-500/30 */
+  }
+  
+  .border-yellow-300 {
+    border-color: rgba(234, 179, 8, 0.4) !important; /* yellow-500/40 */
   }
   
   /* Force light text to appropriate dark mode colors */
@@ -280,6 +314,47 @@
   
   .text-blue-900 {
     color: rgb(219 234 254) !important; /* blue-100 - light text */
+  }
+  
+  /* Force amber/yellow text colors to light amber for dark theme */
+  .text-amber-100 {
+    color: rgb(254 243 199) !important; /* amber-100 */
+  }
+  
+  .text-amber-200 {
+    color: rgb(253 230 138) !important; /* amber-200 */
+  }
+  
+  .text-amber-600 {
+    color: rgb(251 191 36) !important; /* amber-400 - lighter for visibility */
+  }
+  
+  .text-amber-700 {
+    color: rgb(252 211 77) !important; /* amber-300 - lighter for visibility */
+  }
+  
+  .text-amber-800 {
+    color: rgb(253 230 138) !important; /* amber-200 - lighter for visibility */
+  }
+  
+  .text-amber-900 {
+    color: rgb(254 243 199) !important; /* amber-100 - light text */
+  }
+  
+  .text-yellow-600 {
+    color: rgb(250 204 21) !important; /* yellow-400 - lighter for visibility */
+  }
+  
+  .text-yellow-700 {
+    color: rgb(253 224 71) !important; /* yellow-300 - lighter for visibility */
+  }
+  
+  .text-yellow-800 {
+    color: rgb(254 240 138) !important; /* yellow-200 - lighter for visibility */
+  }
+  
+  .text-yellow-900 {
+    color: rgb(254 249 195) !important; /* yellow-100 - light text */
   }
   
   /* Force hover states to dark */
@@ -467,6 +542,24 @@
   
   .border-absence {
     border-color: hsl(var(--absence-primary));
+  }
+  
+  /* Manager/Admin Notice/Comments Box - Dark mode compatible */
+  .manager-notice,
+  .admin-notice {
+    background-color: rgba(245, 158, 11, 0.1) !important; /* amber-500/10 - subtle amber glow */
+    border-color: rgba(245, 158, 11, 0.3) !important; /* amber-500/30 */
+    color: rgb(252 211 77) !important; /* amber-300 - bright readable text */
+  }
+  
+  .manager-notice-title,
+  .admin-notice-title {
+    color: rgb(251 191 36) !important; /* amber-400 - slightly darker for title */
+  }
+  
+  .manager-notice-content,
+  .admin-notice-content {
+    color: rgb(253 230 138) !important; /* amber-200 - lighter for content */
   }
   
   /* Tab Styling - Standard Approvals Page Pattern */
