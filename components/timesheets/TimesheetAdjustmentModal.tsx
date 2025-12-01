@@ -21,7 +21,7 @@ import { toast } from 'sonner';
 interface Manager {
   id: string;
   full_name: string;
-  email: string;
+  email: string | null;
   role: {
     name: string;
     display_name: string;
@@ -33,7 +33,7 @@ const SUZANNE_EMAIL = 'suzanne@avsquires.co.uk';
 function compareManagers(a: Manager, b: Manager): number {
   if (a.email === SUZANNE_EMAIL) return -1;
   if (b.email === SUZANNE_EMAIL) return 1;
-  return a.full_name.localeCompare(b.full_name);
+  return (a.full_name || '').localeCompare(b.full_name || '');
 }
 
 function sortManagersWithSuzanneFirst(managers: Manager[]): Manager[] {
