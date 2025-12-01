@@ -60,12 +60,12 @@ export async function GET() {
 
     const supabaseAdmin = getSupabaseAdmin();
 
-    const { data, error } = await supabaseAdmin
+    // Query profiles with roles, then get emails from auth.users
+    const { data: profilesData, error } = await supabaseAdmin
       .from('profiles')
       .select(`
         id,
         full_name,
-        email,
         roles!inner(
           name,
           display_name,
@@ -82,6 +82,32 @@ export async function GET() {
         { status: 500 }
       );
     }
+
+    // Get emails from auth.users for these profiles
+    const profileIds = (profilesData ?? []).map((p) => p.id);
+    
+    const { data: usersData, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
+    
+    if (usersError) {
+      console.error('Error fetching user emails:', usersError);
+      return NextResponse.json(
+        { error: 'Failed to fetch user details' },
+        { status: 500 }
+      );
+    }
+
+    // Create a map of user_id -> email
+    const emailMap = new Map(
+      usersData.users
+        .filter((u) => profileIds.includes(u.id))
+        .map((u) => [u.id, u.email])
+    );
+
+    // Merge profiles with emails
+    const data = (profilesData ?? []).map((profile) => ({
+      ...profile,
+      email: emailMap.get(profile.id) || null,
+    }));
 
     const rawManagers = (data ?? []) as Array<{
       id: string;
