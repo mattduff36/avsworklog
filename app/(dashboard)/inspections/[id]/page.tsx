@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Save, Send, Edit2, CheckCircle2, XCircle, AlertCircle, Camera, Download } from 'lucide-react';
+import { ArrowLeft, Save, Send, Edit2, AlertCircle, Camera, Download } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
 import { InspectionStatus, VehicleInspection, InspectionItem } from '@/types/inspection';
@@ -671,36 +671,8 @@ export default function ViewInspectionPage() {
                 disabled={saving}
               >
                 <Send className="h-4 w-4 mr-2" />
-                {saving ? 'Submitting...' : 'Submit for Approval'}
+                {saving ? 'Submitting...' : 'Submit Inspection'}
               </Button>
-            )}
-
-            {canApprove && (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    const comments = prompt('Enter rejection reason (optional):');
-                    if (comments !== null) {
-                      handleReject(comments);
-                    }
-                  }}
-                  disabled={saving}
-                  className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Reject
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleApprove}
-                  disabled={saving}
-                  className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
-                >
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Approve
-                </Button>
-              </>
             )}
           </div>
         </CardContent>
