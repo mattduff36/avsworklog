@@ -325,22 +325,22 @@ export default function DebugPage() {
       }
 
       if (errorData) {
-        // Fetch user names for all unique emails
-        const uniqueEmails = [...new Set(errorData.map(e => e.user_email).filter(Boolean))];
+        // Fetch user names for all unique user IDs
+        const uniqueUserIds = [...new Set(errorData.map(e => e.user_id).filter(Boolean))];
         const { data: profilesData } = await supabase
           .from('profiles')
-          .select('email, name')
-          .in('email', uniqueEmails);
+          .select('id, full_name')
+          .in('id', uniqueUserIds);
 
-        // Create a map of email -> name
-        const emailToName = new Map(
-          profilesData?.map(p => [p.email, p.name]) || []
+        // Create a map of user_id -> full_name
+        const userIdToName = new Map(
+          profilesData?.map(p => [p.id, p.full_name]) || []
         );
 
         // Add user names to error logs
         const enrichedErrorData = errorData.map(log => ({
           ...log,
-          user_name: log.user_email ? emailToName.get(log.user_email) || null : null,
+          user_name: log.user_id ? userIdToName.get(log.user_id) || null : null,
         }));
 
         setErrorLogs(enrichedErrorData as ErrorLogEntry[]);
