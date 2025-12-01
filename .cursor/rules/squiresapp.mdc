@@ -4,9 +4,15 @@ alwaysApply: true
 
 # squires app – project rules for cursor
 
-## 1. Build control
-- Run test builds only when the user says “run tests” or “start test build”.
-- Before running tests, confirm branch and scope in one line.
+## 1. Database and Database Migrations (CRITICAL)
+- **ALWAYS** check `docs/guides/HOW_TO_RUN_MIGRATIONS.md` BEFORE running ANY database migration
+- **ALWAYS** use the `pg` library pattern from `MIGRATIONS_GUIDE.md`
+- **NEVER** use Supabase client RPC or other methods
+- Pattern: Parse POSTGRES_URL_NON_POOLING → Create pg.Client → Configure SSL → Execute SQL
+- Assume `.env.local` exists with required variables.
+- Generate and run migrations yourself.
+- Do not ask the user to run commands unless blocked by missing variables or permissions.
+- Never print or expose secrets from `.env.local`.
 
 ## 2. Git pushes
 - Push to GitHub only when the user writes exactly: `push to GitHub`.
@@ -16,11 +22,9 @@ alwaysApply: true
   - After a coding task, say: "✅ Complete. Changes committed locally. Say 'push to GitHub' to push." and wait.
 - Before pushing, state what will be pushed (branch and short summary).
 
-## 3. Database and migrations
-- Assume `.env.local` exists with required variables.
-- Generate and run migrations yourself.
-- Do not ask the user to run commands unless blocked by missing variables or permissions.
-- Never print or expose secrets from `.env.local`.
+## 3. Build control
+- Run test builds only when the user says “run tests” or “start test build”.
+- Before running tests, confirm branch and scope in one line.
 
 ## 4. PRD alignment
 - Track every task to a PRD section or ID.

@@ -24,6 +24,7 @@ class ErrorLogger {
   private supabase = createClient();
   private queue: Omit<ErrorLog, 'id'>[] = [];
   private isProcessing = false;
+  private isLogging = false; // Prevent recursive logging
 
   private constructor() {
     // Set up global error handlers
@@ -56,9 +57,20 @@ class ErrorLogger {
       const originalError = console.error;
       console.error = (...args: unknown[]) => {
         originalError.apply(console, args);
+        
+        // Don't log if we're already in the logging process (prevent recursion)
+        if (this.isLogging) return;
+        
         const errorMessage = args.map(arg => 
           typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
         ).join(' ');
+        
+        // Don't log errors from the error logging system itself
+        if (errorMessage.includes('Error fetching error logs') || 
+            errorMessage.includes('error_logs') ||
+            errorMessage.includes('Failed to log error')) {
+          return;
+        }
         
         // Only log if it looks like an actual error (not React warnings)
         if (!errorMessage.includes('Warning:') && !errorMessage.includes('%c')) {
@@ -91,6 +103,11 @@ class ErrorLogger {
     componentName?: string | null;
     additionalData?: Record<string, unknown> | null;
   }): Promise<void> {
+    // Prevent recursive logging
+    if (this.isLogging) return;
+    
+    this.isLogging = true;
+    
     try {
       const errorObj = typeof error === 'string' ? new Error(error) : error;
       
@@ -117,7 +134,12 @@ class ErrorLogger {
       this.processQueue();
     } catch (err) {
       // Silent fail - don't want error logging to break the app
-      console.warn('Failed to log error:', err);
+      // Use console.warn to avoid triggering the console.error interceptor
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn('Failed to log error:', err);
+      }
+    } finally {
+      this.isLogging = false;
     }
   }
 

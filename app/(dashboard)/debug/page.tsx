@@ -272,11 +272,15 @@ export default function DebugPage() {
         .limit(100);
 
       if (error) {
-        console.error('Error fetching error logs:', error);
-        // Don't show toast if table doesn't exist yet
-        if (!error.message.includes('does not exist')) {
-          toast.error('Failed to fetch error logs: ' + error.message);
+        // Don't log or show error if table doesn't exist yet (first time setup)
+        if (error.message.includes('does not exist') || error.code === 'PGRST204') {
+          // Table doesn't exist yet - this is expected on first load
+          setErrorLogs([]);
+          return;
         }
+        
+        // For other errors, show a toast but don't console.error (to avoid logging loop)
+        toast.error('Failed to fetch error logs. Table may need to be created.');
         return;
       }
 
@@ -284,7 +288,8 @@ export default function DebugPage() {
         setErrorLogs(errorData as ErrorLogEntry[]);
       }
     } catch (error) {
-      console.error('Error fetching error logs:', error);
+      // Silent fail - don't want to create error logging loops
+      toast.error('Error loading error logs');
     }
   };
 
