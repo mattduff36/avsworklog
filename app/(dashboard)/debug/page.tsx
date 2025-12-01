@@ -131,36 +131,15 @@ export default function DebugPage() {
 
   // Load viewed errors from localStorage on mount
   useEffect(() => {
-    // Load previously viewed errors
     const stored = localStorage.getItem('viewedErrorLogs');
-    let viewedSet = new Set<string>();
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        viewedSet = new Set(parsed);
+        setViewedErrors(new Set(parsed));
       } catch (err) {
         console.error('Failed to parse viewed errors:', err);
       }
     }
-
-    // Move pending viewed errors to viewed (from previous session)
-    const pendingStored = localStorage.getItem('pendingViewedErrorLogs');
-    if (pendingStored) {
-      try {
-        const pending = JSON.parse(pendingStored);
-        pending.forEach((id: string) => viewedSet.add(id));
-        
-        // Update viewed errors in localStorage
-        localStorage.setItem('viewedErrorLogs', JSON.stringify(Array.from(viewedSet)));
-        
-        // Clear pending
-        localStorage.removeItem('pendingViewedErrorLogs');
-      } catch (err) {
-        console.error('Failed to parse pending viewed errors:', err);
-      }
-    }
-
-    setViewedErrors(viewedSet);
   }, []);
 
   // Fetch debug info
@@ -382,12 +361,14 @@ export default function DebugPage() {
       // Auto-collapse all others and expand only this one
       setExpandedErrors([id]);
       
-      // Mark as "pending viewed" - will move to viewed on next page load
-      const pendingViewed = localStorage.getItem('pendingViewedErrorLogs');
-      const pending = pendingViewed ? JSON.parse(pendingViewed) : [];
-      if (!pending.includes(id)) {
-        pending.push(id);
-        localStorage.setItem('pendingViewedErrorLogs', JSON.stringify(pending));
+      // Mark as viewed immediately (both in state and localStorage)
+      if (!viewedErrors.has(id)) {
+        const newViewedErrors = new Set(viewedErrors);
+        newViewedErrors.add(id);
+        setViewedErrors(newViewedErrors);
+        
+        // Persist to localStorage
+        localStorage.setItem('viewedErrorLogs', JSON.stringify(Array.from(newViewedErrors)));
       }
     } else {
       // Collapse this one
