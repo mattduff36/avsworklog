@@ -485,11 +485,18 @@ function NewInspectionContent() {
           .from('vehicle_inspections')
           .update(inspectionUpdate)
           .eq('id', existingInspectionId)
-          .select()
-          .single();
+          .select();
 
-        if (updateError) throw updateError;
-        inspection = updatedInspection;
+        if (updateError) {
+          console.error('Update error:', updateError);
+          throw updateError;
+        }
+        
+        if (!updatedInspection || updatedInspection.length === 0) {
+          throw new Error('Failed to update inspection - no rows returned. You may not have permission to edit this inspection.');
+        }
+        
+        inspection = updatedInspection[0];
 
         // Delete existing items before inserting new ones
         console.log(`Deleting existing items for inspection ${existingInspectionId}...`);
