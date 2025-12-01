@@ -39,12 +39,12 @@ const timesheetStatusConfig: Record<TimesheetStatus, StatusConfig> = {
   },
   processed: {
     label: 'Processed',
-    variant: 'outline',
+    variant: 'default',
     icon: <Package className="h-3 w-3 mr-1" />,
   },
   adjusted: {
     label: 'Adjusted',
-    variant: 'outline',
+    variant: 'default',
     icon: <Edit2 className="h-3 w-3 mr-1" />,
   },
 };
@@ -86,8 +86,14 @@ export function getTimesheetStatusBadge(status: string) {
     variant: 'outline' as const,
   };
 
+  // Apply blue styling for final states (processed and adjusted)
+  const isFinalState = status === 'processed' || status === 'adjusted';
+  const blueClasses = isFinalState 
+    ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' 
+    : '';
+
   return (
-    <Badge variant={config.variant} className="flex items-center w-fit">
+    <Badge variant={config.variant} className={`flex items-center w-fit ${blueClasses}`}>
       {config.icon}
       {config.label}
     </Badge>

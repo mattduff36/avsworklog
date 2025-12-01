@@ -379,7 +379,12 @@ export default function ViewTimesheetPage() {
       adjusted: { variant: 'default' as const, label: 'Adjusted' },
     };
     const config = variants[status as keyof typeof variants] || variants.draft;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    
+    // Apply blue styling for final states (processed and adjusted)
+    const isFinalState = status === 'processed' || status === 'adjusted';
+    const blueClasses = isFinalState ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' : '';
+    
+    return <Badge variant={config.variant} className={blueClasses}>{config.label}</Badge>;
   };
 
   if (authLoading || loading) {
