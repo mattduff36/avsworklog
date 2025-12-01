@@ -457,8 +457,8 @@ export default function TimesheetsPage() {
                       See manager comments
                     </div>
                   )}
-                  {/* Download PDF Button for all non-draft statuses */}
-                  {(timesheet.status !== 'draft') && (
+                  {/* Download PDF Button for submitted, approved, processed, and adjusted statuses */}
+                  {(timesheet.status === 'submitted' || timesheet.status === 'approved' || timesheet.status === 'processed' || timesheet.status === 'adjusted') && (
                     <Button
                       onClick={(e) => handleDownloadPDF(e, timesheet.id)}
                       disabled={downloading === timesheet.id}
