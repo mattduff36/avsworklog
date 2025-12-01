@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { sendTimesheetAdjustmentEmail } from '@/lib/utils/email';
+import type { Database } from '@/types/database';
+
+function getSupabaseAdmin() {
+  return createSupabaseAdmin<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+}
 
 export async function POST(
   request: NextRequest,
@@ -38,7 +53,13 @@ export async function POST(
       .eq('id', user.id)
       .single();
 
-    if (!profile?.roles?.is_manager_admin) {
+    const typedProfile = profile as unknown as { 
+      id: string; 
+      full_name: string; 
+      roles: { is_manager_admin: boolean } 
+    } | null;
+
+    if (!typedProfile?.roles?.is_manager_admin) {
       return NextResponse.json(
         { error: 'Only managers and admins can adjust timesheets' },
         { status: 403 }
@@ -55,21 +76,38 @@ export async function POST(
         status,
         profiles:user_id (
           id,
-          full_name,
-          email
+          full_name
         )
       `)
       .eq('id', timesheetId)
       .single();
 
-    if (timesheetError || !timesheet) {
+    const typedTimesheet = timesheet as unknown as {
+      id: string;
+      user_id: string;
+      week_ending: string;
+      status: string;
+      profiles: { id: string; full_name: string };
+    } | null;
+
+    if (timesheetError || !typedTimesheet) {
       return NextResponse.json(
         { error: 'Timesheet not found' },
         { status: 404 }
       );
     }
 
-    if (timesheet.status !== 'approved') {
+    // Get employee email from auth.users using admin client
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: { user: employeeUser }, error: employeeUserError } = await supabaseAdmin.auth.admin.getUserById(typedTimesheet.user_id);
+    
+    if (employeeUserError) {
+      console.error('Error fetching employee email:', employeeUserError);
+    }
+
+    const employeeEmail = employeeUser?.email || null;
+
+    if (typedTimesheet.status !== 'approved') {
       return NextResponse.json(
         { error: 'Only approved timesheets can be marked as adjusted' },
         { status: 400 }
@@ -93,8 +131,8 @@ export async function POST(
       throw updateError;
     }
 
-    const employeeProfile = timesheet.profiles as unknown as { id: string; full_name: string; email: string };
-    const weekEnding = new Date(timesheet.week_ending).toLocaleDateString('en-GB', {
+    const employeeProfile = typedTimesheet.profiles;
+    const weekEnding = new Date(typedTimesheet.week_ending).toLocaleDateString('en-GB', {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
@@ -102,14 +140,14 @@ export async function POST(
     });
 
     // Send email to employee
-    if (employeeProfile?.email) {
+    if (employeeEmail) {
       const emailResult = await sendTimesheetAdjustmentEmail({
-        to: employeeProfile.email,
+        to: employeeEmail,
         recipientName: employeeProfile.full_name,
         employeeName: employeeProfile.full_name,
         weekEnding,
         adjustmentComments: comments.trim(),
-        adjustedBy: profile.full_name,
+        adjustedBy: typedProfile!.full_name,
       });
 
       if (!emailResult.success) {
@@ -121,19 +159,28 @@ export async function POST(
     if (notifyManagerIds && notifyManagerIds.length > 0) {
       const { data: managers } = await supabase
         .from('profiles')
-        .select('id, full_name, email')
+        .select('id, full_name')
         .in('id', notifyManagerIds);
 
       if (managers) {
+        // Get emails from auth.users for these managers
+        const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
+        const emailMap = new Map(
+          usersData.users
+            .filter((u) => notifyManagerIds.includes(u.id))
+            .map((u) => [u.id, u.email])
+        );
+
         for (const manager of managers) {
-          if (manager.email) {
+          const managerEmail = emailMap.get(manager.id);
+          if (managerEmail) {
             await sendTimesheetAdjustmentEmail({
-              to: manager.email,
+              to: managerEmail,
               recipientName: manager.full_name,
               employeeName: employeeProfile.full_name,
               weekEnding,
               adjustmentComments: comments.trim(),
-              adjustedBy: profile.full_name,
+              adjustedBy: typedProfile!.full_name,
             });
           }
         }
@@ -145,23 +192,25 @@ export async function POST(
       .from('messages')
       .insert({
         title: '📝 Your Timesheet Has Been Adjusted',
-        content: `Your timesheet for week ending ${new Date(timesheet.week_ending).toLocaleDateString('en-GB', {
+        content: `Your timesheet for week ending ${new Date(typedTimesheet.week_ending).toLocaleDateString('en-GB', {
           day: 'numeric',
           month: 'short',
           year: 'numeric',
-        })} has been adjusted by ${profile.full_name}.\n\nAdjustment Details: ${comments.trim()}`,
+        })} has been adjusted by ${typedProfile!.full_name}.\n\nAdjustment Details: ${comments.trim()}`,
         message_type: 'timesheet_adjustment',
         created_by: user.id,
       })
       .select('id')
       .single();
 
-    if (employeeMessage) {
+    const typedEmployeeMessage = employeeMessage as unknown as { id: string } | null;
+
+    if (typedEmployeeMessage) {
       await supabase
         .from('message_recipients')
         .insert({
-          message_id: employeeMessage.id,
-          recipient_id: timesheet.user_id,
+          message_id: typedEmployeeMessage.id,
+          recipient_id: typedTimesheet.user_id,
           read: false,
         });
     }
@@ -172,20 +221,22 @@ export async function POST(
         .from('messages')
         .insert({
           title: '📝 Timesheet Adjusted',
-          content: `A timesheet for ${employeeProfile.full_name} (week ending ${new Date(timesheet.week_ending).toLocaleDateString('en-GB', {
+          content: `A timesheet for ${employeeProfile.full_name} (week ending ${new Date(typedTimesheet.week_ending).toLocaleDateString('en-GB', {
             day: 'numeric',
             month: 'short',
             year: 'numeric',
-          })}) has been adjusted by ${profile.full_name}.\n\nAdjustment Details: ${comments.trim()}`,
+          })}) has been adjusted by ${typedProfile!.full_name}.\n\nAdjustment Details: ${comments.trim()}`,
           message_type: 'timesheet_adjustment',
           created_by: user.id,
         })
         .select('id')
         .single();
 
-      if (managerMessage) {
+      const typedManagerMessage = managerMessage as unknown as { id: string } | null;
+
+      if (typedManagerMessage) {
         const recipients = notifyManagerIds.map((recipientId: string) => ({
-          message_id: managerMessage.id,
+          message_id: typedManagerMessage.id,
           recipient_id: recipientId,
           read: false,
         }));
