@@ -47,6 +47,104 @@ export function useAuth() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Auto-detect role changes and force re-login
+  useEffect(() => {
+    if (!user || !profile) return;
+
+    // Store current role_id in localStorage
+    const storageKey = `role_cache_${user.id}`;
+    const cachedRoleId = localStorage.getItem(storageKey);
+    const currentRoleId = profile.role?.name || '';
+
+    if (cachedRoleId && cachedRoleId !== currentRoleId) {
+      // Role changed! Force logout and show message
+      console.log('Role change detected - forcing re-login');
+      localStorage.removeItem(storageKey);
+      
+      // Show user-friendly message
+      if (typeof window !== 'undefined') {
+        alert('Your account permissions have been updated. Please log in again to continue.');
+      }
+      
+      // Force logout
+      supabase.auth.signOut().then(() => {
+        window.location.href = '/login';
+      });
+    } else if (!cachedRoleId) {
+      // First time or after logout - store current role
+      localStorage.setItem(storageKey, currentRoleId);
+    }
+  }, [user, profile]);
+
+  // Realtime subscription for profile changes (immediate detection)
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`profile_changes_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Profile updated in database - checking for role changes...');
+          // Force re-fetch to get latest data
+          fetchProfile(user.id);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  // Periodic check as backup (every 30 seconds)
+  useEffect(() => {
+    if (!user) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select(`
+            role:roles(
+              name
+            )
+          `)
+          .eq('id', user.id)
+          .single();
+
+        if (data && data.role) {
+          const storageKey = `role_cache_${user.id}`;
+          const cachedRoleId = localStorage.getItem(storageKey);
+          const currentRoleId = (data.role as any).name;
+
+          if (cachedRoleId && cachedRoleId !== currentRoleId) {
+            // Role changed! Force logout
+            console.log('Role change detected via periodic check - forcing re-login');
+            localStorage.removeItem(storageKey);
+            
+            if (typeof window !== 'undefined') {
+              alert('Your account permissions have been updated. Please log in again to continue.');
+            }
+            
+            await supabase.auth.signOut();
+            window.location.href = '/login';
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for role changes:', error);
+      }
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [user]);
+
   const fetchProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -114,6 +212,11 @@ export function useAuth() {
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (!error) {
+      // Clear role cache
+      if (user) {
+        localStorage.removeItem(`role_cache_${user.id}`);
+      }
+      
       setUser(null);
       setProfile(null);
       
