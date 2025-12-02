@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { AlertTriangle, Calendar, Wrench, AlertCircle } from 'lucide-react';
 
 // Placeholder/mock data (replace with selectors or hooks as needed)
 const vehicles = [
@@ -58,7 +59,7 @@ const vehicles = [
     brand: 'Vauxhall',
     model: 'Corsa',
     presentMileage: 163068,
-    milesNextService: 161000,
+    milesNextService: 161000, // OVERDUE (current mileage exceeds service mileage)
     milesLastService: 151000,
     milesDueCambelt: 180000,
     cambeltDone: 'No',
@@ -66,8 +67,8 @@ const vehicles = [
     firstAidCheck: 'Needs replacement',
     comments: 'Service overdue',
     hardwareId: '354018118074131',
-    motDateDue: '2026-03-15',
-    taxDateDue: '2025-12-30',
+    motDateDue: '2025-12-10', // DUE SOON (10 days)
+    taxDateDue: '2025-12-05', // OVERDUE
     defects1: 'Windscreen chip',
     defects2: '-',
     defects3: '-',
@@ -126,14 +127,14 @@ const vehicles = [
     presentMileage: 154300,
     milesNextService: 160000,
     milesLastService: 150000,
-    milesDueCambelt: 175000,
-    cambeltDone: 'Yes',
-    fireExtinguisher: 'Expired',
+    milesDueCambelt: 152000, // OVERDUE (current mileage exceeds cambelt due)
+    cambeltDone: 'No',
+    fireExtinguisher: 'Expired', // OVERDUE
     firstAidCheck: 'OK',
-    comments: 'Needs fire extinguisher service',
+    comments: 'Needs fire extinguisher service & cambelt URGENT',
     hardwareId: '359632101663478',
-    motDateDue: '2026-02-28',
-    taxDateDue: '2025-12-01',
+    motDateDue: '2025-12-20', // DUE SOON (18 days)
+    taxDateDue: '2025-11-28', // OVERDUE
     defects1: 'Brake wear',
     defects2: '-',
     defects3: '-',
@@ -145,17 +146,17 @@ const vehicles = [
     driver: 'James Mitchell',
     brand: 'Ford',
     model: 'Transit',
-    presentMileage: 92100,
-    milesNextService: 100000,
+    presentMileage: 99200,
+    milesNextService: 100000, // DUE SOON (800 miles to go)
     milesLastService: 90000,
     milesDueCambelt: 125000,
     cambeltDone: 'No',
     fireExtinguisher: 'OK',
     firstAidCheck: 'OK',
-    comments: 'Minor dent on rear panel',
+    comments: 'Service due soon',
     hardwareId: '359632101557892',
-    motDateDue: '2026-08-05',
-    taxDateDue: '2026-03-20',
+    motDateDue: '2025-12-25', // DUE SOON (23 days)
+    taxDateDue: '2026-01-10',
     defects1: 'None',
     defects2: 'None',
     defects3: '-',
@@ -229,7 +230,128 @@ const vehicles = [
   },
 ];
 
+// Helper functions for color coding and status
+const getDaysUntil = (dateString: string) => {
+  const today = new Date();
+  const targetDate = new Date(dateString);
+  const diffTime = targetDate.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
+};
+
+const getMilesUntil = (currentMileage: number, targetMileage: number) => {
+  return targetMileage - currentMileage;
+};
+
+const getStatusColor = (value: number, type: 'days' | 'miles') => {
+  if (value < 0) return 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20'; // Overdue
+  if (type === 'days' && value <= 30) return 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20'; // Due soon
+  if (type === 'miles' && value <= 1000) return 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20'; // Due soon
+  return 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'; // OK
+};
+
+const getDateStatusColor = (dateString: string) => {
+  const daysUntil = getDaysUntil(dateString);
+  return getStatusColor(daysUntil, 'days');
+};
+
+const getMileageStatusColor = (currentMileage: number, targetMileage: number) => {
+  const milesUntil = getMilesUntil(currentMileage, targetMileage);
+  return getStatusColor(milesUntil, 'miles');
+};
+
+const getItemStatusColor = (item: string) => {
+  if (item === 'Expired' || item === 'Needs replacement') {
+    return 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20';
+  }
+  return 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20';
+};
+
 export default function MaintenanceDemoPage() {
+  // Calculate upcoming/overdue tasks
+  const alerts = vehicles.flatMap((v) => {
+    const tasks = [];
+    
+    // Check service
+    const milesUntilService = getMilesUntil(v.presentMileage, v.milesNextService);
+    if (milesUntilService < 1000) {
+      tasks.push({
+        vehicle: v.reg,
+        type: milesUntilService < 0 ? 'overdue' : 'due-soon',
+        task: 'Service',
+        detail: milesUntilService < 0 
+          ? `${Math.abs(milesUntilService).toLocaleString()} miles overdue` 
+          : `${milesUntilService.toLocaleString()} miles remaining`,
+      });
+    }
+    
+    // Check cambelt
+    if (v.cambeltDone === 'No') {
+      const milesUntilCambelt = getMilesUntil(v.presentMileage, v.milesDueCambelt);
+      if (milesUntilCambelt < 5000) {
+        tasks.push({
+          vehicle: v.reg,
+          type: milesUntilCambelt < 0 ? 'overdue' : 'due-soon',
+          task: 'Cambelt replacement',
+          detail: milesUntilCambelt < 0 
+            ? `${Math.abs(milesUntilCambelt).toLocaleString()} miles overdue` 
+            : `${milesUntilCambelt.toLocaleString()} miles remaining`,
+        });
+      }
+    }
+    
+    // Check MOT
+    const daysUntilMOT = getDaysUntil(v.motDateDue);
+    if (daysUntilMOT < 30) {
+      tasks.push({
+        vehicle: v.reg,
+        type: daysUntilMOT < 0 ? 'overdue' : 'due-soon',
+        task: 'MOT',
+        detail: daysUntilMOT < 0 
+          ? `${Math.abs(daysUntilMOT)} days overdue` 
+          : `Due in ${daysUntilMOT} days`,
+      });
+    }
+    
+    // Check TAX
+    const daysUntilTAX = getDaysUntil(v.taxDateDue);
+    if (daysUntilTAX < 30) {
+      tasks.push({
+        vehicle: v.reg,
+        type: daysUntilTAX < 0 ? 'overdue' : 'due-soon',
+        task: 'TAX',
+        detail: daysUntilTAX < 0 
+          ? `${Math.abs(daysUntilTAX)} days overdue` 
+          : `Due in ${daysUntilTAX} days`,
+      });
+    }
+    
+    // Check fire extinguisher
+    if (v.fireExtinguisher === 'Expired') {
+      tasks.push({
+        vehicle: v.reg,
+        type: 'overdue',
+        task: 'Fire extinguisher',
+        detail: 'Expired',
+      });
+    }
+    
+    // Check first aid
+    if (v.firstAidCheck === 'Needs replacement') {
+      tasks.push({
+        vehicle: v.reg,
+        type: 'overdue',
+        task: 'First aid kit',
+        detail: 'Needs replacement',
+      });
+    }
+    
+    return tasks;
+  });
+
+  const overdueAlerts = alerts.filter(a => a.type === 'overdue');
+  const dueSoonAlerts = alerts.filter(a => a.type === 'due-soon');
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-4 py-6">
       {/* Header */}
@@ -243,6 +365,67 @@ export default function MaintenanceDemoPage() {
           </div>
         </div>
       </div>
+
+      {/* Alerts Summary */}
+      {(overdueAlerts.length > 0 || dueSoonAlerts.length > 0) && (
+        <div className="grid md:grid-cols-2 gap-4">
+          {/* Overdue Tasks */}
+          {overdueAlerts.length > 0 && (
+            <Card className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                  <CardTitle className="text-lg text-red-900 dark:text-red-100">Overdue Tasks</CardTitle>
+                </div>
+                <CardDescription className="text-red-700 dark:text-red-300">
+                  {overdueAlerts.length} task{overdueAlerts.length !== 1 ? 's' : ''} requiring immediate attention
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {overdueAlerts.map((alert, idx) => (
+                    <div key={idx} className="flex items-start gap-3 text-sm bg-white dark:bg-slate-900 p-3 rounded-md border border-red-200 dark:border-red-800">
+                      <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <div className="font-semibold text-red-900 dark:text-red-100">{alert.vehicle} - {alert.task}</div>
+                        <div className="text-red-700 dark:text-red-300">{alert.detail}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Due Soon Tasks */}
+          {dueSoonAlerts.length > 0 && (
+            <Card className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                  <CardTitle className="text-lg text-amber-900 dark:text-amber-100">Due Soon</CardTitle>
+                </div>
+                <CardDescription className="text-amber-700 dark:text-amber-300">
+                  {dueSoonAlerts.length} task{dueSoonAlerts.length !== 1 ? 's' : ''} coming up
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {dueSoonAlerts.map((alert, idx) => (
+                    <div key={idx} className="flex items-start gap-3 text-sm bg-white dark:bg-slate-900 p-3 rounded-md border border-amber-200 dark:border-amber-800">
+                      <Wrench className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <div className="font-semibold text-amber-900 dark:text-amber-100">{alert.vehicle} - {alert.task}</div>
+                        <div className="text-amber-700 dark:text-amber-300">{alert.detail}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       <Tabs defaultValue="table" className="space-y-4">
         <TabsList className="bg-slate-100 dark:bg-slate-800">
@@ -299,18 +482,30 @@ export default function MaintenanceDemoPage() {
                         <TableCell className="text-slate-700 dark:text-slate-300">{v.brand}</TableCell>
                         <TableCell className="text-slate-700 dark:text-slate-300">{v.model}</TableCell>
                         <TableCell className="text-slate-700 dark:text-slate-300">{v.presentMileage.toLocaleString()}</TableCell>
-                        <TableCell className="text-slate-700 dark:text-slate-300">{v.milesNextService.toLocaleString()}</TableCell>
+                        <TableCell className={`font-medium px-2 py-1 rounded ${getMileageStatusColor(v.presentMileage, v.milesNextService)}`}>
+                          {v.milesNextService.toLocaleString()}
+                        </TableCell>
                         <TableCell className="text-slate-700 dark:text-slate-300">{v.milesLastService.toLocaleString()}</TableCell>
-                        <TableCell className="text-slate-700 dark:text-slate-300">{v.milesDueCambelt.toLocaleString()}</TableCell>
+                        <TableCell className={`font-medium px-2 py-1 rounded ${getMileageStatusColor(v.presentMileage, v.milesDueCambelt)}`}>
+                          {v.milesDueCambelt.toLocaleString()}
+                        </TableCell>
                         <TableCell className="text-slate-700 dark:text-slate-300">{v.cambeltDone}</TableCell>
-                        <TableCell className="text-slate-700 dark:text-slate-300">{v.motDateDue}</TableCell>
-                        <TableCell className="text-slate-700 dark:text-slate-300">{v.taxDateDue}</TableCell>
+                        <TableCell className={`font-medium px-2 py-1 rounded ${getDateStatusColor(v.motDateDue)}`}>
+                          {v.motDateDue}
+                        </TableCell>
+                        <TableCell className={`font-medium px-2 py-1 rounded ${getDateStatusColor(v.taxDateDue)}`}>
+                          {v.taxDateDue}
+                        </TableCell>
                         <TableCell className="text-slate-700 dark:text-slate-300">{v.defects1}</TableCell>
                         <TableCell className="text-slate-700 dark:text-slate-300">{v.defects2}</TableCell>
                         <TableCell className="text-slate-700 dark:text-slate-300">{v.defects3}</TableCell>
                         <TableCell className="text-slate-700 dark:text-slate-300">{v.defects4}</TableCell>
-                        <TableCell className="text-slate-700 dark:text-slate-300">{v.fireExtinguisher}</TableCell>
-                        <TableCell className="text-slate-700 dark:text-slate-300">{v.firstAidCheck}</TableCell>
+                        <TableCell className={`font-medium px-2 py-1 rounded ${getItemStatusColor(v.fireExtinguisher)}`}>
+                          {v.fireExtinguisher}
+                        </TableCell>
+                        <TableCell className={`font-medium px-2 py-1 rounded ${getItemStatusColor(v.firstAidCheck)}`}>
+                          {v.firstAidCheck}
+                        </TableCell>
                         <TableCell className="text-slate-700 dark:text-slate-300">{v.comments}</TableCell>
                         <TableCell className="text-slate-700 dark:text-slate-300 text-xs">{v.hardwareId}</TableCell>
                       </TableRow>
@@ -360,25 +555,33 @@ export default function MaintenanceDemoPage() {
                           <span className="text-slate-600 dark:text-slate-400">Mileage:</span>
                           <span className="font-semibold">{v.presentMileage.toLocaleString()}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between items-center">
                           <span className="text-slate-600 dark:text-slate-400">MOT Due:</span>
-                          <span className="font-semibold">{v.motDateDue}</span>
+                          <Badge className={`font-semibold ${getDateStatusColor(v.motDateDue)}`}>
+                            {v.motDateDue}
+                          </Badge>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between items-center">
                           <span className="text-slate-600 dark:text-slate-400">Tax Due:</span>
-                          <span className="font-semibold">{v.taxDateDue}</span>
+                          <Badge className={`font-semibold ${getDateStatusColor(v.taxDateDue)}`}>
+                            {v.taxDateDue}
+                          </Badge>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between items-center">
                           <span className="text-slate-600 dark:text-slate-400">Next Service:</span>
-                          <span className="font-semibold">{v.milesNextService.toLocaleString()}</span>
+                          <Badge className={`font-semibold ${getMileageStatusColor(v.presentMileage, v.milesNextService)}`}>
+                            {v.milesNextService.toLocaleString()}
+                          </Badge>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-600 dark:text-slate-400">Last Service:</span>
                           <span className="font-semibold">{v.milesLastService.toLocaleString()}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-600 dark:text-slate-400">Cambelt:</span>
-                          <span className="font-semibold">{v.cambeltDone}</span>
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-600 dark:text-slate-400">Cambelt Due:</span>
+                          <Badge className={`font-semibold ${getMileageStatusColor(v.presentMileage, v.milesDueCambelt)}`}>
+                            {v.milesDueCambelt.toLocaleString()}
+                          </Badge>
                         </div>
                       </div>
                       <div className="border-t border-slate-200 dark:border-slate-700 pt-3 space-y-1 text-xs text-slate-600 dark:text-slate-400">
@@ -386,8 +589,18 @@ export default function MaintenanceDemoPage() {
                         <div><span className="font-medium">Defects 2wk:</span> {v.defects2}</div>
                         <div><span className="font-medium">Defects 3wk:</span> {v.defects3}</div>
                         <div><span className="font-medium">Defects 4wk:</span> {v.defects4}</div>
-                        <div><span className="font-medium">Fire Ext.:</span> {v.fireExtinguisher}</div>
-                        <div><span className="font-medium">First Aid:</span> {v.firstAidCheck}</div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">Fire Ext.:</span>
+                          <Badge className={`text-xs ${getItemStatusColor(v.fireExtinguisher)}`}>
+                            {v.fireExtinguisher}
+                          </Badge>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">First Aid:</span>
+                          <Badge className={`text-xs ${getItemStatusColor(v.firstAidCheck)}`}>
+                            {v.firstAidCheck}
+                          </Badge>
+                        </div>
                         <div><span className="font-medium">Comments:</span> {v.comments}</div>
                       </div>
                       <div className="flex gap-2 pt-2">
@@ -456,29 +669,37 @@ export default function MaintenanceDemoPage() {
                             <span className="text-slate-600 dark:text-slate-400">Present Mileage:</span>
                             <span className="font-medium text-slate-900 dark:text-white">{v.presentMileage.toLocaleString()}</span>
                           </div>
-                          <div className="flex justify-between">
+                          <div className="flex justify-between items-center">
                             <span className="text-slate-600 dark:text-slate-400">Next Service:</span>
-                            <span className="font-medium text-slate-900 dark:text-white">{v.milesNextService.toLocaleString()}</span>
+                            <Badge className={`${getMileageStatusColor(v.presentMileage, v.milesNextService)}`}>
+                              {v.milesNextService.toLocaleString()}
+                            </Badge>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-600 dark:text-slate-400">Last Service:</span>
                             <span className="font-medium text-slate-900 dark:text-white">{v.milesLastService.toLocaleString()}</span>
                           </div>
-                          <div className="flex justify-between">
+                          <div className="flex justify-between items-center">
                             <span className="text-slate-600 dark:text-slate-400">Cambelt Due:</span>
-                            <span className="font-medium text-slate-900 dark:text-white">{v.milesDueCambelt.toLocaleString()}</span>
+                            <Badge className={`${getMileageStatusColor(v.presentMileage, v.milesDueCambelt)}`}>
+                              {v.milesDueCambelt.toLocaleString()}
+                            </Badge>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-600 dark:text-slate-400">Cambelt Done:</span>
                             <span className="font-medium text-slate-900 dark:text-white">{v.cambeltDone}</span>
                           </div>
-                          <div className="flex justify-between">
+                          <div className="flex justify-between items-center">
                             <span className="text-slate-600 dark:text-slate-400">MOT Due:</span>
-                            <span className="font-medium text-slate-900 dark:text-white">{v.motDateDue}</span>
+                            <Badge className={`${getDateStatusColor(v.motDateDue)}`}>
+                              {v.motDateDue}
+                            </Badge>
                           </div>
-                          <div className="flex justify-between">
+                          <div className="flex justify-between items-center">
                             <span className="text-slate-600 dark:text-slate-400">TAX Due:</span>
-                            <span className="font-medium text-slate-900 dark:text-white">{v.taxDateDue}</span>
+                            <Badge className={`${getDateStatusColor(v.taxDateDue)}`}>
+                              {v.taxDateDue}
+                            </Badge>
                           </div>
                         </div>
                       </div>
@@ -501,13 +722,17 @@ export default function MaintenanceDemoPage() {
                             <span className="text-slate-600 dark:text-slate-400">Defects (4wk):</span>
                             <span className="font-medium text-slate-900 dark:text-white">{v.defects4}</span>
                           </div>
-                          <div className="flex justify-between">
+                          <div className="flex justify-between items-center">
                             <span className="text-slate-600 dark:text-slate-400">Fire Extinguisher:</span>
-                            <span className="font-medium text-slate-900 dark:text-white">{v.fireExtinguisher}</span>
+                            <Badge className={`${getItemStatusColor(v.fireExtinguisher)}`}>
+                              {v.fireExtinguisher}
+                            </Badge>
                           </div>
-                          <div className="flex justify-between">
+                          <div className="flex justify-between items-center">
                             <span className="text-slate-600 dark:text-slate-400">First Aid:</span>
-                            <span className="font-medium text-slate-900 dark:text-white">{v.firstAidCheck}</span>
+                            <Badge className={`${getItemStatusColor(v.firstAidCheck)}`}>
+                              {v.firstAidCheck}
+                            </Badge>
                           </div>
                           <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
                             <span className="text-slate-600 dark:text-slate-400 block mb-1">Comments:</span>
