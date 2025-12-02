@@ -680,10 +680,10 @@ export default function ViewInspectionPage() {
 
       {/* Defects & Comments Section */}
       {items.some(item => item.status === 'attention' || item.comments) && (
-        <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-red-900 dark:text-red-400">Defects & Comments</CardTitle>
-            <CardDescription className="text-red-700 dark:text-red-500">
+            <CardTitle>Defects & Comments</CardTitle>
+            <CardDescription>
               Items requiring attention or with additional notes
             </CardDescription>
           </CardHeader>
@@ -708,12 +708,12 @@ export default function ViewInspectionPage() {
                   return (
                     <div 
                       key={`${item.item_number}-${item.day_of_week}`}
-                      className="p-3 bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900 rounded-md"
+                      className="p-3 border rounded-md"
                     >
                       <div className="flex items-start gap-2 mb-2">
                         {getStatusIcon(item.status)}
                         <div className="flex-1">
-                          <div className="font-medium text-slate-900 dark:text-white">
+                          <div className="font-medium">
                             {item.item_number}. {item.item_description}
                             {dayName && ` (${dayName})`}
                             {statusBadge}
@@ -721,8 +721,8 @@ export default function ViewInspectionPage() {
                         </div>
                       </div>
                       {item.comments && (
-                        <div className="mt-2 pl-7 text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 p-2 rounded border-l-4 border-red-400">
-                          <span className="font-semibold">Comment:</span> {item.comments}
+                        <div className="mt-2 pl-7 text-sm text-muted-foreground">
+                          {item.comments}
                         </div>
                       )}
                     </div>
