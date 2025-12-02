@@ -404,7 +404,7 @@ export default function ViewTimesheetPage() {
             Back to Timesheets
           </Button>
         </Link>
-        <Card>
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardContent className="pt-6">
             <p className="text-red-600">{error}</p>
           </CardContent>
@@ -423,32 +423,36 @@ export default function ViewTimesheetPage() {
   const isEndState = timesheet.status === 'processed' || timesheet.status === 'adjusted';
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Link href="/timesheets">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-3xl font-bold">Timesheet</h1>
-            <p className="text-muted-foreground">
-              Week Ending {formatDate(timesheet.week_ending)}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {isManager && (
-            <a href={`/api/timesheets/${timesheet.id}/pdf`} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Download PDF
+    <div className="space-y-6 max-w-6xl">
+      {/* Header */}
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-slate-200 dark:border-slate-700">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex items-center space-x-3 md:space-x-4">
+            <Link href="/timesheets">
+              <Button variant="ghost" size="sm" className="h-9 w-9 p-0 md:w-auto md:px-3">
+                <ArrowLeft className="h-5 w-5 md:mr-2" />
+                <span className="hidden md:inline">Back</span>
               </Button>
-            </a>
-          )}
-          {getStatusBadge(timesheet.status)}
+            </Link>
+            <div>
+              <h1 className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white">Timesheet</h1>
+              <p className="text-sm md:text-base text-slate-600 dark:text-slate-400">
+                Week Ending {formatDate(timesheet.week_ending)}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {isManager && (
+              <a href={`/api/timesheets/${timesheet.id}/pdf`} target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" size="sm">
+                  <Download className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Download PDF</span>
+                  <span className="sm:hidden">PDF</span>
+                </Button>
+              </a>
+            )}
+            {getStatusBadge(timesheet.status)}
+          </div>
         </div>
       </div>
 
@@ -459,17 +463,17 @@ export default function ViewTimesheetPage() {
       )}
 
       {timesheet.manager_comments && (
-        <Card className="manager-notice">
+        <Card className="bg-white dark:bg-slate-900 border-amber-200 bg-amber-50 dark:bg-amber-950/20">
           <CardHeader>
-            <CardTitle className="manager-notice-title">Manager Comments</CardTitle>
+            <CardTitle className="text-amber-900 dark:text-amber-400">Manager Comments</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="manager-notice-content">{timesheet.manager_comments}</p>
+            <p className="text-amber-800 dark:text-amber-300">{timesheet.manager_comments}</p>
           </CardContent>
         </Card>
       )}
 
-      <Card>
+      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
