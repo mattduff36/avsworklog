@@ -348,36 +348,40 @@ export default function ViewInspectionPage() {
   const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Link href="/inspections">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-3xl font-bold">Vehicle Inspection</h1>
-            <p className="text-muted-foreground">
-              {inspection.vehicles?.reg_number} • {
-                inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
-                  ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
-                  : formatDate(inspection.inspection_date)
-              }
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {isManager && (
-            <a href={`/api/inspections/${inspection.id}/pdf`} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Download PDF
+    <div className="space-y-6 max-w-6xl">
+      {/* Header */}
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-slate-200 dark:border-slate-700">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex items-center space-x-3 md:space-x-4">
+            <Link href="/inspections">
+              <Button variant="ghost" size="sm" className="h-9 w-9 p-0 md:w-auto md:px-3">
+                <ArrowLeft className="h-5 w-5 md:mr-2" />
+                <span className="hidden md:inline">Back</span>
               </Button>
-            </a>
-          )}
-          {getStatusBadge(inspection.status)}
+            </Link>
+            <div>
+              <h1 className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white">Vehicle Inspection</h1>
+              <p className="text-sm md:text-base text-slate-600 dark:text-slate-400">
+                {inspection.vehicles?.reg_number} • {
+                  inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
+                    ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
+                    : formatDate(inspection.inspection_date)
+                }
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {isManager && (
+              <a href={`/api/inspections/${inspection.id}/pdf`} target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" size="sm">
+                  <Download className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Download PDF</span>
+                  <span className="sm:hidden">PDF</span>
+                </Button>
+              </a>
+            )}
+            {getStatusBadge(inspection.status)}
+          </div>
         </div>
       </div>
 
@@ -388,47 +392,36 @@ export default function ViewInspectionPage() {
       )}
 
       {inspection.manager_comments && (
-        <Card className="border-amber-200 bg-amber-50">
+        <Card className="bg-white dark:bg-slate-900 border-amber-200 bg-amber-50 dark:bg-amber-950/20">
           <CardHeader>
-            <CardTitle className="text-amber-900">Manager Comments</CardTitle>
+            <CardTitle className="text-amber-900 dark:text-amber-400">Manager Comments</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-amber-800">{inspection.manager_comments}</p>
+            <p className="text-amber-800 dark:text-amber-300">{inspection.manager_comments}</p>
           </CardContent>
         </Card>
       )}
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card>
+      <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardContent className="pt-6 text-center">
             <div className="text-3xl font-bold text-green-600">{okCount}</div>
             <div className="text-sm text-muted-foreground">OK</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardContent className="pt-6 text-center">
             <div className="text-3xl font-bold text-red-600">{defectCount}</div>
             <div className="text-sm text-muted-foreground">Defects</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <div className="text-3xl font-bold text-gray-600">{naCount}</div>
-            <div className="text-sm text-muted-foreground">N/A</div>
-          </CardContent>
-        </Card>
       </div>
 
-      <Card>
+      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Inspection Items</CardTitle>
-              <CardDescription>
-                {inspection.vehicles?.vehicle_type || 'Vehicle'}
-              </CardDescription>
-            </div>
+            <CardTitle>Inspection Items</CardTitle>
             {canEdit && !editing && (
               <Button variant="outline" onClick={() => setEditing(true)}>
                 <Edit2 className="h-4 w-4 mr-2" />
@@ -680,7 +673,7 @@ export default function ViewInspectionPage() {
 
       {/* Defects & Comments Section */}
       {items.some(item => item.status === 'attention' || item.comments) && (
-        <Card>
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardHeader>
             <CardTitle>Defects & Comments</CardTitle>
             <CardDescription>
