@@ -260,7 +260,7 @@ export default function ViewInspectionPage() {
     switch (status) {
       case 'ok':
         return <CheckCircle2 className="h-5 w-5 text-green-600" />;
-      case 'defect':
+      case 'attention':
         return <XCircle className="h-5 w-5 text-red-600" />;
       case 'na':
         return <AlertCircle className="h-5 w-5 text-gray-400" />;
@@ -275,7 +275,7 @@ export default function ViewInspectionPage() {
     switch (status) {
       case 'ok':
         return 'bg-green-100 text-green-700 border-green-300';
-      case 'defect':
+      case 'attention':
         return 'bg-red-100 text-red-700 border-red-300';
       case 'na':
         return 'bg-gray-100 text-gray-700 border-gray-300';
@@ -677,6 +677,61 @@ export default function ViewInspectionPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Defects & Comments Section */}
+      {items.some(item => item.status === 'attention' || item.comments) && (
+        <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900">
+          <CardHeader>
+            <CardTitle className="text-red-900 dark:text-red-400">Defects & Comments</CardTitle>
+            <CardDescription className="text-red-700 dark:text-red-500">
+              Items requiring attention or with additional notes
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {items
+                .filter(item => item.status === 'attention' || item.comments)
+                .sort((a, b) => {
+                  // Sort by day_of_week first, then item_number
+                  if (a.day_of_week !== b.day_of_week) {
+                    return (a.day_of_week || 0) - (b.day_of_week || 0);
+                  }
+                  return a.item_number - b.item_number;
+                })
+                .map((item) => {
+                  const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                  const dayName = item.day_of_week ? dayNames[item.day_of_week - 1] : '';
+                  const statusBadge = item.status === 'attention' 
+                    ? <Badge variant="destructive" className="ml-2">DEFECT</Badge>
+                    : <Badge variant="secondary" className="ml-2">NOTE</Badge>;
+                  
+                  return (
+                    <div 
+                      key={`${item.item_number}-${item.day_of_week}`}
+                      className="p-3 bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900 rounded-md"
+                    >
+                      <div className="flex items-start gap-2 mb-2">
+                        {getStatusIcon(item.status)}
+                        <div className="flex-1">
+                          <div className="font-medium text-slate-900 dark:text-white">
+                            {item.item_number}. {item.item_description}
+                            {dayName && ` (${dayName})`}
+                            {statusBadge}
+                          </div>
+                        </div>
+                      </div>
+                      {item.comments && (
+                        <div className="mt-2 pl-7 text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 p-2 rounded border-l-4 border-red-400">
+                          <span className="font-semibold">Comment:</span> {item.comments}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Photo Upload Modal */}
       {photoUploadItem && (
