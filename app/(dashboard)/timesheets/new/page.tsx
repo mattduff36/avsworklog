@@ -493,7 +493,7 @@ function NewTimesheetContent() {
             });
             
             let hours = calculateHours(entry.time_started, entry.time_finished);
-            if (hours !== null && hours > 5) {
+            if (hours !== null && hours > 6.5) {
               hours = hours - 0.5;
             }
             newEntries[dayIndex].daily_total = hours;
@@ -554,8 +554,8 @@ function NewTimesheetContent() {
             
             let hours = calculateHours(entry.time_started, entry.time_finished);
             
-            // Auto-deduct 30 mins (0.5 hours) for lunch break if daily total > 5 hours
-            if (hours !== null && hours > 5) {
+            // Auto-deduct 30 mins (0.5 hours) for lunch break if daily total > 6.5 hours
+            if (hours !== null && hours > 6.5) {
               hours = hours - 0.5;
             }
             
