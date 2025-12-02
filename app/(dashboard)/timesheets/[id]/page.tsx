@@ -50,6 +50,7 @@ export default function ViewTimesheetPage() {
   const [rejectionComments, setRejectionComments] = useState('');
   const [originalData, setOriginalData] = useState<{entries: TimesheetEntry[], regNumber: string | null} | null>(null);
   const [dataChanged, setDataChanged] = useState(false);
+  const [manuallyEditedDays, setManuallyEditedDays] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (params.id && !authLoading) {
@@ -125,7 +126,7 @@ export default function ViewTimesheetPage() {
     }
   };
 
-  const updateEntry = (dayIndex: number, field: string, value: string | boolean) => {
+  const updateEntry = (dayIndex: number, field: string, value: string | boolean | number) => {
     const newEntries = [...entries];
     newEntries[dayIndex] = {
       ...newEntries[dayIndex],
@@ -135,8 +136,27 @@ export default function ViewTimesheetPage() {
     // Auto-calculate daily total if both times are present
     if (field === 'time_started' || field === 'time_finished') {
       const entry = newEntries[dayIndex];
-      const hours = calculateHours(entry.time_started, entry.time_finished);
+      let hours = calculateHours(entry.time_started, entry.time_finished);
+      
+      // Auto-deduct 30 mins (0.5 hours) for lunch break if daily total > 6.5 hours
+      if (hours !== null && hours > 6.5) {
+        hours = hours - 0.5;
+      }
+      
       newEntries[dayIndex].daily_total = hours;
+      
+      // Clear manual edit flag for this day when times change (recalculation)
+      setManuallyEditedDays(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(dayIndex);
+        return newSet;
+      });
+    }
+
+    // Handle manual daily_total edits
+    if (field === 'daily_total') {
+      // Mark this day as manually edited
+      setManuallyEditedDays(prev => new Set(prev).add(dayIndex));
     }
 
     setEntries(newEntries);
@@ -549,7 +569,26 @@ export default function ViewTimesheetPage() {
                       )}
                     </td>
                     <td className="p-2 text-right font-semibold">
-                      {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'}
+                      {canEdit && isManager ? (
+                        <Input
+                          type="number"
+                          step="0.25"
+                          value={entry.daily_total ?? ''}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                            updateEntry(index, 'daily_total', val);
+                          }}
+                          className={`w-24 text-right font-semibold ${
+                            manuallyEditedDays.has(index) 
+                              ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-700' 
+                              : ''
+                          }`}
+                        />
+                      ) : (
+                        <span className={manuallyEditedDays.has(index) ? 'text-blue-600 dark:text-blue-400' : ''}>
+                          {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'}
+                        </span>
+                      )}
                     </td>
                     <td className="p-2">
                       {canEdit ? (
@@ -646,11 +685,28 @@ export default function ViewTimesheetPage() {
                     )}
                   </div>
                   <div className="pt-2 border-t">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center gap-2">
                       <span className="text-sm font-medium">Daily Total:</span>
-                      <span className="text-lg font-bold">
-                        {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'} hrs
-                      </span>
+                      {canEdit && isManager ? (
+                        <Input
+                          type="number"
+                          step="0.25"
+                          value={entry.daily_total ?? ''}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                            updateEntry(index, 'daily_total', val);
+                          }}
+                          className={`w-24 text-right text-lg font-bold ${
+                            manuallyEditedDays.has(index) 
+                              ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-700' 
+                              : ''
+                          }`}
+                        />
+                      ) : (
+                        <span className={`text-lg font-bold ${manuallyEditedDays.has(index) ? 'text-blue-600 dark:text-blue-400' : ''}`}>
+                          {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'} hrs
+                        </span>
+                      )}
                     </div>
                   </div>
                 </CardContent>
