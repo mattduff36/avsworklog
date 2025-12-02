@@ -34,7 +34,7 @@ type ViewAsRole = 'actual' | 'employee' | 'manager' | 'admin';
 
 export function Navbar() {
   const pathname = usePathname();
-  const { profile, signOut, isAdmin, isManager } = useAuth();
+  const { user, profile, signOut, isAdmin, isManager } = useAuth();
   const { isOnline, pendingCount } = useOfflineSync();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar starts collapsed
