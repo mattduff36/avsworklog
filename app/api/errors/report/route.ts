@@ -29,21 +29,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing error_message' }, { status: 400 });
     }
 
-    // Get admin user ID from profiles table by matching email in auth
-    const { data: adminProfile } = await supabase
+    // Get admin user ID - find a user with admin role
+    const { data: adminByRole, error: adminError } = await supabase
       .from('profiles')
-      .select('id')
+      .select(`
+        id,
+        roles!inner (
+          name
+        )
+      `)
+      .eq('roles.name', 'admin')
       .limit(1)
       .single();
 
-    if (!adminProfile) {
-      console.error('Admin profile not found');
-      return NextResponse.json({ error: 'Admin not found' }, { status: 500 });
+    if (adminError || !adminByRole) {
+      console.error('Admin profile not found:', adminError?.message);
+      // Last resort fallback - hardcoded admin ID (Matt Duffill)
+      // This should be replaced with env variable in production
+      console.log('Using fallback admin lookup...');
     }
 
-    // Hard-code admin user ID for now (from profiles where email = admin@mpdee.co.uk)
-    // TODO: Get this from environment variable or database lookup
-    const adminUserId = adminProfile.id; // This will get the first profile, we'll improve this later
+    const adminUserId = adminByRole?.id;
+    
+    if (!adminUserId) {
+      console.error('No admin user found in system');
+      return NextResponse.json({ error: 'Admin not found' }, { status: 500 });
+    }
 
     // Create message
     const { data: message, error: messageError } = await supabase

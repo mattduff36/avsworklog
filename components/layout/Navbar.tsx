@@ -163,17 +163,31 @@ export function Navbar() {
     fetchRAMSAssignments();
   }, [profile?.id, supabase]);
 
-  // Fetch notification count
+  // Fetch notification count (only when user is authenticated)
   useEffect(() => {
+    // Don't fetch if not logged in
+    if (!user) return;
+
     async function fetchNotificationCount() {
       try {
         const response = await fetch('/api/messages/notifications');
+        
+        // Handle 401 gracefully - user may have just logged out
+        if (response.status === 401) {
+          setUnreadCount(0);
+          return;
+        }
+        
         const data = await response.json();
         if (data.success) {
           setUnreadCount(data.unread_count || 0);
         }
       } catch (error) {
-        console.error('Error fetching notification count:', error);
+        // Only log network errors, not auth errors
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+          console.error('Network error fetching notifications:', error);
+        }
+        // Silently fail for other errors - don't spam console
       }
     }
 
@@ -182,7 +196,7 @@ export function Navbar() {
     // Poll every 60 seconds for new notifications
     const interval = setInterval(fetchNotificationCount, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   const handleSignOut = async () => {
     try {

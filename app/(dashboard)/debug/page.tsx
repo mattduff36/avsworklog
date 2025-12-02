@@ -103,25 +103,31 @@ export default function DebugPage() {
   // Check if user is superadmin and viewing as actual role
   useEffect(() => {
     async function checkAccess() {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser?.email) {
-        setUserEmail(authUser.email);
-        
-        // Check if viewing as another role
-        const viewAsRole = localStorage.getItem('viewAsRole') || 'actual';
-        
-        // Redirect if not superadmin or if viewing as another role
-        if (authUser.email !== 'admin@mpdee.co.uk') {
-          toast.error('Access denied: SuperAdmin only');
-          router.push('/dashboard');
-          return;
-        }
-        
-        if (viewAsRole !== 'actual') {
-          toast.error('Debug console only available in Actual Role mode');
-          router.push('/dashboard');
-          return;
-        }
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      
+      // SECURITY: Redirect if not authenticated
+      if (authError || !authUser) {
+        router.push('/login');
+        return;
+      }
+      
+      setUserEmail(authUser.email || '');
+      
+      // Check if viewing as another role
+      const viewAsRole = localStorage.getItem('viewAsRole') || 'actual';
+      
+      // SECURITY: Redirect if not superadmin
+      if (authUser.email !== 'admin@mpdee.co.uk') {
+        toast.error('Access denied: SuperAdmin only');
+        router.push('/dashboard');
+        return;
+      }
+      
+      // Redirect if viewing as another role (debug must be in actual role mode)
+      if (viewAsRole !== 'actual') {
+        toast.error('Debug console only available in Actual Role mode');
+        router.push('/dashboard');
+        return;
       }
       
       setLoading(false);
