@@ -39,6 +39,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import type { Database } from '@/types/database';
+import Link from 'next/link';
 
 type Vehicle = Database['public']['Tables']['vehicles']['Row'] & {
   vehicle_categories?: { id: string; name: string } | null;
@@ -483,6 +484,9 @@ export default function VehiclesAdminPage() {
         <TabsList className="bg-slate-100 dark:bg-slate-800">
           <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
+          <TabsTrigger asChild value="maintenance-demo">
+            <Link href="/admin/maintenance-demo">Maintenance Log (Demo)</Link>
+          </TabsTrigger>
         </TabsList>
 
         {/* Vehicles Tab */}
@@ -735,6 +739,19 @@ export default function VehiclesAdminPage() {
                   </Table>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Maintenance Log Tab */}
+        <TabsContent value="maintenance-demo">
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-slate-900 dark:text-white">Maintenance Log Demo</CardTitle>
+              <CardDescription>This is a preview/demo for the upcoming vehicle maintenance module.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p>Navigate to <Link className="underline text-blue-600" href="/admin/maintenance-demo">Maintenance Log Demo Page</Link> to try several layout options!</p>
             </CardContent>
           </Card>
         </TabsContent>
