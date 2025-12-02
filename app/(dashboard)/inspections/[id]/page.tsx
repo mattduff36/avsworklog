@@ -212,7 +212,7 @@ export default function ViewInspectionPage() {
 
     // Validate: all defects must have comments
     const defectsWithoutComments = items.filter(
-      item => item.status === 'defect' && !item.comments
+      item => item.status === 'attention' && !item.comments
     );
 
     if (defectsWithoutComments.length > 0) {
@@ -315,7 +315,7 @@ export default function ViewInspectionPage() {
   const canEdit = editing && inspection.status === 'draft';
   const canSubmit = inspection.user_id === user?.id && inspection.status === 'draft';
 
-  const defectCount = items.filter(item => item.status === 'defect').length;
+  const defectCount = items.filter(item => item.status === 'attention').length;
   const okCount = items.filter(item => item.status === 'ok').length;
   const naCount = items.filter(item => item.status === 'na').length;
 
@@ -529,8 +529,8 @@ export default function ViewInspectionPage() {
                           <Input
                             value={item.comments || ''}
                             onChange={(e) => updateItem(item.item_number, 'comments', e.target.value)}
-                            placeholder={item.status === 'defect' ? 'Required for defects' : 'Optional notes'}
-                            className={item.status === 'defect' && !item.comments ? 'border-red-300' : ''}
+                            placeholder={item.status === 'attention' ? 'Required for defects' : 'Optional notes'}
+                            className={item.status === 'attention' && !item.comments ? 'border-red-300' : ''}
                           />
                         ) : (
                           <span className="text-sm">{item.comments || '-'}</span>
@@ -628,8 +628,8 @@ export default function ViewInspectionPage() {
                       <Input
                         value={item.comments || ''}
                         onChange={(e) => updateItem(item.item_number, 'comments', e.target.value)}
-                        placeholder={item.status === 'defect' ? 'Required for defects' : 'Optional notes'}
-                        className={item.status === 'defect' && !item.comments ? 'border-red-300' : ''}
+                        placeholder={item.status === 'attention' ? 'Required for defects' : 'Optional notes'}
+                        className={item.status === 'attention' && !item.comments ? 'border-red-300' : ''}
                       />
                     ) : (
                       item.comments && (

@@ -316,6 +316,25 @@ function NewInspectionContent() {
       setError('Week ending must be a Sunday');
       return;
     }
+
+    // Validate: all defects must have comments
+    const defectsWithoutComments: string[] = [];
+    Object.entries(checkboxStates).forEach(([key, status]) => {
+      if (status === 'attention' && !comments[key]) {
+        const [dayOfWeek, itemNumber] = key.split('-').map(Number);
+        const dayName = DAY_NAMES[dayOfWeek - 1] || `Day ${dayOfWeek}`;
+        const itemName = currentChecklist[itemNumber - 1] || `Item ${itemNumber}`;
+        defectsWithoutComments.push(`${itemName} (${dayName})`);
+      }
+    });
+
+    if (defectsWithoutComments.length > 0) {
+      setError(`Please add comments for all defects: ${defectsWithoutComments.join(', ')}`);
+      toast.error('Missing defect comments', {
+        description: `Please add comments for: ${defectsWithoutComments.slice(0, 3).join(', ')}${defectsWithoutComments.length > 3 ? '...' : ''}`,
+      });
+      return;
+    }
     
     // Show signature dialog
     setShowSignatureDialog(true);

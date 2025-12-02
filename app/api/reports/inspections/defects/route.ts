@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
     const excelData: any[] = [];
 
     inspections.forEach((inspection: any) => {
-      const defectItems = (inspection.inspection_items || []).filter((item: any) => item.status === 'defect');
+      const defectItems = (inspection.inspection_items || []).filter((item: any) => item.status === 'attention');
       
       defectItems.forEach((item: any) => {
         excelData.push({
