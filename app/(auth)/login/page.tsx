@@ -13,9 +13,6 @@ import {
 } from '@/components/ui/card';
 import { Lock } from 'lucide-react';
 
-// Force dynamic rendering to prevent build-time prerendering issues
-export const dynamic = 'force-dynamic';
-
 export default function LoginPage() {
   const router = useRouter();
   const { signIn } = useAuth();
