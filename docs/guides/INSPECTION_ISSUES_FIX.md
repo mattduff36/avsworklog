@@ -279,3 +279,5 @@ LIMIT 10;
 **Date**: December 2, 2025
 **Commit**: `fix(inspections): fix defect comments, RLS policies, and status validation`
 
+
+
