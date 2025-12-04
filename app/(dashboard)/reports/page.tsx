@@ -155,7 +155,7 @@ export default function ReportsPage() {
               boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
             } : {}}
           >
-            <Package className="h-5 w-5" />
+            <Package className="h-5 w-5" style={activeTab === 'future' ? { color: '#252525' } : {}} />
             <span className="text-sm font-medium">More Reports</span>
           </TabsTrigger>
         </TabsList>

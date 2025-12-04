@@ -126,7 +126,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                       open ? 'gap-3 px-3 py-2' : 'justify-center py-3'
                     } ${
                       isActive
-                        ? 'bg-avs-yellow text-slate-900'
+                        ? 'bg-avs-yellow text-slate-900 [&>svg]:text-slate-900'
                         : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                     }`}
                   >
@@ -163,7 +163,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                         open ? 'gap-3 px-3 py-2' : 'justify-center py-3'
                       } ${
                         isActive
-                          ? 'bg-avs-yellow text-slate-900'
+                          ? 'bg-avs-yellow text-slate-900 [&>svg]:text-slate-900'
                           : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                       }`}
                     >

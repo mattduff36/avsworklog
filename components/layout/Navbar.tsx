@@ -286,7 +286,7 @@ export function Navbar() {
                       href={item.href}
                       className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                         isActive
-                          ? 'bg-avs-yellow text-slate-900'
+                          ? 'bg-avs-yellow text-slate-900 [&>svg]:text-slate-900'
                           : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
                       }`}
                     >
@@ -306,7 +306,7 @@ export function Navbar() {
                       href={item.href}
                       className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                         isActive
-                          ? 'bg-avs-yellow text-slate-900'
+                          ? 'bg-avs-yellow text-slate-900 [&>svg]:text-slate-900'
                           : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
                       }`}
                     >
@@ -425,7 +425,7 @@ export function Navbar() {
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                       isActive
-                        ? 'bg-avs-yellow text-slate-900'
+                        ? 'bg-avs-yellow text-slate-900 [&>svg]:text-slate-900'
                         : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
                     }`}
                   >
@@ -446,7 +446,7 @@ export function Navbar() {
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                       isActive
-                        ? 'bg-avs-yellow text-slate-900'
+                        ? 'bg-avs-yellow text-slate-900 [&>svg]:text-slate-900'
                         : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
                     }`}
                   >
@@ -475,7 +475,7 @@ export function Navbar() {
                         onClick={() => setMobileMenuOpen(false)}
                         className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                           isActive
-                            ? 'bg-avs-yellow text-slate-900'
+                            ? 'bg-avs-yellow text-slate-900 [&>svg]:text-slate-900'
                             : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
                         }`}
                       >
@@ -501,7 +501,7 @@ export function Navbar() {
                             onClick={() => setMobileMenuOpen(false)}
                             className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                               isActive
-                                ? 'bg-avs-yellow text-slate-900'
+                                ? 'bg-avs-yellow text-slate-900 [&>svg]:text-slate-900'
                                 : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
                             }`}
                           >
