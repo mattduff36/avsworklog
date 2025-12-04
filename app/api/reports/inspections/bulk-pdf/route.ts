@@ -260,16 +260,6 @@ export async function POST(request: NextRequest) {
 
           for (let i = 0; i < chunk.length; i++) {
             const inspection = chunk[i];
-            processedCount++;
-            
-            // Send progress update
-            controller.enqueue(encoder.encode(JSON.stringify({ 
-              type: 'progress', 
-              current: processedCount, 
-              total: totalInspections,
-              currentPart: chunkIndex + 1,
-              totalParts: numParts
-            }) + '\n'));
 
             // Fetch inspection items
             const { data: items, error: itemsError } = await supabase
@@ -282,6 +272,18 @@ export async function POST(request: NextRequest) {
               console.error(`Failed to fetch items for inspection ${inspection.id}:`, itemsError);
               continue;
             }
+
+            // Only increment and report progress after successful item fetch
+            processedCount++;
+            
+            // Send progress update
+            controller.enqueue(encoder.encode(JSON.stringify({ 
+              type: 'progress', 
+              current: processedCount, 
+              total: totalInspections,
+              currentPart: chunkIndex + 1,
+              totalParts: numParts
+            }) + '\n'));
 
             // Determine which PDF template to use
             const categoryName = (inspection as any).vehicle?.vehicle_categories?.name;
