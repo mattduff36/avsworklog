@@ -150,7 +150,8 @@ export default function LoginPage() {
 
               <Button
                 type="submit"
-                className="w-full h-12 bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 font-semibold text-base shadow-lg shadow-avs-yellow/20 transition-all"
+                className="w-full h-12 bg-avs-yellow hover:bg-avs-yellow-hover font-semibold text-base shadow-lg shadow-avs-yellow/20 transition-all"
+                style={{ color: 'rgb(15 23 42)' }}
                 disabled={loading}
               >
                 {loading ? 'Signing in...' : 'Sign In'}
