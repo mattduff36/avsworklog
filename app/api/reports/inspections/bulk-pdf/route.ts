@@ -268,9 +268,20 @@ export async function POST(request: NextRequest) {
               .eq('inspection_id', inspection.id)
               .order('item_number', { ascending: true });
 
+            // Track progress for ALL inspections (even skipped ones)
+            processedCount++;
+            
             if (itemsError || !items || items.length === 0) {
-              console.error(`Failed to fetch items for inspection ${inspection.id}:`, itemsError);
-              continue; // Skip this inspection without counting it
+              console.error(`Skipping inspection ${inspection.id} - no items found:`, itemsError);
+              // Send progress update for skipped inspection
+              controller.enqueue(encoder.encode(JSON.stringify({ 
+                type: 'progress', 
+                current: processedCount, 
+                total: totalInspections,
+                currentPart: chunkIndex + 1,
+                totalParts: numParts
+              }) + '\n'));
+              continue; // Skip to next inspection
             }
 
             // Determine which PDF template to use
@@ -297,11 +308,8 @@ export async function POST(request: NextRequest) {
             const singlePdf = await PDFDocument.load(pdfBuffer);
             const pages = await mergedPdf.copyPages(singlePdf, singlePdf.getPageIndices());
             pages.forEach((page) => mergedPdf.addPage(page));
-
-            // Only increment and report progress after successful PDF generation
-            processedCount++;
             
-            // Send progress update
+            // Send progress update after successful PDF generation
             controller.enqueue(encoder.encode(JSON.stringify({ 
               type: 'progress', 
               current: processedCount, 
