@@ -933,6 +933,7 @@ input[type="date"]::-webkit-datetime-edit-year-field {
 .bg-avs-yellow *,
 .bg-avs-yellow svg,
 .bg-avs-yellow span,
+.bg-avs-yellow.text-slate-900,
 .bg-avs-yellow .text-slate-900 {
   color: rgb(15 23 42) !important; /* Dark slate text - same as sidebar */
 }
