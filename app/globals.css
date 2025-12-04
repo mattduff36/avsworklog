@@ -602,31 +602,30 @@
   
   /* Tab Styling - Standard Approvals Page Pattern */
   /* Use data-state="active" to match shadcn/ui tabs component */
-  [role="tab"][data-state="active"] {
+  [role="tab"][data-state="active"],
+  [role="tab"][data-state="active"] *,
+  [role="tab"][data-state="active"] svg,
+  [role="tab"][data-state="active"] span {
     background-color: hsl(var(--primary)) !important; /* AVS Yellow */
-    color: rgb(15 23 42) !important; /* Dark slate text */
+    color: rgb(15 23 42) !important; /* Dark slate text - same as sidebar */
     border-bottom: 2px solid hsl(var(--primary)) !important;
   }
   
   /* Custom tab colors for specific tabs */
-  [role="tab"][data-state="active"][data-tab="toolbox-talk"] {
+  [role="tab"][data-state="active"][data-tab="toolbox-talk"],
+  [role="tab"][data-state="active"][data-tab="toolbox-talk"] * {
     background-color: rgb(220 38 38) !important; /* red-600 */
     color: white !important;
     border-bottom-color: rgb(220 38 38) !important;
   }
   
   [role="tab"][data-state="active"][data-tab="reminder"],
-  [role="tab"][data-state="active"][data-tab="reports"] {
+  [role="tab"][data-state="active"][data-tab="reminder"] *,
+  [role="tab"][data-state="active"][data-tab="reports"],
+  [role="tab"][data-state="active"][data-tab="reports"] * {
     background-color: #F1D64A !important; /* AVS Yellow */
     color: rgb(15 23 42) !important;
     border-bottom-color: #F1D64A !important;
-  }
-  
-  /* Allow inline styles on tabs to override global rules */
-  [role="tab"][style*="color"],
-  [role="tab"][style*="color"] > *,
-  [role="tab"][style*="color"] span {
-    color: unset !important;
   }
 }
 
