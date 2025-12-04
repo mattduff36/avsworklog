@@ -132,6 +132,7 @@ export default function ReportsPage() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let shouldExit = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -206,6 +207,7 @@ export default function ReportsPage() {
               alert(data.error);
               setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
               abortControllerRef.current?.abort();
+              shouldExit = true;
               break;
             }
 
@@ -254,13 +256,17 @@ export default function ReportsPage() {
                 status: '',
               });
               
-              // Exit the inner loop to prevent duplicate handling
-              // The stream reader will naturally complete on the next iteration
+              shouldExit = true;
               break;
             }
           } catch (parseError) {
             console.error('Error parsing stream data:', parseError, 'Line:', line);
           }
+        }
+
+        // Check if we should exit the outer loop
+        if (shouldExit) {
+          break;
         }
       }
     } catch (error) {
