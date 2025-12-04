@@ -418,6 +418,14 @@
     border-color: #F1D64A;
   }
   
+  /* Force dark text on any element with yellow background */
+  .bg-avs-yellow,
+  .bg-avs-yellow *,
+  .bg-avs-yellow svg,
+  .bg-avs-yellow span {
+    color: rgb(15 23 42) !important; /* Dark slate text - same as sidebar */
+  }
+  
   /* Timesheet Colors */
   .bg-timesheet {
     background-color: hsl(var(--timesheet-primary));
