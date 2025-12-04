@@ -14,7 +14,8 @@ import {
   Loader2,
   Clipboard,
   Download,
-  Package
+  Package,
+  FileArchive
 } from 'lucide-react';
 
 export default function ReportsPage() {
