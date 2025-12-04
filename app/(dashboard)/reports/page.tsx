@@ -206,7 +206,7 @@ export default function ReportsPage() {
               alert(data.error);
               setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
               abortControllerRef.current?.abort();
-              return;
+              break;
             }
 
             if (data.type === 'init') {
@@ -254,8 +254,9 @@ export default function ReportsPage() {
                 status: '',
               });
               
-              // Exit the loop to prevent duplicate handling
-              return;
+              // Exit the inner loop to prevent duplicate handling
+              // The stream reader will naturally complete on the next iteration
+              break;
             }
           } catch (parseError) {
             console.error('Error parsing stream data:', parseError, 'Line:', line);
