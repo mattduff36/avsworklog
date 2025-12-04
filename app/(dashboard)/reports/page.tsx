@@ -340,11 +340,11 @@ export default function ReportsPage() {
             className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
             style={activeTab === 'inspections' ? {
               backgroundColor: 'hsl(30 95% 55%)',
-              color: 'white',
+              color: '#252525',
               boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
             } : {}}
           >
-            <Clipboard className="h-5 w-5" />
+            <Clipboard className="h-5 w-5" style={activeTab === 'inspections' ? { color: '#252525' } : {}} />
             <span className="text-sm font-medium">Inspections</span>
           </TabsTrigger>
           <TabsTrigger 
