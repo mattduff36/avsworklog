@@ -621,6 +621,15 @@
     color: rgb(15 23 42) !important;
     border-bottom-color: #F1D64A !important;
   }
+  
+  /* Allow inline styles on tabs to override global rules */
+  [role="tab"][style*="color"] {
+    color: inherit !important;
+  }
+  
+  [role="tab"][style*="color"] * {
+    color: inherit !important;
+  }
 }
 
 /*
