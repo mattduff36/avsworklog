@@ -116,9 +116,15 @@ export default function ReportsPage() {
         signal: abortControllerRef.current.signal,
       });
 
-      if (!response.ok || !response.body) {
+      if (!response.ok) {
         const error = await response.json();
         alert(error.error || 'Failed to generate bulk PDFs');
+        setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
+        return;
+      }
+
+      if (!response.body) {
+        alert('Failed to generate bulk PDFs - no response body');
         setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
         return;
       }
@@ -129,7 +135,55 @@ export default function ReportsPage() {
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        
+        if (done) {
+          // Flush decoder and process any remaining buffered data
+          buffer += decoder.decode(new Uint8Array(), { stream: false });
+          
+          // Process the final buffered line if it exists
+          if (buffer.trim()) {
+            try {
+              const data = JSON.parse(buffer);
+              
+              if (data.error) {
+                alert(data.error);
+                setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
+                return;
+              }
+
+              if (data.type === 'complete') {
+                // Convert base64 to blob and download
+                const binaryString = atob(data.data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                  bytes[i] = binaryString.charCodeAt(i);
+                }
+                const blob = new Blob([bytes], { type: data.contentType });
+                
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = data.fileName;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                setBulkProgress({
+                  isDownloading: false,
+                  current: 0,
+                  total: 0,
+                  currentPart: 1,
+                  totalParts: 1,
+                  status: '',
+                });
+              }
+            } catch (parseError) {
+              console.error('Error parsing final buffer:', parseError, 'Buffer:', buffer);
+            }
+          }
+          break;
+        }
 
         // Append new data to buffer
         buffer += decoder.decode(value, { stream: true });
