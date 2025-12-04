@@ -261,18 +261,6 @@ export async function POST(request: NextRequest) {
           for (let i = 0; i < chunk.length; i++) {
             const inspection = chunk[i];
 
-            // Always increment counter for every inspection attempted
-            processedCount++;
-            
-            // Send progress update
-            controller.enqueue(encoder.encode(JSON.stringify({ 
-              type: 'progress', 
-              current: processedCount, 
-              total: totalInspections,
-              currentPart: chunkIndex + 1,
-              totalParts: numParts
-            }) + '\n'));
-
             // Fetch inspection items
             const { data: items, error: itemsError } = await supabase
               .from('inspection_items')
@@ -282,7 +270,7 @@ export async function POST(request: NextRequest) {
 
             if (itemsError || !items || items.length === 0) {
               console.error(`Failed to fetch items for inspection ${inspection.id}:`, itemsError);
-              continue; // Skip PDF generation but progress was already reported
+              continue; // Skip this inspection without counting it
             }
 
             // Determine which PDF template to use
@@ -309,6 +297,18 @@ export async function POST(request: NextRequest) {
             const singlePdf = await PDFDocument.load(pdfBuffer);
             const pages = await mergedPdf.copyPages(singlePdf, singlePdf.getPageIndices());
             pages.forEach((page) => mergedPdf.addPage(page));
+
+            // Only increment and report progress after successful PDF generation
+            processedCount++;
+            
+            // Send progress update
+            controller.enqueue(encoder.encode(JSON.stringify({ 
+              type: 'progress', 
+              current: processedCount, 
+              total: totalInspections,
+              currentPart: chunkIndex + 1,
+              totalParts: numParts
+            }) + '\n'));
           }
 
           // Save the merged PDF

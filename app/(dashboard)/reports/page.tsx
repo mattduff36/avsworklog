@@ -140,7 +140,7 @@ export default function ReportsPage() {
           // Flush decoder and process any remaining buffered data
           buffer += decoder.decode(new Uint8Array(), { stream: false });
           
-          // Process the final buffered line if it exists
+          // Process the final buffered line if it exists (only for non-complete messages)
           if (buffer.trim()) {
             try {
               const data = JSON.parse(buffer);
@@ -148,9 +148,11 @@ export default function ReportsPage() {
               if (data.error) {
                 alert(data.error);
                 setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
-                return;
+                abortControllerRef.current?.abort();
+                break;
               }
 
+              // Only handle complete message here if it wasn't already handled in the loop
               if (data.type === 'complete') {
                 // Convert base64 to blob and download
                 const binaryString = atob(data.data);
@@ -203,6 +205,7 @@ export default function ReportsPage() {
             if (data.error) {
               alert(data.error);
               setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
+              abortControllerRef.current?.abort();
               return;
             }
 
@@ -250,6 +253,9 @@ export default function ReportsPage() {
                 totalParts: 1,
                 status: '',
               });
+              
+              // Exit the loop to prevent duplicate handling
+              return;
             }
           } catch (parseError) {
             console.error('Error parsing stream data:', parseError, 'Line:', line);
