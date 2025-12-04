@@ -623,12 +623,10 @@
   }
   
   /* Allow inline styles on tabs to override global rules */
-  [role="tab"][style*="color"] {
-    color: inherit !important;
-  }
-  
-  [role="tab"][style*="color"] * {
-    color: inherit !important;
+  [role="tab"][style*="color"],
+  [role="tab"][style*="color"] > *,
+  [role="tab"][style*="color"] span {
+    color: unset !important;
   }
 }
 

@@ -345,7 +345,7 @@ export default function ReportsPage() {
             } : {}}
           >
             <Clipboard className="h-5 w-5" style={activeTab === 'inspections' ? { color: 'rgb(15 23 42)' } : {}} />
-            <span className="text-sm font-medium">Inspections</span>
+            <span className="text-sm font-medium" style={activeTab === 'inspections' ? { color: 'rgb(15 23 42)' } : {}}>Inspections</span>
           </TabsTrigger>
           <TabsTrigger 
             value="future" 
@@ -357,7 +357,7 @@ export default function ReportsPage() {
             } : {}}
           >
             <Package className="h-5 w-5" style={activeTab === 'future' ? { color: 'rgb(15 23 42)' } : {}} />
-            <span className="text-sm font-medium">More Reports</span>
+            <span className="text-sm font-medium" style={activeTab === 'future' ? { color: 'rgb(15 23 42)' } : {}}>More Reports</span>
           </TabsTrigger>
         </TabsList>
 
