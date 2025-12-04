@@ -340,11 +340,11 @@ export default function ReportsPage() {
             className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
             style={activeTab === 'inspections' ? {
               backgroundColor: 'hsl(30 95% 55%)',
-              color: '#252525',
+              color: 'rgb(15 23 42)',
               boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
             } : {}}
           >
-            <Clipboard className="h-5 w-5" style={activeTab === 'inspections' ? { color: '#252525' } : {}} />
+            <Clipboard className="h-5 w-5" style={activeTab === 'inspections' ? { color: 'rgb(15 23 42)' } : {}} />
             <span className="text-sm font-medium">Inspections</span>
           </TabsTrigger>
           <TabsTrigger 
@@ -352,11 +352,11 @@ export default function ReportsPage() {
             className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
             style={activeTab === 'future' ? {
               backgroundColor: '#F1D64A',
-              color: '#252525',
+              color: 'rgb(15 23 42)',
               boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
             } : {}}
           >
-            <Package className="h-5 w-5" style={activeTab === 'future' ? { color: '#252525' } : {}} />
+            <Package className="h-5 w-5" style={activeTab === 'future' ? { color: 'rgb(15 23 42)' } : {}} />
             <span className="text-sm font-medium">More Reports</span>
           </TabsTrigger>
         </TabsList>
