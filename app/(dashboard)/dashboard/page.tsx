@@ -305,7 +305,7 @@ export default function DashboardPage() {
           Welcome back, {profile?.full_name}
         </h1>
         <p className="text-slate-600 dark:text-slate-400 mt-1">
-          {profile?.role?.display_name || 'No Role Assigned'}
+          {isSuperAdmin ? 'SuperAdmin' : (profile?.role?.display_name || 'No Role Assigned')}
         </p>
       </div>
 

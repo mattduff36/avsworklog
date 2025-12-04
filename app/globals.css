@@ -418,14 +418,6 @@
     border-color: #F1D64A;
   }
   
-  /* Force dark text on any element with yellow background */
-  .bg-avs-yellow,
-  .bg-avs-yellow *,
-  .bg-avs-yellow svg,
-  .bg-avs-yellow span {
-    color: rgb(15 23 42) !important; /* Dark slate text - same as sidebar */
-  }
-  
   /* Timesheet Colors */
   .bg-timesheet {
     background-color: hsl(var(--timesheet-primary));
@@ -936,3 +928,11 @@ input[type="date"]::-webkit-datetime-edit-year-field {
   .border-2 { border-width: 1.6px !important; } /* 2px -> 1.6px */
 }
 
+/* CRITICAL: Force dark text on ALL yellow backgrounds - MUST come last to override everything */
+.bg-avs-yellow,
+.bg-avs-yellow *,
+.bg-avs-yellow svg,
+.bg-avs-yellow span,
+.bg-avs-yellow .text-slate-900 {
+  color: rgb(15 23 42) !important; /* Dark slate text - same as sidebar */
+}
