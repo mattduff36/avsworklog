@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
 import { 
   FileText, 
   Calendar, 
@@ -18,9 +19,27 @@ import {
   FileArchive
 } from 'lucide-react';
 
+interface BulkDownloadProgress {
+  isDownloading: boolean;
+  current: number;
+  total: number;
+  currentPart: number;
+  totalParts: number;
+  status: string;
+}
+
 export default function ReportsPage() {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('timesheets');
+  const [bulkProgress, setBulkProgress] = useState<BulkDownloadProgress>({
+    isDownloading: false,
+    current: 0,
+    total: 0,
+    currentPart: 1,
+    totalParts: 1,
+    status: '',
+  });
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Form state
   const [dateFrom, setDateFrom] = useState('');
@@ -71,6 +90,124 @@ export default function ReportsPage() {
       alert('Failed to download report');
     } finally {
       setDownloading(null);
+    }
+  };
+
+  const downloadBulkInspectionPDFs = async () => {
+    // Create abort controller for potential cancellation
+    abortControllerRef.current = new AbortController();
+    
+    setBulkProgress({
+      isDownloading: true,
+      current: 0,
+      total: 0,
+      currentPart: 1,
+      totalParts: 1,
+      status: 'Fetching inspections...',
+    });
+
+    try {
+      const response = await fetch('/api/reports/inspections/bulk-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ dateFrom, dateTo }),
+        signal: abortControllerRef.current.signal,
+      });
+
+      if (!response.ok || !response.body) {
+        const error = await response.json();
+        alert(error.error || 'Failed to generate bulk PDFs');
+        setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const text = decoder.decode(value, { stream: true });
+        const lines = text.split('\n').filter(line => line.trim());
+
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line);
+
+            if (data.error) {
+              alert(data.error);
+              setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
+              return;
+            }
+
+            if (data.type === 'init') {
+              setBulkProgress(prev => ({
+                ...prev,
+                total: data.total,
+                totalParts: data.numParts,
+              }));
+            }
+
+            if (data.type === 'progress') {
+              setBulkProgress(prev => ({
+                ...prev,
+                current: data.current,
+                total: data.total,
+                currentPart: data.currentPart,
+                totalParts: data.totalParts,
+              }));
+            }
+
+            if (data.type === 'complete') {
+              // Convert base64 to blob and download
+              const binaryString = atob(data.data);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+              const blob = new Blob([bytes], { type: data.contentType });
+              
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = data.fileName;
+              document.body.appendChild(a);
+              a.click();
+              window.URL.revokeObjectURL(url);
+              document.body.removeChild(a);
+
+              setBulkProgress({
+                isDownloading: false,
+                current: 0,
+                total: 0,
+                currentPart: 1,
+                totalParts: 1,
+                status: '',
+              });
+            }
+          } catch (parseError) {
+            console.error('Error parsing stream data:', parseError);
+          }
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('Download cancelled');
+      } else {
+        console.error('Error downloading bulk PDFs:', error);
+        alert('Failed to download bulk PDFs');
+      }
+      setBulkProgress({
+        isDownloading: false,
+        current: 0,
+        total: 0,
+        currentPart: 1,
+        totalParts: 1,
+        status: '',
+      });
     }
   };
 
