@@ -175,12 +175,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
   
+  // Read request body BEFORE creating stream to avoid race condition
+  const body = await request.json();
+  const { dateFrom, dateTo } = body;
+  
   const stream = new ReadableStream({
     async start(controller) {
       try {
         const supabase = await createClient();
-        const body = await request.json();
-        const { dateFrom, dateTo } = body;
 
         // Validate parameters
         if (!dateFrom || !dateTo) {
