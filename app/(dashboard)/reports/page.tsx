@@ -446,10 +446,16 @@ export default function ReportsPage() {
                     </p>
                     {bulkProgress.isDownloading && (
                       <div className="space-y-2">
-                        <Progress value={(bulkProgress.current / bulkProgress.total) * 100} />
+                        <Progress value={bulkProgress.total > 0 ? (bulkProgress.current / bulkProgress.total) * 100 : 0} />
                         <p className="text-xs text-slate-500 dark:text-slate-400">
-                          Processing {bulkProgress.current} of {bulkProgress.total} inspections
-                          {bulkProgress.totalParts > 1 && ` (Part ${bulkProgress.currentPart}/${bulkProgress.totalParts})`}
+                          {bulkProgress.total > 0 ? (
+                            <>
+                              Processing {bulkProgress.current} of {bulkProgress.total} inspections
+                              {bulkProgress.totalParts > 1 && ` (Part ${bulkProgress.currentPart}/${bulkProgress.totalParts})`}
+                            </>
+                          ) : (
+                            'Initializing...'
+                          )}
                         </p>
                       </div>
                     )}
