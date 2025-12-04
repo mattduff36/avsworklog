@@ -261,19 +261,7 @@ export async function POST(request: NextRequest) {
           for (let i = 0; i < chunk.length; i++) {
             const inspection = chunk[i];
 
-            // Fetch inspection items
-            const { data: items, error: itemsError } = await supabase
-              .from('inspection_items')
-              .select('*')
-              .eq('inspection_id', inspection.id)
-              .order('item_number', { ascending: true });
-
-            if (itemsError || !items || items.length === 0) {
-              console.error(`Failed to fetch items for inspection ${inspection.id}:`, itemsError);
-              continue;
-            }
-
-            // Only increment and report progress after successful item fetch
+            // Always increment counter for every inspection attempted
             processedCount++;
             
             // Send progress update
@@ -284,6 +272,18 @@ export async function POST(request: NextRequest) {
               currentPart: chunkIndex + 1,
               totalParts: numParts
             }) + '\n'));
+
+            // Fetch inspection items
+            const { data: items, error: itemsError } = await supabase
+              .from('inspection_items')
+              .select('*')
+              .eq('inspection_id', inspection.id)
+              .order('item_number', { ascending: true });
+
+            if (itemsError || !items || items.length === 0) {
+              console.error(`Failed to fetch items for inspection ${inspection.id}:`, itemsError);
+              continue; // Skip PDF generation but progress was already reported
+            }
 
             // Determine which PDF template to use
             const categoryName = (inspection as any).vehicle?.vehicle_categories?.name;
