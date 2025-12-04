@@ -285,6 +285,46 @@ export default function ReportsPage() {
                 </div>
               </CardContent>
             </Card>
+
+            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                      <FileArchive className="h-5 w-5" />
+                      Bulk Inspection PDFs
+                    </h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+                      Download all inspection reports as individual PDFs (merged or zipped)
+                    </p>
+                    {bulkProgress.isDownloading && (
+                      <div className="space-y-2">
+                        <Progress value={(bulkProgress.current / bulkProgress.total) * 100} />
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Processing {bulkProgress.current} of {bulkProgress.total} inspections
+                          {bulkProgress.totalParts > 1 && ` (Part ${bulkProgress.currentPart}/${bulkProgress.totalParts})`}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    size="lg"
+                    className="bg-inspection hover:bg-inspection-dark text-white ml-4 transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
+                    onClick={downloadBulkInspectionPDFs}
+                    disabled={bulkProgress.isDownloading}
+                  >
+                    {bulkProgress.isDownloading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <>
+                        <Download className="h-5 w-5 mr-2" />
+                        Download
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
