@@ -71,9 +71,10 @@ export default function ReportsPage() {
     const lastWeekEnd = new Date(today);
     lastWeekEnd.setDate(today.getDate() - today.getDay() - (today.getDay() === 0 ? 0 : 1)); // Last Sunday (or today if Sunday)
     const lastWeekStart = getMonday(lastWeekEnd);
+    const lastWeekSunday = getSunday(lastWeekStart); // Get the actual Sunday (Mon + 6 days = 7 days total)
     
     setDateFrom(lastWeekStart.toISOString().split('T')[0]);
-    setDateTo(lastWeekEnd.toISOString().split('T')[0]);
+    setDateTo(lastWeekSunday.toISOString().split('T')[0]);
   };
 
   const setLastMonth = () => {
