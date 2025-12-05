@@ -46,14 +46,44 @@ export default function ReportsPage() {
   const [dateTo, setDateTo] = useState('');
 
   useEffect(() => {
-    // Set default date range to last 30 days
-    const today = new Date();
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(today.getDate() - 30);
-    
-    setDateFrom(thirtyDaysAgo.toISOString().split('T')[0]);
-    setDateTo(today.toISOString().split('T')[0]);
+    // Set default date range to last week (Mon-Sun of previous week)
+    setLastWeek();
   }, []);
+
+  // Helper to get Monday of a given date's week
+  const getMonday = (date: Date) => {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+    return new Date(d.setDate(diff));
+  };
+
+  // Helper to get Sunday of a given date's week
+  const getSunday = (date: Date) => {
+    const monday = getMonday(date);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    return sunday;
+  };
+
+  const setLastWeek = () => {
+    const today = new Date();
+    const lastWeekEnd = new Date(today);
+    lastWeekEnd.setDate(today.getDate() - today.getDay() - (today.getDay() === 0 ? 0 : 1)); // Last Sunday (or today if Sunday)
+    const lastWeekStart = getMonday(lastWeekEnd);
+    
+    setDateFrom(lastWeekStart.toISOString().split('T')[0]);
+    setDateTo(lastWeekEnd.toISOString().split('T')[0]);
+  };
+
+  const setLastMonth = () => {
+    const today = new Date();
+    const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+    
+    setDateFrom(lastMonthStart.toISOString().split('T')[0]);
+    setDateTo(lastMonthEnd.toISOString().split('T')[0]);
+  };
 
   const downloadReport = async (
     endpoint: string,
@@ -305,7 +335,7 @@ export default function ReportsPage() {
             Report Date Range
           </CardTitle>
           <CardDescription className="text-slate-600 dark:text-slate-400">
-            Select the date range for generating reports (default: last 30 days)
+            Select the date range for generating reports (default: last week)
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
@@ -329,6 +359,25 @@ export default function ReportsPage() {
                 onChange={(e) => setDateTo(e.target.value)}
               />
             </div>
+          </div>
+          
+          <div className="flex gap-2 mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={setLastWeek}
+              className="text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              Last Week
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={setLastMonth}
+              className="text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              Last Month
+            </Button>
           </div>
         </CardContent>
       </Card>
