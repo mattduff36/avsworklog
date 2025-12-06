@@ -1,19 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient as createServerClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 
 /**
  * POST /api/errors/report
  * Report an error from a user - creates a notification for admin
+ * 
+ * NOTE: This endpoint uses the service role key to bypass RLS policies
+ * since error reporting is an administrative function that all authenticated
+ * users should be able to use, regardless of their role.
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    // First verify the user is authenticated using their session
+    const authClient = await createServerClient();
+    const { data: { user }, error: userError } = await authClient.auth.getUser();
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Use service role client for database operations to bypass RLS
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     // Get user's profile
     const { data: profile } = await supabase

@@ -272,7 +272,7 @@ export async function POST(request: NextRequest) {
 
             // Track progress for ALL inspections (even skipped ones)
             processedCount++;
-            
+
             if (itemsError || !items || items.length === 0) {
               console.error(`Skipping inspection ${inspection.id} - no items found:`, itemsError);
               // Send progress update for skipped inspection
