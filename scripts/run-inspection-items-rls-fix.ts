@@ -96,7 +96,7 @@ async function runInspectionItemsRLSFix() {
     if (policies.length === 0) {
       console.log('   ⚠️  No policies found - this might be an issue!');
     } else {
-      policies.forEach((policy: any) => {
+      policies.forEach((policy: { policyname: string; cmd: string }) => {
         const cmdIcon = 
           policy.cmd === 'SELECT' ? '👁️' :
           policy.cmd === 'INSERT' ? '➕' :
@@ -145,16 +145,22 @@ async function runInspectionItemsRLSFix() {
     console.log('🎉 Done! Inspection items RLS policies are fixed');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.error('❌ MIGRATION FAILED');
     console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    console.error('Error:', error.message);
-    if (error.detail) {
-      console.error('Details:', error.detail);
-    }
-    if (error.hint) {
-      console.error('Hint:', error.hint);
+    
+    if (error instanceof Error) {
+      console.error('Error:', error.message);
+      const pgError = error as Error & { detail?: string; hint?: string };
+      if (pgError.detail) {
+        console.error('Details:', pgError.detail);
+      }
+      if (pgError.hint) {
+        console.error('Hint:', pgError.hint);
+      }
+    } else {
+      console.error('Unknown error:', error);
     }
     
     // Note: Policies can be dropped and recreated, so "already exists" is not expected
