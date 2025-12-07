@@ -297,6 +297,10 @@ Proprietary - A&V Squires Plant Co. Ltd.
 
 ## Version
 
+**v1.1.2** - Emergency Repository Recovery (December 2025)
+- Restored correct codebase after external overwrite
+- Removed obsolete database export files
+
 **v1.1.1** - Bug Fixes & Improvements (November 2025)
 - Fixed admin account creation issues
 - Improved user management functionality
