@@ -492,40 +492,10 @@ function NewInspectionContent() {
 
       // Update existing draft or create new inspection
       if (existingInspectionId) {
-        // Update existing inspection
-        type InspectionUpdate = Database['public']['Tables']['vehicle_inspections']['Update'];
-        const inspectionUpdate: InspectionUpdate = {
-          vehicle_id: vehicleId,
-          user_id: selectedEmployeeId,
-          inspection_date: formatDateISO(startDate),
-          inspection_end_date: weekEnding,
-          current_mileage: parseInt(currentMileage),
-          status,
-          submitted_at: status === 'submitted' ? new Date().toISOString() : null,
-          signature_data: signatureData || null,
-          signed_at: signatureData ? new Date().toISOString() : null,
-          updated_at: new Date().toISOString(),
-        };
-
-        const { data: updatedInspection, error: updateError } = await supabase
-          .from('vehicle_inspections')
-          .update(inspectionUpdate)
-          .eq('id', existingInspectionId)
-          .select();
-
-        if (updateError) {
-          console.error('Update error:', updateError);
-          throw updateError;
-        }
+        // IMPORTANT: Delete and insert items BEFORE updating inspection status
+        // This ensures RLS policies work correctly (they require status = 'draft')
         
-        if (!updatedInspection || updatedInspection.length === 0) {
-          throw new Error('Failed to update inspection - no rows returned. You may not have permission to edit this inspection.');
-        }
-        
-        inspection = updatedInspection[0];
-
-        // Delete existing items before inserting new ones
-        // First, get all existing items to determine which ones to remove
+        // Delete existing items first (while inspection is still in 'draft' status)
         console.log(`Fetching existing items for inspection ${existingInspectionId}...`);
         const { data: existingItems, error: fetchError } = await supabase
           .from('inspection_items')
@@ -537,7 +507,6 @@ function NewInspectionContent() {
           throw new Error(`Failed to fetch existing items: ${fetchError.message}`);
         }
 
-        // Delete all existing items - we'll use upsert for the new ones
         if (existingItems && existingItems.length > 0) {
           console.log(`Deleting ${existingItems.length} existing items...`);
           const { error: deleteError } = await supabase
@@ -553,6 +522,11 @@ function NewInspectionContent() {
         } else {
           console.log('No existing items to delete');
         }
+
+        // Set inspection reference for items insertion (below)
+        inspection = { id: existingInspectionId };
+
+        // Note: Inspection update happens AFTER items are inserted (see below)
       } else {
         // Create new inspection
         const { data: newInspection, error: insertError } = await supabase
@@ -596,14 +570,11 @@ function NewInspectionContent() {
       if (items.length > 0) {
         console.log(`Saving ${items.length} inspection items for inspection ${inspection.id}...`);
         
-        // Use upsert to handle any potential duplicates gracefully
-        // onConflict parameter specifies which columns to check for conflicts
+        // Use regular INSERT since we already deleted all existing items
+        // This avoids RLS policy issues with UPSERT triggering UPDATE policies
         const { data, error: itemsError } = await supabase
           .from('inspection_items')
-          .upsert(items, {
-            onConflict: 'inspection_id,item_number,day_of_week',
-            ignoreDuplicates: false, // Update existing records instead of ignoring
-          })
+          .insert(items)
           .select();
 
         if (itemsError) {
@@ -616,6 +587,41 @@ function NewInspectionContent() {
         console.log(`Successfully saved ${insertedItems.length} items`);
       } else {
         console.warn('No items to save - inspection has no completed items');
+      }
+
+      // NOW update the inspection (after items are saved)
+      // This is important for existing inspections to avoid RLS issues
+      if (existingInspectionId) {
+        type InspectionUpdate = Database['public']['Tables']['vehicle_inspections']['Update'];
+        const inspectionUpdate: InspectionUpdate = {
+          vehicle_id: vehicleId,
+          user_id: selectedEmployeeId,
+          inspection_date: formatDateISO(startDate),
+          inspection_end_date: weekEnding,
+          current_mileage: parseInt(currentMileage),
+          status,
+          submitted_at: status === 'submitted' ? new Date().toISOString() : null,
+          signature_data: signatureData || null,
+          signed_at: signatureData ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        };
+
+        const { data: updatedInspection, error: updateError } = await supabase
+          .from('vehicle_inspections')
+          .update(inspectionUpdate)
+          .eq('id', existingInspectionId)
+          .select();
+
+        if (updateError) {
+          console.error('Update error:', updateError);
+          throw updateError;
+        }
+        
+        if (!updatedInspection || updatedInspection.length === 0) {
+          throw new Error('Failed to update inspection - no rows returned. You may not have permission to edit this inspection.');
+        }
+        
+        inspection = updatedInspection[0];
       }
 
       // Auto-create actions for failed items (only when submitting, not drafting)
