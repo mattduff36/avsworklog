@@ -5,7 +5,15 @@ import { sendErrorReportEmail } from '@/lib/utils/email';
 
 /**
  * POST /api/errors/report
- * Report an error from a user - creates a notification for admin
+ * Report an error from a user - creates a notification for admin@mpdee.co.uk ONLY
+ * 
+ * SECURITY: Error reports are ONLY sent to admin@mpdee.co.uk. No other user
+ * will ever receive error report notifications.
+ * 
+ * Flow:
+ * 1. Finds admin@mpdee.co.uk user account by email
+ * 2. If found: Creates in-app notification for that account only
+ * 3. If not found or notification fails: Sends email to admin@mpdee.co.uk
  * 
  * NOTE: This endpoint uses the service role key to bypass RLS policies
  * since error reporting is an administrative function that all authenticated
@@ -40,50 +48,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing error_message' }, { status: 400 });
     }
 
-    // Get admin user ID - find a user who can receive error reports
-    // Priority: 1) super_admin, 2) admin role, 3) any manager/admin role
+    // Find admin user ID - ONLY admin@mpdee.co.uk should receive error reports
+    // We find the user by email to ensure it's specifically your account
     let adminUserId: string | null = null;
+    const adminEmail = 'admin@mpdee.co.uk';
 
-    // Strategy 1: Find super admin user first (highest priority)
-    const { data: superAdmin } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('super_admin', true)
-      .limit(1)
-      .maybeSingle();
-
-    if (superAdmin?.id) {
-      adminUserId = superAdmin.id;
-    } else {
-      // Strategy 2: Get all profiles with their roles and find admin/manager
-      // Since Supabase query builder has limitations with complex joins,
-      // we fetch profiles with roles and filter in JavaScript
-      const { data: profilesWithRoles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, role_id, roles(name, is_manager_admin)')
-        .not('role_id', 'is', null)
-        .limit(100);
-
-      if (!profilesError && profilesWithRoles && profilesWithRoles.length > 0) {
-        // Find admin user: prioritize admin role name, then is_manager_admin
-        const adminProfile = profilesWithRoles.find((p: any) => {
-          if (!p.roles) return false;
-          const role = Array.isArray(p.roles) ? p.roles[0] : p.roles;
-          return role && (role.name === 'admin' || role.is_manager_admin === true);
-        });
-
-        if (adminProfile?.id) {
-          adminUserId = adminProfile.id;
+    try {
+      // Use admin API to find user by email (requires service role)
+      const { data: authUsers, error: listError } = await supabase.auth.admin.listUsers();
+      
+      if (!listError && authUsers?.users) {
+        const adminUser = authUsers.users.find(u => u.email === adminEmail);
+        if (adminUser?.id) {
+          adminUserId = adminUser.id;
+          console.log(`Found admin user: ${adminEmail} (ID: ${adminUserId})`);
+        } else {
+          console.warn(`Admin user not found: ${adminEmail}`);
         }
+      } else {
+        console.error('Error listing users:', listError);
       }
+    } catch (error) {
+      console.error('Error finding admin user:', error);
     }
     
     if (!adminUserId) {
-      console.warn('No admin user found in system, will use email fallback');
-      // Don't return error here - we'll try email fallback instead
+      console.warn(`Admin user ${adminEmail} not found, will use email fallback only`);
     }
 
-    // Try to create in-app notification first (only if admin user found)
+    // Try to create in-app notification first (ONLY for admin@mpdee.co.uk)
+    // If admin@mpdee.co.uk account is found, create notification
+    // Otherwise, skip notification and go straight to email
     let notificationSuccess = false;
     if (adminUserId) {
       try {
