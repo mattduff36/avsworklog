@@ -39,31 +39,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing error_message' }, { status: 400 });
     }
 
-    // Get admin user ID - find a user with admin role
-    const { data: adminByRole, error: adminError } = await supabase
+    // Get admin user ID - find a user who can receive error reports
+    // Priority: 1) super_admin, 2) admin role, 3) any manager/admin role
+    let adminUserId: string | null = null;
+
+    // Strategy 1: Find super admin user first (highest priority)
+    const { data: superAdmin } = await supabase
       .from('profiles')
-      .select(`
-        id,
-        roles!inner (
-          name
-        )
-      `)
-      .eq('roles.name', 'admin')
+      .select('id')
+      .eq('super_admin', true)
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    if (adminError || !adminByRole) {
-      console.error('Admin profile not found:', adminError?.message);
-      // Last resort fallback - hardcoded admin ID (Matt Duffill)
-      // This should be replaced with env variable in production
-      console.log('Using fallback admin lookup...');
+    if (superAdmin?.id) {
+      adminUserId = superAdmin.id;
+    } else {
+      // Strategy 2: Get all profiles with their roles and find admin/manager
+      // Since Supabase query builder has limitations with complex joins,
+      // we fetch profiles with roles and filter in JavaScript
+      const { data: profilesWithRoles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, role_id, roles(name, is_manager_admin)')
+        .not('role_id', 'is', null)
+        .limit(100);
+
+      if (!profilesError && profilesWithRoles && profilesWithRoles.length > 0) {
+        // Find admin user: prioritize admin role name, then is_manager_admin
+        const adminProfile = profilesWithRoles.find((p: any) => {
+          if (!p.roles) return false;
+          const role = Array.isArray(p.roles) ? p.roles[0] : p.roles;
+          return role && (role.name === 'admin' || role.is_manager_admin === true);
+        });
+
+        if (adminProfile?.id) {
+          adminUserId = adminProfile.id;
+        }
+      }
     }
-
-    const adminUserId = adminByRole?.id;
     
     if (!adminUserId) {
       console.error('No admin user found in system');
-      return NextResponse.json({ error: 'Admin not found' }, { status: 500 });
+      return NextResponse.json({ 
+        error: 'Admin not found - unable to deliver error report' 
+      }, { status: 500 });
     }
 
     // Create message

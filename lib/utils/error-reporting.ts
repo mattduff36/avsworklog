@@ -31,7 +31,9 @@ export async function reportError(options: ReportErrorOptions): Promise<void> {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to report error');
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.error || 'Failed to report error';
+      throw new Error(errorMessage);
     }
 
     toast.success('Error reported', {
