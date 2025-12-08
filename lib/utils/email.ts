@@ -749,6 +749,135 @@ export async function sendTimesheetAdjustmentEmail(params: SendTimesheetAdjustme
 }
 
 /**
+ * Send error report email to admin
+ */
+interface SendErrorReportEmailParams {
+  errorMessage: string;
+  errorCode?: string;
+  userName: string;
+  userEmail: string;
+  pageUrl?: string;
+  userAgent?: string;
+  additionalContext?: Record<string, unknown>;
+}
+
+export async function sendErrorReportEmail(params: SendErrorReportEmailParams): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  const { errorMessage, errorCode, userName, userEmail, pageUrl, userAgent, additionalContext } = params;
+  
+  try {
+    // Check if Resend API key is configured
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      console.error('RESEND_API_KEY not configured');
+      return {
+        success: false,
+        error: 'Email service not configured'
+      };
+    }
+    
+    const adminEmail = 'admin@mpdee.co.uk';
+    const subject = `🐛 Error Report: ${errorMessage.substring(0, 50)}${errorMessage.length > 50 ? '...' : ''}`;
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #dc2626; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0; color: #ffffff;">🐛 Error Report</h1>
+          </div>
+          
+          <div style="background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+            <h2 style="color: #dc2626; margin-top: 0;">User-Reported Error</h2>
+            
+            <p>A user has reported an error in the application.</p>
+            
+            <div style="background-color: #fff; border: 2px solid #dc2626; border-radius: 8px; padding: 20px; margin: 20px 0;">
+              <h3 style="margin: 0 0 15px 0; color: #252525;">Error Details</h3>
+              
+              <p style="margin: 10px 0;"><strong>User:</strong> ${userName} (${userEmail})</p>
+              
+              <p style="margin: 10px 0;"><strong>Error Message:</strong></p>
+              <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin: 10px 0;">
+                <p style="margin: 0; color: #991b1b; white-space: pre-wrap;">${errorMessage}</p>
+              </div>
+              
+              ${errorCode ? `<p style="margin: 10px 0;"><strong>Error Code:</strong> <code style="background-color: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${errorCode}</code></p>` : ''}
+              
+              <p style="margin: 10px 0;"><strong>Page URL:</strong> <a href="${pageUrl || 'Unknown'}" style="color: #3b82f6; text-decoration: none;">${pageUrl || 'Unknown'}</a></p>
+              
+              ${userAgent ? `<p style="margin: 10px 0;"><strong>User Agent:</strong> <span style="font-size: 12px; color: #6b7280;">${userAgent}</span></p>` : ''}
+              
+              ${additionalContext ? `
+                <p style="margin: 15px 0 5px 0;"><strong>Additional Context:</strong></p>
+                <pre style="background-color: #f3f4f6; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 12px; color: #374151;">${JSON.stringify(additionalContext, null, 2)}</pre>
+              ` : ''}
+            </div>
+            
+            <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
+              <p style="margin: 0; font-weight: bold; color: #92400e;">⚠️ Action Required</p>
+              <p style="margin: 5px 0 0 0; color: #92400e;">Please investigate this error and take appropriate action. This error was reported directly by the user from the application.</p>
+            </div>
+            
+            <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+              <strong>Note:</strong> This email was sent as a fallback because the in-app notification system was unavailable.
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin-top: 20px; color: #9ca3af; font-size: 12px;">
+            <p>© ${new Date().getFullYear()} A&V Squires Plant Co. Ltd. All rights reserved.</p>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    // Send email using Resend API
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: process.env.RESEND_FROM_EMAIL || 'AVS Worklog <onboarding@resend.dev>',
+        to: [adminEmail],
+        subject,
+        html: htmlContent
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('Resend API error:', error);
+      return {
+        success: false,
+        error: `Failed to send email: ${error.message || 'Unknown error'}`
+      };
+    }
+    
+    const data = await response.json();
+    console.log('Error report email sent successfully:', data);
+    
+    return {
+      success: true
+    };
+    
+  } catch (error: any) {
+    console.error('Error sending error report email:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to send email'
+    };
+  }
+}
+
+/**
  * Send test emails to admin for template approval
  */
 export async function sendTestTimesheetEmails(adminEmail: string): Promise<{

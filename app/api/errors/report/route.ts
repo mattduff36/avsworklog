@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
+import { sendErrorReportEmail } from '@/lib/utils/email';
 
 /**
  * POST /api/errors/report
@@ -78,20 +79,22 @@ export async function POST(request: NextRequest) {
     }
     
     if (!adminUserId) {
-      console.error('No admin user found in system');
-      return NextResponse.json({ 
-        error: 'Admin not found - unable to deliver error report' 
-      }, { status: 500 });
+      console.warn('No admin user found in system, will use email fallback');
+      // Don't return error here - we'll try email fallback instead
     }
 
-    // Create message
-    const { data: message, error: messageError } = await supabase
-      .from('messages')
-      .insert({
-        type: 'REMINDER',
-        priority: 'HIGH',
-        subject: `🐛 Error Report: ${error_message.substring(0, 50)}${error_message.length > 50 ? '...' : ''}`,
-        body: `**User:** ${profile?.full_name || 'Unknown'} (${user.email})
+    // Try to create in-app notification first (only if admin user found)
+    let notificationSuccess = false;
+    if (adminUserId) {
+      try {
+        // Create message
+        const { data: message, error: messageError } = await supabase
+          .from('messages')
+          .insert({
+            type: 'REMINDER',
+            priority: 'HIGH',
+            subject: `🐛 Error Report: ${error_message.substring(0, 50)}${error_message.length > 50 ? '...' : ''}`,
+            body: `**User:** ${profile?.full_name || 'Unknown'} (${user.email})
 
 **Error:** ${error_message}
 
@@ -104,33 +107,73 @@ ${additional_context ? `**Additional Context:**\n${JSON.stringify(additional_con
 
 ---
 *This error was reported by the user from the application.*`,
-        sender_id: user.id,
-      })
-      .select()
-      .single();
+            sender_id: user.id,
+          })
+          .select()
+          .single();
 
-    if (messageError) {
-      console.error('Error creating message:', messageError);
-      throw messageError;
+        if (messageError) {
+          console.error('Error creating message:', messageError);
+          throw messageError;
+        }
+
+        // Create recipient entry for admin
+        const { error: recipientError } = await supabase
+          .from('message_recipients')
+          .insert({
+            message_id: message.id,
+            user_id: adminUserId,
+            status: 'PENDING',
+          });
+
+        if (recipientError) {
+          console.error('Error creating recipient:', recipientError);
+          throw recipientError;
+        }
+
+        notificationSuccess = true;
+        console.log('Error report notification created successfully');
+      } catch (notificationError) {
+        console.error('Failed to create in-app notification, falling back to email:', notificationError);
+        // Fall through to email fallback
+      }
+    } else {
+      console.log('No admin user found, skipping notification and using email fallback');
     }
 
-    // Create recipient entry for admin
-    const { error: recipientError } = await supabase
-      .from('message_recipients')
-      .insert({
-        message_id: message.id,
-        user_id: adminUserId,
-        status: 'PENDING',
+    // If notification failed, send email as fallback
+    if (!notificationSuccess) {
+      console.log('Sending error report via email fallback to admin@mpdee.co.uk');
+      const emailResult = await sendErrorReportEmail({
+        errorMessage: error_message,
+        errorCode: error_code,
+        userName: profile?.full_name || 'Unknown',
+        userEmail: user.email || 'Unknown',
+        pageUrl: page_url,
+        userAgent: user_agent,
+        additionalContext: additional_context,
       });
 
-    if (recipientError) {
-      console.error('Error creating recipient:', recipientError);
-      throw recipientError;
+      if (!emailResult.success) {
+        console.error('Email fallback also failed:', emailResult.error);
+        return NextResponse.json({ 
+          error: 'Failed to deliver error report via notification or email',
+          details: emailResult.error
+        }, { status: 500 });
+      }
+
+      console.log('Error report sent via email fallback successfully');
+      return NextResponse.json({ 
+        success: true,
+        message: 'Error reported successfully (sent via email)',
+        method: 'email'
+      });
     }
 
     return NextResponse.json({ 
       success: true,
-      message: 'Error reported successfully'
+      message: 'Error reported successfully',
+      method: 'notification'
     });
 
   } catch (error) {
