@@ -165,11 +165,18 @@ export function Navbar() {
 
   // Fetch notification count (only when user is authenticated)
   useEffect(() => {
-    // Don't fetch if not logged in
-    if (!user) return;
+    // Don't fetch if not logged in or user ID is not available
+    if (!user?.id) return;
 
     async function fetchNotificationCount() {
       try {
+        // Double-check user is still authenticated before making request
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (!currentUser?.id) {
+          setUnreadCount(0);
+          return;
+        }
+
         const response = await fetch('/api/messages/notifications');
         
         // Handle 401 gracefully - user may have just logged out
@@ -177,17 +184,34 @@ export function Navbar() {
           setUnreadCount(0);
           return;
         }
+
+        // Handle other HTTP errors
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         
         const data = await response.json();
         if (data.success) {
           setUnreadCount(data.unread_count || 0);
         }
       } catch (error) {
-        // Only log network errors, not auth errors
-        if (error instanceof TypeError && error.message.includes('fetch')) {
-          console.error('Network error fetching notifications:', error);
+        // Improved error logging with context
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorDetails = {
+          message: errorMessage,
+          type: error instanceof TypeError ? 'Network' : 'Application',
+          endpoint: '/api/messages/notifications',
+          userId: user?.id || 'unknown',
+          timestamp: new Date().toISOString()
+        };
+
+        // Only log if error is not a simple network timeout or user logged out
+        if (error instanceof Error && !error.message.includes('401')) {
+          console.error('Error fetching notifications:', errorDetails);
         }
-        // Silently fail for other errors - don't spam console
+        
+        // Set count to 0 on error to prevent showing stale data
+        setUnreadCount(0);
       }
     }
 
@@ -196,7 +220,7 @@ export function Navbar() {
     // Poll every 60 seconds for new notifications
     const interval = setInterval(fetchNotificationCount, 60000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user?.id, supabase]);
 
   const handleSignOut = async () => {
     try {

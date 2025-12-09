@@ -10,6 +10,7 @@ import { ArrowLeft, Loader2, FileText, Download, CheckCircle2, Mail, ExternalLin
 import Link from 'next/link';
 import { SignRAMSModal } from '@/components/rams/SignRAMSModal';
 import { toast } from 'sonner';
+import { RAMSErrorBoundary } from '@/components/rams/RAMSErrorBoundary';
 
 interface RAMSDocument {
   id: string;
@@ -71,8 +72,15 @@ export default function ReadRAMSPage() {
         .single();
 
       if (docError || !doc) {
-        console.error('Error fetching document:', docError);
-        setError('Document not found');
+        const errorMessage = docError instanceof Error ? docError.message : 
+                           docError?.message || 'Document not found';
+        console.error('Error fetching RAMS document:', {
+          message: errorMessage,
+          documentId,
+          error: docError,
+          timestamp: new Date().toISOString()
+        });
+        setError('Document not found or you do not have permission to view it');
         return;
       }
 
@@ -104,8 +112,18 @@ export default function ReadRAMSPage() {
       }
 
     } catch (error) {
-      console.error('Error:', error);
-      setError('Failed to load document');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error loading RAMS document:', {
+        message: errorMessage,
+        documentId,
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : error,
+        timestamp: new Date().toISOString()
+      });
+      setError('Failed to load document. Please try refreshing the page.');
     } finally {
       setLoading(false);
     }
@@ -134,7 +152,15 @@ export default function ReadRAMSPage() {
           .eq('id', assignment.id);
 
         if (updateError) {
-          console.error('Error recording action:', updateError);
+          const errorMessage = updateError instanceof Error ? updateError.message : 
+                             updateError?.message || 'Unknown error';
+          console.error('Error recording RAMS action:', {
+            message: errorMessage,
+            assignmentId: assignment.id,
+            action,
+            error: updateError,
+            timestamp: new Date().toISOString()
+          });
           return;
         }
 
@@ -148,7 +174,17 @@ export default function ReadRAMSPage() {
           } : {})
         } : null);
       } catch (error) {
-        console.error('Error recording action:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Error recording RAMS action (outer catch):', {
+          message: errorMessage,
+          assignmentId: assignment?.id,
+          action,
+          error: error instanceof Error ? {
+            name: error.name,
+            message: error.message
+          } : error,
+          timestamp: new Date().toISOString()
+        });
       }
     }
   };
@@ -181,7 +217,18 @@ export default function ReadRAMSPage() {
       // Record action (only if assignment exists, not required for signed docs)
       await recordAction('downloaded', !!assignment);
     } catch (error) {
-      console.error('Error downloading document:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error downloading RAMS document:', {
+        message: errorMessage,
+        documentId,
+        documentTitle: ramsDocument?.title,
+        action: 'download',
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message
+        } : error,
+        timestamp: new Date().toISOString()
+      });
       setError('Failed to download document. Please try again or select a different option.');
     } finally {
       setActionInProgress(null);
@@ -214,8 +261,20 @@ export default function ReadRAMSPage() {
       // Record action (only if assignment exists, not required for signed docs)
       await recordAction('opened', !!assignment);
     } catch (error: any) {
-      console.error('Error opening document:', error);
-      setError(error.message || 'Failed to open document. Please try again or select a different option.');
+      const errorMessage = error instanceof Error ? error.message : 
+                          typeof error === 'string' ? error : 'Unknown error';
+      console.error('Error opening RAMS document:', {
+        message: errorMessage,
+        documentId,
+        documentTitle: ramsDocument?.title,
+        action: 'open',
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message
+        } : error,
+        timestamp: new Date().toISOString()
+      });
+      setError(errorMessage || 'Failed to open document. Please try again or select a different option.');
     } finally {
       setActionInProgress(null);
     }
@@ -243,8 +302,20 @@ export default function ReadRAMSPage() {
       // Record action (only if assignment exists, not required for signed docs)
       await recordAction('emailed', !!assignment);
     } catch (error: any) {
-      console.error('Error sending email:', error);
-      setError(error.message || 'Failed to send email. Please try again or select a different option.');
+      const errorMessage = error instanceof Error ? error.message : 
+                          typeof error === 'string' ? error : 'Unknown error';
+      console.error('Error sending RAMS email:', {
+        message: errorMessage,
+        documentId,
+        documentTitle: ramsDocument?.title,
+        action: 'email',
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message
+        } : error,
+        timestamp: new Date().toISOString()
+      });
+      setError(errorMessage || 'Failed to send email. Please try again or select a different option.');
     } finally {
       setActionInProgress(null);
     }
@@ -292,6 +363,7 @@ export default function ReadRAMSPage() {
   const canViewSigned = isSigned;
 
   return (
+    <RAMSErrorBoundary>
     <div className="flex flex-col min-h-screen">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 shadow-sm">
@@ -499,5 +571,6 @@ export default function ReadRAMSPage() {
       )}
 
     </div>
+    </RAMSErrorBoundary>
   );
 }
