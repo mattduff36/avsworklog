@@ -1,6 +1,7 @@
 /**
  * Global Error Logger
  * Captures and stores all application errors for debugging
+ * Automatically sends daily error summary email on first error of each day
  */
 
 import { createClient } from '@/lib/supabase/client';
@@ -25,8 +26,13 @@ class ErrorLogger {
   private queue: Omit<ErrorLog, 'id'>[] = [];
   private isProcessing = false;
   private isLogging = false; // Prevent recursive logging
+  private lastEmailSentDate: string | null = null; // Track last daily email sent
 
   private constructor() {
+    // Load last email sent date from localStorage
+    if (typeof window !== 'undefined') {
+      this.lastEmailSentDate = localStorage.getItem('lastErrorEmailSentDate');
+    }
     // Set up global error handlers
     if (typeof window !== 'undefined') {
       // Capture unhandled errors
@@ -165,11 +171,50 @@ class ErrorLogger {
         // Put items back in queue if insert failed
         this.queue.unshift(...batch);
         console.warn('Failed to save error logs to database:', error);
+      } else {
+        // After successfully logging error, check if we should send daily summary
+        this.checkAndSendDailySummary();
       }
     } catch (err) {
       console.warn('Error processing error queue:', err);
     } finally {
       this.isProcessing = false;
+    }
+  }
+
+  /**
+   * Check if this is the first error of a new day and send daily summary
+   */
+  private async checkAndSendDailySummary(): Promise<void> {
+    // Only run on client side
+    if (typeof window === 'undefined') return;
+
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+
+    // Check if we've already sent an email today
+    if (this.lastEmailSentDate === today) {
+      return; // Already sent today
+    }
+
+    // This is the first error of a new day - trigger the daily summary
+    try {
+      const response = await fetch('/api/errors/daily-summary', {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        // Update last sent date
+        this.lastEmailSentDate = today;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('lastErrorEmailSentDate', today);
+        }
+        console.log('Daily error summary email sent successfully');
+      } else {
+        console.warn('Failed to send daily error summary email');
+      }
+    } catch (err) {
+      // Silent fail - don't want email sending to break error logging
+      console.warn('Error sending daily summary:', err);
     }
   }
 
