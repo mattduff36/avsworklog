@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { formatFileSize } from '@/lib/utils/file-validation';
 import { RecordVisitorSignatureModal } from '@/components/rams/RecordVisitorSignatureModal';
+import { RAMSErrorBoundary } from '@/components/rams/RAMSErrorBoundary';
 
 interface RAMSDocument {
   id: string;
@@ -49,14 +50,26 @@ export default function RAMSPage() {
     try {
       // Fetch documents for all users (API handles permissions)
       const response = await fetch('/api/rams');
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch RAMS documents: HTTP ${response.status}`);
+      }
+      
       const data = await response.json();
 
       if (data.success) {
         setDocuments(data.documents);
         setFilteredDocuments(data.documents);
+      } else {
+        throw new Error(data.error || 'Failed to fetch RAMS documents');
       }
     } catch (error) {
-      console.error('Error fetching RAMS documents:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error fetching RAMS documents:', {
+        message: errorMessage,
+        timestamp: new Date().toISOString(),
+        endpoint: '/api/rams'
+      });
     } finally {
       setLoading(false);
     }
@@ -107,6 +120,7 @@ export default function RAMSPage() {
   }
 
   return (
+    <RAMSErrorBoundary>
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
@@ -304,6 +318,7 @@ export default function RAMSPage() {
         />
       )}
     </div>
+    </RAMSErrorBoundary>
   );
 }
 
