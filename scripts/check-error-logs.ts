@@ -1,114 +1,54 @@
-// Check error logs from database
-// Run: npx tsx scripts/check-error-logs.ts
+import { Client } from 'pg';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
 
-import { config } from 'dotenv';
-import { resolve } from 'path';
-import pg from 'pg';
-
-const { Client } = pg;
-
-config({ path: resolve(process.cwd(), '.env.local') });
-
-const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
-
-if (!connectionString) {
-  console.error('❌ Missing database connection string');
-  process.exit(1);
-}
+// Load environment variables
+dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
 
 async function checkErrorLogs() {
-  console.log('🔍 Checking Error Logs\n');
-
-  const url = new URL(connectionString);
+  const dbUrl = process.env.POSTGRES_URL_NON_POOLING;
   
+  if (!dbUrl) {
+    console.error('POSTGRES_URL_NON_POOLING not found in environment');
+    process.exit(1);
+  }
+
   const client = new Client({
-    host: url.hostname,
-    port: parseInt(url.port) || 5432,
-    database: url.pathname.slice(1),
-    user: url.username,
-    password: url.password,
-    ssl: { rejectUnauthorized: false }
+    connectionString: dbUrl,
+    ssl: { rejectUnauthorized: false },
   });
 
   try {
     await client.connect();
-    console.log('✅ Connected to database\n');
+    console.log('Connected to database\n');
 
-    // Get recent error logs with user info
-    const { rows: errors } = await client.query(`
+    // Query error logs from December 8th, 2025 at 11am onwards
+    const result = await client.query(`
       SELECT 
-        e.id,
-        e.timestamp,
-        e.error_type,
-        e.error_message,
-        e.component_name,
-        e.user_email,
-        e.page_url,
-        LEFT(e.user_agent, 30) as browser,
-        p.full_name as user_name
-      FROM error_logs e
-      LEFT JOIN profiles p ON e.user_id = p.id
-      ORDER BY e.timestamp DESC
-      LIMIT 50;
+        id, 
+        timestamp, 
+        error_type, 
+        error_message, 
+        error_stack,
+        component_name,
+        page_url,
+        user_id,
+        user_email,
+        user_agent,
+        additional_data
+      FROM error_logs
+      WHERE timestamp >= '2025-12-08 11:00:00'
+      ORDER BY timestamp DESC
     `);
 
-    console.log('📋 Recent Errors (Last 50):');
-    console.log('='.repeat(100));
-    
-    // Group by error message to see patterns
-    const errorGroups: Record<string, { count: number; users: string[]; lastSeen: string }> = {};
-    
-    errors.forEach((err: any) => {
-      const key = err.error_message.substring(0, 80);
-      if (!errorGroups[key]) {
-        errorGroups[key] = { count: 0, users: [], lastSeen: '' };
-      }
-      errorGroups[key].count++;
-      if (err.user_name && !errorGroups[key].users.includes(err.user_name)) {
-        errorGroups[key].users.push(err.user_name);
-      }
-      if (!errorGroups[key].lastSeen) {
-        errorGroups[key].lastSeen = err.timestamp;
-      }
-    });
+    console.log(`Found ${result.rows.length} error(s) from 08/12/2025 11:00 onwards:\n`);
+    console.log(JSON.stringify(result.rows, null, 2));
 
-    console.log('\n📊 Error Summary (Grouped):');
-    console.log('='.repeat(100));
-    
-    Object.entries(errorGroups)
-      .sort((a, b) => b[1].count - a[1].count)
-      .forEach(([msg, info]) => {
-        console.log(`\n[${info.count}x] ${msg}...`);
-        console.log(`    Last: ${new Date(info.lastSeen).toLocaleString()}`);
-        console.log(`    Users: ${info.users.slice(0, 5).join(', ')}${info.users.length > 5 ? '...' : ''}`);
-      });
-
-    // Show detailed view of unique errors
-    console.log('\n\n📝 Unique Error Types:');
-    console.log('='.repeat(100));
-    
-    const uniqueErrors = new Map<string, any>();
-    errors.forEach((err: any) => {
-      const key = err.error_message.substring(0, 50);
-      if (!uniqueErrors.has(key)) {
-        uniqueErrors.set(key, err);
-      }
-    });
-
-    uniqueErrors.forEach((err: any, key: string) => {
-      console.log(`\n🔴 ${err.error_type || 'Error'}: ${err.component_name || 'Unknown Component'}`);
-      console.log(`   Message: ${err.error_message}`);
-      console.log(`   Page: ${err.page_url}`);
-      console.log(`   User: ${err.user_name} (${err.user_email})`);
-      console.log(`   Time: ${new Date(err.timestamp).toLocaleString()}`);
-    });
-
-  } catch (error: any) {
-    console.error('❌ Error:', error.message);
-  } finally {
     await client.end();
+  } catch (error) {
+    console.error('Error:', error);
+    process.exit(1);
   }
 }
 
-checkErrorLogs().catch(console.error);
-
+checkErrorLogs();
