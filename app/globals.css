@@ -673,27 +673,37 @@
  */
 
 /* AlertDialog Overlay - semi-transparent backdrop */
-[data-radix-alert-dialog-overlay] {
+[data-radix-alert-dialog-overlay],
+[data-radix-alert-dialog-overlay][data-state],
+div[data-radix-alert-dialog-overlay] {
   background: rgba(0, 0, 0, 0.7) !important;
   z-index: 90 !important;
 }
 
-/* AlertDialog Content - completely opaque background */
-[data-radix-alert-dialog-content] {
+/* AlertDialog Content - completely opaque background - ALL POSSIBLE SELECTORS */
+[data-radix-alert-dialog-content],
+[data-radix-alert-dialog-content][data-state],
+div[data-radix-alert-dialog-content],
+[role="alertdialog"],
+[role="alertdialog"] > div {
   background: rgb(15 23 42) !important; /* slate-900 - completely opaque */
   background-color: rgb(15 23 42) !important; /* slate-900 - force opaque */
   border: 1px solid rgb(51 65 85) !important; /* slate-700 */
   z-index: 100 !important;
   opacity: 1 !important; /* Force full opacity */
+  backdrop-filter: none !important; /* Remove any blur effects */
 }
 
-/* Ensure AlertDialog content has no transparency */
+/* Ensure AlertDialog content has no transparency - class-based selectors */
 .alert-dialog-content,
-[class*="AlertDialogContent"] {
+[class*="AlertDialogContent"],
+[class*="alert-dialog"],
+div[class*="AlertDialog"] {
   background: rgb(15 23 42) !important; /* slate-900 */
   background-color: rgb(15 23 42) !important; /* slate-900 */
   opacity: 1 !important;
   border: 1px solid rgb(51 65 85) !important; /* slate-700 */
+  backdrop-filter: none !important;
 }
 
 /*
@@ -702,28 +712,59 @@
  * Regular dialogs (non-alert) should also be completely opaque.
  */
 
-/* Dialog Overlay - semi-transparent backdrop */
-[data-radix-dialog-overlay] {
+/* Dialog Overlay - semi-transparent backdrop - ALL POSSIBLE SELECTORS */
+[data-radix-dialog-overlay],
+[data-radix-dialog-overlay][data-state],
+div[data-radix-dialog-overlay] {
   background: rgba(0, 0, 0, 0.7) !important;
   z-index: 90 !important;
 }
 
-/* Dialog Content - completely opaque background */
-[data-radix-dialog-content] {
+/* Dialog Content - completely opaque background - ALL POSSIBLE SELECTORS */
+[data-radix-dialog-content],
+[data-radix-dialog-content][data-state],
+div[data-radix-dialog-content],
+[role="dialog"]:not([role="alertdialog"]),
+[role="dialog"]:not([role="alertdialog"]) > div {
   background: rgb(15 23 42) !important; /* slate-900 - completely opaque */
   background-color: rgb(15 23 42) !important; /* slate-900 - force opaque */
   border: 1px solid rgb(51 65 85) !important; /* slate-700 */
   z-index: 100 !important;
   opacity: 1 !important; /* Force full opacity */
+  backdrop-filter: none !important; /* Remove any blur effects */
 }
 
-/* Ensure Dialog content has no transparency */
+/* Ensure Dialog content has no transparency - class-based selectors */
 .dialog-content,
-[class*="DialogContent"] {
+[class*="DialogContent"],
+[class*="dialog-content"],
+div[class*="Dialog"]:not([class*="AlertDialog"]) {
   background: rgb(15 23 42) !important; /* slate-900 */
   background-color: rgb(15 23 42) !important; /* slate-900 */
   opacity: 1 !important;
   border: 1px solid rgb(51 65 85) !important; /* slate-700 */
+  backdrop-filter: none !important;
+}
+
+/*
+ * CATCH-ALL MODAL STYLING
+ * =======================
+ * Ensure ANY element that looks like a modal has opaque background
+ */
+
+/* Target any element with modal-like positioning and z-index */
+div[style*="fixed"][style*="z-50"],
+div[style*="fixed"][style*="z-index: 50"],
+div[style*="fixed"][style*="z-index:50"] {
+  background: rgb(15 23 42) !important;
+  background-color: rgb(15 23 42) !important;
+  opacity: 1 !important;
+}
+
+/* Target elements with bg-background class that might be transparent */
+.bg-background {
+  background-color: rgb(15 23 42) !important; /* slate-900 */
+  opacity: 1 !important;
 }
 
 /*

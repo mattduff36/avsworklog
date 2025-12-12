@@ -162,7 +162,7 @@ export default function PhotoUpload({ inspectionId, itemNumber, onClose, onUploa
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[600px] bg-slate-900 border-slate-700">
         <DialogHeader>
           <DialogTitle>Photo Upload - Item #{itemNumber}</DialogTitle>
           <DialogDescription>
