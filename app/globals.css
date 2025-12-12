@@ -666,6 +666,67 @@
 }
 
 /*
+ * ALERT DIALOG STYLING
+ * ====================
+ * Alert dialogs (used for confirmations, rejections, etc.) must be
+ * completely opaque with solid backgrounds matching the site theme.
+ */
+
+/* AlertDialog Overlay - semi-transparent backdrop */
+[data-radix-alert-dialog-overlay] {
+  background: rgba(0, 0, 0, 0.7) !important;
+  z-index: 90 !important;
+}
+
+/* AlertDialog Content - completely opaque background */
+[data-radix-alert-dialog-content] {
+  background: rgb(15 23 42) !important; /* slate-900 - completely opaque */
+  background-color: rgb(15 23 42) !important; /* slate-900 - force opaque */
+  border: 1px solid rgb(51 65 85) !important; /* slate-700 */
+  z-index: 100 !important;
+  opacity: 1 !important; /* Force full opacity */
+}
+
+/* Ensure AlertDialog content has no transparency */
+.alert-dialog-content,
+[class*="AlertDialogContent"] {
+  background: rgb(15 23 42) !important; /* slate-900 */
+  background-color: rgb(15 23 42) !important; /* slate-900 */
+  opacity: 1 !important;
+  border: 1px solid rgb(51 65 85) !important; /* slate-700 */
+}
+
+/*
+ * REGULAR DIALOG STYLING
+ * ======================
+ * Regular dialogs (non-alert) should also be completely opaque.
+ */
+
+/* Dialog Overlay - semi-transparent backdrop */
+[data-radix-dialog-overlay] {
+  background: rgba(0, 0, 0, 0.7) !important;
+  z-index: 90 !important;
+}
+
+/* Dialog Content - completely opaque background */
+[data-radix-dialog-content] {
+  background: rgb(15 23 42) !important; /* slate-900 - completely opaque */
+  background-color: rgb(15 23 42) !important; /* slate-900 - force opaque */
+  border: 1px solid rgb(51 65 85) !important; /* slate-700 */
+  z-index: 100 !important;
+  opacity: 1 !important; /* Force full opacity */
+}
+
+/* Ensure Dialog content has no transparency */
+.dialog-content,
+[class*="DialogContent"] {
+  background: rgb(15 23 42) !important; /* slate-900 */
+  background-color: rgb(15 23 42) !important; /* slate-900 */
+  opacity: 1 !important;
+  border: 1px solid rgb(51 65 85) !important; /* slate-700 */
+}
+
+/*
  * STANDARD PAGE LAYOUT PATTERN
  * ============================
  * All list/index pages should follow this consistent pattern:
