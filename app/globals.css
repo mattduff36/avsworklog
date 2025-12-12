@@ -688,10 +688,11 @@ div[data-radix-alert-dialog-content],
 [role="alertdialog"] > div {
   background: rgb(15 23 42) !important; /* slate-900 - completely opaque */
   background-color: rgb(15 23 42) !important; /* slate-900 - force opaque */
-  border: 1px solid rgb(51 65 85) !important; /* slate-700 */
+  border: none !important; /* Remove outer border for cleaner look */
   z-index: 100 !important;
   opacity: 1 !important; /* Force full opacity */
   backdrop-filter: none !important; /* Remove any blur effects */
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3) !important; /* Enhanced shadow for depth */
 }
 
 /* Ensure AlertDialog content has no transparency - class-based selectors */
@@ -702,8 +703,18 @@ div[class*="AlertDialog"] {
   background: rgb(15 23 42) !important; /* slate-900 */
   background-color: rgb(15 23 42) !important; /* slate-900 */
   opacity: 1 !important;
-  border: 1px solid rgb(51 65 85) !important; /* slate-700 */
+  border: none !important; /* Remove borders for cleaner look */
   backdrop-filter: none !important;
+}
+
+/* Remove borders from AlertDialog header and footer */
+[data-radix-alert-dialog-content] > div:first-child,
+[data-radix-alert-dialog-content] > div:last-child,
+.alert-dialog-header,
+.alert-dialog-footer {
+  border: none !important;
+  border-top: none !important;
+  border-bottom: none !important;
 }
 
 /*
@@ -728,10 +739,11 @@ div[data-radix-dialog-content],
 [role="dialog"]:not([role="alertdialog"]) > div {
   background: rgb(15 23 42) !important; /* slate-900 - completely opaque */
   background-color: rgb(15 23 42) !important; /* slate-900 - force opaque */
-  border: 1px solid rgb(51 65 85) !important; /* slate-700 */
+  border: none !important; /* Remove outer border for cleaner look */
   z-index: 100 !important;
   opacity: 1 !important; /* Force full opacity */
   backdrop-filter: none !important; /* Remove any blur effects */
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3) !important; /* Enhanced shadow for depth */
 }
 
 /* Ensure Dialog content has no transparency - class-based selectors */
@@ -742,8 +754,18 @@ div[class*="Dialog"]:not([class*="AlertDialog"]) {
   background: rgb(15 23 42) !important; /* slate-900 */
   background-color: rgb(15 23 42) !important; /* slate-900 */
   opacity: 1 !important;
-  border: 1px solid rgb(51 65 85) !important; /* slate-700 */
+  border: none !important; /* Remove borders for cleaner look */
   backdrop-filter: none !important;
+}
+
+/* Remove borders from Dialog header and footer */
+[data-radix-dialog-content] > div:first-child,
+[data-radix-dialog-content] > div:last-child,
+.dialog-header,
+.dialog-footer {
+  border: none !important;
+  border-top: none !important;
+  border-bottom: none !important;
 }
 
 /*
@@ -765,6 +787,56 @@ div[style*="fixed"][style*="z-index:50"] {
 .bg-background {
   background-color: rgb(15 23 42) !important; /* slate-900 */
   opacity: 1 !important;
+}
+
+/*
+ * MODAL INPUT & TEXTAREA STYLING
+ * ==============================
+ * Make input fields in modals have subtle borders
+ */
+
+/* Subtle borders for inputs and textareas in modals */
+[data-radix-alert-dialog-content] textarea,
+[data-radix-alert-dialog-content] input,
+[data-radix-dialog-content] textarea,
+[data-radix-dialog-content] input {
+  border: 1px solid rgb(51 65 85) !important; /* slate-700 - subtle */
+  border-radius: 0.5rem !important;
+  background-color: rgb(30 41 59) !important; /* slate-800 - slightly lighter than modal */
+}
+
+[data-radix-alert-dialog-content] textarea:focus,
+[data-radix-alert-dialog-content] input:focus,
+[data-radix-dialog-content] textarea:focus,
+[data-radix-dialog-content] input:focus {
+  border-color: rgb(148 163 184) !important; /* slate-400 - lighter on focus */
+  outline: none !important;
+  ring: 2px solid rgba(148, 163, 184, 0.2) !important;
+}
+
+/*
+ * MODAL BUTTON STYLING
+ * ====================
+ * Cleaner button borders in modals
+ */
+
+/* Remove or soften button borders in modals */
+[data-radix-alert-dialog-content] button[class*="outline"],
+[data-radix-dialog-content] button[class*="outline"] {
+  border: 1px solid rgb(51 65 85) !important; /* slate-700 - subtle */
+  background-color: transparent !important;
+}
+
+[data-radix-alert-dialog-content] button[class*="outline"]:hover,
+[data-radix-dialog-content] button[class*="outline"]:hover {
+  border-color: rgb(71 85 105) !important; /* slate-600 - slightly lighter on hover */
+  background-color: rgb(30 41 59) !important; /* slate-800 - subtle background */
+}
+
+/* Primary/destructive buttons - no border needed */
+[data-radix-alert-dialog-content] button:not([class*="outline"]),
+[data-radix-dialog-content] button:not([class*="outline"]) {
+  border: none !important;
 }
 
 /*

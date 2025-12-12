@@ -890,7 +890,7 @@ export default function ViewTimesheetPage() {
               Please provide a reason for rejecting this timesheet. The employee will be notified via email and in-app notification.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="py-4">
+          <div className="space-y-3">
             <Label htmlFor="rejection-comments" className="text-sm font-medium">
               Rejection Reason <span className="text-red-600">*</span>
             </Label>
@@ -901,18 +901,18 @@ export default function ViewTimesheetPage() {
               onChange={(e) => setRejectionComments(e.target.value)}
               disabled={saving}
               rows={4}
-              className="mt-2 resize-none"
+              className="resize-none bg-slate-800 border-slate-700 focus:border-slate-500"
               required
             />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={saving} onClick={() => setRejectionComments('')}>
+            <AlertDialogCancel disabled={saving} onClick={() => setRejectionComments('')} className="border-slate-700 hover:bg-slate-800">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleReject}
               disabled={saving || rejectionComments.trim().length === 0}
-              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600 border-0"
             >
               {saving ? 'Rejecting...' : 'Reject Timesheet'}
             </AlertDialogAction>
