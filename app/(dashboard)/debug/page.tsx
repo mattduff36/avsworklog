@@ -218,7 +218,7 @@ export default function DebugPage() {
 
       if (absenceData) {
         setAbsences(
-          absenceData.map((a: any) => ({
+          absenceData.map((a: { id: string; status: string; date: string; absence_reasons?: { name: string } | null; profiles?: { full_name: string } | null }) => ({
             id: a.id,
             type: 'absence' as const,
             identifier: `${a.absence_reasons?.name || 'Unknown'} - ${new Date(a.date).toLocaleDateString()}`,
@@ -238,7 +238,7 @@ export default function DebugPage() {
 
       if (ramsData) {
         setRamsDocuments(
-          ramsData.map((r: any) => ({
+          ramsData.map((r: { id: string; title: string | null; created_at: string }) => ({
             id: r.id,
             type: 'rams' as const,
             identifier: r.title || 'Untitled',
@@ -269,7 +269,7 @@ export default function DebugPage() {
 
       if (auditData) {
         setAuditLogs(
-          auditData.map((log: any) => ({
+          auditData.map((log: { id: string; table_name: string; record_id: string; user_id: string | null; action: string; changes: unknown; created_at: string; profiles?: { full_name: string } | null }) => ({
             id: log.id,
             table_name: log.table_name,
             record_id: log.record_id,
