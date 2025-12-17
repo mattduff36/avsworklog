@@ -32,7 +32,6 @@ function NewTimesheetContent() {
   useEffect(() => {
     async function loadExistingWeek() {
       if (existingId && user) {
-        console.log('🔍 Loading existing timesheet:', existingId);
         try {
           const { data, error } = await supabase
             .from('timesheets')
@@ -42,12 +41,11 @@ function NewTimesheetContent() {
           
           if (error) throw error;
           
-          console.log('✅ Loaded week:', data.week_ending);
           setLoadedWeek(data.week_ending);
           setShowForm(true);
           setTimesheetId(existingId);
         } catch (err) {
-          console.error('❌ Error loading existing timesheet:', err);
+          console.error('Error loading existing timesheet:', err);
           // Fall back to showing week selector
           setShowForm(false);
         }
@@ -79,18 +77,8 @@ function NewTimesheetContent() {
   if (showForm && user) {
     const weekToUse = existingId ? loadedWeek : (selectedWeek || '');
     
-    console.log('📋 Rendering form:', { 
-      showForm, 
-      existingId, 
-      loadedWeek, 
-      selectedWeek, 
-      weekToUse,
-      timesheetId 
-    });
-    
     // Don't render until we have a week (prevents blank form bug for existing timesheets)
     if (!weekToUse) {
-      console.log('⏳ Waiting for week to load...');
       return (
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center space-y-3">
@@ -100,8 +88,6 @@ function NewTimesheetContent() {
         </div>
       );
     }
-    
-    console.log('🚀 Rendering TimesheetRouter with:', { weekToUse, timesheetId, userId: user.id });
     
     return (
       <TimesheetRouter
