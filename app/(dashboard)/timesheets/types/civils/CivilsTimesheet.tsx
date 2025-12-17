@@ -359,9 +359,24 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       if (timesheetError) throw timesheetError;
       
       // Check if user has access and timesheet is draft or rejected
-      console.log('6️⃣ Checking permissions...', { hasElevatedPermissions, isSuperAdmin, isManager, isAdmin, timesheetUserId: timesheetData.user_id, currentUserId: user.id, status: timesheetData.status });
+      // Calculate permissions dynamically from current profile state (not stale closure values)
+      const currentIsSuperAdmin = profile?.is_super_admin || profile?.role?.is_super_admin || false;
+      const currentIsManager = profile?.role?.is_manager_admin || false;
+      const currentIsAdmin = profile?.role?.name === 'admin';
+      const currentHasElevatedPermissions = currentIsSuperAdmin || currentIsManager || currentIsAdmin;
       
-      if (!hasElevatedPermissions && timesheetData.user_id !== user.id) {
+      console.log('6️⃣ Checking permissions...', { 
+        currentHasElevatedPermissions,
+        currentIsSuperAdmin, 
+        currentIsManager, 
+        currentIsAdmin, 
+        profileRoleName: profile?.role?.name,
+        timesheetUserId: timesheetData.user_id, 
+        currentUserId: user.id, 
+        status: timesheetData.status 
+      });
+      
+      if (!currentHasElevatedPermissions && timesheetData.user_id !== user.id) {
         console.log('❌ Permission denied');
         setError('You do not have permission to edit this timesheet');
         setLoadingExisting(false);
