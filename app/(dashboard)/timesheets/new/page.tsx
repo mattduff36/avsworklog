@@ -3,36 +3,57 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { CivilsTimesheet } from '../types/civils/CivilsTimesheet';
+import { TimesheetRouter } from '../components/TimesheetRouter';
 import { WeekSelector } from '../components/WeekSelector';
+import { createClient } from '@/lib/supabase/client';
 
 /**
  * New Timesheet Page
  * 
- * Phase 3: Week Selection Flow
+ * Phase 5: Dynamic Routing System
  * - Shows WeekSelector first (validates date, checks duplicates)
- * - After valid week selected, shows CivilsTimesheet component
- * - Editing existing timesheets goes straight to form (per Q6 answer)
- * 
- * Future (Phase 5): Will route to correct timesheet type based on role
+ * - Routes to correct timesheet type based on user's role
+ * - Falls back to civils with warning if type not implemented
+ * - Editing existing timesheets goes straight to form (Q6: Answer A)
  */
 
 function NewTimesheetContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
+  const supabase = createClient();
   const existingId = searchParams.get('id');
   
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
   const [timesheetId, setTimesheetId] = useState<string | null>(existingId);
   const [showForm, setShowForm] = useState(false);
+  const [loadedWeek, setLoadedWeek] = useState<string>('');
 
-  // If editing existing timesheet, skip week selector (Q6: Answer A)
+  // If editing existing timesheet, load its week ending and skip selector (Q6: Answer A)
   useEffect(() => {
-    if (existingId) {
-      setShowForm(true);
-      setTimesheetId(existingId);
+    async function loadExistingWeek() {
+      if (existingId && user) {
+        try {
+          const { data, error } = await supabase
+            .from('timesheets')
+            .select('week_ending')
+            .eq('id', existingId)
+            .single();
+          
+          if (error) throw error;
+          
+          setLoadedWeek(data.week_ending);
+          setShowForm(true);
+          setTimesheetId(existingId);
+        } catch (err) {
+          console.error('Error loading existing timesheet:', err);
+          // Fall back to showing week selector
+          setShowForm(false);
+        }
+      }
     }
-  }, [existingId]);
+
+    loadExistingWeek();
+  }, [existingId, user, supabase]);
 
   // Handle week selection from WeekSelector
   const handleWeekSelected = (weekEnding: string, existingTimesheetId: string | null) => {
@@ -41,8 +62,8 @@ function NewTimesheetContent() {
     setShowForm(true);
   };
 
-  // Show WeekSelector for new timesheets, form for editing/after selection
-  if (!showForm && user) {
+  // Show WeekSelector for new timesheets
+  if (!showForm && !existingId && user) {
     return (
       <WeekSelector
         userId={user.id}
@@ -52,23 +73,14 @@ function NewTimesheetContent() {
     );
   }
 
-  // Show form after week is selected or when editing
-  if (showForm && selectedWeek && user) {
+  // Show router/form after week is selected or when editing
+  if (showForm && user) {
+    const weekToUse = existingId ? loadedWeek : (selectedWeek || '');
+    
     return (
-      <CivilsTimesheet
-        weekEnding={selectedWeek}
+      <TimesheetRouter
+        weekEnding={weekToUse}
         existingId={timesheetId}
-        userId={user.id}
-      />
-    );
-  }
-
-  // Editing existing timesheet - week will be loaded from database
-  if (showForm && existingId && user) {
-    return (
-      <CivilsTimesheet
-        weekEnding="" // Will be loaded from database
-        existingId={existingId}
         userId={user.id}
       />
     );
