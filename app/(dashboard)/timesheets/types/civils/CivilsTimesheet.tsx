@@ -51,13 +51,13 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
   });
   
   const router = useRouter();
-  const { user, profile, isManager, isAdmin } = useAuth();
+  const { user, profile, isManager, isAdmin, isSuperAdmin } = useAuth();
   const { isOnline } = useOfflineSync();
   const { addToQueue } = useOfflineStore();
   const supabase = createClient();
   
-  // Admins and managers both have elevated permissions
-  const hasElevatedPermissions = isManager || isAdmin;
+  // SuperAdmins, admins, and managers all have elevated permissions
+  const hasElevatedPermissions = isSuperAdmin || isManager || isAdmin;
   
   const [existingTimesheetId, setExistingTimesheetId] = useState<string | null>(initialExistingId);
   const [regNumber, setRegNumber] = useState('');
@@ -342,7 +342,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       if (timesheetError) throw timesheetError;
       
       // Check if user has access and timesheet is draft or rejected
-      console.log('6️⃣ Checking permissions...', { hasElevatedPermissions, isManager, isAdmin, timesheetUserId: timesheetData.user_id, currentUserId: user.id, status: timesheetData.status });
+      console.log('6️⃣ Checking permissions...', { hasElevatedPermissions, isSuperAdmin, isManager, isAdmin, timesheetUserId: timesheetData.user_id, currentUserId: user.id, status: timesheetData.status });
       
       if (!hasElevatedPermissions && timesheetData.user_id !== user.id) {
         console.log('❌ Permission denied');
