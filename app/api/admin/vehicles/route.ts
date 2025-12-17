@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { reg_number, category_id } = body;
+    const { reg_number, category_id, vehicle_type } = body;
 
     // Validate required fields
     if (!reg_number) {
@@ -118,6 +118,7 @@ export async function POST(request: NextRequest) {
       .insert({
         reg_number: reg_number.toUpperCase(),
         category_id: category_id || null,
+        vehicle_type: vehicle_type || null,
         status: 'active',
       })
       .select()

@@ -44,7 +44,7 @@ export async function PUT(
 
     const vehicleId = (await params).id;
     const body = await request.json();
-    const { reg_number, category_id, status } = body;
+    const { reg_number, category_id, vehicle_type, status } = body;
 
     // Validate required fields
     if (!reg_number) {
@@ -60,6 +60,7 @@ export async function PUT(
       .update({
         reg_number: reg_number.toUpperCase(),
         category_id: category_id || null,
+        vehicle_type: vehicle_type || null,
         status: status || 'active',
       })
       .eq('id', vehicleId)
