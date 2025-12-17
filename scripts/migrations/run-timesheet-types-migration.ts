@@ -46,9 +46,15 @@ async function runMigration() {
   console.log(`✓ Migration file loaded: ${MIGRATION_FILE}`);
   console.log(`  (${migrationSQL.split('\n').length} lines)\n`);
 
-  // Create PostgreSQL client
+  // Parse connection string and rebuild with explicit SSL config (Supabase requires SSL)
+  const url = new URL(connectionString);
+  
   const client = new Client({
-    connectionString,
+    host: url.hostname,
+    port: parseInt(url.port) || 5432,
+    database: url.pathname.slice(1),
+    user: url.username,
+    password: url.password,
     ssl: {
       rejectUnauthorized: false
     }
