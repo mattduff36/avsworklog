@@ -24,6 +24,7 @@ import { SignaturePad } from '@/components/forms/SignaturePad';
 import { fetchUKBankHolidays } from '@/lib/utils/bank-holidays';
 import { Employee } from '@/types/common';
 import { toast } from 'sonner';
+import { ConfirmationModal } from '../../components/ConfirmationModal';
 
 /**
  * Civils Timesheet Component
@@ -55,6 +56,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [activeDay, setActiveDay] = useState('0');
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(false);
@@ -561,7 +563,13 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       return;
     }
     
-    // Show signature dialog
+    // Show confirmation modal first (Phase 4)
+    setShowConfirmationModal(true);
+  };
+
+  // After user confirms in modal, show signature dialog
+  const handleConfirmSubmission = () => {
+    setShowConfirmationModal(false);
     setShowSignatureDialog(true);
   };
 
@@ -1260,6 +1268,17 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
           </Button>
         </div>
       </div>
+
+      {/* Confirmation Modal (Phase 4) */}
+      <ConfirmationModal
+        open={showConfirmationModal}
+        onClose={() => setShowConfirmationModal(false)}
+        onConfirm={handleConfirmSubmission}
+        weekEnding={weekEnding}
+        entries={entries}
+        regNumber={regNumber}
+        submitting={false}
+      />
 
       {/* Signature Dialog */}
       <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>
