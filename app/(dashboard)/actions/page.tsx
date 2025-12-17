@@ -8,9 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertTriangle, CheckCircle2, Clock, Trash2, Clipboard, Package } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { AlertTriangle, CheckCircle2, Clock, Trash2, Clipboard, Package, FileText, Undo2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Database } from '@/types/database';
+import { toast } from 'sonner';
 
 type Action = Database['public']['Tables']['actions']['Row'] & {
   vehicle_inspections?: {
@@ -35,6 +39,12 @@ export default function ActionsPage() {
   const [error, setError] = useState('');
   const [completingActions, setCompletingActions] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState('all');
+  
+  // Logged modal states
+  const [showLoggedDialog, setShowLoggedDialog] = useState(false);
+  const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
+  const [loggedComment, setLoggedComment] = useState('');
+  const [previousStatus, setPreviousStatus] = useState<string>('pending'); // Track previous status for undo
 
   useEffect(() => {
     if (!authLoading) {
@@ -76,23 +86,85 @@ export default function ActionsPage() {
     }
   };
 
-  const handleToggleActioned = async (actionId: string, currentState: boolean) => {
+  // Mark as logged - opens modal for comment
+  const handleMarkAsLogged = (actionId: string) => {
+    setSelectedActionId(actionId);
+    setLoggedComment('');
+    setShowLoggedDialog(true);
+  };
+
+  // Confirm logged with comment
+  const handleConfirmLogged = async () => {
+    if (!selectedActionId) return;
+    
+    if (!loggedComment.trim()) {
+      toast.error('Comment is required');
+      return;
+    }
+
+    if (loggedComment.length > 40) {
+      toast.error('Comment must be 40 characters or less');
+      return;
+    }
+
     try {
-      // Mark as completing for visual feedback
+      setCompletingActions(prev => new Set(prev).add(selectedActionId));
+      
+      const { error } = await supabase
+        .from('actions')
+        .update({
+          status: 'logged',
+          logged_comment: loggedComment.trim(),
+          logged_at: new Date().toISOString(),
+          logged_by: user?.id,
+        })
+        .eq('id', selectedActionId);
+
+      if (error) throw error;
+      
+      toast.success('Action marked as logged');
+      setShowLoggedDialog(false);
+      setSelectedActionId(null);
+      setLoggedComment('');
+      
+      setTimeout(() => {
+        setCompletingActions(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(selectedActionId);
+          return newSet;
+        });
+        fetchActions();
+      }, 500);
+    } catch (err) {
+      console.error('Error marking as logged:', err);
+      toast.error('Failed to mark as logged');
+      setCompletingActions(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(selectedActionId);
+        return newSet;
+      });
+    }
+  };
+
+  // Mark as complete
+  const handleMarkAsComplete = async (actionId: string, currentStatus: string) => {
+    try {
       setCompletingActions(prev => new Set(prev).add(actionId));
       
       const { error } = await supabase
         .from('actions')
         .update({
-          actioned: !currentState,
-          actioned_at: !currentState ? new Date().toISOString() : null,
-          actioned_by: !currentState ? user?.id : null,
+          status: 'completed',
+          actioned: true,
+          actioned_at: new Date().toISOString(),
+          actioned_by: user?.id,
         })
         .eq('id', actionId);
 
       if (error) throw error;
       
-      // Wait 1 second to show "Complete" feedback before refreshing
+      toast.success('Action marked as complete');
+      
       setTimeout(() => {
         setCompletingActions(prev => {
           const newSet = new Set(prev);
@@ -100,10 +172,90 @@ export default function ActionsPage() {
           return newSet;
         });
         fetchActions();
-      }, 1000);
+      }, 500);
     } catch (err) {
-      console.error('Error updating action:', err);
-      setError('Failed to update action');
+      console.error('Error marking as complete:', err);
+      toast.error('Failed to mark as complete');
+      setCompletingActions(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(actionId);
+        return newSet;
+      });
+    }
+  };
+
+  // Undo complete - returns to previous status (logged or pending)
+  const handleUndoComplete = async (actionId: string) => {
+    try {
+      // Find the action to check if it was previously logged
+      const action = actions.find(a => a.id === actionId);
+      const returnStatus = action?.logged_at ? 'logged' : 'pending';
+      
+      setCompletingActions(prev => new Set(prev).add(actionId));
+      
+      const { error } = await supabase
+        .from('actions')
+        .update({
+          status: returnStatus,
+          actioned: false,
+          actioned_at: null,
+          actioned_by: null,
+        })
+        .eq('id', actionId);
+
+      if (error) throw error;
+      
+      toast.success(`Action returned to ${returnStatus}`);
+      
+      setTimeout(() => {
+        setCompletingActions(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(actionId);
+          return newSet;
+        });
+        fetchActions();
+      }, 500);
+    } catch (err) {
+      console.error('Error undoing complete:', err);
+      toast.error('Failed to undo complete');
+      setCompletingActions(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(actionId);
+        return newSet;
+      });
+    }
+  };
+
+  // Undo logged - returns to pending
+  const handleUndoLogged = async (actionId: string) => {
+    try {
+      setCompletingActions(prev => new Set(prev).add(actionId));
+      
+      const { error } = await supabase
+        .from('actions')
+        .update({
+          status: 'pending',
+          logged_comment: null,
+          logged_at: null,
+          logged_by: null,
+        })
+        .eq('id', actionId);
+
+      if (error) throw error;
+      
+      toast.success('Action returned to pending');
+      
+      setTimeout(() => {
+        setCompletingActions(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(actionId);
+          return newSet;
+        });
+        fetchActions();
+      }, 500);
+    } catch (err) {
+      console.error('Error undoing logged:', err);
+      toast.error('Failed to undo logged');
       setCompletingActions(prev => {
         const newSet = new Set(prev);
         newSet.delete(actionId);
@@ -316,12 +468,13 @@ export default function ActionsPage() {
                               <Trash2 className="h-4 w-4" />
                             </Button>
                             <Button
+                              variant="ghost"
                               onClick={() => handleToggleActioned(action.id, action.actioned)}
                               disabled={isCompleting}
                               className={`h-16 min-w-[140px] text-base font-semibold transition-all ${
                                 isCompleting
                                   ? 'bg-green-500 hover:bg-green-500 text-white'
-                                  : 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900'
+                                  : 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 [&]:text-slate-900'
                               }`}
                             >
                               {isCompleting ? (
@@ -452,12 +605,13 @@ export default function ActionsPage() {
                               </div>
                               <div className="flex-shrink-0">
                                 <Button
-                                  onClick={() => handleToggleActioned(action.id)}
+                                  variant="ghost"
+                                  onClick={() => handleToggleActioned(action.id, action.actioned)}
                                   disabled={isCompleting}
                                   className={`min-w-[140px] transition-all duration-200 ${
                                     isCompleting
                                       ? 'bg-green-600 hover:bg-green-600 text-white'
-                                      : 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900'
+                                      : 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 [&]:text-slate-900'
                                   } shadow-md hover:shadow-lg active:scale-95`}
                                 >
                                   {isCompleting ? (
