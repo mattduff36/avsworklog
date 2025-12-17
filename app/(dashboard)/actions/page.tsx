@@ -44,7 +44,6 @@ export default function ActionsPage() {
   const [showLoggedDialog, setShowLoggedDialog] = useState(false);
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [loggedComment, setLoggedComment] = useState('');
-  const [previousStatus, setPreviousStatus] = useState<string>('pending'); // Track previous status for undo
 
   useEffect(() => {
     if (!authLoading) {
@@ -54,9 +53,9 @@ export default function ActionsPage() {
       }
       fetchActions();
     }
-  }, [authLoading, isManager, router]);
+  }, [authLoading, isManager, router, fetchActions]);
 
-  const fetchActions = async () => {
+  const fetchActions = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -84,7 +83,7 @@ export default function ActionsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
 
   // Mark as logged - opens modal for comment
   const handleMarkAsLogged = (actionId: string) => {
@@ -147,7 +146,7 @@ export default function ActionsPage() {
   };
 
   // Mark as complete
-  const handleMarkAsComplete = async (actionId: string, currentStatus: string) => {
+  const handleMarkAsComplete = async (actionId: string) => {
     try {
       setCompletingActions(prev => new Set(prev).add(actionId));
       
@@ -851,7 +850,7 @@ export default function ActionsPage() {
           <div className="space-y-4">
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
               <p className="text-sm text-amber-200">
-                This defect will be automatically marked on future inspections until it's completed.
+                This defect will be automatically marked on future inspections until it&apos;s completed.
               </p>
             </div>
 
