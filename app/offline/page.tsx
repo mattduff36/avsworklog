@@ -46,9 +46,8 @@ export default function OfflinePage() {
 
               <div className="pt-2">
                 <Button
-                  variant="ghost"
                   onClick={handleRetry}
-                  className="w-full h-12 bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 [&]:text-slate-900 font-semibold text-base shadow-lg shadow-avs-yellow/20 transition-all"
+                  className="w-full h-12 bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 font-semibold text-base shadow-lg shadow-avs-yellow/20 transition-all"
                 >
                   Try Again
                 </Button>

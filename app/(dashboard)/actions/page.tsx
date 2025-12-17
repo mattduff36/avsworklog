@@ -490,7 +490,7 @@ export default function ActionsPage() {
                               className={`h-16 min-w-[140px] text-base font-semibold transition-all ${
                                 isCompleting
                                   ? 'bg-green-500 hover:bg-green-500 text-white'
-                                  : 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 [&]:text-slate-900'
+                                  : 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900'
                               }`}
                             >
                               {isCompleting ? (
@@ -595,7 +595,7 @@ export default function ActionsPage() {
                               className={`h-16 min-w-[140px] text-base font-semibold transition-all ${
                                 isCompleting
                                   ? 'bg-green-500 hover:bg-green-500 text-white'
-                                  : 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 [&]:text-slate-900'
+                                  : 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900'
                               }`}
                             >
                               {isCompleting ? (
@@ -740,7 +740,7 @@ export default function ActionsPage() {
                                   className={`h-16 min-w-[140px] text-base font-semibold transition-all ${
                                     isCompleting
                                       ? 'bg-green-500 hover:bg-green-500 text-white'
-                                      : 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 [&]:text-slate-900'
+                                      : 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900'
                                   }`}
                                 >
                                   {isCompleting ? (

@@ -52,10 +52,9 @@ export default function Home() {
 
         {/* Action Button */}
         <Button
-          variant="ghost"
           onClick={handleGoToDashboard}
           size="lg"
-          className="w-full bg-avs-yellow text-slate-900 [&]:text-slate-900 hover:bg-avs-yellow/90 font-semibold"
+          className="w-full bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 font-semibold"
         >
           Go to Dashboard
         </Button>

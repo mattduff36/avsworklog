@@ -1505,10 +1505,9 @@ function NewInspectionContent() {
               Cancel
             </Button>
             <Button
-              variant="ghost"
               onClick={handleAddVehicle}
               disabled={addingVehicle || !newVehicleReg.trim() || !newVehicleCategoryId}
-              className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 [&]:text-slate-900 font-semibold"
+              className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 font-semibold"
             >
               {addingVehicle ? 'Adding...' : 'Add Vehicle'}
             </Button>

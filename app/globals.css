@@ -275,7 +275,7 @@
   }
   
   .text-slate-900 {
-    color: rgb(248 250 252) !important; /* slate-50 - white text */
+    color: rgb(15 23 42) !important; /* slate-900 - dark text for yellow buttons */
   }
   
   .text-white {
