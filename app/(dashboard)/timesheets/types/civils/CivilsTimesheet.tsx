@@ -133,18 +133,19 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       loadingExisting 
     });
     
-    // Don't wait for useAuth - we already have user.id from parent's useAuth
-    if (initialExistingId && !loadingExisting) {
+    // Wait for both ID and authenticated user before loading
+    if (initialExistingId && user && !loadingExisting) {
       console.log('📥 Calling loadExistingTimesheet...');
       loadExistingTimesheet(initialExistingId);
     } else {
       console.log('⏭️ Skipping load:', { 
-        hasId: !!initialExistingId, 
+        hasId: !!initialExistingId,
+        hasUser: !!user,
         alreadyLoading: loadingExisting 
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialExistingId]);
+  }, [initialExistingId, user]);
 
   // Removed: Fetch existing timesheets effect - no longer needed
   // Duplicate checking now happens in WeekSelector
@@ -291,16 +292,19 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
   // Duplicate checking now happens in WeekSelector before reaching this component
 
   const loadExistingTimesheet = async (timesheetId: string) => {
-    // Wait for user to be available (from parent's useAuth)
+    // This should never be called without user due to useEffect guard
     if (!user) {
-      console.log('⏳ Waiting for user auth...');
+      console.error('❌ loadExistingTimesheet called without user!');
       return;
     }
     
-    // Don't load if already loading
-    if (loadingExisting) return;
+    // Prevent duplicate loads
+    if (loadingExisting) {
+      console.log('⏭️ Already loading, skipping...');
+      return;
+    }
     
-    console.log('🔓 User ready, loading timesheet data...');
+    console.log('🔓 User ready, loading timesheet data...', { timesheetId, userId: user.id });
     setLoadingExisting(true);
     setError('');
     
