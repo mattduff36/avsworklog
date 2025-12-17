@@ -954,6 +954,14 @@ button.bg-avs-yellow,
 button.bg-avs-yellow *,
 button.bg-avs-yellow span,
 .bg-avs-yellow.text-white,
-.bg-avs-yellow .text-white {
+.bg-avs-yellow .text-white,
+.bg-avs-yellow[class*="text-"],
+button[class*="bg-avs-yellow"],
+button[class*="bg-avs-yellow"] *,
+[class*="bg-avs-yellow"] [class*="text-"],
+[style*="background-color: #F1D64A"],
+[style*="background-color: #F1D64A"] *,
+[style*="background-color: rgb(241, 214, 74)"],
+[style*="background-color: rgb(241, 214, 74)"] * {
   color: rgb(15 23 42) !important; /* Dark slate text - same as sidebar */
 }
