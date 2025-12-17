@@ -17,10 +17,12 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Shield, Plus, Edit, Trash2, Loader2, AlertTriangle, Users, Lock } from 'lucide-react';
+import { Shield, Plus, Edit, Trash2, Loader2, AlertTriangle, Users, Lock, FileText } from 'lucide-react';
 import type { RoleWithUserCount, ModuleName } from '@/types/roles';
 import { ALL_MODULES, MODULE_DESCRIPTIONS, MODULE_DISPLAY_NAMES } from '@/types/roles';
 import { toast } from 'sonner';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TimesheetTypeOptions } from '@/app/(dashboard)/timesheets/types/registry';
 
 export function RoleManagement() {
   const [roles, setRoles] = useState<RoleWithUserCount[]>([]);
@@ -39,6 +41,7 @@ export function RoleManagement() {
     display_name: '',
     description: '',
     is_manager_admin: false,
+    timesheet_type: 'civils' as string,
   });
   const [permissions, setPermissions] = useState<Record<ModuleName, boolean>>({} as Record<ModuleName, boolean>);
   const [formLoading, setFormLoading] = useState(false);
@@ -263,6 +266,7 @@ export function RoleManagement() {
       display_name: '',
       description: '',
       is_manager_admin: false,
+      timesheet_type: 'civils',
     });
     setFormError('');
   }
@@ -452,6 +456,30 @@ export function RoleManagement() {
                 placeholder="Brief description of this role..."
                 className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 min-h-[80px]"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-timesheet-type" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Timesheet Type
+              </Label>
+              <Select 
+                value={formData.timesheet_type} 
+                onValueChange={(value) => setFormData({ ...formData, timesheet_type: value })}
+              >
+                <SelectTrigger id="add-timesheet-type" className="bg-slate-800 border-slate-600 text-white">
+                  <SelectValue placeholder="Select timesheet type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TimesheetTypeOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-400">
+                Which timesheet format should employees with this role use?
+              </p>
             </div>
             <div className="flex items-center justify-between p-3 bg-slate-800 rounded">
               <div>

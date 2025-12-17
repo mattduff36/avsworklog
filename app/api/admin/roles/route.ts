@@ -120,6 +120,7 @@ export async function POST(request: NextRequest) {
         description: body.description || null,
         is_super_admin: false, // Cannot create super admin via API
         is_manager_admin: body.is_manager_admin || false,
+        timesheet_type: body.timesheet_type || 'civils', // Default to civils (Phase 6)
       })
       .select()
       .single();
