@@ -17,14 +17,15 @@ type TimesheetProps = {
   userId?: string; // For managers creating for others
 };
 
+import { CivilsTimesheet } from './civils/CivilsTimesheet';
+
 /**
  * Timesheet Registry
  * Maps timesheet type string to React component
  */
 export const TimesheetRegistry: Record<string, React.ComponentType<TimesheetProps>> = {
-  // Will be populated in Phase 2:
-  // civils: CivilsTimesheet,
-  // plant: PlantTimesheet,
+  civils: CivilsTimesheet,
+  // plant: PlantTimesheet, // Coming in Phase 8
 };
 
 /**
