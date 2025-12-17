@@ -71,6 +71,7 @@ function InspectionsContent() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [inspectionToDelete, setInspectionToDelete] = useState<{ id: string; vehicleReg: string; date: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [displayCount, setDisplayCount] = useState(12); // Show 12 inspections initially
   const supabase = createClient();
 
   // Fetch employees and vehicles
@@ -344,53 +345,55 @@ function InspectionsContent() {
         )}
       </div>
 
-      {/* Filters */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Status Filter */}
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-slate-400" />
-              <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
-              <div className="flex gap-2 flex-wrap">
-                {(['all', 'draft', 'submitted'] as InspectionStatusFilter[]).map((filter) => (
-                  <Button
-                    key={filter}
-                    variant={statusFilter === filter ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setStatusFilter(filter)}
-                    className={statusFilter === filter ? '' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50'}
-                  >
-                    {filter === 'submitted' && <Clock className="h-3 w-3 mr-1" />}
-                    {filter === 'draft' && <FileText className="h-3 w-3 mr-1" />}
-                    {getFilterLabel(filter)}
-                  </Button>
-                ))}
+      {/* Filters - Only show for managers */}
+      {isManager && (
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Status Filter */}
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-slate-400" />
+                <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
+                <div className="flex gap-2 flex-wrap">
+                  {(['all', 'draft', 'submitted'] as InspectionStatusFilter[]).map((filter) => (
+                    <Button
+                      key={filter}
+                      variant={statusFilter === filter ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setStatusFilter(filter)}
+                      className={statusFilter === filter ? '' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50'}
+                    >
+                      {filter === 'submitted' && <Clock className="h-3 w-3 mr-1" />}
+                      {filter === 'draft' && <FileText className="h-3 w-3 mr-1" />}
+                      {getFilterLabel(filter)}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Vehicle Filter */}
+              <div className="flex items-center gap-3">
+                <Truck className="h-4 w-4 text-slate-400" />
+                <span className="text-sm text-slate-400 mr-2 whitespace-nowrap">Filter by vehicle:</span>
+                <Select value={vehicleFilter} onValueChange={setVehicleFilter}>
+                  <SelectTrigger className="h-9 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white">
+                    <SelectValue placeholder="All vehicles" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Vehicles</SelectItem>
+                    {vehicles.map((vehicle) => (
+                      <SelectItem key={vehicle.id} value={vehicle.id}>
+                        {vehicle.reg_number}
+                        {vehicle.vehicle_categories?.name && ` (${vehicle.vehicle_categories.name})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-
-            {/* Vehicle Filter */}
-            <div className="flex items-center gap-3">
-              <Truck className="h-4 w-4 text-slate-400" />
-              <span className="text-sm text-slate-400 mr-2 whitespace-nowrap">Filter by vehicle:</span>
-              <Select value={vehicleFilter} onValueChange={setVehicleFilter}>
-                <SelectTrigger className="h-9 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white">
-                  <SelectValue placeholder="All vehicles" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Vehicles</SelectItem>
-                  {vehicles.map((vehicle) => (
-                    <SelectItem key={vehicle.id} value={vehicle.id}>
-                      {vehicle.reg_number}
-                      {vehicle.vehicle_categories?.name && ` (${vehicle.vehicle_categories.name})`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {loading ? (
         <div className="grid gap-4">
@@ -431,8 +434,9 @@ function InspectionsContent() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
-          {inspections.map((inspection) => (
+        <>
+          <div className="grid gap-4">
+            {inspections.slice(0, displayCount).map((inspection) => (
             <Card 
               key={inspection.id} 
               className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200 cursor-pointer"
@@ -512,8 +516,22 @@ function InspectionsContent() {
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
+            ))}
+          </div>
+
+          {/* Show More Button */}
+          {inspections.length > displayCount && (
+            <div className="flex justify-center pt-4">
+              <Button
+                onClick={() => setDisplayCount(prev => prev + 12)}
+                variant="outline"
+                className="w-full max-w-xs bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                Show More ({inspections.length - displayCount} remaining)
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Delete Confirmation Dialog */}

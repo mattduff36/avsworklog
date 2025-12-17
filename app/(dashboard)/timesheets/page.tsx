@@ -51,6 +51,7 @@ export default function TimesheetsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [timesheetToDelete, setTimesheetToDelete] = useState<{ id: string; weekEnding: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [displayCount, setDisplayCount] = useState(12); // Show 12 timesheets initially
   const supabase = createClient();
 
   // Fetch employees if manager
@@ -330,34 +331,36 @@ export default function TimesheetsPage() {
         )}
       </div>
 
-      {/* Status Filter */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-slate-400" />
-            <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
-            <div className="flex gap-2 flex-wrap">
-              {(['all', 'draft', 'pending', 'approved', 'rejected', 'processed', 'adjusted'] as TimesheetStatusFilter[]).map((filter) => (
-                <Button
-                  key={filter}
-                  variant={statusFilter === filter ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setStatusFilter(filter)}
-                  className={statusFilter === filter ? '' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50'}
-                >
-                  {filter === 'pending' && <Clock className="h-3 w-3 mr-1" />}
-                  {filter === 'approved' && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                  {filter === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
-                  {filter === 'processed' && <Package className="h-3 w-3 mr-1" />}
-                  {filter === 'adjusted' && <AlertTriangle className="h-3 w-3 mr-1" />}
-                  {filter === 'draft' && <FileText className="h-3 w-3 mr-1" />}
-                  {getFilterLabel(filter)}
-                </Button>
-              ))}
+      {/* Status Filter - Only show for managers */}
+      {isManager && (
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-slate-400" />
+              <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
+              <div className="flex gap-2 flex-wrap">
+                {(['all', 'draft', 'pending', 'approved', 'rejected', 'processed', 'adjusted'] as TimesheetStatusFilter[]).map((filter) => (
+                  <Button
+                    key={filter}
+                    variant={statusFilter === filter ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setStatusFilter(filter)}
+                    className={statusFilter === filter ? '' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50'}
+                  >
+                    {filter === 'pending' && <Clock className="h-3 w-3 mr-1" />}
+                    {filter === 'approved' && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                    {filter === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
+                    {filter === 'processed' && <Package className="h-3 w-3 mr-1" />}
+                    {filter === 'adjusted' && <AlertTriangle className="h-3 w-3 mr-1" />}
+                    {filter === 'draft' && <FileText className="h-3 w-3 mr-1" />}
+                    {getFilterLabel(filter)}
+                  </Button>
+                ))}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {loading ? (
         <div className="grid gap-4">
@@ -398,8 +401,9 @@ export default function TimesheetsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
-          {timesheets.map((timesheet) => (
+        <>
+          <div className="grid gap-4">
+            {timesheets.slice(0, displayCount).map((timesheet) => (
             <Card 
               key={timesheet.id} 
               className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-timesheet/50 transition-all duration-200 cursor-pointer"
@@ -475,8 +479,22 @@ export default function TimesheetsPage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
+            ))}
+          </div>
+
+          {/* Show More Button */}
+          {timesheets.length > displayCount && (
+            <div className="flex justify-center pt-4">
+              <Button
+                onClick={() => setDisplayCount(prev => prev + 12)}
+                variant="outline"
+                className="w-full max-w-xs bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                Show More ({timesheets.length - displayCount} remaining)
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Delete Confirmation Dialog */}
