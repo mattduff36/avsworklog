@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
@@ -45,16 +45,6 @@ export default function ActionsPage() {
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [loggedComment, setLoggedComment] = useState('');
 
-  useEffect(() => {
-    if (!authLoading) {
-      if (!isManager) {
-        router.push('/dashboard');
-        return;
-      }
-      fetchActions();
-    }
-  }, [authLoading, isManager, router, fetchActions]);
-
   const fetchActions = useCallback(async () => {
     try {
       setLoading(true);
@@ -84,6 +74,16 @@ export default function ActionsPage() {
       setLoading(false);
     }
   }, [supabase]);
+
+  useEffect(() => {
+    if (!authLoading) {
+      if (!isManager) {
+        router.push('/dashboard');
+        return;
+      }
+      fetchActions();
+    }
+  }, [authLoading, isManager, router, fetchActions]);
 
   // Mark as logged - opens modal for comment
   const handleMarkAsLogged = (actionId: string) => {
