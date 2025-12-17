@@ -44,7 +44,7 @@ function NewInspectionContent() {
   }>>([]);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [vehicleId, setVehicleId] = useState('');
-  const [weekEnding, setWeekEnding] = useState(formatDateISO(getWeekEnding()));
+  const [weekEnding, setWeekEnding] = useState('');
   const [activeDay, setActiveDay] = useState('0'); // 0-6 for Monday-Sunday
   const [currentMileage, setCurrentMileage] = useState('');
   // Store checkbox states as "dayOfWeek-itemNumber": status (e.g., "1-5": "ok")
@@ -761,19 +761,23 @@ function NewInspectionContent() {
               </p>
             </div>
           </div>
-          {/* Progress Badge */}
-          <div className="bg-inspection/10 dark:bg-inspection/20 border border-inspection/30 rounded-lg px-3 py-2">
-            <div className="text-xs text-slate-600 dark:text-slate-400">Progress</div>
-            <div className="text-lg font-bold text-slate-900 dark:text-white">{completedItems}/{totalItems}</div>
+          {/* Progress Badge - Only show when vehicle is selected */}
+          {vehicleId && (
+            <div className="bg-inspection/10 dark:bg-inspection/20 border border-inspection/30 rounded-lg px-3 py-2">
+              <div className="text-xs text-slate-600 dark:text-slate-400">Progress</div>
+              <div className="text-lg font-bold text-slate-900 dark:text-white">{completedItems}/{totalItems}</div>
+            </div>
+          )}
+        </div>
+        {/* Progress Bar - Only show when vehicle is selected */}
+        {vehicleId && (
+          <div className="h-2 bg-slate-200 dark:bg-slate-800/50 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-inspection transition-all duration-300"
+              style={{ width: `${progressPercent}%` }}
+            />
           </div>
-        </div>
-        {/* Progress Bar */}
-        <div className="h-2 bg-slate-200 dark:bg-slate-800/50 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-inspection transition-all duration-300"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
+        )}
       </div>
 
       {error && (
