@@ -51,10 +51,13 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
   });
   
   const router = useRouter();
-  const { user, profile, isManager } = useAuth();
+  const { user, profile, isManager, isAdmin } = useAuth();
   const { isOnline } = useOfflineSync();
   const { addToQueue } = useOfflineStore();
   const supabase = createClient();
+  
+  // Admins and managers both have elevated permissions
+  const hasElevatedPermissions = isManager || isAdmin;
   
   const [existingTimesheetId, setExistingTimesheetId] = useState<string | null>(initialExistingId);
   const [regNumber, setRegNumber] = useState('');
@@ -114,16 +117,16 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
     loadBankHolidays();
   }, []);
 
-  // Fetch employees if manager
+  // Fetch employees if manager/admin
   useEffect(() => {
-    if (user && isManager) {
+    if (user && hasElevatedPermissions) {
       fetchEmployees();
     } else if (user && !selectedEmployeeId) {
-      // If not a manager and no employee selected, set to current user
+      // If not a manager/admin and no employee selected, set to current user
       setSelectedEmployeeId(user.id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isManager]);
+  }, [user, hasElevatedPermissions]);
 
   // Load existing timesheet if ID is provided via props
   useEffect(() => {
@@ -309,13 +312,13 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
     setError('');
     
     try {
-      console.log('1️⃣ Starting load, isManager:', isManager, 'employees.length:', employees.length);
+      console.log('1️⃣ Starting load, hasElevatedPermissions:', hasElevatedPermissions, 'employees.length:', employees.length);
       
-      // For managers, ensure employees are loaded first
-      if (isManager) {
+      // For managers/admins, ensure employees are loaded first
+      if (hasElevatedPermissions) {
         // If employees haven't been loaded yet, fetch them now
         if (employees.length === 0) {
-          console.log('2️⃣ Fetching employees for manager...');
+          console.log('2️⃣ Fetching employees for manager/admin...');
           const { data: employeesData, error: employeesError } = await supabase
             .from('profiles')
             .select('id, full_name, employee_id')
@@ -339,9 +342,9 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       if (timesheetError) throw timesheetError;
       
       // Check if user has access and timesheet is draft or rejected
-      console.log('6️⃣ Checking permissions...', { isManager, timesheetUserId: timesheetData.user_id, currentUserId: user.id, status: timesheetData.status });
+      console.log('6️⃣ Checking permissions...', { hasElevatedPermissions, isManager, isAdmin, timesheetUserId: timesheetData.user_id, currentUserId: user.id, status: timesheetData.status });
       
-      if (!isManager && timesheetData.user_id !== user.id) {
+      if (!hasElevatedPermissions && timesheetData.user_id !== user.id) {
         console.log('❌ Permission denied');
         setError('You do not have permission to edit this timesheet');
         setLoadingExisting(false);
@@ -906,8 +909,8 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Manager: Employee Selector */}
-          {isManager && (
+          {/* Manager/Admin: Employee Selector */}
+          {hasElevatedPermissions && (
             <div className="space-y-2 pb-4 border-b border-slate-700">
               <Label htmlFor="employee" className="text-slate-900 dark:text-white text-base flex items-center gap-2">
                 <User className="h-4 w-4" />
