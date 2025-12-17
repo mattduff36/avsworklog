@@ -103,20 +103,57 @@ async function backfillInspectionActions() {
           SELECT item_number, item_description, comments, day_of_week
           FROM inspection_items
           WHERE inspection_id = $1 AND status = 'attention'
-          ORDER BY day_of_week, item_number;
+          ORDER BY item_number, day_of_week;
         `;
 
         const defectsResult = await client.query(defectsQuery, [inspection.id]);
         const defects = defectsResult.rows;
 
-        // Build description
-        const defectsList = defects.map(d => {
-          const day = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][d.day_of_week] || `Day ${d.day_of_week + 1}`;
-          const comment = d.comments ? ` - ${d.comments}` : '';
-          return `${day}: Item ${d.item_number} - ${d.item_description}${comment}`;
+        // Group defects by item_number and description to consolidate duplicates
+        const groupedDefects = new Map<string, { 
+          item_number: number; 
+          item_description: string; 
+          days: number[]; 
+          comments: string[];
+        }>();
+
+        defects.forEach(d => {
+          const key = `${d.item_number}-${d.item_description}`;
+          if (!groupedDefects.has(key)) {
+            groupedDefects.set(key, {
+              item_number: d.item_number,
+              item_description: d.item_description,
+              days: [],
+              comments: []
+            });
+          }
+          const group = groupedDefects.get(key)!;
+          group.days.push(d.day_of_week);
+          if (d.comments) {
+            group.comments.push(d.comments);
+          }
+        });
+
+        // Build consolidated description
+        const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        const defectsList = Array.from(groupedDefects.values()).map(group => {
+          let dayRange: string;
+          if (group.days.length === 1) {
+            dayRange = dayNames[group.days[0]] || `Day ${group.days[0] + 1}`;
+          } else if (group.days.length > 1) {
+            const firstDay = dayNames[group.days[0]] || `Day ${group.days[0] + 1}`;
+            const lastDay = dayNames[group.days[group.days.length - 1]] || `Day ${group.days[group.days.length - 1] + 1}`;
+            dayRange = `${firstDay.substring(0, 3)}-${lastDay.substring(0, 3)}`;
+          } else {
+            dayRange = 'Unknown';
+          }
+
+          const comment = group.comments.length > 0 ? ` - ${group.comments[0]}` : '';
+          return `Item ${group.item_number} - ${group.item_description} (${dayRange})${comment}`;
         }).join('\n');
 
         const description = `Vehicle inspection defects found:\n${defectsList}`;
+        const uniqueDefectCount = groupedDefects.size;
 
         // Create action
         const insertQuery = `
@@ -133,7 +170,7 @@ async function backfillInspectionActions() {
           ) RETURNING id;
         `;
 
-        const title = `${inspection.reg_number} - Inspection Defects (${inspection.defect_count} issue${inspection.defect_count > 1 ? 's' : ''})`;
+        const title = `${inspection.reg_number} - Inspection Defects (${uniqueDefectCount} issue${uniqueDefectCount > 1 ? 's' : ''})`;
         
         const insertResult = await client.query(insertQuery, [
           title,
@@ -147,7 +184,7 @@ async function backfillInspectionActions() {
 
         const actionId = insertResult.rows[0].id;
 
-        console.log(`  ✅ Created action for ${inspection.reg_number} (${inspection.inspection_date.toISOString().split('T')[0]}) - Action ID: ${actionId.substring(0, 8)}...`);
+        console.log(`  ✅ Created action for ${inspection.reg_number} (${inspection.inspection_date.toISOString().split('T')[0]}) - ${uniqueDefectCount} unique defects - Action ID: ${actionId.substring(0, 8)}...`);
         createdCount++;
 
       } catch (error) {

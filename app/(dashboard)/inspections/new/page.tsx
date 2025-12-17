@@ -66,6 +66,13 @@ function NewInspectionContent() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
 
+  // Resolution tracking states
+  const [previousDefects, setPreviousDefects] = useState<Map<string, any>>(new Map());
+  const [showResolutionDialog, setShowResolutionDialog] = useState(false);
+  const [pendingResolution, setPendingResolution] = useState<{ day: number; itemNum: number; itemDesc: string } | null>(null);
+  const [resolutionComment, setResolutionComment] = useState('');
+  const [resolvedItems, setResolvedItems] = useState<Map<string, string>>(new Map()); // key: "day-itemNum", value: resolution comment
+
   useEffect(() => {
     fetchVehicles();
     fetchCategories();
@@ -156,6 +163,58 @@ function NewInspectionContent() {
       setCategories(data || []);
     } catch (err) {
       console.error('Error fetching categories:', err);
+    }
+  };
+
+  // Load previous defects for the selected vehicle
+  const loadPreviousDefects = async (selectedVehicleId: string) => {
+    try {
+      // Get the most recent submitted inspection for this vehicle
+      const { data: lastInspection, error: inspectionError } = await supabase
+        .from('vehicle_inspections')
+        .select(`
+          id,
+          inspection_items (
+            item_number,
+            item_description,
+            status,
+            day_of_week
+          )
+        `)
+        .eq('vehicle_id', selectedVehicleId)
+        .eq('status', 'submitted')
+        .order('inspection_date', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (inspectionError || !lastInspection) {
+        // No previous inspection, clear previous defects
+        setPreviousDefects(new Map());
+        return;
+      }
+
+      // Build map of defective items: key = "itemNumber-itemDescription"
+      const defectsMap = new Map<string, any>();
+      const items = (lastInspection as any).inspection_items || [];
+      
+      items.forEach((item: any) => {
+        if (item.status === 'attention') {
+          const key = `${item.item_number}-${item.item_description}`;
+          if (!defectsMap.has(key)) {
+            defectsMap.set(key, {
+              item_number: item.item_number,
+              item_description: item.item_description,
+              days: []
+            });
+          }
+          defectsMap.get(key).days.push(item.day_of_week);
+        }
+      });
+
+      setPreviousDefects(defectsMap);
+    } catch (err) {
+      console.error('Error loading previous defects:', err);
+      setPreviousDefects(new Map());
     }
   };
 
@@ -273,6 +332,21 @@ function NewInspectionContent() {
   const handleStatusChange = (itemNumber: number, status: InspectionStatus) => {
     const dayOfWeek = parseInt(activeDay) + 1; // Convert 0-6 to 1-7
     const key = `${dayOfWeek}-${itemNumber}`;
+    
+    // Check if marking previously-defective item as OK
+    if (status === 'ok') {
+      const itemDescription = currentChecklist[itemNumber - 1];
+      const defectKey = `${itemNumber}-${itemDescription}`;
+      
+      if (previousDefects.has(defectKey)) {
+        // This item was defective in the last inspection
+        // Show modal requiring resolution comment
+        setPendingResolution({ day: dayOfWeek, itemNum: itemNumber, itemDesc: itemDescription });
+        setShowResolutionDialog(true);
+        return; // Don't set the status yet
+      }
+    }
+    
     setCheckboxStates(prev => ({ ...prev, [key]: status }));
   };
 
@@ -630,15 +704,66 @@ function NewInspectionContent() {
         const failedItems = insertedItems.filter((item: any) => item.status === 'attention');
         
         if (failedItems.length > 0) {
+          // Get vehicle registration for action title
+          const { data: vehicleData } = await supabase
+            .from('vehicles')
+            .select('reg_number')
+            .eq('id', vehicleId)
+            .single();
+          
+          const vehicleReg = vehicleData?.reg_number || 'Unknown Vehicle';
+
+          // Group defects by item_number and description to consolidate duplicates
+          const groupedDefects = new Map<string, { 
+            item_number: number; 
+            item_description: string; 
+            days: number[]; 
+            comments: string[];
+            item_ids: string[];
+          }>();
+
+          failedItems.forEach((item: any) => {
+            const key = `${item.item_number}-${item.item_description}`;
+            if (!groupedDefects.has(key)) {
+              groupedDefects.set(key, {
+                item_number: item.item_number,
+                item_description: item.item_description,
+                days: [],
+                comments: [],
+                item_ids: []
+              });
+            }
+            const group = groupedDefects.get(key)!;
+            group.days.push(item.day_of_week);
+            group.item_ids.push(item.id);
+            if (item.comments) {
+              group.comments.push(item.comments);
+            }
+          });
+
+          // Create one action per unique defect
           type ActionInsert = Database['public']['Tables']['actions']['Insert'];
-          const actions: ActionInsert[] = failedItems.map((item: any) => {
-            const itemName = item.item_description || `Item ${item.item_number}`;
-            const dayName = DAY_NAMES[item.day_of_week - 1] || `Day ${item.day_of_week}`;
+          const actions: ActionInsert[] = Array.from(groupedDefects.values()).map((group) => {
+            let dayRange: string;
+            if (group.days.length === 1) {
+              const dayName = DAY_NAMES[group.days[0] - 1] || `Day ${group.days[0]}`;
+              dayRange = dayName;
+            } else if (group.days.length > 1) {
+              const firstDay = DAY_NAMES[group.days[0] - 1] || `Day ${group.days[0]}`;
+              const lastDay = DAY_NAMES[group.days[group.days.length - 1] - 1] || `Day ${group.days[group.days.length - 1]}`;
+              dayRange = `${firstDay.substring(0, 3)}-${lastDay.substring(0, 3)}`;
+            } else {
+              dayRange = 'Unknown';
+            }
+
+            const itemName = group.item_description || `Item ${group.item_number}`;
+            const comment = group.comments.length > 0 ? `\nComment: ${group.comments[0]}` : '';
+            
             return {
               inspection_id: inspection.id,
-              inspection_item_id: item.id,
-              title: `Defect: ${itemName} (${dayName})`,
-              description: `Vehicle inspection item failed during ${dayName} inspection`,
+              inspection_item_id: group.item_ids[0], // Link to first occurrence
+              title: `${vehicleReg} - ${itemName} (${dayRange})`,
+              description: `Vehicle inspection defect found:\nItem ${group.item_number} - ${itemName}${comment}`,
               priority: 'high',
               status: 'pending',
               created_by: user!.id,
@@ -653,6 +778,68 @@ function NewInspectionContent() {
             console.error('Error creating actions:', actionsError);
             // Don't throw - we don't want to fail the inspection if action creation fails
           }
+        }
+      }
+
+      // Auto-complete actions for resolved items
+      if (status === 'submitted' && resolvedItems.size > 0 && vehicleId) {
+        try {
+          // Find pending actions for this vehicle's defects
+          const { data: pendingActions } = await supabase
+            .from('actions')
+            .select(`
+              id,
+              inspection_item_id,
+              inspection_id,
+              vehicle_inspections!inner (
+                vehicle_id
+              )
+            `)
+            .eq('status', 'pending')
+            .eq('vehicle_inspections.vehicle_id', vehicleId);
+
+          if (pendingActions && pendingActions.length > 0) {
+            // Get the inspection items from the previous inspection to match with actions
+            const { data: previousInspectionItems } = await supabase
+              .from('inspection_items')
+              .select('id, item_number, item_description')
+              .in('id', pendingActions.map(a => a.inspection_item_id).filter(Boolean));
+
+            // For each resolved item, find matching action and complete it
+            for (const [key, resolutionComment] of resolvedItems.entries()) {
+              const [, itemNumStr] = key.split('-');
+              const itemNum = parseInt(itemNumStr);
+              const itemDesc = currentChecklist[itemNum - 1];
+
+              // Find matching action
+              const matchingItem = previousInspectionItems?.find(
+                item => item.item_number === itemNum && item.item_description === itemDesc
+              );
+
+              if (matchingItem) {
+                const matchingAction = pendingActions.find(a => a.inspection_item_id === matchingItem.id);
+
+                if (matchingAction) {
+                  // Complete the action with resolution comment
+                  await supabase
+                    .from('actions')
+                    .update({
+                      status: 'completed',
+                      actioned: true,
+                      actioned_at: new Date().toISOString(),
+                      actioned_by: user!.id,
+                      description: `${matchingAction.description || ''}\n\nResolution: ${resolutionComment}`
+                    })
+                    .eq('id', matchingAction.id);
+
+                  console.log(`✅ Auto-completed action ${matchingAction.id} for resolved item ${itemNum}`);
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error completing resolved actions:', err);
+          // Don't throw - we don't want to fail the inspection if this fails
         }
       }
 
@@ -841,6 +1028,8 @@ function NewInspectionContent() {
                       const checklist = getChecklistForCategory(categoryName);
                       setCurrentChecklist(checklist);
                     }
+                    // Load previous defects for resolution tracking
+                    loadPreviousDefects(value);
                   }
                 }}
                 onOpenChange={(open) => {
@@ -1234,6 +1423,98 @@ function NewInspectionContent() {
               className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 font-semibold"
             >
               {addingVehicle ? 'Adding...' : 'Add Vehicle'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resolution Dialog - Required when marking previously-defective items as OK */}
+      <Dialog open={showResolutionDialog} onOpenChange={(open) => {
+        if (!open && pendingResolution) {
+          // User cancelled - don't mark as OK
+          setPendingResolution(null);
+          setResolutionComment('');
+        }
+        setShowResolutionDialog(open);
+      }}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              Defect Resolution Required
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              This item was defective in the previous inspection
+            </DialogDescription>
+          </DialogHeader>
+          
+          {pendingResolution && (
+            <div className="py-4 space-y-4">
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                <p className="text-sm text-amber-200">
+                  <strong>Item {pendingResolution.itemNum}:</strong> {pendingResolution.itemDesc}
+                </p>
+                <p className="text-xs text-amber-300 mt-2">
+                  This item was marked as defective in the last inspection. 
+                  Please explain why it is now marked as OK.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="resolution-comment" className="text-white">
+                  Resolution Explanation *
+                </Label>
+                <Textarea
+                  id="resolution-comment"
+                  value={resolutionComment}
+                  onChange={(e) => setResolutionComment(e.target.value)}
+                  placeholder="e.g., Light bulb replaced on Wednesday by Dave"
+                  className="bg-slate-800 border-slate-600 text-white min-h-[100px]"
+                  required
+                />
+                <p className="text-xs text-slate-400">
+                  This comment will be added to the action and marked as complete.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowResolutionDialog(false);
+                setPendingResolution(null);
+                setResolutionComment('');
+              }}
+              className="border-slate-600 text-white hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!resolutionComment.trim()) {
+                  toast.error('Please provide an explanation');
+                  return;
+                }
+                if (pendingResolution) {
+                  // Mark as OK and store resolution comment
+                  const key = `${pendingResolution.day}-${pendingResolution.itemNum}`;
+                  setCheckboxStates(prev => ({ ...prev, [key]: 'ok' }));
+                  setResolvedItems(prev => new Map(prev).set(key, resolutionComment.trim()));
+                  
+                  // Close dialog and reset
+                  setShowResolutionDialog(false);
+                  setPendingResolution(null);
+                  setResolutionComment('');
+                  
+                  toast.success('Resolution recorded');
+                }
+              }}
+              className="bg-green-600 hover:bg-green-700"
+              disabled={!resolutionComment.trim()}
+            >
+              Mark as Resolved
             </Button>
           </DialogFooter>
         </DialogContent>
