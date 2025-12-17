@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { OfflineBanner } from '@/components/ui/offline-banner';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, FileText } from 'lucide-react';
+import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, FileText, Truck } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import { VehicleInspection } from '@/types/inspection';
@@ -39,6 +39,12 @@ interface InspectionWithVehicle extends VehicleInspection {
   };
 }
 
+interface Vehicle {
+  id: string;
+  reg_number: string;
+  vehicle_type: string;
+}
+
 function InspectionsContent() {
   const { user, isManager } = useAuth();
   const { isOnline } = useOfflineSync();
@@ -47,6 +53,7 @@ function InspectionsContent() {
   const [inspections, setInspections] = useState<InspectionWithVehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   // Use URL search params to persist filter selection across navigations
   const [selectedEmployeeId, setSelectedEmployeeId] = useQueryState('employee', { 
     defaultValue: 'all',
@@ -56,22 +63,27 @@ function InspectionsContent() {
     defaultValue: 'all' as InspectionStatusFilter,
     shallow: false,
   });
+  const [vehicleFilter, setVehicleFilter] = useQueryState('vehicle', {
+    defaultValue: 'all',
+    shallow: false,
+  });
   const [downloading, setDownloading] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [inspectionToDelete, setInspectionToDelete] = useState<{ id: string; vehicleReg: string; date: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const supabase = createClient();
 
-  // Fetch employees if manager
+  // Fetch employees and vehicles
   useEffect(() => {
     if (user && isManager) {
       fetchEmployees();
     }
+    fetchVehicles();
   }, [user?.id, isManager]);
 
   useEffect(() => {
     fetchInspections();
-  }, [user?.id, isManager, selectedEmployeeId, statusFilter]);
+  }, [user?.id, isManager, selectedEmployeeId, statusFilter, vehicleFilter]);
 
   // Listen for realtime updates to inspections
   useInspectionRealtime((payload) => {
@@ -104,6 +116,20 @@ function InspectionsContent() {
       setEmployees(data || []);
     } catch (err) {
       console.error('Error fetching employees:', err);
+    }
+  };
+
+  const fetchVehicles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('vehicles')
+        .select('id, reg_number, vehicle_type')
+        .order('reg_number');
+      
+      if (error) throw error;
+      setVehicles(data || []);
+    } catch (err) {
+      console.error('Error fetching vehicles:', err);
     }
   };
 
@@ -142,6 +168,12 @@ function InspectionsContent() {
         query = query.eq('status', currentStatusFilter);
       }
       // 'all' doesn't filter by status
+
+      // Apply vehicle filter
+      const currentVehicleFilter = vehicleFilter || 'all';
+      if (currentVehicleFilter !== 'all') {
+        query = query.eq('vehicle_id', currentVehicleFilter);
+      }
 
       const { data, error } = await query;
 
@@ -302,26 +334,49 @@ function InspectionsContent() {
         )}
       </div>
 
-      {/* Status Filter */}
+      {/* Filters */}
       <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
         <CardContent className="pt-6">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-slate-400" />
-            <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
-            <div className="flex gap-2 flex-wrap">
-              {(['all', 'draft', 'submitted'] as InspectionStatusFilter[]).map((filter) => (
-                <Button
-                  key={filter}
-                  variant={statusFilter === filter ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setStatusFilter(filter)}
-                  className={statusFilter === filter ? '' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50'}
-                >
-                  {filter === 'submitted' && <Clock className="h-3 w-3 mr-1" />}
-                  {filter === 'draft' && <FileText className="h-3 w-3 mr-1" />}
-                  {getFilterLabel(filter)}
-                </Button>
-              ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Status Filter */}
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-slate-400" />
+              <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
+              <div className="flex gap-2 flex-wrap">
+                {(['all', 'draft', 'submitted'] as InspectionStatusFilter[]).map((filter) => (
+                  <Button
+                    key={filter}
+                    variant={statusFilter === filter ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setStatusFilter(filter)}
+                    className={statusFilter === filter ? '' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50'}
+                  >
+                    {filter === 'submitted' && <Clock className="h-3 w-3 mr-1" />}
+                    {filter === 'draft' && <FileText className="h-3 w-3 mr-1" />}
+                    {getFilterLabel(filter)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Vehicle Filter */}
+            <div className="flex items-center gap-3">
+              <Truck className="h-4 w-4 text-slate-400" />
+              <span className="text-sm text-slate-400 mr-2 whitespace-nowrap">Filter by vehicle:</span>
+              <Select value={vehicleFilter} onValueChange={setVehicleFilter}>
+                <SelectTrigger className="h-9 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white">
+                  <SelectValue placeholder="All vehicles" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Vehicles</SelectItem>
+                  {vehicles.map((vehicle) => (
+                    <SelectItem key={vehicle.id} value={vehicle.id}>
+                      {vehicle.reg_number}
+                      {vehicle.vehicle_type && ` (${vehicle.vehicle_type})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
