@@ -741,7 +741,7 @@ function NewInspectionContent() {
             }
           });
 
-          // Create one action per unique defect
+          // Create ONE action per unique defect (so each can be resolved independently)
           type ActionInsert = Database['public']['Tables']['actions']['Insert'];
           const actions: ActionInsert[] = Array.from(groupedDefects.values()).map((group) => {
             let dayRange: string;
@@ -763,7 +763,7 @@ function NewInspectionContent() {
               inspection_id: inspection.id,
               inspection_item_id: group.item_ids[0], // Link to first occurrence
               title: `${vehicleReg} - ${itemName} (${dayRange})`,
-              description: `Vehicle inspection defect found:\nItem ${group.item_number} - ${itemName}${comment}`,
+              description: `Vehicle inspection defect found:\nItem ${group.item_number} - ${itemName} (${dayRange})${comment}`,
               priority: 'high',
               status: 'pending',
               created_by: user!.id,

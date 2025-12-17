@@ -134,9 +134,12 @@ async function backfillInspectionActions() {
           }
         });
 
-        // Build consolidated description
+        // Create ONE action per unique defect (not one action per inspection)
         const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        const defectsList = Array.from(groupedDefects.values()).map(group => {
+        const uniqueDefectCount = groupedDefects.size;
+
+        for (const group of groupedDefects.values()) {
+          // Build day range for this defect
           let dayRange: string;
           if (group.days.length === 1) {
             dayRange = dayNames[group.days[0]] || `Day ${group.days[0] + 1}`;
@@ -148,44 +151,40 @@ async function backfillInspectionActions() {
             dayRange = 'Unknown';
           }
 
-          const comment = group.comments.length > 0 ? ` - ${group.comments[0]}` : '';
-          return `Item ${group.item_number} - ${group.item_description} (${dayRange})${comment}`;
-        }).join('\n');
+          const comment = group.comments.length > 0 ? `\nComment: ${group.comments[0]}` : '';
+          const description = `Vehicle inspection defect found:\nItem ${group.item_number} - ${group.item_description} (${dayRange})${comment}`;
+          const title = `${inspection.reg_number} - ${group.item_description} (${dayRange})`;
 
-        const description = `Vehicle inspection defects found:\n${defectsList}`;
-        const uniqueDefectCount = groupedDefects.size;
-
-        // Create action
-        const insertQuery = `
-          INSERT INTO actions (
+          // Create action for this defect
+          const insertQuery = `
+            INSERT INTO actions (
+              title,
+              description,
+              inspection_id,
+              status,
+              priority,
+              created_by,
+              created_at
+            ) VALUES (
+              $1, $2, $3, $4, $5, $6, $7
+            ) RETURNING id;
+          `;
+          
+          const insertResult = await client.query(insertQuery, [
             title,
             description,
-            inspection_id,
-            status,
-            priority,
-            created_by,
-            created_at
-          ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7
-          ) RETURNING id;
-        `;
+            inspection.id,
+            'pending',
+            'high',
+            inspection.user_id,
+            new Date().toISOString()
+          ]);
 
-        const title = `${inspection.reg_number} - Inspection Defects (${uniqueDefectCount} issue${uniqueDefectCount > 1 ? 's' : ''})`;
-        
-        const insertResult = await client.query(insertQuery, [
-          title,
-          description,
-          inspection.id,
-          'pending',
-          'high',
-          inspection.user_id,
-          new Date().toISOString()
-        ]);
+          const actionId = insertResult.rows[0].id;
+          createdCount++;
+        }
 
-        const actionId = insertResult.rows[0].id;
-
-        console.log(`  ✅ Created action for ${inspection.reg_number} (${inspection.inspection_date.toISOString().split('T')[0]}) - ${uniqueDefectCount} unique defects - Action ID: ${actionId.substring(0, 8)}...`);
-        createdCount++;
+        console.log(`  ✅ Created ${uniqueDefectCount} action${uniqueDefectCount > 1 ? 's' : ''} for ${inspection.reg_number} (${inspection.inspection_date.toISOString().split('T')[0]})`);
 
       } catch (error) {
         console.error(`  ❌ Failed to create action for ${inspection.reg_number}:`, error);
