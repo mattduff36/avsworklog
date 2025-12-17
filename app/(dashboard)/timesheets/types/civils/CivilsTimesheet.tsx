@@ -149,23 +149,26 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
   useEffect(() => {
     console.log('🔄 CivilsTimesheet useEffect:', { 
       initialExistingId, 
-      hasUser: !!user, 
+      hasUser: !!user,
+      hasProfile: !!profile,
       loadingExisting 
     });
     
-    // Wait for both ID and authenticated user before loading
-    if (initialExistingId && user && !loadingExisting) {
-      console.log('📥 Calling loadExistingTimesheet...');
+    // Wait for ID, authenticated user, AND profile before loading
+    // (profile needed for permission checks)
+    if (initialExistingId && user && profile && !loadingExisting) {
+      console.log('📥 Calling loadExistingTimesheet with profile...');
       loadExistingTimesheet(initialExistingId);
     } else {
       console.log('⏭️ Skipping load:', { 
         hasId: !!initialExistingId,
         hasUser: !!user,
+        hasProfile: !!profile,
         alreadyLoading: loadingExisting 
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialExistingId, user]);
+  }, [initialExistingId, user, profile]);
 
   // Removed: Fetch existing timesheets effect - no longer needed
   // Duplicate checking now happens in WeekSelector
