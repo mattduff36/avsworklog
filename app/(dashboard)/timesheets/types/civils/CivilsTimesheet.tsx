@@ -58,11 +58,16 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
     userId: user?.id,
     hasProfile: !!profile,
     profileRole: profile?.role?.name,
+    profileRoleObject: profile?.role,
+    profileIsSuperAdmin: profile?.is_super_admin,
+    roleIsSuperAdmin: profile?.role?.is_super_admin,
+    roleIsManager: profile?.role?.is_manager_admin,
     isSuperAdmin, 
     isManager, 
-    isAdmin,
-    rawProfile: profile 
+    isAdmin
   });
+  
+  console.log('📊 Full profile object:', profile);
   
   const { isOnline } = useOfflineSync();
   const { addToQueue } = useOfflineStore();
