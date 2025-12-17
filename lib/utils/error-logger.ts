@@ -78,6 +78,28 @@ class ErrorLogger {
           return;
         }
         
+        // Filter out empty objects and meaningless errors
+        if (errorMessage === '{}' || 
+            errorMessage.trim() === '' ||
+            errorMessage === '[object Object]') {
+          return;
+        }
+        
+        // Filter out Supabase auth internal errors (empty objects from auth flow)
+        if (args.length === 1 && 
+            typeof args[0] === 'object' && 
+            args[0] !== null &&
+            Object.keys(args[0]).length === 0) {
+          return;
+        }
+        
+        // Filter out Supabase session errors (these are internal and not actionable)
+        if (errorMessage.includes('_useSession') || 
+            errorMessage.includes('_getUser') ||
+            errorMessage.includes('AuthSessionMissingError')) {
+          return;
+        }
+        
         // Only log if it looks like an actual error (not React warnings)
         if (!errorMessage.includes('Warning:') && !errorMessage.includes('%c')) {
           this.logError({

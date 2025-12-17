@@ -824,8 +824,34 @@ function NewTimesheetContent() {
           description: 'Please check your internet connection and try again.',
         });
       } else if (error?.code === '23505' || error?.message?.includes('duplicate key') || error?.message?.includes('timesheets_user_id_week_ending_key')) {
-        // Only show duplicate error if we're not updating an existing timesheet
+        // Only handle duplicate error if we're not updating an existing timesheet
         if (!existingTimesheetId) {
+          // Find the existing timesheet and redirect user to edit it
+          try {
+            const { data: existingTimesheet } = await supabase
+              .from('timesheets')
+              .select('id')
+              .eq('user_id', selectedEmployeeId)
+              .eq('week_ending', weekEnding)
+              .single();
+            
+            if (existingTimesheet) {
+              toast.error('Timesheet already exists for this week', {
+                description: 'Redirecting you to the existing timesheet...',
+                duration: 3000,
+              });
+              
+              // Redirect to the existing timesheet after a short delay
+              setTimeout(() => {
+                router.push(`/timesheets/new?id=${existingTimesheet.id}`);
+              }, 1500);
+              return; // Exit early, don't show error dialog
+            }
+          } catch (queryError) {
+            console.error('Error finding existing timesheet:', queryError);
+          }
+          
+          // Fallback error message if we couldn't find the existing timesheet
           setError('A timesheet already exists for this week. Please go back to the timesheets list to view or edit the existing timesheet, or select a different week ending date.');
         } else {
           setError('Failed to update timesheet. Please try again or contact support if the problem persists.');

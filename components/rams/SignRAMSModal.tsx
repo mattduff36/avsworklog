@@ -58,7 +58,10 @@ export function SignRAMSModal({
       onSuccess();
       onClose();
     } catch (error) {
-      console.error('Sign error:', error);
+      // Only log meaningful errors (not empty objects)
+      if (error && (error instanceof Error || (typeof error === 'object' && Object.keys(error).length > 0))) {
+        console.error('Sign error:', error);
+      }
       toast.error(error instanceof Error ? error.message : 'Signature failed');
     } finally {
       setLoading(false);
