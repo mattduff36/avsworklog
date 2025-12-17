@@ -302,6 +302,8 @@ export default function ActionsPage() {
     switch (status) {
       case 'completed':
         return <CheckCircle2 className="h-5 w-5 text-green-400" />;
+      case 'logged':
+        return <FileText className="h-5 w-5 text-red-400" />;
       case 'in_progress':
         return <Clock className="h-5 w-5 text-blue-400" />;
       default:
@@ -317,8 +319,9 @@ export default function ActionsPage() {
     );
   }
 
-  const pendingActions = actions.filter(a => !a.actioned);
-  const actionedActions = actions.filter(a => a.actioned);
+  const pendingActions = actions.filter(a => a.status === 'pending');
+  const loggedActions = actions.filter(a => a.status === 'logged');
+  const completedActions = actions.filter(a => a.status === 'completed');
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -337,7 +340,7 @@ export default function ActionsPage() {
       )}
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardHeader className="pb-3">
             <CardDescription className="text-slate-600 dark:text-slate-400">Pending</CardDescription>
@@ -346,8 +349,14 @@ export default function ActionsPage() {
         </Card>
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardHeader className="pb-3">
-            <CardDescription className="text-slate-600 dark:text-slate-400">Actioned</CardDescription>
-            <CardTitle className="text-3xl text-green-600 dark:text-green-400">{actionedActions.length}</CardTitle>
+            <CardDescription className="text-slate-600 dark:text-slate-400">Logged</CardDescription>
+            <CardTitle className="text-3xl text-red-600 dark:text-red-400">{loggedActions.length}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <CardHeader className="pb-3">
+            <CardDescription className="text-slate-600 dark:text-slate-400">Completed</CardDescription>
+            <CardTitle className="text-3xl text-green-600 dark:text-green-400">{completedActions.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
@@ -468,8 +477,15 @@ export default function ActionsPage() {
                               <Trash2 className="h-4 w-4" />
                             </Button>
                             <Button
-                              variant="ghost"
-                              onClick={() => handleToggleActioned(action.id, action.actioned)}
+                              onClick={() => handleMarkAsLogged(action.id)}
+                              disabled={isCompleting}
+                              className="h-16 min-w-[140px] text-base font-semibold bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30"
+                            >
+                              <FileText className="h-4 w-4 mr-2" />
+                              Logged
+                            </Button>
+                            <Button
+                              onClick={() => handleMarkAsComplete(action.id, action.status)}
                               disabled={isCompleting}
                               className={`h-16 min-w-[140px] text-base font-semibold transition-all ${
                                 isCompleting
@@ -498,12 +514,117 @@ export default function ActionsPage() {
         </div>
       )}
 
-      {/* Actioned Items */}
-      {actionedActions.length > 0 && (
+      {/* Logged Actions */}
+      {loggedActions.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+            <FileText className="h-5 w-5 text-red-400" />
+            Logged Actions
+            <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
+              Acknowledged, not fixed yet
+            </Badge>
+          </h2>
+          <div className="space-y-3">
+            {loggedActions.map((action) => {
+              const isCompleting = completingActions.has(action.id);
+              return (
+                <Card key={action.id} className="bg-white dark:bg-slate-900 border-red-500/30 dark:border-red-500/30 hover:shadow-lg hover:border-red-500/50 transition-all duration-200">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              {getStatusIcon(action.status)}
+                              <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{action.title}</h3>
+                              {getPriorityBadge(action.priority)}
+                              <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
+                                LOGGED
+                              </Badge>
+                            </div>
+                            {action.description && (
+                              <p className="text-sm text-slate-600 dark:text-slate-400 mb-2 whitespace-pre-line">{action.description}</p>
+                            )}
+                            {action.logged_comment && (
+                              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-2">
+                                <p className="text-sm text-red-300">
+                                  <strong>Manager Note:</strong> {action.logged_comment}
+                                </p>
+                              </div>
+                            )}
+                            <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
+                              {action.vehicle_inspections && (
+                                <span>
+                                  Vehicle: {action.vehicle_inspections.vehicles?.reg_number || 'N/A'}
+                                </span>
+                              )}
+                              {action.inspection_items && (
+                                <span>
+                                  Issue: {action.inspection_items.item_description}
+                                </span>
+                              )}
+                              <span>Created: {formatDate(action.created_at)}</span>
+                              {action.logged_at && (
+                                <span className="text-red-400">
+                                  Logged: {formatDate(action.logged_at)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteAction(action.id)}
+                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              onClick={() => handleUndoLogged(action.id)}
+                              variant="outline"
+                              disabled={isCompleting}
+                              className="h-16 min-w-[140px] text-base font-semibold border-slate-600 text-white hover:bg-slate-800"
+                            >
+                              <Undo2 className="h-4 w-4 mr-2" />
+                              Undo Logged
+                            </Button>
+                            <Button
+                              onClick={() => handleMarkAsComplete(action.id, action.status)}
+                              disabled={isCompleting}
+                              className={`h-16 min-w-[140px] text-base font-semibold transition-all ${
+                                isCompleting
+                                  ? 'bg-green-500 hover:bg-green-500 text-white'
+                                  : 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 [&]:text-slate-900'
+                              }`}
+                            >
+                              {isCompleting ? (
+                                <>
+                                  <CheckCircle2 className="h-5 w-5 mr-2" />
+                                  Complete
+                                </>
+                              ) : (
+                                'Complete'
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Completed Actions */}
+      {completedActions.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-xl font-semibold text-slate-600 dark:text-slate-400">Completed Actions</h2>
           <div className="space-y-3">
-            {actionedActions.map((action) => (
+            {completedActions.map((action) => (
               <Card key={action.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-90 transition-opacity">
                 <CardContent className="pt-6">
                   <div className="flex items-start gap-4">
@@ -536,10 +657,11 @@ export default function ActionsPage() {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                           <Button
-                            onClick={() => handleToggleActioned(action.id, action.actioned)}
+                            onClick={() => handleUndoComplete(action.id)}
                             variant="outline"
                             className="h-16 min-w-[140px] text-base font-semibold"
                           >
+                            <Undo2 className="h-4 w-4 mr-2" />
                             Undo Complete
                           </Button>
                         </div>
@@ -603,16 +725,23 @@ export default function ActionsPage() {
                                   <span>Created: {formatDate(action.created_at)}</span>
                                 </div>
                               </div>
-                              <div className="flex-shrink-0">
+                              <div className="flex-shrink-0 flex items-center gap-2">
                                 <Button
-                                  variant="ghost"
-                                  onClick={() => handleToggleActioned(action.id, action.actioned)}
+                                  onClick={() => handleMarkAsLogged(action.id)}
                                   disabled={isCompleting}
-                                  className={`min-w-[140px] transition-all duration-200 ${
+                                  className="h-16 min-w-[140px] text-base font-semibold bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30"
+                                >
+                                  <FileText className="h-4 w-4 mr-2" />
+                                  Logged
+                                </Button>
+                                <Button
+                                  onClick={() => handleMarkAsComplete(action.id, action.status)}
+                                  disabled={isCompleting}
+                                  className={`h-16 min-w-[140px] text-base font-semibold transition-all ${
                                     isCompleting
-                                      ? 'bg-green-600 hover:bg-green-600 text-white'
+                                      ? 'bg-green-500 hover:bg-green-500 text-white'
                                       : 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 [&]:text-slate-900'
-                                  } shadow-md hover:shadow-lg active:scale-95`}
+                                  }`}
                                 >
                                   {isCompleting ? (
                                     <>
@@ -708,6 +837,70 @@ export default function ActionsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Logged Comment Dialog */}
+      <Dialog open={showLoggedDialog} onOpenChange={setShowLoggedDialog}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">Mark Action as Logged</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Add a short comment explaining why this defect is being logged but not fixed immediately
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+              <p className="text-sm text-amber-200">
+                This defect will be automatically marked on future inspections until it's completed.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="logged-comment" className="text-white">
+                Comment <span className="text-slate-400">(max 40 chars)</span> *
+              </Label>
+              <Textarea
+                id="logged-comment"
+                value={loggedComment}
+                onChange={(e) => {
+                  if (e.target.value.length <= 40) {
+                    setLoggedComment(e.target.value);
+                  }
+                }}
+                placeholder="e.g., Minor cosmetic damage, not urgent"
+                className="bg-slate-800 border-slate-600 text-white"
+                maxLength={40}
+                rows={2}
+              />
+              <p className="text-xs text-slate-400">
+                {loggedComment.length}/40 characters
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowLoggedDialog(false);
+                setSelectedActionId(null);
+                setLoggedComment('');
+              }}
+              className="border-slate-600 text-white hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmLogged}
+              disabled={!loggedComment.trim() || loggedComment.length > 40}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Mark as Logged
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

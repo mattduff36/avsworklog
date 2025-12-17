@@ -354,10 +354,13 @@ export interface Database {
           title: string
           description: string | null
           priority: 'low' | 'medium' | 'high' | 'urgent'
-          status: 'pending' | 'in_progress' | 'completed'
+          status: 'pending' | 'in_progress' | 'logged' | 'completed'
           actioned: boolean
           actioned_at: string | null
           actioned_by: string | null
+          logged_comment: string | null
+          logged_at: string | null
+          logged_by: string | null
           created_by: string
           created_at: string
           updated_at: string
@@ -369,10 +372,13 @@ export interface Database {
           title: string
           description?: string | null
           priority?: 'low' | 'medium' | 'high' | 'urgent'
-          status?: 'pending' | 'in_progress' | 'completed'
+          status?: 'pending' | 'in_progress' | 'logged' | 'completed'
           actioned?: boolean
           actioned_at?: string | null
           actioned_by?: string | null
+          logged_comment?: string | null
+          logged_at?: string | null
+          logged_by?: string | null
           created_by: string
           created_at?: string
           updated_at?: string

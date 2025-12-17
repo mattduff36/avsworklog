@@ -72,6 +72,9 @@ function NewInspectionContent() {
   const [pendingResolution, setPendingResolution] = useState<{ day: number; itemNum: number; itemDesc: string } | null>(null);
   const [resolutionComment, setResolutionComment] = useState('');
   const [resolvedItems, setResolvedItems] = useState<Map<string, string>>(new Map()); // key: "day-itemNum", value: resolution comment
+  
+  // Logged defects tracking (read-only auto-marked items)
+  const [loggedDefects, setLoggedDefects] = useState<Map<string, { comment: string; actionId: string }>>(new Map()); // key: "itemNum-itemDesc", value: { comment, actionId }
 
   useEffect(() => {
     fetchVehicles();
@@ -190,31 +193,85 @@ function NewInspectionContent() {
       if (inspectionError || !lastInspection) {
         // No previous inspection, clear previous defects
         setPreviousDefects(new Map());
-        return;
+      } else {
+        // Build map of defective items: key = "itemNumber-itemDescription"
+        const defectsMap = new Map<string, any>();
+        const items = (lastInspection as any).inspection_items || [];
+        
+        items.forEach((item: any) => {
+          if (item.status === 'attention') {
+            const key = `${item.item_number}-${item.item_description}`;
+            if (!defectsMap.has(key)) {
+              defectsMap.set(key, {
+                item_number: item.item_number,
+                item_description: item.item_description,
+                days: []
+              });
+            }
+            defectsMap.get(key).days.push(item.day_of_week);
+          }
+        });
+
+        setPreviousDefects(defectsMap);
       }
 
-      // Build map of defective items: key = "itemNumber-itemDescription"
-      const defectsMap = new Map<string, any>();
-      const items = (lastInspection as any).inspection_items || [];
-      
-      items.forEach((item: any) => {
-        if (item.status === 'attention') {
-          const key = `${item.item_number}-${item.item_description}`;
-          if (!defectsMap.has(key)) {
-            defectsMap.set(key, {
-              item_number: item.item_number,
-              item_description: item.item_description,
-              days: []
+      // Load logged actions for this vehicle
+      const { data: loggedActionsData, error: loggedError } = await supabase
+        .from('actions')
+        .select(`
+          id,
+          logged_comment,
+          inspection_items (
+            item_number,
+            item_description
+          ),
+          vehicle_inspections!inner (
+            vehicle_id
+          )
+        `)
+        .eq('status', 'logged')
+        .eq('vehicle_inspections.vehicle_id', selectedVehicleId);
+
+      if (!loggedError && loggedActionsData) {
+        const loggedMap = new Map<string, { comment: string; actionId: string }>();
+        
+        loggedActionsData.forEach((action: any) => {
+          if (action.inspection_items) {
+            const key = `${action.inspection_items.item_number}-${action.inspection_items.item_description}`;
+            loggedMap.set(key, {
+              comment: action.logged_comment || 'Defect logged by management',
+              actionId: action.id
             });
           }
-          defectsMap.get(key).days.push(item.day_of_week);
-        }
-      });
+        });
 
-      setPreviousDefects(defectsMap);
+        setLoggedDefects(loggedMap);
+
+        // Auto-mark logged items as defective for all days
+        const newCheckboxStates = { ...checkboxStates };
+        const newComments = { ...comments };
+
+        loggedMap.forEach((loggedInfo, key) => {
+          const [itemNumStr] = key.split('-');
+          const itemNum = parseInt(itemNumStr);
+          
+          // Mark as defective for all 7 days
+          for (let day = 1; day <= 7; day++) {
+            const stateKey = `${day}-${itemNum}`;
+            newCheckboxStates[stateKey] = 'attention';
+            newComments[stateKey] = loggedInfo.comment;
+          }
+        });
+
+        setCheckboxStates(newCheckboxStates);
+        setComments(newComments);
+      } else {
+        setLoggedDefects(new Map());
+      }
     } catch (err) {
       console.error('Error loading previous defects:', err);
       setPreviousDefects(new Map());
+      setLoggedDefects(new Map());
     }
   };
 
@@ -1168,9 +1225,16 @@ function NewInspectionContent() {
                     const key = `${dayOfWeek}-${itemNumber}`;
                     const currentStatus = checkboxStates[key];
                     const hasDefectComment = currentStatus === 'attention' && comments[key];
+                    
+                    // Check if this item has a logged action (read-only)
+                    const loggedKey = `${itemNumber}-${item}`;
+                    const isLogged = loggedDefects.has(loggedKey);
+                    const loggedInfo = loggedDefects.get(loggedKey);
               
               return (
-                <div key={itemNumber} className="bg-slate-900/30 border border-slate-700/50 rounded-lg p-4 space-y-3">
+                <div key={itemNumber} className={`bg-slate-900/30 border rounded-lg p-4 space-y-3 ${
+                  isLogged ? 'border-red-500/50 bg-red-500/5' : 'border-slate-700/50'
+                }`}>
                   {/* Item Header */}
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center">
@@ -1178,6 +1242,11 @@ function NewInspectionContent() {
                     </div>
                     <div className="flex-1">
                       <h4 className="text-base font-medium text-white leading-tight">{item}</h4>
+                      {isLogged && (
+                        <Badge className="mt-2 bg-red-500/20 text-red-400 border-red-500/30">
+                          🔒 LOGGED DEFECT (Read-Only)
+                        </Badge>
+                      )}
                     </div>
                   </div>
 
@@ -1187,10 +1256,11 @@ function NewInspectionContent() {
                       <button
                         key={status}
                         type="button"
-                        onClick={() => handleStatusChange(itemNumber, status)}
+                        onClick={() => !isLogged && handleStatusChange(itemNumber, status)}
+                        disabled={isLogged}
                         className={`flex items-center justify-center h-12 rounded-xl border-3 transition-all ${
                           getStatusColor(status, currentStatus === status)
-                        }`}
+                        } ${isLogged ? 'opacity-60 cursor-not-allowed' : ''}`}
                       >
                         {getStatusIcon(status, currentStatus === status)}
                       </button>
@@ -1201,15 +1271,17 @@ function NewInspectionContent() {
                   {(currentStatus === 'attention' || comments[key]) && (
                     <div className="space-y-2">
                       <Label className="text-slate-900 dark:text-white text-sm">
-                        {currentStatus === 'attention' ? 'Comments (Required)' : 'Notes'}
+                        {currentStatus === 'attention' ? (isLogged ? 'Manager Comment (Read-Only)' : 'Comments (Required)') : 'Notes'}
                       </Label>
                       <Textarea
                         value={comments[key] || ''}
-                        onChange={(e) => handleCommentChange(itemNumber, e.target.value)}
-                        placeholder="Add details..."
+                        onChange={(e) => !isLogged && handleCommentChange(itemNumber, e.target.value)}
+                        placeholder={isLogged ? '' : 'Add details...'}
                         className={`w-full min-h-[80px] text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 ${
-                          currentStatus === 'attention' && !comments[key] ? 'border-red-500' : ''
-                        }`}
+                          currentStatus === 'attention' && !comments[key] && !isLogged ? 'border-red-500' : ''
+                        } ${isLogged ? 'cursor-not-allowed opacity-70' : ''}`}
+                        required={currentStatus === 'attention' && !isLogged}
+                        readOnly={isLogged}
                       />
                     </div>
                   )}
@@ -1249,20 +1321,34 @@ function NewInspectionContent() {
                   const key = `${dayOfWeek}-${itemNumber}`;
                   const currentStatus = checkboxStates[key];
                   
+                  // Check if this item has a logged action (read-only)
+                  const loggedKey = `${itemNumber}-${item}`;
+                  const isLogged = loggedDefects.has(loggedKey);
+                  
                   return (
-                    <tr key={itemNumber} className="border-b border-slate-700/50 hover:bg-slate-800/30">
+                    <tr key={itemNumber} className={`border-b border-slate-700/50 hover:bg-slate-800/30 ${
+                      isLogged ? 'bg-red-500/5' : ''
+                    }`}>
                       <td className="p-3 text-sm text-slate-400">{itemNumber}</td>
-                      <td className="p-3 text-sm text-white">{item}</td>
+                      <td className="p-3 text-sm text-white">
+                        {item}
+                        {isLogged && (
+                          <Badge className="ml-2 bg-red-500/20 text-red-400 border-red-500/30 text-xs">
+                            🔒 LOGGED
+                          </Badge>
+                        )}
+                      </td>
                       <td className="p-3">
                         <div className="flex items-center justify-center gap-3">
                           {(['ok', 'attention'] as InspectionStatus[]).map((status) => (
                             <button
                               key={status}
                               type="button"
-                              onClick={() => handleStatusChange(itemNumber, status)}
+                              onClick={() => !isLogged && handleStatusChange(itemNumber, status)}
+                              disabled={isLogged}
                               className={`flex items-center justify-center w-12 h-12 rounded-lg border-2 transition-all ${
                                 getStatusColor(status, currentStatus === status)
-                              }`}
+                              } ${isLogged ? 'opacity-60 cursor-not-allowed' : ''}`}
                               title={status === 'ok' ? 'Pass' : 'Fail'}
                             >
                               {getStatusIcon(status, currentStatus === status)}
@@ -1273,11 +1359,12 @@ function NewInspectionContent() {
                       <td className="p-3">
                         <Input
                           value={comments[key] || ''}
-                          onChange={(e) => handleCommentChange(itemNumber, e.target.value)}
-                          placeholder={currentStatus === 'attention' ? 'Required for defects' : 'Optional notes'}
+                          onChange={(e) => !isLogged && handleCommentChange(itemNumber, e.target.value)}
+                          placeholder={isLogged ? '' : (currentStatus === 'attention' ? 'Required for defects' : 'Optional notes')}
                           className={`bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 ${
-                            currentStatus === 'attention' && !comments[key] ? 'border-red-500' : ''
-                          }`}
+                            currentStatus === 'attention' && !comments[key] && !isLogged ? 'border-red-500' : ''
+                          } ${isLogged ? 'cursor-not-allowed opacity-70' : ''}`}
+                          readOnly={isLogged}
                         />
                       </td>
                     </tr>
