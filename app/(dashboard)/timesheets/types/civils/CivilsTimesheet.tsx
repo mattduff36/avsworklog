@@ -86,6 +86,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(false);
+  const [managerComments, setManagerComments] = useState<string>(''); // For rejected timesheets
   
   // Manager-specific states
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -399,6 +400,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       setExistingTimesheetId(timesheetData.id);
       setRegNumber(timesheetData.reg_number || '');
       setWeekEnding(timesheetData.week_ending);
+      setManagerComments(timesheetData.manager_comments || '');
       
       // Set selected employee - employees are now guaranteed to be loaded for managers
       setSelectedEmployeeId(timesheetData.user_id);
@@ -934,6 +936,21 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
           </div>
         </div>
       </div>
+
+      {/* Manager Comments (for rejected timesheets) */}
+      {managerComments && (
+        <Card className="bg-white dark:bg-slate-900 border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+          <CardHeader>
+            <CardTitle className="text-amber-900 dark:text-amber-400 flex items-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              Manager Comments
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-amber-800 dark:text-amber-300 whitespace-pre-wrap">{managerComments}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Basic Info Card */}
       <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
