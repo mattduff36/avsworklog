@@ -274,9 +274,8 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
   const loadExistingTimesheet = async (timesheetId: string) => {
     if (!user) return;
     
-    // Don't load if already loading or already loaded this timesheet
+    // Don't load if already loading
     if (loadingExisting) return;
-    if (existingTimesheetId === timesheetId) return;
     
     setLoadingExisting(true);
     setError('');
