@@ -869,16 +869,15 @@ export default function VehiclesAdminPage() {
             <div className="space-y-2">
               <Label htmlFor="edit-category">Category</Label>
               <Select
-                value={vehicleFormData.category_id}
+                value={vehicleFormData.category_id || undefined}
                 onValueChange={(value) =>
-                  setVehicleFormData({ ...vehicleFormData, category_id: value })
+                  setVehicleFormData({ ...vehicleFormData, category_id: value || '' })
                 }
               >
                 <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-                  <SelectValue />
+                  <SelectValue placeholder="Select category (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
                   {categories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
