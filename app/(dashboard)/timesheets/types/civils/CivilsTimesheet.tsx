@@ -309,37 +309,47 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
     setError('');
     
     try {
+      console.log('1️⃣ Starting load, isManager:', isManager, 'employees.length:', employees.length);
+      
       // For managers, ensure employees are loaded first
       if (isManager) {
         // If employees haven't been loaded yet, fetch them now
         if (employees.length === 0) {
+          console.log('2️⃣ Fetching employees for manager...');
           const { data: employeesData, error: employeesError } = await supabase
             .from('profiles')
             .select('id, full_name, employee_id')
             .order('full_name');
           
           if (employeesError) throw employeesError;
+          console.log('3️⃣ Employees loaded:', employeesData?.length);
           setEmployees(employeesData || []);
         }
       }
       
       // Fetch timesheet
+      console.log('4️⃣ Fetching timesheet data for ID:', timesheetId);
       const { data: timesheetData, error: timesheetError } = await supabase
         .from('timesheets')
         .select('*')
         .eq('id', timesheetId)
         .single();
       
+      console.log('5️⃣ Timesheet query result:', { data: timesheetData, error: timesheetError });
       if (timesheetError) throw timesheetError;
       
       // Check if user has access and timesheet is draft or rejected
+      console.log('6️⃣ Checking permissions...', { isManager, timesheetUserId: timesheetData.user_id, currentUserId: user.id, status: timesheetData.status });
+      
       if (!isManager && timesheetData.user_id !== user.id) {
+        console.log('❌ Permission denied');
         setError('You do not have permission to edit this timesheet');
         setLoadingExisting(false);
         return;
       }
       
       if (timesheetData.status !== 'draft' && timesheetData.status !== 'rejected') {
+        console.log('❌ Status not editable, redirecting...');
         setError('This timesheet cannot be edited. Only draft or rejected timesheets can be edited.');
         setLoadingExisting(false);
         router.push(`/timesheets/${timesheetId}`);
@@ -347,6 +357,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       }
       
       // Set timesheet data
+      console.log('7️⃣ Setting timesheet data...');
       setExistingTimesheetId(timesheetData.id);
       setRegNumber(timesheetData.reg_number || '');
       setWeekEnding(timesheetData.week_ending);
@@ -355,15 +366,18 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       setSelectedEmployeeId(timesheetData.user_id);
       
       // Fetch entries
+      console.log('8️⃣ Fetching timesheet entries...');
       const { data: entriesData, error: entriesError } = await supabase
         .from('timesheet_entries')
         .select('*')
         .eq('timesheet_id', timesheetId)
         .order('day_of_week');
       
+      console.log('9️⃣ Entries fetched:', entriesData?.length, 'entries');
       if (entriesError) throw entriesError;
       
       // Create full week array with all 7 days, preserving all fields
+      console.log('🔟 Creating full week array...');
       const fullWeek = Array.from({ length: 7 }, (_, i) => {
         const existingEntry = entriesData?.find(e => e.day_of_week === i + 1);
         if (existingEntry) {
@@ -395,12 +409,15 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
         }
       });
       
+      console.log('✅ Setting entries and completing load...');
       setEntries(fullWeek);
+      console.log('🎉 Timesheet loaded successfully!');
     } catch (err) {
-      console.error('Error loading existing timesheet:', err);
+      console.error('❌ Error loading existing timesheet:', err);
       setError(err instanceof Error ? err.message : 'Failed to load timesheet');
       setShowErrorDialog(true);
     } finally {
+      console.log('🏁 Finally block - setting loadingExisting to false');
       setLoadingExisting(false);
     }
   };
