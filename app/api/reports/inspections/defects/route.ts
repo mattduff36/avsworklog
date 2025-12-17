@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
+import { getVehicleCategoryName } from '@/lib/utils/deprecation-logger';
 import { 
   generateExcelFile, 
   formatExcelDate, 
@@ -42,7 +43,9 @@ export async function GET(request: NextRequest) {
         vehicle:vehicles!vehicle_inspections_vehicle_id_fkey (
           id,
           reg_number,
-          vehicle_type
+          vehicle_categories (
+            name
+          )
         ),
         user_id,
         inspector:profiles!vehicle_inspections_user_id_fkey (
@@ -88,7 +91,7 @@ export async function GET(request: NextRequest) {
       defectItems.forEach((item: any) => {
         excelData.push({
           'Vehicle Reg': inspection.vehicle?.reg_number || '-',
-          'Vehicle Type': inspection.vehicle?.vehicle_type || '-',
+          'Vehicle Type': getVehicleCategoryName(inspection.vehicle),
           'Inspector': inspection.inspector?.full_name || 'Unknown',
           'Inspection Date': formatExcelDate(inspection.inspection_date),
           'Item #': item.item_number,

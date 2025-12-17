@@ -35,14 +35,14 @@ import {
 interface InspectionWithVehicle extends VehicleInspection {
   vehicles: {
     reg_number: string;
-    vehicle_type: string;
+    vehicle_categories: { name: string } | null;
   };
 }
 
 interface Vehicle {
   id: string;
   reg_number: string;
-  vehicle_type: string;
+  vehicle_categories: { name: string } | null;
 }
 
 function InspectionsContent() {
@@ -123,7 +123,13 @@ function InspectionsContent() {
     try {
       const { data, error } = await supabase
         .from('vehicles')
-        .select('id, reg_number, vehicle_type')
+        .select(`
+          id, 
+          reg_number, 
+          vehicle_categories (
+            name
+          )
+        `)
         .order('reg_number');
       
       if (error) throw error;
@@ -143,7 +149,9 @@ function InspectionsContent() {
           *,
           vehicles (
             reg_number,
-            vehicle_type
+            vehicle_categories (
+              name
+            )
           ),
           profile:profiles!vehicle_inspections_user_id_fkey(full_name)
         `)
@@ -372,7 +380,7 @@ function InspectionsContent() {
                   {vehicles.map((vehicle) => (
                     <SelectItem key={vehicle.id} value={vehicle.id}>
                       {vehicle.reg_number}
-                      {vehicle.vehicle_type && ` (${vehicle.vehicle_type})`}
+                      {vehicle.vehicle_categories?.name && ` (${vehicle.vehicle_categories.name})`}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -450,7 +458,7 @@ function InspectionsContent() {
                             {' • '}
                           </span>
                         )}
-                        {inspection.vehicles?.vehicle_type && `${inspection.vehicles.vehicle_type} • `}
+                        {inspection.vehicles?.vehicle_categories?.name && `${inspection.vehicles.vehicle_categories.name} • `}
                         {inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
                           ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
                           : formatDate(inspection.inspection_date)

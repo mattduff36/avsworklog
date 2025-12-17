@@ -76,7 +76,6 @@ export default function VehiclesAdminPage() {
   const [vehicleFormData, setVehicleFormData] = useState({
     reg_number: '',
     category_id: '',
-    vehicle_type: '',
     status: 'active',
   });
   const [categoryFormData, setCategoryFormData] = useState({
@@ -191,7 +190,7 @@ export default function VehiclesAdminPage() {
       }
 
       await fetchVehicles();
-      setVehicleFormData({ reg_number: '', category_id: '', vehicle_type: '', status: 'active' });
+      setVehicleFormData({ reg_number: '', category_id: '', status: 'active' });
       setAddVehicleDialogOpen(false);
     } catch (error) {
       console.error('Error creating vehicle:', error);
@@ -369,7 +368,6 @@ export default function VehiclesAdminPage() {
     setVehicleFormData({
       reg_number: vehicle.reg_number || '',
       category_id: vehicle.category_id || '',
-      vehicle_type: vehicle.vehicle_type || '',
       status: vehicle.status || 'active',
     });
     setFormError('');
@@ -809,26 +807,6 @@ export default function VehiclesAdminPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="add-vehicle-type">Vehicle Type</Label>
-              <Select
-                value={vehicleFormData.vehicle_type || undefined}
-                onValueChange={(value) =>
-                  setVehicleFormData({ ...vehicleFormData, vehicle_type: value || '' })
-                }
-              >
-                <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-                  <SelectValue placeholder="Select type (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Van">Van</SelectItem>
-                  <SelectItem value="HGV">HGV</SelectItem>
-                  <SelectItem value="Truck">Truck</SelectItem>
-                  <SelectItem value="Artic">Artic</SelectItem>
-                  <SelectItem value="Trailer">Trailer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
           <DialogFooter>
             <Button
@@ -905,26 +883,6 @@ export default function VehiclesAdminPage() {
                       {category.name}
                     </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-vehicle-type">Vehicle Type</Label>
-              <Select
-                value={vehicleFormData.vehicle_type || undefined}
-                onValueChange={(value) =>
-                  setVehicleFormData({ ...vehicleFormData, vehicle_type: value || '' })
-                }
-              >
-                <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-                  <SelectValue placeholder="Select type (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Van">Van</SelectItem>
-                  <SelectItem value="HGV">HGV</SelectItem>
-                  <SelectItem value="Truck">Truck</SelectItem>
-                  <SelectItem value="Artic">Artic</SelectItem>
-                  <SelectItem value="Trailer">Trailer</SelectItem>
                 </SelectContent>
               </Select>
             </div>

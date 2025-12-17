@@ -7,6 +7,7 @@ import { InspectionPDF } from '@/lib/pdf/inspection-pdf';
 import { VanInspectionPDF } from '@/lib/pdf/van-inspection-pdf';
 import { isVanCategory } from '@/lib/checklists/vehicle-checklists';
 import { getProfileWithRole } from '@/lib/utils/permissions';
+import { getVehicleCategoryName } from '@/lib/utils/deprecation-logger';
 
 const MAX_INSPECTIONS_PER_PDF = 80;
 
@@ -100,8 +101,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Determine which PDF template to use based on vehicle category
-        const categoryName = (inspection as any).vehicle?.vehicle_categories?.name;
-        const vehicleType = categoryName || (inspection as any).vehicle?.vehicle_type || '';
+        const vehicleType = getVehicleCategoryName((inspection as any).vehicle);
         const useVanTemplate = isVanCategory(vehicleType);
 
         // Generate PDF using the appropriate template
@@ -287,8 +287,7 @@ export async function POST(request: NextRequest) {
             }
 
             // Determine which PDF template to use
-            const categoryName = (inspection as any).vehicle?.vehicle_categories?.name;
-            const vehicleType = categoryName || (inspection as any).vehicle?.vehicle_type || '';
+            const vehicleType = getVehicleCategoryName((inspection as any).vehicle);
             const useVanTemplate = isVanCategory(vehicleType);
 
             // Generate PDF

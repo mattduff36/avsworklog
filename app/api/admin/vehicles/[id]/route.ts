@@ -44,7 +44,7 @@ export async function PUT(
 
     const vehicleId = (await params).id;
     const body = await request.json();
-    const { reg_number, category_id, vehicle_type, status } = body;
+    const { reg_number, category_id, status } = body;
 
     // Validate required fields
     if (!reg_number) {
@@ -54,13 +54,19 @@ export async function PUT(
       );
     }
 
-    // Update vehicle
+    if (!category_id) {
+      return NextResponse.json(
+        { error: 'Category is required' },
+        { status: 400 }
+      );
+    }
+
+    // Update vehicle (vehicle_type will auto-sync from category via trigger)
     const { data, error } = await supabase
       .from('vehicles')
       .update({
         reg_number: reg_number.toUpperCase(),
-        category_id: category_id || null,
-        vehicle_type: vehicle_type || null,
+        category_id: category_id,
         status: status || 'active',
       })
       .eq('id', vehicleId)

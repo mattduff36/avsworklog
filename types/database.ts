@@ -52,24 +52,27 @@ export interface Database {
         Row: {
           id: string
           reg_number: string
+          /** @deprecated Use vehicle_categories relationship instead. Auto-synced from category_id. */
           vehicle_type: string | null
-          category_id: string | null
+          category_id: string
           status: string
           created_at: string
         }
         Insert: {
           id?: string
           reg_number: string
+          /** @deprecated Do not set this field. It auto-syncs from category_id. */
           vehicle_type?: string | null
-          category_id?: string | null
+          category_id: string
           status?: string
           created_at?: string
         }
         Update: {
           id?: string
           reg_number?: string
+          /** @deprecated Do not set this field. It auto-syncs from category_id. */
           vehicle_type?: string | null
-          category_id?: string | null
+          category_id?: string
           status?: string
           created_at?: string
         }

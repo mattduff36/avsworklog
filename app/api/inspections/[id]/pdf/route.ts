@@ -5,6 +5,7 @@ import { InspectionPDF } from '@/lib/pdf/inspection-pdf';
 import { VanInspectionPDF } from '@/lib/pdf/van-inspection-pdf';
 import { isVanCategory } from '@/lib/checklists/vehicle-checklists';
 import { getProfileWithRole } from '@/lib/utils/permissions';
+import { getVehicleCategoryName } from '@/lib/utils/deprecation-logger';
 
 export async function GET(
   request: NextRequest,
@@ -67,12 +68,10 @@ export async function GET(
     }
 
     // Determine which PDF template to use based on vehicle category
-    // Check vehicle_categories.name first, fall back to vehicle_type
-    const categoryName = (inspection as any).vehicle?.vehicle_categories?.name;
-    const vehicleType = categoryName || (inspection as any).vehicle?.vehicle_type || '';
+    const vehicleType = getVehicleCategoryName((inspection as any).vehicle);
     const useVanTemplate = isVanCategory(vehicleType);
     
-    console.log(`PDF Generation - Category: ${categoryName}, Vehicle Type: ${vehicleType}, Using Van Template: ${useVanTemplate}`);
+    console.log(`PDF Generation - Vehicle Type: ${vehicleType}, Using Van Template: ${useVanTemplate}`);
     
     // Generate PDF using the appropriate template
     const pdfComponent = useVanTemplate

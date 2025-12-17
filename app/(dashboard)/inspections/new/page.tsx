@@ -368,7 +368,7 @@ function NewInspectionContent() {
       const vehicleData: VehicleInsert = {
         reg_number: formattedReg,
         category_id: newVehicleCategoryId,
-        vehicle_type: 'Van', // Default to Van for new vehicles added from inspections
+        // vehicle_type auto-syncs from category via database trigger
         status: 'active',
       };
 
