@@ -251,7 +251,9 @@ function InspectionsContent() {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Error downloading PDF:', error);
-      alert('Failed to download PDF');
+      toast.error('Failed to download PDF', {
+        description: 'Please try again or contact support if the problem persists.',
+      });
     } finally {
       setDownloading(null);
     }

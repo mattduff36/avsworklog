@@ -1,0 +1,56 @@
+/**
+ * Centralized Environment Configuration
+ * 
+ * This module validates and exports all environment variables used in the application.
+ * All environment variable access should go through this module to ensure type safety
+ * and proper validation.
+ * 
+ * Usage:
+ *   import { env } from '@/lib/config/env';
+ *   const url = env.NEXT_PUBLIC_SUPABASE_URL;
+ */
+
+import { z } from 'zod';
+
+// Define the schema for environment variables
+const envSchema = z.object({
+  // Supabase Configuration (Required)
+  NEXT_PUBLIC_SUPABASE_URL: z.string().url('Invalid Supabase URL'),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1, 'Supabase anon key is required'),
+  
+  // Database Configuration (Optional - used in scripts)
+  POSTGRES_URL_NON_POOLING: z.string().url().optional(),
+  
+  // Email Configuration (Optional - for error reporting)
+  RESEND_API_KEY: z.string().min(1).optional(),
+  ADMIN_EMAIL: z.string().email().optional(),
+  
+  // Vercel Analytics (Optional)
+  NEXT_PUBLIC_VERCEL_ANALYTICS_ID: z.string().optional(),
+  
+  // Node Environment
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+});
+
+// Parse and validate environment variables
+function validateEnv() {
+  try {
+    return envSchema.parse(process.env);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      console.error('❌ Invalid environment variables:');
+      error.errors.forEach((err) => {
+        console.error(`  - ${err.path.join('.')}: ${err.message}`);
+      });
+      throw new Error('Environment validation failed');
+    }
+    throw error;
+  }
+}
+
+// Export validated environment variables
+// This will validate on first import
+export const env = validateEnv();
+
+// Export type for use in other files
+export type Env = z.infer<typeof envSchema>;

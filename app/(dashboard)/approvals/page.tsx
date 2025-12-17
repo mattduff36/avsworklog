@@ -455,7 +455,15 @@ function AbsenceApprovalCard({
     if (absence.absence_reasons.name === 'Annual leave') {
       const projectedRemaining = (summary?.remaining || 0) - absence.duration_days;
       if (projectedRemaining < 0) {
-        if (!confirm('Warning: This request exceeds the employee\'s available allowance. Approve anyway?')) {
+        const confirmed = await import('@/lib/services/notification.service').then(m => 
+          m.notify.confirm({
+            title: 'Insufficient Allowance',
+            description: 'Warning: This request exceeds the employee\'s available allowance. Approve anyway?',
+            confirmText: 'Approve Anyway',
+            destructive: true,
+          })
+        );
+        if (!confirmed) {
           return;
         }
       }
@@ -470,7 +478,9 @@ function AbsenceApprovalCard({
   
   async function handleReject() {
     if (!rejectionReason.trim()) {
-      alert('Please provide a reason for rejection');
+      toast.error('Rejection reason required', {
+        description: 'Please provide a reason for rejecting this absence request.',
+      });
       return;
     }
     

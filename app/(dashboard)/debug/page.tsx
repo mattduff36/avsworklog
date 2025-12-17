@@ -337,7 +337,15 @@ export default function DebugPage() {
   };
 
   const clearAllErrorLogs = async () => {
-    if (!confirm('Are you sure you want to clear ALL error logs? This cannot be undone.')) {
+    const confirmed = await import('@/lib/services/notification.service').then(m => 
+      m.notify.confirm({
+        title: 'Clear All Error Logs',
+        description: 'Are you sure you want to clear ALL error logs? This cannot be undone.',
+        confirmText: 'Clear All',
+        destructive: true,
+      })
+    );
+    if (!confirmed) {
       return;
     }
 

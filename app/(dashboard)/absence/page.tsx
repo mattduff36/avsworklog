@@ -243,7 +243,15 @@ export default function AbsencePage() {
   
   // Handle cancel
   async function handleCancel(id: string, status: string) {
-    if (!confirm(`Are you sure you want to cancel this ${status === 'approved' ? 'approved' : 'pending'} absence?`)) {
+    const confirmed = await import('@/lib/services/notification.service').then(m => 
+      m.notify.confirm({
+        title: 'Cancel Absence',
+        description: `Are you sure you want to cancel this ${status === 'approved' ? 'approved' : 'pending'} absence?`,
+        confirmText: 'Cancel Absence',
+        destructive: true,
+      })
+    );
+    if (!confirmed) {
       return;
     }
     
