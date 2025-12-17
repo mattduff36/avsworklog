@@ -44,30 +44,8 @@ interface CivilsTimesheetProps {
 }
 
 export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: initialExistingId, userId: managerSelectedUserId }: CivilsTimesheetProps) {
-  console.log('🎯 CivilsTimesheet rendered with props:', { 
-    initialWeekEnding, 
-    initialExistingId, 
-    managerSelectedUserId 
-  });
-  
   const router = useRouter();
   const { user, profile, isManager, isAdmin, isSuperAdmin } = useAuth();
-  
-  console.log('🔐 useAuth() returned:', { 
-    hasUser: !!user, 
-    userId: user?.id,
-    hasProfile: !!profile,
-    profileRole: profile?.role?.name,
-    profileRoleObject: profile?.role,
-    profileIsSuperAdmin: profile?.is_super_admin,
-    roleIsSuperAdmin: profile?.role?.is_super_admin,
-    roleIsManager: profile?.role?.is_manager_admin,
-    isSuperAdmin, 
-    isManager, 
-    isAdmin
-  });
-  
-  console.log('📊 Full profile object:', profile);
   
   const { isOnline } = useOfflineSync();
   const { addToQueue } = useOfflineStore();
@@ -148,25 +126,10 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
 
   // Load existing timesheet if ID is provided via props
   useEffect(() => {
-    console.log('🔄 CivilsTimesheet useEffect:', { 
-      initialExistingId, 
-      hasUser: !!user,
-      hasProfile: !!profile,
-      loadingExisting 
-    });
-    
     // Wait for ID, authenticated user, AND profile before loading
     // (profile needed for permission checks)
     if (initialExistingId && user && profile && !loadingExisting) {
-      console.log('📥 Calling loadExistingTimesheet with profile...');
       loadExistingTimesheet(initialExistingId);
-    } else {
-      console.log('⏭️ Skipping load:', { 
-        hasId: !!initialExistingId,
-        hasUser: !!user,
-        hasProfile: !!profile,
-        alreadyLoading: loadingExisting 
-      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialExistingId, user, profile]);
@@ -318,48 +281,38 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
   const loadExistingTimesheet = async (timesheetId: string) => {
     // This should never be called without user due to useEffect guard
     if (!user) {
-      console.error('❌ loadExistingTimesheet called without user!');
+      console.error('loadExistingTimesheet called without user');
       return;
     }
     
     // Prevent duplicate loads
-    if (loadingExisting) {
-      console.log('⏭️ Already loading, skipping...');
-      return;
-    }
+    if (loadingExisting) return;
     
-    console.log('🔓 User ready, loading timesheet data...', { timesheetId, userId: user.id });
     setLoadingExisting(true);
     setError('');
     
     try {
-      console.log('1️⃣ Starting load, hasElevatedPermissions:', hasElevatedPermissions, 'employees.length:', employees.length);
-      
       // For managers/admins, ensure employees are loaded first
       if (hasElevatedPermissions) {
         // If employees haven't been loaded yet, fetch them now
         if (employees.length === 0) {
-          console.log('2️⃣ Fetching employees for manager/admin...');
           const { data: employeesData, error: employeesError } = await supabase
             .from('profiles')
             .select('id, full_name, employee_id')
             .order('full_name');
           
           if (employeesError) throw employeesError;
-          console.log('3️⃣ Employees loaded:', employeesData?.length);
           setEmployees(employeesData || []);
         }
       }
       
       // Fetch timesheet
-      console.log('4️⃣ Fetching timesheet data for ID:', timesheetId);
       const { data: timesheetData, error: timesheetError } = await supabase
         .from('timesheets')
         .select('*')
         .eq('id', timesheetId)
         .single();
       
-      console.log('5️⃣ Timesheet query result:', { data: timesheetData, error: timesheetError });
       if (timesheetError) throw timesheetError;
       
       // Check if user has access and timesheet is draft or rejected
@@ -369,26 +322,13 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       const currentIsAdmin = profile?.role?.name === 'admin';
       const currentHasElevatedPermissions = currentIsSuperAdmin || currentIsManager || currentIsAdmin;
       
-      console.log('6️⃣ Checking permissions...', { 
-        currentHasElevatedPermissions,
-        currentIsSuperAdmin, 
-        currentIsManager, 
-        currentIsAdmin, 
-        profileRoleName: profile?.role?.name,
-        timesheetUserId: timesheetData.user_id, 
-        currentUserId: user.id, 
-        status: timesheetData.status 
-      });
-      
       if (!currentHasElevatedPermissions && timesheetData.user_id !== user.id) {
-        console.log('❌ Permission denied');
         setError('You do not have permission to edit this timesheet');
         setLoadingExisting(false);
         return;
       }
       
       if (timesheetData.status !== 'draft' && timesheetData.status !== 'rejected') {
-        console.log('❌ Status not editable, redirecting...');
         setError('This timesheet cannot be edited. Only draft or rejected timesheets can be edited.');
         setLoadingExisting(false);
         router.push(`/timesheets/${timesheetId}`);
@@ -396,7 +336,6 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       }
       
       // Set timesheet data
-      console.log('7️⃣ Setting timesheet data...');
       setExistingTimesheetId(timesheetData.id);
       setRegNumber(timesheetData.reg_number || '');
       setWeekEnding(timesheetData.week_ending);
@@ -406,18 +345,15 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       setSelectedEmployeeId(timesheetData.user_id);
       
       // Fetch entries
-      console.log('8️⃣ Fetching timesheet entries...');
       const { data: entriesData, error: entriesError } = await supabase
         .from('timesheet_entries')
         .select('*')
         .eq('timesheet_id', timesheetId)
         .order('day_of_week');
       
-      console.log('9️⃣ Entries fetched:', entriesData?.length, 'entries');
       if (entriesError) throw entriesError;
       
       // Create full week array with all 7 days, preserving all fields
-      console.log('🔟 Creating full week array...');
       const fullWeek = Array.from({ length: 7 }, (_, i) => {
         const existingEntry = entriesData?.find(e => e.day_of_week === i + 1);
         if (existingEntry) {
@@ -449,15 +385,12 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
         }
       });
       
-      console.log('✅ Setting entries and completing load...');
       setEntries(fullWeek);
-      console.log('🎉 Timesheet loaded successfully!');
     } catch (err) {
-      console.error('❌ Error loading existing timesheet:', err);
+      console.error('Error loading existing timesheet:', err);
       setError(err instanceof Error ? err.message : 'Failed to load timesheet');
       setShowErrorDialog(true);
     } finally {
-      console.log('🏁 Finally block - setting loadingExisting to false');
       setLoadingExisting(false);
     }
   };
