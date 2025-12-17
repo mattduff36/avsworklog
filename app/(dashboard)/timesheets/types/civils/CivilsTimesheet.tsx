@@ -44,6 +44,12 @@ interface CivilsTimesheetProps {
 }
 
 export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: initialExistingId, userId: managerSelectedUserId }: CivilsTimesheetProps) {
+  console.log('🎯 CivilsTimesheet rendered with props:', { 
+    initialWeekEnding, 
+    initialExistingId, 
+    managerSelectedUserId 
+  });
+  
   const router = useRouter();
   const { user, profile, isManager } = useAuth();
   const { isOnline } = useOfflineSync();
@@ -121,8 +127,21 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
 
   // Load existing timesheet if ID is provided via props
   useEffect(() => {
+    console.log('🔄 CivilsTimesheet useEffect:', { 
+      initialExistingId, 
+      hasUser: !!user, 
+      loadingExisting 
+    });
+    
     if (initialExistingId && user && !loadingExisting) {
+      console.log('📥 Calling loadExistingTimesheet...');
       loadExistingTimesheet(initialExistingId);
+    } else {
+      console.log('⏭️ Skipping load:', { 
+        hasId: !!initialExistingId, 
+        hasUser: !!user, 
+        alreadyLoading: loadingExisting 
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialExistingId, user]);
