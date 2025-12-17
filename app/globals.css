@@ -664,14 +664,20 @@
   border: 1px solid rgb(51 65 85) !important; /* slate-700 - subtle border */
   border-radius: 0.5rem !important;
   opacity: 1 !important;
-  z-index: 51 !important;
+  z-index: 50 !important;
   box-shadow: none !important; /* No shadows - clean and simple */
 }
 
-/* Ensure dropdowns appear above modals */
+/* CRITICAL: Ensure dropdowns appear above modals - must override component z-50 */
 [data-radix-select-content],
 [data-radix-popover-content] {
-  z-index: 100 !important;
+  z-index: 999 !important;
+  position: fixed !important;
+}
+
+/* Fix select dropdown backdrop blur causing visibility issues */
+[data-radix-select-content] {
+  backdrop-filter: none !important;
 }
 
 /*
