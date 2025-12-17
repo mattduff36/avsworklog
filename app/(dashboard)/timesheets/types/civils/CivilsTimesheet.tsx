@@ -52,6 +52,18 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
   
   const router = useRouter();
   const { user, profile, isManager, isAdmin, isSuperAdmin } = useAuth();
+  
+  console.log('🔐 useAuth() returned:', { 
+    hasUser: !!user, 
+    userId: user?.id,
+    hasProfile: !!profile,
+    profileRole: profile?.role?.name,
+    isSuperAdmin, 
+    isManager, 
+    isAdmin,
+    rawProfile: profile 
+  });
+  
   const { isOnline } = useOfflineSync();
   const { addToQueue } = useOfflineStore();
   const supabase = createClient();
