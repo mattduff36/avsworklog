@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { useOfflineStore } from '@/lib/stores/offline-queue';
@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { OfflineBanner } from '@/components/ui/offline-banner';
 import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User, WifiOff } from 'lucide-react';
 import Link from 'next/link';
-import { getWeekEnding, formatDateISO } from '@/lib/utils/date';
+// Removed: getWeekEnding, formatDateISO - no longer needed (week comes from props)
 import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
 import { DAY_NAMES } from '@/types/timesheet';
 import { Database } from '@/types/database';
@@ -30,30 +30,38 @@ import { toast } from 'sonner';
  * 
  * This is the standard weekly timesheet for civil engineering work.
  * Supports offline mode, bank holiday detection, and automatic time calculations.
+ * 
+ * @param weekEnding - The Sunday date for this timesheet (YYYY-MM-DD format)
+ * @param existingId - ID of existing timesheet to edit (null for new)
+ * @param userId - User ID for whom this timesheet is being created (for managers)
  */
 
-export function CivilsTimesheet() {
+interface CivilsTimesheetProps {
+  weekEnding: string;
+  existingId: string | null;
+  userId?: string;
+}
+
+export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: initialExistingId, userId: managerSelectedUserId }: CivilsTimesheetProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { user, profile, isManager } = useAuth();
   const { isOnline } = useOfflineSync();
   const { addToQueue } = useOfflineStore();
   const supabase = createClient();
   
-  const [existingTimesheetId, setExistingTimesheetId] = useState<string | null>(null);
+  const [existingTimesheetId, setExistingTimesheetId] = useState<string | null>(initialExistingId);
   const [regNumber, setRegNumber] = useState('');
-  const [weekEnding, setWeekEnding] = useState(formatDateISO(getWeekEnding()));
+  const [weekEnding, setWeekEnding] = useState(initialWeekEnding || ''); // Comes from props or loaded from DB
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [activeDay, setActiveDay] = useState('0');
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
-  const [existingWeeks, setExistingWeeks] = useState<string[]>([]);
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(false);
   
   // Manager-specific states
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(managerSelectedUserId || user?.id || '');
   
   // Bank holidays cache (fetched from GOV.UK API)
   const [bankHolidays, setBankHolidays] = useState<Set<string>>(new Set());
@@ -102,31 +110,23 @@ export function CivilsTimesheet() {
   useEffect(() => {
     if (user && isManager) {
       fetchEmployees();
-    } else if (user) {
-      // If not a manager, set selected employee to current user
+    } else if (user && !selectedEmployeeId) {
+      // If not a manager and no employee selected, set to current user
       setSelectedEmployeeId(user.id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isManager]);
 
-  // Load existing draft timesheet if ID is provided in query params
-  // The loadExistingTimesheet function will ensure employees are loaded for managers
+  // Load existing timesheet if ID is provided via props
   useEffect(() => {
-    const timesheetId = searchParams.get('id');
-    if (timesheetId && user && !loadingExisting && existingTimesheetId !== timesheetId) {
-      loadExistingTimesheet(timesheetId);
+    if (initialExistingId && user && !loadingExisting) {
+      loadExistingTimesheet(initialExistingId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, user]);
+  }, [initialExistingId, user]);
 
-  // Fetch existing timesheets when selected employee changes
-  useEffect(() => {
-    if (selectedEmployeeId && !searchParams.get('id')) {
-      // Only fetch existing timesheets if we're not loading an existing one
-      fetchExistingTimesheets();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEmployeeId]);
+  // Removed: Fetch existing timesheets effect - no longer needed
+  // Duplicate checking now happens in WeekSelector
 
   // Check if a specific day is a bank holiday
   const isDayBankHoliday = (dayIndex: number): boolean => {
@@ -258,8 +258,7 @@ export function CivilsTimesheet() {
       setEmployees(formattedEmployees);
       
       // Set default to current user only if we're not loading an existing timesheet
-      const timesheetId = searchParams.get('id');
-      if (user && !timesheetId) {
+      if (user && !initialExistingId && !managerSelectedUserId) {
         setSelectedEmployeeId(user.id);
       }
     } catch (err) {
@@ -267,27 +266,8 @@ export function CivilsTimesheet() {
     }
   };
 
-  const fetchExistingTimesheets = async () => {
-    if (!selectedEmployeeId) return;
-    await fetchExistingTimesheetsForEmployee(selectedEmployeeId);
-  };
-
-  const fetchExistingTimesheetsForEmployee = async (employeeId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('timesheets')
-        .select('week_ending, id')
-        .eq('user_id', employeeId);
-      
-      if (error) throw error;
-      
-      // Store existing week ending dates (excluding the current draft being edited)
-      const weeks = data?.filter(t => t.id !== existingTimesheetId).map(t => t.week_ending) || [];
-      setExistingWeeks(weeks);
-    } catch (err) {
-      console.error('Error fetching existing timesheets:', err);
-    }
-  };
+  // Removed: fetchExistingTimesheets logic - no longer needed
+  // Duplicate checking now happens in WeekSelector before reaching this component
 
   const loadExistingTimesheet = async (timesheetId: string) => {
     if (!user) return;
@@ -387,10 +367,6 @@ export function CivilsTimesheet() {
       });
       
       setEntries(fullWeek);
-      
-      // Refresh existing weeks list for the employee (excluding this timesheet)
-      // Use the timesheet's user_id directly since selectedEmployeeId might not be updated yet
-      await fetchExistingTimesheetsForEmployee(timesheetData.user_id);
     } catch (err) {
       console.error('Error loading existing timesheet:', err);
       setError(err instanceof Error ? err.message : 'Failed to load timesheet');
@@ -400,46 +376,8 @@ export function CivilsTimesheet() {
     }
   };
 
-  // Check if a date is a Sunday
-  const isSunday = (dateString: string): boolean => {
-    const date = new Date(dateString + 'T00:00:00');
-    return date.getDay() === 0;
-  };
-
-  // Check if week already has a timesheet (excluding current draft being edited)
-  const weekExists = (dateString: string): boolean => {
-    // If we're editing an existing draft, allow the same week ending
-    if (existingTimesheetId) {
-      return false;
-    }
-    return existingWeeks.includes(dateString);
-  };
-
-  // Handle week ending date change with validation
-  const handleWeekEndingChange = (newDate: string) => {
-    setError(''); // Clear any previous errors
-    
-    if (!newDate) {
-      setWeekEnding(newDate);
-      return;
-    }
-
-    // Check if it's a Sunday
-    if (!isSunday(newDate)) {
-      setError('Week Ending must be a Sunday. Please select a Sunday date.');
-      setShowErrorDialog(true);
-      return;
-    }
-
-    // Check if week already exists
-    if (weekExists(newDate)) {
-      setError('You already have a timesheet for this week. Please select a different week.');
-      setShowErrorDialog(true);
-      return;
-    }
-
-    setWeekEnding(newDate);
-  };
+  // Week ending is now passed via props and validated in WeekSelector
+  // No date validation needed here
 
   // Validate and round time to nearest 15-minute interval
   const roundToQuarterHour = (timeString: string): string => {
@@ -943,18 +881,20 @@ export function CivilsTimesheet() {
             </div>
           )}
           
+          {/* Vehicle Registration */}
           <div className="space-y-2 max-w-full">
-            <Label htmlFor="week_ending" className="text-slate-900 dark:text-white text-base">Week Ending (Sunday)</Label>
+            <Label htmlFor="reg_number" className="text-slate-900 dark:text-white text-base">Vehicle Registration (Optional)</Label>
             <div className="max-w-full overflow-hidden">
               <Input
-                id="week_ending"
-                type="date"
-                value={weekEnding}
-                onChange={(e) => handleWeekEndingChange(e.target.value)}
-                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
+                id="reg_number"
+                type="text"
+                value={regNumber}
+                onChange={(e) => setRegNumber(e.target.value.toUpperCase())}
+                placeholder="e.g., AB12 CDE"
+                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full uppercase"
               />
             </div>
-            <p className="text-xs text-slate-400">Please select a Sunday that you haven&apos;t already submitted</p>
+            <p className="text-xs text-slate-400">Enter the vehicle registration you used this week (if applicable)</p>
           </div>
         </CardContent>
       </Card>
