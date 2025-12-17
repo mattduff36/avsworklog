@@ -1206,7 +1206,7 @@ function NewInspectionContent() {
             {DAY_NAMES.map((day, dayIndex) => (
               <TabsContent key={dayIndex} value={dayIndex.toString()} className="mt-0">
                 {/* Mark All Pass Button - Mobile */}
-                <div className="md:hidden mb-4">
+                <div className="md:hidden mb-4 hidden">
                   <Button
                     type="button"
                     onClick={handleMarkAllPass}
@@ -1292,7 +1292,7 @@ function NewInspectionContent() {
           </div>
 
           {/* Mark All Pass Button - Desktop */}
-          <div className="hidden md:block mb-4">
+          <div className="hidden md:block mb-4 !hidden">
             <Button
               type="button"
               onClick={handleMarkAllPass}
