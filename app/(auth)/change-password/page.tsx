@@ -122,9 +122,9 @@ export default function ChangePasswordPage() {
       setTimeout(() => {
         router.push('/dashboard');
       }, 2000);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error changing password:', error);
-      setError(error.message || 'Failed to change password');
+      setError(error instanceof Error ? error.message : 'Failed to change password');
     } finally {
       setSubmitting(false);
     }

@@ -12,20 +12,14 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDate } from '@/lib/utils/date';
 import { 
-  Clock, 
-  CheckCircle2, 
-  XCircle,
-  Plus,
-  FileSpreadsheet,
+  CheckCircle2,
   AlertTriangle,
   Wrench,
   PackageCheck,
   Clipboard,
-  HardHat,
   Truck,
   FileCheck,
   ScrollText,
-  CarFront,
   FileText,
   Calendar,
   ChevronRight
@@ -149,7 +143,7 @@ export default function DashboardPage() {
         
         // Build Set of enabled permissions
         const enabledModules = new Set<ModuleName>();
-        data?.roles?.role_permissions?.forEach((perm: any) => {
+        data?.roles?.role_permissions?.forEach((perm: { enabled: boolean; module_name: string }) => {
           if (perm.enabled) {
             enabledModules.add(perm.module_name as ModuleName);
           }
@@ -173,6 +167,7 @@ export default function DashboardPage() {
       fetchTopActions();
     }
     fetchPendingRAMS();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isManager, isAdmin, profile, isSuperAdmin, viewAsRole]);
 
   const fetchPendingApprovals = async () => {

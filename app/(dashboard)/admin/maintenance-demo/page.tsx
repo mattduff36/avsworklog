@@ -3,7 +3,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import Link from 'next/link';
 import { AlertTriangle, Calendar, Wrench, AlertCircle } from 'lucide-react';
 
 // Placeholder/mock data (replace with selectors or hooks as needed)
