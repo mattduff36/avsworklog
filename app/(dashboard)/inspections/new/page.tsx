@@ -915,8 +915,8 @@ function NewInspectionContent() {
         </CardContent>
       </Card>
 
-      {/* Safety Check - Only shown when vehicle is selected */}
-      {vehicleId && (
+      {/* Safety Check - Only shown when vehicle AND week ending are selected */}
+      {vehicleId && weekEnding && (
       <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
         <CardHeader className="pb-3">
           <CardTitle className="text-slate-900 dark:text-white">{currentChecklist.length}-Point Safety Check</CardTitle>
