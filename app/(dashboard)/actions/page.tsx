@@ -764,12 +764,12 @@ export default function ActionsPage() {
             </div>
           )}
 
-          {/* Actioned Items */}
-          {actionedActions.length > 0 && (
+          {/* Completed Items */}
+          {completedActions.length > 0 && (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-slate-600 dark:text-slate-400">Completed Actions from Inspections</h2>
               <div className="space-y-3">
-                {actionedActions.map((action) => (
+                {completedActions.map((action) => (
                   <Card key={action.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-90 transition-opacity">
                     <CardContent className="pt-6">
                       <div className="flex items-start gap-4">
