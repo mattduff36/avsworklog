@@ -18,9 +18,7 @@ import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { 
   getStatusColorClass,
   formatMileage,
-  formatMaintenanceDate,
-  formatDaysUntil,
-  formatMilesUntil
+  formatMaintenanceDate
 } from '@/lib/utils/maintenanceCalculations';
 import { EditMaintenanceDialog } from './EditMaintenanceDialog';
 
@@ -28,7 +26,6 @@ interface MaintenanceTableProps {
   vehicles: VehicleMaintenanceWithStatus[];
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  isLoading: boolean;
 }
 
 type SortField = 
@@ -45,8 +42,7 @@ type SortDirection = 'asc' | 'desc';
 export function MaintenanceTable({ 
   vehicles, 
   searchQuery, 
-  onSearchChange,
-  isLoading 
+  onSearchChange
 }: MaintenanceTableProps) {
   const [sortField, setSortField] = useState<SortField>('reg_number');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');

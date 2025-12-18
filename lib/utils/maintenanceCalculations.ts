@@ -5,8 +5,7 @@
 
 import type { 
   MaintenanceStatus, 
-  MaintenanceItemStatus,
-  MaintenanceCategory 
+  MaintenanceItemStatus
 } from '@/types/maintenance';
 
 // ============================================================================

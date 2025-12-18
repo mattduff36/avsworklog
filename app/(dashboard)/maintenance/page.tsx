@@ -14,7 +14,7 @@ import { MaintenanceTable } from './components/MaintenanceTable';
 
 function MaintenanceContent() {
   // 1. Hooks
-  const { profile, isManager, isAdmin } = useAuth();
+  const { isManager, isAdmin } = useAuth();
   const { isOnline } = useOfflineSync();
   
   // 2. State
@@ -131,7 +131,6 @@ function MaintenanceContent() {
             vehicles={filteredVehicles}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            isLoading={isLoading}
           />
         </>
       )}
