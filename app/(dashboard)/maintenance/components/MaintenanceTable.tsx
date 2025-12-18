@@ -12,10 +12,12 @@ import {
   History,
   ArrowUpDown,
   Plus,
-  AlertTriangle
+  AlertTriangle,
+  Trash2
 } from 'lucide-react';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { AddVehicleDialog } from './AddVehicleDialog';
+import { DeleteVehicleDialog } from './DeleteVehicleDialog';
 import { 
   getStatusColorClass,
   formatMileage,
@@ -53,6 +55,7 @@ export function MaintenanceTable({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [addVehicleDialogOpen, setAddVehicleDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleMaintenanceWithStatus | null>(null);
   
   // Handle sort
@@ -300,19 +303,34 @@ export function MaintenanceTable({
                         
                         {/* Actions */}
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation(); // Prevent row click
-                              setSelectedVehicle(vehicle);
-                              setEditDialogOpen(true);
-                            }}
-                            className="text-blue-400 hover:text-blue-300 hover:bg-slate-800"
-                            title="Edit Maintenance"
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
+                          <div className="flex gap-1 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent row click
+                                setSelectedVehicle(vehicle);
+                                setEditDialogOpen(true);
+                              }}
+                              className="text-blue-400 hover:text-blue-300 hover:bg-slate-800"
+                              title="Edit Maintenance"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent row click
+                                setSelectedVehicle(vehicle);
+                                setDeleteDialogOpen(true);
+                              }}
+                              className="text-red-400 hover:text-red-300 hover:bg-slate-800"
+                              title="Delete Vehicle"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -354,6 +372,22 @@ export function MaintenanceTable({
         onSuccess={() => {
           setAddVehicleDialogOpen(false);
           onVehicleAdded?.();
+        }}
+      />
+      
+      {/* Delete Vehicle Dialog */}
+      <DeleteVehicleDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        vehicle={selectedVehicle ? {
+          id: selectedVehicle.vehicle_id,
+          reg_number: selectedVehicle.vehicle?.reg_number || 'Unknown',
+          category: selectedVehicle.vehicle?.category_id ? { name: 'Vehicle' } : null
+        } : null}
+        onSuccess={() => {
+          setDeleteDialogOpen(false);
+          setSelectedVehicle(null);
+          onVehicleAdded?.(); // Refresh the list
         }}
       />
     </>

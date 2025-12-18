@@ -120,6 +120,10 @@ export async function DELETE(
 
     const vehicleId = (await params).id;
 
+    // Parse request body to get reason
+    const body = await request.json().catch(() => ({}));
+    const reason = body.reason || 'Other';
+
     // Check if vehicle has any inspections
     const { data: inspections } = await supabase
       .from('vehicle_inspections')
@@ -137,7 +141,31 @@ export async function DELETE(
       );
     }
 
-    // Delete vehicle
+    // Get vehicle details before deleting (for archiving)
+    const { data: vehicle } = await supabase
+      .from('vehicles')
+      .select('*, vehicle_maintenance(*)')
+      .eq('id', vehicleId)
+      .single();
+
+    if (vehicle) {
+      // Archive the vehicle with reason
+      await supabase.from('vehicle_archive').insert({
+        vehicle_id: vehicle.id,
+        reg_number: vehicle.reg_number,
+        category_id: vehicle.category_id,
+        status: vehicle.status,
+        archive_reason: reason,
+        archived_by: user.id,
+        vehicle_data: vehicle,
+        maintenance_data: vehicle.vehicle_maintenance || null,
+      }).catch((err) => {
+        // Log error but don't fail delete if archiving fails
+        console.error('Failed to archive vehicle:', err);
+      });
+    }
+
+    // Delete vehicle (CASCADE will handle maintenance records)
     const { error } = await supabase
       .from('vehicles')
       .delete()
@@ -145,7 +173,10 @@ export async function DELETE(
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ 
+      success: true,
+      message: `Vehicle deleted (Reason: ${reason})`
+    });
   } catch (error) {
     console.error('Error deleting vehicle:', error);
     return NextResponse.json(
