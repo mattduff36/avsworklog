@@ -449,8 +449,8 @@ export default function DashboardPage() {
               );
             })}
             
-            {/* SuperAdmin Only - Debug Link */}
-            {isSuperAdmin && (() => {
+            {/* SuperAdmin Only - Debug Link (only when viewing as actual role) */}
+            {isSuperAdmin && viewAsRole === 'actual' && (() => {
               const link = { href: '/debug', label: 'Debug', icon: Bug, borderColor: 'border-yellow-500', iconColor: 'text-yellow-400', hoverBorder: 'hover:border-yellow-400' };
               const Icon = link.icon;
               return (
