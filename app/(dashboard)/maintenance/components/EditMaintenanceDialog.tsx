@@ -26,6 +26,7 @@ import { formatDateForInput, formatMileage } from '@/lib/utils/maintenanceCalcul
 // ============================================================================
 
 const editMaintenanceSchema = z.object({
+  nickname: z.string().max(100, 'Nickname must be less than 100 characters').optional().nullable(),
   current_mileage: z.coerce.number().int().positive('Current mileage must be a positive number').optional().nullable(),
   tax_due_date: z.string().optional().nullable(),
   mot_due_date: z.string().optional().nullable(),
@@ -86,6 +87,7 @@ export function EditMaintenanceDialog({
   useEffect(() => {
     if (vehicle) {
       reset({
+        nickname: vehicle.vehicle?.nickname || '',
         current_mileage: vehicle.current_mileage || undefined,
         tax_due_date: formatDateForInput(vehicle.tax_due_date),
         mot_due_date: formatDateForInput(vehicle.mot_due_date),
@@ -103,6 +105,27 @@ export function EditMaintenanceDialog({
   // Submit handler
   const onSubmit = async (data: EditMaintenanceFormData) => {
     if (!vehicle) return;
+
+    // If nickname has changed, update the vehicle record first
+    const nicknameChanged = data.nickname?.trim() !== vehicle.vehicle?.nickname;
+    if (nicknameChanged && vehicle.vehicle?.id) {
+      try {
+        const response = await fetch(`/api/admin/vehicles/${vehicle.vehicle.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nickname: data.nickname?.trim() || null,
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to update vehicle nickname');
+        }
+      } catch (error) {
+        console.error('Error updating vehicle nickname:', error);
+        // Continue with maintenance update even if nickname update fails
+      }
+    }
 
     // Convert empty strings to null for dates
     const updates = {
@@ -150,6 +173,25 @@ export function EditMaintenanceDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Vehicle Nickname */}
+          <div className="space-y-2">
+            <Label htmlFor="nickname" className="text-white">
+              Vehicle Nickname <span className="text-slate-400 text-xs">(Optional)</span>
+            </Label>
+            <Input
+              id="nickname"
+              {...register('nickname')}
+              placeholder="e.g., Andy's Van, Red Pickup, Main Truck"
+              className="bg-slate-800 border-slate-600 text-white"
+            />
+            <p className="text-xs text-slate-400">
+              A friendly name to help identify this vehicle quickly
+            </p>
+            {errors.nickname && (
+              <p className="text-sm text-red-400">{errors.nickname.message}</p>
+            )}
+          </div>
+
           {/* Current Mileage (Editable for manual corrections) */}
           <div className={`rounded-lg p-4 transition-colors ${
             isMileageFocused 

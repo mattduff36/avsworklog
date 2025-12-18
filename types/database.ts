@@ -56,6 +56,7 @@ export interface Database {
           vehicle_type: string | null
           category_id: string
           status: string
+          nickname: string | null
           created_at: string
         }
         Insert: {
@@ -65,6 +66,7 @@ export interface Database {
           vehicle_type?: string | null
           category_id: string
           status?: string
+          nickname?: string | null
           created_at?: string
         }
         Update: {
@@ -74,6 +76,7 @@ export interface Database {
           vehicle_type?: string | null
           category_id?: string
           status?: string
+          nickname?: string | null
           created_at?: string
         }
       }

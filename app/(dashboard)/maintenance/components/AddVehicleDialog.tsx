@@ -47,6 +47,7 @@ export function AddVehicleDialog({
     reg_number: '',
     category_id: '',
     status: 'active',
+    nickname: '',
   });
   const [error, setError] = useState('');
 
@@ -64,6 +65,7 @@ export function AddVehicleDialog({
         reg_number: '',
         category_id: '',
         status: 'active',
+        nickname: '',
       });
       setError('');
     }
@@ -120,6 +122,7 @@ export function AddVehicleDialog({
         body: JSON.stringify({
           ...formData,
           reg_number: formattedReg,
+          nickname: formData.nickname.trim() || null, // Send null if empty
         }),
       });
 
@@ -187,6 +190,26 @@ export function AddVehicleDialog({
             />
             <p className="text-xs text-slate-400">
               Will be formatted as UK registration (e.g., AB12 CDE)
+            </p>
+          </div>
+
+          {/* Nickname */}
+          <div className="space-y-2">
+            <Label htmlFor="nickname" className="text-white">
+              Nickname <span className="text-slate-400 text-xs">(Optional)</span>
+            </Label>
+            <Input
+              id="nickname"
+              value={formData.nickname}
+              onChange={(e) =>
+                setFormData({ ...formData, nickname: e.target.value.trim() })
+              }
+              placeholder="e.g., Andy's Van, Red Pickup, Main Truck"
+              className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+              disabled={loading}
+            />
+            <p className="text-xs text-slate-400">
+              A friendly name to help identify this vehicle quickly
             </p>
           </div>
 

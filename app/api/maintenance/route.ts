@@ -82,6 +82,7 @@ export async function GET(request: NextRequest) {
         reg_number,
         category_id,
         status,
+        nickname,
         maintenance:vehicle_maintenance(*)
       `)
       .eq('status', 'active');
@@ -134,7 +135,8 @@ export async function GET(request: NextRequest) {
             id: v.id,
             reg_number: v.reg_number,
             category_id: v.category_id,
-            status: v.status
+            status: v.status,
+            nickname: v.nickname || null
           },
           last_inspector: v.last_inspector,
           last_inspection_date: v.last_inspection_date,
@@ -195,7 +197,8 @@ export async function GET(request: NextRequest) {
           id: v.id,
           reg_number: v.reg_number,
           category_id: v.category_id,
-          status: v.status
+          status: v.status,
+          nickname: v.nickname || null
         },
         last_inspector: v.last_inspector,
         last_inspection_date: v.last_inspection_date,

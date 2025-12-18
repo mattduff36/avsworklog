@@ -92,6 +92,7 @@ export interface VehicleMaintenanceWithStatus extends VehicleMaintenance {
     reg_number: string;
     category_id: string | null;
     status: string;
+    nickname?: string | null;
   };
   
   // Last inspection info

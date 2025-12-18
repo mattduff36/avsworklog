@@ -44,31 +44,58 @@ export async function PUT(
 
     const vehicleId = (await params).id;
     const body = await request.json();
-    const { reg_number, category_id, status } = body;
+    const { reg_number, category_id, status, nickname } = body;
 
-    // Validate required fields
-    if (!reg_number) {
-      return NextResponse.json(
-        { error: 'Registration number is required' },
-        { status: 400 }
-      );
+    // Build update object with only provided fields
+    const updates: any = {};
+    
+    if (reg_number !== undefined) {
+      updates.reg_number = reg_number.toUpperCase();
+    }
+    
+    if (category_id !== undefined) {
+      updates.category_id = category_id;
+    }
+    
+    if (status !== undefined) {
+      updates.status = status;
+    }
+    
+    if (nickname !== undefined) {
+      updates.nickname = nickname?.trim() || null;
     }
 
-    if (!category_id) {
-      return NextResponse.json(
-        { error: 'Category is required' },
-        { status: 400 }
-      );
+    // If full update (reg_number and category_id provided), validate
+    if ('reg_number' in updates || 'category_id' in updates) {
+      // Get current vehicle to validate required fields
+      const { data: currentVehicle } = await supabase
+        .from('vehicles')
+        .select('reg_number, category_id')
+        .eq('id', vehicleId)
+        .single();
+
+      const finalRegNumber = updates.reg_number || currentVehicle?.reg_number;
+      const finalCategoryId = updates.category_id || currentVehicle?.category_id;
+
+      if (!finalRegNumber) {
+        return NextResponse.json(
+          { error: 'Registration number is required' },
+          { status: 400 }
+        );
+      }
+
+      if (!finalCategoryId) {
+        return NextResponse.json(
+          { error: 'Category is required' },
+          { status: 400 }
+        );
+      }
     }
 
     // Update vehicle (vehicle_type will auto-sync from category via trigger)
     const { data, error } = await supabase
       .from('vehicles')
-      .update({
-        reg_number: reg_number.toUpperCase(),
-        category_id: category_id,
-        status: status || 'active',
-      })
+      .update(updates)
       .eq('id', vehicleId)
       .select()
       .single();

@@ -45,7 +45,7 @@ interface MaintenanceTableProps {
 
 type SortField = 
   | 'reg_number'
-  | 'last_inspector'
+  | 'nickname'
   | 'current_mileage' 
   | 'tax_due' 
   | 'mot_due' 
@@ -56,7 +56,7 @@ type SortField =
 type SortDirection = 'asc' | 'desc';
 
 interface ColumnVisibility {
-  last_inspector: boolean;
+  nickname: boolean;
   current_mileage: boolean;
   tax_due: boolean;
   mot_due: boolean;
@@ -81,7 +81,7 @@ export function MaintenanceTable({
   
   // Column visibility state - all columns visible by default
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
-    last_inspector: true,
+    nickname: true,
     current_mileage: true,
     tax_due: true,
     mot_due: true,
@@ -115,8 +115,8 @@ export function MaintenanceTable({
       case 'reg_number':
         return multiplier * (a.vehicle?.reg_number || '').localeCompare(b.vehicle?.reg_number || '');
       
-      case 'last_inspector':
-        return multiplier * (a.last_inspector || '').localeCompare(b.last_inspector || '');
+      case 'nickname':
+        return multiplier * (a.vehicle?.nickname || '').localeCompare(b.vehicle?.nickname || '');
       
       case 'current_mileage':
         return multiplier * ((a.current_mileage || 0) - (b.current_mileage || 0));
@@ -222,10 +222,10 @@ export function MaintenanceTable({
                 <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuCheckboxItem
-                  checked={columnVisibility.last_inspector}
-                  onCheckedChange={() => toggleColumn('last_inspector')}
+                  checked={columnVisibility.nickname}
+                  onCheckedChange={() => toggleColumn('nickname')}
                 >
-                  Last Inspector
+                  Nickname
                 </DropdownMenuCheckboxItem>
                 <DropdownMenuCheckboxItem
                   checked={columnVisibility.current_mileage}
@@ -274,9 +274,9 @@ export function MaintenanceTable({
             </div>
           ) : (
             <div className="border border-slate-700 rounded-lg overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[calc(100vh-280px)] relative">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-slate-900">
                     <TableRow className="border-slate-700 hover:bg-slate-800/50">
                       <TableHead 
                         className="text-slate-300 cursor-pointer hover:bg-slate-800"
@@ -287,13 +287,13 @@ export function MaintenanceTable({
                           <ArrowUpDown className="h-3 w-3" />
                         </div>
                       </TableHead>
-                      {columnVisibility.last_inspector && (
+                      {columnVisibility.nickname && (
                         <TableHead 
                           className="text-slate-300 cursor-pointer hover:bg-slate-800"
-                          onClick={() => handleSort('last_inspector')}
+                          onClick={() => handleSort('nickname')}
                         >
                           <div className="flex items-center gap-2">
-                            Last Inspector
+                            Nickname
                             <ArrowUpDown className="h-3 w-3" />
                           </div>
                         </TableHead>
@@ -384,16 +384,11 @@ export function MaintenanceTable({
                           {vehicle.vehicle?.reg_number || 'Unknown'}
                         </TableCell>
                         
-                        {/* Last Inspector */}
-                        {columnVisibility.last_inspector && (
+                        {/* Nickname */}
+                        {columnVisibility.nickname && (
                           <TableCell className="text-slate-300">
-                            {vehicle.last_inspector ? (
-                              <div className="flex items-center gap-2">
-                                <User className="h-3 w-3 text-slate-400" />
-                                {vehicle.last_inspector}
-                              </div>
-                            ) : (
-                              <span className="text-slate-400">No inspections</span>
+                            {vehicle.vehicle?.nickname || (
+                              <span className="text-slate-400 italic">No nickname</span>
                             )}
                           </TableCell>
                         )}

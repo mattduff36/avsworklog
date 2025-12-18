@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { reg_number, category_id } = body;
+    const { reg_number, category_id, nickname } = body;
 
     // Validate required fields
     if (!reg_number) {
@@ -126,6 +126,7 @@ export async function POST(request: NextRequest) {
         reg_number: reg_number.toUpperCase(),
         category_id: category_id,
         status: 'active',
+        nickname: nickname?.trim() || null,
       })
       .select()
       .single();
