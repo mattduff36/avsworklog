@@ -17,13 +17,15 @@ interface MaintenanceHistoryDialogProps {
   onOpenChange: (open: boolean) => void;
   vehicleId: string | null;
   vehicleReg?: string;
+  onEditClick?: () => void;
 }
 
 export function MaintenanceHistoryDialog({
   open,
   onOpenChange,
   vehicleId,
-  vehicleReg
+  vehicleReg,
+  onEditClick
 }: MaintenanceHistoryDialogProps) {
   const { data: historyData, isLoading } = useMaintenanceHistory(vehicleId);
   

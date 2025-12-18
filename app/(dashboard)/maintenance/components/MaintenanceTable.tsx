@@ -249,7 +249,7 @@ export function MaintenanceTable({
                         key={vehicle.id || vehicle.vehicle_id || vehicle.vehicle?.id}
                         onClick={() => {
                           setSelectedVehicle(vehicle);
-                          setEditDialogOpen(true);
+                          setHistoryDialogOpen(true);
                         }}
                         className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer"
                       >
@@ -300,34 +300,19 @@ export function MaintenanceTable({
                         
                         {/* Actions */}
                         <TableCell className="text-right">
-                          <div className="flex gap-1 justify-end">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation(); // Prevent row click
-                                setSelectedVehicle(vehicle);
-                                setEditDialogOpen(true);
-                              }}
-                              className="text-blue-400 hover:text-blue-300 hover:bg-slate-800"
-                              title="Edit Maintenance"
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation(); // Prevent row click
-                                setSelectedVehicle(vehicle);
-                                setHistoryDialogOpen(true);
-                              }}
-                              className="text-slate-400 hover:text-slate-300 hover:bg-slate-800"
-                              title="View History"
-                            >
-                              <History className="h-3 w-3" />
-                            </Button>
-                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent row click
+                              setSelectedVehicle(vehicle);
+                              setEditDialogOpen(true);
+                            }}
+                            className="text-blue-400 hover:text-blue-300 hover:bg-slate-800"
+                            title="Edit Maintenance"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -356,6 +341,10 @@ export function MaintenanceTable({
         onOpenChange={setHistoryDialogOpen}
         vehicleId={selectedVehicle?.vehicle_id || null}
         vehicleReg={selectedVehicle?.vehicle?.reg_number}
+        onEditClick={() => {
+          setHistoryDialogOpen(false);
+          setEditDialogOpen(true);
+        }}
       />
       
       {/* Add Vehicle Dialog */}
