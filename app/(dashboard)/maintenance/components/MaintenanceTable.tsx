@@ -274,9 +274,9 @@ export function MaintenanceTable({
             </div>
           ) : (
             <div className="border border-slate-700 rounded-lg overflow-hidden">
-              <div className="overflow-x-auto max-h-[calc(100vh-280px)] relative">
+              <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader className="sticky top-0 z-10 bg-slate-900">
+                  <TableHeader>
                     <TableRow className="border-slate-700 hover:bg-slate-800/50">
                       <TableHead 
                         className="text-slate-300 cursor-pointer hover:bg-slate-800"
