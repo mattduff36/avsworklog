@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -62,6 +62,7 @@ export function EditMaintenanceDialog({
 }: EditMaintenanceDialogProps) {
   const updateMutation = useUpdateMaintenance();
   const createMutation = useCreateMaintenance();
+  const [isMileageFocused, setIsMileageFocused] = useState(false);
   
   // Check if this is a new maintenance record (vehicle.id is null for vehicles without maintenance records)
   const isNewRecord = !vehicle?.id;
@@ -150,23 +151,31 @@ export function EditMaintenanceDialog({
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Current Mileage (Editable for manual corrections) */}
-          <div className="bg-amber-900/20 border border-amber-800/50 rounded-lg p-4">
+          <div className={`rounded-lg p-4 transition-colors ${
+            isMileageFocused 
+              ? 'bg-amber-900/20 border border-amber-800/50' 
+              : 'bg-slate-800/50 border border-slate-700'
+          }`}>
             <Label htmlFor="current_mileage" className="text-white">
-              Current Mileage <span className="text-amber-400">(Manual Override)</span>
+              Current Mileage {isMileageFocused && <span className="text-amber-400">(Manual Override)</span>}
             </Label>
             <Input
               id="current_mileage"
               type="number"
               {...register('current_mileage')}
+              onFocus={() => setIsMileageFocused(true)}
+              onBlur={() => setIsMileageFocused(false)}
               placeholder="e.g., 75000"
               className="bg-slate-800 border-slate-600 text-white mt-2"
             />
-            <p className="text-xs text-slate-400 mt-2">
-              ⚠️ Normally auto-updated from inspections. Only edit if the current mileage is incorrect (e.g., typo in inspection).
-            </p>
-            {vehicle.last_mileage_update && (
+            {isMileageFocused && (
+              <p className="text-xs text-amber-400 mt-2">
+                ⚠️ Normally auto-updated from inspections. Only edit if the current mileage is incorrect (e.g., typo in inspection).
+              </p>
+            )}
+            {!isMileageFocused && vehicle.last_mileage_update && (
               <p className="text-xs text-slate-500 mt-1">
-                Last auto-update: {new Date(vehicle.last_mileage_update).toLocaleString()}
+                Last updated: {new Date(vehicle.last_mileage_update).toLocaleString()}
               </p>
             )}
             {errors.current_mileage && (
