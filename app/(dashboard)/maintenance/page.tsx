@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
+import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -19,30 +20,86 @@ import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 
 function MaintenanceContent() {
   // 1. Hooks
-  const { isManager, isAdmin, isSuperAdmin } = useAuth();
+  const { profile, isManager, isAdmin, isSuperAdmin } = useAuth();
   const { isOnline } = useOfflineSync();
   const queryClient = useQueryClient();
+  const supabase = createClient();
   
   // 2. State
   const [searchQuery, setSearchQuery] = useState('');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleMaintenanceWithStatus | null>(null);
+  const [hasModulePermission, setHasModulePermission] = useState<boolean | null>(null);
   
   // 3. Data - fetch all maintenance records
   const { data: maintenanceData, isLoading, error } = useMaintenance();
   
-  // 4. Handler for opening edit dialog
+  // 4. Fetch user permissions for 'maintenance' module
+  useEffect(() => {
+    async function checkPermission() {
+      if (!profile?.id) {
+        setHasModulePermission(false);
+        return;
+      }
+      
+      // Managers and admins have full access
+      if (isManager || isAdmin || isSuperAdmin) {
+        setHasModulePermission(true);
+        return;
+      }
+      
+      try {
+        // Check if employee has 'maintenance' module permission
+        const { data } = await supabase
+          .from('profiles')
+          .select(`
+            role_id,
+            roles!inner(
+              role_permissions!inner(
+                module_name,
+                enabled
+              )
+            )
+          `)
+          .eq('id', profile.id)
+          .eq('roles.role_permissions.module_name', 'maintenance')
+          .single();
+        
+        // Check if maintenance permission is enabled
+        const maintenancePerm = data?.roles?.role_permissions?.find(
+          (p: { module_name: string; enabled: boolean }) => 
+            p.module_name === 'maintenance'
+        );
+        
+        setHasModulePermission(maintenancePerm?.enabled || false);
+      } catch (err) {
+        logger.error('Failed to check maintenance permission', err, 'MaintenancePage');
+        setHasModulePermission(false);
+      }
+    }
+    
+    checkPermission();
+  }, [profile?.id, isManager, isAdmin, isSuperAdmin, supabase]);
+  
+  // 5. Handler for opening edit dialog
   const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
     setSelectedVehicle(vehicle);
     setEditDialogOpen(true);
   };
   
-  // 5. Check permissions - using RBAC via has_maintenance_permission() function
-  // SuperAdmin/Managers/Admins have full access, employees need 'maintenance' module permission
-  // RLS also enforces this at database level
-  const hasAccess = isSuperAdmin || isManager || isAdmin;
+  // 6. Check permissions - Admins/Managers always have access, employees need module permission
+  const hasAccess = hasModulePermission;
   
-  // 6. Guards
+  // 7. Guards
+  // Show loading while checking permissions
+  if (hasModulePermission === null) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </div>
+    );
+  }
+  
   if (!hasAccess) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -85,12 +142,12 @@ function MaintenanceContent() {
     );
   }
   
-  // 6. Filter vehicles based on search
+  // 8. Filter vehicles based on search
   const filteredVehicles = maintenanceData?.vehicles.filter(vehicle => 
     vehicle.vehicle?.reg_number?.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
   
-  // 8. Render
+  // 9. Render
   return (
     <div className="space-y-6 max-w-7xl">
       {!isOnline && <OfflineBanner />}
