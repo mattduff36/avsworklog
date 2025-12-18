@@ -7,8 +7,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, History as HistoryIcon, User, Calendar } from 'lucide-react';
+import { Loader2, History as HistoryIcon, User, Calendar, Edit } from 'lucide-react';
 import { useMaintenanceHistory } from '@/lib/hooks/useMaintenance';
 import { formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 
@@ -76,13 +77,27 @@ export function MaintenanceHistoryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl flex items-center gap-2">
-            <HistoryIcon className="h-6 w-6" />
-            Maintenance History - {vehicleReg || 'Vehicle'}
-          </DialogTitle>
-          <DialogDescription className="text-slate-400">
-            Complete audit trail of all maintenance changes
-          </DialogDescription>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <DialogTitle className="text-2xl flex items-center gap-2">
+                <HistoryIcon className="h-6 w-6" />
+                Maintenance History - {vehicleReg || 'Vehicle'}
+              </DialogTitle>
+              <DialogDescription className="text-slate-400">
+                Complete audit trail of all maintenance changes
+              </DialogDescription>
+            </div>
+            {onEditClick && (
+              <Button
+                onClick={onEditClick}
+                className="bg-red-600 hover:bg-red-700 text-white flex-shrink-0"
+                size="sm"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
         {isLoading ? (
