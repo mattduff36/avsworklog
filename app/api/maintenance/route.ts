@@ -91,8 +91,36 @@ export async function GET(request: NextRequest) {
       throw vehiclesError;
     }
     
+    // Get last inspector for each vehicle
+    const vehiclesWithInspector = await Promise.all(
+      (vehicles || []).map(async (vehicle) => {
+        const v = vehicle as any;
+        
+        // Get the last inspection for this vehicle
+        const { data: inspections } = await supabase
+          .from('vehicle_inspections')
+          .select(`
+            inspection_date,
+            profiles!vehicle_inspections_user_id_fkey (
+              full_name
+            )
+          `)
+          .eq('vehicle_id', v.id)
+          .order('inspection_date', { ascending: false })
+          .limit(1);
+        
+        const lastInspection = inspections?.[0] || null;
+        
+        return {
+          ...v,
+          last_inspector: (lastInspection?.profiles as any)?.full_name || null,
+          last_inspection_date: lastInspection?.inspection_date || null,
+        };
+      })
+    );
+    
     // Calculate status for each vehicle
-    const vehiclesWithStatus: VehicleMaintenanceWithStatus[] = (vehicles || []).map(vehicle => {
+    const vehiclesWithStatus: VehicleMaintenanceWithStatus[] = vehiclesWithInspector.map(vehicle => {
       const v = vehicle as any;
       // Get maintenance data (will be null/empty if no maintenance record exists)
       const maintenance = Array.isArray(v.maintenance) ? v.maintenance[0] : v.maintenance;
@@ -108,6 +136,8 @@ export async function GET(request: NextRequest) {
             category_id: v.category_id,
             status: v.status
           },
+          last_inspector: v.last_inspector,
+          last_inspection_date: v.last_inspection_date,
           current_mileage: null,
           tax_due_date: null,
           mot_due_date: null,
@@ -118,6 +148,10 @@ export async function GET(request: NextRequest) {
           first_aid_kit_expiry: null,
           created_at: null,
           updated_at: null,
+          last_updated_by: null,
+          last_updated_at: '',
+          last_mileage_update: null,
+          notes: null,
           tax_status: { status: 'not_set' as const },
           mot_status: { status: 'not_set' as const },
           service_status: { status: 'not_set' as const },
@@ -163,6 +197,8 @@ export async function GET(request: NextRequest) {
           category_id: v.category_id,
           status: v.status
         },
+        last_inspector: v.last_inspector,
+        last_inspection_date: v.last_inspection_date,
         tax_status,
         mot_status,
         service_status,

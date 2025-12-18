@@ -94,6 +94,10 @@ export interface VehicleMaintenanceWithStatus extends VehicleMaintenance {
     status: string;
   };
   
+  // Last inspection info
+  last_inspector?: string | null;
+  last_inspection_date?: string | null;
+  
   // Calculated status for each maintenance type
   tax_status?: MaintenanceItemStatus;
   mot_status?: MaintenanceItemStatus;

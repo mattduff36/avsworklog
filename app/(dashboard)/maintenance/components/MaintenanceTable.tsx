@@ -6,6 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { 
   Search, 
   Edit, 
@@ -13,7 +21,9 @@ import {
   ArrowUpDown,
   Plus,
   AlertTriangle,
-  Trash2
+  Trash2,
+  Settings2,
+  User
 } from 'lucide-react';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { AddVehicleDialog } from './AddVehicleDialog';
@@ -34,7 +44,8 @@ interface MaintenanceTableProps {
 }
 
 type SortField = 
-  | 'reg_number' 
+  | 'reg_number'
+  | 'last_inspector'
   | 'current_mileage' 
   | 'tax_due' 
   | 'mot_due' 
@@ -43,6 +54,16 @@ type SortField =
   | 'first_aid_expiry';
 
 type SortDirection = 'asc' | 'desc';
+
+interface ColumnVisibility {
+  last_inspector: boolean;
+  current_mileage: boolean;
+  tax_due: boolean;
+  mot_due: boolean;
+  service_due: boolean;
+  cambelt_due: boolean;
+  first_aid_expiry: boolean;
+}
 
 export function MaintenanceTable({ 
   vehicles, 
@@ -57,6 +78,24 @@ export function MaintenanceTable({
   const [addVehicleDialogOpen, setAddVehicleDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleMaintenanceWithStatus | null>(null);
+  
+  // Column visibility state - all columns visible by default
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
+    last_inspector: true,
+    current_mileage: true,
+    tax_due: true,
+    mot_due: true,
+    service_due: true,
+    cambelt_due: true,
+    first_aid_expiry: true,
+  });
+  
+  const toggleColumn = (column: keyof ColumnVisibility) => {
+    setColumnVisibility(prev => ({
+      ...prev,
+      [column]: !prev[column]
+    }));
+  };
   
   // Handle sort
   const handleSort = (field: SortField) => {
@@ -75,6 +114,9 @@ export function MaintenanceTable({
     switch (sortField) {
       case 'reg_number':
         return multiplier * (a.vehicle?.reg_number || '').localeCompare(b.vehicle?.reg_number || '');
+      
+      case 'last_inspector':
+        return multiplier * (a.last_inspector || '').localeCompare(b.last_inspector || '');
       
       case 'current_mileage':
         return multiplier * ((a.current_mileage || 0) - (b.current_mileage || 0));
@@ -156,15 +198,73 @@ export function MaintenanceTable({
             </div>
           )}
           
-          {/* Search Bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search by registration number..."
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="pl-9 bg-white dark:bg-slate-900/50 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white"
-            />
+          {/* Search Bar and Column Filter */}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search by registration number..."
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="pl-9 bg-white dark:bg-slate-900/50 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white"
+              />
+            </div>
+            
+            {/* Column Visibility Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="border-slate-300 dark:border-slate-600">
+                  <Settings2 className="h-4 w-4 mr-2" />
+                  Show columns
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuCheckboxItem
+                  checked={columnVisibility.last_inspector}
+                  onCheckedChange={() => toggleColumn('last_inspector')}
+                >
+                  Last Inspector
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columnVisibility.current_mileage}
+                  onCheckedChange={() => toggleColumn('current_mileage')}
+                >
+                  Mileage
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columnVisibility.tax_due}
+                  onCheckedChange={() => toggleColumn('tax_due')}
+                >
+                  Tax Due
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columnVisibility.mot_due}
+                  onCheckedChange={() => toggleColumn('mot_due')}
+                >
+                  MOT Due
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columnVisibility.service_due}
+                  onCheckedChange={() => toggleColumn('service_due')}
+                >
+                  Service Due
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columnVisibility.cambelt_due}
+                  onCheckedChange={() => toggleColumn('cambelt_due')}
+                >
+                  Cambelt Due
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columnVisibility.first_aid_expiry}
+                  onCheckedChange={() => toggleColumn('first_aid_expiry')}
+                >
+                  First Aid
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Table */}
@@ -187,60 +287,83 @@ export function MaintenanceTable({
                           <ArrowUpDown className="h-3 w-3" />
                         </div>
                       </TableHead>
+                      {columnVisibility.last_inspector && (
+                        <TableHead 
+                          className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                          onClick={() => handleSort('last_inspector')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Last Inspector
+                            <ArrowUpDown className="h-3 w-3" />
+                          </div>
+                        </TableHead>
+                      )}
+                      {columnVisibility.current_mileage && (
                       <TableHead 
-                        className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
-                        onClick={() => handleSort('current_mileage')}
-                      >
-                        <div className="flex items-center gap-2">
-                          Mileage
-                          <ArrowUpDown className="h-3 w-3" />
-                        </div>
-                      </TableHead>
+                          className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                          onClick={() => handleSort('current_mileage')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Mileage
+                            <ArrowUpDown className="h-3 w-3" />
+                          </div>
+                        </TableHead>
+                      )}
+                      {columnVisibility.tax_due && (
                       <TableHead 
-                        className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
-                        onClick={() => handleSort('tax_due')}
-                      >
-                        <div className="flex items-center gap-2">
-                          Tax Due
-                          <ArrowUpDown className="h-3 w-3" />
-                        </div>
-                      </TableHead>
+                          className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                          onClick={() => handleSort('tax_due')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Tax Due
+                            <ArrowUpDown className="h-3 w-3" />
+                          </div>
+                        </TableHead>
+                      )}
+                      {columnVisibility.mot_due && (
                       <TableHead 
-                        className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
-                        onClick={() => handleSort('mot_due')}
-                      >
-                        <div className="flex items-center gap-2">
-                          MOT Due
-                          <ArrowUpDown className="h-3 w-3" />
-                        </div>
-                      </TableHead>
+                          className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                          onClick={() => handleSort('mot_due')}
+                        >
+                          <div className="flex items-center gap-2">
+                            MOT Due
+                            <ArrowUpDown className="h-3 w-3" />
+                          </div>
+                        </TableHead>
+                      )}
+                      {columnVisibility.service_due && (
                       <TableHead 
-                        className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
-                        onClick={() => handleSort('service_due')}
-                      >
-                        <div className="flex items-center gap-2">
-                          Service Due
-                          <ArrowUpDown className="h-3 w-3" />
-                        </div>
-                      </TableHead>
+                          className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                          onClick={() => handleSort('service_due')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Service Due
+                            <ArrowUpDown className="h-3 w-3" />
+                          </div>
+                        </TableHead>
+                      )}
+                      {columnVisibility.cambelt_due && (
                       <TableHead 
-                        className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
-                        onClick={() => handleSort('cambelt_due')}
-                      >
-                        <div className="flex items-center gap-2">
-                          Cambelt Due
-                          <ArrowUpDown className="h-3 w-3" />
-                        </div>
-                      </TableHead>
+                          className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                          onClick={() => handleSort('cambelt_due')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Cambelt Due
+                            <ArrowUpDown className="h-3 w-3" />
+                          </div>
+                        </TableHead>
+                      )}
+                      {columnVisibility.first_aid_expiry && (
                       <TableHead 
-                        className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
-                        onClick={() => handleSort('first_aid_expiry')}
-                      >
-                        <div className="flex items-center gap-2">
-                          First Aid
-                          <ArrowUpDown className="h-3 w-3" />
-                        </div>
-                      </TableHead>
+                          className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                          onClick={() => handleSort('first_aid_expiry')}
+                        >
+                          <div className="flex items-center gap-2">
+                            First Aid
+                            <ArrowUpDown className="h-3 w-3" />
+                          </div>
+                        </TableHead>
+                      )}
                       <TableHead className="text-right text-slate-700 dark:text-slate-300">
                         Actions
                       </TableHead>
@@ -261,45 +384,71 @@ export function MaintenanceTable({
                           {vehicle.vehicle?.reg_number || 'Unknown'}
                         </TableCell>
                         
+                        {/* Last Inspector */}
+                        {columnVisibility.last_inspector && (
+                          <TableCell className="text-slate-700 dark:text-slate-300">
+                            {vehicle.last_inspector ? (
+                              <div className="flex items-center gap-2">
+                                <User className="h-3 w-3 text-slate-400" />
+                                {vehicle.last_inspector}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">No inspections</span>
+                            )}
+                          </TableCell>
+                        )}
+                        
                         {/* Current Mileage */}
-                        <TableCell className="text-slate-700 dark:text-slate-300">
-                          {formatMileage(vehicle.current_mileage)}
-                        </TableCell>
+                        {columnVisibility.current_mileage && (
+                          <TableCell className="text-slate-700 dark:text-slate-300">
+                            {formatMileage(vehicle.current_mileage)}
+                          </TableCell>
+                        )}
                         
                         {/* Tax Due */}
-                        <TableCell>
-                          <Badge className={`font-medium ${getStatusColorClass(vehicle.tax_status?.status || 'not_set')}`}>
-                            {formatMaintenanceDate(vehicle.tax_due_date)}
-                          </Badge>
-                        </TableCell>
+                        {columnVisibility.tax_due && (
+                          <TableCell>
+                            <Badge className={`font-medium ${getStatusColorClass(vehicle.tax_status?.status || 'not_set')}`}>
+                              {formatMaintenanceDate(vehicle.tax_due_date)}
+                            </Badge>
+                          </TableCell>
+                        )}
                         
                         {/* MOT Due */}
-                        <TableCell>
-                          <Badge className={`font-medium ${getStatusColorClass(vehicle.mot_status?.status || 'not_set')}`}>
-                            {formatMaintenanceDate(vehicle.mot_due_date)}
-                          </Badge>
-                        </TableCell>
+                        {columnVisibility.mot_due && (
+                          <TableCell>
+                            <Badge className={`font-medium ${getStatusColorClass(vehicle.mot_status?.status || 'not_set')}`}>
+                              {formatMaintenanceDate(vehicle.mot_due_date)}
+                            </Badge>
+                          </TableCell>
+                        )}
                         
                         {/* Service Due */}
-                        <TableCell>
-                          <Badge className={`font-medium ${getStatusColorClass(vehicle.service_status?.status || 'not_set')}`}>
-                            {formatMileage(vehicle.next_service_mileage)}
-                          </Badge>
-                        </TableCell>
+                        {columnVisibility.service_due && (
+                          <TableCell>
+                            <Badge className={`font-medium ${getStatusColorClass(vehicle.service_status?.status || 'not_set')}`}>
+                              {formatMileage(vehicle.next_service_mileage)}
+                            </Badge>
+                          </TableCell>
+                        )}
                         
                         {/* Cambelt Due */}
-                        <TableCell>
-                          <Badge className={`font-medium ${getStatusColorClass(vehicle.cambelt_status?.status || 'not_set')}`}>
-                            {formatMileage(vehicle.cambelt_due_mileage)}
-                          </Badge>
-                        </TableCell>
+                        {columnVisibility.cambelt_due && (
+                          <TableCell>
+                            <Badge className={`font-medium ${getStatusColorClass(vehicle.cambelt_status?.status || 'not_set')}`}>
+                              {formatMileage(vehicle.cambelt_due_mileage)}
+                            </Badge>
+                          </TableCell>
+                        )}
                         
                         {/* First Aid */}
-                        <TableCell>
-                          <Badge className={`font-medium ${getStatusColorClass(vehicle.first_aid_status?.status || 'not_set')}`}>
-                            {formatMaintenanceDate(vehicle.first_aid_kit_expiry)}
-                          </Badge>
-                        </TableCell>
+                        {columnVisibility.first_aid_expiry && (
+                          <TableCell>
+                            <Badge className={`font-medium ${getStatusColorClass(vehicle.first_aid_status?.status || 'not_set')}`}>
+                              {formatMaintenanceDate(vehicle.first_aid_kit_expiry)}
+                            </Badge>
+                          </TableCell>
+                        )}
                         
                         {/* Actions */}
                         <TableCell className="text-right">
