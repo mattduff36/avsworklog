@@ -32,7 +32,7 @@ const editMaintenanceSchema = z.object({
   next_service_mileage: z.coerce.number().int().positive().optional().nullable(),
   last_service_mileage: z.coerce.number().int().positive().optional().nullable(),
   cambelt_due_mileage: z.coerce.number().int().positive().optional().nullable(),
-  cambelt_done: z.boolean().optional(),
+  tracker_id: z.string().max(50, 'Tracker ID must be less than 50 characters').optional().nullable(),
   notes: z.string().max(500, 'Notes must be less than 500 characters').optional().nullable(),
   comment: z.string()
     .min(10, 'Comment must be at least 10 characters')
@@ -90,7 +90,7 @@ export function EditMaintenanceDialog({
         next_service_mileage: vehicle.next_service_mileage || undefined,
         last_service_mileage: vehicle.last_service_mileage || undefined,
         cambelt_due_mileage: vehicle.cambelt_due_mileage || undefined,
-        cambelt_done: vehicle.cambelt_done || false,
+        tracker_id: vehicle.tracker_id || '',
         notes: vehicle.notes || '',
         comment: '',
       });
@@ -109,7 +109,7 @@ export function EditMaintenanceDialog({
       next_service_mileage: data.next_service_mileage || null,
       last_service_mileage: data.last_service_mileage || null,
       cambelt_due_mileage: data.cambelt_due_mileage || null,
-      cambelt_done: data.cambelt_done,
+      tracker_id: data.tracker_id || null,
       notes: data.notes || null,
       comment: data.comment.trim(), // Mandatory comment
       current_mileage: vehicle.current_mileage || 0, // Include current mileage for new records
@@ -264,18 +264,24 @@ export function EditMaintenanceDialog({
               </div>
             </div>
 
-            {/* Cambelt Done Checkbox */}
-            <div className="flex items-center space-x-2">
-              <input
-                id="cambelt_done"
-                type="checkbox"
-                {...register('cambelt_done')}
-                className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-blue-600 focus:ring-2 focus:ring-blue-500"
-              />
-              <Label htmlFor="cambelt_done" className="text-sm text-slate-300">
-                Cambelt replacement completed (reference only)
-              </Label>
-            </div>
+          </div>
+
+          {/* Tracker ID */}
+          <div className="space-y-2">
+            <Label htmlFor="tracker_id" className="text-white">GPS Tracker ID</Label>
+            <Input
+              id="tracker_id"
+              type="text"
+              {...register('tracker_id')}
+              placeholder="e.g., 359632101982533"
+              className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+            />
+            <p className="text-xs text-slate-400">
+              GPS tracking device identifier number
+            </p>
+            {errors.tracker_id && (
+              <p className="text-sm text-red-400">{errors.tracker_id.message}</p>
+            )}
           </div>
 
           {/* Notes */}

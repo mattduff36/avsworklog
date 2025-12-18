@@ -27,7 +27,9 @@ export interface VehicleMaintenance {
   last_service_mileage: number | null;
   next_service_mileage: number | null;
   cambelt_due_mileage: number | null;
-  cambelt_done: boolean;
+  
+  // Tracker
+  tracker_id: string | null;
   
   // Tracking
   last_mileage_update: string | null;
@@ -115,7 +117,7 @@ export interface UpdateMaintenanceRequest {
   next_service_mileage?: number | null;
   last_service_mileage?: number | null;
   cambelt_due_mileage?: number | null;
-  cambelt_done?: boolean;
+  tracker_id?: string | null;
   notes?: string | null;
   comment: string; // Mandatory for audit trail (min 10 chars)
 }

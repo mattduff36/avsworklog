@@ -147,14 +147,14 @@ export async function PUT(
       }
     }
     
-    if (body.cambelt_done !== undefined) {
-      updates.cambelt_done = body.cambelt_done;
-      if (currentRecord.cambelt_done !== body.cambelt_done) {
+    if (body.tracker_id !== undefined) {
+      updates.tracker_id = body.tracker_id;
+      if (currentRecord.tracker_id !== body.tracker_id) {
         changedFields.push({
-          field_name: 'cambelt_done',
-          old_value: currentRecord.cambelt_done?.toString() || 'false',
-          new_value: body.cambelt_done?.toString() || 'false',
-          value_type: 'boolean'
+          field_name: 'tracker_id',
+          old_value: currentRecord.tracker_id,
+          new_value: body.tracker_id,
+          value_type: 'text'
         });
       }
     }

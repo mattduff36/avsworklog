@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
           next_service_mileage: null,
           miles_last_service: null,
           cambelt_due_mileage: null,
-          cambelt_done: null,
+          tracker_id: null,
           first_aid_kit_expiry: null,
           created_at: null,
           updated_at: null,
@@ -266,7 +266,7 @@ export async function POST(request: NextRequest) {
       next_service_mileage: body.next_service_mileage || null,
       last_service_mileage: body.last_service_mileage || null,
       cambelt_due_mileage: body.cambelt_due_mileage || null,
-      cambelt_done: body.cambelt_done || false,
+      tracker_id: body.tracker_id || null,
       notes: body.notes || null,
       last_updated_by: user.id
     };

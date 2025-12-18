@@ -28,7 +28,7 @@ interface ExcelRow {
   'MILES NEXT SERVICE': number;
   'MILES LAST SERVICE': number;
   'MILES DUE CAMBELT'?: number;
-  'CAM BELT DONE'?: string;
+  'TRACKER No.'?: string;
   'FIRST AID CHECK'?: string;
   'Comments'?: string;
   'MOT Date Due'?: string;
@@ -197,7 +197,7 @@ async function importMaintenanceData() {
           last_service_mileage: parseMileage(row['MILES LAST SERVICE']),
           next_service_mileage: parseMileage(row['MILES NEXT SERVICE']),
           cambelt_due_mileage: parseMileage(row['MILES DUE CAMBELT']),
-          cambelt_done: row['CAM BELT DONE'] ? parseBoolean(row['CAM BELT DONE']) : false,
+          tracker_id: row['TRACKER No.'] ? String(row['TRACKER No.']).trim() : null,
           tax_due_date: row['Tax Date Due'] ? parseExcelDate(row['Tax Date Due']) : null,
           mot_due_date: row['MOT Date Due'] ? parseExcelDate(row['MOT Date Due']) : null,
           first_aid_kit_expiry: row['FIRST AID CHECK'] ? parseExcelDate(row['FIRST AID CHECK']) : null,
@@ -213,7 +213,7 @@ async function importMaintenanceData() {
             last_service_mileage,
             next_service_mileage,
             cambelt_due_mileage,
-            cambelt_done,
+            tracker_id,
             tax_due_date,
             mot_due_date,
             first_aid_kit_expiry,
@@ -226,7 +226,7 @@ async function importMaintenanceData() {
             last_service_mileage = EXCLUDED.last_service_mileage,
             next_service_mileage = EXCLUDED.next_service_mileage,
             cambelt_due_mileage = EXCLUDED.cambelt_due_mileage,
-            cambelt_done = EXCLUDED.cambelt_done,
+            tracker_id = EXCLUDED.tracker_id,
             tax_due_date = EXCLUDED.tax_due_date,
             mot_due_date = EXCLUDED.mot_due_date,
             first_aid_kit_expiry = EXCLUDED.first_aid_kit_expiry,
@@ -242,7 +242,7 @@ async function importMaintenanceData() {
           maintenanceData.last_service_mileage,
           maintenanceData.next_service_mileage,
           maintenanceData.cambelt_due_mileage,
-          maintenanceData.cambelt_done,
+          maintenanceData.tracker_id,
           maintenanceData.tax_due_date,
           maintenanceData.mot_due_date,
           maintenanceData.first_aid_kit_expiry,
