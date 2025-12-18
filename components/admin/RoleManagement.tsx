@@ -249,6 +249,7 @@ export function RoleManagement() {
       display_name: role.display_name,
       description: role.description || '',
       is_manager_admin: role.is_manager_admin,
+      timesheet_type: role.timesheet_type || 'civils',
     });
     setFormError('');
     setEditDialogOpen(true);
@@ -546,6 +547,30 @@ export function RoleManagement() {
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 min-h-[80px]"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-timesheet-type" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Timesheet Type
+              </Label>
+              <Select
+                value={formData.timesheet_type}
+                onValueChange={(value) => setFormData({ ...formData, timesheet_type: value })}
+              >
+                <SelectTrigger id="edit-timesheet-type" className="bg-slate-800 border-slate-600 text-white">
+                  <SelectValue placeholder="Select timesheet type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TimesheetTypeOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-400">
+                Which timesheet format should employees with this role use?
+              </p>
             </div>
             <div className="flex items-center justify-between p-3 bg-slate-800 rounded">
               <div>
