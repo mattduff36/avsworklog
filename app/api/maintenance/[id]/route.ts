@@ -222,8 +222,7 @@ export async function PUT(
     const { data: historyData, error: historyError } = await supabase
       .from('maintenance_history')
       .insert(historyEntries)
-      .select()
-      .single();
+      .select();
     
     if (historyError) {
       logger.error('Failed to create history entry', historyError);
