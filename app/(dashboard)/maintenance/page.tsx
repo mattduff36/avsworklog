@@ -4,13 +4,14 @@ import { useState, Suspense } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OfflineBanner } from '@/components/ui/offline-banner';
-import { Loader2, Wrench, AlertTriangle, Settings } from 'lucide-react';
+import { Loader2, Wrench, AlertTriangle } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
 import { useMaintenance } from '@/lib/hooks/useMaintenance';
 import { MaintenanceOverview } from './components/MaintenanceOverview';
 import { MaintenanceTable } from './components/MaintenanceTable';
+import { MaintenanceSettings } from './components/MaintenanceSettings';
 
 function MaintenanceContent() {
   // 1. Hooks
@@ -84,26 +85,16 @@ function MaintenanceContent() {
       {/* Header */}
       <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Wrench className="h-8 w-8 text-red-500" />
             <div>
-              <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-white text-3xl">
-                <Wrench className="h-8 w-8" />
+              <CardTitle className="text-slate-900 dark:text-white text-3xl">
                 Vehicle Maintenance & Service
               </CardTitle>
               <CardDescription className="text-slate-600 dark:text-slate-400 mt-2">
                 Track and manage all vehicle maintenance schedules
               </CardDescription>
             </div>
-            {(isAdmin || isManager) && (
-              <Button
-                variant="outline"
-                className="border-slate-600 text-slate-300 hover:bg-slate-700/50"
-                disabled
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </Button>
-            )}
           </div>
         </CardHeader>
       </Card>
@@ -119,20 +110,36 @@ function MaintenanceContent() {
           </CardContent>
         </Card>
       ) : (
-        <>
-          {/* Alert Overview */}
-          <MaintenanceOverview 
-            vehicles={maintenanceData?.vehicles || []}
-            summary={maintenanceData?.summary || { total: 0, overdue: 0, due_soon: 0 }}
-          />
-          
-          {/* Main Table */}
-          <MaintenanceTable
-            vehicles={filteredVehicles}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-          />
-        </>
+        <Tabs defaultValue="maintenance" className="space-y-4">
+          <TabsList className="bg-slate-100 dark:bg-slate-800">
+            <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+            <TabsTrigger value="settings" disabled={!isAdmin && !isManager}>
+              Settings {!isAdmin && !isManager && '(Admin Only)'}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="maintenance" className="space-y-6">
+            {/* Alert Overview */}
+            <MaintenanceOverview 
+              vehicles={maintenanceData?.vehicles || []}
+              summary={maintenanceData?.summary || { total: 0, overdue: 0, due_soon: 0 }}
+            />
+            
+            {/* Main Table */}
+            <MaintenanceTable
+              vehicles={filteredVehicles}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+            />
+          </TabsContent>
+
+          <TabsContent value="settings">
+            <MaintenanceSettings
+              isAdmin={isAdmin}
+              isManager={isManager}
+            />
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   );

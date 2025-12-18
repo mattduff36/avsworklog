@@ -21,6 +21,7 @@ import {
   formatMaintenanceDate
 } from '@/lib/utils/maintenanceCalculations';
 import { EditMaintenanceDialog } from './EditMaintenanceDialog';
+import { MaintenanceHistoryDialog } from './MaintenanceHistoryDialog';
 
 interface MaintenanceTableProps {
   vehicles: VehicleMaintenanceWithStatus[];
@@ -47,6 +48,7 @@ export function MaintenanceTable({
   const [sortField, setSortField] = useState<SortField>('reg_number');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleMaintenanceWithStatus | null>(null);
   
   // Handle sort
@@ -306,7 +308,10 @@ export function MaintenanceTable({
                             <Button
                               variant="ghost"
                               size="sm"
-                              disabled
+                              onClick={() => {
+                                setSelectedVehicle(vehicle);
+                                setHistoryDialogOpen(true);
+                              }}
                               className="text-slate-400 hover:text-slate-300 hover:bg-slate-800"
                               title="View History"
                             >
@@ -333,6 +338,14 @@ export function MaintenanceTable({
           setEditDialogOpen(false);
           setSelectedVehicle(null);
         }}
+      />
+      
+      {/* History Dialog */}
+      <MaintenanceHistoryDialog
+        open={historyDialogOpen}
+        onOpenChange={setHistoryDialogOpen}
+        vehicleId={selectedVehicle?.vehicle_id || null}
+        vehicleReg={selectedVehicle?.vehicle?.reg_number}
       />
     </>
   );
