@@ -157,14 +157,14 @@ export function MaintenanceTable({
   
   return (
     <>
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="bg-slate-900 border-slate-700">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-slate-900 dark:text-white">
+              <CardTitle className="text-white">
                 All Vehicles
               </CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400">
+              <CardDescription className="text-slate-400">
                 {vehicles.length} vehicle{vehicles.length !== 1 ? 's' : ''} • Click column headers to sort
               </CardDescription>
             </div>
@@ -181,14 +181,14 @@ export function MaintenanceTable({
         <CardContent className="space-y-4">
           {/* Warning Banner for Missing Data */}
           {missingDataCount > 0 && (
-            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+            <div className="bg-amber-900/20 border border-amber-800 rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="font-semibold text-amber-900 dark:text-amber-100 mb-1">
+                  <h4 className="font-semibold text-amber-100 mb-1">
                     Missing Maintenance Dates
                   </h4>
-                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                  <p className="text-sm text-amber-300">
                     {missingDataCount} vehicle{missingDataCount !== 1 ? 's have' : ' has'} incomplete maintenance records. 
                     Vehicles without scheduled due dates will not be monitored and may miss critical deadlines. 
                     Please review and update these records.
@@ -206,19 +206,19 @@ export function MaintenanceTable({
                 placeholder="Search by registration number..."
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
-                className="pl-9 bg-white dark:bg-slate-900/50 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white"
+                className="pl-9 bg-slate-900/50 border-slate-600 text-white"
               />
             </div>
             
             {/* Column Visibility Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="border-slate-300 dark:border-slate-600">
+                <Button variant="outline" className="border-slate-600">
                   <Settings2 className="h-4 w-4 mr-2" />
                   Show columns
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+              <DropdownMenuContent align="end" className="w-56 bg-slate-900 border border-slate-700">
                 <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuCheckboxItem
@@ -269,17 +269,17 @@ export function MaintenanceTable({
 
           {/* Table */}
           {vehicles.length === 0 ? (
-            <div className="text-center py-12 text-slate-600 dark:text-slate-400">
+            <div className="text-center py-12 text-slate-400">
               {searchQuery ? 'No vehicles found matching your search.' : 'No vehicles with maintenance records yet.'}
             </div>
           ) : (
-            <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+            <div className="border border-slate-700 rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/50">
+                    <TableRow className="border-slate-700 hover:bg-slate-800/50">
                       <TableHead 
-                        className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                        className="text-slate-300 cursor-pointer hover:bg-slate-800"
                         onClick={() => handleSort('reg_number')}
                       >
                         <div className="flex items-center gap-2">
@@ -289,7 +289,7 @@ export function MaintenanceTable({
                       </TableHead>
                       {columnVisibility.last_inspector && (
                         <TableHead 
-                          className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                          className="text-slate-300 cursor-pointer hover:bg-slate-800"
                           onClick={() => handleSort('last_inspector')}
                         >
                           <div className="flex items-center gap-2">
@@ -300,7 +300,7 @@ export function MaintenanceTable({
                       )}
                       {columnVisibility.current_mileage && (
                       <TableHead 
-                          className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                          className="text-slate-300 cursor-pointer hover:bg-slate-800"
                           onClick={() => handleSort('current_mileage')}
                         >
                           <div className="flex items-center gap-2">
@@ -311,7 +311,7 @@ export function MaintenanceTable({
                       )}
                       {columnVisibility.tax_due && (
                       <TableHead 
-                          className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                          className="text-slate-300 cursor-pointer hover:bg-slate-800"
                           onClick={() => handleSort('tax_due')}
                         >
                           <div className="flex items-center gap-2">
@@ -322,7 +322,7 @@ export function MaintenanceTable({
                       )}
                       {columnVisibility.mot_due && (
                       <TableHead 
-                          className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                          className="text-slate-300 cursor-pointer hover:bg-slate-800"
                           onClick={() => handleSort('mot_due')}
                         >
                           <div className="flex items-center gap-2">
@@ -333,7 +333,7 @@ export function MaintenanceTable({
                       )}
                       {columnVisibility.service_due && (
                       <TableHead 
-                          className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                          className="text-slate-300 cursor-pointer hover:bg-slate-800"
                           onClick={() => handleSort('service_due')}
                         >
                           <div className="flex items-center gap-2">
@@ -344,7 +344,7 @@ export function MaintenanceTable({
                       )}
                       {columnVisibility.cambelt_due && (
                       <TableHead 
-                          className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                          className="text-slate-300 cursor-pointer hover:bg-slate-800"
                           onClick={() => handleSort('cambelt_due')}
                         >
                           <div className="flex items-center gap-2">
@@ -355,7 +355,7 @@ export function MaintenanceTable({
                       )}
                       {columnVisibility.first_aid_expiry && (
                       <TableHead 
-                          className="text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                          className="text-slate-300 cursor-pointer hover:bg-slate-800"
                           onClick={() => handleSort('first_aid_expiry')}
                         >
                           <div className="flex items-center gap-2">
@@ -364,7 +364,7 @@ export function MaintenanceTable({
                           </div>
                         </TableHead>
                       )}
-                      <TableHead className="text-right text-slate-700 dark:text-slate-300">
+                      <TableHead className="text-right text-slate-300">
                         Actions
                       </TableHead>
                     </TableRow>
@@ -377,16 +377,16 @@ export function MaintenanceTable({
                           setSelectedVehicle(vehicle);
                           setHistoryDialogOpen(true);
                         }}
-                        className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer"
+                        className="border-slate-700 hover:bg-slate-800/50 cursor-pointer"
                       >
                         {/* Registration */}
-                        <TableCell className="font-medium text-slate-900 dark:text-white">
+                        <TableCell className="font-medium text-white">
                           {vehicle.vehicle?.reg_number || 'Unknown'}
                         </TableCell>
                         
                         {/* Last Inspector */}
                         {columnVisibility.last_inspector && (
-                          <TableCell className="text-slate-700 dark:text-slate-300">
+                          <TableCell className="text-slate-300">
                             {vehicle.last_inspector ? (
                               <div className="flex items-center gap-2">
                                 <User className="h-3 w-3 text-slate-400" />
@@ -400,7 +400,7 @@ export function MaintenanceTable({
                         
                         {/* Current Mileage */}
                         {columnVisibility.current_mileage && (
-                          <TableCell className="text-slate-700 dark:text-slate-300">
+                          <TableCell className="text-slate-300">
                             {formatMileage(vehicle.current_mileage)}
                           </TableCell>
                         )}
