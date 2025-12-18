@@ -601,98 +601,97 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
   return (
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
-      <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-lg p-6 text-white">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-3">
-          <Bug className="h-8 w-8" />
+          <Bug className="h-6 md:h-8 w-6 md:w-8 text-orange-500" />
           <div>
-            <h1 className="text-3xl font-bold mb-2">SuperAdmin Debug Console</h1>
-            <p className="text-red-100">
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white mb-1 md:mb-2">SuperAdmin Debug Console</h1>
+            <p className="text-sm md:text-base text-slate-600 dark:text-slate-400">
               Developer tools and system information
             </p>
           </div>
         </div>
       </div>
 
-      {/* Debug Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Database className="h-4 w-4 text-blue-500" />
-              Environment
-            </CardTitle>
+      {/* Debug Info Cards - Compact on mobile, full on desktop */}
+      <div className="grid grid-cols-4 gap-2 md:gap-4">
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
+            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400 flex items-center gap-1 md:gap-2">
+              <Database className="h-3 md:h-4 w-3 md:w-4 text-blue-500" />
+              <span className="hidden md:inline">Environment</span>
+              <span className="md:hidden">Env</span>
+            </CardDescription>
+            <CardTitle className="text-base md:text-2xl font-bold text-slate-900 dark:text-white truncate">{debugInfo?.environment}</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{debugInfo?.environment}</p>
-          </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Users className="h-4 w-4 text-green-500" />
-              Logged In As
-            </CardTitle>
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
+            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400 flex items-center gap-1 md:gap-2">
+              <Users className="h-3 md:h-4 w-3 md:w-4 text-green-500" />
+              <span className="hidden md:inline">Logged In</span>
+              <span className="md:hidden">User</span>
+            </CardDescription>
+            <CardTitle className="text-xs md:text-lg font-bold text-slate-900 dark:text-white truncate">{profile?.full_name}</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-lg font-bold truncate">{profile?.full_name}</p>
-            <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
-          </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <ShieldAlert className="h-4 w-4 text-red-500" />
-              Access Level
-            </CardTitle>
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
+            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400 flex items-center gap-1 md:gap-2">
+              <ShieldAlert className="h-3 md:h-4 w-3 md:w-4 text-red-500" />
+              <span className="hidden md:inline">Access</span>
+              <span className="md:hidden">Role</span>
+            </CardDescription>
+            <CardTitle className="text-xs md:text-base font-bold text-red-600 dark:text-red-400">SuperAdmin</CardTitle>
           </CardHeader>
-          <CardContent>
-            <Badge variant="destructive" className="text-lg">SuperAdmin</Badge>
-          </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Clock className="h-4 w-4 text-purple-500" />
-              Next.js Version
-            </CardTitle>
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
+            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400 flex items-center gap-1 md:gap-2">
+              <Clock className="h-3 md:h-4 w-3 md:w-4 text-purple-500" />
+              <span className="hidden md:inline">Next.js</span>
+              <span className="md:hidden">Ver</span>
+            </CardDescription>
+            <CardTitle className="text-base md:text-2xl font-bold text-slate-900 dark:text-white">{debugInfo?.nextVersion}</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{debugInfo?.nextVersion}</p>
-          </CardContent>
         </Card>
       </div>
 
       {/* Developer Tools Tabs */}
       <Tabs defaultValue="errors" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6 lg:w-[900px]">
-          <TabsTrigger value="errors">
-            <Bug className="h-4 w-4 mr-2" />
-            Error Log
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 gap-1 md:gap-0 h-auto md:h-10 p-1 bg-slate-100 dark:bg-slate-800">
+          <TabsTrigger value="errors" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2">
+            <Bug className="h-3 md:h-4 w-3 md:w-4" />
+            <span className="hidden sm:inline">Error Log</span>
+            <span className="sm:hidden">Errors</span>
           </TabsTrigger>
-          <TabsTrigger value="audit">
-            <History className="h-4 w-4 mr-2" />
-            Audit Log
+          <TabsTrigger value="audit" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2">
+            <History className="h-3 md:h-4 w-3 md:w-4" />
+            <span className="hidden sm:inline">Audit Log</span>
+            <span className="sm:hidden">Audit</span>
           </TabsTrigger>
-          <TabsTrigger value="timesheets">
-            <FileText className="h-4 w-4 mr-2" />
-            Timesheets
+          <TabsTrigger value="timesheets" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2">
+            <FileText className="h-3 md:h-4 w-3 md:w-4" />
+            <span className="hidden sm:inline">Timesheets</span>
+            <span className="sm:hidden">Sheets</span>
           </TabsTrigger>
-          <TabsTrigger value="inspections">
-            <Clipboard className="h-4 w-4 mr-2" />
-            Inspections
+          <TabsTrigger value="inspections" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2">
+            <Clipboard className="h-3 md:h-4 w-3 md:w-4" />
+            <span className="hidden sm:inline">Inspections</span>
+            <span className="sm:hidden">Inspect</span>
           </TabsTrigger>
-          <TabsTrigger value="absences">
-            <Calendar className="h-4 w-4 mr-2" />
+          <TabsTrigger value="absences" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 col-span-2 md:col-span-1">
+            <Calendar className="h-3 md:h-4 w-3 md:w-4" />
             Absences
           </TabsTrigger>
         </TabsList>
 
         {/* Error Log Tab */}
         <TabsContent value="errors">
-          <Card>
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -1039,7 +1038,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
         {/* Audit Log Tab */}
         <TabsContent value="audit">
-          <Card>
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -1189,7 +1188,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
         {/* Timesheets Tab */}
         <TabsContent value="timesheets">
-          <Card>
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
             <CardHeader>
               <CardTitle>Timesheet Status Manager</CardTitle>
               <CardDescription>
@@ -1239,7 +1238,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
         {/* Inspections Tab */}
         <TabsContent value="inspections">
-          <Card>
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
             <CardHeader>
               <CardTitle>Inspection Status Manager</CardTitle>
               <CardDescription>
@@ -1289,7 +1288,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
         {/* Absences Tab */}
         <TabsContent value="absences">
-          <Card>
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
             <CardHeader>
               <CardTitle>Absence Status Manager</CardTitle>
               <CardDescription>
