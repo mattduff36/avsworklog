@@ -346,30 +346,30 @@ export default function ActionsPage() {
         </div>
       )}
 
-      {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Statistics - Compact on mobile, full on desktop */}
+      <div className="grid grid-cols-4 md:grid-cols-4 gap-2 md:gap-4">
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-slate-600 dark:text-slate-400">Pending</CardDescription>
-            <CardTitle className="text-3xl text-amber-600 dark:text-amber-400">{pendingActions.length}</CardTitle>
+          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
+            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400">Pending</CardDescription>
+            <CardTitle className="text-xl md:text-3xl text-amber-600 dark:text-amber-400">{pendingActions.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-slate-600 dark:text-slate-400">Logged</CardDescription>
-            <CardTitle className="text-3xl text-red-600 dark:text-red-400">{loggedActions.length}</CardTitle>
+          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
+            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400">Logged</CardDescription>
+            <CardTitle className="text-xl md:text-3xl text-red-600 dark:text-red-400">{loggedActions.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-slate-600 dark:text-slate-400">Completed</CardDescription>
-            <CardTitle className="text-3xl text-green-600 dark:text-green-400">{completedActions.length}</CardTitle>
+          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
+            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400">Done</CardDescription>
+            <CardTitle className="text-xl md:text-3xl text-green-600 dark:text-green-400">{completedActions.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-slate-600 dark:text-slate-400">Total</CardDescription>
-            <CardTitle className="text-3xl text-slate-900 dark:text-white">{actions.length}</CardTitle>
+          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
+            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400">Total</CardDescription>
+            <CardTitle className="text-xl md:text-3xl text-slate-900 dark:text-white">{actions.length}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -448,10 +448,10 @@ export default function ActionsPage() {
               return (
                 <Card key={action.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-red-500/50 transition-all duration-200">
                   <CardContent className="pt-6">
-                    <div className="flex items-start gap-4">
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1">
+                    <div className="flex flex-col items-start gap-4">
+                      <div className="flex-1 space-y-2 w-full">
+                        <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                          <div className="flex-1 w-full">
                             <div className="flex items-center gap-2 mb-2">
                               {getStatusIcon(action.status)}
                               <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{action.title}</h3>
@@ -474,27 +474,27 @@ export default function ActionsPage() {
                               <span>Created: {formatDate(action.created_at)}</span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 w-full md:w-auto">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDeleteAction(action.id)}
-                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10 md:self-start"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                             <Button
                               onClick={() => handleMarkAsLogged(action.id)}
                               disabled={isCompleting}
-                              className="h-16 min-w-[140px] text-base font-semibold bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30"
+                              className="h-12 md:h-16 min-w-0 md:min-w-[140px] text-sm md:text-base font-semibold bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30"
                             >
-                              <FileText className="h-4 w-4 mr-2" />
-                              Logged
+                              <FileText className="h-4 w-4 md:mr-2" />
+                              <span className="md:inline">Logged</span>
                             </Button>
                             <Button
                               onClick={() => handleMarkAsComplete(action.id, action.status)}
                               disabled={isCompleting}
-                              className={`h-16 min-w-[140px] text-base font-semibold transition-all ${
+                              className={`h-12 md:h-16 min-w-0 md:min-w-[140px] text-sm md:text-base font-semibold transition-all ${
                                 isCompleting
                                   ? 'bg-green-500 hover:bg-green-500 text-white'
                                   : 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900'
@@ -502,8 +502,8 @@ export default function ActionsPage() {
                             >
                               {isCompleting ? (
                                 <>
-                                  <CheckCircle2 className="h-5 w-5 mr-2" />
-                                  Complete
+                                  <CheckCircle2 className="h-4 md:h-5 w-4 md:w-5 md:mr-2" />
+                                  <span className="md:inline">Complete</span>
                                 </>
                               ) : (
                                 'Complete'
@@ -537,10 +537,10 @@ export default function ActionsPage() {
               return (
                 <Card key={action.id} className="bg-white dark:bg-slate-900 border-red-500/30 dark:border-red-500/30 hover:shadow-lg hover:border-red-500/50 transition-all duration-200">
                   <CardContent className="pt-6">
-                    <div className="flex items-start gap-4">
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1">
+                    <div className="flex flex-col items-start gap-4">
+                      <div className="flex-1 space-y-2 w-full">
+                        <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                          <div className="flex-1 w-full">
                             <div className="flex items-center gap-2 mb-2">
                               {getStatusIcon(action.status)}
                               <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{action.title}</h3>
@@ -578,12 +578,12 @@ export default function ActionsPage() {
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 w-full md:w-auto">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDeleteAction(action.id)}
-                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10 md:self-start"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -591,15 +591,15 @@ export default function ActionsPage() {
                               onClick={() => handleUndoLogged(action.id)}
                               variant="outline"
                               disabled={isCompleting}
-                              className="h-16 min-w-[140px] text-base font-semibold border-slate-600 text-white hover:bg-slate-800"
+                              className="h-12 md:h-16 min-w-0 md:min-w-[140px] text-sm md:text-base font-semibold border-slate-600 text-white hover:bg-slate-800"
                             >
-                              <Undo2 className="h-4 w-4 mr-2" />
-                              Undo Logged
+                              <Undo2 className="h-4 w-4 md:mr-2" />
+                              <span className="md:inline">Undo</span>
                             </Button>
                             <Button
                               onClick={() => handleMarkAsComplete(action.id, action.status)}
                               disabled={isCompleting}
-                              className={`h-16 min-w-[140px] text-base font-semibold transition-all ${
+                              className={`h-12 md:h-16 min-w-0 md:min-w-[140px] text-sm md:text-base font-semibold transition-all ${
                                 isCompleting
                                   ? 'bg-green-500 hover:bg-green-500 text-white'
                                   : 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900'
@@ -607,8 +607,8 @@ export default function ActionsPage() {
                             >
                               {isCompleting ? (
                                 <>
-                                  <CheckCircle2 className="h-5 w-5 mr-2" />
-                                  Complete
+                                  <CheckCircle2 className="h-4 md:h-5 w-4 md:w-5 md:mr-2" />
+                                  <span className="md:inline">Complete</span>
                                 </>
                               ) : (
                                 'Complete'
@@ -634,10 +634,10 @@ export default function ActionsPage() {
             {completedActions.map((action) => (
               <Card key={action.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-90 transition-opacity">
                 <CardContent className="pt-6">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
+                  <div className="flex flex-col items-start gap-4">
+                    <div className="flex-1 space-y-2 w-full">
+                      <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                        <div className="flex-1 w-full">
                           <div className="flex items-center gap-2 mb-2">
                             <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
                             <h3 className="font-semibold text-lg text-slate-900 dark:text-white line-through">{action.title}</h3>
@@ -654,22 +654,22 @@ export default function ActionsPage() {
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 w-full md:w-auto">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteAction(action.id)}
-                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10 md:self-start"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                           <Button
                             onClick={() => handleUndoComplete(action.id)}
                             variant="outline"
-                            className="h-16 min-w-[140px] text-base font-semibold"
+                            className="h-12 md:h-16 min-w-0 md:min-w-[140px] text-sm md:text-base font-semibold"
                           >
-                            <Undo2 className="h-4 w-4 mr-2" />
-                            Undo Complete
+                            <Undo2 className="h-4 w-4 md:mr-2" />
+                            <span className="md:inline">Undo</span>
                           </Button>
                         </div>
                       </div>
@@ -706,10 +706,10 @@ export default function ActionsPage() {
                   return (
                     <Card key={action.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200">
                       <CardContent className="pt-6">
-                        <div className="flex items-start gap-4">
-                          <div className="flex-1 space-y-2">
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex-1">
+                        <div className="flex flex-col items-start gap-4">
+                          <div className="flex-1 space-y-2 w-full">
+                            <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                              <div className="flex-1 w-full">
                                 <div className="flex items-center gap-2 mb-2">
                                   {getStatusIcon(action.status)}
                                   <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{action.title}</h3>
@@ -732,19 +732,19 @@ export default function ActionsPage() {
                                   <span>Created: {formatDate(action.created_at)}</span>
                                 </div>
                               </div>
-                              <div className="flex-shrink-0 flex items-center gap-2">
+                              <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 w-full md:w-auto flex-shrink-0">
                                 <Button
                                   onClick={() => handleMarkAsLogged(action.id)}
                                   disabled={isCompleting}
-                                  className="h-16 min-w-[140px] text-base font-semibold bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30"
+                                  className="h-12 md:h-16 min-w-0 md:min-w-[140px] text-sm md:text-base font-semibold bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30"
                                 >
-                                  <FileText className="h-4 w-4 mr-2" />
-                                  Logged
+                                  <FileText className="h-4 w-4 md:mr-2" />
+                                  <span className="md:inline">Logged</span>
                                 </Button>
                                 <Button
                                   onClick={() => handleMarkAsComplete(action.id, action.status)}
                                   disabled={isCompleting}
-                                  className={`h-16 min-w-[140px] text-base font-semibold transition-all ${
+                                  className={`h-12 md:h-16 min-w-0 md:min-w-[140px] text-sm md:text-base font-semibold transition-all ${
                                     isCompleting
                                       ? 'bg-green-500 hover:bg-green-500 text-white'
                                       : 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900'
@@ -752,8 +752,8 @@ export default function ActionsPage() {
                                 >
                                   {isCompleting ? (
                                     <>
-                                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                                      Complete
+                                      <CheckCircle2 className="h-4 w-4 md:mr-2" />
+                                      <span className="md:inline">Complete</span>
                                     </>
                                   ) : (
                                     'Complete'
@@ -779,10 +779,10 @@ export default function ActionsPage() {
                 {completedActions.map((action) => (
                   <Card key={action.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-90 transition-opacity">
                     <CardContent className="pt-6">
-                      <div className="flex items-start gap-4">
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1">
+                      <div className="flex flex-col items-start gap-4">
+                        <div className="flex-1 space-y-2 w-full">
+                          <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                            <div className="flex-1 w-full">
                               <div className="flex items-center gap-2 mb-2">
                                 <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
                                 <h3 className="font-semibold text-lg text-slate-900 dark:text-white line-through">{action.title}</h3>
