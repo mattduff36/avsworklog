@@ -289,9 +289,11 @@ export default function DebugPage() {
 
   const fetchErrorLogs = async () => {
     try {
+      // Fetch error logs, excluding development/localhost errors
       const { data: errorData, error } = await supabase
         .from('error_logs')
         .select('*')
+        .not('page_url', 'ilike', '%localhost%') // Filter out development errors
         .order('timestamp', { ascending: false })
         .limit(100);
 
