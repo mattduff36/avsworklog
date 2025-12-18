@@ -247,7 +247,11 @@ export function MaintenanceTable({
                     {sortedVehicles.map((vehicle) => (
                       <TableRow 
                         key={vehicle.id || vehicle.vehicle_id || vehicle.vehicle?.id}
-                        className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                        onClick={() => {
+                          setSelectedVehicle(vehicle);
+                          setEditDialogOpen(true);
+                        }}
+                        className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer"
                       >
                         {/* Registration */}
                         <TableCell className="font-medium text-slate-900 dark:text-white">
@@ -300,7 +304,8 @@ export function MaintenanceTable({
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent row click
                                 setSelectedVehicle(vehicle);
                                 setEditDialogOpen(true);
                               }}
@@ -312,7 +317,8 @@ export function MaintenanceTable({
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent row click
                                 setSelectedVehicle(vehicle);
                                 setHistoryDialogOpen(true);
                               }}
