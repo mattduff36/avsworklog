@@ -10,11 +10,10 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, Clipboard, Clock, CheckCircle2, XCircle, User, Filter, Calendar, Package } from 'lucide-react';
+import { FileText, Clock, CheckCircle2, XCircle, User, Filter, Calendar, Package } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
-import { VehicleInspection } from '@/types/inspection';
 import { AbsenceWithRelations } from '@/types/absence';
 import { TimesheetStatusFilter, StatusFilter } from '@/types/common';
 import { usePendingAbsences, useApproveAbsence, useRejectAbsence, useAbsenceSummaryForEmployee } from '@/lib/hooks/useAbsence';
@@ -455,7 +454,15 @@ function AbsenceApprovalCard({
     if (absence.absence_reasons.name === 'Annual leave') {
       const projectedRemaining = (summary?.remaining || 0) - absence.duration_days;
       if (projectedRemaining < 0) {
-        if (!confirm('Warning: This request exceeds the employee\'s available allowance. Approve anyway?')) {
+        const confirmed = await import('@/lib/services/notification.service').then(m => 
+          m.notify.confirm({
+            title: 'Insufficient Allowance',
+            description: 'Warning: This request exceeds the employee\'s available allowance. Approve anyway?',
+            confirmText: 'Approve Anyway',
+            destructive: true,
+          })
+        );
+        if (!confirmed) {
           return;
         }
       }
@@ -470,7 +477,9 @@ function AbsenceApprovalCard({
   
   async function handleReject() {
     if (!rejectionReason.trim()) {
-      alert('Please provide a reason for rejection');
+      toast.error('Rejection reason required', {
+        description: 'Please provide a reason for rejecting this absence request.',
+      });
       return;
     }
     

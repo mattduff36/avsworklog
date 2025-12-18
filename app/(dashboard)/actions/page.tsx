@@ -264,7 +264,15 @@ export default function ActionsPage() {
   };
 
   const handleDeleteAction = async (actionId: string) => {
-    if (!confirm('Are you sure you want to delete this action?')) return;
+    const confirmed = await import('@/lib/services/notification.service').then(m => 
+      m.notify.confirm({
+        title: 'Delete Action',
+        description: 'Are you sure you want to delete this action? This cannot be undone.',
+        confirmText: 'Delete',
+        destructive: true,
+      })
+    );
+    if (!confirmed) return;
     
     try {
       const { error } = await supabase

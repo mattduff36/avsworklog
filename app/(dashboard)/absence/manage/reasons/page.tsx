@@ -144,7 +144,15 @@ export default function AbsenceReasonsPage() {
   
   // Handle delete (soft delete by setting is_active = false)
   async function handleDelete(reason: AbsenceReason) {
-    if (!confirm(`Are you sure you want to disable "${reason.name}"? It will no longer be available for new absence requests.`)) {
+    const confirmed = await import('@/lib/services/notification.service').then(m => 
+      m.notify.confirm({
+        title: 'Disable Absence Reason',
+        description: `Are you sure you want to disable "${reason.name}"? It will no longer be available for new absence requests.`,
+        confirmText: 'Disable',
+        destructive: true,
+      })
+    );
+    if (!confirmed) {
       return;
     }
     

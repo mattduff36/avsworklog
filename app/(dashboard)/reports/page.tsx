@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
+import { toast } from 'sonner';
 import { 
   FileText, 
   Calendar, 
@@ -103,7 +104,9 @@ export default function ReportsPage() {
       
       if (!response.ok) {
         const error = await response.json();
-        alert(error.error || 'Failed to generate report');
+        toast.error('Failed to generate report', {
+          description: error.error || 'Please try again or contact support.',
+        });
         return;
       }
 
@@ -118,7 +121,9 @@ export default function ReportsPage() {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Error downloading report:', error);
-      alert('Failed to download report');
+      toast.error('Failed to download report', {
+        description: 'Please try again or contact support if the problem persists.',
+      });
     } finally {
       setDownloading(null);
     }
@@ -149,13 +154,17 @@ export default function ReportsPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        alert(error.error || 'Failed to generate bulk PDFs');
+        toast.error('Failed to generate bulk PDFs', {
+          description: error.error || 'Please try again or contact support.',
+        });
         setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
         return;
       }
 
       if (!response.body) {
-        alert('Failed to generate bulk PDFs - no response body');
+        toast.error('Failed to generate bulk PDFs', {
+          description: 'No response received from server.',
+        });
         setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
         return;
       }
@@ -176,9 +185,11 @@ export default function ReportsPage() {
           if (buffer.trim()) {
             try {
               const data = JSON.parse(buffer);
-              
+
               if (data.error) {
-                alert(data.error);
+                toast.error('Error during bulk download', {
+                  description: data.error,
+                });
                 setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
                 abortControllerRef.current?.abort();
                 break;
@@ -235,7 +246,9 @@ export default function ReportsPage() {
             const data = JSON.parse(line);
 
             if (data.error) {
-              alert(data.error);
+              toast.error('Error during bulk download', {
+                description: data.error,
+              });
               setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
               abortControllerRef.current?.abort();
               shouldExit = true;
@@ -305,7 +318,9 @@ export default function ReportsPage() {
         console.log('Download cancelled');
       } else {
         console.error('Error downloading bulk PDFs:', error);
-        alert('Failed to download bulk PDFs');
+        toast.error('Failed to download bulk PDFs', {
+          description: 'Please try again or contact support if the problem persists.',
+        });
       }
       setBulkProgress({
         isDownloading: false,

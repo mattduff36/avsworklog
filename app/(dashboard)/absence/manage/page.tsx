@@ -158,7 +158,15 @@ export default function AdminAbsencePage() {
   
   // Handle delete
   async function handleDelete(id: string) {
-    if (!confirm('Are you sure you want to delete this absence?')) return;
+    const confirmed = await import('@/lib/services/notification.service').then(m => 
+      m.notify.confirm({
+        title: 'Delete Absence',
+        description: 'Are you sure you want to delete this absence? This cannot be undone.',
+        confirmText: 'Delete',
+        destructive: true,
+      })
+    );
+    if (!confirmed) return;
     
     try {
       await deleteAbsence.mutateAsync(id);

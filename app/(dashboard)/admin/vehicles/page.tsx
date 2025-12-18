@@ -50,7 +50,7 @@ type Vehicle = Database['public']['Tables']['vehicles']['Row'] & {
 type Category = Database['public']['Tables']['vehicle_categories']['Row'];
 
 export default function VehiclesAdminPage() {
-  const { user, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
   const supabase = createClient();
 
   // State

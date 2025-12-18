@@ -136,6 +136,7 @@ export async function PATCH(
     if (body.display_name !== undefined) updateData.display_name = body.display_name;
     if (body.description !== undefined) updateData.description = body.description;
     if (body.is_manager_admin !== undefined) updateData.is_manager_admin = body.is_manager_admin;
+    if (body.timesheet_type !== undefined) updateData.timesheet_type = body.timesheet_type; // Phase 6
 
     const { data: updatedRole, error: updateError } = await supabase
       .from('roles')

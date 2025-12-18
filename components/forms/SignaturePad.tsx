@@ -29,7 +29,9 @@ export function SignaturePad({ onSave, onCancel, initialValue, disabled = false,
 
   const handleSave = () => {
     if (sigCanvas.current?.isEmpty()) {
-      alert('Please provide a signature');
+      toast.error('Signature required', {
+        description: 'Please provide a signature before saving.',
+      });
       return;
     }
     const dataURL = sigCanvas.current?.toDataURL('image/png');

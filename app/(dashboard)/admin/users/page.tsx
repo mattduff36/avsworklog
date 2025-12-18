@@ -44,7 +44,6 @@ import type { Database } from '@/types/database';
 import { RoleManagement } from '@/components/admin/RoleManagement';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
-type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
 type ProfileWithEmail = Profile & { email?: string };
 
 type TabType = 'users' | 'roles';
@@ -65,7 +64,6 @@ export default function UsersAdminPage() {
   // Dialog states
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteOptionsDialogOpen, setDeleteOptionsDialogOpen] = useState(false);
   const [deletionMode, setDeletionMode] = useState<'keep-data' | 'delete-all'>('keep-data');
   const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
@@ -118,7 +116,7 @@ export default function UsersAdminPage() {
     const { users: authUsers } = await response.json();
 
     // Create a map of user id to email
-    const emailMap = new Map(authUsers?.map((u: any) => [u.id, u.email]) || []);
+    const emailMap = new Map(authUsers?.map((u: { id: string; email: string }) => [u.id, u.email]) || []);
 
     // Merge profiles with emails
     return profiles?.map(profile => ({
@@ -168,7 +166,8 @@ export default function UsersAdminPage() {
     if (isAdmin) {
       fetchUsers();
     }
-  }, [isAdmin, supabase]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
 
   // Search and role filter
   useEffect(function () {
@@ -302,12 +301,6 @@ export default function UsersAdminPage() {
   }
 
   // Handle delete user
-  function openDeleteOptionsDialog() {
-    setDeleteDialogOpen(false);
-    setDeleteOptionsDialogOpen(true);
-    setDeletionMode('keep-data'); // Default to safer option
-  }
-
   async function handleDeleteUser() {
     if (!selectedUser) return;
 
@@ -325,7 +318,7 @@ export default function UsersAdminPage() {
         try {
           const result = await response.json();
           errorMessage = result.error || errorMessage;
-        } catch (jsonError) {
+        } catch {
           // If JSON parsing fails, use the response status text
           errorMessage = `Failed to delete user: ${response.statusText}`;
         }
@@ -339,11 +332,6 @@ export default function UsersAdminPage() {
 
       setDeleteOptionsDialogOpen(false);
       setSelectedUser(null);
-      
-      // Show success message
-      const successMsg = deletionMode === 'delete-all' 
-        ? 'User and all data deleted successfully'
-        : 'User deleted - company data preserved';
       setFormError(''); // Clear any previous errors
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete user';
@@ -708,7 +696,7 @@ export default function UsersAdminPage() {
               </div>
             )}
             <div className="bg-blue-500/10 border border-blue-500/50 rounded p-3 text-sm text-blue-400">
-              <strong>Note:</strong> A secure temporary password will be automatically generated and sent to the user's email address.
+              <strong>Note:</strong> A secure temporary password will be automatically generated and sent to the user&apos;s email address.
             </div>
             <div className="space-y-2">
               <Label htmlFor="add-email">Email *</Label>
@@ -886,7 +874,7 @@ export default function UsersAdminPage() {
               Delete User Account
             </DialogTitle>
             <DialogDescription className="text-slate-400">
-              Choose how to handle this user's company data (timesheets, inspections, etc.)
+              Choose how to handle this user&apos;s company data (timesheets, inspections, etc.)
             </DialogDescription>
           </DialogHeader>
           
@@ -915,7 +903,7 @@ export default function UsersAdminPage() {
 
               {/* Deletion Options */}
               <div className="space-y-3">
-                <Label className="text-white font-semibold">What should happen to this user's company data?</Label>
+                <Label className="text-white font-semibold">What should happen to this user&apos;s company data?</Label>
                 
                 {/* Option 1: Keep Data (Recommended) */}
                 <div 
@@ -1056,7 +1044,7 @@ export default function UsersAdminPage() {
             </div>
           )}
           <div className="bg-amber-500/10 border border-amber-500/50 rounded p-3 text-sm text-amber-400">
-            <strong>Note:</strong> The new password will be sent to the user's email address and displayed to you.
+            <strong>Note:</strong> The new password will be sent to the user&apos;s email address and displayed to you.
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setResetPasswordDialogOpen(false); setSelectedUser(null); }} className="border-slate-600 text-white hover:bg-slate-800">

@@ -190,8 +190,8 @@ export default function ViewInspectionPage() {
       setError(errorMessage);
       
       // Log to error logger if available
-      if (typeof window !== 'undefined' && (window as any).errorLogger) {
-        (window as any).errorLogger.logError({
+      if (typeof window !== 'undefined' && (window as Window & { errorLogger?: { logError: (opts: unknown) => void } }).errorLogger) {
+        (window as Window & { errorLogger: { logError: (opts: unknown) => void } }).errorLogger.logError({
           error: err,
           componentName: 'InspectionEditPage - handleSave',
           additionalData: {

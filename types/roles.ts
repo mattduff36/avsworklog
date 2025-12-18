@@ -7,6 +7,7 @@ export interface Role {
   description: string | null;
   is_super_admin: boolean;
   is_manager_admin: boolean;
+  timesheet_type?: string;
   created_at: string;
   updated_at: string;
 }

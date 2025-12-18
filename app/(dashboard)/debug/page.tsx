@@ -80,7 +80,7 @@ type ErrorLogEntry = {
 };
 
 export default function DebugPage() {
-  const { profile, user } = useAuth();
+  const { profile } = useAuth();
   const router = useRouter();
   const supabase = createClient();
   const [userEmail, setUserEmail] = useState('');
@@ -91,7 +91,6 @@ export default function DebugPage() {
   const [timesheets, setTimesheets] = useState<EntityStatus[]>([]);
   const [inspections, setInspections] = useState<EntityStatus[]>([]);
   const [absences, setAbsences] = useState<EntityStatus[]>([]);
-  const [ramsDocuments, setRamsDocuments] = useState<EntityStatus[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([]);
   const [updating, setUpdating] = useState<string | null>(null);
@@ -179,7 +178,7 @@ export default function DebugPage() {
 
       if (timesheetData) {
         setTimesheets(
-          timesheetData.map((t: any) => ({
+          timesheetData.map((t: { id: string; week_ending: string; status: string; profiles?: { full_name: string } }) => ({
             id: t.id,
             type: 'timesheet' as const,
             identifier: `Week ending ${new Date(t.week_ending).toLocaleDateString()}`,
@@ -199,7 +198,7 @@ export default function DebugPage() {
 
       if (inspectionData) {
         setInspections(
-          inspectionData.map((i: any) => ({
+          inspectionData.map((i: { id: string; inspection_date: string; status: string; vehicles?: { reg_number: string }; profiles?: { full_name: string } }) => ({
             id: i.id,
             type: 'inspection' as const,
             identifier: `${i.vehicles?.reg_number || 'Unknown'} - ${new Date(i.inspection_date).toLocaleDateString()}`,
@@ -219,7 +218,7 @@ export default function DebugPage() {
 
       if (absenceData) {
         setAbsences(
-          absenceData.map((a: any) => ({
+          absenceData.map((a: { id: string; status: string; date: string; absence_reasons?: { name: string } | null; profiles?: { full_name: string } | null }) => ({
             id: a.id,
             type: 'absence' as const,
             identifier: `${a.absence_reasons?.name || 'Unknown'} - ${new Date(a.date).toLocaleDateString()}`,
@@ -239,7 +238,7 @@ export default function DebugPage() {
 
       if (ramsData) {
         setRamsDocuments(
-          ramsData.map((r: any) => ({
+          ramsData.map((r: { id: string; title: string | null; created_at: string }) => ({
             id: r.id,
             type: 'rams' as const,
             identifier: r.title || 'Untitled',
@@ -270,7 +269,7 @@ export default function DebugPage() {
 
       if (auditData) {
         setAuditLogs(
-          auditData.map((log: any) => ({
+          auditData.map((log: { id: string; table_name: string; record_id: string; user_id: string | null; action: string; changes: unknown; created_at: string; profiles?: { full_name: string } | null }) => ({
             id: log.id,
             table_name: log.table_name,
             record_id: log.record_id,
@@ -337,7 +336,15 @@ export default function DebugPage() {
   };
 
   const clearAllErrorLogs = async () => {
-    if (!confirm('Are you sure you want to clear ALL error logs? This cannot be undone.')) {
+    const confirmed = await import('@/lib/services/notification.service').then(m => 
+      m.notify.confirm({
+        title: 'Clear All Error Logs',
+        description: 'Are you sure you want to clear ALL error logs? This cannot be undone.',
+        confirmText: 'Clear All',
+        destructive: true,
+      })
+    );
+    if (!confirmed) {
       return;
     }
 

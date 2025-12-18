@@ -28,6 +28,60 @@ import { showErrorWithReport } from '@/lib/utils/error-reporting';
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+// Type definitions for inspection data
+type InspectionItem = {
+  id: string;
+  inspection_id: string;
+  item_number: number;
+  item_description: string;
+  status: InspectionStatus;
+  day_of_week: number;
+  comments?: string | null;
+};
+
+type VehicleWithCategory = {
+  id: string;
+  reg_number: string;
+  vehicle_type: string;
+  vehicle_categories?: { name: string } | null;
+};
+
+type InspectionWithRelations = {
+  id: string;
+  user_id: string;
+  vehicle_id: string;
+  inspection_date: string;
+  inspection_end_date: string;
+  current_mileage: number | null;
+  status: string;
+  vehicles?: VehicleWithCategory;
+  inspection_items?: InspectionItem[];
+};
+
+type LoggedAction = {
+  id: string;
+  logged_comment: string | null;
+  inspection_items?: {
+    item_number: number;
+    item_description: string;
+  } | null;
+  vehicle_inspections?: {
+    vehicle_id: string;
+  };
+};
+
+type PreviousDefect = {
+  item_number: number;
+  item_description: string;
+  days: number[];
+};
+
+type ProfileWithRole = {
+  role?: {
+    is_manager_admin?: boolean;
+  } | null;
+};
+
 function NewInspectionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -68,7 +122,7 @@ function NewInspectionContent() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
 
   // Resolution tracking states
-  const [previousDefects, setPreviousDefects] = useState<Map<string, any>>(new Map());
+  const [previousDefects, setPreviousDefects] = useState<Map<string, PreviousDefect>>(new Map());
   const [showResolutionDialog, setShowResolutionDialog] = useState(false);
   const [pendingResolution, setPendingResolution] = useState<{ day: number; itemNum: number; itemDesc: string } | null>(null);
   const [resolutionComment, setResolutionComment] = useState('');
@@ -196,10 +250,10 @@ function NewInspectionContent() {
         setPreviousDefects(new Map());
       } else {
         // Build map of defective items: key = "itemNumber-itemDescription"
-        const defectsMap = new Map<string, any>();
-        const items = (lastInspection as any).inspection_items || [];
+        const defectsMap = new Map<string, PreviousDefect>();
+        const items = (lastInspection as InspectionWithRelations).inspection_items || [];
         
-        items.forEach((item: any) => {
+        items.forEach((item: InspectionItem) => {
           if (item.status === 'attention') {
             const key = `${item.item_number}-${item.item_description}`;
             if (!defectsMap.has(key)) {
@@ -236,7 +290,7 @@ function NewInspectionContent() {
       if (!loggedError && loggedActionsData) {
         const loggedMap = new Map<string, { comment: string; actionId: string }>();
         
-        loggedActionsData.forEach((action: any) => {
+        (loggedActionsData as LoggedAction[]).forEach((action: LoggedAction) => {
           if (action.inspection_items) {
             const key = `${action.inspection_items.item_number}-${action.inspection_items.item_description}`;
             loggedMap.set(key, {
@@ -294,7 +348,7 @@ function NewInspectionContent() {
         .eq('id', user?.id)
         .single();
 
-      const userIsManager = (profileData as any)?.role?.is_manager_admin || false;
+      const userIsManager = (profileData as ProfileWithRole)?.role?.is_manager_admin || false;
 
       // Fetch inspection
       const { data: inspection, error: inspectionError } = await supabase
@@ -327,8 +381,9 @@ function NewInspectionContent() {
 
       // Update checklist FIRST based on vehicle category (important for progress calculation)
       let checklist = INSPECTION_ITEMS;
-      if ((inspection as any).vehicles?.vehicle_categories?.name || (inspection as any).vehicles?.vehicle_type) {
-        const categoryName = (inspection as any).vehicles?.vehicle_categories?.name || (inspection as any).vehicles?.vehicle_type;
+      const inspectionData = inspection as InspectionWithRelations;
+      if (inspectionData.vehicles?.vehicle_categories?.name || inspectionData.vehicles?.vehicle_type) {
+        const categoryName = inspectionData.vehicles?.vehicle_categories?.name || inspectionData.vehicles?.vehicle_type;
         checklist = getChecklistForCategory(categoryName);
         setCurrentChecklist(checklist);
       }
@@ -344,7 +399,7 @@ function NewInspectionContent() {
 
       // Populate form with inspection data
       setExistingInspectionId(id);
-      setVehicleId((inspection as any).vehicles?.id || '');
+      setVehicleId(inspectionData.vehicles?.id || '');
       setWeekEnding(inspection.inspection_end_date || formatDateISO(getWeekEnding()));
       setCurrentMileage(inspection.current_mileage?.toString() || '');
       
@@ -355,7 +410,7 @@ function NewInspectionContent() {
       const newCheckboxStates: Record<string, InspectionStatus> = {};
       const newComments: Record<string, string> = {};
       
-      items?.forEach((item: any) => {
+      (items as InspectionItem[] | null)?.forEach((item: InspectionItem) => {
         const key = `${item.day_of_week}-${item.item_number}`;
         newCheckboxStates[key] = item.status;
         if (item.comments) {
@@ -621,7 +676,7 @@ function NewInspectionContent() {
         return;
       }
 
-      let inspection: any;
+      let inspection: InspectionWithRelations;
 
       // Update existing draft or create new inspection
       if (existingInspectionId) {
@@ -699,7 +754,7 @@ function NewInspectionContent() {
       }
 
       // Only insert if there are items to save
-      let insertedItems: any[] = [];
+      let insertedItems: InspectionItem[] = [];
       if (items.length > 0) {
         console.log(`Saving ${items.length} inspection items for inspection ${inspection.id}...`);
         
@@ -716,7 +771,7 @@ function NewInspectionContent() {
           throw new Error(`Failed to save inspection items: ${itemsError.message}`);
         }
         
-        insertedItems = data || [];
+        insertedItems = (data || []) as InspectionItem[];
         console.log(`Successfully saved ${insertedItems.length} items`);
       } else {
         console.warn('No items to save - inspection has no completed items');
@@ -759,7 +814,7 @@ function NewInspectionContent() {
 
       // Auto-create actions for failed items (only when submitting, not drafting)
       if (status === 'submitted' && insertedItems) {
-        const failedItems = insertedItems.filter((item: any) => item.status === 'attention');
+        const failedItems = insertedItems.filter((item: InspectionItem) => item.status === 'attention');
         
         if (failedItems.length > 0) {
           // Get vehicle registration for action title
@@ -780,7 +835,7 @@ function NewInspectionContent() {
             item_ids: string[];
           }>();
 
-          failedItems.forEach((item: any) => {
+          failedItems.forEach((item: InspectionItem) => {
             const key = `${item.item_number}-${item.item_description}`;
             if (!groupedDefects.has(key)) {
               groupedDefects.set(key, {

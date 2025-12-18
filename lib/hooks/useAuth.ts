@@ -63,9 +63,15 @@ export function useAuth() {
       
       // Show user-friendly message
       if (typeof window !== 'undefined') {
-        alert('Your account permissions have been updated. Please log in again to continue.');
+        // Dynamic import to avoid SSR issues
+        import('sonner').then(({ toast }) => {
+          toast.info('Account Updated', {
+            description: 'Your account permissions have been updated. Please log in again to continue.',
+            duration: 5000,
+          });
+        });
       }
-      
+
       // Force logout
       supabase.auth.signOut().then(() => {
         window.location.href = '/login';
@@ -128,11 +134,17 @@ export function useAuth() {
             // Role changed! Force logout
             console.log('Role change detected via periodic check - forcing re-login');
             localStorage.removeItem(storageKey);
-            
+
             if (typeof window !== 'undefined') {
-              alert('Your account permissions have been updated. Please log in again to continue.');
+              // Dynamic import to avoid SSR issues
+              import('sonner').then(({ toast }) => {
+                toast.info('Account Updated', {
+                  description: 'Your account permissions have been updated. Please log in again to continue.',
+                  duration: 5000,
+                });
+              });
             }
-            
+
             await supabase.auth.signOut();
             window.location.href = '/login';
           }
