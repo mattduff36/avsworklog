@@ -16,7 +16,7 @@ import { MaintenanceSettings } from './components/MaintenanceSettings';
 
 function MaintenanceContent() {
   // 1. Hooks
-  const { isManager, isAdmin } = useAuth();
+  const { isManager, isAdmin, isSuperAdmin } = useAuth();
   const { isOnline } = useOfflineSync();
   
   // 2. State
@@ -26,8 +26,9 @@ function MaintenanceContent() {
   const { data: maintenanceData, isLoading, error } = useMaintenance();
   
   // 4. Check permissions - using RBAC via has_maintenance_permission() function
-  // Managers/Admins have full access, employees need 'maintenance' module permission
-  const hasAccess = isManager || isAdmin; // RLS handles employee permissions
+  // SuperAdmin/Managers/Admins have full access, employees need 'maintenance' module permission
+  // RLS also enforces this at database level
+  const hasAccess = isSuperAdmin || isManager || isAdmin;
   
   // 5. Guards
   if (!hasAccess) {
@@ -135,7 +136,7 @@ function MaintenanceContent() {
 
           <TabsContent value="settings">
             <MaintenanceSettings
-              isAdmin={isAdmin}
+              isAdmin={isAdmin || isSuperAdmin}
               isManager={isManager}
             />
           </TabsContent>
