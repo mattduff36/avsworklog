@@ -70,6 +70,8 @@ export async function GET(request: NextRequest) {
     const firstAidThreshold = categoryMap.get('first aid kit expiry')?.alert_threshold_days || 30;
     
     // Get all vehicles with maintenance data
+    // Note: Cannot order by joined table columns in Supabase
+    // Sorting is handled client-side in the MaintenanceTable component
     const { data: maintenanceRecords, error: maintenanceError } = await supabase
       .from('vehicle_maintenance')
       .select(`
@@ -80,8 +82,7 @@ export async function GET(request: NextRequest) {
           category_id,
           status
         )
-      `)
-      .order('vehicle.reg_number', { ascending: true });
+      `);
     
     if (maintenanceError) {
       logger.error('Failed to fetch maintenance records', maintenanceError);
