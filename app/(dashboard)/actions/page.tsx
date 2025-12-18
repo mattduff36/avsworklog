@@ -7,11 +7,10 @@ import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, CheckCircle2, Clock, Trash2, Clipboard, Package, FileText, Undo2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Trash2, FileText, Undo2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Database } from '@/types/database';
 import { toast } from 'sonner';
@@ -38,7 +37,6 @@ export default function ActionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [completingActions, setCompletingActions] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState('all');
   
   // Logged modal states
   const [showLoggedDialog, setShowLoggedDialog] = useState(false);
@@ -374,70 +372,8 @@ export default function ActionsPage() {
         </Card>
       </div>
 
-      {/* Tabs Navigation */}
-      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full max-w-2xl grid-cols-3 h-auto p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
-          <TabsTrigger 
-            value="all" 
-            className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
-            style={activeTab === 'all' ? {
-              backgroundColor: 'hsl(0 84% 60%)', // Red for Actions
-              color: 'white',
-              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
-            } : {}}
-          >
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              <span className="text-sm font-medium">All Actions</span>
-              {actions.length > 0 && (
-                <Badge 
-                  variant="secondary" 
-                  className={activeTab === 'all' ? "bg-white/20 text-white border-white/30" : ""}
-                >
-                  {actions.length}
-                </Badge>
-              )}
-            </div>
-          </TabsTrigger>
-          <TabsTrigger 
-            value="inspections" 
-            className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
-            style={activeTab === 'inspections' ? {
-              backgroundColor: 'hsl(30 95% 55%)', // Inspection Orange
-              color: 'white',
-              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
-            } : {}}
-          >
-            <div className="flex items-center gap-2">
-              <Clipboard className="h-5 w-5" />
-              <span className="text-sm font-medium">From Inspections</span>
-              {actions.length > 0 && (
-                <Badge 
-                  variant="secondary"
-                  className={activeTab === 'inspections' ? "bg-white/20 text-white border-white/30" : ""}
-                >
-                  {actions.length}
-                </Badge>
-              )}
-            </div>
-          </TabsTrigger>
-          <TabsTrigger 
-            value="future" 
-            className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
-            style={activeTab === 'future' ? {
-              backgroundColor: '#F1D64A', // AVS Yellow
-              color: '#252525',
-              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
-            } : {}}
-          >
-            <div className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              <span className="text-sm font-medium">More Sources</span>
-            </div>
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="all" className="space-y-6">
+      {/* All Actions Content */}
+      <div className="space-y-6">
           {/* Pending Actions */}
           {pendingActions.length > 0 && (
             <div className="space-y-4">
@@ -693,157 +629,7 @@ export default function ActionsPage() {
               </CardContent>
             </Card>
           )}
-        </TabsContent>
-
-        <TabsContent value="inspections" className="space-y-6">
-          {/* Pending Actions */}
-          {pendingActions.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Pending Actions from Inspections</h2>
-              <div className="space-y-3">
-                {pendingActions.map((action) => {
-                  const isCompleting = completingActions.has(action.id);
-                  return (
-                    <Card key={action.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200">
-                      <CardContent className="pt-6">
-                        <div className="flex flex-col items-start gap-4">
-                          <div className="flex-1 space-y-2 w-full">
-                            <div className="flex flex-col md:flex-row items-start justify-between gap-4">
-                              <div className="flex-1 w-full">
-                                <div className="flex items-center gap-2 mb-2">
-                                  {getStatusIcon(action.status)}
-                                  <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{action.title}</h3>
-                                  {getPriorityBadge(action.priority)}
-                                </div>
-                                {action.description && (
-                                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{action.description}</p>
-                                )}
-                                <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
-                                  {action.vehicle_inspections && (
-                                    <span>
-                                      Vehicle: {action.vehicle_inspections.vehicles?.reg_number || 'N/A'}
-                                    </span>
-                                  )}
-                                  {action.inspection_items && (
-                                    <span>
-                                      Issue: {action.inspection_items.item_description}
-                                    </span>
-                                  )}
-                                  <span>Created: {formatDate(action.created_at)}</span>
-                                </div>
-                              </div>
-                              <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 w-full md:w-auto flex-shrink-0">
-                                <Button
-                                  onClick={() => handleMarkAsLogged(action.id)}
-                                  disabled={isCompleting}
-                                  className="h-12 md:h-16 min-w-0 md:min-w-[140px] text-sm md:text-base font-semibold bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30"
-                                >
-                                  <FileText className="h-4 w-4 md:mr-2" />
-                                  <span className="md:inline">Logged</span>
-                                </Button>
-                                <Button
-                                  onClick={() => handleMarkAsComplete(action.id, action.status)}
-                                  disabled={isCompleting}
-                                  className={`h-12 md:h-16 min-w-0 md:min-w-[140px] text-sm md:text-base font-semibold transition-all ${
-                                    isCompleting
-                                      ? 'bg-green-500 hover:bg-green-500 text-white'
-                                      : 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900'
-                                  }`}
-                                >
-                                  {isCompleting ? (
-                                    <>
-                                      <CheckCircle2 className="h-4 w-4 md:mr-2" />
-                                      <span className="md:inline">Complete</span>
-                                    </>
-                                  ) : (
-                                    'Complete'
-                                  )}
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Completed Items */}
-          {completedActions.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-slate-600 dark:text-slate-400">Completed Actions from Inspections</h2>
-              <div className="space-y-3">
-                {completedActions.map((action) => (
-                  <Card key={action.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-90 transition-opacity">
-                    <CardContent className="pt-6">
-                      <div className="flex flex-col items-start gap-4">
-                        <div className="flex-1 space-y-2 w-full">
-                          <div className="flex flex-col md:flex-row items-start justify-between gap-4">
-                            <div className="flex-1 w-full">
-                              <div className="flex items-center gap-2 mb-2">
-                                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
-                                <h3 className="font-semibold text-lg text-slate-900 dark:text-white line-through">{action.title}</h3>
-                                {getPriorityBadge(action.priority)}
-                              </div>
-                              {action.description && (
-                                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{action.description}</p>
-                              )}
-                              <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
-                                {action.actioned_at && (
-                                  <span className="text-green-400">
-                                    Actioned: {formatDate(action.actioned_at)}
-                                  </span>
-                                )}
-                                {action.vehicle_inspections && (
-                                  <span>
-                                    Vehicle: {action.vehicle_inspections.vehicles?.reg_number || 'N/A'}
-                                  </span>
-                                )}
-                                {action.inspection_items && (
-                                  <span>
-                                    Issue: {action.inspection_items.item_description}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {actions.length === 0 && !loading && (
-            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-              <CardContent className="pt-6 text-center py-12">
-                <Clipboard className="h-12 w-12 mx-auto text-slate-400 mb-4" />
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No Inspection Actions Yet</h3>
-                <p className="text-slate-600 dark:text-slate-400 mb-4">
-                  Actions from inspections will appear here when inspection items fail
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="future" className="space-y-6">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-            <CardContent className="pt-6 text-center py-16">
-              <Package className="h-16 w-16 mx-auto text-slate-400 mb-4" />
-              <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">More Action Sources Coming Soon</h3>
-              <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-                In future updates, actions will be created from additional sources including timesheets, maintenance schedules, and more.
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      </div>
 
       {/* Logged Comment Dialog */}
       <Dialog open={showLoggedDialog} onOpenChange={setShowLoggedDialog}>
