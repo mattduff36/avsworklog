@@ -1,0 +1,1923 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Squires App - User Guide</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            color: #000;
+            padding: 40px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+        
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .section {
+            background: white;
+            padding: 30px;
+            margin-bottom: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h2 {
+            color: #FFD700;
+            border-bottom: 3px solid #FFD700;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        
+        h3 {
+            color: #FFA500;
+            margin-top: 25px;
+        }
+        
+        h4 {
+            color: #666;
+            margin-top: 20px;
+        }
+        
+        .screenshot-placeholder {
+            background: #f0f0f0;
+            border: 2px dashed #ccc;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            border-radius: 5px;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .step-list {
+            background: #f9f9f9;
+            padding: 20px;
+            border-left: 4px solid #FFD700;
+            margin: 15px 0;
+        }
+        
+        .step-list ol {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        .step-list li {
+            margin: 10px 0;
+        }
+        
+        .tip-box {
+            background: #e8f4f8;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .tip-box strong {
+            color: #2196F3;
+        }
+        
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .warning-box strong {
+            color: #856404;
+        }
+        
+        .scenario {
+            background: #f0f8ff;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 5px;
+            border: 1px solid #b8daff;
+        }
+        
+        .scenario h4 {
+            color: #004085;
+            margin-top: 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        table th {
+            background: #FFD700;
+            color: #000;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+        }
+        
+        table tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        
+        .toc {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+        }
+        
+        .toc ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .toc li {
+            margin: 8px 0;
+        }
+        
+        .toc a {
+            color: #FFA500;
+            text-decoration: none;
+        }
+        
+        .toc a:hover {
+            text-decoration: underline;
+        }
+        
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin: 0 4px;
+        }
+        
+        .badge-pending {
+            background: #ffc107;
+            color: #000;
+        }
+        
+        .badge-approved {
+            background: #4caf50;
+            color: white;
+        }
+        
+        .badge-rejected {
+            background: #f44336;
+            color: white;
+        }
+        
+        .badge-draft {
+            background: #9e9e9e;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Squires App</h1>
+        <p>Complete User Guide for A&V Squires Plant Co. Ltd.</p>
+        <p style="font-size: 0.9em; margin-top: 15px;">Digital Forms Management System</p>
+    </div>
+
+    <!-- Table of Contents -->
+    <div class="section toc">
+        <h2>Table of Contents</h2>
+        <ul>
+            <li><a href="#introduction">1. Introduction</a></li>
+            <li><a href="#getting-started">2. Getting Started</a></li>
+            <li><a href="#dashboard">3. Dashboard and Navigation</a></li>
+            <li><a href="#timesheets">4. Timesheets</a></li>
+            <li><a href="#inspections">5. Vehicle Inspections</a></li>
+            <li><a href="#rams">6. RAMS Documents</a></li>
+            <li><a href="#absence">7. Absence & Leave</a></li>
+            <li><a href="#maintenance">8. Vehicle Maintenance & Service</a></li>
+            <li><a href="#user-management">9. User Management (Admin)</a></li>
+            <li><a href="#reports">10. Reports and Exports</a></li>
+            <li><a href="#messaging">11. Messaging System</a></li>
+            <li><a href="#scenarios">12. Common Scenarios</a></li>
+            <li><a href="#troubleshooting">13. Troubleshooting</a></li>
+        </ul>
+    </div>
+
+    <!-- Section 1: Introduction -->
+    <div class="section" id="introduction">
+        <h2>1. Introduction</h2>
+        
+        <h3>What is the Squires App?</h3>
+        <p>The Squires App is a comprehensive digital forms management system designed specifically for A&V Squires Plant Co. Ltd. It replaces paper-based processes with an easy-to-use web application that can be accessed from any device with an internet connection.</p>
+        
+        <h3>What Can You Do With This App?</h3>
+        <ul>
+            <li><strong>Submit Digital Timesheets:</strong> Record your working hours each week with automatic calculations</li>
+            <li><strong>Complete Vehicle Inspections:</strong> Perform daily safety checks on company vehicles</li>
+            <li><strong>Access RAMS Documents:</strong> View Risk Assessments and Method Statements for your jobs</li>
+            <li><strong>Request Annual Leave:</strong> Submit and track holiday requests</li>
+            <li><strong>Track Vehicle Maintenance:</strong> View and update vehicle service schedules</li>
+            <li><strong>Communicate with Colleagues:</strong> Send and receive messages within the system</li>
+            <li><strong>Generate Reports:</strong> Create PDF and Excel reports for various purposes</li>
+        </ul>
+        
+        <h3>Who Is This Guide For?</h3>
+        <p>This guide is primarily aimed at managers and administrators, but it covers all features available to different user roles including:</p>
+        <ul>
+            <li><strong>Field Workers:</strong> Creating timesheets and inspections</li>
+            <li><strong>Office Staff:</strong> Processing forms and managing data</li>
+            <li><strong>Managers:</strong> Approving submissions and viewing reports</li>
+            <li><strong>Administrators:</strong> Managing users and system configuration</li>
+        </ul>
+        
+        <div class="tip-box">
+            <strong>💡 Tip:</strong> This application works best on desktop browsers (Chrome, Edge, Firefox, or Safari). Whilst it works on mobile devices, some features are optimised for larger screens.
+        </div>
+    </div>
+
+    <!-- Section 2: Getting Started -->
+    <div class="section" id="getting-started">
+        <h2>2. Getting Started</h2>
+        
+        <h3>Accessing the Application</h3>
+        <div class="step-list">
+            <ol>
+                <li>Open your web browser (Chrome, Edge, Firefox, or Safari recommended)</li>
+                <li>Navigate to: <code>https://avsworklog.mpdee.uk</code></li>
+                <li>Bookmark this page for easy access in future</li>
+            </ol>
+        </div>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 1: Login page showing Squires logo, email and password fields]
+        </div>
+        
+        <h3>Logging In</h3>
+        <div class="step-list">
+            <ol>
+                <li>Enter your email address (this will have been provided by your administrator)</li>
+                <li>Enter your password</li>
+                <li>Tick "Keep me signed in" if you're using a personal device</li>
+                <li>Click the <strong>Sign In</strong> button</li>
+            </ol>
+        </div>
+        
+        <div class="warning-box">
+            <strong>⚠️ Important:</strong> For security reasons, don't tick "Keep me signed in" if you're using a shared or public computer.
+        </div>
+        
+        <h3>First Time Login</h3>
+        <p>If this is your first time logging in, you may be asked to set a new password. Follow these steps:</p>
+        <div class="step-list">
+            <ol>
+                <li>Click the "Forgot Password?" link on the login page</li>
+                <li>Enter your email address</li>
+                <li>Check your email for a password reset link</li>
+                <li>Click the link and create a new, secure password</li>
+                <li>Return to the login page and sign in with your new password</li>
+            </ol>
+        </div>
+        
+        <h3>Understanding User Roles</h3>
+        <p>Your account will have one of the following roles, which determines what features you can access:</p>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Role</th>
+                    <th>What You Can Do</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Employee</strong></td>
+                    <td>Create timesheets and inspections for yourself</td>
+                </tr>
+                <tr>
+                    <td><strong>Manager</strong></td>
+                    <td>All employee functions, plus approve/reject submissions, create forms for others, and view reports</td>
+                </tr>
+                <tr>
+                    <td><strong>Admin</strong></td>
+                    <td>All manager functions, plus manage users, configure system settings, and access all data</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div class="tip-box">
+            <strong>💡 Tip:</strong> If you need access to additional features, speak to your administrator about changing your role.
+        </div>
+    </div>
+
+    <!-- Section 3: Dashboard -->
+    <div class="section" id="dashboard">
+        <h2>3. Dashboard and Navigation</h2>
+        
+        <h3>The Dashboard</h3>
+        <p>When you log in, you'll see the main dashboard. This is your central hub for accessing all features.</p>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 2: Main dashboard showing all feature tiles - Timesheets, Vehicle Inspections, RAMS, Absence, Maintenance]
+        </div>
+        
+        <h3>Dashboard Tiles</h3>
+        <p>The dashboard displays tiles for each major feature. Click any tile to access that feature:</p>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Tile</th>
+                    <th>Icon</th>
+                    <th>What It's For</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Timesheets</strong></td>
+                    <td>📄 (Yellow)</td>
+                    <td>Record your weekly working hours</td>
+                </tr>
+                <tr>
+                    <td><strong>Vehicle Inspections</strong></td>
+                    <td>✓ (Blue)</td>
+                    <td>Complete daily vehicle safety checks</td>
+                </tr>
+                <tr>
+                    <td><strong>RAMS Documents</strong></td>
+                    <td>📋 (Green)</td>
+                    <td>View risk assessments for your work</td>
+                </tr>
+                <tr>
+                    <td><strong>Absence & Leave</strong></td>
+                    <td>📅 (Purple)</td>
+                    <td>Request and manage holidays</td>
+                </tr>
+                <tr>
+                    <td><strong>Maintenance & Service</strong></td>
+                    <td>🔧 (Red)</td>
+                    <td>Track vehicle maintenance schedules</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <h3>Navigation Bar</h3>
+        <p>At the top of every page, you'll see the navigation bar with quick links:</p>
+        <ul>
+            <li><strong>Squires (logo):</strong> Click to return to the dashboard</li>
+            <li><strong>Recent Activity:</strong> View your recently accessed forms</li>
+            <li><strong>Messages:</strong> Access your internal messages (shows unread count)</li>
+            <li><strong>Profile Menu:</strong> Access your profile settings and sign out</li>
+        </ul>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 3: Navigation bar showing logo, recent activity, messages bell icon, and profile menu]
+        </div>
+        
+        <div class="tip-box">
+            <strong>💡 Tip:</strong> Use the "Recent Activity" dropdown to quickly return to forms you were working on recently.
+        </div>
+    </div>
+
+    <!-- Section 4: Timesheets -->
+    <div class="section" id="timesheets">
+        <h2>4. Timesheets</h2>
+        
+        <h3>Overview</h3>
+        <p>Timesheets are used to record your working hours for each week. The system automatically calculates total hours and can detect special conditions like bank holidays and night shifts.</p>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 4: Timesheets list page showing table with multiple timesheets, status badges, and filter buttons]
+        </div>
+        
+        <h3>Viewing Your Timesheets</h3>
+        <div class="step-list">
+            <ol>
+                <li>Click the <strong>Timesheets</strong> tile on the dashboard</li>
+                <li>You'll see a list of all your timesheets</li>
+                <li>Each timesheet shows:
+                    <ul>
+                        <li>Week ending date</li>
+                        <li>Total hours worked</li>
+                        <li>Status (Draft, Pending, Approved, Rejected)</li>
+                        <li>Who it was created for</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+        
+        <h3>Understanding Timesheet Status</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>What It Means</th>
+                    <th>What You Can Do</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="badge badge-draft">Draft</span></td>
+                    <td>Not yet submitted</td>
+                    <td>Edit and submit</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-pending">Pending</span></td>
+                    <td>Awaiting manager approval</td>
+                    <td>View only</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-approved">Approved</span></td>
+                    <td>Approved by manager</td>
+                    <td>View and download PDF</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-rejected">Rejected</span></td>
+                    <td>Needs corrections</td>
+                    <td>View comments, edit, and resubmit</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <h3>Creating a New Timesheet</h3>
+        <div class="step-list">
+            <ol>
+                <li>Click <strong>New Timesheet</strong> button</li>
+                <li>Select the week ending date (must be a Sunday)</li>
+                <li>The system checks if you already have a timesheet for that week</li>
+                <li>If no duplicate exists, the timesheet form will open</li>
+            </ol>
+        </div>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 5: Week selector page showing date picker and Continue button]
+        </div>
+        
+        <h3>Filling In Your Timesheet</h3>
+        <div class="step-list">
+            <ol>
+                <li><strong>Vehicle Registration:</strong> Enter the reg number of the vehicle you used</li>
+                <li><strong>For Each Day (Monday to Sunday):</strong>
+                    <ul>
+                        <li>Enter start and finish times</li>
+                        <li>The system calculates hours automatically</li>
+                        <li>Add job number if applicable</li>
+                        <li>Add any remarks or notes</li>
+                        <li>Tick special flags if needed:
+                            <ul>
+                                <li><strong>Bank Holiday:</strong> If it was a public holiday</li>
+                                <li><strong>Night Shift:</strong> Automatically detected if work goes past midnight</li>
+                                <li><strong>Did Not Work:</strong> If you didn't work that day</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 6: Timesheet form showing tabs for days of week, time inputs, job numbers, and checkboxes]
+        </div>
+        
+        <h3>Special Features</h3>
+        
+        <h4>Automatic Hour Calculation</h4>
+        <p>When you enter start and finish times, the system automatically calculates:</p>
+        <ul>
+            <li>Daily hours (including lunch break deduction if applicable)</li>
+            <li>Weekly total hours</li>
+            <li>Number of days worked</li>
+        </ul>
+        
+        <h4>Bank Holiday Detection</h4>
+        <p>The system knows about UK bank holidays and will suggest ticking the Bank Holiday box on those dates.</p>
+        
+        <h4>Night Shift Detection</h4>
+        <p>If your finish time is earlier than your start time (indicating work past midnight), the Night Shift box is automatically ticked.</p>
+        
+        <div class="tip-box">
+            <strong>💡 Tip:</strong> You can still manually tick or untick the Bank Holiday and Night Shift boxes if needed.
+        </div>
+        
+        <h3>Saving Your Work</h3>
+        <p>You have two options when working on a timesheet:</p>
+        <ul>
+            <li><strong>Save Draft:</strong> Saves your progress without submitting. You can come back and finish it later</li>
+            <li><strong>Submit for Approval:</strong> Completes the timesheet and sends it to your manager for review</li>
+        </ul>
+        
+        <h3>Submitting Your Timesheet</h3>
+        <div class="step-list">
+            <ol>
+                <li>Click <strong>Submit for Approval</strong></li>
+                <li>A confirmation window appears showing a summary:
+                    <ul>
+                        <li>Total hours</li>
+                        <li>Days worked</li>
+                        <li>Vehicle registration</li>
+                        <li>Day-by-day breakdown</li>
+                    </ul>
+                </li>
+                <li>Review the summary carefully</li>
+                <li>If everything is correct, click <strong>Confirm Submission</strong></li>
+                <li>If you spot an error, click <strong>Go Back to Edit</strong></li>
+            </ol>
+        </div>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 7: Confirmation modal showing timesheet summary with total hours, days worked, and detailed breakdown table]
+        </div>
+        
+        <div class="warning-box">
+            <strong>⚠️ Important:</strong> Once submitted, you cannot edit the timesheet unless your manager rejects it and asks for changes.
+        </div>
+        
+        <h3>Editing a Rejected Timesheet</h3>
+        <p>If your manager rejects your timesheet:</p>
+        <div class="step-list">
+            <ol>
+                <li>Open the timesheet from your list</li>
+                <li>Read the manager's comments carefully (shown at the top)</li>
+                <li>Make the requested changes</li>
+                <li>Click <strong>Submit for Approval</strong> again</li>
+            </ol>
+        </div>
+        
+        <h3>For Managers: Approving Timesheets</h3>
+        <p>If you're a manager, you can approve or reject timesheets:</p>
+        
+        <div class="step-list">
+            <ol>
+                <li>Go to <strong>Timesheets</strong> page</li>
+                <li>Filter by "Pending" to see timesheets awaiting approval</li>
+                <li>Click on a timesheet to open it</li>
+                <li>Review all the details carefully</li>
+                <li>Either:
+                    <ul>
+                        <li><strong>Approve:</strong> Click the green Approve button</li>
+                        <li><strong>Reject:</strong> Click Reject, add comments explaining what needs to be fixed, then confirm</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 8: Timesheet detail view showing Approve and Reject buttons, with manager view]
+        </div>
+        
+        <h3>For Managers: Creating Timesheets for Others</h3>
+        <p>Managers can create timesheets on behalf of employees:</p>
+        <div class="step-list">
+            <ol>
+                <li>Click <strong>New Timesheet</strong></li>
+                <li>Select which employee you're creating it for from the dropdown</li>
+                <li>Choose the week ending date</li>
+                <li>Fill in the timesheet as normal</li>
+                <li>Save as draft or submit for approval</li>
+            </ol>
+        </div>
+        
+        <div class="tip-box">
+            <strong>💡 Tip:</strong> When a manager creates a timesheet for an employee, the employee can still edit it if it's in draft status.
+        </div>
+        
+        <h3>Downloading Timesheet PDFs</h3>
+        <p>Once a timesheet is approved, you can download a PDF copy:</p>
+        <div class="step-list">
+            <ol>
+                <li>Open the approved timesheet</li>
+                <li>Click the <strong>Download PDF</strong> button</li>
+                <li>The PDF includes:
+                    <ul>
+                        <li>Employee details and signature</li>
+                        <li>All hours worked</li>
+                        <li>Job numbers and remarks</li>
+                        <li>Approval status</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Section 5: Vehicle Inspections -->
+    <div class="section" id="inspections">
+        <h2>5. Vehicle Inspections</h2>
+        
+        <h3>Overview</h3>
+        <p>Vehicle inspections are daily safety checks performed on company vehicles. The system uses a 26-point checklist to ensure all vehicles are safe to operate.</p>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 9: Inspections list page showing table with vehicle registrations, dates, and status]
+        </div>
+        
+        <h3>Creating a New Inspection</h3>
+        <div class="step-list">
+            <ol>
+                <li>Click <strong>Vehicle Inspections</strong> on the dashboard</li>
+                <li>Click <strong>New Inspection</strong></li>
+                <li>Select the vehicle you're inspecting from the dropdown</li>
+                <li>Enter the current mileage</li>
+                <li>Select the week you're inspecting for</li>
+            </ol>
+        </div>
+        
+        <h3>The 26-Point Inspection Checklist</h3>
+        <p>For each day of the week, you'll need to check the following items:</p>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Items to Check</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Exterior</strong></td>
+                    <td>Bodywork, mirrors, windows, lights, indicators, registration plates</td>
+                </tr>
+                <tr>
+                    <td><strong>Tyres</strong></td>
+                    <td>Tread depth, pressure, condition, wheel nuts</td>
+                </tr>
+                <tr>
+                    <td><strong>Under Bonnet</strong></td>
+                    <td>Oil level, coolant, washer fluid, battery</td>
+                </tr>
+                <tr>
+                    <td><strong>Safety Equipment</strong></td>
+                    <td>First aid kit, fire extinguisher, warning triangle</td>
+                </tr>
+                <tr>
+                    <td><strong>Inside Cab</strong></td>
+                    <td>Seat belts, horn, wipers, heater, instruments</td>
+                </tr>
+                <tr>
+                    <td><strong>Documents</strong></td>
+                    <td>MOT, insurance, vehicle manual</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 10: Inspection form showing tabs for days, checklist items with tick/cross/zero options]
+        </div>
+        
+        <h3>Marking Items</h3>
+        <p>For each checklist item, you have three options:</p>
+        <ul>
+            <li><strong>✓ (Tick):</strong> Item is satisfactory</li>
+            <li><strong>✗ (Cross):</strong> Item has a defect that needs attention</li>
+            <li><strong>0 (Zero):</strong> Item not applicable or not checked</li>
+        </ul>
+        
+        <h3>Recording Defects</h3>
+        <p>If you mark any item with a cross (✗), you must provide details:</p>
+        <div class="step-list">
+            <ol>
+                <li>When you mark an item as defective, a text box appears</li>
+                <li>Describe the defect clearly (e.g., "Nearside front tyre tread below legal limit")</li>
+                <li>Optionally, add a photo of the defect</li>
+                <li>Indicate if the vehicle is still safe to use</li>
+            </ol>
+        </div>
+        
+        <div class="tip-box">
+            <strong>💡 Tip:</strong> Clear photos of defects help the maintenance team understand and fix issues more quickly.
+        </div>
+        
+        <h3>Adding Photos</h3>
+        <p>You can attach photos to your inspection:</p>
+        <div class="step-list">
+            <ol>
+                <li>Click the camera icon or "Add Photo" button</li>
+                <li>Either:
+                    <ul>
+                        <li>Take a photo using your device's camera, or</li>
+                        <li>Upload a photo from your device</li>
+                    </ul>
+                </li>
+                <li>Add a description of what the photo shows</li>
+                <li>The photo will be included in the inspection report</li>
+            </ol>
+        </div>
+        
+        <h3>Completing the Inspection</h3>
+        <div class="step-list">
+            <ol>
+                <li>Go through each day's checklist</li>
+                <li>Mark all items appropriately</li>
+                <li>Add defect details and photos where needed</li>
+                <li>Review your entries</li>
+                <li>Click <strong>Submit Inspection</strong></li>
+                <li>The inspection is sent to your manager for review</li>
+            </ol>
+        </div>
+        
+        <div class="warning-box">
+            <strong>⚠️ Important:</strong> If a vehicle has serious defects that make it unsafe to operate, do not use the vehicle and inform your manager immediately.
+        </div>
+        
+        <h3>For Managers: Reviewing Inspections</h3>
+        <p>Managers should regularly review vehicle inspections:</p>
+        <div class="step-list">
+            <ol>
+                <li>Go to <strong>Vehicle Inspections</strong></li>
+                <li>Look for inspections with defects (marked with warning icon)</li>
+                <li>Open the inspection to see defect details and photos</li>
+                <li>Take appropriate action:
+                    <ul>
+                        <li>Schedule maintenance for minor defects</li>
+                        <li>Take vehicle out of service for serious defects</li>
+                        <li>Update the maintenance system with actions taken</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 11: Inspection detail view showing defects highlighted, photos attached, and manager notes section]
+        </div>
+    </div>
+
+    <!-- Section 6: RAMS Documents -->
+    <div class="section" id="rams">
+        <h2>6. RAMS Documents</h2>
+        
+        <h3>Overview</h3>
+        <p>RAMS (Risk Assessment & Method Statement) documents describe the safe way to carry out specific work tasks. All employees must read and understand the relevant RAMS before starting a job.</p>
+        
+        <h3>What is a RAMS Document?</h3>
+        <ul>
+            <li><strong>Risk Assessment:</strong> Identifies hazards and risks associated with the work</li>
+            <li><strong>Method Statement:</strong> Describes the safe procedure for carrying out the work</li>
+            <li><strong>Control Measures:</strong> Steps to reduce or eliminate risks</li>
+            <li><strong>Emergency Procedures:</strong> What to do if something goes wrong</li>
+        </ul>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 12: RAMS list page showing available documents with categories and search]
+        </div>
+        
+        <h3>Accessing RAMS Documents</h3>
+        <div class="step-list">
+            <ol>
+                <li>Click <strong>RAMS Documents</strong> on the dashboard</li>
+                <li>Browse the list of available documents</li>
+                <li>Use the search box to find specific documents by name or job type</li>
+                <li>Filter by category if available</li>
+            </ol>
+        </div>
+        
+        <h3>Reading a RAMS Document</h3>
+        <div class="step-list">
+            <ol>
+                <li>Click on a RAMS document to open it</li>
+                <li>You'll see three options:
+                    <ul>
+                        <li><strong>Open:</strong> Read the document in your browser</li>
+                        <li><strong>Download:</strong> Save a PDF copy to your device</li>
+                        <li><strong>Email:</strong> Send a copy to your email address</li>
+                    </ul>
+                </li>
+                <li>The system records which documents you've accessed</li>
+            </ol>
+        </div>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 13: RAMS document view showing Open, Download, and Email buttons]
+        </div>
+        
+        <h3>RAMS Document Sections</h3>
+        <p>A typical RAMS document includes:</p>
+        <ul>
+            <li><strong>Job Description:</strong> What work is being carried out</li>
+            <li><strong>Location:</strong> Where the work will take place</li>
+            <li><strong>Hazards Identified:</strong> What could cause harm</li>
+            <li><strong>Persons at Risk:</strong> Who might be affected</li>
+            <li><strong>Control Measures:</strong> How to stay safe</li>
+            <li><strong>PPE Required:</strong> What protective equipment to wear</li>
+            <li><strong>Emergency Procedures:</strong> What to do in an emergency</li>
+            <li><strong>Sign-off:</strong> Who has approved this document</li>
+        </ul>
+        
+        <div class="warning-box">
+            <strong>⚠️ Important:</strong> Always read the relevant RAMS document before starting a new job. If you don't understand any part of it, ask your manager for clarification before proceeding.
+        </div>
+        
+        <h3>For Managers: Uploading RAMS Documents</h3>
+        <p>Managers and admins can upload new RAMS documents:</p>
+        <div class="step-list">
+            <ol>
+                <li>Go to <strong>RAMS Documents</strong></li>
+                <li>Click <strong>Upload New RAMS</strong></li>
+                <li>Enter document details:
+                    <ul>
+                        <li>Document name</li>
+                        <li>Category</li>
+                        <li>Description</li>
+                        <li>Related job numbers (if applicable)</li>
+                    </ul>
+                </li>
+                <li>Upload the PDF file</li>
+                <li>Click <strong>Save</strong></li>
+                <li>The document is now available to all relevant staff</li>
+            </ol>
+        </div>
+        
+        <h3>For Managers: Tracking Document Access</h3>
+        <p>Managers can see who has accessed each RAMS document:</p>
+        <ul>
+            <li>Open a RAMS document</li>
+            <li>Click <strong>View Access History</strong></li>
+            <li>See a list showing who opened, downloaded, or emailed the document and when</li>
+            <li>Export this data to Excel if needed</li>
+        </ul>
+        
+        <div class="tip-box">
+            <strong>💡 Tip:</strong> RAMS documents should be reviewed and updated regularly (at least annually) to ensure they remain accurate and relevant.
+        </div>
+    </div>
+
+    <!-- Section 7: Absence & Leave -->
+    <div class="section" id="absence">
+        <h2>7. Absence & Leave</h2>
+        
+        <h3>Overview</h3>
+        <p>The Absence & Leave module allows you to request annual leave (holidays) and track your leave balance. Managers can approve or reject requests and see team availability.</p>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 14: Absence calendar view showing requested and approved leave in different colours]
+        </div>
+        
+        <h3>Viewing Your Leave Balance</h3>
+        <p>When you open the Absence & Leave page, you'll see:</p>
+        <ul>
+            <li><strong>Annual Entitlement:</strong> Total days you're entitled to per year</li>
+            <li><strong>Days Taken:</strong> How many days you've used</li>
+            <li><strong>Days Approved:</strong> Leave that's been approved but not yet taken</li>
+            <li><strong>Days Available:</strong> How many days you have left to book</li>
+        </ul>
+        
+        <h3>Requesting Annual Leave</h3>
+        <div class="step-list">
+            <ol>
+                <li>Click <strong>Absence & Leave</strong> on the dashboard</li>
+                <li>Click <strong>Request Leave</strong></li>
+                <li>Select the start and end dates of your leave</li>
+                <li>The system calculates the number of working days automatically</li>
+                <li>Add a note if needed (e.g., "Family holiday abroad")</li>
+                <li>Click <strong>Submit Request</strong></li>
+                <li>Your request is sent to your manager for approval</li>
+            </ol>
+        </div>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 15: Leave request form showing date pickers, working days calculation, and notes field]
+        </div>
+        
+        <div class="tip-box">
+            <strong>💡 Tip:</strong> The system automatically excludes weekends and bank holidays when calculating working days.
+        </div>
+        
+        <h3>Request Status</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>What It Means</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="badge badge-pending">Pending</span></td>
+                    <td>Awaiting manager approval - you can cancel if needed</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-approved">Approved</span></td>
+                    <td>Manager has approved - your leave is confirmed</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-rejected">Rejected</span></td>
+                    <td>Manager has declined - see their comments for the reason</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <h3>Cancelling a Leave Request</h3>
+        <p>If your plans change, you can cancel a pending or approved request:</p>
+        <div class="step-list">
+            <ol>
+                <li>Go to your list of leave requests</li>
+                <li>Find the request you want to cancel</li>
+                <li>Click <strong>Cancel Request</strong></li>
+                <li>Confirm the cancellation</li>
+                <li>The days are added back to your available balance</li>
+            </ol>
+        </div>
+        
+        <div class="warning-box">
+            <strong>⚠️ Important:</strong> Give as much notice as possible when cancelling leave, especially if it's already been approved.
+        </div>
+        
+        <h3>For Managers: Approving Leave Requests</h3>
+        <p>When an employee submits a leave request, managers receive a notification:</p>
+        <div class="step-list">
+            <ol>
+                <li>Go to <strong>Absence & Leave</strong></li>
+                <li>Click the <strong>Pending Requests</strong> tab</li>
+                <li>Review each request considering:
+                    <ul>
+                        <li>Business needs and workload</li>
+                        <li>Other staff already on leave</li>
+                        <li>Adequate notice given</li>
+                    </ul>
+                </li>
+                <li>Either:
+                    <ul>
+                        <li><strong>Approve:</strong> Click Approve to confirm the leave</li>
+                        <li><strong>Reject:</strong> Click Reject and add a reason (e.g., "Sorry, we already have 2 people off that week")</li>
+                    </ul>
+                </li>
+                <li>The employee is notified of your decision</li>
+            </ol>
+        </div>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 16: Manager view showing pending requests with Approve and Reject buttons]
+        </div>
+        
+        <h3>For Managers: Team Calendar View</h3>
+        <p>Managers can see a calendar view of all team absences:</p>
+        <ul>
+            <li>Switch to <strong>Calendar View</strong></li>
+            <li>See colour-coded leave for all team members</li>
+            <li>Identify potential coverage issues</li>
+            <li>Export to PDF or print for office display</li>
+        </ul>
+        
+        <h3>For Admins: Managing Leave Entitlements</h3>
+        <p>Administrators can adjust leave entitlements:</p>
+        <div class="step-list">
+            <ol>
+                <li>Go to <strong>User Management</strong></li>
+                <li>Select an employee</li>
+                <li>Click <strong>Edit Leave Entitlement</strong></li>
+                <li>Adjust their annual allowance</li>
+                <li>Add any carry-over days from previous year</li>
+                <li>Save changes</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Section 8: Vehicle Maintenance -->
+    <div class="section" id="maintenance">
+        <h2>8. Vehicle Maintenance & Service</h2>
+        
+        <h3>Overview</h3>
+        <p>The Vehicle Maintenance & Service module helps you track and manage all vehicle maintenance activities including MOT, tax, servicing, and safety equipment checks. This replaces the old Excel spreadsheet system.</p>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 17: Maintenance dashboard showing vehicle list with colour-coded status indicators for MOT, Tax, Service due dates]
+        </div>
+        
+        <h3>What Does This Module Track?</h3>
+        <p>For each vehicle, the system monitors:</p>
+        <ul>
+            <li><strong>Tax Due Date:</strong> When vehicle road tax expires</li>
+            <li><strong>MOT Due Date:</strong> When the MOT test is due</li>
+            <li><strong>Service Due:</strong> Mileage-based service intervals</li>
+            <li><strong>Cambelt Replacement:</strong> When cambelt needs replacing</li>
+            <li><strong>First Aid Kit Expiry:</strong> When first aid kit needs renewing</li>
+            <li><strong>Current Mileage:</strong> Automatically updated from vehicle inspections</li>
+        </ul>
+        
+        <h3>Understanding the Colour Coding</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Colour</th>
+                    <th>What It Means</th>
+                    <th>Action Needed</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="background: #f44336; color: white;"><strong>Red</strong></td>
+                    <td>Overdue - past the due date or mileage</td>
+                    <td>Urgent - schedule immediately</td>
+                </tr>
+                <tr>
+                    <td style="background: #ff9800; color: white;"><strong>Amber</strong></td>
+                    <td>Due Soon - within the warning threshold</td>
+                    <td>Plan maintenance soon</td>
+                </tr>
+                <tr>
+                    <td style="background: #4caf50; color: white;"><strong>Green</strong></td>
+                    <td>OK - plenty of time remaining</td>
+                    <td>No action needed</td>
+                </tr>
+                <tr>
+                    <td style="background: #9e9e9e; color: white;"><strong>Grey</strong></td>
+                    <td>Not Set - no due date recorded</td>
+                    <td>Add the date when known</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div class="tip-box">
+            <strong>💡 Tip:</strong> The warning thresholds are configurable. By default, date-based items warn 30 days in advance, and mileage-based items warn 1,000 miles in advance.
+        </div>
+        
+        <h3>Viewing Vehicle Maintenance</h3>
+        <div class="step-list">
+            <ol>
+                <li>Click <strong>Maintenance & Service</strong> on the dashboard</li>
+                <li>You'll see a list of all vehicles with their maintenance status</li>
+                <li>Items needing attention are highlighted in red or amber</li>
+                <li>Click on any vehicle to see full details</li>
+            </ol>
+        </div>
+        
+        <h3>Alert Panels</h3>
+        <p>At the top of the maintenance page, you'll see two alert panels:</p>
+        <ul>
+            <li><strong>Overdue Tasks (Red):</strong> Items that are already overdue and need immediate attention</li>
+            <li><strong>Due Soon (Amber):</strong> Items that will be due within the warning threshold</li>
+        </ul>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 18: Alert panels showing overdue and due soon items with vehicle details]
+        </div>
+        
+        <h3>Updating Maintenance Records</h3>
+        <p>When maintenance is completed, update the system:</p>
+        <div class="step-list">
+            <ol>
+                <li>Find the vehicle in the list</li>
+                <li>Click <strong>Edit</strong></li>
+                <li>Update the relevant date or mileage:
+                    <ul>
+                        <li>Tax renewed? Update the Tax Due Date</li>
+                        <li>MOT completed? Update the MOT Due Date</li>
+                        <li>Service done? Update the Service Due Mileage</li>
+                    </ul>
+                </li>
+                <li><strong>Add a comment</strong> explaining what was done (minimum 10 characters required):
+                    <ul>
+                        <li>"MOT passed on [date], renewed for 12 months"</li>
+                        <li>"Full service completed at 45,000 miles. Cost: £250. Next service due at 55,000 miles"</li>
+                        <li>"Tax renewed online, expires Aug-26"</li>
+                    </ul>
+                </li>
+                <li>Click <strong>Save Changes</strong></li>
+            </ol>
+        </div>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 19: Edit maintenance dialog showing date fields, mileage inputs, and mandatory comment box]
+        </div>
+        
+        <div class="warning-box">
+            <strong>⚠️ Important:</strong> You must add a comment every time you update a maintenance record. This creates an audit trail showing what was done and when.
+        </div>
+        
+        <h3>Automatic Mileage Updates</h3>
+        <p>The system automatically updates vehicle mileage:</p>
+        <ul>
+            <li>When a vehicle inspection is submitted, the current mileage is recorded</li>
+            <li>This mileage is automatically copied to the maintenance system</li>
+            <li>You don't need to manually enter mileage - it happens automatically</li>
+            <li>The "Last Updated" timestamp shows when the mileage was last refreshed</li>
+        </ul>
+        
+        <h3>Viewing Maintenance History</h3>
+        <p>To see all changes made to a vehicle's maintenance records:</p>
+        <div class="step-list">
+            <ol>
+                <li>Click <strong>History</strong> button next to the vehicle</li>
+                <li>You'll see a chronological list of all updates showing:
+                    <ul>
+                        <li>What changed (old value → new value)</li>
+                        <li>Who made the change</li>
+                        <li>When it was changed</li>
+                        <li>The comment explaining why</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 20: Maintenance history dialog showing timeline of changes with dates, users, and comments]
+        </div>
+        
+        <h3>For Admins: Configuring Maintenance Categories</h3>
+        <p>Administrators and managers can customise the maintenance system:</p>
+        <div class="step-list">
+            <ol>
+                <li>Go to <strong>Maintenance & Service</strong></li>
+                <li>Click the <strong>Settings</strong> tab (gear icon)</li>
+                <li>Here you can:
+                    <ul>
+                        <li>Add new maintenance categories (e.g., "Tyre Replacement")</li>
+                        <li>Edit existing categories</li>
+                        <li>Change warning thresholds (e.g., warn 60 days before MOT instead of 30)</li>
+                        <li>Delete unused categories</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+        
+        <div class="tip-box">
+            <strong>💡 Tip:</strong> Changes to warning thresholds take effect immediately and apply to all vehicles.
+        </div>
+        
+        <h3>Sorting and Searching</h3>
+        <p>To find specific vehicles or sort the list:</p>
+        <ul>
+            <li><strong>Search:</strong> Type a registration number in the search box</li>
+            <li><strong>Sort:</strong> Click any column header to sort by that column</li>
+            <li><strong>Filter:</strong> Click the overdue or due soon panels to filter the list</li>
+        </ul>
+    </div>
+
+    <!-- Section 9: User Management -->
+    <div class="section" id="user-management">
+        <h2>9. User Management (Admin)</h2>
+        
+        <div class="warning-box">
+            <strong>⚠️ Admin Only:</strong> This section is only accessible to administrators. Regular users and managers cannot access user management features.
+        </div>
+        
+        <h3>Overview</h3>
+        <p>The User Management section allows administrators to control who has access to the system and what they can do.</p>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 21: User management page showing list of users with roles and status]
+        </div>
+        
+        <h3>Accessing User Management</h3>
+        <div class="step-list">
+            <ol>
+                <li>Click your profile menu in the top right</li>
+                <li>Click <strong>Admin</strong></li>
+                <li>Click <strong>Users</strong></li>
+            </ol>
+        </div>
+        
+        <h3>Creating a New User</h3>
+        <div class="step-list">
+            <ol>
+                <li>Click <strong>Add New User</strong></li>
+                <li>Fill in the user's details:
+                    <ul>
+                        <li><strong>Full Name:</strong> Their complete name</li>
+                        <li><strong>Email Address:</strong> This will be their username</li>
+                        <li><strong>Employee ID:</strong> Company employee number (if applicable)</li>
+                        <li><strong>Role:</strong> Choose from your configured roles (e.g., Employee, Manager, Admin)</li>
+                        <li><strong>Send Welcome Email:</strong> Tick this to automatically email them login instructions</li>
+                    </ul>
+                </li>
+                <li>Click <strong>Create User</strong></li>
+                <li>The user receives an email with instructions to set their password</li>
+            </ol>
+        </div>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 22: Add new user form showing name, email, employee ID, and role dropdown]
+        </div>
+        
+        <h3>Editing User Details</h3>
+        <p>To update a user's information:</p>
+        <div class="step-list">
+            <ol>
+                <li>Find the user in the list</li>
+                <li>Click <strong>Edit</strong></li>
+                <li>Update any details as needed</li>
+                <li>Click <strong>Save Changes</strong></li>
+            </ol>
+        </div>
+        
+        <h3>Changing User Roles</h3>
+        <p>To change what a user can access:</p>
+        <div class="step-list">
+            <ol>
+                <li>Edit the user</li>
+                <li>Select a different role from the dropdown</li>
+                <li>Save changes</li>
+                <li>The user's permissions update immediately</li>
+            </ol>
+        </div>
+        
+        <div class="tip-box">
+            <strong>💡 Tip:</strong> Changes to roles take effect the next time the user logs in or refreshes their browser.
+        </div>
+        
+        <h3>Resetting User Passwords</h3>
+        <p>If a user forgets their password:</p>
+        <div class="step-list">
+            <ol>
+                <li>Find the user in the list</li>
+                <li>Click <strong>Reset Password</strong></li>
+                <li>The user receives an email with a password reset link</li>
+                <li>They click the link and create a new password</li>
+            </ol>
+        </div>
+        
+        <h3>Deactivating Users</h3>
+        <p>When someone leaves the company:</p>
+        <div class="step-list">
+            <ol>
+                <li>Find the user in the list</li>
+                <li>Click <strong>Deactivate</strong></li>
+                <li>Confirm the action</li>
+                <li>The user can no longer log in</li>
+                <li>Their historical data (timesheets, inspections) is preserved</li>
+            </ol>
+        </div>
+        
+        <div class="warning-box">
+            <strong>⚠️ Important:</strong> Deactivated users cannot be reactivated. If someone returns to the company, you'll need to create a new account for them.
+        </div>
+        
+        <h3>Managing Roles and Permissions</h3>
+        <p>Administrators can create and customise roles:</p>
+        <div class="step-list">
+            <ol>
+                <li>Go to <strong>Admin</strong> → <strong>Roles</strong></li>
+                <li>You'll see a list of existing roles</li>
+                <li>Click <strong>Add New Role</strong> to create a custom role</li>
+                <li>Set permissions for each module:
+                    <ul>
+                        <li>Timesheets - can they create and view timesheets?</li>
+                        <li>Inspections - can they access vehicle inspections?</li>
+                        <li>RAMS - can they view RAMS documents?</li>
+                        <li>Absence - can they request leave?</li>
+                        <li>Maintenance - can they view maintenance schedules?</li>
+                        <li>Reports - can they generate reports?</li>
+                    </ul>
+                </li>
+                <li>Set timesheet type (if applicable) - which timesheet format should users with this role use?</li>
+                <li>Save the role</li>
+            </ol>
+        </div>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 23: Role management showing permissions checkboxes for different modules]
+        </div>
+        
+        <h3>Viewing User Activity</h3>
+        <p>To see what a user has been doing:</p>
+        <ul>
+            <li>Open the user's profile</li>
+            <li>Click the <strong>Activity</strong> tab</li>
+            <li>View their recent actions including:
+                <ul>
+                    <li>Timesheets submitted</li>
+                    <li>Inspections completed</li>
+                    <li>RAMS documents accessed</li>
+                    <li>Leave requests made</li>
+                </ul>
+            </li>
+        </ul>
+        
+        <h3>Managing Vehicles</h3>
+        <p>Administrators can add and manage vehicles:</p>
+        <div class="step-list">
+            <ol>
+                <li>Go to <strong>Admin</strong> → <strong>Vehicles</strong></li>
+                <li>Click <strong>Add Vehicle</strong></li>
+                <li>Enter vehicle details:
+                    <ul>
+                        <li>Registration number</li>
+                        <li>Make and model</li>
+                        <li>Year</li>
+                        <li>Category (van, truck, car, etc.)</li>
+                        <li>Current mileage</li>
+                    </ul>
+                </li>
+                <li>Click <strong>Save</strong></li>
+                <li>The vehicle is now available in inspections and maintenance</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Section 10: Reports -->
+    <div class="section" id="reports">
+        <h2>10. Reports and Exports</h2>
+        
+        <h3>Overview</h3>
+        <p>The Reports section allows managers and admins to generate various reports and export data to Excel or PDF format.</p>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 24: Reports page showing different report types available]
+        </div>
+        
+        <h3>Accessing Reports</h3>
+        <div class="step-list">
+            <ol>
+                <li>Click your profile menu</li>
+                <li>Click <strong>Reports</strong></li>
+                <li>Or from the dashboard, some modules have "View Reports" links</li>
+            </ol>
+        </div>
+        
+        <h3>Available Reports</h3>
+        
+        <h4>1. Timesheet Summary Report</h4>
+        <p>Shows all timesheet data for a selected period:</p>
+        <div class="step-list">
+            <ol>
+                <li>Select date range (from and to)</li>
+                <li>Choose specific employees or "All Employees"</li>
+                <li>Click <strong>Generate Report</strong></li>
+                <li>The report shows:
+                    <ul>
+                        <li>Total hours worked per employee</li>
+                        <li>Hours broken down by week</li>
+                        <li>Bank holiday hours</li>
+                        <li>Night shift hours</li>
+                        <li>Job numbers worked</li>
+                    </ul>
+                </li>
+                <li>Export to Excel or PDF</li>
+            </ol>
+        </div>
+        
+        <h4>2. Vehicle Inspection Report</h4>
+        <p>Summarises vehicle inspection data:</p>
+        <ul>
+            <li>Inspections completed per vehicle</li>
+            <li>Defects found and their status</li>
+            <li>Vehicles with outstanding defects</li>
+            <li>Compliance rate (% of inspections completed on time)</li>
+        </ul>
+        
+        <h4>3. Absence Report</h4>
+        <p>Shows leave taken and balances:</p>
+        <ul>
+            <li>Days taken per employee</li>
+            <li>Days remaining</li>
+            <li>Upcoming approved leave</li>
+            <li>Leave patterns and trends</li>
+        </ul>
+        
+        <h4>4. Maintenance Schedule Report</h4>
+        <p>Lists all vehicle maintenance items:</p>
+        <ul>
+            <li>Upcoming MOTs and services</li>
+            <li>Overdue maintenance</li>
+            <li>Maintenance costs (if recorded)</li>
+            <li>Vehicle utilisation based on mileage</li>
+        </ul>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 25: Sample report showing timesheet data in table format with totals]
+        </div>
+        
+        <h3>Exporting to Excel</h3>
+        <p>Excel exports are useful for further analysis or sending to external systems:</p>
+        <div class="step-list">
+            <ol>
+                <li>Generate the report you need</li>
+                <li>Click <strong>Export to Excel</strong></li>
+                <li>Choose what to include (summary only, or full details)</li>
+                <li>The file downloads automatically</li>
+                <li>Open in Microsoft Excel, Google Sheets, or similar</li>
+            </ol>
+        </div>
+        
+        <div class="tip-box">
+            <strong>💡 Tip:</strong> Excel exports include formulas, so you can add your own calculations and pivot tables.
+        </div>
+        
+        <h3>Exporting to PDF</h3>
+        <p>PDF exports are ideal for printing or sharing officially:</p>
+        <div class="step-list">
+            <ol>
+                <li>Generate the report</li>
+                <li>Click <strong>Export to PDF</strong></li>
+                <li>The PDF is formatted for A4 paper</li>
+                <li>Includes company branding and page numbers</li>
+                <li>Print directly or save to your computer</li>
+            </ol>
+        </div>
+        
+        <h3>Scheduling Automatic Reports</h3>
+        <p>Administrators can set up automatic reports:</p>
+        <div class="step-list">
+            <ol>
+                <li>Go to <strong>Admin</strong> → <strong>Scheduled Reports</strong></li>
+                <li>Click <strong>Add Schedule</strong></li>
+                <li>Choose:
+                    <ul>
+                        <li>Report type</li>
+                        <li>Frequency (daily, weekly, monthly)</li>
+                        <li>Recipients (email addresses)</li>
+                        <li>Format (Excel or PDF)</li>
+                    </ul>
+                </li>
+                <li>Save the schedule</li>
+                <li>Reports are automatically generated and emailed</li>
+            </ol>
+        </div>
+        
+        <div class="tip-box">
+            <strong>💡 Tip:</strong> Set up a weekly timesheet summary report to be emailed to the office every Monday morning for payroll processing.
+        </div>
+    </div>
+
+    <!-- Section 11: Messaging System -->
+    <div class="section" id="messaging">
+        <h2>11. Messaging System</h2>
+        
+        <h3>Overview</h3>
+        <p>The internal messaging system allows you to communicate with colleagues without using email or text messages. All messages are stored within the application.</p>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 26: Messages inbox showing list of conversations]
+        </div>
+        
+        <h3>Accessing Messages</h3>
+        <ul>
+            <li>Click the <strong>Messages</strong> icon (bell) in the top navigation bar</li>
+            <li>A number badge shows how many unread messages you have</li>
+            <li>Click to open your messages inbox</li>
+        </ul>
+        
+        <h3>Sending a Message</h3>
+        <div class="step-list">
+            <ol>
+                <li>Click <strong>New Message</strong></li>
+                <li>Select recipients:
+                    <ul>
+                        <li>Type names to search</li>
+                        <li>Select multiple recipients if needed</li>
+                        <li>Or select "All Managers" for broadcast messages</li>
+                    </ul>
+                </li>
+                <li>Enter a subject</li>
+                <li>Type your message</li>
+                <li>Click <strong>Send</strong></li>
+            </ol>
+        </div>
+        
+        <div class="screenshot-placeholder">
+            [Screenshot 27: New message compose window with recipient selection, subject, and message body]
+        </div>
+        
+        <h3>Reading Messages</h3>
+        <ul>
+            <li>Unread messages appear in bold</li>
+            <li>Click a message to open and read it</li>
+            <li>Once opened, it's marked as read automatically</li>
+            <li>Reply directly from the message view</li>
+        </ul>
+        
+        <h3>Message Notifications</h3>
+        <p>You're notified of new messages in several ways:</p>
+        <ul>
+            <li>Badge number on the messages icon</li>
+            <li>Toast notification when a new message arrives (if you're logged in)</li>
+            <li>Email notification (if enabled in your profile settings)</li>
+        </ul>
+        
+        <h3>Managing Messages</h3>
+        <ul>
+            <li><strong>Mark as Unread:</strong> If you want to deal with a message later</li>
+            <li><strong>Archive:</strong> Move old messages out of your inbox but keep them searchable</li>
+            <li><strong>Delete:</strong> Permanently remove messages</li>
+        </ul>
+        
+        <div class="tip-box">
+            <strong>💡 Tip:</strong> Use messages for quick questions or updates that don't require formal email. For important matters or external communication, still use regular email.
+        </div>
+        
+        <h3>Searching Messages</h3>
+        <p>To find old messages:</p>
+        <div class="step-list">
+            <ol>
+                <li>Use the search box at the top of the messages page</li>
+                <li>Search by:
+                    <ul>
+                        <li>Sender name</li>
+                        <li>Subject keywords</li>
+                        <li>Message content</li>
+                    </ul>
+                </li>
+                <li>Filter by date range if needed</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Section 12: Common Scenarios -->
+    <div class="section" id="scenarios">
+        <h2>12. Common Scenarios</h2>
+        
+        <p>Here are some typical situations and how to handle them using the system:</p>
+        
+        <div class="scenario">
+            <h4>Scenario 1: Starting a New Week</h4>
+            <p><strong>Situation:</strong> It's Monday morning and you're starting a new working week.</p>
+            <p><strong>What to do:</strong></p>
+            <ol>
+                <li>Log in to the application</li>
+                <li>Go to <strong>Vehicle Inspections</strong></li>
+                <li>Create a new inspection for your vehicle for this week</li>
+                <li>Complete Monday's inspection checklist before starting work</li>
+                <li>If any defects are found, photograph them and report immediately</li>
+            </ol>
+        </div>
+        
+        <div class="scenario">
+            <h4>Scenario 2: Submitting Your Weekly Timesheet</h4>
+            <p><strong>Situation:</strong> It's Sunday evening and you need to submit your timesheet for the week just ended.</p>
+            <p><strong>What to do:</strong></p>
+            <ol>
+                <li>Log in to the application</li>
+                <li>Click <strong>Timesheets</strong> → <strong>New Timesheet</strong></li>
+                <li>Select the Sunday just passed as the week ending date</li>
+                <li>Fill in your hours for each day, along with job numbers</li>
+                <li>Add vehicle registration</li>
+                <li>Review the summary carefully</li>
+                <li>Click <strong>Submit for Approval</strong></li>
+                <li>Check the confirmation modal and submit</li>
+                <li>Your manager will be notified and will approve it</li>
+            </ol>
+        </div>
+        
+        <div class="scenario">
+            <h4>Scenario 3: Booking a Week's Holiday</h4>
+            <p><strong>Situation:</strong> You want to book a week off in August for a family holiday.</p>
+            <p><strong>What to do:</strong></p>
+            <ol>
+                <li>Go to <strong>Absence & Leave</strong></li>
+                <li>Check your available days balance</li>
+                <li>Click <strong>Request Leave</strong></li>
+                <li>Select your start date (first day off) and end date (last day off)</li>
+                <li>The system calculates that it's 5 working days</li>
+                <li>Add a note: "Family holiday"</li>
+                <li>Submit your request</li>
+                <li>Wait for your manager to approve</li>
+                <li>You'll get a notification when it's approved or if there's an issue</li>
+            </ol>
+        </div>
+        
+        <div class="scenario">
+            <h4>Scenario 4: Finding a Tyre Defect During Inspection</h4>
+            <p><strong>Situation:</strong> During your daily vehicle inspection, you notice the front nearside tyre tread is very low.</p>
+            <p><strong>What to do:</strong></p>
+            <ol>
+                <li>In the vehicle inspection form, mark "Tyres - Tread Depth" with a cross (✗)</li>
+                <li>In the defect description, write: "Front nearside tyre tread below 3mm, approaching legal limit"</li>
+                <li>Take a photo of the tyre showing the tread</li>
+                <li>Assess if the vehicle is safe to use for the day (if above legal limit, yes; if below, no)</li>
+                <li>Submit the inspection</li>
+                <li>Inform your manager immediately about the defect</li>
+                <li>The manager will schedule tyre replacement</li>
+            </ol>
+        </div>
+        
+        <div class="scenario">
+            <h4>Scenario 5: Your Manager Rejects Your Timesheet</h4>
+            <p><strong>Situation:</strong> You submitted your timesheet but your manager has rejected it with comments asking for corrections.</p>
+            <p><strong>What to do:</strong></p>
+            <ol>
+                <li>Go to <strong>Timesheets</strong></li>
+                <li>Open the rejected timesheet (shown with red Rejected badge)</li>
+                <li>Read the manager's comments carefully at the top</li>
+                <li>Make the requested corrections</li>
+                <li>For example, if they said "Please add job number for Thursday" - add the job number</li>
+                <li>Once corrected, click <strong>Submit for Approval</strong> again</li>
+                <li>Your manager will review the updated version</li>
+            </ol>
+        </div>
+        
+        <div class="scenario">
+            <h4>Scenario 6: Manager Approving Multiple Timesheets</h4>
+            <p><strong>Situation:</strong> You're a manager and it's Monday morning. You have 10 timesheets to review from last week.</p>
+            <p><strong>What to do:</strong></p>
+            <ol>
+                <li>Go to <strong>Timesheets</strong></li>
+                <li>Click the <strong>Pending</strong> filter to see only submissions awaiting approval</li>
+                <li>Go through each timesheet one by one:
+                    <ul>
+                        <li>Check hours seem reasonable</li>
+                        <li>Verify job numbers are correct</li>
+                        <li>Look for any anomalies (very high hours, missing days, etc.)</li>
+                    </ul>
+                </li>
+                <li>For timesheets that are correct: Click <strong>Approve</strong></li>
+                <li>For any with issues: Click <strong>Reject</strong> and add a clear comment explaining what needs fixing</li>
+                <li>Process approved timesheets for payroll</li>
+            </ol>
+        </div>
+        
+        <div class="scenario">
+            <h4>Scenario 7: Admin Adding a New Employee</h4>
+            <p><strong>Situation:</strong> A new person has joined the company and needs access to the system.</p>
+            <p><strong>What to do:</strong></p>
+            <ol>
+                <li>Go to <strong>Admin</strong> → <strong>Users</strong></li>
+                <li>Click <strong>Add New User</strong></li>
+                <li>Enter their details:
+                    <ul>
+                        <li>Full name: "John Smith"</li>
+                        <li>Email: their work email address</li>
+                        <li>Employee ID: their HR system ID</li>
+                        <li>Role: Select appropriate role (usually "Employee" to start)</li>
+                    </ul>
+                </li>
+                <li>Tick "Send Welcome Email"</li>
+                <li>Save</li>
+                <li>The new user receives an email with instructions to set their password</li>
+                <li>Confirm with them that they've received the email and can log in</li>
+                <li>Show them this user guide</li>
+            </ol>
+        </div>
+        
+        <div class="scenario">
+            <h4>Scenario 8: Updating Vehicle MOT Date</h4>
+            <p><strong>Situation:</strong> A company van has just had its MOT and passed. You need to update the system.</p>
+            <p><strong>What to do:</strong></p>
+            <ol>
+                <li>Go to <strong>Maintenance & Service</strong></li>
+                <li>Find the vehicle in the list</li>
+                <li>Click <strong>Edit</strong></li>
+                <li>Update the "MOT Due Date" to be 12 months from the test date</li>
+                <li>In the comment box, write: "MOT completed at XYZ Garage on [date]. Passed with no advisories. Cost: £54. Next MOT due [date]"</li>
+                <li>If you have the MOT certificate, you could also upload it as an attachment</li>
+                <li>Save changes</li>
+                <li>The vehicle's MOT status changes from red/amber to green</li>
+            </ol>
+        </div>
+        
+        <div class="scenario">
+            <h4>Scenario 9: Generating a Monthly Report</h4>
+            <p><strong>Situation:</strong> End of month and you need to generate a timesheet summary report for the office.</p>
+            <p><strong>What to do:</strong></p>
+            <ol>
+                <li>Go to <strong>Reports</strong></li>
+                <li>Select "Timesheet Summary Report"</li>
+                <li>Set date range:
+                    <ul>
+                        <li>From: 1st of the month</li>
+                        <li>To: Last day of the month</li>
+                    </ul>
+                </li>
+                <li>Select "All Employees" or specific employees if needed</li>
+                <li>Click <strong>Generate Report</strong></li>
+                <li>Review the report on screen</li>
+                <li>Click <strong>Export to Excel</strong></li>
+                <li>Open the file and save it to the network drive or email it to payroll</li>
+            </ol>
+        </div>
+        
+        <div class="scenario">
+            <h4>Scenario 10: Vehicle Shows Red Alert for Overdue Service</h4>
+            <p><strong>Situation:</strong> You notice a vehicle in the maintenance list has a red alert showing the service is overdue.</p>
+            <p><strong>What to do:</strong></p>
+            <ol>
+                <li>Click on the vehicle to see details</li>
+                <li>Check current mileage vs. service due mileage</li>
+                <li>Contact the driver and ask them to book the vehicle in for service</li>
+                <li>Once service is booked, make a note of the appointment</li>
+                <li>After service is completed:
+                    <ul>
+                        <li>Update the "Next Service Due" mileage (current + 10,000 miles, or as recommended by garage)</li>
+                        <li>Update the "Last Service" mileage to current</li>
+                        <li>Add a detailed comment with date, garage name, work done, and cost</li>
+                    </ul>
+                </li>
+                <li>Save changes</li>
+                <li>The red alert disappears and changes to green</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Section 13: Troubleshooting -->
+    <div class="section" id="troubleshooting">
+        <h2>13. Troubleshooting</h2>
+        
+        <h3>Common Issues and Solutions</h3>
+        
+        <h4>I can't log in - "Invalid email or password" error</h4>
+        <p><strong>Solution:</strong></p>
+        <ul>
+            <li>Check you're using the correct email address (the one provided by your administrator)</li>
+            <li>Check caps lock isn't on when typing your password</li>
+            <li>Try clicking "Forgot Password?" to reset your password</li>
+            <li>If still having issues, contact your administrator</li>
+        </ul>
+        
+        <h4>I can't see certain features that others can</h4>
+        <p><strong>Solution:</strong></p>
+        <ul>
+            <li>Your user role might not have permissions for those features</li>
+            <li>Check with your manager or administrator about your role</li>
+            <li>They can update your permissions if needed</li>
+        </ul>
+        
+        <h4>The page won't load or keeps spinning</h4>
+        <p><strong>Solution:</strong></p>
+        <ul>
+            <li>Check your internet connection is working</li>
+            <li>Try refreshing the page (F5 or Ctrl+R)</li>
+            <li>Clear your browser cache and cookies</li>
+            <li>Try a different browser</li>
+            <li>If the problem persists, it might be a system issue - contact your administrator</li>
+        </ul>
+        
+        <h4>My timesheet won't submit - validation errors</h4>
+        <p><strong>Solution:</strong></p>
+        <ul>
+            <li>Read the error messages carefully - they tell you what's wrong</li>
+            <li>Common issues:
+                <ul>
+                    <li>Missing vehicle registration</li>
+                    <li>Times not entered for all days</li>
+                    <li>Finish time before start time (unless night shift)</li>
+                    <li>Missing job numbers</li>
+                </ul>
+            </li>
+            <li>Correct the highlighted issues and try submitting again</li>
+        </ul>
+        
+        <h4>I accidentally submitted the wrong timesheet</h4>
+        <p><strong>Solution:</strong></p>
+        <ul>
+            <li>If it's still in "Pending" status, you cannot edit it</li>
+            <li>Contact your manager immediately and ask them to reject it</li>
+            <li>Explain what needs changing</li>
+            <li>Once rejected, you can edit and resubmit</li>
+        </ul>
+        
+        <h4>The vehicle I need isn't in the dropdown list</h4>
+        <p><strong>Solution:</strong></p>
+        <ul>
+            <li>The vehicle might not have been added to the system yet</li>
+            <li>Contact your administrator and ask them to add it</li>
+            <li>They need to go to Admin → Vehicles → Add Vehicle</li>
+        </ul>
+        
+        <h4>I can't remember which vehicle I used last week</h4>
+        <p><strong>Solution:</strong></p>
+        <ul>
+            <li>Go to Vehicle Inspections and look at your previous inspections</li>
+            <li>The vehicle registration is shown on each inspection</li>
+            <li>Or check your previous timesheets</li>
+        </ul>
+        
+        <h4>My leave request was rejected but I don't know why</h4>
+        <p><strong>Solution:</strong></p>
+        <ul>
+            <li>Open the rejected leave request</li>
+            <li>Your manager should have added comments explaining the reason</li>
+            <li>If there are no comments, speak to your manager directly</li>
+            <li>Once you understand the issue, you can submit a new request for different dates</li>
+        </ul>
+        
+        <h4>I need to access the system on my phone but it's not working well</h4>
+        <p><strong>Solution:</strong></p>
+        <ul>
+            <li>The system is designed primarily for desktop/laptop browsers</li>
+            <li>It does work on mobile, but some features are better on a larger screen</li>
+            <li>For best results:
+                <ul>
+                    <li>Use landscape orientation on your phone</li>
+                    <li>Use Chrome browser on Android or Safari on iPhone</li>
+                    <li>For complex tasks like filling timesheets, try to use a computer if possible</li>
+                </ul>
+            </li>
+        </ul>
+        
+        <h4>Photos aren't uploading to my vehicle inspection</h4>
+        <p><strong>Solution:</strong></p>
+        <ul>
+            <li>Check the photo file size - very large photos might fail</li>
+            <li>Try taking a new photo at a lower resolution</li>
+            <li>Make sure your internet connection is stable</li>
+            <li>Ensure you've given the browser permission to access your camera</li>
+        </ul>
+        
+        <h4>I'm getting a message saying the system can't find my profile</h4>
+        <p><strong>Solution:</strong></p>
+        <ul>
+            <li>This usually means your account isn't fully set up</li>
+            <li>Contact your administrator immediately</li>
+            <li>They may need to recreate your account properly</li>
+        </ul>
+        
+        <h3>Getting Help</h3>
+        <p>If you can't resolve an issue using this guide:</p>
+        <ol>
+            <li><strong>First:</strong> Try the solutions above for your specific issue</li>
+            <li><strong>Then:</strong> Use the internal messaging system to ask a colleague or your manager</li>
+            <li><strong>If still stuck:</strong> Contact your system administrator with:
+                <ul>
+                    <li>A description of the problem</li>
+                    <li>What you were trying to do</li>
+                    <li>Any error messages you saw</li>
+                    <li>Screenshots if possible</li>
+                </ul>
+            </li>
+        </ol>
+        
+        <h3>Browser Compatibility</h3>
+        <p>For best results, use one of these modern browsers:</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Browser</th>
+                    <th>Minimum Version</th>
+                    <th>Recommended</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Google Chrome</td>
+                    <td>Version 90+</td>
+                    <td>✓</td>
+                </tr>
+                <tr>
+                    <td>Microsoft Edge</td>
+                    <td>Version 90+</td>
+                    <td>✓</td>
+                </tr>
+                <tr>
+                    <td>Firefox</td>
+                    <td>Version 88+</td>
+                    <td>✓</td>
+                </tr>
+                <tr>
+                    <td>Safari</td>
+                    <td>Version 14+</td>
+                    <td>✓</td>
+                </tr>
+                <tr>
+                    <td>Internet Explorer</td>
+                    <td>Not supported</td>
+                    <td>❌</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div class="warning-box">
+            <strong>⚠️ Important:</strong> Internet Explorer is not supported. If you're still using it, please switch to a modern browser.
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="section" style="background: #f9f9f9; text-align: center;">
+        <h3>Document Information</h3>
+        <p><strong>Application:</strong> Squires App - Digital Forms Management System</p>
+        <p><strong>Company:</strong> A&V Squires Plant Co. Ltd.</p>
+        <p><strong>Document Version:</strong> 1.0</p>
+        <p><strong>Last Updated:</strong> December 2025</p>
+        <p><strong>URL:</strong> <a href="https://avsworklog.mpdee.uk">https://avsworklog.mpdee.uk</a></p>
+        
+        <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;">
+        
+        <p style="color: #666; font-size: 0.9em;">
+            This guide covers all major features of the Squires App. For technical support or questions,<br>
+            please contact your system administrator.
+        </p>
+        
+        <p style="color: #666; font-size: 0.9em; margin-top: 20px;">
+            © 2025 A&V Squires Plant Co. Ltd. All rights reserved.
+        </p>
+    </div>
+
+</body>
+</html>
