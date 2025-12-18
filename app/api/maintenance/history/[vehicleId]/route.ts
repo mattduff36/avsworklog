@@ -9,7 +9,7 @@ import type { MaintenanceHistoryResponse } from '@/types/maintenance';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { vehicleId: string } }
+  { params }: { params: Promise<{ vehicleId: string }> }
 ) {
   try {
     const supabase = await createClient();
@@ -19,11 +19,14 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
+    // Await params (Next.js 15 requirement)
+    const { vehicleId } = await params;
+    
     // Get vehicle info
     const { data: vehicle, error: vehicleError } = await supabase
       .from('vehicles')
       .select('id, reg_number')
-      .eq('id', params.vehicleId)
+      .eq('id', vehicleId)
       .single();
     
     if (vehicleError || !vehicle) {
@@ -34,7 +37,7 @@ export async function GET(
     const { data: history, error } = await supabase
       .from('maintenance_history')
       .select('*')
-      .eq('vehicle_id', params.vehicleId)
+      .eq('vehicle_id', vehicleId)
       .order('created_at', { ascending: false });
     
     if (error) {
