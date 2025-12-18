@@ -302,11 +302,11 @@ function InspectionsContent() {
       {!isOnline && <OfflineBanner />}
       
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-slate-900 rounded-lg p-6 border border-slate-700">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Vehicle Inspections</h1>
-            <p className="text-slate-600 dark:text-slate-400">
+            <h1 className="text-3xl font-bold text-white mb-2">Vehicle Inspections</h1>
+            <p className="text-slate-400">
               Daily safety check sheets
             </p>
           </div>
@@ -320,14 +320,14 @@ function InspectionsContent() {
         
         {/* Manager: Employee Filter */}
         {isManager && employees.length > 0 && (
-          <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+          <div className="pt-4 border-t border-slate-700">
             <div className="flex items-center gap-3 max-w-md">
-              <Label htmlFor="employee-filter" className="text-slate-900 dark:text-white text-sm flex items-center gap-2 whitespace-nowrap">
+              <Label htmlFor="employee-filter" className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
                 <User className="h-4 w-4" />
                 View inspections for:
               </Label>
               <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                <SelectTrigger id="employee-filter" className="h-10 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white">
+                <SelectTrigger id="employee-filter" className="h-10 bg-slate-900 border-slate-600 text-white">
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
@@ -347,7 +347,7 @@ function InspectionsContent() {
 
       {/* Filters - Only show for managers */}
       {isManager && (
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="bg-slate-900 border-slate-700">
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Status Filter */}
@@ -361,7 +361,7 @@ function InspectionsContent() {
                       variant={statusFilter === filter ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setStatusFilter(filter)}
-                      className={statusFilter === filter ? '' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50'}
+                      className={statusFilter === filter ? '' : 'border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50'}
                     >
                       {filter === 'submitted' && <Clock className="h-3 w-3 mr-1" />}
                       {filter === 'draft' && <FileText className="h-3 w-3 mr-1" />}
@@ -376,7 +376,7 @@ function InspectionsContent() {
                 <Truck className="h-4 w-4 text-slate-400" />
                 <span className="text-sm text-slate-400 mr-2 whitespace-nowrap">Filter by vehicle:</span>
                 <Select value={vehicleFilter} onValueChange={setVehicleFilter}>
-                  <SelectTrigger className="h-9 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white">
+                  <SelectTrigger className="h-9 bg-slate-900 border-slate-600 text-white">
                     <SelectValue placeholder="All vehicles" />
                   </SelectTrigger>
                   <SelectContent>
@@ -398,7 +398,7 @@ function InspectionsContent() {
       {loading ? (
         <div className="grid gap-4">
           {[1, 2, 3].map((i) => (
-            <Card key={i} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+            <Card key={i} className="bg-slate-900 border-slate-700">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3 flex-1">
@@ -418,11 +418,11 @@ function InspectionsContent() {
           ))}
         </div>
       ) : inspections.length === 0 ? (
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="bg-slate-900 border-slate-700">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Clipboard className="h-16 w-16 text-slate-400 mb-4" />
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No inspections yet</h3>
-            <p className="text-slate-600 dark:text-slate-400 mb-4">
+            <h3 className="text-lg font-semibold text-white mb-2">No inspections yet</h3>
+            <p className="text-slate-400 mb-4">
               Create your first vehicle inspection
             </p>
             <Link href="/inspections/new">
@@ -439,7 +439,7 @@ function InspectionsContent() {
             {inspections.slice(0, displayCount).map((inspection) => (
             <Card 
               key={inspection.id} 
-              className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200 cursor-pointer"
+              className="bg-slate-900 border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200 cursor-pointer"
               onClick={() => {
                 // Draft inspections open in the new/edit page, others in view page
                 if (inspection.status === 'draft') {
@@ -454,12 +454,12 @@ function InspectionsContent() {
                   <div className="flex items-center space-x-3">
                     {getStatusIcon(inspection.status)}
                     <div>
-                      <CardTitle className="text-lg text-slate-900 dark:text-white">
+                      <CardTitle className="text-lg text-white">
                         {inspection.vehicles?.reg_number || 'Unknown Vehicle'}
                       </CardTitle>
-                      <CardDescription className="text-slate-600 dark:text-slate-400">
+                      <CardDescription className="text-slate-400">
                         {isManager && (inspection as any).profile?.full_name && (
-                          <span className="font-medium text-slate-900 dark:text-white">
+                          <span className="font-medium text-white">
                             {(inspection as any).profile.full_name}
                             {' • '}
                           </span>
@@ -490,7 +490,7 @@ function InspectionsContent() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between text-sm">
-                  <div className="text-slate-600 dark:text-slate-400">
+                  <div className="text-slate-400">
                     {inspection.submitted_at
                       ? `Submitted ${formatDate(inspection.submitted_at)}`
                       : 'Not yet submitted'}
@@ -507,7 +507,7 @@ function InspectionsContent() {
                       disabled={downloading === inspection.id}
                       variant="outline"
                       size="sm"
-                      className="bg-white dark:bg-slate-900 border-inspection text-inspection hover:bg-inspection hover:text-white transition-all duration-200"
+                      className="bg-slate-900 border-inspection text-inspection hover:bg-inspection hover:text-white transition-all duration-200"
                     >
                       <Download className="h-4 w-4 mr-2" />
                       {downloading === inspection.id ? 'Downloading...' : 'Download PDF'}
@@ -525,7 +525,7 @@ function InspectionsContent() {
               <Button
                 onClick={() => setDisplayCount(prev => prev + 12)}
                 variant="outline"
-                className="w-full max-w-xs bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="w-full max-w-xs bg-slate-900 border-slate-600 text-white hover:bg-slate-800"
               >
                 Show More ({inspections.length - displayCount} remaining)
               </Button>

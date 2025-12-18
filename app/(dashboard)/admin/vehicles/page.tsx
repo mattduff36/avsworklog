@@ -418,13 +418,13 @@ export default function VehiclesAdminPage() {
   return (
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-slate-900 rounded-lg p-6 border border-slate-700">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+            <h1 className="text-3xl font-bold text-white mb-2">
               Vehicle Management
             </h1>
-            <p className="text-slate-600 dark:text-slate-400">
+            <p className="text-slate-400">
               Manage vehicles and vehicle categories
             </p>
           </div>
@@ -433,45 +433,45 @@ export default function VehiclesAdminPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="bg-slate-900 border-slate-700">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Total Vehicles</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.total}</p>
+                <p className="text-sm text-slate-400">Total Vehicles</p>
+                <p className="text-2xl font-bold text-white">{stats.total}</p>
               </div>
               <Truck className="h-8 w-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="bg-slate-900 border-slate-700">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Active</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.active}</p>
+                <p className="text-sm text-slate-400">Active</p>
+                <p className="text-2xl font-bold text-white">{stats.active}</p>
               </div>
               <Truck className="h-8 w-8 text-green-500" />
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="bg-slate-900 border-slate-700">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Inactive</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.inactive}</p>
+                <p className="text-sm text-slate-400">Inactive</p>
+                <p className="text-2xl font-bold text-white">{stats.inactive}</p>
               </div>
               <Truck className="h-8 w-8 text-slate-400" />
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="bg-slate-900 border-slate-700">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Categories</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.categories}</p>
+                <p className="text-sm text-slate-400">Categories</p>
+                <p className="text-2xl font-bold text-white">{stats.categories}</p>
               </div>
               <Tag className="h-8 w-8 text-amber-500" />
             </div>
@@ -491,12 +491,12 @@ export default function VehiclesAdminPage() {
 
         {/* Vehicles Tab */}
         <TabsContent value="vehicles">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="bg-slate-900 border-slate-700">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-slate-900 dark:text-white">All Vehicles</CardTitle>
-                  <CardDescription className="text-slate-600 dark:text-slate-400">
+                  <CardTitle className="text-white">All Vehicles</CardTitle>
+                  <CardDescription className="text-slate-400">
                     View and manage fleet vehicles
                   </CardDescription>
                 </div>
@@ -532,26 +532,26 @@ export default function VehiclesAdminPage() {
                     <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                   </div>
                 ) : filteredVehicles.length === 0 ? (
-                  <div className="text-center py-8 text-slate-600 dark:text-slate-400">
+                  <div className="text-center py-8 text-slate-400">
                     {searchQuery ? 'No vehicles found matching your search.' : 'No vehicles yet.'}
                   </div>
                 ) : (
-                  <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                  <div className="border border-slate-700 rounded-lg overflow-hidden">
                     <Table>
                       <TableHeader>
-                        <TableRow className="border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/50">
-                          <TableHead className="text-slate-700 dark:text-slate-300">
+                        <TableRow className="border-slate-700 hover:bg-slate-800/50">
+                          <TableHead className="text-slate-300">
                             Registration
                           </TableHead>
-                          <TableHead className="text-slate-700 dark:text-slate-300">Category</TableHead>
-                          <TableHead className="text-slate-700 dark:text-slate-300">Status</TableHead>
-                          <TableHead className="text-slate-700 dark:text-slate-300">
+                          <TableHead className="text-slate-300">Category</TableHead>
+                          <TableHead className="text-slate-300">Status</TableHead>
+                          <TableHead className="text-slate-300">
                             Last Inspector
                           </TableHead>
-                          <TableHead className="text-slate-700 dark:text-slate-300">
+                          <TableHead className="text-slate-300">
                             Last Inspection
                           </TableHead>
-                          <TableHead className="text-right text-slate-700 dark:text-slate-300">
+                          <TableHead className="text-right text-slate-300">
                             Actions
                           </TableHead>
                         </TableRow>
@@ -560,15 +560,15 @@ export default function VehiclesAdminPage() {
                         {filteredVehicles.map((vehicle) => (
                           <TableRow
                             key={vehicle.id}
-                            className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                            className="border-slate-700 hover:bg-slate-800/50"
                           >
-                            <TableCell className="font-medium text-slate-900 dark:text-white">
+                            <TableCell className="font-medium text-white">
                               <div className="flex items-center gap-2">
                                 <Truck className="h-4 w-4 text-slate-400" />
                                 {vehicle.reg_number}
                               </div>
                             </TableCell>
-                            <TableCell className="text-slate-700 dark:text-slate-300">
+                            <TableCell className="text-slate-300">
                               {vehicle.vehicle_categories?.name || (
                                 <span className="text-slate-400">Not set</span>
                               )}
@@ -580,7 +580,7 @@ export default function VehiclesAdminPage() {
                                 {vehicle.status}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-slate-700 dark:text-slate-300">
+                            <TableCell className="text-slate-300">
                               {vehicle.last_inspector ? (
                                 <div className="flex items-center gap-2">
                                   <User className="h-3 w-3 text-slate-400" />
@@ -590,7 +590,7 @@ export default function VehiclesAdminPage() {
                                 <span className="text-slate-400">No inspections</span>
                               )}
                             </TableCell>
-                            <TableCell className="text-slate-700 dark:text-slate-300">
+                            <TableCell className="text-slate-300">
                               {vehicle.last_inspection_date ? (
                                 <div className="flex items-center gap-2 text-sm">
                                   <Calendar className="h-3 w-3 text-slate-400" />
@@ -635,14 +635,14 @@ export default function VehiclesAdminPage() {
 
         {/* Categories Tab */}
         <TabsContent value="categories">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="bg-slate-900 border-slate-700">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-slate-900 dark:text-white">
+                  <CardTitle className="text-white">
                     Vehicle Categories
                   </CardTitle>
-                  <CardDescription className="text-slate-600 dark:text-slate-400">
+                  <CardDescription className="text-slate-400">
                     Manage vehicle types and categories
                   </CardDescription>
                 </div>
@@ -661,22 +661,22 @@ export default function VehiclesAdminPage() {
             </CardHeader>
             <CardContent>
               {categories.length === 0 ? (
-                <div className="text-center py-8 text-slate-600 dark:text-slate-400">
+                <div className="text-center py-8 text-slate-400">
                   No categories yet. Add one to get started.
                 </div>
               ) : (
-                <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                <div className="border border-slate-700 rounded-lg overflow-hidden">
                   <Table>
                     <TableHeader>
-                      <TableRow className="border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/50">
-                        <TableHead className="text-slate-700 dark:text-slate-300">Name</TableHead>
-                        <TableHead className="text-slate-700 dark:text-slate-300">
+                      <TableRow className="border-slate-700 hover:bg-slate-800/50">
+                        <TableHead className="text-slate-300">Name</TableHead>
+                        <TableHead className="text-slate-300">
                           Description
                         </TableHead>
-                        <TableHead className="text-slate-700 dark:text-slate-300">
+                        <TableHead className="text-slate-300">
                           Vehicles
                         </TableHead>
-                        <TableHead className="text-right text-slate-700 dark:text-slate-300">
+                        <TableHead className="text-right text-slate-300">
                           Actions
                         </TableHead>
                       </TableRow>
@@ -689,20 +689,20 @@ export default function VehiclesAdminPage() {
                         return (
                           <TableRow
                             key={category.id}
-                            className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                            className="border-slate-700 hover:bg-slate-800/50"
                           >
-                            <TableCell className="font-medium text-slate-900 dark:text-white">
+                            <TableCell className="font-medium text-white">
                               <div className="flex items-center gap-2">
                                 <Tag className="h-4 w-4 text-slate-400" />
                                 {category.name}
                               </div>
                             </TableCell>
-                            <TableCell className="text-slate-700 dark:text-slate-300">
+                            <TableCell className="text-slate-300">
                               {category.description || (
                                 <span className="text-slate-400">No description</span>
                               )}
                             </TableCell>
-                            <TableCell className="text-slate-700 dark:text-slate-300">
+                            <TableCell className="text-slate-300">
                               <Badge variant="outline">{vehicleCount}</Badge>
                             </TableCell>
                             <TableCell className="text-right">
@@ -745,9 +745,9 @@ export default function VehiclesAdminPage() {
 
         {/* Maintenance Log Tab */}
         <TabsContent value="maintenance-demo">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="bg-slate-900 border-slate-700">
             <CardHeader>
-              <CardTitle className="text-slate-900 dark:text-white">Maintenance Log Demo</CardTitle>
+              <CardTitle className="text-white">Maintenance Log Demo</CardTitle>
               <CardDescription>This is a preview/demo for the upcoming vehicle maintenance module.</CardDescription>
             </CardHeader>
             <CardContent>

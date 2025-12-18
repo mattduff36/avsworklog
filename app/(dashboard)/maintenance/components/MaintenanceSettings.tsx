@@ -58,14 +58,14 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
   return (
     <div className="space-y-6">
       {/* Header */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="bg-slate-900 border-slate-700">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-slate-900 dark:text-white">
+              <CardTitle className="text-white">
                 Maintenance Categories
               </CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400">
+              <CardDescription className="text-slate-400">
                 Configure maintenance types and alert thresholds
               </CardDescription>
             </div>
@@ -82,20 +82,20 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
         
         <CardContent>
           {categories.length === 0 ? (
-            <div className="text-center py-8 text-slate-600 dark:text-slate-400">
+            <div className="text-center py-8 text-slate-400">
               No categories configured yet.
             </div>
           ) : (
-            <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+            <div className="border border-slate-700 rounded-lg overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/50">
-                    <TableHead className="text-slate-700 dark:text-slate-300">Name</TableHead>
-                    <TableHead className="text-slate-700 dark:text-slate-300">Type</TableHead>
-                    <TableHead className="text-slate-700 dark:text-slate-300">Alert Threshold</TableHead>
-                    <TableHead className="text-slate-700 dark:text-slate-300">Status</TableHead>
-                    <TableHead className="text-slate-700 dark:text-slate-300">Description</TableHead>
-                    <TableHead className="text-right text-slate-700 dark:text-slate-300">Actions</TableHead>
+                  <TableRow className="border-slate-700 hover:bg-slate-800/50">
+                    <TableHead className="text-slate-300">Name</TableHead>
+                    <TableHead className="text-slate-300">Type</TableHead>
+                    <TableHead className="text-slate-300">Alert Threshold</TableHead>
+                    <TableHead className="text-slate-300">Status</TableHead>
+                    <TableHead className="text-slate-300">Description</TableHead>
+                    <TableHead className="text-right text-slate-300">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -104,9 +104,9 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                     .map((category) => (
                       <TableRow
                         key={category.id}
-                        className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                        className="border-slate-700 hover:bg-slate-800/50"
                       >
-                        <TableCell className="font-medium text-slate-900 dark:text-white">
+                        <TableCell className="font-medium text-white">
                           {category.name}
                         </TableCell>
                         
@@ -116,7 +116,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                           </Badge>
                         </TableCell>
                         
-                        <TableCell className="text-slate-700 dark:text-slate-300">
+                        <TableCell className="text-slate-300">
                           {category.type === 'date' 
                             ? `${category.alert_threshold_days} days`
                             : `${category.alert_threshold_miles?.toLocaleString()} miles`
@@ -132,7 +132,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                           </Badge>
                         </TableCell>
                         
-                        <TableCell className="text-slate-700 dark:text-slate-300 text-sm max-w-md truncate">
+                        <TableCell className="text-slate-300 text-sm max-w-md truncate">
                           {category.description || '-'}
                         </TableCell>
                         

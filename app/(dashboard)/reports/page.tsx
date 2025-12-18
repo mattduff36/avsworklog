@@ -336,41 +336,41 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Reports</h1>
-        <p className="text-slate-600 dark:text-slate-400">
+      <div className="bg-slate-900 rounded-lg p-6 border border-slate-700">
+        <h1 className="text-3xl font-bold text-white mb-2">Reports</h1>
+        <p className="text-slate-400">
           Generate and export reports for your business operations
         </p>
       </div>
 
       {/* Date Range - Clean style */}
-      <Card className="bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700">
-        <CardHeader className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50">
-          <CardTitle className="text-slate-900 dark:text-white flex items-center gap-2">
+      <Card className="bg-slate-50 dark:bg-slate-800/50 border-slate-700">
+        <CardHeader className="border-b border-slate-700 bg-slate-900/50">
+          <CardTitle className="text-white flex items-center gap-2">
             <Calendar className="h-5 w-5" style={{ color: '#F1D64A' }} />
             Report Date Range
           </CardTitle>
-          <CardDescription className="text-slate-600 dark:text-slate-400">
+          <CardDescription className="text-slate-400">
             Select the date range for generating reports (default: last week)
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label className="text-slate-700 dark:text-slate-300 font-medium">Date From</Label>
+              <Label className="text-slate-300 font-medium">Date From</Label>
               <Input 
                 type="date" 
-                className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white" 
+                className="bg-slate-900 border-slate-600 text-white" 
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
               />
             </div>
             
             <div className="space-y-2">
-              <Label className="text-slate-700 dark:text-slate-300 font-medium">Date To</Label>
+              <Label className="text-slate-300 font-medium">Date To</Label>
               <Input 
                 type="date" 
-                className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white"
+                className="bg-slate-900 border-slate-600 text-white"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
               />
@@ -382,7 +382,7 @@ export default function ReportsPage() {
               variant="outline"
               size="sm"
               onClick={setLastWeek}
-              className="text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="text-slate-300 border-slate-600 hover:bg-slate-800"
             >
               Last Week
             </Button>
@@ -390,7 +390,7 @@ export default function ReportsPage() {
               variant="outline"
               size="sm"
               onClick={setLastMonth}
-              className="text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="text-slate-300 border-slate-600 hover:bg-slate-800"
             >
               Last Month
             </Button>
@@ -441,14 +441,14 @@ export default function ReportsPage() {
 
         <TabsContent value="timesheets" className="space-y-4">
           <div className="grid gap-4">
-            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-timesheet/50 transition-all duration-200">
+            <Card className="bg-slate-900 border-slate-700 hover:shadow-lg hover:border-timesheet/50 transition-all duration-200">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                    <h3 className="text-lg font-semibold text-white mb-2">
                       Weekly Timesheet Summary
                     </h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                    <p className="text-sm text-slate-400">
                       Export timesheet summary with daily breakdown and totals
                     </p>
                   </div>
@@ -471,14 +471,14 @@ export default function ReportsPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-timesheet/50 transition-all duration-200">
+            <Card className="bg-slate-900 border-slate-700 hover:shadow-lg hover:border-timesheet/50 transition-all duration-200">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                    <h3 className="text-lg font-semibold text-white mb-2">
                       Payroll Export
                     </h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                    <p className="text-sm text-slate-400">
                       Export approved hours for payroll processing
                     </p>
                   </div>
@@ -505,14 +505,14 @@ export default function ReportsPage() {
 
         <TabsContent value="inspections" className="space-y-4">
           <div className="grid gap-4">
-            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200">
+            <Card className="bg-slate-900 border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                    <h3 className="text-lg font-semibold text-white mb-2">
                       Compliance Summary
                     </h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                    <p className="text-sm text-slate-400">
                       Vehicle safety compliance with statistics and trends
                     </p>
                   </div>
@@ -535,14 +535,14 @@ export default function ReportsPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200">
+            <Card className="bg-slate-900 border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                    <h3 className="text-lg font-semibold text-white mb-2">
                       Defects Log
                     </h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                    <p className="text-sm text-slate-400">
                       All failed items requiring immediate attention
                     </p>
                   </div>
@@ -565,15 +565,15 @@ export default function ReportsPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200">
+            <Card className="bg-slate-900 border-slate-700 hover:shadow-lg hover:border-inspection/50 transition-all duration-200">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
                       <FileArchive className="h-5 w-5" />
                       Bulk Inspection PDFs
                     </h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+                    <p className="text-sm text-slate-400 mb-3">
                       Download all inspection reports as individual PDFs (merged or zipped)
                     </p>
                     {bulkProgress.isDownloading && (
@@ -614,13 +614,13 @@ export default function ReportsPage() {
         </TabsContent>
 
         <TabsContent value="future" className="space-y-4">
-          <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700">
+          <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-700">
             <CardContent className="py-12 text-center">
               <Package className="h-16 w-16 mx-auto mb-4 text-slate-400" />
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+              <h3 className="text-lg font-semibold text-white mb-2">
                 More Reports Coming Soon
               </h3>
-              <p className="text-slate-600 dark:text-slate-400">
+              <p className="text-slate-400">
                 Additional report types will be added here as new features are developed
               </p>
             </CardContent>

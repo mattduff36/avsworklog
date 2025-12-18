@@ -283,12 +283,12 @@ export function RoleManagement() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="bg-slate-900 border-slate-700">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-slate-900 dark:text-white">Job Roles & Permissions</CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400">
+              <CardTitle className="text-white">Job Roles & Permissions</CardTitle>
+              <CardDescription className="text-slate-400">
                 Manage job roles and configure module access permissions
               </CardDescription>
             </div>
@@ -306,26 +306,26 @@ export function RoleManagement() {
         </CardHeader>
         <CardContent>
           {roles.length === 0 ? (
-            <div className="text-center py-8 text-slate-600 dark:text-slate-400">
+            <div className="text-center py-8 text-slate-400">
               No roles configured yet.
             </div>
           ) : (
-            <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+            <div className="border border-slate-700 rounded-lg overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/50">
-                    <TableHead className="text-slate-700 dark:text-slate-300">Role Name</TableHead>
-                    <TableHead className="text-slate-700 dark:text-slate-300">Description</TableHead>
-                    <TableHead className="text-slate-700 dark:text-slate-300">Type</TableHead>
-                    <TableHead className="text-slate-700 dark:text-slate-300">Users</TableHead>
-                    <TableHead className="text-slate-700 dark:text-slate-300">Modules</TableHead>
-                    <TableHead className="text-right text-slate-700 dark:text-slate-300">Actions</TableHead>
+                  <TableRow className="border-slate-700 hover:bg-slate-800/50">
+                    <TableHead className="text-slate-300">Role Name</TableHead>
+                    <TableHead className="text-slate-300">Description</TableHead>
+                    <TableHead className="text-slate-300">Type</TableHead>
+                    <TableHead className="text-slate-300">Users</TableHead>
+                    <TableHead className="text-slate-300">Modules</TableHead>
+                    <TableHead className="text-right text-slate-300">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {roles.map((role) => (
-                    <TableRow key={role.id} className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                      <TableCell className="font-medium text-slate-900 dark:text-white">
+                    <TableRow key={role.id} className="border-slate-700 hover:bg-slate-800/50">
+                      <TableCell className="font-medium text-white">
                         <div className="flex items-center gap-2">
                           {role.is_super_admin && <Shield className="h-4 w-4 text-purple-500" />}
                           {role.display_name}
@@ -336,7 +336,7 @@ export function RoleManagement() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-slate-700 dark:text-slate-300 max-w-xs truncate">
+                      <TableCell className="text-slate-300 max-w-xs truncate">
                         {role.description || '-'}
                       </TableCell>
                       <TableCell>
@@ -348,13 +348,13 @@ export function RoleManagement() {
                           <Badge variant="secondary">Employee</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-slate-700 dark:text-slate-300">
+                      <TableCell className="text-slate-300">
                         <div className="flex items-center gap-1">
                           <Users className="h-3 w-3 text-slate-400" />
                           {role.user_count}
                         </div>
                       </TableCell>
-                      <TableCell className="text-slate-700 dark:text-slate-300">
+                      <TableCell className="text-slate-300">
                         {role.is_super_admin || role.is_manager_admin ? (
                           <Badge variant="outline" className="text-green-500 border-green-500">
                             All Access

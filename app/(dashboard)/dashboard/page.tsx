@@ -305,11 +305,11 @@ export default function DashboardPage() {
       {!isOnline && <OfflineBanner />}
       
       {/* Welcome Section */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+      <div className="bg-slate-900 rounded-lg p-6 border border-slate-700">
+        <h1 className="text-3xl font-bold text-white">
           Welcome back, {profile?.full_name}
         </h1>
-        <p className="text-slate-600 dark:text-slate-400 mt-1">
+        <p className="text-slate-400 mt-1">
           {isSuperAdmin ? 'SuperAdmin' : (profile?.role?.display_name || 'No Role Assigned')}
         </p>
       </div>
@@ -407,7 +407,7 @@ export default function DashboardPage() {
       {/* Manager/Admin Quick Access - Smaller Tiles */}
       {effectiveIsManager && (
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+          <h3 className="text-lg font-semibold text-white mb-3">
             Management Tools
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
@@ -479,9 +479,9 @@ export default function DashboardPage() {
 
       {/* Pending Approvals Summary - Manager/Admin Only */}
       {effectiveIsManager && (
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="bg-slate-900 border-slate-700">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between text-slate-900 dark:text-white">
+            <CardTitle className="flex items-center justify-between text-white">
               <span>Pending Approvals</span>
               <Link href="/approvals">
                 <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-700/50">
@@ -509,7 +509,7 @@ export default function DashboardPage() {
                       href={approval.href}
                       className="block group"
                     >
-                      <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-800/30 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-all duration-200 border border-slate-200 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600">
+                      <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-800/30 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-all duration-200 border border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600">
                         <div className="flex items-center gap-4">
                           <div 
                             className="flex items-center justify-center w-10 h-10 rounded-lg"
@@ -521,10 +521,10 @@ export default function DashboardPage() {
                             />
                           </div>
                           <div>
-                            <p className="font-medium text-slate-900 dark:text-white group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
+                            <p className="font-medium text-white group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
                               {approval.label}
                             </p>
-                            <p className="text-sm text-slate-600 dark:text-slate-400">
+                            <p className="text-sm text-slate-400">
                               {approval.count === 0 ? 'No' : approval.count} pending {approval.count === 1 ? 'request' : 'requests'}
                             </p>
                           </div>
@@ -562,9 +562,9 @@ export default function DashboardPage() {
 
       {/* Manager Actions Section */}
       {effectiveIsManager && (
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="bg-slate-900 border-slate-700">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between text-slate-900 dark:text-white">
+            <CardTitle className="flex items-center justify-between text-white">
               <span>Manager Actions</span>
               <Link href="/actions">
                 <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-700/50">
@@ -602,21 +602,21 @@ export default function DashboardPage() {
                   return (
                     <div
                       key={action.id}
-                      className="p-4 rounded-lg bg-slate-50 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-700/50"
+                      className="p-4 rounded-lg bg-slate-50 dark:bg-slate-700/30 border border-slate-700/50"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                            <h3 className="font-semibold text-slate-900 dark:text-white">{action.title}</h3>
+                            <h3 className="font-semibold text-white">{action.title}</h3>
                             <Badge variant="outline" className={getPriorityColor(action.priority)}>
                               {action.priority.toUpperCase()}
                             </Badge>
                           </div>
                           {action.description && (
-                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{action.description}</p>
+                            <p className="text-sm text-slate-400 mb-2">{action.description}</p>
                           )}
-                          <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
+                          <div className="flex flex-wrap gap-4 text-sm text-slate-400">
                             {action.vehicle_inspections && (
                               <span>
                                 Vehicle: {action.vehicle_inspections.vehicles?.reg_number || 'N/A'}

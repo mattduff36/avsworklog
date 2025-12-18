@@ -115,12 +115,12 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
       />
 
       {/* Panel */}
-      <div className="fixed top-16 right-4 z-50 w-[400px] max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 rounded-lg shadow-2xl border border-slate-200 dark:border-slate-700 animate-in slide-in-from-top-2 duration-200">
+      <div className="fixed top-16 right-4 z-50 w-[400px] max-w-[calc(100vw-2rem)] bg-slate-900 rounded-lg shadow-2xl border border-slate-700 animate-in slide-in-from-top-2 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between p-4 border-b border-slate-700">
           <div className="flex items-center gap-2">
-            <Bell className="h-5 w-5 text-slate-700 dark:text-slate-300" />
-            <h3 className="font-semibold text-slate-900 dark:text-white">Notifications</h3>
+            <Bell className="h-5 w-5 text-slate-300" />
+            <h3 className="font-semibold text-white">Notifications</h3>
           </div>
           <Button
             variant="ghost"
@@ -140,7 +140,7 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
         ) : notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
             <Bell className="h-12 w-12 text-slate-300 dark:text-slate-600 mb-3" />
-            <p className="text-sm text-slate-600 dark:text-slate-400">No notifications</p>
+            <p className="text-sm text-slate-400">No notifications</p>
             <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
               You&apos;re all caught up!
             </p>
@@ -152,7 +152,7 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
                 {notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    className="p-4 hover:bg-slate-800/50 transition-colors cursor-pointer"
                     onClick={() => onNotificationClick?.(notification)}
                   >
                     <div className="flex items-start gap-3">
@@ -166,13 +166,13 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-1">
-                          <h4 className="font-medium text-sm text-slate-900 dark:text-white leading-tight">
+                          <h4 className="font-medium text-sm text-white leading-tight">
                             {notification.subject}
                           </h4>
                           {getStatusBadge(notification.status)}
                         </div>
 
-                        <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">
+                        <p className="text-xs text-slate-400 mb-2">
                           {truncateText(notification.body)}
                         </p>
 
@@ -189,7 +189,7 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
             </ScrollArea>
 
             {/* Footer */}
-            <div className="p-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 rounded-b-lg">
+            <div className="p-3 border-t border-slate-700 bg-slate-50 dark:bg-slate-800/50 rounded-b-lg">
               <div className="flex items-center justify-between gap-2">
                 <Link href="/notifications" onClick={onClose}>
                   <Button variant="ghost" size="sm" className="text-xs">

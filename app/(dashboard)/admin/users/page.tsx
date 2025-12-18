@@ -437,11 +437,11 @@ export default function UsersAdminPage() {
   return (
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-slate-900 rounded-lg p-6 border border-slate-700">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">User Management</h1>
-            <p className="text-slate-600 dark:text-slate-400">
+            <h1 className="text-3xl font-bold text-white mb-2">User Management</h1>
+            <p className="text-slate-400">
               Manage users, roles, and permissions
             </p>
           </div>
@@ -472,7 +472,7 @@ export default function UsersAdminPage() {
           {/* Stats Cards - Now Filter Buttons */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card 
-          className={`bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-lg transition-all ${
+          className={`bg-slate-900 border-slate-700 cursor-pointer hover:shadow-lg transition-all ${
             roleFilter === 'all' ? 'border-2 border-yellow-500' : ''
           }`}
           onClick={() => setRoleFilter('all')}
@@ -480,15 +480,15 @@ export default function UsersAdminPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">All Users</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.total}</p>
+                <p className="text-sm text-slate-400">All Users</p>
+                <p className="text-2xl font-bold text-white">{stats.total}</p>
               </div>
               <User className="h-8 w-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
         <Card 
-          className={`bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-lg transition-all ${
+          className={`bg-slate-900 border-slate-700 cursor-pointer hover:shadow-lg transition-all ${
             roleFilter === 'admin' ? 'border-2 border-yellow-500' : ''
           }`}
           onClick={() => setRoleFilter('admin')}
@@ -496,15 +496,15 @@ export default function UsersAdminPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Admins</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.admins}</p>
+                <p className="text-sm text-slate-400">Admins</p>
+                <p className="text-2xl font-bold text-white">{stats.admins}</p>
               </div>
               <Shield className="h-8 w-8 text-red-500" />
             </div>
           </CardContent>
         </Card>
         <Card 
-          className={`bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-lg transition-all ${
+          className={`bg-slate-900 border-slate-700 cursor-pointer hover:shadow-lg transition-all ${
             roleFilter === 'manager' ? 'border-2 border-yellow-500' : ''
           }`}
           onClick={() => setRoleFilter('manager')}
@@ -512,15 +512,15 @@ export default function UsersAdminPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Managers</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.managers}</p>
+                <p className="text-sm text-slate-400">Managers</p>
+                <p className="text-2xl font-bold text-white">{stats.managers}</p>
               </div>
               <Shield className="h-8 w-8 text-amber-500" />
             </div>
           </CardContent>
         </Card>
         <Card 
-          className={`bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-lg transition-all ${
+          className={`bg-slate-900 border-slate-700 cursor-pointer hover:shadow-lg transition-all ${
             roleFilter === 'employee' ? 'border-2 border-yellow-500' : ''
           }`}
           onClick={() => setRoleFilter('employee')}
@@ -528,8 +528,8 @@ export default function UsersAdminPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Employees</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.employees}</p>
+                <p className="text-sm text-slate-400">Employees</p>
+                <p className="text-2xl font-bold text-white">{stats.employees}</p>
               </div>
               <User className="h-8 w-8 text-green-500" />
             </div>
@@ -538,12 +538,12 @@ export default function UsersAdminPage() {
       </div>
 
       {/* User Management Interface */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="bg-slate-900 border-slate-700">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-slate-900 dark:text-white">All Users</CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400">
+              <CardTitle className="text-white">All Users</CardTitle>
+              <CardDescription className="text-slate-400">
                 View and manage user accounts, roles, and permissions
               </CardDescription>
             </div>
@@ -589,26 +589,26 @@ export default function UsersAdminPage() {
                 <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
               </div>
             ) : filteredUsers.length === 0 ? (
-              <div className="text-center py-8 text-slate-600 dark:text-slate-400">
+              <div className="text-center py-8 text-slate-400">
                 {searchQuery ? 'No users found matching your search.' : 'No users yet.'}
               </div>
             ) : (
-              <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+              <div className="border border-slate-700 rounded-lg overflow-hidden">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/50">
-                      <TableHead className="text-slate-700 dark:text-slate-300">Name</TableHead>
-                      <TableHead className="text-slate-700 dark:text-slate-300">Email</TableHead>
-                      <TableHead className="text-slate-700 dark:text-slate-300">Employee ID</TableHead>
-                      <TableHead className="text-slate-700 dark:text-slate-300">Role</TableHead>
-                      <TableHead className="text-slate-700 dark:text-slate-300">Created</TableHead>
-                      <TableHead className="text-right text-slate-700 dark:text-slate-300">Actions</TableHead>
+                    <TableRow className="border-slate-700 hover:bg-slate-800/50">
+                      <TableHead className="text-slate-300">Name</TableHead>
+                      <TableHead className="text-slate-300">Email</TableHead>
+                      <TableHead className="text-slate-300">Employee ID</TableHead>
+                      <TableHead className="text-slate-300">Role</TableHead>
+                      <TableHead className="text-slate-300">Created</TableHead>
+                      <TableHead className="text-right text-slate-300">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredUsers.map((user) => (
-                      <TableRow key={user.id} className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                        <TableCell className="font-medium text-slate-900 dark:text-white">
+                      <TableRow key={user.id} className="border-slate-700 hover:bg-slate-800/50">
+                        <TableCell className="font-medium text-white">
                           <div className="flex items-center gap-2">
                             <div className="h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
                               <User className="h-4 w-4 text-slate-600 dark:text-slate-300" />
@@ -616,13 +616,13 @@ export default function UsersAdminPage() {
                             {user.full_name || 'Unnamed User'}
                           </div>
                         </TableCell>
-                        <TableCell className="text-slate-700 dark:text-slate-300">
+                        <TableCell className="text-slate-300">
                           <div className="flex items-center gap-2 text-sm">
                             <Mail className="h-3 w-3 text-slate-400" />
                             {user.email}
                           </div>
                         </TableCell>
-                        <TableCell className="text-slate-700 dark:text-slate-300">{user.employee_id || '-'}</TableCell>
+                        <TableCell className="text-slate-300">{user.employee_id || '-'}</TableCell>
                         <TableCell>
                           <Badge variant={
                             user.email === 'admin@mpdee.co.uk' ? 'destructive' :
@@ -632,7 +632,7 @@ export default function UsersAdminPage() {
                             {user.email === 'admin@mpdee.co.uk' ? 'SuperAdmin' : (user.role?.display_name || 'No Role')}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-slate-700 dark:text-slate-300">
+                        <TableCell className="text-slate-300">
                           <div className="flex items-center gap-2 text-sm">
                             <Calendar className="h-3 w-3 text-slate-400" />
                             {new Date(user.created_at || '').toLocaleDateString()}
