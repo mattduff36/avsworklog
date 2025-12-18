@@ -484,8 +484,8 @@ export default function VehiclesAdminPage() {
         <TabsList className="bg-slate-100 dark:bg-slate-800">
           <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
-          <TabsTrigger asChild value="maintenance-demo">
-            <Link href="/admin/maintenance-demo">Maintenance Log (Demo)</Link>
+          <TabsTrigger asChild value="maintenance">
+            <Link href="/maintenance">Maintenance & Service</Link>
           </TabsTrigger>
         </TabsList>
 

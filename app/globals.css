@@ -56,6 +56,11 @@
     --absence-light: 260 60% 96%;
     --absence-dark: 260 60% 40%;
     
+    /* Maintenance & Service - Red */
+    --maintenance-primary: 0 84% 60%;
+    --maintenance-light: 0 100% 96%;
+    --maintenance-dark: 0 84% 45%;
+    
     /* Reports - Professional Green */
     --report-primary: 150 70% 45%;
     --report-light: 150 100% 96%;
@@ -542,6 +547,27 @@
   
   .border-absence {
     border-color: hsl(var(--absence-primary));
+  }
+  
+  /* Maintenance & Service - Red */
+  .bg-maintenance {
+    background-color: hsl(var(--maintenance-primary));
+  }
+  
+  .bg-maintenance-light {
+    background-color: hsl(var(--maintenance-light));
+  }
+  
+  .bg-maintenance-dark {
+    background-color: hsl(var(--maintenance-dark));
+  }
+  
+  .text-maintenance {
+    color: hsl(var(--maintenance-primary));
+  }
+  
+  .border-maintenance {
+    border-color: hsl(var(--maintenance-primary));
   }
   
   /* Manager/Admin Notice/Comments Box - Solid background approach
