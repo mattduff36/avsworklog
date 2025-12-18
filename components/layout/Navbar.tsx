@@ -215,7 +215,7 @@ export function Navbar() {
         );
         
         if (!isExpectedError) {
-          console.error('Error fetching notifications:', errorDetails);
+          console.warn('Error fetching notifications:', errorMessage, errorDetails);
         }
         
         // Set count to 0 on error to prevent showing stale data
