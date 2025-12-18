@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { OfflineBanner } from '@/components/ui/offline-banner';
 import { Loader2, Wrench, AlertTriangle } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
