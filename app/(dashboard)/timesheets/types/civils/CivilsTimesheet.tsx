@@ -170,15 +170,15 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
     // Only show if:
     // 1. It's a bank holiday
     // 2. Warning hasn't been shown for this day yet
-    // 3. User has entered 2 or more characters
+    // 3. User has entered any value (works with mobile time pickers and manual entry)
     // 4. Day is not already marked as "did not work"
     const entry = entries[dayIndex];
-    
+
     if (
       isDayBankHoliday(dayIndex) &&
       !entry.bankHolidayWarningShown &&
       !entry.did_not_work &&
-      value.length >= 2
+      value && value.trim().length > 0
     ) {
       setBankHolidayDayIndex(dayIndex);
       setBankHolidayDate(getFormattedDate(dayIndex));
@@ -222,8 +222,8 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
 
   // Handle job number input with auto-dash formatting (NNNN-LL format)
   const handleJobNumberChange = (index: number, value: string) => {
-    // Check for bank holiday warning (only on 2nd character)
-    if (value.length === 2) {
+    // Check for bank holiday warning when user enters a job number
+    if (value && value.trim().length > 0) {
       checkAndShowBankHolidayWarning(index, value);
     }
     
@@ -471,9 +471,9 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
         }
       }
     } else {
-      // Check for bank holiday warning on time fields (only on 2nd character)
+      // Check for bank holiday warning on time fields (triggers on any value change, including mobile time pickers)
       if ((field === 'time_started' || field === 'time_finished') && typeof value === 'string') {
-        if (value.length === 2) {
+        if (value && value.trim().length > 0) {
           checkAndShowBankHolidayWarning(dayIndex, value);
         }
         // Round time inputs to 15-minute intervals
