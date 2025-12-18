@@ -37,6 +37,7 @@ export type ModuleName =
   | 'inspections'
   | 'rams'
   | 'absence'
+  | 'maintenance'
   | 'toolbox-talks'
   | 'approvals'
   | 'actions'
@@ -49,6 +50,7 @@ export const ALL_MODULES: ModuleName[] = [
   'inspections',
   'rams',
   'absence',
+  'maintenance',
   'toolbox-talks',
   'approvals',
   'actions',
@@ -62,6 +64,7 @@ export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
   'inspections': 'Vehicle Inspections',
   'rams': 'RAMS Documents',
   'absence': 'Absence & Leave',
+  'maintenance': 'Maintenance & Service',
   'toolbox-talks': 'Toolbox Talks',
   'approvals': 'Approvals',
   'actions': 'Actions',
@@ -75,6 +78,7 @@ export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
   'inspections': 'Perform vehicle inspections',
   'rams': 'Access and sign RAMS documents',
   'absence': 'Request and manage absence',
+  'maintenance': 'Track and manage vehicle maintenance schedules',
   'toolbox-talks': 'Receive and sign toolbox talks',
   'approvals': 'Approve timesheets, inspections, and absences',
   'actions': 'Manage and track actions',

@@ -78,6 +78,16 @@ export const FORM_TYPES: FormType[] = [
     color: 'absence',
     enabled: true,
   },
+  {
+    id: 'maintenance',
+    title: 'Maintenance & Service',
+    description: 'Vehicle maintenance tracking',
+    icon: Wrench,
+    href: '/maintenance',
+    listHref: '/maintenance',
+    color: 'maintenance',
+    enabled: true,
+  },
   // Future forms - uncomment and configure as needed:
   /*
   {
@@ -88,16 +98,6 @@ export const FORM_TYPES: FormType[] = [
     href: '/incidents/new',
     listHref: '/incidents',
     color: 'incident', // Add --incident-primary to globals.css
-    enabled: false,
-  },
-  {
-    id: 'maintenance',
-    title: 'Maintenance Request',
-    description: 'Equipment & vehicle repairs',
-    icon: Wrench,
-    href: '/maintenance/new',
-    listHref: '/maintenance',
-    color: 'maintenance',
     enabled: false,
   },
   {

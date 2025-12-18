@@ -239,13 +239,13 @@ function ApprovalsContent() {
       </div>
 
       {totalCount === 0 ? (
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="bg-slate-900 border-slate-700">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            {statusFilter === 'pending' && <CheckCircle2 className="h-16 w-16 text-green-600 dark:text-green-400 mb-4" />}
-            {statusFilter === 'approved' && <CheckCircle2 className="h-16 w-16 text-green-600 dark:text-green-400 mb-4" />}
-            {statusFilter === 'rejected' && <XCircle className="h-16 w-16 text-red-600 dark:text-red-400 mb-4" />}
+            {statusFilter === 'pending' && <CheckCircle2 className="h-16 w-16 text-green-400 mb-4" />}
+            {statusFilter === 'approved' && <CheckCircle2 className="h-16 w-16 text-green-400 mb-4" />}
+            {statusFilter === 'rejected' && <XCircle className="h-16 w-16 text-red-400 mb-4" />}
             {statusFilter === 'all' && <FileText className="h-16 w-16 text-slate-400 mb-4" />}
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+            <h3 className="text-lg font-semibold text-white mb-2">
               {statusFilter === 'pending' && 'All caught up!'}
               {statusFilter === 'approved' && 'No approved submissions'}
               {statusFilter === 'rejected' && 'No rejected submissions'}

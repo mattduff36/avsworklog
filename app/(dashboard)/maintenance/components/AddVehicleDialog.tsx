@@ -1,0 +1,281 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Loader2, Plus } from 'lucide-react';
+import { toast } from 'sonner';
+import { logger } from '@/lib/utils/logger';
+
+interface AddVehicleDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
+}
+
+interface Category {
+  id: string;
+  name: string;
+}
+
+export function AddVehicleDialog({
+  open,
+  onOpenChange,
+  onSuccess
+}: AddVehicleDialogProps) {
+  const queryClient = useQueryClient();
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    reg_number: '',
+    category_id: '',
+    status: 'active',
+  });
+  const [error, setError] = useState('');
+
+  // Fetch categories when dialog opens
+  useEffect(() => {
+    if (open) {
+      fetchCategories();
+    }
+  }, [open]);
+
+  // Reset form when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setFormData({
+        reg_number: '',
+        category_id: '',
+        status: 'active',
+      });
+      setError('');
+    }
+  }, [open]);
+
+  async function fetchCategories() {
+    try {
+      const response = await fetch('/api/admin/categories');
+      const data = await response.json();
+      if (response.ok) {
+        setCategories(data.categories || []);
+      }
+    } catch (error) {
+      logger.error('Error fetching categories', error, 'AddVehicleDialog');
+    }
+  }
+
+  // Format UK registration plates (LLNNLLL -> LLNN LLL)
+  function formatRegistration(reg: string): string {
+    const cleaned = reg.replace(/\s/g, '').toUpperCase();
+    
+    // Check if it matches UK format: 2 letters, 2 numbers, 3 letters (7 chars total)
+    if (cleaned.length === 7 && /^[A-Z]{2}\d{2}[A-Z]{3}$/.test(cleaned)) {
+      return `${cleaned.slice(0, 4)} ${cleaned.slice(4)}`;
+    }
+    
+    return cleaned;
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    
+    // Validate
+    if (!formData.reg_number.trim()) {
+      setError('Registration number is required');
+      return;
+    }
+    
+    if (!formData.category_id) {
+      setError('Category is required');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Format registration number
+      const formattedReg = formatRegistration(formData.reg_number);
+      
+      const response = await fetch('/api/admin/vehicles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          reg_number: formattedReg,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success('Vehicle added successfully', {
+          description: `${formattedReg} has been added to the system.`,
+        });
+        
+        // Invalidate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+        
+        onSuccess?.();
+        onOpenChange(false);
+      } else {
+        setError(data.error || 'Failed to add vehicle');
+        toast.error('Failed to add vehicle', {
+          description: data.error || 'Please try again.',
+        });
+      }
+    } catch (error: any) {
+      logger.error('Error adding vehicle', error, 'AddVehicleDialog');
+      setError('An unexpected error occurred');
+      toast.error('An unexpected error occurred', {
+        description: 'Please try again.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-2xl">Add New Vehicle</DialogTitle>
+          <DialogDescription className="text-slate-400">
+            Add a new vehicle to the fleet management system.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-900/20 border border-red-800 rounded-lg p-3">
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
+          )}
+
+          {/* Registration Number */}
+          <div className="space-y-2">
+            <Label htmlFor="reg_number" className="text-white">
+              Registration Number <span className="text-red-400">*</span>
+            </Label>
+            <Input
+              id="reg_number"
+              value={formData.reg_number}
+              onChange={(e) =>
+                setFormData({ ...formData, reg_number: e.target.value })
+              }
+              placeholder="e.g., AB12 CDE or AB12CDE"
+              className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+              disabled={loading}
+              required
+            />
+            <p className="text-xs text-slate-400">
+              Will be formatted as UK registration (e.g., AB12 CDE)
+            </p>
+          </div>
+
+          {/* Category */}
+          <div className="space-y-2">
+            <Label htmlFor="category" className="text-white">
+              Vehicle Category <span className="text-red-400">*</span>
+            </Label>
+            <Select
+              value={formData.category_id}
+              onValueChange={(value) =>
+                setFormData({ ...formData, category_id: value })
+              }
+              disabled={loading}
+              required
+            >
+              <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                <SelectValue placeholder="Select category..." />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-700">
+                {categories.map((category) => (
+                  <SelectItem
+                    key={category.id}
+                    value={category.id}
+                    className="text-white hover:bg-slate-700"
+                  >
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Status */}
+          <div className="space-y-2">
+            <Label htmlFor="status" className="text-white">
+              Status
+            </Label>
+            <Select
+              value={formData.status}
+              onValueChange={(value) =>
+                setFormData({ ...formData, status: value })
+              }
+              disabled={loading}
+            >
+              <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-700">
+                <SelectItem value="active" className="text-white hover:bg-slate-700">
+                  Active
+                </SelectItem>
+                <SelectItem value="inactive" className="text-white hover:bg-slate-700">
+                  Inactive
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="border-slate-600 text-white hover:bg-slate-800"
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-700"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Vehicle
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

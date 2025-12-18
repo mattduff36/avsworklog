@@ -311,7 +311,7 @@ export function AssignEmployeesModal({
                         >
                           {employee.full_name}
                           {employee.alreadySigned && (
-                            <span className="ml-2 text-xs text-green-600 dark:text-green-400 flex items-center gap-1 inline-flex">
+                            <span className="ml-2 text-xs text-green-400 flex items-center gap-1 inline-flex">
                               <AlertCircle className="h-3 w-3" />
                               Already signed
                             </span>

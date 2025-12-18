@@ -100,6 +100,185 @@ export interface Database {
           updated_at?: string
         }
       }
+      maintenance_categories: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          type: 'date' | 'mileage'
+          alert_threshold_days: number | null
+          alert_threshold_miles: number | null
+          is_active: boolean
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          type: 'date' | 'mileage'
+          alert_threshold_days?: number | null
+          alert_threshold_miles?: number | null
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          type?: 'date' | 'mileage'
+          alert_threshold_days?: number | null
+          alert_threshold_miles?: number | null
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      vehicle_maintenance: {
+        Row: {
+          id: string
+          vehicle_id: string
+          tax_due_date: string | null
+          mot_due_date: string | null
+          first_aid_kit_expiry: string | null
+          current_mileage: number | null
+          last_service_mileage: number | null
+          next_service_mileage: number | null
+          cambelt_due_mileage: number | null
+          cambelt_done: boolean
+          last_mileage_update: string | null
+          last_updated_at: string
+          last_updated_by: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          vehicle_id: string
+          tax_due_date?: string | null
+          mot_due_date?: string | null
+          first_aid_kit_expiry?: string | null
+          current_mileage?: number | null
+          last_service_mileage?: number | null
+          next_service_mileage?: number | null
+          cambelt_due_mileage?: number | null
+          cambelt_done?: boolean
+          last_mileage_update?: string | null
+          last_updated_at?: string
+          last_updated_by?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          vehicle_id?: string
+          tax_due_date?: string | null
+          mot_due_date?: string | null
+          first_aid_kit_expiry?: string | null
+          current_mileage?: number | null
+          last_service_mileage?: number | null
+          next_service_mileage?: number | null
+          cambelt_due_mileage?: number | null
+          cambelt_done?: boolean
+          last_mileage_update?: string | null
+          last_updated_at?: string
+          last_updated_by?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      maintenance_history: {
+        Row: {
+          id: string
+          vehicle_id: string
+          maintenance_category_id: string | null
+          field_name: string
+          old_value: string | null
+          new_value: string | null
+          value_type: 'date' | 'mileage' | 'boolean' | 'text'
+          comment: string
+          updated_by: string | null
+          updated_by_name: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          vehicle_id: string
+          maintenance_category_id?: string | null
+          field_name: string
+          old_value?: string | null
+          new_value?: string | null
+          value_type: 'date' | 'mileage' | 'boolean' | 'text'
+          comment: string
+          updated_by?: string | null
+          updated_by_name?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          vehicle_id?: string
+          maintenance_category_id?: string | null
+          field_name?: string
+          old_value?: string | null
+          new_value?: string | null
+          value_type?: 'date' | 'mileage' | 'boolean' | 'text'
+          comment?: string
+          updated_by?: string | null
+          updated_by_name?: string | null
+          created_at?: string
+        }
+      }
+      vehicle_archive: {
+        Row: {
+          id: string
+          vehicle_id: string
+          reg_number: string
+          category_id: string | null
+          status: string | null
+          archive_reason: 'Sold' | 'Scrapped' | 'Other'
+          archive_comment: string | null
+          archived_by: string | null
+          archived_at: string
+          vehicle_data: Json
+          maintenance_data: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          vehicle_id: string
+          reg_number: string
+          category_id?: string | null
+          status?: string | null
+          archive_reason: 'Sold' | 'Scrapped' | 'Other'
+          archive_comment?: string | null
+          archived_by?: string | null
+          archived_at?: string
+          vehicle_data: Json
+          maintenance_data?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          vehicle_id?: string
+          reg_number?: string
+          category_id?: string | null
+          status?: string | null
+          archive_reason?: 'Sold' | 'Scrapped' | 'Other'
+          archive_comment?: string | null
+          archived_by?: string | null
+          archived_at?: string
+          vehicle_data?: Json
+          maintenance_data?: Json | null
+          created_at?: string
+        }
+      }
       timesheets: {
         Row: {
           id: string

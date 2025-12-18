@@ -546,9 +546,9 @@ export default function ReadRAMSPage() {
 
               {/* Already Signed Message */}
               {isSigned && (
-                <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
-                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                    <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                <div className="mt-8 pt-8 border-t border-slate-700">
+                  <div className="bg-green-900/20 border border-green-800 rounded-lg p-4">
+                    <p className="text-sm font-medium text-green-300">
                       ✓ You have signed this document on {assignment?.signed_at ? new Date(assignment.signed_at).toLocaleDateString() : 'previously'}
                     </p>
                   </div>

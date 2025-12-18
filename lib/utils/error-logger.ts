@@ -78,8 +78,10 @@ class ErrorLogger {
           return;
         }
         
-        // Filter out empty objects and meaningless errors
-        if (errorMessage === '{}' || 
+        // Filter out structured logging that ends with empty objects (e.g., "Error message: {}")
+        // This catches cases where console.error is used for structured logging with objects
+        if (errorMessage.endsWith('{}') || 
+            errorMessage.trim() === '{}' || 
             errorMessage.trim() === '' ||
             errorMessage === '[object Object]') {
           return;

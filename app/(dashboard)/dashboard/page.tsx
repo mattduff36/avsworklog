@@ -14,7 +14,6 @@ import { formatDate } from '@/lib/utils/date';
 import { 
   CheckCircle2,
   AlertTriangle,
-  Wrench,
   PackageCheck,
   Clipboard,
   Truck,
@@ -22,7 +21,13 @@ import {
   ScrollText,
   FileText,
   Calendar,
-  ChevronRight
+  ChevronRight,
+  CheckSquare,
+  ListTodo,
+  MessageSquare,
+  BarChart3,
+  Users,
+  Bug
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
 import { Database } from '@/types/database';
@@ -68,7 +73,6 @@ export default function DashboardPage() {
 
   // Placeholder forms for future development (only shown to superadmin)
   const placeholderForms = [
-    { id: 'maintenance', title: 'Maintenance Request', icon: Wrench, color: 'bg-red-500' },
     { id: 'delivery', title: 'Delivery Note', icon: PackageCheck, color: 'bg-rose-500' },
     { id: 'site-diary', title: 'Site Diary', icon: Clipboard, color: 'bg-cyan-500' },
     { id: 'plant-hire', title: 'Plant Hire', icon: Truck, color: 'bg-indigo-500' },
@@ -120,7 +124,7 @@ export default function DashboardPage() {
       // Managers and admins have all permissions
       if (isManager || isAdmin) {
         setUserPermissions(new Set([
-          'timesheets', 'inspections', 'rams', 'absence', 'toolbox-talks',
+          'timesheets', 'inspections', 'rams', 'absence', 'maintenance', 'toolbox-talks',
           'approvals', 'actions', 'reports', 'admin-users', 'admin-vehicles'
         ] as ModuleName[]));
         return;
@@ -317,6 +321,7 @@ export default function DashboardPage() {
                   'inspection': 'inspections',
                   'rams': 'rams',
                   'absence': 'absence',
+                  'maintenance': 'maintenance',
                 };
                 
                 const moduleName = moduleMap[formType.id];
@@ -393,6 +398,78 @@ export default function DashboardPage() {
         </TooltipProvider>
       </div>
 
+      {/* Manager/Admin Quick Access - Smaller Tiles */}
+      {effectiveIsManager && (
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+            Management Tools
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {/* Manager Links */}
+            {[
+              { href: '/approvals', label: 'Approvals', icon: CheckSquare, borderColor: 'border-blue-500', iconColor: 'text-blue-400', hoverBorder: 'hover:border-blue-400' },
+              { href: '/actions', label: 'Actions', icon: ListTodo, borderColor: 'border-purple-500', iconColor: 'text-purple-400', hoverBorder: 'hover:border-purple-400' },
+              { href: '/toolbox-talks', label: 'Toolbox Talks', icon: MessageSquare, borderColor: 'border-red-500', iconColor: 'text-red-400', hoverBorder: 'hover:border-red-400' },
+              { href: '/reports', label: 'Reports', icon: BarChart3, borderColor: 'border-emerald-500', iconColor: 'text-emerald-400', hoverBorder: 'hover:border-emerald-400' },
+            ].map((link) => {
+              const Icon = link.icon;
+              return (
+                <Link key={link.href} href={link.href}>
+                  <div className={`bg-slate-800 dark:bg-slate-900 border-4 ${link.borderColor} ${link.hoverBorder} hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer`}
+                       style={{ height: '100px' }}>
+                    <div className="flex flex-col items-start justify-between h-full">
+                      <Icon className={`h-6 w-6 ${link.iconColor}`} />
+                      <span className="text-white font-semibold text-base leading-tight">
+                        {link.label}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+            
+            {/* Admin Links */}
+            {effectiveIsAdmin && [
+              { href: '/admin/users', label: 'Users', icon: Users, borderColor: 'border-slate-400', iconColor: 'text-slate-300', hoverBorder: 'hover:border-slate-300' },
+              { href: '/admin/vehicles', label: 'Vehicles', icon: Truck, borderColor: 'border-slate-500', iconColor: 'text-slate-400', hoverBorder: 'hover:border-slate-400' },
+            ].map((link) => {
+              const Icon = link.icon;
+              return (
+                <Link key={link.href} href={link.href}>
+                  <div className={`bg-slate-800 dark:bg-slate-900 border-4 ${link.borderColor} ${link.hoverBorder} hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer`}
+                       style={{ height: '100px' }}>
+                    <div className="flex flex-col items-start justify-between h-full">
+                      <Icon className={`h-6 w-6 ${link.iconColor}`} />
+                      <span className="text-white font-semibold text-base leading-tight">
+                        {link.label}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+            
+            {/* SuperAdmin Only - Debug Link (only when viewing as actual role) */}
+            {isSuperAdmin && viewAsRole === 'actual' && (() => {
+              const link = { href: '/debug', label: 'Debug', icon: Bug, borderColor: 'border-yellow-500', iconColor: 'text-yellow-400', hoverBorder: 'hover:border-yellow-400' };
+              const Icon = link.icon;
+              return (
+                <Link key={link.href} href={link.href}>
+                  <div className={`bg-slate-800 dark:bg-slate-900 border-4 ${link.borderColor} ${link.hoverBorder} hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer`}
+                       style={{ height: '100px' }}>
+                    <div className="flex flex-col items-start justify-between h-full">
+                      <Icon className={`h-6 w-6 ${link.iconColor}`} />
+                      <span className="text-white font-semibold text-base leading-tight">
+                        {link.label}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* Pending Approvals Summary - Manager/Admin Only */}
       {effectiveIsManager && (

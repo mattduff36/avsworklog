@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Menu, 
@@ -23,7 +22,8 @@ import {
   Bell,
   MessageSquare,
   Eye,
-  Bug
+  Bug,
+  Wrench
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { NotificationPanel } from '@/components/messages/NotificationPanel';
@@ -36,7 +36,7 @@ type ViewAsRole = 'actual' | 'employee' | 'manager' | 'admin';
 export function Navbar() {
   const pathname = usePathname();
   const { user, profile, signOut, isAdmin, isManager } = useAuth();
-  const { isOnline, pendingCount } = useOfflineSync();
+  useOfflineSync(); // Keep hook for potential future use
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar starts collapsed
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
@@ -91,7 +91,7 @@ export function Navbar() {
       // When viewing as different roles, simulate their permissions
       if (isSuperAdmin && viewAsRole !== 'actual') {
         if (viewAsRole === 'admin' || viewAsRole === 'manager') {
-          setUserPermissions(new Set(['timesheets', 'inspections', 'absence', 'rams', 'approvals', 'actions', 'reports'] as ModuleName[]));
+          setUserPermissions(new Set(['timesheets', 'inspections', 'absence', 'rams', 'maintenance', 'approvals', 'actions', 'reports'] as ModuleName[]));
         } else if (viewAsRole === 'employee') {
           // Simulate basic employee permissions
           setUserPermissions(new Set(['timesheets', 'inspections'] as ModuleName[]));
@@ -102,7 +102,7 @@ export function Navbar() {
 
       // Managers and admins have all permissions
       if (isManager || isAdmin) {
-        setUserPermissions(new Set(['timesheets', 'inspections', 'absence', 'rams', 'approvals', 'actions', 'reports'] as ModuleName[]));
+        setUserPermissions(new Set(['timesheets', 'inspections', 'absence', 'rams', 'maintenance', 'approvals', 'actions', 'reports'] as ModuleName[]));
         setPermissionsLoading(false);
         return;
       }
@@ -215,7 +215,7 @@ export function Navbar() {
         );
         
         if (!isExpectedError) {
-          console.error('Error fetching notifications:', errorDetails);
+          console.warn('Error fetching notifications:', errorMessage, errorDetails);
         }
         
         // Set count to 0 on error to prevent showing stale data
@@ -259,6 +259,7 @@ export function Navbar() {
     { href: '/inspections', label: 'Inspections', icon: ClipboardCheck, module: 'inspections' as ModuleName },
     { href: '/rams', label: 'RAMS', icon: CheckSquare, module: 'rams' as ModuleName },
     { href: '/absence', label: 'Absence', icon: Calendar, module: 'absence' as ModuleName },
+    { href: '/maintenance', label: 'Maintenance', icon: Wrench, module: 'maintenance' as ModuleName },
   ];
 
   // Filter employee nav by permissions
@@ -354,28 +355,6 @@ export function Navbar() {
 
             {/* Right side */}
             <div className="flex items-center space-x-4">
-            {/* Offline/Online Status */}
-            <div className="flex items-center space-x-2">
-              {isOnline ? (
-                <div 
-                  className="w-2.5 h-2.5 rounded-full bg-green-400" 
-                  title="Online"
-                />
-              ) : (
-                <div className="flex items-center space-x-2">
-                  <div 
-                    className="w-2.5 h-2.5 rounded-full bg-amber-400" 
-                    title="Offline"
-                  />
-                  {pendingCount > 0 && (
-                    <Badge variant="warning" className="text-xs bg-amber-500/20 text-amber-300 border-amber-500/30">
-                      {pendingCount} pending
-                    </Badge>
-                  )}
-                </div>
-              )}
-            </div>
-
               {/* Notification Bell */}
               <div className="relative">
                 <Button
