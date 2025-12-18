@@ -21,7 +21,12 @@ import {
   ScrollText,
   FileText,
   Calendar,
-  ChevronRight
+  ChevronRight,
+  CheckSquare,
+  ListTodo,
+  MessageSquare,
+  BarChart3,
+  Users
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
 import { Database } from '@/types/database';
@@ -392,6 +397,59 @@ export default function DashboardPage() {
         </TooltipProvider>
       </div>
 
+      {/* Manager/Admin Quick Access - Smaller Tiles */}
+      {effectiveIsManager && (
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+            Management Tools
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {/* Manager Links */}
+            {[
+              { href: '/approvals', label: 'Approvals', icon: CheckSquare, color: 'from-blue-600 to-blue-700' },
+              { href: '/actions', label: 'Actions', icon: ListTodo, color: 'from-purple-600 to-purple-700' },
+              { href: '/toolbox-talks', label: 'Toolbox Talks', icon: MessageSquare, color: 'from-red-600 to-red-700' },
+              { href: '/reports', label: 'Reports', icon: BarChart3, color: 'from-emerald-600 to-emerald-700' },
+            ].map((link) => {
+              const Icon = link.icon;
+              return (
+                <Link key={link.href} href={link.href}>
+                  <div className={`bg-gradient-to-br ${link.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md border border-white/20 cursor-pointer`}
+                       style={{ height: '100px' }}>
+                    <div className="flex flex-col items-start justify-between h-full">
+                      <Icon className="h-6 w-6 text-white" />
+                      <span className="text-white font-semibold text-base leading-tight">
+                        {link.label}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+            
+            {/* Admin Links */}
+            {effectiveIsAdmin && [
+              { href: '/admin/users', label: 'Users', icon: Users, color: 'from-slate-700 to-slate-800' },
+              { href: '/admin/vehicles', label: 'Vehicles', icon: Truck, color: 'from-slate-600 to-slate-700' },
+            ].map((link) => {
+              const Icon = link.icon;
+              return (
+                <Link key={link.href} href={link.href}>
+                  <div className={`bg-gradient-to-br ${link.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md border border-white/20 cursor-pointer`}
+                       style={{ height: '100px' }}>
+                    <div className="flex flex-col items-start justify-between h-full">
+                      <Icon className="h-6 w-6 text-white" />
+                      <span className="text-white font-semibold text-base leading-tight">
+                        {link.label}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Pending Approvals Summary - Manager/Admin Only */}
       {effectiveIsManager && (
