@@ -67,9 +67,42 @@ class ErrorLogger {
         // Don't log if we're already in the logging process (prevent recursion)
         if (this.isLogging) return;
         
-        const errorMessage = args.map(arg => 
-          typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
-        ).join(' ');
+        // Helper function to serialize an argument properly
+        const serializeArg = (arg: unknown): string => {
+          if (arg === null) return 'null';
+          if (arg === undefined) return 'undefined';
+          
+          // Handle Error objects specially
+          if (arg instanceof Error) {
+            return `${arg.name}: ${arg.message}${arg.stack ? '\n' + arg.stack : ''}`;
+          }
+          
+          // Handle plain objects
+          if (typeof arg === 'object') {
+            try {
+              const keys = Object.keys(arg);
+              // Empty object
+              if (keys.length === 0) return '{}';
+              
+              // Try to stringify with error properties if it looks like an error
+              if ('message' in arg || 'name' in arg || 'stack' in arg) {
+                const errorLike = arg as { message?: string; name?: string; stack?: string };
+                return `${errorLike.name || 'Error'}: ${errorLike.message || 'Unknown error'}`;
+              }
+              
+              // Regular object - stringify
+              const stringified = JSON.stringify(arg, null, 2);
+              // If it stringifies to empty object, return a more useful representation
+              return stringified === '{}' ? '[Empty Object]' : stringified;
+            } catch (e) {
+              return '[Object (unstringifiable)]';
+            }
+          }
+          
+          return String(arg);
+        };
+        
+        const errorMessage = args.map(serializeArg).join(' ');
         
         // Don't log errors from the error logging system itself
         if (errorMessage.includes('Error fetching error logs') || 
@@ -78,12 +111,13 @@ class ErrorLogger {
           return;
         }
         
-        // Filter out structured logging that ends with empty objects (e.g., "Error message: {}")
-        // This catches cases where console.error is used for structured logging with objects
-        if (errorMessage.endsWith('{}') || 
-            errorMessage.trim() === '{}' || 
+        // Filter out empty/meaningless errors
+        if (errorMessage.trim() === '{}' || 
             errorMessage.trim() === '' ||
-            errorMessage === '[object Object]') {
+            errorMessage.trim() === '[Empty Object]' ||
+            errorMessage === '[object Object]' ||
+            errorMessage === 'undefined' ||
+            errorMessage === 'null') {
           return;
         }
         
