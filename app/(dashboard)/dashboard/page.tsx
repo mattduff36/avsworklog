@@ -26,7 +26,8 @@ import {
   ListTodo,
   MessageSquare,
   BarChart3,
-  Users
+  Users,
+  Bug
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
 import { Database } from '@/types/database';
@@ -432,6 +433,43 @@ export default function DashboardPage() {
               { href: '/admin/users', label: 'Users', icon: Users, borderColor: 'border-slate-400', iconColor: 'text-slate-300', hoverBorder: 'hover:border-slate-300' },
               { href: '/admin/vehicles', label: 'Vehicles', icon: Truck, borderColor: 'border-slate-500', iconColor: 'text-slate-400', hoverBorder: 'hover:border-slate-400' },
             ].map((link) => {
+              const Icon = link.icon;
+              return (
+                <Link key={link.href} href={link.href}>
+                  <div className={`bg-slate-800 dark:bg-slate-900 border-4 ${link.borderColor} ${link.hoverBorder} hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer`}
+                       style={{ height: '100px' }}>
+                    <div className="flex flex-col items-start justify-between h-full">
+                      <Icon className={`h-6 w-6 ${link.iconColor}`} />
+                      <span className="text-white font-semibold text-base leading-tight">
+                        {link.label}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+            
+            {/* SuperAdmin Only - Debug Link */}
+            {isSuperAdmin && (() => {
+              const link = { href: '/debug', label: 'Debug', icon: Bug, borderColor: 'border-yellow-500', iconColor: 'text-yellow-400', hoverBorder: 'hover:border-yellow-400' };
+              const Icon = link.icon;
+              return (
+                <Link key={link.href} href={link.href}>
+                  <div className={`bg-slate-800 dark:bg-slate-900 border-4 ${link.borderColor} ${link.hoverBorder} hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer`}
+                       style={{ height: '100px' }}>
+                    <div className="flex flex-col items-start justify-between h-full">
+                      <Icon className={`h-6 w-6 ${link.iconColor}`} />
+                      <span className="text-white font-semibold text-base leading-tight">
+                        {link.label}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })()}
+          </div>
+        </div>
+      )}
               const Icon = link.icon;
               return (
                 <Link key={link.href} href={link.href}>
