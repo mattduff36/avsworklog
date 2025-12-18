@@ -470,24 +470,6 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-              const Icon = link.icon;
-              return (
-                <Link key={link.href} href={link.href}>
-                  <div className={`bg-slate-800 dark:bg-slate-900 border-4 ${link.borderColor} ${link.hoverBorder} hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer`}
-                       style={{ height: '100px' }}>
-                    <div className="flex flex-col items-start justify-between h-full">
-                      <Icon className={`h-6 w-6 ${link.iconColor}`} />
-                      <span className="text-white font-semibold text-base leading-tight">
-                        {link.label}
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Pending Approvals Summary - Manager/Admin Only */}
       {effectiveIsManager && (
