@@ -14,6 +14,7 @@ import {
   Plus,
   AlertTriangle
 } from 'lucide-react';
+import Link from 'next/link';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { 
   getStatusColorClass,
@@ -119,13 +120,12 @@ export function MaintenanceTable({
                 {vehicles.length} vehicle{vehicles.length !== 1 ? 's' : ''} • Click column headers to sort
               </CardDescription>
             </div>
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700"
-              disabled
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Vehicle
-            </Button>
+            <Link href="/admin/vehicles">
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Vehicle
+              </Button>
+            </Link>
           </div>
         </CardHeader>
         
