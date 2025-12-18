@@ -662,30 +662,31 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
       {/* Developer Tools Tabs */}
       <Tabs defaultValue="errors" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 gap-1 md:gap-0 h-auto md:h-10 p-1 bg-slate-100 dark:bg-slate-800">
-          <TabsTrigger value="errors" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2">
-            <Bug className="h-3 md:h-4 w-3 md:w-4" />
-            <span className="hidden sm:inline">Error Log</span>
-            <span className="sm:hidden">Errors</span>
+        <TabsList className="grid w-full grid-cols-5 md:grid-cols-5 gap-1 md:gap-0 h-auto md:h-10 p-1 bg-slate-100 dark:bg-slate-800">
+          <TabsTrigger value="errors" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+            <Bug className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden md:inline">Error Log</span>
+            <span className="md:hidden data-[state=active]:inline hidden">Errors</span>
           </TabsTrigger>
-          <TabsTrigger value="audit" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2">
-            <History className="h-3 md:h-4 w-3 md:w-4" />
-            <span className="hidden sm:inline">Audit Log</span>
-            <span className="sm:hidden">Audit</span>
+          <TabsTrigger value="audit" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+            <History className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden md:inline">Audit Log</span>
+            <span className="md:hidden data-[state=active]:inline hidden">Audit</span>
           </TabsTrigger>
-          <TabsTrigger value="timesheets" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2">
-            <FileText className="h-3 md:h-4 w-3 md:w-4" />
-            <span className="hidden sm:inline">Timesheets</span>
-            <span className="sm:hidden">Sheets</span>
+          <TabsTrigger value="timesheets" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+            <FileText className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden md:inline">Timesheets</span>
+            <span className="md:hidden data-[state=active]:inline hidden">Sheets</span>
           </TabsTrigger>
-          <TabsTrigger value="inspections" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2">
-            <Clipboard className="h-3 md:h-4 w-3 md:w-4" />
-            <span className="hidden sm:inline">Inspections</span>
-            <span className="sm:hidden">Inspect</span>
+          <TabsTrigger value="inspections" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+            <Clipboard className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden md:inline">Inspections</span>
+            <span className="md:hidden data-[state=active]:inline hidden">Inspect</span>
           </TabsTrigger>
-          <TabsTrigger value="absences" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 col-span-2 md:col-span-1">
-            <Calendar className="h-3 md:h-4 w-3 md:w-4" />
-            Absences
+          <TabsTrigger value="absences" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+            <Calendar className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden md:inline">Absences</span>
+            <span className="md:hidden data-[state=active]:inline hidden">Absent</span>
           </TabsTrigger>
         </TabsList>
 
