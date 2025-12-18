@@ -274,7 +274,7 @@ export function MaintenanceTable({
             </div>
           ) : (
             <div className="border border-slate-700 rounded-lg">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-scroll" style={{ overflowY: 'visible' }}>
                 <Table>
                   <TableHeader>
                     <TableRow className="border-slate-700">
