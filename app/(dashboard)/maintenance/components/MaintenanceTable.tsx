@@ -14,8 +14,8 @@ import {
   Plus,
   AlertTriangle
 } from 'lucide-react';
-import Link from 'next/link';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
+import { AddVehicleDialog } from './AddVehicleDialog';
 import { 
   getStatusColorClass,
   formatMileage,
@@ -28,6 +28,7 @@ interface MaintenanceTableProps {
   vehicles: VehicleMaintenanceWithStatus[];
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  onVehicleAdded?: () => void;
 }
 
 type SortField = 
@@ -44,12 +45,14 @@ type SortDirection = 'asc' | 'desc';
 export function MaintenanceTable({ 
   vehicles, 
   searchQuery, 
-  onSearchChange
+  onSearchChange,
+  onVehicleAdded
 }: MaintenanceTableProps) {
   const [sortField, setSortField] = useState<SortField>('reg_number');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [addVehicleDialogOpen, setAddVehicleDialogOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleMaintenanceWithStatus | null>(null);
   
   // Handle sort
@@ -120,12 +123,13 @@ export function MaintenanceTable({
                 {vehicles.length} vehicle{vehicles.length !== 1 ? 's' : ''} • Click column headers to sort
               </CardDescription>
             </div>
-            <Link href="/admin/vehicles">
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Vehicle
-              </Button>
-            </Link>
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => setAddVehicleDialogOpen(true)}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Vehicle
+            </Button>
           </div>
         </CardHeader>
         
@@ -242,7 +246,7 @@ export function MaintenanceTable({
                   <TableBody>
                     {sortedVehicles.map((vehicle) => (
                       <TableRow 
-                        key={vehicle.id}
+                        key={vehicle.id || vehicle.vehicle_id || vehicle.vehicle?.id}
                         className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                       >
                         {/* Registration */}
@@ -346,6 +350,16 @@ export function MaintenanceTable({
         onOpenChange={setHistoryDialogOpen}
         vehicleId={selectedVehicle?.vehicle_id || null}
         vehicleReg={selectedVehicle?.vehicle?.reg_number}
+      />
+      
+      {/* Add Vehicle Dialog */}
+      <AddVehicleDialog
+        open={addVehicleDialogOpen}
+        onOpenChange={setAddVehicleDialogOpen}
+        onSuccess={() => {
+          setAddVehicleDialogOpen(false);
+          onVehicleAdded?.();
+        }}
       />
     </>
   );

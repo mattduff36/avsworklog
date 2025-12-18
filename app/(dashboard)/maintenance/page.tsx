@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, Suspense } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -20,6 +21,7 @@ function MaintenanceContent() {
   // 1. Hooks
   const { isManager, isAdmin, isSuperAdmin } = useAuth();
   const { isOnline } = useOfflineSync();
+  const queryClient = useQueryClient();
   
   // 2. State
   const [searchQuery, setSearchQuery] = useState('');
@@ -142,6 +144,10 @@ function MaintenanceContent() {
               vehicles={filteredVehicles}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
+              onVehicleAdded={() => {
+                // Refetch maintenance data when a new vehicle is added
+                queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+              }}
             />
             
             {/* Edit Dialog */}
