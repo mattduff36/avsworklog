@@ -95,7 +95,23 @@ export async function PUT(
       changes.employee_id = { old: existingUser.employee_id || '', new: employee_id || '' };
     }
     if (role_id !== existingUser.role_id) {
-      changes.role_id = { old: existingUser.role_id, new: role_id };
+      // Fetch role names for email (display_name instead of UUID)
+      const { data: oldRole } = await supabaseAdmin
+        .from('roles')
+        .select('display_name')
+        .eq('id', existingUser.role_id)
+        .single();
+      
+      const { data: newRole } = await supabaseAdmin
+        .from('roles')
+        .select('display_name')
+        .eq('id', role_id)
+        .single();
+      
+      changes.role = {
+        old: oldRole?.display_name || 'Unknown',
+        new: newRole?.display_name || 'Unknown'
+      };
     }
 
     // Update email in auth if it changed
