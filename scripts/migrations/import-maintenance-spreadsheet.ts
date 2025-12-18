@@ -28,7 +28,7 @@ interface ExcelRow {
   'MILES NEXT SERVICE': number;
   'MILES LAST SERVICE': number;
   'MILES DUE CAMBELT'?: number;
-  'TRACKER No.'?: string;
+  'Tracker Number'?: string | number;
   'FIRST AID CHECK'?: string;
   'Comments'?: string;
   'MOT Date Due'?: string;
@@ -197,7 +197,7 @@ async function importMaintenanceData() {
           last_service_mileage: parseMileage(row['MILES LAST SERVICE']),
           next_service_mileage: parseMileage(row['MILES NEXT SERVICE']),
           cambelt_due_mileage: parseMileage(row['MILES DUE CAMBELT']),
-          tracker_id: row['TRACKER No.'] ? String(row['TRACKER No.']).trim() : null,
+          tracker_id: row['Tracker Number'] ? String(row['Tracker Number']).trim() : null,
           tax_due_date: row['Tax Date Due'] ? parseExcelDate(row['Tax Date Due']) : null,
           mot_due_date: row['MOT Date Due'] ? parseExcelDate(row['MOT Date Due']) : null,
           first_aid_kit_expiry: row['FIRST AID CHECK'] ? parseExcelDate(row['FIRST AID CHECK']) : null,
