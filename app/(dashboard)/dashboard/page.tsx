@@ -118,7 +118,7 @@ export default function DashboardPage() {
       // Managers and admins have all permissions
       if (isManager || isAdmin) {
         setUserPermissions(new Set([
-          'timesheets', 'inspections', 'rams', 'absence', 'toolbox-talks',
+          'timesheets', 'inspections', 'rams', 'absence', 'maintenance', 'toolbox-talks',
           'approvals', 'actions', 'reports', 'admin-users', 'admin-vehicles'
         ] as ModuleName[]));
         return;
@@ -315,6 +315,7 @@ export default function DashboardPage() {
                   'inspection': 'inspections',
                   'rams': 'rams',
                   'absence': 'absence',
+                  'maintenance': 'maintenance',
                 };
                 
                 const moduleName = moduleMap[formType.id];
