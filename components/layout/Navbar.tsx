@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Menu, 
@@ -37,7 +36,7 @@ type ViewAsRole = 'actual' | 'employee' | 'manager' | 'admin';
 export function Navbar() {
   const pathname = usePathname();
   const { user, profile, signOut, isAdmin, isManager } = useAuth();
-  const { isOnline, pendingCount } = useOfflineSync();
+  useOfflineSync(); // Keep hook for potential future use
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar starts collapsed
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
@@ -356,28 +355,6 @@ export function Navbar() {
 
             {/* Right side */}
             <div className="flex items-center space-x-4">
-            {/* Offline/Online Status */}
-            <div className="flex items-center space-x-2">
-              {isOnline ? (
-                <div 
-                  className="w-2.5 h-2.5 rounded-full bg-green-400" 
-                  title="Online"
-                />
-              ) : (
-                <div className="flex items-center space-x-2">
-                  <div 
-                    className="w-2.5 h-2.5 rounded-full bg-amber-400" 
-                    title="Offline"
-                  />
-                  {pendingCount > 0 && (
-                    <Badge variant="warning" className="text-xs bg-amber-500/20 text-amber-300 border-amber-500/30">
-                      {pendingCount} pending
-                    </Badge>
-                  )}
-                </div>
-              )}
-            </div>
-
               {/* Notification Bell */}
               <div className="relative">
                 <Button
