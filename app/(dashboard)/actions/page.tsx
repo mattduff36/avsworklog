@@ -21,6 +21,9 @@ type Action = Database['public']['Tables']['actions']['Row'] & {
     vehicles?: {
       reg_number: string;
     };
+    profiles?: {
+      full_name: string;
+    };
   };
   inspection_items?: {
     item_description: string;
@@ -54,6 +57,9 @@ export default function ActionsPage() {
             inspection_date,
             vehicles (
               reg_number
+            ),
+            profiles!vehicle_inspections_user_id_fkey (
+              full_name
             )
           ),
           inspection_items (
@@ -402,6 +408,11 @@ export default function ActionsPage() {
                                   Vehicle: {action.vehicle_inspections.vehicles?.reg_number || 'N/A'}
                                 </span>
                               )}
+                              {action.vehicle_inspections?.profiles?.full_name && (
+                                <span>
+                                  Submitted by: {action.vehicle_inspections.profiles.full_name}
+                                </span>
+                              )}
                               {action.inspection_items && (
                                 <span>
                                   Issue: {action.inspection_items.item_description}
@@ -499,6 +510,11 @@ export default function ActionsPage() {
                               {action.vehicle_inspections && (
                                 <span>
                                   Vehicle: {action.vehicle_inspections.vehicles?.reg_number || 'N/A'}
+                                </span>
+                              )}
+                              {action.vehicle_inspections?.profiles?.full_name && (
+                                <span>
+                                  Submitted by: {action.vehicle_inspections.profiles.full_name}
                                 </span>
                               )}
                               {action.inspection_items && (
