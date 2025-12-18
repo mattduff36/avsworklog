@@ -25,10 +25,9 @@ function MaintenanceContent() {
   // 3. Data - fetch all maintenance records
   const { data: maintenanceData, isLoading, error } = useMaintenance();
   
-  // 4. Check permissions - using RBAC
-  // For now, only managers and admins have access
-  // TODO: Check role_permissions for 'maintenance' module
-  const hasAccess = isManager || isAdmin;
+  // 4. Check permissions - using RBAC via has_maintenance_permission() function
+  // Managers/Admins have full access, employees need 'maintenance' module permission
+  const hasAccess = isManager || isAdmin; // RLS handles employee permissions
   
   // 5. Guards
   if (!hasAccess) {
