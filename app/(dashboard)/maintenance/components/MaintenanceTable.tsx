@@ -273,13 +273,14 @@ export function MaintenanceTable({
               {searchQuery ? 'No vehicles found matching your search.' : 'No vehicles with maintenance records yet.'}
             </div>
           ) : (
-            <div className="border border-slate-700 rounded-lg overflow-hidden">
+            <div className="border border-slate-700 rounded-lg">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-slate-700 hover:bg-slate-800/50">
+                    <TableRow className="border-slate-700">
                       <TableHead 
-                        className="text-slate-300 cursor-pointer hover:bg-slate-800"
+                        className="sticky z-30 bg-slate-900 text-slate-300 cursor-pointer hover:bg-slate-800 border-b-2 border-slate-700"
+                        style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                         onClick={() => handleSort('reg_number')}
                       >
                         <div className="flex items-center gap-2">
@@ -289,7 +290,8 @@ export function MaintenanceTable({
                       </TableHead>
                       {columnVisibility.nickname && (
                         <TableHead 
-                          className="text-slate-300 cursor-pointer hover:bg-slate-800"
+                          className="sticky z-30 bg-slate-900 text-slate-300 cursor-pointer hover:bg-slate-800 border-b-2 border-slate-700"
+                          style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                           onClick={() => handleSort('nickname')}
                         >
                           <div className="flex items-center gap-2">
@@ -300,7 +302,8 @@ export function MaintenanceTable({
                       )}
                       {columnVisibility.current_mileage && (
                       <TableHead 
-                          className="text-slate-300 cursor-pointer hover:bg-slate-800"
+                          className="sticky z-30 bg-slate-900 text-slate-300 cursor-pointer hover:bg-slate-800 border-b-2 border-slate-700"
+                          style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                           onClick={() => handleSort('current_mileage')}
                         >
                           <div className="flex items-center gap-2">
@@ -311,7 +314,8 @@ export function MaintenanceTable({
                       )}
                       {columnVisibility.tax_due && (
                       <TableHead 
-                          className="text-slate-300 cursor-pointer hover:bg-slate-800"
+                          className="sticky z-30 bg-slate-900 text-slate-300 cursor-pointer hover:bg-slate-800 border-b-2 border-slate-700"
+                          style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                           onClick={() => handleSort('tax_due')}
                         >
                           <div className="flex items-center gap-2">
@@ -322,7 +326,8 @@ export function MaintenanceTable({
                       )}
                       {columnVisibility.mot_due && (
                       <TableHead 
-                          className="text-slate-300 cursor-pointer hover:bg-slate-800"
+                          className="sticky z-30 bg-slate-900 text-slate-300 cursor-pointer hover:bg-slate-800 border-b-2 border-slate-700"
+                          style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                           onClick={() => handleSort('mot_due')}
                         >
                           <div className="flex items-center gap-2">
@@ -333,7 +338,8 @@ export function MaintenanceTable({
                       )}
                       {columnVisibility.service_due && (
                       <TableHead 
-                          className="text-slate-300 cursor-pointer hover:bg-slate-800"
+                          className="sticky z-30 bg-slate-900 text-slate-300 cursor-pointer hover:bg-slate-800 border-b-2 border-slate-700"
+                          style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                           onClick={() => handleSort('service_due')}
                         >
                           <div className="flex items-center gap-2">
@@ -344,7 +350,8 @@ export function MaintenanceTable({
                       )}
                       {columnVisibility.cambelt_due && (
                       <TableHead 
-                          className="text-slate-300 cursor-pointer hover:bg-slate-800"
+                          className="sticky z-30 bg-slate-900 text-slate-300 cursor-pointer hover:bg-slate-800 border-b-2 border-slate-700"
+                          style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                           onClick={() => handleSort('cambelt_due')}
                         >
                           <div className="flex items-center gap-2">
@@ -355,7 +362,8 @@ export function MaintenanceTable({
                       )}
                       {columnVisibility.first_aid_expiry && (
                       <TableHead 
-                          className="text-slate-300 cursor-pointer hover:bg-slate-800"
+                          className="sticky z-30 bg-slate-900 text-slate-300 cursor-pointer hover:bg-slate-800 border-b-2 border-slate-700"
+                          style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                           onClick={() => handleSort('first_aid_expiry')}
                         >
                           <div className="flex items-center gap-2">
@@ -364,7 +372,10 @@ export function MaintenanceTable({
                           </div>
                         </TableHead>
                       )}
-                      <TableHead className="text-right text-slate-300">
+                      <TableHead 
+                        className="sticky z-30 bg-slate-900 text-right text-slate-300 border-b-2 border-slate-700"
+                        style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
+                      >
                         Actions
                       </TableHead>
                     </TableRow>
