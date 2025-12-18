@@ -205,8 +205,15 @@ export function Navbar() {
           timestamp: new Date().toISOString()
         };
 
-        // Only log if error is not a simple network timeout or user logged out
-        if (error instanceof Error && !error.message.includes('401')) {
+        // Only log unexpected errors, not network failures or auth errors
+        // Skip: "Failed to fetch" (dev server down), "Network request failed" (offline), "401" (logged out)
+        const isExpectedError = error instanceof Error && (
+          error.message.includes('401') ||
+          error.message.includes('Failed to fetch') ||
+          error.message.includes('Network request failed')
+        );
+        
+        if (!isExpectedError) {
           console.error('Error fetching notifications:', errorDetails);
         }
         
