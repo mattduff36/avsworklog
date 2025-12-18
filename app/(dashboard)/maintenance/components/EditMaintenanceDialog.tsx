@@ -26,6 +26,7 @@ import { formatDateForInput, formatMileage } from '@/lib/utils/maintenanceCalcul
 // ============================================================================
 
 const editMaintenanceSchema = z.object({
+  current_mileage: z.coerce.number().int().positive('Current mileage must be a positive number').optional().nullable(),
   tax_due_date: z.string().optional().nullable(),
   mot_due_date: z.string().optional().nullable(),
   first_aid_kit_expiry: z.string().optional().nullable(),
@@ -84,6 +85,7 @@ export function EditMaintenanceDialog({
   useEffect(() => {
     if (vehicle) {
       reset({
+        current_mileage: vehicle.current_mileage || undefined,
         tax_due_date: formatDateForInput(vehicle.tax_due_date),
         mot_due_date: formatDateForInput(vehicle.mot_due_date),
         first_aid_kit_expiry: formatDateForInput(vehicle.first_aid_kit_expiry),
@@ -103,6 +105,7 @@ export function EditMaintenanceDialog({
 
     // Convert empty strings to null for dates
     const updates = {
+      current_mileage: data.current_mileage || null,
       tax_due_date: data.tax_due_date || null,
       mot_due_date: data.mot_due_date || null,
       first_aid_kit_expiry: data.first_aid_kit_expiry || null,
@@ -112,7 +115,6 @@ export function EditMaintenanceDialog({
       tracker_id: data.tracker_id || null,
       notes: data.notes || null,
       comment: data.comment.trim(), // Mandatory comment
-      current_mileage: vehicle.current_mileage || 0, // Include current mileage for new records
     };
 
     if (isNewRecord) {
@@ -147,16 +149,28 @@ export function EditMaintenanceDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Current Mileage (Read-only) */}
-          <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-            <Label className="text-sm text-slate-400">Current Mileage (Auto-updated)</Label>
-            <p className="text-xl font-semibold text-white mt-1">
-              {formatMileage(vehicle.current_mileage)}
+          {/* Current Mileage (Editable for manual corrections) */}
+          <div className="bg-amber-900/20 border border-amber-800/50 rounded-lg p-4">
+            <Label htmlFor="current_mileage" className="text-white">
+              Current Mileage <span className="text-amber-400">(Manual Override)</span>
+            </Label>
+            <Input
+              id="current_mileage"
+              type="number"
+              {...register('current_mileage')}
+              placeholder="e.g., 75000"
+              className="bg-slate-800 border-slate-600 text-white mt-2"
+            />
+            <p className="text-xs text-slate-400 mt-2">
+              ⚠️ Normally auto-updated from inspections. Only edit if the current mileage is incorrect (e.g., typo in inspection).
             </p>
             {vehicle.last_mileage_update && (
               <p className="text-xs text-slate-500 mt-1">
-                Last updated: {new Date(vehicle.last_mileage_update).toLocaleString()}
+                Last auto-update: {new Date(vehicle.last_mileage_update).toLocaleString()}
               </p>
+            )}
+            {errors.current_mileage && (
+              <p className="text-sm text-red-400 mt-2">{errors.current_mileage.message}</p>
             )}
           </div>
 

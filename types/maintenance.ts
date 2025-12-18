@@ -115,6 +115,7 @@ export interface VehicleMaintenanceWithStatus extends VehicleMaintenance {
 // ============================================================================
 
 export interface UpdateMaintenanceRequest {
+  current_mileage?: number | null; // Manual override for current mileage
   tax_due_date?: string | null;
   mot_due_date?: string | null;
   first_aid_kit_expiry?: string | null;

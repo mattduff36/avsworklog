@@ -75,6 +75,20 @@ export async function PUT(
     }> = [];
     
     // Check each possible update field
+    // Current mileage (manual override)
+    if (body.current_mileage !== undefined) {
+      updates.current_mileage = body.current_mileage;
+      updates.last_mileage_update = new Date().toISOString(); // Update the last mileage timestamp
+      if (currentRecord.current_mileage !== body.current_mileage) {
+        changedFields.push({
+          field_name: 'current_mileage',
+          old_value: currentRecord.current_mileage?.toString() || null,
+          new_value: body.current_mileage?.toString() || null,
+          value_type: 'mileage'
+        });
+      }
+    }
+    
     if (body.tax_due_date !== undefined) {
       updates.tax_due_date = body.tax_due_date;
       if (currentRecord.tax_due_date !== body.tax_due_date) {
