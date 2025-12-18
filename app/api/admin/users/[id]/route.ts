@@ -115,7 +115,8 @@ export async function PUT(
     }
 
     // Update profile data (email is only in auth, not in profiles table)
-    const { error: profileError } = await supabase
+    // Use admin client to bypass RLS policies
+    const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .update({
         full_name,
