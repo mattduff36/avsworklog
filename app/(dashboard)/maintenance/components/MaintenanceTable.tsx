@@ -274,8 +274,7 @@ export function MaintenanceTable({
             </div>
           ) : (
             <div className="border border-slate-700 rounded-lg">
-              <div className="overflow-x-scroll" style={{ overflowY: 'visible' }}>
-                <Table>
+                <Table className="min-w-full">
                   <TableHeader>
                     <TableRow className="border-slate-700">
                       <TableHead 
@@ -491,7 +490,6 @@ export function MaintenanceTable({
                     ))}
                   </TableBody>
                 </Table>
-              </div>
             </div>
           )}
         </CardContent>
