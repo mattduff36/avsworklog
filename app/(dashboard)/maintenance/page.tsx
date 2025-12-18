@@ -114,8 +114,8 @@ function MaintenanceContent() {
         <Tabs defaultValue="maintenance" className="space-y-4">
           <TabsList className="bg-slate-100 dark:bg-slate-800">
             <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
-            <TabsTrigger value="settings" disabled={!isAdmin && !isManager}>
-              Settings {!isAdmin && !isManager && '(Admin Only)'}
+            <TabsTrigger value="settings" disabled={!isSuperAdmin && !isAdmin && !isManager}>
+              Settings {!isSuperAdmin && !isAdmin && !isManager && '(Admin Only)'}
             </TabsTrigger>
           </TabsList>
 

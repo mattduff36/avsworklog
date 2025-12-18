@@ -211,6 +211,23 @@
     background-color: rgb(51 65 85) !important; /* slate-700 */
   }
   
+  /* Force light green backgrounds to dark green - CRITICAL for badges */
+  .bg-green-50 {
+    background-color: rgba(34, 197, 94, 0.1) !important; /* green-500/10 */
+  }
+  
+  .bg-green-100 {
+    background-color: rgba(34, 197, 94, 0.2) !important; /* green-500/20 */
+  }
+  
+  .bg-green-200 {
+    background-color: rgba(34, 197, 94, 0.25) !important; /* green-500/25 */
+  }
+  
+  .bg-green-300 {
+    background-color: rgba(34, 197, 94, 0.3) !important; /* green-500/30 */
+  }
+  
   /* Force light borders to dark slate colors */
   .border-slate-200 {
     border-color: rgb(51 65 85) !important; /* slate-700 */
@@ -252,6 +269,19 @@
   
   .border-yellow-300 {
     border-color: rgba(234, 179, 8, 0.4) !important; /* yellow-500/40 */
+  }
+  
+  /* Force light green borders to dark green */
+  .border-green-200 {
+    border-color: rgba(34, 197, 94, 0.3) !important; /* green-500/30 */
+  }
+  
+  .border-green-300 {
+    border-color: rgba(34, 197, 94, 0.4) !important; /* green-500/40 */
+  }
+  
+  .border-green-800 {
+    border-color: rgba(34, 197, 94, 0.5) !important; /* green-500/50 */
   }
   
   /* Force light text to appropriate dark mode colors */
@@ -362,6 +392,27 @@
     color: rgb(254 249 195) !important; /* yellow-100 - light text */
   }
   
+  /* Force green text colors to light green for dark theme */
+  .text-green-400 {
+    color: rgb(74 222 128) !important; /* green-400 - bright for dark bg */
+  }
+  
+  .text-green-600 {
+    color: rgb(134 239 172) !important; /* green-300 - lighter for visibility */
+  }
+  
+  .text-green-700 {
+    color: rgb(187 247 208) !important; /* green-200 - lighter for visibility */
+  }
+  
+  .text-green-800 {
+    color: rgb(220 252 231) !important; /* green-100 - very light */
+  }
+  
+  .text-green-900 {
+    color: rgb(240 253 244) !important; /* green-50 - nearly white text */
+  }
+  
   /* Force hover states to dark */
   .hover\:bg-slate-100:hover {
     background-color: rgb(51 65 85) !important; /* slate-700 */
@@ -369,6 +420,11 @@
   
   .hover\:bg-slate-800:hover {
     background-color: rgb(30 41 59) !important; /* slate-800 */
+  }
+  
+  /* Force green hover states to darker green */
+  .hover\:bg-green-600:hover {
+    background-color: rgb(22 163 74) !important; /* green-600 */
   }
   
   /* Mobile View - 20% Smaller */

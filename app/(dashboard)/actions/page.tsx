@@ -358,10 +358,10 @@ export default function ActionsPage() {
             <CardTitle className="text-xl md:text-3xl text-red-600 dark:text-red-400">{loggedActions.length}</CardTitle>
           </CardHeader>
         </Card>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="bg-slate-900 border-slate-700">
           <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
-            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400">Done</CardDescription>
-            <CardTitle className="text-xl md:text-3xl text-green-600 dark:text-green-400">{completedActions.length}</CardTitle>
+            <CardDescription className="text-xs md:text-sm text-slate-400">Done</CardDescription>
+            <CardTitle className="text-xl md:text-3xl text-green-400">{completedActions.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
@@ -575,8 +575,8 @@ export default function ActionsPage() {
                       <div className="flex flex-col md:flex-row items-start justify-between gap-4">
                         <div className="flex-1 w-full">
                           <div className="flex items-center gap-2 mb-2">
-                            <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
-                            <h3 className="font-semibold text-lg text-slate-900 dark:text-white line-through">{action.title}</h3>
+                            <CheckCircle2 className="h-5 w-5 text-green-400" />
+                            <h3 className="font-semibold text-lg text-white line-through">{action.title}</h3>
                             {getPriorityBadge(action.priority)}
                           </div>
                           {action.description && (
