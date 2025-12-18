@@ -601,12 +601,12 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
   return (
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-lg p-6 text-white">
         <div className="flex items-center gap-3">
-          <Bug className="h-6 md:h-8 w-6 md:w-8 text-orange-500" />
+          <Bug className="h-6 md:h-8 w-6 md:w-8" />
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white mb-1 md:mb-2">SuperAdmin Debug Console</h1>
-            <p className="text-sm md:text-base text-slate-600 dark:text-slate-400">
+            <h1 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">SuperAdmin Debug Console</h1>
+            <p className="text-sm md:text-base text-red-100">
               Developer tools and system information
             </p>
           </div>
