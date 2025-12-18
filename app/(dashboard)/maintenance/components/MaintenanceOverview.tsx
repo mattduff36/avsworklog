@@ -12,16 +12,18 @@ interface MaintenanceOverviewProps {
     overdue: number;
     due_soon: number;
   };
+  onVehicleClick?: (vehicle: VehicleMaintenanceWithStatus) => void;
 }
 
 interface Alert {
+  vehicle: VehicleMaintenanceWithStatus;
   vehicle_reg: string;
   type: string;
   detail: string;
   severity: 'overdue' | 'due_soon';
 }
 
-export function MaintenanceOverview({ vehicles, summary }: MaintenanceOverviewProps) {
+export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: MaintenanceOverviewProps) {
   // Extract all alerts from vehicles
   const alerts: Alert[] = [];
   
@@ -31,6 +33,7 @@ export function MaintenanceOverview({ vehicles, summary }: MaintenanceOverviewPr
     // Check Tax
     if (vehicle.tax_status?.status === 'overdue') {
       alerts.push({
+        vehicle,
         vehicle_reg: reg,
         type: 'Tax',
         detail: formatDaysUntil(vehicle.tax_status.days_until),
@@ -38,6 +41,7 @@ export function MaintenanceOverview({ vehicles, summary }: MaintenanceOverviewPr
       });
     } else if (vehicle.tax_status?.status === 'due_soon') {
       alerts.push({
+        vehicle,
         vehicle_reg: reg,
         type: 'Tax',
         detail: formatDaysUntil(vehicle.tax_status.days_until),
@@ -48,6 +52,7 @@ export function MaintenanceOverview({ vehicles, summary }: MaintenanceOverviewPr
     // Check MOT
     if (vehicle.mot_status?.status === 'overdue') {
       alerts.push({
+        vehicle,
         vehicle_reg: reg,
         type: 'MOT',
         detail: formatDaysUntil(vehicle.mot_status.days_until),
@@ -55,6 +60,7 @@ export function MaintenanceOverview({ vehicles, summary }: MaintenanceOverviewPr
       });
     } else if (vehicle.mot_status?.status === 'due_soon') {
       alerts.push({
+        vehicle,
         vehicle_reg: reg,
         type: 'MOT',
         detail: formatDaysUntil(vehicle.mot_status.days_until),
@@ -65,6 +71,7 @@ export function MaintenanceOverview({ vehicles, summary }: MaintenanceOverviewPr
     // Check Service
     if (vehicle.service_status?.status === 'overdue') {
       alerts.push({
+        vehicle,
         vehicle_reg: reg,
         type: 'Service',
         detail: formatMilesUntil(vehicle.service_status.miles_until),
@@ -72,6 +79,7 @@ export function MaintenanceOverview({ vehicles, summary }: MaintenanceOverviewPr
       });
     } else if (vehicle.service_status?.status === 'due_soon') {
       alerts.push({
+        vehicle,
         vehicle_reg: reg,
         type: 'Service',
         detail: formatMilesUntil(vehicle.service_status.miles_until),
@@ -82,6 +90,7 @@ export function MaintenanceOverview({ vehicles, summary }: MaintenanceOverviewPr
     // Check Cambelt
     if (vehicle.cambelt_status?.status === 'overdue') {
       alerts.push({
+        vehicle,
         vehicle_reg: reg,
         type: 'Cambelt',
         detail: formatMilesUntil(vehicle.cambelt_status.miles_until),
@@ -89,6 +98,7 @@ export function MaintenanceOverview({ vehicles, summary }: MaintenanceOverviewPr
       });
     } else if (vehicle.cambelt_status?.status === 'due_soon') {
       alerts.push({
+        vehicle,
         vehicle_reg: reg,
         type: 'Cambelt',
         detail: formatMilesUntil(vehicle.cambelt_status.miles_until),
@@ -99,6 +109,7 @@ export function MaintenanceOverview({ vehicles, summary }: MaintenanceOverviewPr
     // Check First Aid
     if (vehicle.first_aid_status?.status === 'overdue') {
       alerts.push({
+        vehicle,
         vehicle_reg: reg,
         type: 'First Aid Kit',
         detail: formatDaysUntil(vehicle.first_aid_status.days_until),
@@ -106,6 +117,7 @@ export function MaintenanceOverview({ vehicles, summary }: MaintenanceOverviewPr
       });
     } else if (vehicle.first_aid_status?.status === 'due_soon') {
       alerts.push({
+        vehicle,
         vehicle_reg: reg,
         type: 'First Aid Kit',
         detail: formatDaysUntil(vehicle.first_aid_status.days_until),
@@ -161,7 +173,16 @@ export function MaintenanceOverview({ vehicles, summary }: MaintenanceOverviewPr
               {overdueAlerts.map((alert, idx) => (
                 <div 
                   key={idx} 
-                  className="flex items-start gap-3 text-sm bg-white dark:bg-slate-900 p-3 rounded-md border border-red-200 dark:border-red-800"
+                  onClick={() => onVehicleClick?.(alert.vehicle)}
+                  className="flex items-start gap-3 text-sm bg-white dark:bg-slate-900 p-3 rounded-md border border-red-200 dark:border-red-800 cursor-pointer hover:bg-red-50 dark:hover:bg-slate-800 transition-colors"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onVehicleClick?.(alert.vehicle);
+                    }
+                  }}
                 >
                   <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
@@ -198,7 +219,16 @@ export function MaintenanceOverview({ vehicles, summary }: MaintenanceOverviewPr
               {dueSoonAlerts.map((alert, idx) => (
                 <div 
                   key={idx} 
-                  className="flex items-start gap-3 text-sm bg-white dark:bg-slate-900 p-3 rounded-md border border-amber-200 dark:border-amber-800"
+                  onClick={() => onVehicleClick?.(alert.vehicle)}
+                  className="flex items-start gap-3 text-sm bg-white dark:bg-slate-900 p-3 rounded-md border border-amber-200 dark:border-amber-800 cursor-pointer hover:bg-amber-50 dark:hover:bg-slate-800 transition-colors"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onVehicleClick?.(alert.vehicle);
+                    }
+                  }}
                 >
                   <Wrench className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">

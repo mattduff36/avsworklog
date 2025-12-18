@@ -5,7 +5,9 @@ import type {
   VehicleMaintenance,
   VehicleMaintenanceWithStatus,
   MaintenanceCategory,
-  MaintenanceListResponse
+  MaintenanceListResponse,
+  UpdateMaintenanceRequest,
+  MaintenanceUpdateResponse
 } from '@/types/maintenance';
 import {
   getDateBasedStatus,
@@ -69,29 +71,62 @@ export async function GET(request: NextRequest) {
     const cambeltThreshold = categoryMap.get('cambelt replacement')?.alert_threshold_miles || 5000;
     const firstAidThreshold = categoryMap.get('first aid kit expiry')?.alert_threshold_days || 30;
     
-    // Get all vehicles with maintenance data
+    // Get all active vehicles with their maintenance data (if any)
+    // Using LEFT JOIN to include vehicles without maintenance records
     // Note: Cannot order by joined table columns in Supabase
     // Sorting is handled client-side in the MaintenanceTable component
-    const { data: maintenanceRecords, error: maintenanceError } = await supabase
-      .from('vehicle_maintenance')
+    const { data: vehicles, error: vehiclesError } = await supabase
+      .from('vehicles')
       .select(`
-        *,
-        vehicle:vehicles(
-          id,
-          reg_number,
-          category_id,
-          status
-        )
-      `);
+        id,
+        reg_number,
+        category_id,
+        status,
+        maintenance:vehicle_maintenance(*)
+      `)
+      .eq('status', 'active');
     
-    if (maintenanceError) {
-      logger.error('Failed to fetch maintenance records', maintenanceError);
-      throw maintenanceError;
+    if (vehiclesError) {
+      logger.error('Failed to fetch vehicles with maintenance records', vehiclesError);
+      throw vehiclesError;
     }
     
     // Calculate status for each vehicle
-    const vehiclesWithStatus: VehicleMaintenanceWithStatus[] = (maintenanceRecords || []).map(record => {
-      const maintenance = record as any;
+    const vehiclesWithStatus: VehicleMaintenanceWithStatus[] = (vehicles || []).map(vehicle => {
+      const v = vehicle as any;
+      // Get maintenance data (will be null/empty if no maintenance record exists)
+      const maintenance = Array.isArray(v.maintenance) ? v.maintenance[0] : v.maintenance;
+      
+      // If no maintenance record exists, create a placeholder structure
+      if (!maintenance) {
+        return {
+          id: null,
+          vehicle_id: v.id,
+          vehicle: {
+            id: v.id,
+            reg_number: v.reg_number,
+            category_id: v.category_id,
+            status: v.status
+          },
+          current_mileage: null,
+          tax_due_date: null,
+          mot_due_date: null,
+          next_service_mileage: null,
+          miles_last_service: null,
+          cambelt_due_mileage: null,
+          cambelt_done: null,
+          first_aid_kit_expiry: null,
+          created_at: null,
+          updated_at: null,
+          tax_status: { status: 'not_set' as const },
+          mot_status: { status: 'not_set' as const },
+          service_status: { status: 'not_set' as const },
+          cambelt_status: { status: 'not_set' as const },
+          first_aid_status: { status: 'not_set' as const },
+          overdue_count: 0,
+          due_soon_count: 0
+        };
+      }
       
       // Calculate status for each maintenance type
       const tax_status = getDateBasedStatus(maintenance.tax_due_date, taxThreshold);
@@ -122,6 +157,12 @@ export async function GET(request: NextRequest) {
       
       return {
         ...maintenance,
+        vehicle: {
+          id: v.id,
+          reg_number: v.reg_number,
+          category_id: v.category_id,
+          status: v.status
+        },
         tax_status,
         mot_status,
         service_status,
@@ -149,6 +190,188 @@ export async function GET(request: NextRequest) {
     
   } catch (error: any) {
     logger.error('GET /api/maintenance failed', error, 'MaintenanceAPI');
+    return NextResponse.json(
+      { error: 'Internal server error', details: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST /api/maintenance
+ * Create a new maintenance record for a vehicle
+ */
+export async function POST(request: NextRequest) {
+  try {
+    // Auth check
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+    
+    // Get user profile for name
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single();
+    
+    const userName = profile?.full_name || 'Unknown User';
+    
+    // Parse request body
+    const body: UpdateMaintenanceRequest & { vehicle_id: string } = await request.json();
+    
+    // Validate vehicle_id
+    if (!body.vehicle_id) {
+      return NextResponse.json(
+        { error: 'vehicle_id is required' },
+        { status: 400 }
+      );
+    }
+    
+    // Validate comment (mandatory, min 10 characters)
+    if (!body.comment || body.comment.trim().length < 10) {
+      return NextResponse.json(
+        { error: 'Comment is required and must be at least 10 characters' },
+        { status: 400 }
+      );
+    }
+    
+    // Check if maintenance record already exists
+    const { data: existingRecord } = await supabase
+      .from('vehicle_maintenance')
+      .select('id')
+      .eq('vehicle_id', body.vehicle_id)
+      .single();
+    
+    if (existingRecord) {
+      return NextResponse.json(
+        { error: 'Maintenance record already exists for this vehicle' },
+        { status: 409 }
+      );
+    }
+    
+    // Create new maintenance record
+    const newRecord = {
+      vehicle_id: body.vehicle_id,
+      current_mileage: body.current_mileage || 0,
+      tax_due_date: body.tax_due_date || null,
+      mot_due_date: body.mot_due_date || null,
+      first_aid_kit_expiry: body.first_aid_kit_expiry || null,
+      next_service_mileage: body.next_service_mileage || null,
+      last_service_mileage: body.last_service_mileage || null,
+      cambelt_due_mileage: body.cambelt_due_mileage || null,
+      cambelt_done: body.cambelt_done || false,
+      notes: body.notes || null,
+      last_updated_by: user.id
+    };
+    
+    const { data: createdMaintenance, error: createError } = await supabase
+      .from('vehicle_maintenance')
+      .insert(newRecord)
+      .select()
+      .single();
+    
+    if (createError) {
+      logger.error('Failed to create maintenance record', createError);
+      throw createError;
+    }
+    
+    // Create history entry for initial creation
+    const historyEntries = [];
+    
+    if (body.tax_due_date) {
+      historyEntries.push({
+        vehicle_id: body.vehicle_id,
+        field_name: 'tax_due_date',
+        old_value: null,
+        new_value: body.tax_due_date,
+        value_type: 'date' as const,
+        comment: body.comment,
+        updated_by: user.id,
+        updated_by_name: userName
+      });
+    }
+    
+    if (body.mot_due_date) {
+      historyEntries.push({
+        vehicle_id: body.vehicle_id,
+        field_name: 'mot_due_date',
+        old_value: null,
+        new_value: body.mot_due_date,
+        value_type: 'date' as const,
+        comment: body.comment,
+        updated_by: user.id,
+        updated_by_name: userName
+      });
+    }
+    
+    if (body.first_aid_kit_expiry) {
+      historyEntries.push({
+        vehicle_id: body.vehicle_id,
+        field_name: 'first_aid_kit_expiry',
+        old_value: null,
+        new_value: body.first_aid_kit_expiry,
+        value_type: 'date' as const,
+        comment: body.comment,
+        updated_by: user.id,
+        updated_by_name: userName
+      });
+    }
+    
+    if (body.next_service_mileage) {
+      historyEntries.push({
+        vehicle_id: body.vehicle_id,
+        field_name: 'next_service_mileage',
+        old_value: null,
+        new_value: body.next_service_mileage.toString(),
+        value_type: 'mileage' as const,
+        comment: body.comment,
+        updated_by: user.id,
+        updated_by_name: userName
+      });
+    }
+    
+    if (body.cambelt_due_mileage) {
+      historyEntries.push({
+        vehicle_id: body.vehicle_id,
+        field_name: 'cambelt_due_mileage',
+        old_value: null,
+        new_value: body.cambelt_due_mileage.toString(),
+        value_type: 'mileage' as const,
+        comment: body.comment,
+        updated_by: user.id,
+        updated_by_name: userName
+      });
+    }
+    
+    // Insert history entries if any
+    if (historyEntries.length > 0) {
+      const { error: historyError } = await supabase
+        .from('maintenance_history')
+        .insert(historyEntries);
+      
+      if (historyError) {
+        logger.error('Failed to create history entries', historyError);
+        // Don't fail the request if history fails
+      }
+    }
+    
+    const response: MaintenanceUpdateResponse = {
+      success: true,
+      maintenance: createdMaintenance,
+      message: 'Maintenance record created successfully'
+    };
+    
+    return NextResponse.json(response);
+    
+  } catch (error: any) {
+    logger.error('POST /api/maintenance failed', error, 'MaintenanceAPI');
     return NextResponse.json(
       { error: 'Internal server error', details: error.message },
       { status: 500 }

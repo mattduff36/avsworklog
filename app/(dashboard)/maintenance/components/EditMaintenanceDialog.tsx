@@ -18,7 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Save, History as HistoryIcon } from 'lucide-react';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
-import { useUpdateMaintenance } from '@/lib/hooks/useMaintenance';
+import { useUpdateMaintenance, useCreateMaintenance } from '@/lib/hooks/useMaintenance';
 import { formatDateForInput, formatMileage } from '@/lib/utils/maintenanceCalculations';
 
 // ============================================================================
@@ -60,6 +60,10 @@ export function EditMaintenanceDialog({
   onSuccess
 }: EditMaintenanceDialogProps) {
   const updateMutation = useUpdateMaintenance();
+  const createMutation = useCreateMaintenance();
+  
+  // Check if this is a new maintenance record (vehicle.id is null for vehicles without maintenance records)
+  const isNewRecord = !vehicle?.id;
 
   // Initialize form
   const {
@@ -108,9 +112,20 @@ export function EditMaintenanceDialog({
       cambelt_done: data.cambelt_done,
       notes: data.notes || null,
       comment: data.comment.trim(), // Mandatory comment
+      current_mileage: vehicle.current_mileage || 0, // Include current mileage for new records
     };
 
-    await updateMutation.mutateAsync({ id: vehicle.id, updates });
+    if (isNewRecord) {
+      // Create new maintenance record
+      await createMutation.mutateAsync({ 
+        vehicle_id: vehicle.vehicle_id, 
+        data: updates 
+      });
+    } else {
+      // Update existing maintenance record
+      await updateMutation.mutateAsync({ id: vehicle.id, updates });
+    }
+    
     onSuccess?.();
   };
 
@@ -121,10 +136,13 @@ export function EditMaintenanceDialog({
       <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">
-            Edit Maintenance - {vehicle.vehicle?.reg_number}
+            {isNewRecord ? 'Create' : 'Edit'} Maintenance - {vehicle.vehicle?.reg_number}
           </DialogTitle>
           <DialogDescription className="text-slate-400">
-            Update maintenance dates and schedules. A comment is required to explain changes.
+            {isNewRecord 
+              ? 'Set up maintenance schedule for this vehicle. A comment is required to explain the initial setup.' 
+              : 'Update maintenance dates and schedules. A comment is required to explain changes.'
+            }
           </DialogDescription>
         </DialogHeader>
 
@@ -306,7 +324,7 @@ export function EditMaintenanceDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
               className="border-slate-600 text-white hover:bg-slate-800"
-              disabled={isSubmitting || updateMutation.isPending}
+              disabled={isSubmitting || updateMutation.isPending || createMutation.isPending}
             >
               Cancel
             </Button>
@@ -321,18 +339,18 @@ export function EditMaintenanceDialog({
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || updateMutation.isPending || commentLength < 10}
+              disabled={isSubmitting || updateMutation.isPending || createMutation.isPending || commentLength < 10}
               className="bg-blue-600 hover:bg-blue-700"
             >
-              {(isSubmitting || updateMutation.isPending) ? (
+              {(isSubmitting || updateMutation.isPending || createMutation.isPending) ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
+                  {isNewRecord ? 'Creating...' : 'Saving...'}
                 </>
               ) : (
                 <>
                   <Save className="h-4 w-4 mr-2" />
-                  Save Changes
+                  {isNewRecord ? 'Create Record' : 'Save Changes'}
                 </>
               )}
             </Button>

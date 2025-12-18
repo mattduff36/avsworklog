@@ -85,6 +85,52 @@ export function useMaintenanceHistory(vehicleId: string | null) {
 }
 
 // ============================================================================
+// Mutation: Create maintenance record
+// ============================================================================
+
+export function useCreateMaintenance() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      vehicle_id, 
+      data 
+    }: { 
+      vehicle_id: string; 
+      data: UpdateMaintenanceRequest 
+    }): Promise<MaintenanceUpdateResponse> => {
+      const response = await fetch('/api/maintenance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vehicle_id, ...data }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create maintenance record');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      // Invalidate maintenance list to refetch with new data
+      queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+      
+      toast.success('Maintenance record created', {
+        description: 'The vehicle maintenance record has been created.',
+      });
+    },
+    onError: (error: Error) => {
+      logger.error('Failed to create maintenance record', error, 'useMaintenance');
+      toast.error('Failed to create maintenance record', {
+        description: error.message,
+        duration: 5000,
+      });
+    },
+  });
+}
+
+// ============================================================================
 // Mutation: Update maintenance record
 // ============================================================================
 

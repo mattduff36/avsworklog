@@ -13,6 +13,8 @@ import { useMaintenance } from '@/lib/hooks/useMaintenance';
 import { MaintenanceOverview } from './components/MaintenanceOverview';
 import { MaintenanceTable } from './components/MaintenanceTable';
 import { MaintenanceSettings } from './components/MaintenanceSettings';
+import { EditMaintenanceDialog } from './components/EditMaintenanceDialog';
+import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 
 function MaintenanceContent() {
   // 1. Hooks
@@ -21,16 +23,24 @@ function MaintenanceContent() {
   
   // 2. State
   const [searchQuery, setSearchQuery] = useState('');
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<VehicleMaintenanceWithStatus | null>(null);
   
   // 3. Data - fetch all maintenance records
   const { data: maintenanceData, isLoading, error } = useMaintenance();
   
-  // 4. Check permissions - using RBAC via has_maintenance_permission() function
+  // 4. Handler for opening edit dialog
+  const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
+    setSelectedVehicle(vehicle);
+    setEditDialogOpen(true);
+  };
+  
+  // 5. Check permissions - using RBAC via has_maintenance_permission() function
   // SuperAdmin/Managers/Admins have full access, employees need 'maintenance' module permission
   // RLS also enforces this at database level
   const hasAccess = isSuperAdmin || isManager || isAdmin;
   
-  // 5. Guards
+  // 6. Guards
   if (!hasAccess) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -78,7 +88,7 @@ function MaintenanceContent() {
     vehicle.vehicle?.reg_number?.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
   
-  // 7. Render
+  // 8. Render
   return (
     <div className="space-y-6 max-w-7xl">
       {!isOnline && <OfflineBanner />}
@@ -124,6 +134,7 @@ function MaintenanceContent() {
             <MaintenanceOverview 
               vehicles={maintenanceData?.vehicles || []}
               summary={maintenanceData?.summary || { total: 0, overdue: 0, due_soon: 0 }}
+              onVehicleClick={handleVehicleClick}
             />
             
             {/* Main Table */}
@@ -131,6 +142,17 @@ function MaintenanceContent() {
               vehicles={filteredVehicles}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
+            />
+            
+            {/* Edit Dialog */}
+            <EditMaintenanceDialog
+              open={editDialogOpen}
+              onOpenChange={setEditDialogOpen}
+              vehicle={selectedVehicle}
+              onSuccess={() => {
+                setEditDialogOpen(false);
+                setSelectedVehicle(null);
+              }}
             />
           </TabsContent>
 
