@@ -77,7 +77,7 @@ export function MaintenanceHistoryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-between gap-4 pr-8">
             <div className="flex-1">
               <DialogTitle className="text-2xl flex items-center gap-2">
                 <HistoryIcon className="h-6 w-6" />
@@ -90,7 +90,7 @@ export function MaintenanceHistoryDialog({
             {onEditClick && (
               <Button
                 onClick={onEditClick}
-                className="bg-red-600 hover:bg-red-700 text-white flex-shrink-0"
+                className="bg-red-600 hover:bg-red-700 text-white flex-shrink-0 mt-1"
                 size="sm"
               >
                 <Edit className="h-4 w-4 mr-2" />
