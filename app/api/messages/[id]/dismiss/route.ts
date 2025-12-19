@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import type { SignMessageResponse } from '@/types/messages';
-import { logServerError } from '@/lib/utils/server-error-logger';
 
 /**
  * POST /api/messages/[id]/dismiss
@@ -84,17 +83,6 @@ export async function POST(
 
   } catch (error) {
     console.error('Error in POST /api/messages/[id]/dismiss:', error);
-
-    
-    // Log error to database
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: '/messages/:id/dismiss',
-      additionalData: {
-        endpoint: '/messages/:id/dismiss',
-      },
-    );
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
-import { logServerError } from '@/lib/utils/server-error-logger';
 
 export async function POST(
   request: NextRequest,
@@ -177,17 +176,6 @@ export async function POST(
     );
   } catch (error) {
     console.error('Unexpected error in assign:', error);
-
-    
-    // Log error to database
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: '/rams/:id/assign',
-      additionalData: {
-        endpoint: '/rams/:id/assign',
-      },
-    );
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
       { status: 500 }
@@ -249,17 +237,6 @@ export async function GET(
     });
   } catch (error) {
     console.error('Unexpected error in GET assignments:', error);
-
-    
-    // Log error to database
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: '/rams/:id/assign',
-      additionalData: {
-        endpoint: '/rams/:id/assign',
-      },
-    );
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
       { status: 500 }

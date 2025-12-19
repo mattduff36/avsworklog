@@ -4,7 +4,6 @@ import { createClient as createServerClient } from '@/lib/supabase/server';
 import { generateSecurePassword, validatePasswordStrength } from '@/lib/utils/password';
 import { sendPasswordEmail } from '@/lib/utils/email';
 import { getProfileWithRole } from '@/lib/utils/permissions';
-import { logServerError } from '@/lib/utils/server-error-logger';
 
 // Helper to create admin client with service role key
 function getSupabaseAdmin() {
@@ -159,17 +158,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error creating user:', error);
-
-    
-    // Log error to database
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: '/admin/users',
-      additionalData: {
-        endpoint: '/admin/users',
-      },
-    );
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

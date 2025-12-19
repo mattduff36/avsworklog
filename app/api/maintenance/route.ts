@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
-import { logServerError } from '@/lib/utils/server-error-logger';
 import type {
   VehicleMaintenance,
   VehicleMaintenanceWithStatus,
@@ -230,14 +229,6 @@ export async function GET(request: NextRequest) {
     
   } catch (error: any) {
     logger.error('GET /api/maintenance failed', error, 'MaintenanceAPI');
-    
-    // Log error to database
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: 'GET /api/maintenance',
-    });
-    
     return NextResponse.json(
       { error: 'Internal server error', details: error.message },
       { status: 500 }
@@ -420,14 +411,6 @@ export async function POST(request: NextRequest) {
     
   } catch (error: any) {
     logger.error('POST /api/maintenance failed', error, 'MaintenanceAPI');
-    
-    // Log error to database
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: 'POST /api/maintenance',
-    });
-    
     return NextResponse.json(
       { error: 'Internal server error', details: error.message },
       { status: 500 }

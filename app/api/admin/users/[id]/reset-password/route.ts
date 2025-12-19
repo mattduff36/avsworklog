@@ -4,7 +4,6 @@ import { createClient as createServerClient } from '@/lib/supabase/server';
 import { generateSecurePassword } from '@/lib/utils/password';
 import { sendPasswordEmail } from '@/lib/utils/email';
 import { getProfileWithRole } from '@/lib/utils/permissions';
-import { logServerError } from '@/lib/utils/server-error-logger';
 
 // Helper to create admin client with service role key
 function getSupabaseAdmin() {
@@ -120,17 +119,6 @@ export async function POST(
     });
   } catch (error) {
     console.error('Error resetting password:', error);
-
-    
-    // Log error to database
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: '/admin/users/:id/reset-password',
-      additionalData: {
-        endpoint: '/admin/users/:id/reset-password',
-      },
-    );
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

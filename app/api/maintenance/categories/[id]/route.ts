@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
-import { logServerError } from '@/lib/utils/server-error-logger';
 import type { UpdateCategoryRequest } from '@/types/maintenance';
 
 /**
@@ -62,13 +61,6 @@ export async function PUT(
     
   } catch (error: any) {
     logger.error('PUT /api/maintenance/categories/[id] failed', error, 'MaintenanceAPI');
-    
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: 'PUT /api/maintenance/categories/[id]',
-    });
-    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -133,13 +125,6 @@ export async function DELETE(
     
   } catch (error: any) {
     logger.error('DELETE /api/maintenance/categories/[id] failed', error, 'MaintenanceAPI');
-    
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: 'DELETE /api/maintenance/categories/[id]',
-    });
-    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

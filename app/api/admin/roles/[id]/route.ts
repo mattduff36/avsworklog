@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isManagerOrAdmin } from '@/lib/utils/permissions';
 import type { GetRoleResponse, UpdateRoleRequest } from '@/types/roles';
-import { logServerError } from '@/lib/utils/server-error-logger';
 
 /**
  * GET /api/admin/roles/[id]
@@ -62,18 +61,7 @@ export async function GET(
     return NextResponse.json(response);
 
   } catch (error) {
-    console.error(`Error in GET /api/admin/roles/${params.id
-
-    
-    // Log error to database
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: '/admin/roles/:id',
-      additionalData: {
-        endpoint: '/admin/roles/:id',
-      },
-    );}:`, error);
+    console.error(`Error in GET /api/admin/roles/${params.id}:`, error);
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });
@@ -167,18 +155,7 @@ export async function PATCH(
     });
 
   } catch (error) {
-    console.error(`Error in PATCH /api/admin/roles/${params.id
-
-    
-    // Log error to database
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: '/admin/roles/:id',
-      additionalData: {
-        endpoint: '/admin/roles/:id',
-      },
-    );}:`, error);
+    console.error(`Error in PATCH /api/admin/roles/${params.id}:`, error);
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });
@@ -257,18 +234,7 @@ export async function DELETE(
     });
 
   } catch (error) {
-    console.error(`Error in DELETE /api/admin/roles/${params.id
-
-    
-    // Log error to database
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: '/admin/roles/:id',
-      additionalData: {
-        endpoint: '/admin/roles/:id',
-      },
-    );}:`, error);
+    console.error(`Error in DELETE /api/admin/roles/${params.id}:`, error);
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });

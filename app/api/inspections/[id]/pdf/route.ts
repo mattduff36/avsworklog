@@ -6,7 +6,6 @@ import { VanInspectionPDF } from '@/lib/pdf/van-inspection-pdf';
 import { isVanCategory } from '@/lib/checklists/vehicle-checklists';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { getVehicleCategoryName } from '@/lib/utils/deprecation-logger';
-import { logServerError } from '@/lib/utils/server-error-logger';
 
 export async function GET(
   request: NextRequest,
@@ -107,17 +106,6 @@ export async function GET(
     });
   } catch (error) {
     console.error('PDF generation error:', error);
-
-    
-    // Log error to database
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: '/inspections/:id/pdf',
-      additionalData: {
-        endpoint: '/inspections/:id/pdf',
-      },
-    );
     return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });
   }
 }

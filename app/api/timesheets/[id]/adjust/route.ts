@@ -3,7 +3,6 @@ import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { sendTimesheetAdjustmentEmail } from '@/lib/utils/email';
 import type { Database } from '@/types/database';
-import { logServerError } from '@/lib/utils/server-error-logger';
 
 function getSupabaseAdmin() {
   return createSupabaseAdmin<Database>(
@@ -183,18 +182,7 @@ export async function POST(
               console.error(`Error fetching email for manager ${manager.id}:`, managerUserError);
             }
           } catch (err) {
-            console.error(`Exception fetching email for manager ${manager.id
-
-    
-    // Log error to database
-    await logServerError({
-      error: err as Error,
-      request,
-      componentName: '/timesheets/:id/adjust',
-      additionalData: {
-        endpoint: '/timesheets/:id/adjust',
-      },
-    );}:`, err);
+            console.error(`Exception fetching email for manager ${manager.id}:`, err);
           }
         }
       }
@@ -267,17 +255,6 @@ export async function POST(
 
   } catch (error) {
     console.error('Error adjusting timesheet:', error);
-
-    
-    // Log error to database
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: '/timesheets/:id/adjust',
-      additionalData: {
-        endpoint: '/timesheets/:id/adjust',
-      },
-    );
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
