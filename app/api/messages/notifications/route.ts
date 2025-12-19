@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import type { GetNotificationsResponse, NotificationItem } from '@/types/messages';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 /**
  * GET /api/messages/notifications
@@ -86,6 +87,17 @@ export async function GET() {
 
   } catch (error) {
     console.error('Error in GET /api/messages/notifications:', error);
+
+    
+    // Log error to database
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/messages/notifications',
+      additionalData: {
+        endpoint: '/messages/notifications',
+      },
+    );
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });

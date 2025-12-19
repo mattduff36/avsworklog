@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -149,6 +150,17 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error fetching statistics:', error);
+
+    
+    // Log error to database
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/reports/stats',
+      additionalData: {
+        endpoint: '/reports/stats',
+      },
+    );
     return NextResponse.json(
       { error: 'Failed to fetch statistics' },
       { status: 500 }

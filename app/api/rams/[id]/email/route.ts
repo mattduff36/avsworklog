@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 /**
  * Send RAMS document via email to the logged-in user
@@ -199,6 +200,17 @@ export async function POST(
 
   } catch (error: any) {
     console.error('Error sending RAMS document via email:', error);
+
+    
+    // Log error to database
+    await logServerError({
+      error: error: any as Error,
+      request,
+      componentName: '/rams/:id/email',
+      additionalData: {
+        endpoint: '/rams/:id/email',
+      },
+    );
     return NextResponse.json(
       { error: error.message || 'Failed to send email' },
       { status: 500 }

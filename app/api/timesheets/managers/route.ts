@@ -3,6 +3,7 @@ import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database';
 import { getProfileWithRole } from '@/lib/utils/permissions';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 type Manager = {
   id: string;
@@ -97,7 +98,18 @@ export async function GET() {
           emailMap.set(profile.id, null);
         }
       } catch (err) {
-        console.error(`Exception fetching email for user ${profile.id}:`, err);
+        console.error(`Exception fetching email for user ${profile.id
+
+    
+    // Log error to database
+    await logServerError({
+      error: err as Error,
+      request,
+      componentName: '/timesheets/managers',
+      additionalData: {
+        endpoint: '/timesheets/managers',
+      },
+    );}:`, err);
         emailMap.set(profile.id, null);
       }
     }
@@ -134,6 +146,17 @@ export async function GET() {
     return NextResponse.json({ managers });
   } catch (error) {
     console.error('Unexpected error fetching managers:', error);
+
+    
+    // Log error to database
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/timesheets/managers',
+      additionalData: {
+        endpoint: '/timesheets/managers',
+      },
+    );
     return NextResponse.json(
       { error: 'Failed to fetch managers' },
       { status: 500 }

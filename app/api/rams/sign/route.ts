@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -76,6 +77,17 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error('Unexpected error in sign:', error);
+
+    
+    // Log error to database
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/rams/sign',
+      additionalData: {
+        endpoint: '/rams/sign',
+      },
+    );
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
       { status: 500 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { sendToolboxTalkEmail } from '@/lib/utils/email';
 import { getProfileWithRole } from '@/lib/utils/permissions';
+import { logServerError } from '@/lib/utils/server-error-logger';
 import type { CreateMessageInput, CreateMessageResponse } from '@/types/messages';
 
 /**
@@ -266,6 +267,18 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error in POST /api/messages:', error);
+    
+    // Log error to database
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: 'POST /api/messages',
+      additionalData: {
+        endpoint: '/api/messages',
+        method: 'POST',
+      },
+    });
+    
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });

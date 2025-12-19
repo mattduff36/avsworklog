@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { renderToStream } from '@react-pdf/renderer';
 import { TimesheetPDF } from '@/lib/pdf/timesheet-pdf';
 import { getProfileWithRole } from '@/lib/utils/permissions';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 export async function GET(
   request: NextRequest,
@@ -88,6 +89,17 @@ export async function GET(
     });
   } catch (error) {
     console.error('PDF generation error:', error);
+
+    
+    // Log error to database
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/timesheets/:id/pdf',
+      additionalData: {
+        endpoint: '/timesheets/:id/pdf',
+      },
+    );
     return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import type { GetReportsResponse, MessageReportData } from '@/types/messages';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 /**
  * GET /api/messages/reports
@@ -139,6 +140,17 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Error in GET /api/messages/reports:', error);
+
+    
+    // Log error to database
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/messages/reports',
+      additionalData: {
+        endpoint: '/messages/reports',
+      },
+    );
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });

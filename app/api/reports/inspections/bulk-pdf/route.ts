@@ -8,6 +8,7 @@ import { VanInspectionPDF } from '@/lib/pdf/van-inspection-pdf';
 import { isVanCategory } from '@/lib/checklists/vehicle-checklists';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { getVehicleCategoryName } from '@/lib/utils/deprecation-logger';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 const MAX_INSPECTIONS_PER_PDF = 80;
 
@@ -164,6 +165,17 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Bulk PDF generation error:', error);
+
+    
+    // Log error to database
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/reports/inspections/bulk-pdf',
+      additionalData: {
+        endpoint: '/reports/inspections/bulk-pdf',
+      },
+    );
     return NextResponse.json(
       { error: 'Failed to generate PDFs', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
@@ -359,6 +371,17 @@ export async function POST(request: NextRequest) {
         controller.close();
       } catch (error) {
         console.error('Streaming PDF generation error:', error);
+
+    
+    // Log error to database
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/reports/inspections/bulk-pdf',
+      additionalData: {
+        endpoint: '/reports/inspections/bulk-pdf',
+      },
+    );
         controller.enqueue(encoder.encode(JSON.stringify({ 
           error: 'Failed to generate PDFs', 
           details: error instanceof Error ? error.message : 'Unknown error' 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 export async function DELETE(
   request: NextRequest,
@@ -69,6 +70,17 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting RAMS document:', error);
+
+    
+    // Log error to database
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/rams/:id/delete',
+      additionalData: {
+        endpoint: '/rams/:id/delete',
+      },
+    );
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

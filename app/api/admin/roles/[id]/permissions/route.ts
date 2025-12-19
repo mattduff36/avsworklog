@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isManagerOrAdmin } from '@/lib/utils/permissions';
 import type { UpdatePermissionsRequest } from '@/types/roles';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 /**
  * PUT /api/admin/roles/[id]/permissions
@@ -100,7 +101,18 @@ export async function PUT(
     });
 
   } catch (error) {
-    console.error(`Error in PUT /api/admin/roles/${params.id}/permissions:`, error);
+    console.error(`Error in PUT /api/admin/roles/${params.id
+
+    
+    // Log error to database
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/admin/roles/:id/permissions',
+      additionalData: {
+        endpoint: '/admin/roles/:id/permissions',
+      },
+    );}/permissions:`, error);
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });

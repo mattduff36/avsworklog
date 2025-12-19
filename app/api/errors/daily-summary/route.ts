@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -269,6 +270,17 @@ export async function POST() {
 
   } catch (error) {
     console.error('Error in daily summary API:', error);
+
+    
+    // Log error to database
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/errors/daily-summary',
+      additionalData: {
+        endpoint: '/errors/daily-summary',
+      },
+    );
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 /**
  * GET /api/toolbox-talk-pdf/[...path]
@@ -49,6 +50,17 @@ export async function GET(
 
   } catch (error) {
     console.error('Error in GET /api/toolbox-talk-pdf:', error);
+
+    
+    // Log error to database
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/toolbox-talk-pdf/:...path',
+      additionalData: {
+        endpoint: '/toolbox-talk-pdf/:...path',
+      },
+    );
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });

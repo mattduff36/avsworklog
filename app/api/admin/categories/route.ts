@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 // GET - List all categories
 export async function GET(request: NextRequest) {
@@ -25,6 +26,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ categories: categories || [] });
   } catch (error) {
     console.error('Error fetching categories:', error);
+
+    
+    // Log error to database
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/admin/categories',
+      additionalData: {
+        endpoint: '/admin/categories',
+      },
+    );
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -88,6 +100,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ category: data });
   } catch (error) {
     console.error('Error creating category:', error);
+
+    
+    // Log error to database
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/admin/categories',
+      additionalData: {
+        endpoint: '/admin/categories',
+      },
+    );
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

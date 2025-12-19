@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
+import { logServerError } from '@/lib/utils/server-error-logger';
 import type {
   UpdateMaintenanceRequest,
   MaintenanceUpdateResponse
@@ -253,6 +254,13 @@ export async function PUT(
     
   } catch (error: any) {
     logger.error('PUT /api/maintenance/[id] failed', error, 'MaintenanceAPI');
+    
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: 'PUT /api/maintenance/[id]',
+    });
+    
     return NextResponse.json(
       { error: 'Internal server error', details: error.message },
       { status: 500 }
@@ -295,6 +303,13 @@ export async function DELETE(
     
   } catch (error: any) {
     logger.error('DELETE /api/maintenance/[id] failed', error, 'MaintenanceAPI');
+    
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: 'DELETE /api/maintenance/[id]',
+    });
+    
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

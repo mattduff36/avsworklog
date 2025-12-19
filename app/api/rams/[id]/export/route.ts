@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { RAMSExportDocument } from '@/lib/pdf/RAMSExportDocument';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 export async function GET(
   request: NextRequest,
@@ -110,6 +111,17 @@ export async function GET(
     });
   } catch (error) {
     console.error('Unexpected error in export:', error);
+
+    
+    // Log error to database
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/rams/:id/export',
+      additionalData: {
+        endpoint: '/rams/:id/export',
+      },
+    );
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
       { status: 500 }
