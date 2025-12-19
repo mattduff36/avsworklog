@@ -37,24 +37,43 @@ class ErrorLogger {
     if (typeof window !== 'undefined') {
       // Capture unhandled errors
       window.addEventListener('error', (event) => {
+        const errorMessage = event.error?.message || event.message || 'Unknown error';
+        const location = event.filename ? `${event.filename}:${event.lineno}:${event.colno}` : 'unknown location';
+        
         this.logError({
-          error: event.error || new Error(event.message),
+          error: event.error || new Error(`Uncaught Error: ${errorMessage} at ${location}`),
           componentName: 'Global Error Handler',
           additionalData: {
             filename: event.filename,
             lineno: event.lineno,
             colno: event.colno,
+            location,
+            description: `Unhandled JavaScript error thrown at runtime`,
           },
         });
       });
 
       // Capture unhandled promise rejections
       window.addEventListener('unhandledrejection', (event) => {
+        const reason = event.reason;
+        let errorMessage = 'Promise rejected';
+        
+        if (reason instanceof Error) {
+          errorMessage = `Unhandled Promise Rejection: ${reason.message}`;
+        } else if (typeof reason === 'string') {
+          errorMessage = `Unhandled Promise Rejection: ${reason}`;
+        } else if (reason && typeof reason === 'object') {
+          errorMessage = `Unhandled Promise Rejection: ${JSON.stringify(reason)}`;
+        }
+        
         this.logError({
-          error: new Error(event.reason?.message || String(event.reason)),
+          error: reason instanceof Error ? reason : new Error(errorMessage),
           componentName: 'Unhandled Promise Rejection',
           additionalData: {
-            reason: event.reason,
+            reason: reason,
+            reasonType: typeof reason,
+            description: 'Promise was rejected but no .catch() handler was attached',
+            pageUrl: window.location.href,
           },
         });
       });
@@ -139,9 +158,14 @@ class ErrorLogger {
         // Only log if it looks like an actual error (not React warnings)
         if (!errorMessage.includes('Warning:') && !errorMessage.includes('%c')) {
           this.logError({
-            error: new Error(errorMessage),
+            error: new Error(`Console Error: ${errorMessage}`),
             componentName: 'Console Error',
-            additionalData: { args },
+            additionalData: { 
+              args,
+              description: 'Error logged via console.error() in application code',
+              pageUrl: typeof window !== 'undefined' ? window.location.href : 'N/A',
+              callStack: new Error().stack,
+            },
           });
         }
       };
