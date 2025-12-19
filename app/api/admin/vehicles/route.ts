@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 // Helper to create admin client with service role key
 function getSupabaseAdmin() {
@@ -82,6 +83,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ vehicles: vehiclesWithInspector });
   } catch (error) {
     console.error('Error fetching vehicles:', error);
+
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/api/admin/vehicles',
+      additionalData: {
+        endpoint: '/api/admin/vehicles',
+      },
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -144,6 +154,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ vehicle: data });
   } catch (error) {
     console.error('Error creating vehicle:', error);
+
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/api/admin/vehicles',
+      additionalData: {
+        endpoint: '/api/admin/vehicles',
+      },
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

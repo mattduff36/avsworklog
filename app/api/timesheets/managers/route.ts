@@ -3,6 +3,7 @@ import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database';
 import { getProfileWithRole } from '@/lib/utils/permissions';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 type Manager = {
   id: string;
@@ -134,6 +135,15 @@ export async function GET() {
     return NextResponse.json({ managers });
   } catch (error) {
     console.error('Unexpected error fetching managers:', error);
+
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/api/timesheets/managers',
+      additionalData: {
+        endpoint: '/api/timesheets/managers',
+      },
+    });
     return NextResponse.json(
       { error: 'Failed to fetch managers' },
       { status: 500 }

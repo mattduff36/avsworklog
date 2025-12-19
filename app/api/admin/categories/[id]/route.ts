@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 // PUT - Update category
 export async function PUT(
@@ -63,6 +64,15 @@ export async function PUT(
     return NextResponse.json({ category: data });
   } catch (error) {
     console.error('Error updating category:', error);
+
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/api/admin/categories/[id]',
+      additionalData: {
+        endpoint: '/api/admin/categories/[id]',
+      },
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -124,6 +134,15 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting category:', error);
+
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/api/admin/categories/[id]',
+      additionalData: {
+        endpoint: '/api/admin/categories/[id]',
+      },
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

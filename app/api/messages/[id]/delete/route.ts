@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 /**
  * DELETE /api/messages/[id]/delete
@@ -70,6 +71,15 @@ export async function DELETE(
 
   } catch (error) {
     console.error('Error in DELETE /api/messages/[id]/delete:', error);
+
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/api/messages/[id]/delete',
+      additionalData: {
+        endpoint: '/api/messages/[id]/delete',
+      },
+    });
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });

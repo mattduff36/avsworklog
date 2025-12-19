@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isManagerOrAdmin } from '@/lib/utils/permissions';
+import { logServerError } from '@/lib/utils/server-error-logger';
 import type { GetRoleResponse, UpdateRoleRequest } from '@/types/roles';
 
 /**
@@ -62,6 +63,15 @@ export async function GET(
 
   } catch (error) {
     console.error(`Error in GET /api/admin/roles/${params.id}:`, error);
+
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/api/admin/roles/[id]',
+      additionalData: {
+        endpoint: '/api/admin/roles/[id]',
+      },
+    });
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });
@@ -156,6 +166,15 @@ export async function PATCH(
 
   } catch (error) {
     console.error(`Error in PATCH /api/admin/roles/${params.id}:`, error);
+
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/api/admin/roles/[id]',
+      additionalData: {
+        endpoint: '/api/admin/roles/[id]',
+      },
+    });
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });
@@ -235,6 +254,15 @@ export async function DELETE(
 
   } catch (error) {
     console.error(`Error in DELETE /api/admin/roles/${params.id}:`, error);
+
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/api/admin/roles/[id]',
+      additionalData: {
+        endpoint: '/api/admin/roles/[id]',
+      },
+    });
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });

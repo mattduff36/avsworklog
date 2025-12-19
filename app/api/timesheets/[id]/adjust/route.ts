@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { sendTimesheetAdjustmentEmail } from '@/lib/utils/email';
+import { logServerError } from '@/lib/utils/server-error-logger';
 import type { Database } from '@/types/database';
 
 function getSupabaseAdmin() {
@@ -255,6 +256,15 @@ export async function POST(
 
   } catch (error) {
     console.error('Error adjusting timesheet:', error);
+
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/api/timesheets/[id]/adjust',
+      additionalData: {
+        endpoint: '/api/timesheets/[id]/adjust',
+      },
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

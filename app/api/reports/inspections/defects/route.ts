@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { getVehicleCategoryName } from '@/lib/utils/deprecation-logger';
+import { logServerError } from '@/lib/utils/server-error-logger';
 import { 
   generateExcelFile, 
   formatExcelDate, 
@@ -161,6 +162,15 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error generating defects report:', error);
+
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/api/reports/inspections/defects',
+      additionalData: {
+        endpoint: '/api/reports/inspections/defects',
+      },
+    });
     return NextResponse.json(
       { error: 'Failed to generate report' },
       { status: 500 }
