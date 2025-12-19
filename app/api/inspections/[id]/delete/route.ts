@@ -47,16 +47,14 @@ export async function DELETE(
   } catch (error) {
     console.error('Error deleting inspection:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/inspections/:id/delete',
+      componentName: '/api/inspections/[id]/delete',
       additionalData: {
-        endpoint: '/inspections/:id/delete',
+        endpoint: '/api/inspections/[id]/delete',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

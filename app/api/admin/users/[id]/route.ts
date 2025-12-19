@@ -173,16 +173,14 @@ export async function PUT(
   } catch (error) {
     console.error('Error updating user:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/admin/users/:id',
+      componentName: '/api/admin/users/[id]',
       additionalData: {
-        endpoint: '/admin/users/:id',
+        endpoint: '/api/admin/users/[id]',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -433,17 +431,6 @@ export async function DELETE(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     console.error('Error deleting user:', errorMessage, error);
-
-    
-    // Log error to database
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: '/admin/users/:id',
-      additionalData: {
-        endpoint: '/admin/users/:id',
-      },
-    );
     return NextResponse.json(
       { error: `Internal server error: ${errorMessage}` }, 
       { status: 500 }

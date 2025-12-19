@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isManagerOrAdmin } from '@/lib/utils/permissions';
+import { logServerError } from '@/lib/utils/server-error-logger';
 import type { GetRolesResponse, CreateRoleRequest, RoleWithUserCount } from '@/types/roles';
 import { ALL_MODULES } from '@/types/roles';
-import { logServerError } from '@/lib/utils/server-error-logger';
 
 /**
  * GET /api/admin/roles
@@ -65,16 +65,14 @@ export async function GET() {
   } catch (error) {
     console.error('Error in GET /api/admin/roles:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/admin/roles',
+      componentName: '/api/admin/roles',
       additionalData: {
-        endpoint: '/admin/roles',
+        endpoint: '/api/admin/roles',
       },
-    );
+    });
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });
@@ -167,16 +165,14 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error in POST /api/admin/roles:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/admin/roles',
+      componentName: '/api/admin/roles',
       additionalData: {
-        endpoint: '/admin/roles',
+        endpoint: '/api/admin/roles',
       },
-    );
+    });
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });

@@ -333,16 +333,14 @@ export async function POST() {
   } catch (error) {
     console.error('Error in test daily summary API:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/errors/daily-summary/test',
+      componentName: '/api/errors/daily-summary/test',
       additionalData: {
-        endpoint: '/errors/daily-summary/test',
+        endpoint: '/api/errors/daily-summary/test',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

@@ -155,16 +155,14 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error generating compliance report:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/reports/inspections/compliance',
+      componentName: '/api/reports/inspections/compliance',
       additionalData: {
-        endpoint: '/reports/inspections/compliance',
+        endpoint: '/api/reports/inspections/compliance',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Failed to generate report' },
       { status: 500 }

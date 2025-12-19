@@ -119,16 +119,14 @@ export async function GET(
   } catch (error) {
     console.error('Unexpected error in export:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/messages/:id/export',
+      componentName: '/api/messages/[id]/export',
       additionalData: {
-        endpoint: '/messages/:id/export',
+        endpoint: '/api/messages/[id]/export',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
       { status: 500 }

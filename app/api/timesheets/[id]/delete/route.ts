@@ -47,16 +47,14 @@ export async function DELETE(
   } catch (error) {
     console.error('Error deleting timesheet:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/timesheets/:id/delete',
+      componentName: '/api/timesheets/[id]/delete',
       additionalData: {
-        endpoint: '/timesheets/:id/delete',
+        endpoint: '/api/timesheets/[id]/delete',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

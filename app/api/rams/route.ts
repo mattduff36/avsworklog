@@ -118,18 +118,15 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Unexpected error in GET /api/rams:', error);
-    
-    // Log error to database
+
     await logServerError({
       error: error as Error,
       request,
-      componentName: 'GET /api/rams',
+      componentName: '/api/rams',
       additionalData: {
         endpoint: '/api/rams',
-        method: 'GET',
       },
     });
-    
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
       { status: 500 }

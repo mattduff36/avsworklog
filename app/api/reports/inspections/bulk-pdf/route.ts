@@ -166,16 +166,14 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Bulk PDF generation error:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/reports/inspections/bulk-pdf',
+      componentName: '/api/reports/inspections/bulk-pdf',
       additionalData: {
-        endpoint: '/reports/inspections/bulk-pdf',
+        endpoint: '/api/reports/inspections/bulk-pdf',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Failed to generate PDFs', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
@@ -371,17 +369,6 @@ export async function POST(request: NextRequest) {
         controller.close();
       } catch (error) {
         console.error('Streaming PDF generation error:', error);
-
-    
-    // Log error to database
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: '/reports/inspections/bulk-pdf',
-      additionalData: {
-        endpoint: '/reports/inspections/bulk-pdf',
-      },
-    );
         controller.enqueue(encoder.encode(JSON.stringify({ 
           error: 'Failed to generate PDFs', 
           details: error instanceof Error ? error.message : 'Unknown error' 

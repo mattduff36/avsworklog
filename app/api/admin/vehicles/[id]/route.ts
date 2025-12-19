@@ -115,16 +115,14 @@ export async function PUT(
   } catch (error) {
     console.error('Error updating vehicle:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/admin/vehicles/:id',
+      componentName: '/api/admin/vehicles/[id]',
       additionalData: {
-        endpoint: '/admin/vehicles/:id',
+        endpoint: '/api/admin/vehicles/[id]',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -219,16 +217,14 @@ export async function DELETE(
   } catch (error) {
     console.error('Error deleting vehicle:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/admin/vehicles/:id',
+      componentName: '/api/admin/vehicles/[id]',
       additionalData: {
-        endpoint: '/admin/vehicles/:id',
+        endpoint: '/api/admin/vehicles/[id]',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

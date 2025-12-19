@@ -90,16 +90,14 @@ export async function GET(
   } catch (error) {
     console.error('PDF generation error:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/timesheets/:id/pdf',
+      componentName: '/api/timesheets/[id]/pdf',
       additionalData: {
-        endpoint: '/timesheets/:id/pdf',
+        endpoint: '/api/timesheets/[id]/pdf',
       },
-    );
+    });
     return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });
   }
 }

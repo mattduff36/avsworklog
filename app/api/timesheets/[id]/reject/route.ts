@@ -152,16 +152,14 @@ export async function POST(
   } catch (error) {
     console.error('Error rejecting timesheet:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/timesheets/:id/reject',
+      componentName: '/api/timesheets/[id]/reject',
       additionalData: {
-        endpoint: '/timesheets/:id/reject',
+        endpoint: '/api/timesheets/[id]/reject',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

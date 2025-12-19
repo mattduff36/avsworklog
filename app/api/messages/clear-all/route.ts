@@ -42,16 +42,14 @@ export async function POST() {
   } catch (error) {
     console.error('Error in POST /api/messages/clear-all:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/messages/clear-all',
+      componentName: '/api/messages/clear-all',
       additionalData: {
-        endpoint: '/messages/clear-all',
+        endpoint: '/api/messages/clear-all',
       },
-    );
+    });
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });

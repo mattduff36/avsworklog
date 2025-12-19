@@ -121,16 +121,14 @@ export async function POST(
   } catch (error) {
     console.error('Error resetting password:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/admin/users/:id/reset-password',
+      componentName: '/api/admin/users/[id]/reset-password',
       additionalData: {
-        endpoint: '/admin/users/:id/reset-password',
+        endpoint: '/api/admin/users/[id]/reset-password',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -65,16 +65,14 @@ export async function PUT(
   } catch (error) {
     console.error('Error updating category:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/admin/categories/:id',
+      componentName: '/api/admin/categories/[id]',
       additionalData: {
-        endpoint: '/admin/categories/:id',
+        endpoint: '/api/admin/categories/[id]',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -137,16 +135,14 @@ export async function DELETE(
   } catch (error) {
     console.error('Error deleting category:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/admin/categories/:id',
+      componentName: '/api/admin/categories/[id]',
       additionalData: {
-        endpoint: '/admin/categories/:id',
+        endpoint: '/api/admin/categories/[id]',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

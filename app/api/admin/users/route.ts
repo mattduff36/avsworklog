@@ -160,16 +160,14 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error creating user:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/admin/users',
+      componentName: '/api/admin/users',
       additionalData: {
-        endpoint: '/admin/users',
+        endpoint: '/api/admin/users',
       },
-    );
+    });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

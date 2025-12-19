@@ -98,18 +98,7 @@ export async function GET() {
           emailMap.set(profile.id, null);
         }
       } catch (err) {
-        console.error(`Exception fetching email for user ${profile.id
-
-    
-    // Log error to database
-    await logServerError({
-      error: err as Error,
-      request,
-      componentName: '/timesheets/managers',
-      additionalData: {
-        endpoint: '/timesheets/managers',
-      },
-    );}:`, err);
+        console.error(`Exception fetching email for user ${profile.id}:`, err);
         emailMap.set(profile.id, null);
       }
     }
@@ -147,16 +136,14 @@ export async function GET() {
   } catch (error) {
     console.error('Unexpected error fetching managers:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/timesheets/managers',
+      componentName: '/api/timesheets/managers',
       additionalData: {
-        endpoint: '/timesheets/managers',
+        endpoint: '/api/timesheets/managers',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Failed to fetch managers' },
       { status: 500 }

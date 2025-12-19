@@ -273,16 +273,14 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error generating payroll report:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/reports/timesheets/payroll',
+      componentName: '/api/reports/timesheets/payroll',
       additionalData: {
-        endpoint: '/reports/timesheets/payroll',
+        endpoint: '/api/reports/timesheets/payroll',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Failed to generate report' },
       { status: 500 }

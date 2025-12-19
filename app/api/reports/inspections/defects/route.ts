@@ -163,16 +163,14 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error generating defects report:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/reports/inspections/defects',
+      componentName: '/api/reports/inspections/defects',
       additionalData: {
-        endpoint: '/reports/inspections/defects',
+        endpoint: '/api/reports/inspections/defects',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Failed to generate report' },
       { status: 500 }

@@ -62,16 +62,14 @@ export async function GET() {
   } catch (error) {
     console.error('Error in list-with-emails:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/admin/users/list-with-emails',
+      componentName: '/api/admin/users/list-with-emails',
       additionalData: {
-        endpoint: '/admin/users/list-with-emails',
+        endpoint: '/api/admin/users/list-with-emails',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

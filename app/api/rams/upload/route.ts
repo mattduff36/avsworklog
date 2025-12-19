@@ -106,16 +106,14 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Unexpected error in upload:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/rams/upload',
+      componentName: '/api/rams/upload',
       additionalData: {
-        endpoint: '/rams/upload',
+        endpoint: '/api/rams/upload',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
       { status: 500 }

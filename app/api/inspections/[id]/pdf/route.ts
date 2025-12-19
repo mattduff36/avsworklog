@@ -108,16 +108,14 @@ export async function GET(
   } catch (error) {
     console.error('PDF generation error:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/inspections/:id/pdf',
+      componentName: '/api/inspections/[id]/pdf',
       additionalData: {
-        endpoint: '/inspections/:id/pdf',
+        endpoint: '/api/inspections/[id]/pdf',
       },
-    );
+    });
     return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });
   }
 }

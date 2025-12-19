@@ -84,16 +84,14 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching vehicles:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/admin/vehicles',
+      componentName: '/api/admin/vehicles',
       additionalData: {
-        endpoint: '/admin/vehicles',
+        endpoint: '/api/admin/vehicles',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -157,16 +155,14 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error creating vehicle:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/admin/vehicles',
+      componentName: '/api/admin/vehicles',
       additionalData: {
-        endpoint: '/admin/vehicles',
+        endpoint: '/api/admin/vehicles',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

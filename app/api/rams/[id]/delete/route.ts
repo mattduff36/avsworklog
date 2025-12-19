@@ -71,16 +71,14 @@ export async function DELETE(
   } catch (error) {
     console.error('Error deleting RAMS document:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/rams/:id/delete',
+      componentName: '/api/rams/[id]/delete',
       additionalData: {
-        endpoint: '/rams/:id/delete',
+        endpoint: '/api/rams/[id]/delete',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

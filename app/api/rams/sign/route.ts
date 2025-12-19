@@ -78,16 +78,14 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Unexpected error in sign:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/rams/sign',
+      componentName: '/api/rams/sign',
       additionalData: {
-        endpoint: '/rams/sign',
+        endpoint: '/api/rams/sign',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
       { status: 500 }

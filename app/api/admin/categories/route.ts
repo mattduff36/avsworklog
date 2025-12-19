@@ -27,16 +27,14 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching categories:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/admin/categories',
+      componentName: '/api/admin/categories',
       additionalData: {
-        endpoint: '/admin/categories',
+        endpoint: '/api/admin/categories',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -101,16 +99,14 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error creating category:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/admin/categories',
+      componentName: '/api/admin/categories',
       additionalData: {
-        endpoint: '/admin/categories',
+        endpoint: '/api/admin/categories',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

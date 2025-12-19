@@ -309,16 +309,14 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error generating timesheet summary:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/reports/timesheets/summary',
+      componentName: '/api/reports/timesheets/summary',
       additionalData: {
-        endpoint: '/reports/timesheets/summary',
+        endpoint: '/api/reports/timesheets/summary',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Failed to generate report' },
       { status: 500 }

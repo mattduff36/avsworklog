@@ -271,16 +271,14 @@ export async function POST() {
   } catch (error) {
     console.error('Error in daily summary API:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/errors/daily-summary',
+      componentName: '/api/errors/daily-summary',
       additionalData: {
-        endpoint: '/errors/daily-summary',
+        endpoint: '/api/errors/daily-summary',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

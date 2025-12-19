@@ -267,18 +267,15 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error in POST /api/messages:', error);
-    
-    // Log error to database
+
     await logServerError({
       error: error as Error,
       request,
-      componentName: 'POST /api/messages',
+      componentName: '/api/messages',
       additionalData: {
         endpoint: '/api/messages',
-        method: 'POST',
       },
     });
-    
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });

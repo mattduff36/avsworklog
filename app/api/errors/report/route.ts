@@ -71,17 +71,6 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       console.error('Error finding admin user:', error);
-
-    
-    // Log error to database
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: '/errors/report',
-      additionalData: {
-        endpoint: '/errors/report',
-      },
-    );
     }
     
     if (!adminUserId) {
@@ -142,17 +131,6 @@ ${additional_context ? `**Additional Context:**\n${JSON.stringify(additional_con
         console.log('Error report notification created successfully');
       } catch (notificationError) {
         console.error('Failed to create in-app notification, falling back to email:', notificationError);
-
-    
-    // Log error to database
-    await logServerError({
-      error: notificationError as Error,
-      request,
-      componentName: '/errors/report',
-      additionalData: {
-        endpoint: '/errors/report',
-      },
-    );
         // Fall through to email fallback
       }
     } else {
@@ -197,16 +175,14 @@ ${additional_context ? `**Additional Context:**\n${JSON.stringify(additional_con
   } catch (error) {
     console.error('Error in POST /api/errors/report:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/errors/report',
+      componentName: '/api/errors/report',
       additionalData: {
-        endpoint: '/errors/report',
+        endpoint: '/api/errors/report',
       },
-    );
+    });
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });

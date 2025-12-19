@@ -72,16 +72,14 @@ export async function DELETE(
   } catch (error) {
     console.error('Error in DELETE /api/messages/[id]/delete:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/messages/:id/delete',
+      componentName: '/api/messages/[id]/delete',
       additionalData: {
-        endpoint: '/messages/:id/delete',
+        endpoint: '/api/messages/[id]/delete',
       },
-    );
+    });
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });

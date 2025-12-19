@@ -83,16 +83,14 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Unexpected error in visitor-sign:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/rams/visitor-sign',
+      componentName: '/api/rams/visitor-sign',
       additionalData: {
-        endpoint: '/rams/visitor-sign',
+        endpoint: '/api/rams/visitor-sign',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
       { status: 500 }

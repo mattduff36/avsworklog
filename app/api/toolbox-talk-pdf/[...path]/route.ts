@@ -51,16 +51,14 @@ export async function GET(
   } catch (error) {
     console.error('Error in GET /api/toolbox-talk-pdf:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/toolbox-talk-pdf/:...path',
+      componentName: '/api/toolbox-talk-pdf/[...path]',
       additionalData: {
-        endpoint: '/toolbox-talk-pdf/:...path',
+        endpoint: '/api/toolbox-talk-pdf/[...path]',
       },
-    );
+    });
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });

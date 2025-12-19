@@ -151,16 +151,14 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching statistics:', error);
 
-    
-    // Log error to database
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/reports/stats',
+      componentName: '/api/reports/stats',
       additionalData: {
-        endpoint: '/reports/stats',
+        endpoint: '/api/reports/stats',
       },
-    );
+    });
     return NextResponse.json(
       { error: 'Failed to fetch statistics' },
       { status: 500 }
