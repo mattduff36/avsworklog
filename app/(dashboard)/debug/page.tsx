@@ -46,7 +46,7 @@ type DebugInfo = {
 
 type EntityStatus = {
   id: string;
-  type: 'timesheet' | 'inspection' | 'absence' | 'rams';
+  type: 'timesheet' | 'inspection' | 'absence';
   identifier: string;
   current_status: string;
   user_name: string;
@@ -225,26 +225,6 @@ export default function DebugPage() {
             current_status: a.status,
             user_name: a.profiles?.full_name || 'Unknown',
             date: a.date,
-          }))
-        );
-      }
-
-      // Fetch RAMS
-      const { data: ramsData } = await supabase
-        .from('rams_documents')
-        .select('id, title, created_at')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (ramsData) {
-        setRamsDocuments(
-          ramsData.map((r: { id: string; title: string | null; created_at: string }) => ({
-            id: r.id,
-            type: 'rams' as const,
-            identifier: r.title || 'Untitled',
-            current_status: 'active',
-            user_name: 'System',
-            date: r.created_at,
           }))
         );
       }

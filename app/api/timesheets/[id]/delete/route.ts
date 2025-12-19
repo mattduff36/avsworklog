@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 export async function DELETE(
   request: NextRequest,
@@ -45,6 +46,15 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting timesheet:', error);
+
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/api/timesheets/[id]/delete',
+      additionalData: {
+        endpoint: '/api/timesheets/[id]/delete',
+      },
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
