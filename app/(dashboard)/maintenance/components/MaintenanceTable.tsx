@@ -35,6 +35,7 @@ import {
 } from '@/lib/utils/maintenanceCalculations';
 import { EditMaintenanceDialog } from './EditMaintenanceDialog';
 import { MaintenanceHistoryDialog } from './MaintenanceHistoryDialog';
+import { DVLASyncButton } from './DVLASyncButton';
 
 interface MaintenanceTableProps {
   vehicles: VehicleMaintenanceWithStatus[];
@@ -458,6 +459,13 @@ export function MaintenanceTable({
                         {/* Actions */}
                         <TableCell className="text-right">
                           <div className="flex gap-1 justify-end">
+                            <DVLASyncButton
+                              vehicleId={vehicle.vehicle_id}
+                              registrationNumber={vehicle.vehicle?.reg_number || 'Unknown'}
+                              lastSync={vehicle.last_dvla_sync}
+                              syncStatus={vehicle.dvla_sync_status}
+                              onSyncComplete={onVehicleAdded}
+                            />
                             <Button
                               variant="ghost"
                               size="sm"

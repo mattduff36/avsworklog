@@ -36,6 +36,12 @@ export interface VehicleMaintenance {
   last_updated_at: string;
   last_updated_by: string | null;
   
+  // DVLA API Sync
+  last_dvla_sync: string | null;
+  dvla_sync_status: 'never' | 'success' | 'error' | 'pending' | null;
+  dvla_sync_error: string | null;
+  dvla_raw_data: Record<string, any> | null;
+  
   created_at: string;
   updated_at: string;
   
