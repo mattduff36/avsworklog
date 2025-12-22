@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendErrorReportEmail } from '@/lib/utils/email';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 /**
  * POST /api/errors/report
@@ -173,6 +174,15 @@ ${additional_context ? `**Additional Context:**\n${JSON.stringify(additional_con
 
   } catch (error) {
     console.error('Error in POST /api/errors/report:', error);
+
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/api/errors/report',
+      additionalData: {
+        endpoint: '/api/errors/report',
+      },
+    });
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });

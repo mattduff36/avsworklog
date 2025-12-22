@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { ToolboxTalkExportDocument } from '@/lib/pdf/ToolboxTalkExportDocument';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
 export async function GET(
   request: NextRequest,
@@ -117,6 +118,15 @@ export async function GET(
     });
   } catch (error) {
     console.error('Unexpected error in export:', error);
+
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/api/messages/[id]/export',
+      additionalData: {
+        endpoint: '/api/messages/[id]/export',
+      },
+    });
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
       { status: 500 }

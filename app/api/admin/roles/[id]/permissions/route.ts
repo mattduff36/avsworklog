@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isManagerOrAdmin } from '@/lib/utils/permissions';
+import { logServerError } from '@/lib/utils/server-error-logger';
 import type { UpdatePermissionsRequest } from '@/types/roles';
 
 /**
@@ -101,6 +102,15 @@ export async function PUT(
 
   } catch (error) {
     console.error(`Error in PUT /api/admin/roles/${params.id}/permissions:`, error);
+
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/api/admin/roles/[id]/permissions',
+      additionalData: {
+        endpoint: '/api/admin/roles/[id]/permissions',
+      },
+    });
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Internal server error' 
     }, { status: 500 });
