@@ -171,7 +171,7 @@ export function EditMaintenanceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-2xl md:max-w-2xl w-full max-h-[90vh] md:max-h-[90vh] h-full md:h-auto overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">
             {isNewRecord ? 'Create' : 'Edit'} Maintenance - {vehicle.vehicle?.reg_number}

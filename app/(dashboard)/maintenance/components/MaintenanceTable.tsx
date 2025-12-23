@@ -23,8 +23,11 @@ import {
   AlertTriangle,
   Trash2,
   Settings2,
-  User
+  User,
+  Info,
+  Monitor
 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { AddVehicleDialog } from './AddVehicleDialog';
 import { DeleteVehicleDialog } from './DeleteVehicleDialog';
@@ -154,6 +157,14 @@ export function MaintenanceTable({
   
   return (
     <>
+      {/* Mobile Info Banner */}
+      <Alert className="md:hidden bg-blue-900/20 border-blue-700/50 mb-4">
+        <Monitor className="h-4 w-4 text-blue-400" />
+        <AlertDescription className="text-blue-200 text-sm">
+          Mobile view shows essential information only. Desktop recommended for complete data and advanced features.
+        </AlertDescription>
+      </Alert>
+
       <Card className="bg-slate-900 border-slate-700">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -169,8 +180,9 @@ export function MaintenanceTable({
               className="bg-blue-600 hover:bg-blue-700"
               onClick={() => setAddVehicleDialogOpen(true)}
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Vehicle
+              <Plus className="h-4 w-4 mr-2 hidden md:inline" />
+              <span className="hidden md:inline">Add Vehicle</span>
+              <Plus className="h-4 w-4 md:hidden" />
             </Button>
           </div>
         </CardHeader>
@@ -189,10 +201,10 @@ export function MaintenanceTable({
               />
             </div>
             
-            {/* Column Visibility Dropdown */}
+            {/* Column Visibility Dropdown - Hidden on Mobile */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="border-slate-600">
+                <Button variant="outline" className="border-slate-600 hidden md:flex">
                   <Settings2 className="h-4 w-4 mr-2" />
                   Show columns
                 </Button>
