@@ -406,6 +406,7 @@ export function MaintenanceHistoryDialog({
                   </Button>
                 )}
               </div>
+              </>
             )}
           </div>
         )}
