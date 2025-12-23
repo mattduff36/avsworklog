@@ -437,13 +437,15 @@ export function MaintenanceTable({
                         {/* Actions */}
                         <TableCell className="text-right">
                           <div className="flex gap-1 justify-end">
-                            <DVLASyncButton
-                              vehicleId={vehicle.vehicle_id}
-                              registrationNumber={vehicle.vehicle?.reg_number || 'Unknown'}
-                              lastSync={vehicle.last_dvla_sync}
-                              syncStatus={vehicle.dvla_sync_status}
-                              onSyncComplete={onVehicleAdded}
-                            />
+                            {!DVLA_EXCLUDED_REG_NUMBERS.includes(vehicle.vehicle?.reg_number || '') && (
+                              <DVLASyncButton
+                                vehicleId={vehicle.vehicle_id}
+                                registrationNumber={vehicle.vehicle?.reg_number || 'Unknown'}
+                                lastSync={vehicle.last_dvla_sync}
+                                syncStatus={vehicle.dvla_sync_status}
+                                onSyncComplete={onVehicleAdded}
+                              />
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
