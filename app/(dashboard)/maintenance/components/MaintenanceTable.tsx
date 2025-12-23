@@ -25,7 +25,9 @@ import {
   Settings2,
   User,
   Info,
-  Monitor
+  Monitor,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
