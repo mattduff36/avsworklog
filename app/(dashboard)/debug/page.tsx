@@ -781,117 +781,98 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
             </CardHeader>
             <CardContent>
               {/* Error Log Filters */}
-              <div className="mb-6 p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/50">
-                <div className="flex items-center gap-2 mb-4">
+              <div className="mb-4 p-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                <div className="flex items-center gap-2 mb-3">
                   <Filter className="h-4 w-4 text-slate-600 dark:text-slate-400" />
                   <h3 className="font-semibold text-sm text-slate-900 dark:text-white">Filters</h3>
-                  <Badge variant="secondary" className="ml-auto">
-                    {getFilteredErrorLogs().length} of {errorLogs.length} errors
+                  <Badge variant="secondary" className="ml-auto text-xs">
+                    {getFilteredErrorLogs().length} / {errorLogs.length}
                   </Badge>
                 </div>
 
                 {/* Search Bar */}
-                <div className="mb-4">
+                <div className="mb-3">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <Input
                       type="text"
-                      placeholder="Search error messages, stack traces, components, or URLs..."
+                      placeholder="Search errors..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
+                      className="pl-11 h-9"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                   {/* Toggle Filters */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="filter-localhost" className="text-sm font-medium flex items-center gap-2">
-                        <span>Hide Localhost</span>
-                      </Label>
-                      <Switch
-                        id="filter-localhost"
-                        checked={filterLocalhost}
-                        onCheckedChange={setFilterLocalhost}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="filter-admin" className="text-sm font-medium flex items-center gap-2">
-                        <span>Hide Admin Account</span>
-                      </Label>
-                      <Switch
-                        id="filter-admin"
-                        checked={filterAdminAccount}
-                        onCheckedChange={setFilterAdminAccount}
-                      />
-                    </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="filter-localhost" className="text-xs font-medium">
+                      Hide Localhost
+                    </Label>
+                    <Switch
+                      id="filter-localhost"
+                      checked={filterLocalhost}
+                      onCheckedChange={setFilterLocalhost}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="filter-admin" className="text-xs font-medium">
+                      Hide Admin
+                    </Label>
+                    <Switch
+                      id="filter-admin"
+                      checked={filterAdminAccount}
+                      onCheckedChange={setFilterAdminAccount}
+                    />
                   </div>
 
                   {/* Dropdown Filters */}
-                  <div className="space-y-3">
-                    <div>
-                      <Label className="text-xs text-slate-600 dark:text-slate-400 mb-1.5 block">
-                        Error Type
-                      </Label>
-                      <Select value={filterErrorType} onValueChange={setFilterErrorType}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Types</SelectItem>
-                          {uniqueErrorTypes.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div>
+                    <Select value={filterErrorType} onValueChange={setFilterErrorType}>
+                      <SelectTrigger className="w-full h-9">
+                        <SelectValue placeholder="Error Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        {uniqueErrorTypes.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  <div className="space-y-3">
-                    <div>
-                      <Label className="text-xs text-slate-600 dark:text-slate-400 mb-1.5 block">
-                        Device Type
-                      </Label>
-                      <Select value={filterDeviceType} onValueChange={setFilterDeviceType}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">
-                            <div className="flex items-center gap-2">
-                              All Devices
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="mobile">
-                            <div className="flex items-center gap-2">
-                              <Smartphone className="h-3 w-3" />
-                              Mobile Only
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="desktop">
-                            <div className="flex items-center gap-2">
-                              <Monitor className="h-3 w-3" />
-                              Desktop Only
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div>
+                    <Select value={filterDeviceType} onValueChange={setFilterDeviceType}>
+                      <SelectTrigger className="w-full h-9">
+                        <SelectValue placeholder="Device" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Devices</SelectItem>
+                        <SelectItem value="mobile">
+                          <div className="flex items-center gap-2">
+                            <Smartphone className="h-3 w-3" />
+                            Mobile
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="desktop">
+                          <div className="flex items-center gap-2">
+                            <Monitor className="h-3 w-3" />
+                            Desktop
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  {/* Component Filter - spans remaining space */}
+                  {/* Component Filter */}
                   {uniqueComponents.length > 0 && (
-                    <div className="md:col-span-2 lg:col-span-3">
-                      <Label className="text-xs text-slate-600 dark:text-slate-400 mb-1.5 block">
-                        Component
-                      </Label>
+                    <div className="lg:col-span-4">
                       <Select value={filterComponent} onValueChange={setFilterComponent}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
+                        <SelectTrigger className="w-full h-9">
+                          <SelectValue placeholder="Component" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Components</SelectItem>
@@ -908,43 +889,19 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
                 {/* Active Filters Summary */}
                 {(searchQuery || filterErrorType !== 'all' || filterDeviceType !== 'all' || filterComponent !== 'all' || filterLocalhost || filterAdminAccount) && (
-                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-slate-600 dark:text-slate-400">Active filters:</span>
-                      {filterLocalhost && (
-                        <Badge variant="secondary" className="text-xs">
-                          No Localhost
-                        </Badge>
-                      )}
-                      {filterAdminAccount && (
-                        <Badge variant="secondary" className="text-xs">
-                          No Admin
-                        </Badge>
-                      )}
-                      {filterErrorType !== 'all' && (
-                        <Badge variant="secondary" className="text-xs">
-                          Type: {filterErrorType}
-                        </Badge>
-                      )}
-                      {filterDeviceType !== 'all' && (
-                        <Badge variant="secondary" className="text-xs">
-                          {filterDeviceType === 'mobile' ? '📱 Mobile' : '🖥️ Desktop'}
-                        </Badge>
-                      )}
-                      {filterComponent !== 'all' && (
-                        <Badge variant="secondary" className="text-xs">
-                          Component: {filterComponent}
-                        </Badge>
-                      )}
-                      {searchQuery && (
-                        <Badge variant="secondary" className="text-xs">
-                          Search: &quot;{searchQuery}&quot;
-                        </Badge>
-                      )}
+                  <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                      <span className="text-slate-600 dark:text-slate-400">Active:</span>
+                      {filterLocalhost && <Badge variant="secondary" className="text-xs h-5">No Localhost</Badge>}
+                      {filterAdminAccount && <Badge variant="secondary" className="text-xs h-5">No Admin</Badge>}
+                      {filterErrorType !== 'all' && <Badge variant="secondary" className="text-xs h-5">{filterErrorType}</Badge>}
+                      {filterDeviceType !== 'all' && <Badge variant="secondary" className="text-xs h-5">{filterDeviceType === 'mobile' ? '📱' : '🖥️'}</Badge>}
+                      {filterComponent !== 'all' && <Badge variant="secondary" className="text-xs h-5">{filterComponent}</Badge>}
+                      {searchQuery && <Badge variant="secondary" className="text-xs h-5">Search</Badge>}
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-6 text-xs ml-auto"
+                        className="h-5 text-xs px-2 ml-auto"
                         onClick={() => {
                           setSearchQuery('');
                           setFilterErrorType('all');
@@ -954,7 +911,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                           setFilterAdminAccount(true);
                         }}
                       >
-                        Clear All
+                        Clear
                       </Button>
                     </div>
                   </div>

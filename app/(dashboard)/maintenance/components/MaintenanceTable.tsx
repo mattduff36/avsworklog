@@ -200,7 +200,7 @@ export function MaintenanceTable({
                 placeholder="Search by registration number..."
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
-                className="pl-9 bg-slate-900/50 border-slate-600 text-white"
+                className="pl-11 bg-slate-900/50 border-slate-600 text-white"
               />
             </div>
             

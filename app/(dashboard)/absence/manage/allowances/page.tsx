@@ -188,7 +188,7 @@ export default function AllowancesPage() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search by name or employee ID..."
-              className="pl-10 bg-white dark:bg-slate-900 border-slate-600"
+              className="pl-11 bg-white dark:bg-slate-900 border-slate-600"
             />
           </div>
         </CardContent>

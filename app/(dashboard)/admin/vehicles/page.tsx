@@ -522,7 +522,7 @@ export default function VehiclesAdminPage() {
                     placeholder="Search by registration, category, or inspector..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 bg-slate-900/50 border-slate-600 text-white"
+                    className="pl-11 bg-slate-900/50 border-slate-600 text-white"
                   />
                 </div>
 
