@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import {
   Bug,
   Database,
@@ -34,6 +36,10 @@ import {
   ChevronDown,
   ChevronRight,
   Copy,
+  Filter,
+  Search,
+  Smartphone,
+  Monitor,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DVLASyncDebugPanel } from './components/DVLASyncDebugPanel';
@@ -99,6 +105,14 @@ export default function DebugPage() {
   const [expandedErrors, setExpandedErrors] = useState<string[]>([]);
   const [expandedAudits, setExpandedAudits] = useState<string[]>([]);
   const [viewedErrors, setViewedErrors] = useState<Set<string>>(new Set());
+  
+  // Error log filter states
+  const [filterLocalhost, setFilterLocalhost] = useState(true);
+  const [filterAdminAccount, setFilterAdminAccount] = useState(true);
+  const [filterErrorType, setFilterErrorType] = useState<string>('all');
+  const [filterDeviceType, setFilterDeviceType] = useState<string>('all'); // 'all', 'mobile', 'desktop'
+  const [filterComponent, setFilterComponent] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Check if user is superadmin and viewing as actual role
   useEffect(() => {
@@ -270,13 +284,12 @@ export default function DebugPage() {
 
   const fetchErrorLogs = async () => {
     try {
-      // Fetch error logs, excluding development/localhost errors
+      // Fetch all error logs - filtering will be done in UI
       const { data: errorData, error } = await supabase
         .from('error_logs')
         .select('*')
-        .not('page_url', 'ilike', '%localhost%') // Filter out development errors
         .order('timestamp', { ascending: false })
-        .limit(100);
+        .limit(200); // Increased limit since we're filtering in UI
 
       if (error) {
         // Don't log or show error if table doesn't exist yet (first time setup)
@@ -569,6 +582,58 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
     return String(value);
   };
 
+  // Filter error logs based on selected filters
+  const getFilteredErrorLogs = () => {
+    let filtered = [...errorLogs];
+
+    // Filter by localhost
+    if (filterLocalhost) {
+      filtered = filtered.filter(log => !log.page_url.toLowerCase().includes('localhost'));
+    }
+
+    // Filter by admin account
+    if (filterAdminAccount) {
+      filtered = filtered.filter(log => log.user_email !== 'admin@mpdee.co.uk');
+    }
+
+    // Filter by error type
+    if (filterErrorType !== 'all') {
+      filtered = filtered.filter(log => log.error_type === filterErrorType);
+    }
+
+    // Filter by device type
+    if (filterDeviceType !== 'all') {
+      filtered = filtered.filter(log => {
+        const isMobile = log.user_agent.includes('Mobile') || log.user_agent.includes('iPhone') || log.user_agent.includes('Android');
+        return filterDeviceType === 'mobile' ? isMobile : !isMobile;
+      });
+    }
+
+    // Filter by component
+    if (filterComponent !== 'all') {
+      filtered = filtered.filter(log => log.component_name === filterComponent);
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(log => 
+        log.error_message.toLowerCase().includes(query) ||
+        (log.error_stack && log.error_stack.toLowerCase().includes(query)) ||
+        (log.component_name && log.component_name.toLowerCase().includes(query)) ||
+        log.page_url.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  };
+
+  // Get unique error types for filter dropdown
+  const uniqueErrorTypes = Array.from(new Set(errorLogs.map(log => log.error_type))).sort();
+  
+  // Get unique components for filter dropdown (excluding null)
+  const uniqueComponents = Array.from(new Set(errorLogs.map(log => log.component_name).filter(Boolean))).sort();
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -715,18 +780,221 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
               </div>
             </CardHeader>
             <CardContent>
+              {/* Error Log Filters */}
+              <div className="mb-6 p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                <div className="flex items-center gap-2 mb-4">
+                  <Filter className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                  <h3 className="font-semibold text-sm text-slate-900 dark:text-white">Filters</h3>
+                  <Badge variant="secondary" className="ml-auto">
+                    {getFilteredErrorLogs().length} of {errorLogs.length} errors
+                  </Badge>
+                </div>
+
+                {/* Search Bar */}
+                <div className="mb-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      type="text"
+                      placeholder="Search error messages, stack traces, components, or URLs..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Toggle Filters */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="filter-localhost" className="text-sm font-medium flex items-center gap-2">
+                        <span>Hide Localhost</span>
+                      </Label>
+                      <Switch
+                        id="filter-localhost"
+                        checked={filterLocalhost}
+                        onCheckedChange={setFilterLocalhost}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="filter-admin" className="text-sm font-medium flex items-center gap-2">
+                        <span>Hide Admin Account</span>
+                      </Label>
+                      <Switch
+                        id="filter-admin"
+                        checked={filterAdminAccount}
+                        onCheckedChange={setFilterAdminAccount}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Dropdown Filters */}
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-xs text-slate-600 dark:text-slate-400 mb-1.5 block">
+                        Error Type
+                      </Label>
+                      <Select value={filterErrorType} onValueChange={setFilterErrorType}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Types</SelectItem>
+                          {uniqueErrorTypes.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-xs text-slate-600 dark:text-slate-400 mb-1.5 block">
+                        Device Type
+                      </Label>
+                      <Select value={filterDeviceType} onValueChange={setFilterDeviceType}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">
+                            <div className="flex items-center gap-2">
+                              All Devices
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="mobile">
+                            <div className="flex items-center gap-2">
+                              <Smartphone className="h-3 w-3" />
+                              Mobile Only
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="desktop">
+                            <div className="flex items-center gap-2">
+                              <Monitor className="h-3 w-3" />
+                              Desktop Only
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Component Filter - spans remaining space */}
+                  {uniqueComponents.length > 0 && (
+                    <div className="md:col-span-2 lg:col-span-3">
+                      <Label className="text-xs text-slate-600 dark:text-slate-400 mb-1.5 block">
+                        Component
+                      </Label>
+                      <Select value={filterComponent} onValueChange={setFilterComponent}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Components</SelectItem>
+                          {uniqueComponents.map((component) => (
+                            <SelectItem key={component} value={component}>
+                              {component}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Active Filters Summary */}
+                {(searchQuery || filterErrorType !== 'all' || filterDeviceType !== 'all' || filterComponent !== 'all' || filterLocalhost || filterAdminAccount) && (
+                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-slate-600 dark:text-slate-400">Active filters:</span>
+                      {filterLocalhost && (
+                        <Badge variant="secondary" className="text-xs">
+                          No Localhost
+                        </Badge>
+                      )}
+                      {filterAdminAccount && (
+                        <Badge variant="secondary" className="text-xs">
+                          No Admin
+                        </Badge>
+                      )}
+                      {filterErrorType !== 'all' && (
+                        <Badge variant="secondary" className="text-xs">
+                          Type: {filterErrorType}
+                        </Badge>
+                      )}
+                      {filterDeviceType !== 'all' && (
+                        <Badge variant="secondary" className="text-xs">
+                          {filterDeviceType === 'mobile' ? '📱 Mobile' : '🖥️ Desktop'}
+                        </Badge>
+                      )}
+                      {filterComponent !== 'all' && (
+                        <Badge variant="secondary" className="text-xs">
+                          Component: {filterComponent}
+                        </Badge>
+                      )}
+                      {searchQuery && (
+                        <Badge variant="secondary" className="text-xs">
+                          Search: &quot;{searchQuery}&quot;
+                        </Badge>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs ml-auto"
+                        onClick={() => {
+                          setSearchQuery('');
+                          setFilterErrorType('all');
+                          setFilterDeviceType('all');
+                          setFilterComponent('all');
+                          setFilterLocalhost(true);
+                          setFilterAdminAccount(true);
+                        }}
+                      >
+                        Clear All
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {errorLogs.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-50 text-green-500" />
                   <p className="font-semibold">No errors logged</p>
                   <p className="text-sm mt-1">Application errors will appear here when they occur</p>
                 </div>
+              ) : getFilteredErrorLogs().length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Filter className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="font-semibold">No errors match your filters</p>
+                  <p className="text-sm mt-1">Try adjusting your filter settings above</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-4"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setFilterErrorType('all');
+                      setFilterDeviceType('all');
+                      setFilterComponent('all');
+                      setFilterLocalhost(false);
+                      setFilterAdminAccount(false);
+                    }}
+                  >
+                    Clear All Filters
+                  </Button>
+                </div>
               ) : (
                 <div className="space-y-6">
                   {/* New Errors Section */}
                   {(() => {
-                    const newErrors = errorLogs.filter(log => !viewedErrors.has(log.id));
-                    const viewedErrorsList = errorLogs.filter(log => viewedErrors.has(log.id));
+                    const filteredLogs = getFilteredErrorLogs();
+                    const newErrors = filteredLogs.filter(log => !viewedErrors.has(log.id));
+                    const viewedErrorsList = filteredLogs.filter(log => viewedErrors.has(log.id));
 
                     return (
                       <>
