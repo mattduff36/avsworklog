@@ -424,6 +424,13 @@ export function MaintenanceHistoryDialog({
           </div>
         )}
       </DialogContent>
+      
+      {/* MOT History Modal */}
+      <MotHistoryDialog
+        open={motHistoryOpen}
+        onOpenChange={setMotHistoryOpen}
+        vehicleReg={vehicleReg || 'Unknown'}
+      />
     </Dialog>
   );
 }
