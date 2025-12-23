@@ -27,13 +27,25 @@ import { formatDateForInput, formatMileage } from '@/lib/utils/maintenanceCalcul
 
 const editMaintenanceSchema = z.object({
   nickname: z.string().max(100, 'Nickname must be less than 100 characters').optional().nullable(),
-  current_mileage: z.coerce.number().int().positive('Current mileage must be a positive number').optional().nullable(),
+  current_mileage: z.preprocess(
+    (val) => val === '' || val === null || val === undefined ? null : Number(val),
+    z.number().int().positive('Current mileage must be a positive number').optional().nullable()
+  ),
   tax_due_date: z.string().optional().nullable(),
   mot_due_date: z.string().optional().nullable(),
   first_aid_kit_expiry: z.string().optional().nullable(),
-  next_service_mileage: z.coerce.number().int().positive().optional().nullable(),
-  last_service_mileage: z.coerce.number().int().positive().optional().nullable(),
-  cambelt_due_mileage: z.coerce.number().int().positive().optional().nullable(),
+  next_service_mileage: z.preprocess(
+    (val) => val === '' || val === null || val === undefined ? null : Number(val),
+    z.number().int().positive('Too small expected number to be >0').optional().nullable()
+  ),
+  last_service_mileage: z.preprocess(
+    (val) => val === '' || val === null || val === undefined ? null : Number(val),
+    z.number().int().positive('Too small expected number to be >0').optional().nullable()
+  ),
+  cambelt_due_mileage: z.preprocess(
+    (val) => val === '' || val === null || val === undefined ? null : Number(val),
+    z.number().int().positive('Too small expected number to be >0').optional().nullable()
+  ),
   tracker_id: z.string().max(50, 'Tracker ID must be less than 50 characters').optional().nullable(),
   notes: z.string().max(500, 'Notes must be less than 500 characters').optional().nullable(),
   comment: z.string()
