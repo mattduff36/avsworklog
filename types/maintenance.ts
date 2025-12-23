@@ -60,12 +60,28 @@ export interface VehicleMaintenance {
   ves_month_of_first_registration: string | null;
   ves_date_of_last_v5c_issued: string | null;
   
-  // MOT History API Data
+  // MOT History API Data - Sync tracking
   mot_expiry_date: string | null;
   mot_api_sync_status: 'never' | 'success' | 'error' | 'pending' | null;
   mot_api_sync_error: string | null;
   last_mot_api_sync: string | null;
   mot_raw_data: Record<string, any> | null;
+  
+  // MOT History API Data - Vehicle details
+  mot_make: string | null;
+  mot_model: string | null;
+  mot_first_used_date: string | null;
+  mot_registration_date: string | null;
+  mot_manufacture_date: string | null;
+  mot_engine_size: string | null;
+  mot_fuel_type: string | null;
+  mot_primary_colour: string | null;
+  mot_secondary_colour: string | null;
+  mot_vehicle_id: string | null;
+  mot_registration: string | null;
+  mot_vin: string | null;
+  mot_v5c_reference: string | null;
+  mot_dvla_id: string | null;
   
   created_at: string;
   updated_at: string;
