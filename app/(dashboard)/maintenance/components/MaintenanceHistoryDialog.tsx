@@ -10,9 +10,10 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, History as HistoryIcon, User, Calendar, Edit, ChevronDown, Clock } from 'lucide-react';
+import { Loader2, History as HistoryIcon, User, Calendar, Edit, ChevronDown, Clock, FileText } from 'lucide-react';
 import { useMaintenanceHistory } from '@/lib/hooks/useMaintenance';
 import { formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
+import { MotHistoryDialog } from './MotHistoryDialog';
 
 interface MaintenanceHistoryDialogProps {
   open: boolean;
@@ -33,6 +34,7 @@ export function MaintenanceHistoryDialog({
   const [showFullHistory, setShowFullHistory] = useState(false);
   const [visibleHistoryCount, setVisibleHistoryCount] = useState(10);
   const [showVehicleData, setShowVehicleData] = useState(false);
+  const [motHistoryOpen, setMotHistoryOpen] = useState(false);
   
   const history = historyData?.history || [];
   const vesData = historyData?.vesData || null;
@@ -123,16 +125,26 @@ export function MaintenanceHistoryDialog({
                 Complete audit trail of all maintenance changes
               </DialogDescription>
             </div>
-            {onEditClick && (
+            <div className="flex gap-2">
               <Button
-                onClick={onEditClick}
-                className="bg-red-600 hover:bg-red-700 text-white flex-shrink-0 mt-1"
+                onClick={() => setMotHistoryOpen(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white flex-shrink-0 mt-1"
                 size="sm"
               >
-                <Edit className="h-4 w-4 mr-2" />
-                Edit
+                <FileText className="h-4 w-4 mr-2" />
+                MOT History
               </Button>
-            )}
+              {onEditClick && (
+                <Button
+                  onClick={onEditClick}
+                  className="bg-red-600 hover:bg-red-700 text-white flex-shrink-0 mt-1"
+                  size="sm"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+              )}
+            </div>
           </div>
         </DialogHeader>
 
