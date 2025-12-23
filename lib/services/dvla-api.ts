@@ -26,6 +26,8 @@ export class DVLAApiService {
 
     try {
       switch (this.provider) {
+        case 'ves':
+          return await this.fetchFromVES(normalizedReg);
         case 'vehiclesmart':
           return await this.fetchFromVehicleSmart(normalizedReg);
         case 'checkcardetails':
@@ -38,6 +40,30 @@ export class DVLAApiService {
     } catch (error: any) {
       throw new Error(`DVLA API Error: ${error.message}`);
     }
+  }
+
+  /**
+   * GOV.UK VES API Integration (Official DVLA API)
+   */
+  private async fetchFromVES(reg: string): Promise<VehicleDataResponse> {
+    const response = await fetch(`${this.baseUrl}/vehicles`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': this.apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        registrationNumber: reg,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`API request failed: ${response.status} - ${errorData.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    return this.normalizeVESResponse(data);
   }
 
   /**
@@ -103,6 +129,27 @@ export class DVLAApiService {
 
     const data = await response.json();
     return this.normalizeVehicleDataGlobalResponse(data);
+  }
+
+  /**
+   * Normalize VES (GOV.UK) response to common format
+   */
+  private normalizeVESResponse(data: any): VehicleDataResponse {
+    return {
+      registrationNumber: data.registrationNumber,
+      taxStatus: data.taxStatus || null,
+      taxDueDate: data.taxDueDate || null,
+      motStatus: data.motStatus || null,
+      motExpiryDate: null, // VES API doesn't provide MOT expiry date, only status text
+      make: data.make || null,
+      model: null, // VES API doesn't provide model
+      colour: data.colour || null,
+      yearOfManufacture: data.yearOfManufacture || null,
+      engineSize: data.engineCapacity || null,
+      fuelType: data.fuelType || null,
+      co2Emissions: data.co2Emissions || null,
+      rawData: data,
+    };
   }
 
   /**

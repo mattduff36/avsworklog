@@ -36,6 +36,7 @@ import {
   Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { DVLASyncDebugPanel } from './components/DVLASyncDebugPanel';
 
 type DebugInfo = {
   environment: string;
@@ -644,7 +645,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
       {/* Developer Tools Tabs */}
       <Tabs defaultValue="errors" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5 md:grid-cols-5 gap-1 md:gap-0 h-auto md:h-10 p-1 bg-slate-100 dark:bg-slate-800">
+        <TabsList className="grid w-full grid-cols-6 md:grid-cols-6 gap-1 md:gap-0 h-auto md:h-10 p-1 bg-slate-100 dark:bg-slate-800">
           <TabsTrigger value="errors" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
             <Bug className="h-4 w-4 flex-shrink-0" />
             <span className="hidden md:inline">Error Log</span>
@@ -669,6 +670,11 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
             <Calendar className="h-4 w-4 flex-shrink-0" />
             <span className="hidden md:inline">Absences</span>
             <span className="md:hidden data-[state=active]:inline hidden">Absent</span>
+          </TabsTrigger>
+          <TabsTrigger value="dvla" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+            <RefreshCw className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden md:inline">DVLA Sync</span>
+            <span className="md:hidden data-[state=active]:inline hidden">DVLA</span>
           </TabsTrigger>
         </TabsList>
 
@@ -1317,6 +1323,11 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* DVLA Sync Tab */}
+        <TabsContent value="dvla">
+          <DVLASyncDebugPanel />
         </TabsContent>
 
         {/* System Tab */}

@@ -1,6 +1,6 @@
 // Types for DVLA API Integration
 
-export type DVLAProvider = 'vehiclesmart' | 'checkcardetails' | 'vehicledataglobal';
+export type DVLAProvider = 'vehiclesmart' | 'checkcardetails' | 'vehicledataglobal' | 'ves';
 
 export interface DVLAApiConfig {
   provider: DVLAProvider;
