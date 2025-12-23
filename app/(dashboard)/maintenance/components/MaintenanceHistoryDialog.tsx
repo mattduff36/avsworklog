@@ -32,8 +32,10 @@ export function MaintenanceHistoryDialog({
   const { data: historyData, isLoading } = useMaintenanceHistory(vehicleId);
   const [showFullHistory, setShowFullHistory] = useState(false);
   const [visibleHistoryCount, setVisibleHistoryCount] = useState(10);
+  const [showVehicleData, setShowVehicleData] = useState(false);
   
   const history = historyData?.history || [];
+  const vesData = historyData?.vesData || null;
   
   // Group history by date (show all changes made together)
   const groupedHistory: Record<string, typeof history> = {};
@@ -146,6 +148,94 @@ export function MaintenanceHistoryDialog({
           </div>
         ) : (
           <div className="space-y-4">
+            {/* VES Vehicle Data Section */}
+            {vesData && (vesData.ves_make || vesData.ves_colour || vesData.ves_fuel_type) && (
+              <div className="bg-gradient-to-r from-blue-900/20 to-blue-800/10 border border-blue-700/30 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-blue-300 uppercase tracking-wide flex items-center gap-2">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    DVLA Vehicle Data
+                  </h3>
+                  {vesData.last_dvla_sync && (
+                    <span className="text-xs text-slate-400">
+                      Last synced: {new Date(vesData.last_dvla_sync).toLocaleDateString('en-GB')}
+                    </span>
+                  )}
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                  {vesData.ves_make && (
+                    <div>
+                      <span className="text-slate-400">Make:</span>
+                      <span className="ml-2 text-white font-medium">{vesData.ves_make}</span>
+                    </div>
+                  )}
+                  {vesData.ves_colour && (
+                    <div>
+                      <span className="text-slate-400">Colour:</span>
+                      <span className="ml-2 text-white font-medium">{vesData.ves_colour}</span>
+                    </div>
+                  )}
+                  {vesData.ves_year_of_manufacture && (
+                    <div>
+                      <span className="text-slate-400">Year:</span>
+                      <span className="ml-2 text-white font-medium">{vesData.ves_year_of_manufacture}</span>
+                    </div>
+                  )}
+                  {vesData.ves_fuel_type && (
+                    <div>
+                      <span className="text-slate-400">Fuel:</span>
+                      <span className="ml-2 text-white font-medium">{vesData.ves_fuel_type}</span>
+                    </div>
+                  )}
+                  {vesData.ves_engine_capacity && (
+                    <div>
+                      <span className="text-slate-400">Engine:</span>
+                      <span className="ml-2 text-white font-medium">{vesData.ves_engine_capacity}cc</span>
+                    </div>
+                  )}
+                  {vesData.ves_tax_status && (
+                    <div>
+                      <span className="text-slate-400">Tax Status:</span>
+                      <span className="ml-2 text-white font-medium">{vesData.ves_tax_status}</span>
+                    </div>
+                  )}
+                  {vesData.tax_due_date && (
+                    <div>
+                      <span className="text-slate-400">Tax Due:</span>
+                      <span className="ml-2 text-white font-medium">{formatMaintenanceDate(vesData.tax_due_date)}</span>
+                    </div>
+                  )}
+                  {vesData.ves_mot_status && (
+                    <div>
+                      <span className="text-slate-400">MOT Status:</span>
+                      <span className="ml-2 text-white font-medium">{vesData.ves_mot_status}</span>
+                    </div>
+                  )}
+                  {vesData.ves_co2_emissions && (
+                    <div>
+                      <span className="text-slate-400">CO2:</span>
+                      <span className="ml-2 text-white font-medium">{vesData.ves_co2_emissions}g/km</span>
+                    </div>
+                  )}
+                  {vesData.ves_euro_status && (
+                    <div>
+                      <span className="text-slate-400">Euro Status:</span>
+                      <span className="ml-2 text-white font-medium">{vesData.ves_euro_status}</span>
+                    </div>
+                  )}
+                  {vesData.ves_wheelplan && (
+                    <div className="col-span-2">
+                      <span className="text-slate-400">Wheelplan:</span>
+                      <span className="ml-2 text-white font-medium">{vesData.ves_wheelplan}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
             {/* Recent Updates Summary */}
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Recent Updates</h3>

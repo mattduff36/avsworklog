@@ -33,6 +33,32 @@ export async function GET(
       return NextResponse.json({ error: 'Vehicle not found' }, { status: 404 });
     }
     
+    // Get maintenance record with VES data
+    const { data: maintenanceData } = await supabase
+      .from('vehicle_maintenance')
+      .select(`
+        ves_make,
+        ves_colour,
+        ves_fuel_type,
+        ves_year_of_manufacture,
+        ves_engine_capacity,
+        ves_tax_status,
+        ves_mot_status,
+        ves_co2_emissions,
+        ves_euro_status,
+        ves_real_driving_emissions,
+        ves_type_approval,
+        ves_wheelplan,
+        ves_revenue_weight,
+        ves_marked_for_export,
+        ves_month_of_first_registration,
+        ves_date_of_last_v5c_issued,
+        tax_due_date,
+        last_dvla_sync
+      `)
+      .eq('vehicle_id', vehicleId)
+      .single();
+    
     // Get history (RLS handles permission check)
     const { data: history, error } = await supabase
       .from('maintenance_history')
@@ -51,7 +77,8 @@ export async function GET(
       vehicle: {
         id: vehicle.id,
         reg_number: vehicle.reg_number
-      }
+      },
+      vesData: maintenanceData || null
     };
     
     return NextResponse.json(response);

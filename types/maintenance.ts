@@ -42,6 +42,24 @@ export interface VehicleMaintenance {
   dvla_sync_error: string | null;
   dvla_raw_data: Record<string, any> | null;
   
+  // VES API Vehicle Data
+  ves_make: string | null;
+  ves_colour: string | null;
+  ves_fuel_type: string | null;
+  ves_year_of_manufacture: number | null;
+  ves_engine_capacity: number | null;
+  ves_tax_status: string | null;
+  ves_mot_status: string | null;
+  ves_co2_emissions: number | null;
+  ves_euro_status: string | null;
+  ves_real_driving_emissions: string | null;
+  ves_type_approval: string | null;
+  ves_wheelplan: string | null;
+  ves_revenue_weight: number | null;
+  ves_marked_for_export: boolean | null;
+  ves_month_of_first_registration: string | null;
+  ves_date_of_last_v5c_issued: string | null;
+  
   created_at: string;
   updated_at: string;
   
@@ -186,6 +204,26 @@ export interface MaintenanceHistoryResponse {
     id: string;
     reg_number: string;
   };
+  vesData?: {
+    ves_make: string | null;
+    ves_colour: string | null;
+    ves_fuel_type: string | null;
+    ves_year_of_manufacture: number | null;
+    ves_engine_capacity: number | null;
+    ves_tax_status: string | null;
+    ves_mot_status: string | null;
+    ves_co2_emissions: number | null;
+    ves_euro_status: string | null;
+    ves_real_driving_emissions: string | null;
+    ves_type_approval: string | null;
+    ves_wheelplan: string | null;
+    ves_revenue_weight: number | null;
+    ves_marked_for_export: boolean | null;
+    ves_month_of_first_registration: string | null;
+    ves_date_of_last_v5c_issued: string | null;
+    tax_due_date: string | null;
+    last_dvla_sync: string | null;
+  } | null;
 }
 
 // ============================================================================

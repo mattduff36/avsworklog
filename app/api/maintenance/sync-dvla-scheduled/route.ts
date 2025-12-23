@@ -46,14 +46,17 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Get all active vehicles
-    const { data: vehicles, error: vehiclesError } = await supabase
+    // Test vehicles to exclude from DVLA sync
+    const TEST_VEHICLES = ['TE57VAN', 'TE57HGV'];
+    
+    // Get all active vehicles (excluding test vehicles)
+    const { data: allVehicles, error: vehiclesError } = await supabase
       .from('vehicles')
       .select('id, reg_number')
       .eq('status', 'active');
 
     if (vehiclesError) throw vehiclesError;
-    if (!vehicles || vehicles.length === 0) {
+    if (!allVehicles || allVehicles.length === 0) {
       return NextResponse.json({
         success: true,
         message: 'No active vehicles to sync',
@@ -63,6 +66,11 @@ export async function POST(request: NextRequest) {
         skipped: 0,
       });
     }
+    
+    // Filter out test vehicles
+    const vehicles = allVehicles.filter(v => 
+      !TEST_VEHICLES.includes(v.reg_number.replace(/\s+/g, '').toUpperCase())
+    );
 
     // Get maintenance records to check last sync times
     const { data: maintenanceRecords } = await supabase
@@ -126,6 +134,24 @@ export async function POST(request: NextRequest) {
           last_dvla_sync: new Date().toISOString(),
           dvla_sync_error: null,
           dvla_raw_data: dvlaData.rawData || null,
+          
+          // Store all VES vehicle data
+          ves_make: dvlaData.make || null,
+          ves_colour: dvlaData.colour || null,
+          ves_fuel_type: dvlaData.fuelType || null,
+          ves_year_of_manufacture: dvlaData.yearOfManufacture || null,
+          ves_engine_capacity: dvlaData.engineSize || null,
+          ves_tax_status: dvlaData.taxStatus || null,
+          ves_mot_status: dvlaData.motStatus || null,
+          ves_co2_emissions: dvlaData.co2Emissions || null,
+          ves_euro_status: dvlaData.euroStatus || null,
+          ves_real_driving_emissions: dvlaData.realDrivingEmissions || null,
+          ves_type_approval: dvlaData.typeApproval || null,
+          ves_wheelplan: dvlaData.wheelplan || null,
+          ves_revenue_weight: dvlaData.revenueWeight || null,
+          ves_marked_for_export: dvlaData.markedForExport || false,
+          ves_month_of_first_registration: dvlaData.monthOfFirstRegistration || null,
+          ves_date_of_last_v5c_issued: dvlaData.dateOfLastV5CIssued || null,
         };
 
         const fieldsUpdated: string[] = [];

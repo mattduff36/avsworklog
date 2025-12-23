@@ -133,6 +133,7 @@ export class DVLAApiService {
 
   /**
    * Normalize VES (GOV.UK) response to common format
+   * Includes ALL fields returned by VES API for complete vehicle data storage
    */
   private normalizeVESResponse(data: any): VehicleDataResponse {
     return {
@@ -148,6 +149,17 @@ export class DVLAApiService {
       engineSize: data.engineCapacity || null,
       fuelType: data.fuelType || null,
       co2Emissions: data.co2Emissions || null,
+      
+      // Additional VES fields for comprehensive vehicle data
+      euroStatus: data.euroStatus || null,
+      realDrivingEmissions: data.realDrivingEmissions || null,
+      typeApproval: data.typeApproval || null,
+      wheelplan: data.wheelplan || null,
+      revenueWeight: data.revenueWeight || null,
+      markedForExport: data.markedForExport || false,
+      monthOfFirstRegistration: data.monthOfFirstRegistration || null,
+      dateOfLastV5CIssued: data.dateOfLastV5CIssued || null,
+      
       rawData: data,
     };
   }

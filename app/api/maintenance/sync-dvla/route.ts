@@ -47,27 +47,38 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { vehicleId, vehicleIds, syncAll } = body;
 
+    // Test vehicles to exclude from DVLA sync
+    const TEST_VEHICLES = ['TE57VAN', 'TE57HGV'];
+    
     // Determine which vehicles to sync
     let vehiclesToSync: Array<{ id: string; reg_number: string }> = [];
 
     if (syncAll) {
-      // Sync all active vehicles
+      // Sync all active vehicles (excluding test vehicles)
       const { data: vehicles, error } = await supabase
         .from('vehicles')
         .select('id, reg_number')
         .eq('status', 'active');
 
       if (error) throw error;
-      vehiclesToSync = vehicles || [];
+      
+      // Filter out test vehicles
+      vehiclesToSync = (vehicles || []).filter(v => 
+        !TEST_VEHICLES.includes(v.reg_number.replace(/\s+/g, '').toUpperCase())
+      );
     } else if (vehicleIds && Array.isArray(vehicleIds)) {
-      // Sync multiple specific vehicles
+      // Sync multiple specific vehicles (excluding test vehicles)
       const { data: vehicles, error } = await supabase
         .from('vehicles')
         .select('id, reg_number')
         .in('id', vehicleIds);
 
       if (error) throw error;
-      vehiclesToSync = vehicles || [];
+      
+      // Filter out test vehicles
+      vehiclesToSync = (vehicles || []).filter(v => 
+        !TEST_VEHICLES.includes(v.reg_number.replace(/\s+/g, '').toUpperCase())
+      );
     } else if (vehicleId) {
       // Sync single vehicle
       const { data: vehicle, error } = await supabase
@@ -77,7 +88,11 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (error) throw error;
-      if (vehicle) vehiclesToSync = [vehicle];
+      
+      // Check if it's a test vehicle
+      if (vehicle && !TEST_VEHICLES.includes(vehicle.reg_number.replace(/\s+/g, '').toUpperCase())) {
+        vehiclesToSync = [vehicle];
+      }
     } else {
       return NextResponse.json(
         { success: false, error: 'No vehicles specified' },
@@ -121,6 +136,24 @@ export async function POST(request: NextRequest) {
           last_dvla_sync: new Date().toISOString(),
           dvla_sync_error: null,
           dvla_raw_data: dvlaData.rawData || null,
+          
+          // Store all VES vehicle data
+          ves_make: dvlaData.make || null,
+          ves_colour: dvlaData.colour || null,
+          ves_fuel_type: dvlaData.fuelType || null,
+          ves_year_of_manufacture: dvlaData.yearOfManufacture || null,
+          ves_engine_capacity: dvlaData.engineSize || null,
+          ves_tax_status: dvlaData.taxStatus || null,
+          ves_mot_status: dvlaData.motStatus || null,
+          ves_co2_emissions: dvlaData.co2Emissions || null,
+          ves_euro_status: dvlaData.euroStatus || null,
+          ves_real_driving_emissions: dvlaData.realDrivingEmissions || null,
+          ves_type_approval: dvlaData.typeApproval || null,
+          ves_wheelplan: dvlaData.wheelplan || null,
+          ves_revenue_weight: dvlaData.revenueWeight || null,
+          ves_marked_for_export: dvlaData.markedForExport || false,
+          ves_month_of_first_registration: dvlaData.monthOfFirstRegistration || null,
+          ves_date_of_last_v5c_issued: dvlaData.dateOfLastV5CIssued || null,
         };
 
         const fieldsUpdated: string[] = [];
@@ -133,7 +166,7 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Update MOT due date if available
+        // Update MOT due date if available (VES doesn't provide this, but keep for other providers)
         if (dvlaData.motExpiryDate) {
           updates.mot_due_date = dvlaData.motExpiryDate;
           if (oldMotDate !== dvlaData.motExpiryDate) {

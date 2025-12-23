@@ -21,6 +21,17 @@ export interface VehicleDataResponse {
   engineSize: number | null;
   fuelType: string | null;
   co2Emissions: number | null;
+  
+  // Additional VES API fields
+  euroStatus?: string | null;
+  realDrivingEmissions?: string | null;
+  typeApproval?: string | null;
+  wheelplan?: string | null;
+  revenueWeight?: number | null;
+  markedForExport?: boolean | null;
+  monthOfFirstRegistration?: string | null;
+  dateOfLastV5CIssued?: string | null;
+  
   rawData?: any; // Store complete API response for debugging
 }
 
