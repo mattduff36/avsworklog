@@ -115,33 +115,33 @@ export function MaintenanceHistoryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-3xl max-h-[90vh] md:max-h-[90vh] h-full md:h-auto w-full md:max-w-3xl overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-start justify-between gap-4 pr-8">
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-3 md:gap-4 md:pr-8">
             <div className="flex-1">
-              <DialogTitle className="text-2xl flex items-center gap-2">
-                <HistoryIcon className="h-6 w-6" />
-                Maintenance History - {vehicleReg || 'Vehicle'}
+              <DialogTitle className="text-xl md:text-2xl flex items-center gap-2">
+                <HistoryIcon className="h-5 w-5 md:h-6 md:w-6" />
+                <span className="truncate">Maintenance History - {vehicleReg || 'Vehicle'}</span>
               </DialogTitle>
-              <DialogDescription className="text-slate-400">
+              <DialogDescription className="text-slate-400 text-sm">
                 Complete audit trail of all maintenance changes
               </DialogDescription>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-shrink-0">
               <Button
                 onClick={() => setMotHistoryOpen(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white flex-shrink-0 mt-1"
+                className="bg-blue-600 hover:bg-blue-700 text-white flex-1 md:flex-initial"
                 size="sm"
               >
-                <FileText className="h-4 w-4 mr-2" />
-                MOT History
+                <FileText className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">MOT History</span>
               </Button>
               {onEditClick && (
                 <Button
                   onClick={onEditClick}
-                  className="bg-red-600 hover:bg-red-700 text-white flex-shrink-0 mt-1"
+                  className="bg-red-600 hover:bg-red-700 text-white flex-1 md:flex-initial"
                   size="sm"
                 >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit
+                  <Edit className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">Edit</span>
                 </Button>
               )}
             </div>

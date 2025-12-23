@@ -274,15 +274,15 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg }: MotHistoryD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-[80vw] md:max-w-[80vw] w-full max-h-[90vh] md:max-h-[90vh] h-full md:h-auto overflow-y-auto">
+      <DialogContent className="bg-slate-900 border-slate-700 text-white w-full max-w-full md:max-w-[80vw] h-full md:h-auto max-h-screen md:max-h-[90vh] overflow-y-auto p-4 md:p-6">
         <DialogHeader>
-          <div className="flex items-start justify-between gap-4 pr-8">
-            <div className="flex-1">
-              <DialogTitle className="text-2xl flex items-center gap-2">
-                <FileText className="h-6 w-6" />
-                MOT History - {vehicleReg}
+          <div className="flex items-start justify-between gap-4 pr-6 md:pr-8">
+            <div className="flex-1 min-w-0">
+              <DialogTitle className="text-xl md:text-2xl flex items-center gap-2">
+                <FileText className="h-5 w-5 md:h-6 md:w-6" />
+                <span className="truncate">MOT History - {vehicleReg}</span>
               </DialogTitle>
-              <DialogDescription className="text-slate-400">
+              <DialogDescription className="text-slate-400 text-sm">
                 Complete MOT test history from GOV.UK database
               </DialogDescription>
             </div>
@@ -298,12 +298,12 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg }: MotHistoryD
         ) : (
           <div className="space-y-4">
             {/* Current MOT Status Card */}
-            <div className="bg-gradient-to-r from-blue-900/30 to-blue-800/20 border border-blue-700/50 rounded-lg p-4">
-              <h3 className="text-lg font-semibold text-blue-300 mb-3 flex items-center gap-2">
-                <CheckCircle className="h-5 w-5" />
+            <div className="bg-gradient-to-r from-blue-900/30 to-blue-800/20 border border-blue-700/50 rounded-lg p-3 md:p-4">
+              <h3 className="text-base md:text-lg font-semibold text-blue-300 mb-3 flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 md:h-5 md:w-5" />
                 Current MOT Status
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 text-sm">
                 <div>
                   <span className="text-slate-400">Expiry Date:</span>
                   <p className="text-white font-semibold text-lg">{formatDate(motData.currentStatus.expiryDate)}</p>
@@ -340,14 +340,14 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg }: MotHistoryD
                 return (
                   <div 
                     key={test.id}
-                    className={`border rounded-lg p-4 ${
+                    className={`border rounded-lg p-3 md:p-4 ${
                       isPassed 
                         ? 'bg-gradient-to-r from-green-900/20 to-green-800/10 border-green-700/30' 
                         : 'bg-gradient-to-r from-red-900/20 to-red-800/10 border-red-700/30'
                     }`}
                   >
                     {/* Test Header */}
-                    <div className="flex items-start justify-between mb-3">
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-2 md:gap-0 mb-3">
                       <div className="flex items-center gap-3">
                         {isPassed ? (
                           <CheckCircle className="h-6 w-6 text-green-400 flex-shrink-0" />

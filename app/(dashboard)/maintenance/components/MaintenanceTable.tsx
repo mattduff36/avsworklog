@@ -580,34 +580,6 @@ export function MaintenanceTable({
                       {/* Expanded View - All Fields */}
                       {isExpanded && (
                         <div className="space-y-3 pt-3 border-t border-slate-700">
-                          {/* Quick Actions at Top */}
-                          <div className="flex gap-1 justify-end">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedVehicle(vehicle);
-                                setHistoryDialogOpen(true);
-                              }}
-                              className="h-8 w-8 p-0"
-                            >
-                              <History className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedVehicle(vehicle);
-                                setEditDialogOpen(true);
-                              }}
-                              className="h-8 w-8 p-0"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </div>
-
                           {/* All Status Fields */}
                           <div className="space-y-2">
                             {columnVisibility.current_mileage && vehicle.current_mileage && (
@@ -654,8 +626,32 @@ export function MaintenanceTable({
                             )}
                           </div>
 
-                          {/* Actions */}
-                          <div className="flex gap-2 pt-2 border-t border-slate-700">
+                          {/* Actions - All on One Line */}
+                          <div className="flex items-center gap-2 pt-2 border-t border-slate-700">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedVehicle(vehicle);
+                                setHistoryDialogOpen(true);
+                              }}
+                              className="h-8 w-8 p-0"
+                            >
+                              <History className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedVehicle(vehicle);
+                                setEditDialogOpen(true);
+                              }}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
                             {!DVLA_EXCLUDED_REG_NUMBERS.includes(vehicle.vehicle?.reg_number || '') && (
                               <DVLASyncButton
                                 vehicleId={vehicle.vehicle_id}
