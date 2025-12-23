@@ -60,6 +60,13 @@ export interface VehicleMaintenance {
   ves_month_of_first_registration: string | null;
   ves_date_of_last_v5c_issued: string | null;
   
+  // MOT History API Data
+  mot_expiry_date: string | null;
+  mot_api_sync_status: 'never' | 'success' | 'error' | 'pending' | null;
+  mot_api_sync_error: string | null;
+  last_mot_api_sync: string | null;
+  mot_raw_data: Record<string, any> | null;
+  
   created_at: string;
   updated_at: string;
   
