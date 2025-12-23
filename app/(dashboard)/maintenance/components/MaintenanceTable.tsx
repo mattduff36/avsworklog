@@ -36,6 +36,7 @@ import {
 import { EditMaintenanceDialog } from './EditMaintenanceDialog';
 import { MaintenanceHistoryDialog } from './MaintenanceHistoryDialog';
 import { DVLASyncButton } from './DVLASyncButton';
+import { DVLA_EXCLUDED_REG_NUMBERS } from '@/lib/constants';
 
 interface MaintenanceTableProps {
   vehicles: VehicleMaintenanceWithStatus[];
