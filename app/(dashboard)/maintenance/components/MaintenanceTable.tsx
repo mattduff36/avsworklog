@@ -85,6 +85,7 @@ export function MaintenanceTable({
   const [addVehicleDialogOpen, setAddVehicleDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleMaintenanceWithStatus | null>(null);
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   
   // Column visibility state - all columns visible by default
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
@@ -498,91 +499,191 @@ export function MaintenanceTable({
           {/* Mobile Card View */}
           {vehicles.length > 0 && (
             <div className="md:hidden space-y-3">
-              {sortedVehicles.map((vehicle) => (
-                <Card key={vehicle.vehicle_id} className="bg-slate-800 border-slate-700">
-                  <CardContent className="p-4 space-y-3">
-                    {/* Header */}
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-semibold text-white text-lg">{vehicle.vehicle?.reg_number}</h3>
-                        {vehicle.vehicle?.nickname && (
-                          <p className="text-sm text-slate-400">{vehicle.vehicle.nickname}</p>
+              {sortedVehicles.map((vehicle) => {
+                const isExpanded = expandedCardId === vehicle.vehicle_id;
+                
+                return (
+                  <Card 
+                    key={vehicle.vehicle_id} 
+                    id={`vehicle-card-${vehicle.vehicle_id}`}
+                    className="bg-slate-800 border-slate-700 transition-all duration-200"
+                  >
+                    <CardContent className="p-4">
+                      {/* Collapsed View - Click to Expand */}
+                      <div 
+                        onClick={() => {
+                          if (!isExpanded) {
+                            setExpandedCardId(vehicle.vehicle_id);
+                            // Scroll to top of card after expansion
+                            setTimeout(() => {
+                              const card = document.getElementById(`vehicle-card-${vehicle.vehicle_id}`);
+                              if (card) {
+                                const navbarHeight = 68; // Approximate navbar height
+                                const padding = 16;
+                                const yOffset = -(navbarHeight + padding);
+                                const y = card.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                                window.scrollTo({ top: y, behavior: 'smooth' });
+                              }
+                            }, 100);
+                          } else {
+                            setExpandedCardId(null);
+                          }
+                        }}
+                        className="cursor-pointer"
+                      >
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-white text-lg">{vehicle.vehicle?.reg_number}</h3>
+                            {vehicle.vehicle?.nickname && (
+                              <p className="text-xs text-slate-400">{vehicle.vehicle.nickname}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {/* Most Critical Status Badge */}
+                            <Badge className={`text-xs ${getStatusColorClass(
+                              vehicle.tax_status?.status === 'overdue' || vehicle.mot_status?.status === 'overdue' 
+                                ? 'overdue' 
+                                : vehicle.tax_status?.status === 'due_soon' || vehicle.mot_status?.status === 'due_soon'
+                                ? 'due_soon'
+                                : 'ok'
+                            )}`}>
+                              {vehicle.tax_status?.status === 'overdue' || vehicle.mot_status?.status === 'overdue' 
+                                ? 'OVERDUE' 
+                                : vehicle.tax_status?.status === 'due_soon' || vehicle.mot_status?.status === 'due_soon'
+                                ? 'DUE SOON'
+                                : 'OK'}
+                            </Badge>
+                            {isExpanded ? (
+                              <ChevronUp className="h-5 w-5 text-slate-400" />
+                            ) : (
+                              <ChevronDown className="h-5 w-5 text-slate-400" />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Collapsed View - Essential Info Only */}
+                        {!isExpanded && (
+                          <div className="text-xs text-slate-400 space-y-0.5">
+                            <div className="flex justify-between">
+                              <span>Tax:</span>
+                              <span className="text-white">{formatMaintenanceDate(vehicle.tax_due_date)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>MOT:</span>
+                              <span className="text-white">{formatMaintenanceDate(vehicle.mot_due_date)}</span>
+                            </div>
+                          </div>
                         )}
                       </div>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedVehicle(vehicle);
-                            setHistoryDialogOpen(true);
-                          }}
-                          className="h-8 w-8 p-0"
-                        >
-                          <History className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedVehicle(vehicle);
-                            setEditDialogOpen(true);
-                          }}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
 
-                    {/* Status Grid */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-slate-400">Tax Due:</span>
-                        <Badge className={`font-medium ${getStatusColorClass(vehicle.tax_status?.status || 'not_set')}`}>
-                          {formatMaintenanceDate(vehicle.tax_due_date)}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-slate-400">MOT Due:</span>
-                        <Badge className={`font-medium ${getStatusColorClass(vehicle.mot_status?.status || 'not_set')}`}>
-                          {formatMaintenanceDate(vehicle.mot_due_date)}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-slate-400">Next Service:</span>
-                        <Badge className={`font-medium ${getStatusColorClass(vehicle.next_service_status?.status || 'not_set')}`}>
-                          {formatMileage(vehicle.next_service_mileage)}
-                        </Badge>
-                      </div>
-                    </div>
+                      {/* Expanded View - All Fields */}
+                      {isExpanded && (
+                        <div className="space-y-3 pt-3 border-t border-slate-700">
+                          {/* Quick Actions at Top */}
+                          <div className="flex gap-1 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedVehicle(vehicle);
+                                setHistoryDialogOpen(true);
+                              }}
+                              className="h-8 w-8 p-0"
+                            >
+                              <History className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedVehicle(vehicle);
+                                setEditDialogOpen(true);
+                              }}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </div>
 
-                    {/* Actions */}
-                    <div className="flex gap-2 pt-2 border-t border-slate-700">
-                      {!DVLA_EXCLUDED_REG_NUMBERS.includes(vehicle.vehicle?.reg_number || '') && (
-                        <DVLASyncButton
-                          vehicleId={vehicle.vehicle_id}
-                          registrationNumber={vehicle.vehicle?.reg_number || 'Unknown'}
-                          lastSync={vehicle.last_dvla_sync}
-                          syncStatus={vehicle.dvla_sync_status}
-                          onSyncComplete={onVehicleAdded}
-                        />
+                          {/* All Status Fields */}
+                          <div className="space-y-2">
+                            {columnVisibility.current_mileage && vehicle.current_mileage && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-slate-400">Current Mileage:</span>
+                                <span className="text-white font-medium">{formatMileage(vehicle.current_mileage)}</span>
+                              </div>
+                            )}
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-slate-400">Tax Due:</span>
+                              <Badge className={`font-medium ${getStatusColorClass(vehicle.tax_status?.status || 'not_set')}`}>
+                                {formatMaintenanceDate(vehicle.tax_due_date)}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-slate-400">MOT Due:</span>
+                              <Badge className={`font-medium ${getStatusColorClass(vehicle.mot_status?.status || 'not_set')}`}>
+                                {formatMaintenanceDate(vehicle.mot_due_date)}
+                              </Badge>
+                            </div>
+                            {columnVisibility.service_due && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-slate-400">Next Service:</span>
+                                <Badge className={`font-medium ${getStatusColorClass(vehicle.next_service_status?.status || 'not_set')}`}>
+                                  {formatMileage(vehicle.next_service_mileage)}
+                                </Badge>
+                              </div>
+                            )}
+                            {columnVisibility.cambelt_due && vehicle.cambelt_due_mileage && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-slate-400">Cambelt Due:</span>
+                                <Badge className={`font-medium ${getStatusColorClass(vehicle.cambelt_status?.status || 'not_set')}`}>
+                                  {formatMileage(vehicle.cambelt_due_mileage)}
+                                </Badge>
+                              </div>
+                            )}
+                            {columnVisibility.first_aid_expiry && vehicle.first_aid_kit_expiry && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-slate-400">First Aid Expiry:</span>
+                                <Badge className={`font-medium ${getStatusColorClass(vehicle.first_aid_status?.status || 'not_set')}`}>
+                                  {formatMaintenanceDate(vehicle.first_aid_kit_expiry)}
+                                </Badge>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex gap-2 pt-2 border-t border-slate-700">
+                            {!DVLA_EXCLUDED_REG_NUMBERS.includes(vehicle.vehicle?.reg_number || '') && (
+                              <DVLASyncButton
+                                vehicleId={vehicle.vehicle_id}
+                                registrationNumber={vehicle.vehicle?.reg_number || 'Unknown'}
+                                lastSync={vehicle.last_dvla_sync}
+                                syncStatus={vehicle.dvla_sync_status}
+                                onSyncComplete={onVehicleAdded}
+                              />
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedVehicle(vehicle);
+                                setDeleteDialogOpen(true);
+                              }}
+                              className="text-red-400 hover:text-red-300 hover:bg-red-900/20 ml-auto"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedVehicle(vehicle);
-                          setDeleteDialogOpen(true);
-                        }}
-                        className="text-red-400 hover:text-red-300 hover:bg-red-900/20 ml-auto"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </CardContent>
