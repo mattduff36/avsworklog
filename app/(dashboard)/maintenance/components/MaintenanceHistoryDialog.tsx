@@ -140,15 +140,9 @@ export function MaintenanceHistoryDialog({
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
           </div>
-        ) : history.length === 0 ? (
-          <div className="text-center py-12 text-slate-400">
-            <HistoryIcon className="h-12 w-12 mx-auto mb-3 opacity-20" />
-            <p>No maintenance history yet</p>
-            <p className="text-sm mt-1">Changes will appear here when maintenance records are updated</p>
-          </div>
         ) : (
           <div className="space-y-4">
-            {/* VES Vehicle Data Section */}
+            {/* VES Vehicle Data Section - Show even if no history */}
             {vesData && (vesData.ves_make || vesData.ves_colour || vesData.ves_fuel_type) && (
               <div className="bg-gradient-to-r from-blue-900/20 to-blue-800/10 border border-blue-700/30 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -236,9 +230,18 @@ export function MaintenanceHistoryDialog({
               </div>
             )}
             
-            {/* Recent Updates Summary */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Recent Updates</h3>
+            {/* Show "No history" message if no history, but still show DVLA data above */}
+            {history.length === 0 ? (
+              <div className="text-center py-12 text-slate-400">
+                <HistoryIcon className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                <p>No maintenance history yet</p>
+                <p className="text-sm mt-1">Changes will appear here when maintenance records are updated</p>
+              </div>
+            ) : (
+              <>
+                {/* Recent Updates Summary */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Recent Updates</h3>
               {latestEntries.map((entry) => (
                 <div 
                   key={entry.id}
