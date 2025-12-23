@@ -242,24 +242,31 @@ export function DVLASyncDebugPanel() {
 
       {/* Bulk Sync Confirmation Dialog */}
       <Dialog open={showBulkConfirm} onOpenChange={setShowBulkConfirm}>
-        <DialogContent>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white">
           <DialogHeader>
-            <DialogTitle>Confirm Bulk Sync</DialogTitle>
-            <DialogDescription>
-              This will sync tax due dates for <strong>{vehicleCount} active vehicles</strong> from the DVLA API.
+            <DialogTitle className="text-xl text-white">Confirm Bulk Sync</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              This will sync tax due dates for <strong className="text-white">{vehicleCount} active vehicles</strong> from the DVLA API.
               <br /><br />
-              <strong>API Usage:</strong> ~{vehicleCount} API calls
+              <strong className="text-white">API Usage:</strong> ~{vehicleCount} API calls
               <br />
-              <strong>Time:</strong> ~{Math.ceil(vehicleCount / 60)} minutes (1 call per second)
+              <strong className="text-white">Time:</strong> ~{Math.ceil(vehicleCount / 60)} minutes (1 call per second)
               <br /><br />
               This will use your production API quota. Continue?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowBulkConfirm(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowBulkConfirm(false)}
+              className="border-slate-600 text-white hover:bg-slate-800"
+            >
               Cancel
             </Button>
-            <Button onClick={handleBulkSync}>
+            <Button 
+              onClick={handleBulkSync}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
               Yes, Sync All
             </Button>
           </DialogFooter>
