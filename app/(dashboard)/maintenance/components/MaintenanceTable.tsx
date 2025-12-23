@@ -151,11 +151,6 @@ export function MaintenanceTable({
     }
   });
   
-  // Count vehicles with missing data
-  const missingDataCount = vehicles.filter(v => 
-    !v.tax_due_date || !v.mot_due_date || !v.next_service_mileage || !v.first_aid_kit_expiry
-  ).length;
-  
   return (
     <>
       <Card className="bg-slate-900 border-slate-700">
@@ -180,24 +175,6 @@ export function MaintenanceTable({
         </CardHeader>
         
         <CardContent className="space-y-4">
-          {/* Warning Banner for Missing Data */}
-          {missingDataCount > 0 && (
-            <div className="bg-amber-900/20 border border-amber-800 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="font-semibold text-amber-100 mb-1">
-                    Missing Maintenance Dates
-                  </h4>
-                  <p className="text-sm text-amber-300">
-                    {missingDataCount} vehicle{missingDataCount !== 1 ? 's have' : ' has'} incomplete maintenance records. 
-                    Vehicles without scheduled due dates will not be monitored and may miss critical deadlines. 
-                    Please review and update these records.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
           
           {/* Search Bar and Column Filter */}
           <div className="flex gap-2">
