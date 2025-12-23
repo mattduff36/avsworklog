@@ -258,13 +258,13 @@ export function MaintenanceTable({
             </DropdownMenu>
           </div>
 
-          {/* Table */}
+          {/* Desktop Table View */}
           {vehicles.length === 0 ? (
             <div className="text-center py-12 text-slate-400">
               {searchQuery ? 'No vehicles found matching your search.' : 'No vehicles with maintenance records yet.'}
             </div>
           ) : (
-            <div className="border border-slate-700 rounded-lg">
+            <div className="hidden md:block border border-slate-700 rounded-lg">
                 <Table className="min-w-full">
                   <TableHeader>
                     <TableRow className="border-slate-700">
@@ -490,6 +490,97 @@ export function MaintenanceTable({
                     ))}
                   </TableBody>
                 </Table>
+            </div>
+          )}
+
+          {/* Mobile Card View */}
+          {vehicles.length > 0 && (
+            <div className="md:hidden space-y-3">
+              {sortedVehicles.map((vehicle) => (
+                <Card key={vehicle.vehicle_id} className="bg-slate-800 border-slate-700">
+                  <CardContent className="p-4 space-y-3">
+                    {/* Header */}
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-semibold text-white text-lg">{vehicle.vehicle?.reg_number}</h3>
+                        {vehicle.vehicle?.nickname && (
+                          <p className="text-sm text-slate-400">{vehicle.vehicle.nickname}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedVehicle(vehicle);
+                            setHistoryDialogOpen(true);
+                          }}
+                          className="h-8 w-8 p-0"
+                        >
+                          <History className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedVehicle(vehicle);
+                            setEditDialogOpen(true);
+                          }}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Status Grid */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-400">Tax Due:</span>
+                        <Badge className={`font-medium ${getStatusColorClass(vehicle.tax_status?.status || 'not_set')}`}>
+                          {formatMaintenanceDate(vehicle.tax_due_date)}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-400">MOT Due:</span>
+                        <Badge className={`font-medium ${getStatusColorClass(vehicle.mot_status?.status || 'not_set')}`}>
+                          {formatMaintenanceDate(vehicle.mot_due_date)}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-400">Next Service:</span>
+                        <Badge className={`font-medium ${getStatusColorClass(vehicle.next_service_status?.status || 'not_set')}`}>
+                          {formatMileage(vehicle.next_service_mileage)}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-2 border-t border-slate-700">
+                      {!DVLA_EXCLUDED_REG_NUMBERS.includes(vehicle.vehicle?.reg_number || '') && (
+                        <DVLASyncButton
+                          vehicleId={vehicle.vehicle_id}
+                          registrationNumber={vehicle.vehicle?.reg_number || 'Unknown'}
+                          lastSync={vehicle.last_dvla_sync}
+                          syncStatus={vehicle.dvla_sync_status}
+                          onSyncComplete={onVehicleAdded}
+                        />
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedVehicle(vehicle);
+                          setDeleteDialogOpen(true);
+                        }}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-900/20 ml-auto"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
         </CardContent>
