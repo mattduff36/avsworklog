@@ -187,19 +187,21 @@ export async function DELETE(
 
     if (vehicle) {
       // Archive the vehicle with reason
-      await supabase.from('vehicle_archive').insert({
-        vehicle_id: vehicle.id,
-        reg_number: vehicle.reg_number,
-        category_id: vehicle.category_id,
-        status: vehicle.status,
-        archive_reason: reason,
-        archived_by: user.id,
-        vehicle_data: vehicle,
-        maintenance_data: vehicle.vehicle_maintenance || null,
-      }).catch((err) => {
+      try {
+        await supabase.from('vehicle_archive').insert({
+          vehicle_id: vehicle.id,
+          reg_number: vehicle.reg_number,
+          category_id: vehicle.category_id,
+          status: vehicle.status,
+          archive_reason: reason,
+          archived_by: user.id,
+          vehicle_data: vehicle,
+          maintenance_data: vehicle.vehicle_maintenance || null,
+        });
+      } catch (err) {
         // Log error but don't fail delete if archiving fails
         console.error('Failed to archive vehicle:', err);
-      });
+      }
     }
 
     // Delete vehicle (CASCADE will handle maintenance records)
