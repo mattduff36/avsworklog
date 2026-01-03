@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, History as HistoryIcon, User, Calendar, Edit, ChevronDown, Clock, FileText } from 'lucide-react';
+import { Loader2, History as HistoryIcon, User, Calendar, Edit, ChevronDown, Clock, FileText, RefreshCw } from 'lucide-react';
 import { useMaintenanceHistory } from '@/lib/hooks/useMaintenance';
 import { formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 import { MotHistoryDialog } from './MotHistoryDialog';
@@ -35,9 +35,39 @@ export function MaintenanceHistoryDialog({
   const [visibleHistoryCount, setVisibleHistoryCount] = useState(10);
   const [showVehicleData, setShowVehicleData] = useState(false);
   const [motHistoryOpen, setMotHistoryOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   const history = historyData?.history || [];
   const vesData = historyData?.vesData || null;
+  
+  // Handle sync button click
+  const handleSync = async () => {
+    if (!vehicleId || isSyncing) return;
+    
+    setIsSyncing(true);
+    try {
+      const response = await fetch('/api/maintenance/sync-dvla', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vehicleIds: [vehicleId] }),
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // Refresh the page to show updated data
+        window.location.reload();
+      } else {
+        console.error('Sync failed:', result.message);
+        alert('Sync failed: ' + (result.message || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+      alert('Failed to sync vehicle data');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
   
   // Group history by date (show all changes made together)
   const groupedHistory: Record<string, typeof history> = {};
@@ -157,13 +187,21 @@ export function MaintenanceHistoryDialog({
             {/* VES Vehicle Data Section - Show even if no history */}
             {vesData && (vesData.ves_make || vesData.ves_colour || vesData.ves_fuel_type) && (
               <div className="bg-gradient-to-r from-blue-900/20 to-blue-800/10 border border-blue-700/30 rounded-lg p-4">
-                <div className="mb-3">
+                <div className="mb-3 flex items-center justify-between">
                   <h3 className="text-sm font-medium text-blue-300 uppercase tracking-wide flex items-center gap-2">
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     Vehicle Data
                   </h3>
+                  <button
+                    onClick={handleSync}
+                    disabled={isSyncing}
+                    className="p-1.5 rounded-md bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    title="Sync tax & MOT due dates"
+                  >
+                    <RefreshCw className={`h-4 w-4 text-blue-400 ${isSyncing ? 'animate-spin' : ''}`} />
+                  </button>
                 </div>
                 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">

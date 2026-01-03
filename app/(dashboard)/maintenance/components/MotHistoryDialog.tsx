@@ -21,7 +21,8 @@ import {
   Gauge,
   MapPin,
   Clock,
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 
 interface MotHistoryDialogProps {
@@ -317,9 +318,19 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                 <FileText className="h-5 w-5 md:h-6 md:w-6" />
                 <span className="truncate">MOT History - {vehicleReg}</span>
               </DialogTitle>
-              <DialogDescription className="text-slate-400 text-sm">
+              <DialogDescription className="text-slate-400 text-sm mb-3">
                 Complete MOT test history from GOV.UK database
               </DialogDescription>
+              <Button
+                onClick={fetchMotHistory}
+                disabled={loading}
+                variant="outline"
+                size="sm"
+                className="border-blue-600 text-blue-400 hover:bg-blue-600/10"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Update
+              </Button>
             </div>
           </div>
         </DialogHeader>
