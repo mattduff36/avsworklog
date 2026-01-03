@@ -238,6 +238,50 @@ export function MaintenanceHistoryDialog({
                       <span className="ml-2 text-white font-medium">{vesData.ves_wheelplan}</span>
                     </div>
                   )}
+                  
+                  {/* MOT API Data */}
+                  {vesData.mot_make && (
+                    <div>
+                      <span className="text-slate-400">Make (MOT):</span>
+                      <span className="ml-2 text-white font-medium">{vesData.mot_make}</span>
+                    </div>
+                  )}
+                  {vesData.mot_model && (
+                    <div>
+                      <span className="text-slate-400">Model (MOT):</span>
+                      <span className="ml-2 text-white font-medium">{vesData.mot_model}</span>
+                    </div>
+                  )}
+                  {vesData.mot_primary_colour && (
+                    <div>
+                      <span className="text-slate-400">Colour (MOT):</span>
+                      <span className="ml-2 text-white font-medium">{vesData.mot_primary_colour}</span>
+                    </div>
+                  )}
+                  {vesData.mot_fuel_type && (
+                    <div>
+                      <span className="text-slate-400">Fuel (MOT):</span>
+                      <span className="ml-2 text-white font-medium">{vesData.mot_fuel_type}</span>
+                    </div>
+                  )}
+                  {vesData.mot_year_of_manufacture && (
+                    <div>
+                      <span className="text-slate-400">Year (MOT):</span>
+                      <span className="ml-2 text-white font-medium">{vesData.mot_year_of_manufacture}</span>
+                    </div>
+                  )}
+                  {vesData.mot_first_used_date && (
+                    <div>
+                      <span className="text-slate-400">First Reg (MOT):</span>
+                      <span className="ml-2 text-white font-medium">{formatMaintenanceDate(vesData.mot_first_used_date)}</span>
+                    </div>
+                  )}
+                  {vesData.last_mot_api_sync && (
+                    <div className="col-span-2">
+                      <span className="text-slate-400">MOT Data Last Synced:</span>
+                      <span className="ml-2 text-white font-medium">{new Date(vesData.last_mot_api_sync).toLocaleDateString('en-GB')}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

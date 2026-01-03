@@ -33,7 +33,7 @@ export async function GET(
       return NextResponse.json({ error: 'Vehicle not found' }, { status: 404 });
     }
     
-    // Get maintenance record with VES data
+    // Get maintenance record with VES and MOT data
     const { data: maintenanceData } = await supabase
       .from('vehicle_maintenance')
       .select(`
@@ -55,7 +55,15 @@ export async function GET(
         ves_date_of_last_v5c_issued,
         tax_due_date,
         mot_due_date,
-        last_dvla_sync
+        last_dvla_sync,
+        mot_make,
+        mot_model,
+        mot_fuel_type,
+        mot_primary_colour,
+        mot_registration,
+        mot_year_of_manufacture,
+        mot_first_used_date,
+        last_mot_api_sync
       `)
       .eq('vehicle_id', vehicleId)
       .single();
