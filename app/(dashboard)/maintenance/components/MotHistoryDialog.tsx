@@ -439,9 +439,6 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                   <div>
                     <span className="text-slate-400">Last Test:</span>
                     <p className="text-white font-medium">{formatDate(motData.currentStatus.lastTestDate)}</p>
-                    <Badge className={`mt-1 ${motData.currentStatus.lastTestResult === 'PASSED' ? 'bg-green-600' : 'bg-red-600'}`}>
-                      {motData.currentStatus.lastTestResult}
-                    </Badge>
                   </div>
                 </div>
               </div>
