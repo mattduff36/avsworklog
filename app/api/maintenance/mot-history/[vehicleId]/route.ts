@@ -51,10 +51,10 @@ export async function GET(
       );
     }
 
-    // Fetch MOT history from API
+    // Fetch MOT history from API (single call that includes expiry data)
     try {
-      const motHistory = await motService.getMotHistory(vehicle.reg_number);
       const motExpiryData = await motService.getMotExpiryData(vehicle.reg_number);
+      const motHistory = motExpiryData.rawData; // Reuse the history data from getMotExpiryData
 
       // Transform the data to match UI expectations
       const sortedTests = (motHistory.motTests || []).sort((a, b) => 

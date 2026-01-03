@@ -129,6 +129,7 @@ export async function POST(request: NextRequest) {
         // Fetch MOT expiry data from MOT History API (if configured)
         let motExpiryData = null;
         let motResponseTime = null;
+        let motApiError = null;
         if (motService) {
           try {
             const motStart = Date.now();
@@ -136,6 +137,7 @@ export async function POST(request: NextRequest) {
             motResponseTime = Date.now() - motStart;
             console.log(`[INFO] MOT expiry for ${vehicle.reg_number}: ${motExpiryData.motExpiryDate || 'N/A'}`);
           } catch (motError: any) {
+            motApiError = motError.message;
             console.error(`MOT API fetch failed for ${vehicle.reg_number}:`, motError.message);
             // Continue with DVLA data even if MOT fetch fails
           }
@@ -209,8 +211,14 @@ export async function POST(request: NextRequest) {
           } else {
             console.log(`[INFO] ${vehicle.reg_number}: MOT unchanged (${oldMotDate})`);
           }
-        } else if (motService && !motExpiryData) {
-          // MOT API is configured but returned no data (e.g., vehicle too new)
+        } else if (motService && motApiError) {
+          // MOT API call failed with an error
+          updates.mot_api_sync_status = 'error';
+          updates.last_mot_api_sync = new Date().toISOString();
+          updates.mot_api_sync_error = motApiError;
+          console.log(`[ERROR] ${vehicle.reg_number}: MOT API error: ${motApiError}`);
+        } else if (motService && !motExpiryData && !motApiError) {
+          // MOT API succeeded but returned no data (e.g., vehicle too new)
           updates.mot_api_sync_status = 'success';
           updates.last_mot_api_sync = new Date().toISOString();
           updates.mot_api_sync_error = 'No MOT history found';

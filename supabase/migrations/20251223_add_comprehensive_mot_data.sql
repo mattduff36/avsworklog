@@ -178,12 +178,7 @@ ALTER TABLE mot_test_comments ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view MOT history for vehicles they can access" ON mot_test_history;
 CREATE POLICY "Users can view MOT history for vehicles they can access"
   ON mot_test_history FOR SELECT
-  USING (
-    vehicle_id IN (
-      SELECT id FROM vehicles
-      -- Add your vehicle access logic here
-    )
-  );
+  USING (has_maintenance_permission());
 
 DROP POLICY IF EXISTS "Service role has full access to MOT history" ON mot_test_history;
 CREATE POLICY "Service role has full access to MOT history"
@@ -194,12 +189,7 @@ CREATE POLICY "Service role has full access to MOT history"
 DROP POLICY IF EXISTS "Users can view MOT defects for tests they can access" ON mot_test_defects;
 CREATE POLICY "Users can view MOT defects for tests they can access"
   ON mot_test_defects FOR SELECT
-  USING (
-    mot_test_id IN (
-      SELECT id FROM mot_test_history
-      WHERE vehicle_id IN (SELECT id FROM vehicles)
-    )
-  );
+  USING (has_maintenance_permission());
 
 DROP POLICY IF EXISTS "Service role has full access to MOT defects" ON mot_test_defects;
 CREATE POLICY "Service role has full access to MOT defects"
@@ -210,12 +200,7 @@ CREATE POLICY "Service role has full access to MOT defects"
 DROP POLICY IF EXISTS "Users can view MOT comments for tests they can access" ON mot_test_comments;
 CREATE POLICY "Users can view MOT comments for tests they can access"
   ON mot_test_comments FOR SELECT
-  USING (
-    mot_test_id IN (
-      SELECT id FROM mot_test_history
-      WHERE vehicle_id IN (SELECT id FROM vehicles)
-    )
-  );
+  USING (has_maintenance_permission());
 
 DROP POLICY IF EXISTS "Service role has full access to MOT comments" ON mot_test_comments;
 CREATE POLICY "Service role has full access to MOT comments"

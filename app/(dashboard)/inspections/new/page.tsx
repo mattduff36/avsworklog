@@ -670,6 +670,19 @@ function NewInspectionContent() {
       return;
     }
     
+    // Check for duplicate inspection before saving
+    if (duplicateInspection) {
+      setError('An inspection for this vehicle and week already exists. Please select a different vehicle or week.');
+      return;
+    }
+    
+    // Re-check for duplicates to prevent race conditions
+    await checkForDuplicate(vehicleId, weekEnding);
+    if (duplicateInspection) {
+      setError('An inspection for this vehicle and week already exists. Please select a different vehicle or week.');
+      return;
+    }
+    
     // Prevent duplicate saves
     if (loading) {
       console.log('Save already in progress, ignoring duplicate request');
