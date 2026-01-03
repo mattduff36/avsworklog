@@ -244,7 +244,6 @@ function NewInspectionContent() {
     }
 
     setDuplicateCheckLoading(true);
-    setError('');
     
     try {
       const { data, error } = await supabase
@@ -263,7 +262,8 @@ function NewInspectionContent() {
         return true; // Duplicate found
       } else {
         setDuplicateInspection(null);
-        setError('');
+        // Only clear error if it's a duplicate-related error
+        setError(prev => prev.includes('already exists') ? '' : prev);
         return false; // No duplicate
       }
     } catch (err) {
