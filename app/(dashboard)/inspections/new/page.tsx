@@ -237,10 +237,10 @@ function NewInspectionContent() {
   };
 
   // Check for duplicate inspection (same vehicle + week ending)
-  const checkForDuplicate = async (vehicleIdToCheck: string, weekEndingToCheck: string) => {
+  const checkForDuplicate = async (vehicleIdToCheck: string, weekEndingToCheck: string): Promise<boolean> => {
     if (!vehicleIdToCheck || !weekEndingToCheck || existingInspectionId) {
       setDuplicateInspection(null);
-      return;
+      return false;
     }
 
     setDuplicateCheckLoading(true);
@@ -260,14 +260,17 @@ function NewInspectionContent() {
         const existing = data[0];
         setDuplicateInspection(existing.id);
         setError(`An inspection for this vehicle and week already exists (${existing.status}). Please select a different vehicle or week.`);
+        return true; // Duplicate found
       } else {
         setDuplicateInspection(null);
         setError('');
+        return false; // No duplicate
       }
     } catch (err) {
       console.error('Error checking for duplicate:', err);
       // Don't block the user if the check fails
       setDuplicateInspection(null);
+      return false;
     } finally {
       setDuplicateCheckLoading(false);
     }
@@ -677,8 +680,8 @@ function NewInspectionContent() {
     }
     
     // Re-check for duplicates to prevent race conditions
-    await checkForDuplicate(vehicleId, weekEnding);
-    if (duplicateInspection) {
+    const isDuplicate = await checkForDuplicate(vehicleId, weekEnding);
+    if (isDuplicate) {
       setError('An inspection for this vehicle and week already exists. Please select a different vehicle or week.');
       return;
     }
