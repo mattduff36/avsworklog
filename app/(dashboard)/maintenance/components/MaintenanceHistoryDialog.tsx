@@ -431,6 +431,7 @@ export function MaintenanceHistoryDialog({
         onOpenChange={setMotHistoryOpen}
         vehicleReg={vehicleReg || 'Unknown'}
         vehicleId={vehicleId || ''}
+        existingMotDueDate={vesData?.mot_due_date || null}
       />
     </Dialog>
   );

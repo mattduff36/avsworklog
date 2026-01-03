@@ -29,6 +29,7 @@ interface MotHistoryDialogProps {
   onOpenChange: (open: boolean) => void;
   vehicleReg: string;
   vehicleId: string;
+  existingMotDueDate?: string | null;
 }
 
 // Keep sample data for reference (will be replaced with real API data)
@@ -230,7 +231,7 @@ const SAMPLE_MOT_DATA_REFERENCE: Record<string, any> = {
   }
 };
 
-export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId }: MotHistoryDialogProps) {
+export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, existingMotDueDate }: MotHistoryDialogProps) {
   const [expandedTestId, setExpandedTestId] = useState<string | null>(null);
   const [motData, setMotData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -363,7 +364,19 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId }: 
                     <p className="text-sm text-slate-300 mb-2">
                       <strong className="text-white">First MOT Due:</strong>
                     </p>
-                    {motData.firstUsedDate ? (
+                    {existingMotDueDate ? (
+                      <>
+                        <p className="text-2xl font-bold text-blue-400 mb-3">
+                          {formatDate(existingMotDueDate)}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {motData.firstUsedDate ? 
+                            'New vehicles are exempt from MOT testing for the first 3 years' :
+                            'MOT due date from vehicle records'
+                          }
+                        </p>
+                      </>
+                    ) : motData.firstUsedDate ? (
                       <>
                         <p className="text-2xl font-bold text-blue-400 mb-3">
                           {(() => {
@@ -384,7 +397,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId }: 
                           Date not available
                         </p>
                         <p className="text-xs text-slate-500">
-                          Vehicle registration date not found in MOT database
+                          Vehicle registration date not found in database
                         </p>
                       </>
                     )}

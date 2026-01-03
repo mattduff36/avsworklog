@@ -54,6 +54,7 @@ export async function GET(
         ves_month_of_first_registration,
         ves_date_of_last_v5c_issued,
         tax_due_date,
+        mot_due_date,
         last_dvla_sync
       `)
       .eq('vehicle_id', vehicleId)
