@@ -488,22 +488,27 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                           )}
                         </div>
                       </div>
-                      <Badge variant="outline" className="text-xs">
-                        {test.motTestNumber}
-                      </Badge>
                     </div>
 
                     {/* Test Details Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm mb-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm mb-3">
                       <div className="flex items-center gap-2">
                         <Gauge className="h-4 w-4 text-slate-400" />
                         <span className="text-slate-400">Mileage:</span>
                         <span className="text-white font-medium">{test.odometerValue.toLocaleString()} {test.odometerUnit}</span>
                       </div>
-                      <div className="flex items-center gap-2 col-span-2">
-                        <MapPin className="h-4 w-4 text-slate-400" />
-                        <span className="text-slate-400">Station:</span>
-                        <span className="text-white font-medium">{test.testStationName}, {test.testStationPcode}</span>
+                      {(test.testStationName || test.testStationPcode) && (
+                        <div className="flex items-center gap-2 md:col-span-2">
+                          <MapPin className="h-4 w-4 text-slate-400" />
+                          <span className="text-slate-400">Station:</span>
+                          <span className="text-white font-medium">
+                            {[test.testStationName, test.testStationPcode].filter(Boolean).join(', ')}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 md:col-span-3">
+                        <span className="text-slate-400">Test Number:</span>
+                        <span className="text-white font-mono text-xs">{test.motTestNumber}</span>
                       </div>
                     </div>
 
