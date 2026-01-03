@@ -262,8 +262,7 @@ function NewInspectionContent() {
         return true; // Duplicate found
       } else {
         setDuplicateInspection(null);
-        // Only clear error if it's a duplicate-related error
-        setError(prev => prev.includes('already exists') ? '' : prev);
+        setError(''); // Clear all errors when no duplicate found
         return false; // No duplicate
       }
     } catch (err) {
