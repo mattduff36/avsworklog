@@ -561,9 +561,6 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                                           {defect.locationLateral}
                                         </span>
                                       )}
-                                      {defect.dangerous && (
-                                        <Badge className="bg-red-600 text-xs">DANGEROUS</Badge>
-                                      )}
                                     </div>
                                     <p className="text-sm text-white">{defect.text}</p>
                                   </div>
