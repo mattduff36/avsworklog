@@ -191,7 +191,13 @@ export class MotHistoryService {
         motStatus = 'No Expiry Date';
       }
     } else if (sortedTests.length === 0) {
-      motStatus = 'No MOT History';
+      // No MOT tests yet - check if API provides motTestDueDate for new vehicles
+      if (history.motTestDueDate) {
+        motExpiryDate = history.motTestDueDate;
+        motStatus = 'Not Yet Due';
+      } else {
+        motStatus = 'No MOT History';
+      }
     } else {
       motStatus = 'No Valid MOT';
     }

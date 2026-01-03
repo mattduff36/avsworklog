@@ -351,7 +351,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
         ) : (
           <div className="space-y-4">
             {/* Current MOT Status Card */}
-            {motData.currentStatus.status === 'No MOT History' || !motData.currentStatus.expiryDate || motData.tests.length === 0 ? (
+            {motData.currentStatus.status === 'No MOT History' || motData.currentStatus.status === 'Not Yet Due' || motData.tests.length === 0 ? (
               // Special card for vehicles with no MOT history (too new)
               <div className="bg-gradient-to-r from-slate-800/50 to-slate-700/30 border border-slate-600/50 rounded-lg p-4 md:p-6">
                 <div className="text-center py-4">
@@ -376,6 +376,15 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                           }
                         </p>
                       </>
+                    ) : motData.currentStatus.expiryDate ? (
+                      <>
+                        <p className="text-2xl font-bold text-blue-400 mb-3">
+                          {formatDate(motData.currentStatus.expiryDate)}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          From GOV.UK MOT database
+                        </p>
+                      </>
                     ) : motData.firstUsedDate ? (
                       <>
                         <p className="text-2xl font-bold text-blue-400 mb-3">
@@ -388,7 +397,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                           })()}
                         </p>
                         <p className="text-xs text-slate-500">
-                          New vehicles are exempt from MOT testing for the first 3 years
+                          Calculated: 3 years from first registration
                         </p>
                       </>
                     ) : (
