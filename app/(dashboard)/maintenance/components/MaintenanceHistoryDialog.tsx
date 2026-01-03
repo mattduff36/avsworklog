@@ -430,6 +430,7 @@ export function MaintenanceHistoryDialog({
         open={motHistoryOpen}
         onOpenChange={setMotHistoryOpen}
         vehicleReg={vehicleReg || 'Unknown'}
+        vehicleId={vehicleId || ''}
       />
     </Dialog>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -20,17 +20,19 @@ import {
   Calendar,
   Gauge,
   MapPin,
-  Clock
+  Clock,
+  Loader2
 } from 'lucide-react';
 
 interface MotHistoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   vehicleReg: string;
+  vehicleId: string;
 }
 
-// Sample data for test vehicles
-const SAMPLE_MOT_DATA: Record<string, any> = {
+// Keep sample data for reference (will be replaced with real API data)
+const SAMPLE_MOT_DATA_REFERENCE: Record<string, any> = {
   'TE57 VAN': {
     currentStatus: {
       expiryDate: '2026-07-15',
@@ -228,11 +230,43 @@ const SAMPLE_MOT_DATA: Record<string, any> = {
   }
 };
 
-export function MotHistoryDialog({ open, onOpenChange, vehicleReg }: MotHistoryDialogProps) {
+export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId }: MotHistoryDialogProps) {
   const [expandedTestId, setExpandedTestId] = useState<string | null>(null);
+  const [motData, setMotData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
-  // Get sample data for this vehicle or show "No data" message
-  const motData = SAMPLE_MOT_DATA[vehicleReg];
+  // Fetch MOT history when dialog opens
+  useEffect(() => {
+    if (open && vehicleId) {
+      fetchMotHistory();
+    }
+  }, [open, vehicleId]);
+  
+  const fetchMotHistory = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`/api/maintenance/mot-history/${vehicleId}`);
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || result.error || 'Failed to fetch MOT history');
+      }
+      
+      if (result.success && result.data) {
+        setMotData(result.data);
+      } else {
+        setError(result.message || 'No MOT history available');
+      }
+    } catch (err: any) {
+      console.error('Error fetching MOT history:', err);
+      setError(err.message || 'Failed to load MOT history');
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const getDefectColor = (type: string) => {
     switch (type) {
@@ -289,11 +323,29 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg }: MotHistoryD
           </div>
         </DialogHeader>
 
-        {!motData ? (
+        {loading ? (
+          <div className="text-center py-12">
+            <Loader2 className="h-12 w-12 mx-auto mb-3 animate-spin text-blue-400" />
+            <p className="text-slate-400">Loading MOT history from GOV.UK...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-12 text-slate-400">
+            <AlertTriangle className="h-12 w-12 mx-auto mb-3 text-yellow-400 opacity-50" />
+            <p className="text-lg font-medium text-white mb-2">Unable to Load MOT History</p>
+            <p className="text-sm">{error}</p>
+            <Button 
+              onClick={fetchMotHistory}
+              variant="outline"
+              className="mt-4 border-slate-600 text-white hover:bg-slate-800"
+            >
+              Try Again
+            </Button>
+          </div>
+        ) : !motData ? (
           <div className="text-center py-12 text-slate-400">
             <FileText className="h-12 w-12 mx-auto mb-3 opacity-20" />
-            <p>No MOT history available yet</p>
-            <p className="text-sm mt-1">MOT data will appear here once synced with DVLA</p>
+            <p>No MOT history available</p>
+            <p className="text-sm mt-1">This vehicle may be too new or exempt from MOT testing</p>
           </div>
         ) : (
           <div className="space-y-4">
