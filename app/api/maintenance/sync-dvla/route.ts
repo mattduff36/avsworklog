@@ -121,8 +121,10 @@ export async function POST(request: NextRequest) {
       
       try {
         // Fetch data from DVLA VES API (tax & vehicle details)
+        console.log(`[INFO] Fetching VES data for ${vehicle.reg_number}`);
         const dvlaData = await dvlaService.getVehicleData(vehicle.reg_number);
         const dvlaResponseTime = Date.now() - startTime;
+        console.log(`[INFO] VES data retrieved for ${vehicle.reg_number}, tax due: ${dvlaData.taxDueDate || 'N/A'}`);
 
         // Fetch MOT expiry data from MOT History API (if configured)
         let motExpiryData = null;
@@ -132,6 +134,7 @@ export async function POST(request: NextRequest) {
             const motStart = Date.now();
             motExpiryData = await motService.getMotExpiryData(vehicle.reg_number);
             motResponseTime = Date.now() - motStart;
+            console.log(`[INFO] MOT expiry for ${vehicle.reg_number}: ${motExpiryData.motExpiryDate || 'N/A'}`);
           } catch (motError: any) {
             console.error(`MOT API fetch failed for ${vehicle.reg_number}:`, motError.message);
             // Continue with DVLA data even if MOT fetch fails
@@ -183,7 +186,12 @@ export async function POST(request: NextRequest) {
           updates.tax_due_date = dvlaData.taxDueDate;
           if (oldTaxDate !== dvlaData.taxDueDate) {
             fieldsUpdated.push('tax_due_date');
+            console.log(`[INFO] ${vehicle.reg_number}: Tax updated from ${oldTaxDate} to ${dvlaData.taxDueDate}`);
+          } else {
+            console.log(`[INFO] ${vehicle.reg_number}: Tax unchanged (${oldTaxDate})`);
           }
+        } else {
+          console.log(`[WARN] ${vehicle.reg_number}: No tax due date from VES API`);
         }
 
         // Update MOT due date from MOT History API (if available)
@@ -197,13 +205,20 @@ export async function POST(request: NextRequest) {
           
           if (oldMotDate !== motExpiryData.motExpiryDate) {
             fieldsUpdated.push('mot_due_date');
+            console.log(`[INFO] ${vehicle.reg_number}: MOT updated from ${oldMotDate} to ${motExpiryData.motExpiryDate}`);
+          } else {
+            console.log(`[INFO] ${vehicle.reg_number}: MOT unchanged (${oldMotDate})`);
           }
         } else if (motService && !motExpiryData) {
           // MOT API is configured but returned no data (e.g., vehicle too new)
           updates.mot_api_sync_status = 'success';
           updates.last_mot_api_sync = new Date().toISOString();
           updates.mot_api_sync_error = 'No MOT history found';
+          console.log(`[WARN] ${vehicle.reg_number}: No MOT expiry date found`);
         }
+        
+        console.log(`[INFO] ${vehicle.reg_number}: Fields updated: ${fieldsUpdated.length > 0 ? fieldsUpdated.join(', ') : 'none (data up to date)'}`);
+
 
         // Upsert vehicle_maintenance record
         const { error: upsertError } = await supabase
