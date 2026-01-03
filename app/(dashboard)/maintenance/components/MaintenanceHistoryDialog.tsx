@@ -157,81 +157,121 @@ export function MaintenanceHistoryDialog({
             {/* VES Vehicle Data Section - Show even if no history */}
             {vesData && (vesData.ves_make || vesData.ves_colour || vesData.ves_fuel_type) && (
               <div className="bg-gradient-to-r from-blue-900/20 to-blue-800/10 border border-blue-700/30 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
+                <div className="mb-3">
                   <h3 className="text-sm font-medium text-blue-300 uppercase tracking-wide flex items-center gap-2">
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    DVLA Vehicle Data
+                    Vehicle Data
                   </h3>
-                  {vesData.last_dvla_sync && (
-                    <span className="text-xs text-slate-400">
-                      Last synced: {new Date(vesData.last_dvla_sync).toLocaleDateString('en-GB')}
-                    </span>
-                  )}
                 </div>
                 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                  {vesData.ves_make && (
+                  {/* Make - prefer VES, fallback to MOT */}
+                  {(vesData.ves_make || vesData.mot_make) && (
                     <div>
                       <span className="text-slate-400">Make:</span>
-                      <span className="ml-2 text-white font-medium">{vesData.ves_make}</span>
+                      <span className="ml-2 text-white font-medium">{vesData.ves_make || vesData.mot_make}</span>
                     </div>
                   )}
-                  {vesData.ves_colour && (
+                  
+                  {/* Model - from MOT API only */}
+                  {vesData.mot_model && (
+                    <div>
+                      <span className="text-slate-400">Model:</span>
+                      <span className="ml-2 text-white font-medium">{vesData.mot_model}</span>
+                    </div>
+                  )}
+                  
+                  {/* Colour - prefer VES, fallback to MOT */}
+                  {(vesData.ves_colour || vesData.mot_primary_colour) && (
                     <div>
                       <span className="text-slate-400">Colour:</span>
-                      <span className="ml-2 text-white font-medium">{vesData.ves_colour}</span>
+                      <span className="ml-2 text-white font-medium">{vesData.ves_colour || vesData.mot_primary_colour}</span>
                     </div>
                   )}
-                  {vesData.ves_year_of_manufacture && (
+                  
+                  {/* Year - prefer VES, fallback to MOT */}
+                  {(vesData.ves_year_of_manufacture || vesData.mot_year_of_manufacture) && (
                     <div>
                       <span className="text-slate-400">Year:</span>
-                      <span className="ml-2 text-white font-medium">{vesData.ves_year_of_manufacture}</span>
+                      <span className="ml-2 text-white font-medium">{vesData.ves_year_of_manufacture || vesData.mot_year_of_manufacture}</span>
                     </div>
                   )}
-                  {vesData.ves_fuel_type && (
+                  
+                  {/* Fuel - prefer VES, fallback to MOT */}
+                  {(vesData.ves_fuel_type || vesData.mot_fuel_type) && (
                     <div>
                       <span className="text-slate-400">Fuel:</span>
-                      <span className="ml-2 text-white font-medium">{vesData.ves_fuel_type}</span>
+                      <span className="ml-2 text-white font-medium">{vesData.ves_fuel_type || vesData.mot_fuel_type}</span>
                     </div>
                   )}
+                  
+                  {/* First Registration - from MOT API */}
+                  {vesData.mot_first_used_date && (
+                    <div>
+                      <span className="text-slate-400">First Reg:</span>
+                      <span className="ml-2 text-white font-medium">{formatMaintenanceDate(vesData.mot_first_used_date)}</span>
+                    </div>
+                  )}
+                  
+                  {/* Engine - from VES only */}
                   {vesData.ves_engine_capacity && (
                     <div>
                       <span className="text-slate-400">Engine:</span>
                       <span className="ml-2 text-white font-medium">{vesData.ves_engine_capacity}cc</span>
                     </div>
                   )}
+                  
+                  {/* Tax Status - from VES */}
                   {vesData.ves_tax_status && (
                     <div>
                       <span className="text-slate-400">Tax Status:</span>
                       <span className="ml-2 text-white font-medium">{vesData.ves_tax_status}</span>
                     </div>
                   )}
+                  
+                  {/* Tax Due Date */}
                   {vesData.tax_due_date && (
                     <div>
                       <span className="text-slate-400">Tax Due:</span>
                       <span className="ml-2 text-white font-medium">{formatMaintenanceDate(vesData.tax_due_date)}</span>
                     </div>
                   )}
+                  
+                  {/* MOT Status - from VES */}
                   {vesData.ves_mot_status && (
                     <div>
                       <span className="text-slate-400">MOT Status:</span>
                       <span className="ml-2 text-white font-medium">{vesData.ves_mot_status}</span>
                     </div>
                   )}
+                  
+                  {/* MOT Due Date */}
+                  {vesData.mot_due_date && (
+                    <div>
+                      <span className="text-slate-400">MOT Due:</span>
+                      <span className="ml-2 text-white font-medium">{formatMaintenanceDate(vesData.mot_due_date)}</span>
+                    </div>
+                  )}
+                  
+                  {/* CO2 Emissions - from VES */}
                   {vesData.ves_co2_emissions && (
                     <div>
                       <span className="text-slate-400">CO2:</span>
                       <span className="ml-2 text-white font-medium">{vesData.ves_co2_emissions}g/km</span>
                     </div>
                   )}
+                  
+                  {/* Euro Status - from VES */}
                   {vesData.ves_euro_status && (
                     <div>
                       <span className="text-slate-400">Euro Status:</span>
                       <span className="ml-2 text-white font-medium">{vesData.ves_euro_status}</span>
                     </div>
                   )}
+                  
+                  {/* Wheelplan - from VES */}
                   {vesData.ves_wheelplan && (
                     <div className="col-span-2">
                       <span className="text-slate-400">Wheelplan:</span>
@@ -239,47 +279,22 @@ export function MaintenanceHistoryDialog({
                     </div>
                   )}
                   
-                  {/* MOT API Data */}
-                  {vesData.mot_make && (
-                    <div>
-                      <span className="text-slate-400">Make (MOT):</span>
-                      <span className="ml-2 text-white font-medium">{vesData.mot_make}</span>
-                    </div>
-                  )}
-                  {vesData.mot_model && (
-                    <div>
-                      <span className="text-slate-400">Model (MOT):</span>
-                      <span className="ml-2 text-white font-medium">{vesData.mot_model}</span>
-                    </div>
-                  )}
-                  {vesData.mot_primary_colour && (
-                    <div>
-                      <span className="text-slate-400">Colour (MOT):</span>
-                      <span className="ml-2 text-white font-medium">{vesData.mot_primary_colour}</span>
-                    </div>
-                  )}
-                  {vesData.mot_fuel_type && (
-                    <div>
-                      <span className="text-slate-400">Fuel (MOT):</span>
-                      <span className="ml-2 text-white font-medium">{vesData.mot_fuel_type}</span>
-                    </div>
-                  )}
-                  {vesData.mot_year_of_manufacture && (
-                    <div>
-                      <span className="text-slate-400">Year (MOT):</span>
-                      <span className="ml-2 text-white font-medium">{vesData.mot_year_of_manufacture}</span>
-                    </div>
-                  )}
-                  {vesData.mot_first_used_date && (
-                    <div>
-                      <span className="text-slate-400">First Reg (MOT):</span>
-                      <span className="ml-2 text-white font-medium">{formatMaintenanceDate(vesData.mot_first_used_date)}</span>
-                    </div>
-                  )}
-                  {vesData.last_mot_api_sync && (
-                    <div className="col-span-2">
-                      <span className="text-slate-400">MOT Data Last Synced:</span>
-                      <span className="ml-2 text-white font-medium">{new Date(vesData.last_mot_api_sync).toLocaleDateString('en-GB')}</span>
+                  {/* Data sync timestamps */}
+                  {(vesData.last_dvla_sync || vesData.last_mot_api_sync) && (
+                    <div className="col-span-2 md:col-span-3 pt-2 border-t border-slate-700/50">
+                      {vesData.last_dvla_sync && (
+                        <span className="text-xs text-slate-500">
+                          VES synced: {new Date(vesData.last_dvla_sync).toLocaleDateString('en-GB')}
+                        </span>
+                      )}
+                      {vesData.last_dvla_sync && vesData.last_mot_api_sync && (
+                        <span className="text-xs text-slate-600 mx-2">•</span>
+                      )}
+                      {vesData.last_mot_api_sync && (
+                        <span className="text-xs text-slate-500">
+                          MOT synced: {new Date(vesData.last_mot_api_sync).toLocaleDateString('en-GB')}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
