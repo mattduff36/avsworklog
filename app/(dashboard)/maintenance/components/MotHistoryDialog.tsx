@@ -516,7 +516,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                       )}
                       <div className="flex items-center gap-2">
                         <span className="text-slate-400">Test Number:</span>
-                        <span className="text-white font-mono text-xs">{test.motTestNumber}</span>
+                        <span className="text-white font-medium">{test.motTestNumber}</span>
                       </div>
                     </div>
 
