@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
         // Fetch MOT expiry data from MOT History API (if configured)
         let motExpiryData = null;
         let motResponseTime = null;
-        let motApiError = null;
+        let motApiError: string | null = null;
         if (motService) {
           try {
             const motStart = Date.now();
@@ -137,8 +137,9 @@ export async function POST(request: NextRequest) {
             motResponseTime = Date.now() - motStart;
             console.log(`[INFO] MOT expiry for ${vehicle.reg_number}: ${motExpiryData.motExpiryDate || 'N/A'}`);
           } catch (motError: any) {
-            motApiError = motError.message;
-            console.error(`MOT API fetch failed for ${vehicle.reg_number}:`, motError.message);
+            // Ensure we always capture a non-empty error message
+            motApiError = motError?.message || motError?.toString() || 'Unknown MOT API error';
+            console.error(`MOT API fetch failed for ${vehicle.reg_number}:`, motApiError);
             // Continue with DVLA data even if MOT fetch fails
           }
         }
