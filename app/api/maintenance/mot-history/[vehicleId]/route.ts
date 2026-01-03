@@ -56,6 +56,15 @@ export async function GET(
       const motExpiryData = await motService.getMotExpiryData(vehicle.reg_number);
       const motHistory = motExpiryData.rawData; // Reuse the history data from getMotExpiryData
 
+      // Validate that we have the minimum required data
+      if (!motHistory || !motHistory.registration) {
+        return NextResponse.json({
+          success: false,
+          error: 'Incomplete MOT data',
+          message: `MOT API returned incomplete data for ${vehicle.reg_number}`,
+        });
+      }
+
       // Transform the data to match UI expectations
       const sortedTests = (motHistory.motTests || []).sort((a, b) => 
         new Date(b.completedDate).getTime() - new Date(a.completedDate).getTime()
@@ -72,12 +81,12 @@ export async function GET(
       return NextResponse.json({
         success: true,
         data: {
-          registrationNumber: motHistory.registration,
-          make: motHistory.make,
-          model: motHistory.model,
-          fuelType: motHistory.fuelType,
-          primaryColour: motHistory.primaryColour,
-          firstUsedDate: motHistory.firstUsedDate,
+          registrationNumber: motHistory.registration || vehicle.reg_number,
+          make: motHistory.make || null,
+          model: motHistory.model || null,
+          fuelType: motHistory.fuelType || null,
+          primaryColour: motHistory.primaryColour || null,
+          firstUsedDate: motHistory.firstUsedDate || null,
           currentStatus: {
             expiryDate: motExpiryData.motExpiryDate,
             status: motExpiryData.motStatus,

@@ -197,32 +197,36 @@ export async function POST(request: NextRequest) {
         }
 
         // Update MOT due date from MOT History API (if available)
-        if (motExpiryData?.motExpiryDate) {
-          updates.mot_due_date = motExpiryData.motExpiryDate;
-          updates.mot_expiry_date = motExpiryData.motExpiryDate;
-          updates.mot_api_sync_status = 'success';
-          updates.last_mot_api_sync = new Date().toISOString();
-          updates.mot_api_sync_error = null;
-          updates.mot_raw_data = motExpiryData.rawData || null;
-          
-          if (oldMotDate !== motExpiryData.motExpiryDate) {
-            fieldsUpdated.push('mot_due_date');
-            console.log(`[INFO] ${vehicle.reg_number}: MOT updated from ${oldMotDate} to ${motExpiryData.motExpiryDate}`);
+        if (motService) {
+          if (motApiError) {
+            // MOT API call failed with an error
+            updates.mot_api_sync_status = 'error';
+            updates.last_mot_api_sync = new Date().toISOString();
+            updates.mot_api_sync_error = motApiError;
+            console.log(`[ERROR] ${vehicle.reg_number}: MOT API error: ${motApiError}`);
+          } else if (motExpiryData?.motExpiryDate) {
+            // MOT API succeeded and returned expiry date
+            updates.mot_due_date = motExpiryData.motExpiryDate;
+            updates.mot_expiry_date = motExpiryData.motExpiryDate;
+            updates.mot_api_sync_status = 'success';
+            updates.last_mot_api_sync = new Date().toISOString();
+            updates.mot_api_sync_error = null;
+            updates.mot_raw_data = motExpiryData.rawData || null;
+            
+            if (oldMotDate !== motExpiryData.motExpiryDate) {
+              fieldsUpdated.push('mot_due_date');
+              console.log(`[INFO] ${vehicle.reg_number}: MOT updated from ${oldMotDate} to ${motExpiryData.motExpiryDate}`);
+            } else {
+              console.log(`[INFO] ${vehicle.reg_number}: MOT unchanged (${oldMotDate})`);
+            }
           } else {
-            console.log(`[INFO] ${vehicle.reg_number}: MOT unchanged (${oldMotDate})`);
+            // MOT API succeeded but returned no expiry date (e.g., vehicle too new, no MOT history)
+            updates.mot_api_sync_status = 'success';
+            updates.last_mot_api_sync = new Date().toISOString();
+            updates.mot_api_sync_error = 'No MOT history found';
+            updates.mot_raw_data = motExpiryData?.rawData || null;
+            console.log(`[WARN] ${vehicle.reg_number}: No MOT expiry date found`);
           }
-        } else if (motService && motApiError) {
-          // MOT API call failed with an error
-          updates.mot_api_sync_status = 'error';
-          updates.last_mot_api_sync = new Date().toISOString();
-          updates.mot_api_sync_error = motApiError;
-          console.log(`[ERROR] ${vehicle.reg_number}: MOT API error: ${motApiError}`);
-        } else if (motService && !motExpiryData && !motApiError) {
-          // MOT API succeeded but returned no data (e.g., vehicle too new)
-          updates.mot_api_sync_status = 'success';
-          updates.last_mot_api_sync = new Date().toISOString();
-          updates.mot_api_sync_error = 'No MOT history found';
-          console.log(`[WARN] ${vehicle.reg_number}: No MOT expiry date found`);
         }
         
         console.log(`[INFO] ${vehicle.reg_number}: Fields updated: ${fieldsUpdated.length > 0 ? fieldsUpdated.join(', ') : 'none (data up to date)'}`);
