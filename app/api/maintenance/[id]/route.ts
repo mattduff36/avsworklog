@@ -268,9 +268,11 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+    
     // Auth check
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -286,7 +288,7 @@ export async function DELETE(
     const { error: deleteError } = await supabase
       .from('vehicle_maintenance')
       .delete()
-      .eq('id', params.id);
+      .eq('id', id);
     
     if (deleteError) {
       logger.error('Failed to delete maintenance', deleteError);
