@@ -59,7 +59,7 @@ export interface MotExpiryData {
 export class MotHistoryService {
   private config: MotHistoryConfig;
   private tokenCache: AccessToken | null = null;
-  private baseUrl = 'https://history.mot.api.gov.uk/v1';
+  private baseUrl = process.env.MOT_API_BASE_URL || 'https://history.mot.api.gov.uk';
 
   constructor(config: MotHistoryConfig) {
     this.config = config;
@@ -125,13 +125,12 @@ export class MotHistoryService {
       logger.info(`Fetching MOT history for ${cleanReg}`);
 
       const response = await fetch(
-        `${this.baseUrl}/trade/vehicles/mot-tests?registration=${cleanReg}`,
+        `${this.baseUrl}/v1/trade/vehicles/registration/${cleanReg}`,
         {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'X-API-Key': this.config.apiKey,
-            'Accept': 'application/json',
           },
         }
       );

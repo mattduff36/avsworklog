@@ -60,6 +60,24 @@ The MOT History API uses **OAuth 2.0 with client credentials**:
    - `Authorization: Bearer {access_token}` header
    - `X-API-Key: {api_key}` header
 
+## API Endpoints
+
+The MOT History API uses the following endpoint structure:
+
+**Base URL**: `https://history.mot.api.gov.uk`
+
+**Single Vehicle Lookup**:
+```
+GET /v1/trade/vehicles/registration/{registration}
+```
+
+**Example**:
+```
+GET https://history.mot.api.gov.uk/v1/trade/vehicles/registration/AB12CDE
+```
+
+**⚠️ Important**: Do NOT use the old deprecated endpoint `/v1/trade/vehicles/mot-tests?registration=`. This will return `MOTH-BR-01` error.
+
 ## Rate Limits
 
 - **500,000 requests per day** (quota)
@@ -134,6 +152,12 @@ if (motService) {
 - Rotate secrets immediately if compromised
 
 ## Troubleshooting
+
+### "MOTH-BR-01" Error
+This business rule error typically means:
+- **Wrong endpoint**: Make sure you're using `/v1/trade/vehicles/registration/{registration}`, NOT `/v1/trade/vehicles/mot-tests`
+- **API key not activated**: Wait up to 5 working days after registration
+- **Missing headers**: Ensure both `Authorization` and `X-API-Key` headers are present
 
 ### "Token request failed"
 - Check client_id and client_secret are correct
