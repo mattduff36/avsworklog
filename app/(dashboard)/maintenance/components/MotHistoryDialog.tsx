@@ -438,7 +438,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                   </div>
                   <div>
                     <span className="text-slate-400">Last Test:</span>
-                    <p className="text-white font-medium">{formatDate(motData.currentStatus.lastTestDate)}</p>
+                    <p className="text-white font-semibold text-lg">{formatDate(motData.currentStatus.lastTestDate)}</p>
                   </div>
                 </div>
               </div>
