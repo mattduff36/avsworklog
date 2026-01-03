@@ -143,7 +143,7 @@ export function DVLASyncDebugPanel() {
         <AlertTriangle className="h-4 w-4" />
         <AlertTitle className="text-amber-300">Developer Tool</AlertTitle>
         <AlertDescription className="text-amber-200/80">
-          These controls sync vehicle tax due dates from GOV.UK VES API. Each sync uses your production API quota.
+          These controls sync vehicle tax & MOT due dates from GOV.UK APIs (VES & MOT History). Each sync uses your production API quota.
         </AlertDescription>
       </Alert>
 
@@ -152,7 +152,7 @@ export function DVLASyncDebugPanel() {
         <CardHeader>
           <CardTitle className="text-white">Sync Single Vehicle</CardTitle>
           <CardDescription className="text-slate-400">
-            Sync tax due date for a specific vehicle by registration number
+            Sync tax & MOT due dates for a specific vehicle by registration number
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -194,7 +194,7 @@ export function DVLASyncDebugPanel() {
         <CardHeader>
           <CardTitle className="text-white">Bulk Sync All Vehicles</CardTitle>
           <CardDescription className="text-slate-400">
-            Sync tax due dates for all active vehicles in the database
+            Sync tax & MOT due dates for all active vehicles in the database
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -212,7 +212,7 @@ export function DVLASyncDebugPanel() {
             ) : (
               <>
                 <RefreshCw className="mr-2 h-4 w-4" />
-                Sync All Vehicles (Tax Dates)
+                Sync All Vehicles (Tax & MOT Dates)
               </>
             )}
           </Button>
@@ -246,9 +246,9 @@ export function DVLASyncDebugPanel() {
           <DialogHeader>
             <DialogTitle className="text-xl text-white">Confirm Bulk Sync</DialogTitle>
             <DialogDescription className="text-slate-400">
-              This will sync tax due dates for <strong className="text-white">{vehicleCount} active vehicles</strong> from the DVLA API.
+              This will sync tax & MOT due dates for <strong className="text-white">{vehicleCount} active vehicles</strong> from GOV.UK APIs.
               <br /><br />
-              <strong className="text-white">API Usage:</strong> ~{vehicleCount} API calls
+              <strong className="text-white">API Usage:</strong> ~{vehicleCount * 2} API calls (VES + MOT)
               <br />
               <strong className="text-white">Time:</strong> ~{Math.ceil(vehicleCount / 60)} minutes (1 call per second)
               <br /><br />

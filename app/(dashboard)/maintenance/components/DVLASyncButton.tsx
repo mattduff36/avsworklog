@@ -4,12 +4,6 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, CheckCircle, XCircle, AlertCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 
 interface DVLASyncButtonProps {
   vehicleId: string;
@@ -80,7 +74,8 @@ export function DVLASyncButton({
         const updatedFields = result.updatedFields || [];
 
         if (updatedFields.length > 0) {
-          toast.success(`Tax due date updated for ${registrationNumber}`);
+          const updates = updatedFields.join(', ').replace('tax_due_date', 'Tax').replace('mot_due_date', 'MOT');
+          toast.success(`${updates} updated for ${registrationNumber}`);
         } else {
           toast.success(`${registrationNumber} - data is up to date`);
         }
@@ -105,7 +100,7 @@ export function DVLASyncButton({
     } catch (error: any) {
       console.error('DVLA sync error:', error);
       toast.error('Sync Failed', {
-        description: error.message || 'Failed to sync tax due date from DVLA',
+        description: error.message || 'Failed to sync tax & MOT data',
       });
     } finally {
       setIsSyncing(false);
@@ -149,19 +144,19 @@ export function DVLASyncButton({
       return `Try again at ${resetTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
     }
     
-    if (isSyncing) return 'Syncing tax due date from DVLA...';
+    if (isSyncing) return 'Syncing tax & MOT due dates...';
     
     if (lastSync) {
       const syncDate = new Date(lastSync);
       const now = new Date();
       const daysDiff = Math.floor((now.getTime() - syncDate.getTime()) / (1000 * 60 * 60 * 24));
       
-      if (daysDiff === 0) return 'Sync tax due date from DVLA (synced today)';
-      if (daysDiff === 1) return 'Sync tax due date from DVLA (synced yesterday)';
-      return `Sync tax due date from DVLA (synced ${daysDiff} days ago)`;
+      if (daysDiff === 0) return 'Sync tax & MOT due dates (synced today)';
+      if (daysDiff === 1) return 'Sync tax & MOT due dates (synced yesterday)';
+      return `Sync tax & MOT due dates (synced ${daysDiff} days ago)`;
     }
     
-    return 'Sync tax due date from DVLA';
+    return 'Sync tax & MOT due dates';
   };
   
   const getButtonContent = () => {
@@ -179,24 +174,16 @@ export function DVLASyncButton({
   };
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant={variant}
-            size={size}
-            onClick={handleSync}
-            disabled={isSyncing || isRateLimited}
-            className={`${isRateLimited ? 'text-slate-500' : getStatusColor()} hover:bg-slate-800`}
-          >
-            {getButtonContent()}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{getTooltipText()}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Button
+      variant={variant}
+      size={size}
+      onClick={handleSync}
+      disabled={isSyncing || isRateLimited}
+      className={`${isRateLimited ? 'text-slate-500' : getStatusColor()} hover:bg-slate-800`}
+      title={getTooltipText()}
+    >
+      {getButtonContent()}
+    </Button>
   );
 }
 
