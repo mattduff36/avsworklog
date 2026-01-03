@@ -386,12 +386,12 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId }: 
               
               {motData.tests.map((test: any) => {
                 const defectCounts = countDefectsByType(test.defects);
-                const isExpanded = expandedTestId === test.id;
+                const isExpanded = expandedTestId === test.motTestNumber;
                 const isPassed = test.testResult === 'PASSED';
                 
                 return (
                   <div 
-                    key={test.id}
+                    key={test.motTestNumber}
                     className={`border rounded-lg p-3 md:p-4 ${
                       isPassed 
                         ? 'bg-gradient-to-r from-green-900/20 to-green-800/10 border-green-700/30' 
@@ -454,7 +454,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId }: 
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setExpandedTestId(isExpanded ? null : test.id)}
+                          onClick={() => setExpandedTestId(isExpanded ? null : test.motTestNumber)}
                           className="w-full text-blue-400 hover:text-blue-300 hover:bg-slate-800"
                         >
                           {isExpanded ? (
