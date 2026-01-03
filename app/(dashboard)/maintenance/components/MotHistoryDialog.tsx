@@ -491,14 +491,14 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                     </div>
 
                     {/* Test Details Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm mb-3">
+                    <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-6 text-sm mb-3">
                       <div className="flex items-center gap-2">
                         <Gauge className="h-4 w-4 text-slate-400" />
                         <span className="text-slate-400">Mileage:</span>
                         <span className="text-white font-medium">{test.odometerValue.toLocaleString()} {test.odometerUnit}</span>
                       </div>
                       {(test.testStationName || test.testStationPcode) && (
-                        <div className="flex items-center gap-2 md:col-span-2">
+                        <div className="flex items-center gap-2">
                           <MapPin className="h-4 w-4 text-slate-400" />
                           <span className="text-slate-400">Station:</span>
                           <span className="text-white font-medium">
@@ -506,7 +506,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                           </span>
                         </div>
                       )}
-                      <div className="flex items-center gap-2 md:col-span-3">
+                      <div className="flex items-center gap-2">
                         <span className="text-slate-400">Test Number:</span>
                         <span className="text-white font-mono text-xs">{test.motTestNumber}</span>
                       </div>
