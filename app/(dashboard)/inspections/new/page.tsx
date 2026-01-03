@@ -130,6 +130,11 @@ function NewInspectionContent() {
   
   // Logged defects tracking (read-only auto-marked items)
   const [loggedDefects, setLoggedDefects] = useState<Map<string, { comment: string; actionId: string }>>(new Map()); // key: "itemNum-itemDesc", value: { comment, actionId }
+  
+  // Track if user has started filling checklist (to lock vehicle/date fields)
+  const [checklistStarted, setChecklistStarted] = useState(false);
+  const [duplicateCheckLoading, setDuplicateCheckLoading] = useState(false);
+  const [duplicateInspection, setDuplicateInspection] = useState<string | null>(null);
 
   useEffect(() => {
     fetchVehicles();
@@ -156,6 +161,13 @@ function NewInspectionContent() {
       setSelectedEmployeeId(user.id);
     }
   }, [user, isManager]);
+
+  // Check for duplicate inspection when vehicle or week ending changes
+  useEffect(() => {
+    if (vehicleId && weekEnding && !existingInspectionId) {
+      checkForDuplicate(vehicleId, weekEnding);
+    }
+  }, [vehicleId, weekEnding, existingInspectionId]);
 
   const fetchEmployees = async () => {
     try {
@@ -221,6 +233,43 @@ function NewInspectionContent() {
       setCategories(data || []);
     } catch (err) {
       console.error('Error fetching categories:', err);
+    }
+  };
+
+  // Check for duplicate inspection (same vehicle + week ending)
+  const checkForDuplicate = async (vehicleIdToCheck: string, weekEndingToCheck: string) => {
+    if (!vehicleIdToCheck || !weekEndingToCheck || existingInspectionId) {
+      setDuplicateInspection(null);
+      return;
+    }
+
+    setDuplicateCheckLoading(true);
+    setError('');
+    
+    try {
+      const { data, error } = await supabase
+        .from('vehicle_inspections')
+        .select('id, status')
+        .eq('vehicle_id', vehicleIdToCheck)
+        .eq('inspection_end_date', weekEndingToCheck)
+        .limit(1);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const existing = data[0];
+        setDuplicateInspection(existing.id);
+        setError(`An inspection for this vehicle and week already exists (${existing.status}). Please select a different vehicle or week.`);
+      } else {
+        setDuplicateInspection(null);
+        setError('');
+      }
+    } catch (err) {
+      console.error('Error checking for duplicate:', err);
+      // Don't block the user if the check fails
+      setDuplicateInspection(null);
+    } finally {
+      setDuplicateCheckLoading(false);
     }
   };
 
@@ -420,6 +469,11 @@ function NewInspectionContent() {
 
       setCheckboxStates(newCheckboxStates);
       setComments(newComments);
+      
+      // If draft has any items, mark checklist as started (locks vehicle/date fields)
+      if (Object.keys(newCheckboxStates).length > 0) {
+        setChecklistStarted(true);
+      }
 
       toast.success('Draft inspection loaded');
     } catch (err) {
@@ -445,6 +499,11 @@ function NewInspectionContent() {
   const handleStatusChange = (itemNumber: number, status: InspectionStatus) => {
     const dayOfWeek = parseInt(activeDay) + 1; // Convert 0-6 to 1-7
     const key = `${dayOfWeek}-${itemNumber}`;
+    
+    // Mark checklist as started (locks vehicle/date fields)
+    if (!checklistStarted) {
+      setChecklistStarted(true);
+    }
     
     // Check if marking previously-defective item as OK
     if (status === 'ok') {
@@ -604,6 +663,12 @@ function NewInspectionContent() {
 
   const saveInspection = async (status: 'draft' | 'submitted', signatureData?: string) => {
     if (!user || !selectedEmployeeId || !vehicleId) return;
+    
+    // Validate week ending is provided
+    if (!weekEnding || weekEnding.trim() === '') {
+      setError('Please select a week ending date');
+      return;
+    }
     
     // Prevent duplicate saves
     if (loading) {
@@ -1128,6 +1193,7 @@ function NewInspectionContent() {
               <Label htmlFor="vehicle" className="text-slate-900 dark:text-white text-base">Vehicle</Label>
               <Select 
                 value={vehicleId} 
+                disabled={checklistStarted}
                 onValueChange={(value) => {
                   if (value === 'add-new') {
                     // Don't set the value, just open the dialog
@@ -1152,7 +1218,7 @@ function NewInspectionContent() {
                   }
                 }}
               >
-                <SelectTrigger id="vehicle" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
+                <SelectTrigger id="vehicle" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white" disabled={checklistStarted}>
                   <SelectValue placeholder="Select a vehicle" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-900 border-slate-700 max-h-[300px] md:max-h-[400px]">
@@ -1190,6 +1256,7 @@ function NewInspectionContent() {
                   setWeekEnding(e.target.value);
                 }}
                 max={formatDateISO(new Date())}
+                disabled={checklistStarted}
                 className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
                 required
               />
@@ -1214,11 +1281,20 @@ function NewInspectionContent() {
                   />
                 </div>
           </div>
+          
+          {checklistStarted && (
+            <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+              <p className="text-sm text-blue-400">
+                <Info className="h-4 w-4 inline mr-2" />
+                Vehicle and week ending are locked once you start filling the checklist. Save or leave the page to unlock.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Safety Check - Only shown when vehicle AND week ending are selected */}
-      {vehicleId && weekEnding && (
+      {/* Safety Check - Only shown when vehicle AND week ending are selected AND no duplicate exists */}
+      {vehicleId && weekEnding && !duplicateInspection && !duplicateCheckLoading && (
       <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
         <CardHeader className="pb-3">
           <CardTitle className="text-slate-900 dark:text-white">{currentChecklist.length}-Point Safety Check</CardTitle>
