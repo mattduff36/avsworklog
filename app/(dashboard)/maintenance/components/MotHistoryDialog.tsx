@@ -350,41 +350,86 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId }: 
         ) : (
           <div className="space-y-4">
             {/* Current MOT Status Card */}
-            <div className="bg-gradient-to-r from-blue-900/30 to-blue-800/20 border border-blue-700/50 rounded-lg p-3 md:p-4">
-              <h3 className="text-base md:text-lg font-semibold text-blue-300 mb-3 flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 md:h-5 md:w-5" />
-                Current MOT Status
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 text-sm">
-                <div>
-                  <span className="text-slate-400">Expiry Date:</span>
-                  <p className="text-white font-semibold text-lg">{formatDate(motData.currentStatus.expiryDate)}</p>
-                </div>
-                <div>
-                  <span className="text-slate-400">Status:</span>
-                  <p className={`font-semibold text-lg ${motData.currentStatus.status === 'Valid' ? 'text-green-400' : 'text-red-400'}`}>
-                    {motData.currentStatus.status}
+            {motData.currentStatus.status === 'No MOT History' || !motData.currentStatus.expiryDate || motData.tests.length === 0 ? (
+              // Special card for vehicles with no MOT history (too new)
+              <div className="bg-gradient-to-r from-slate-800/50 to-slate-700/30 border border-slate-600/50 rounded-lg p-4 md:p-6">
+                <div className="text-center py-4">
+                  <AlertTriangle className="h-12 w-12 md:h-16 md:w-16 mx-auto mb-4 text-blue-400 opacity-60" />
+                  <h3 className="text-lg md:text-xl font-semibold text-white mb-2">No MOT History</h3>
+                  <p className="text-slate-400 mb-4">
+                    This vehicle is too new to have any MOT tests recorded.
                   </p>
-                </div>
-                <div>
-                  <span className="text-slate-400">Days Remaining:</span>
-                  <p className="text-white font-semibold text-lg">{motData.currentStatus.daysRemaining}</p>
-                </div>
-                <div>
-                  <span className="text-slate-400">Last Test:</span>
-                  <p className="text-white font-medium">{formatDate(motData.currentStatus.lastTestDate)}</p>
-                  <Badge className={`mt-1 ${motData.currentStatus.lastTestResult === 'PASSED' ? 'bg-green-600' : 'bg-red-600'}`}>
-                    {motData.currentStatus.lastTestResult}
-                  </Badge>
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 max-w-md mx-auto">
+                    <p className="text-sm text-slate-300 mb-2">
+                      <strong className="text-white">First MOT Due:</strong>
+                    </p>
+                    {motData.firstUsedDate ? (
+                      <>
+                        <p className="text-2xl font-bold text-blue-400 mb-3">
+                          {(() => {
+                            // Calculate 3 years from first registration date
+                            const firstUsed = new Date(motData.firstUsedDate);
+                            const motDue = new Date(firstUsed);
+                            motDue.setFullYear(firstUsed.getFullYear() + 3);
+                            return formatDate(motDue.toISOString());
+                          })()}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          New vehicles are exempt from MOT testing for the first 3 years
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xl text-slate-400 mb-3">
+                          Date not available
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          Vehicle registration date not found in MOT database
+                        </p>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              // Normal card for vehicles with MOT history
+              <div className="bg-gradient-to-r from-blue-900/30 to-blue-800/20 border border-blue-700/50 rounded-lg p-3 md:p-4">
+                <h3 className="text-base md:text-lg font-semibold text-blue-300 mb-3 flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 md:h-5 md:w-5" />
+                  Current MOT Status
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 text-sm">
+                  <div>
+                    <span className="text-slate-400">Expiry Date:</span>
+                    <p className="text-white font-semibold text-lg">{formatDate(motData.currentStatus.expiryDate)}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Status:</span>
+                    <p className={`font-semibold text-lg ${motData.currentStatus.status === 'Valid' ? 'text-green-400' : 'text-red-400'}`}>
+                      {motData.currentStatus.status}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Days Remaining:</span>
+                    <p className="text-white font-semibold text-lg">{motData.currentStatus.daysRemaining}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Last Test:</span>
+                    <p className="text-white font-medium">{formatDate(motData.currentStatus.lastTestDate)}</p>
+                    <Badge className={`mt-1 ${motData.currentStatus.lastTestResult === 'PASSED' ? 'bg-green-600' : 'bg-red-600'}`}>
+                      {motData.currentStatus.lastTestResult}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Test History */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Test History</h3>
-              
-              {motData.tests.map((test: any) => {
+            {motData.tests && motData.tests.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Test History</h3>
+                
+                {motData.tests.map((test: any) => {
                 const defectCounts = countDefectsByType(test.defects);
                 const isExpanded = expandedTestId === test.motTestNumber;
                 const isPassed = test.testResult === 'PASSED';
@@ -512,7 +557,8 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId }: 
                   </div>
                 );
               })}
-            </div>
+              </div>
+            )}
           </div>
         )}
       </DialogContent>
