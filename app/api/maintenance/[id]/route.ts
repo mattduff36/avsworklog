@@ -12,9 +12,11 @@ import type {
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+    
     // Auth check
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -50,7 +52,7 @@ export async function PUT(
     const { data: currentRecord, error: fetchError } = await supabase
       .from('vehicle_maintenance')
       .select('*, vehicle:vehicles(id, reg_number)')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
     
     if (fetchError || !currentRecord) {
@@ -212,7 +214,7 @@ export async function PUT(
     const { data: updatedMaintenance, error: updateError } = await supabase
       .from('vehicle_maintenance')
       .update(updates)
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single();
     
