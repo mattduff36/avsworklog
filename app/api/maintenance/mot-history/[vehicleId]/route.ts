@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { vehicleId: string } }
+  { params }: { params: Promise<{ vehicleId: string }> }
 ) {
   try {
     const supabase = await createClient();
@@ -23,7 +23,7 @@ export async function GET(
       );
     }
 
-    const { vehicleId } = params;
+    const { vehicleId } = await params;
 
     // Get vehicle registration number
     const { data: vehicle, error: vehicleError } = await supabase

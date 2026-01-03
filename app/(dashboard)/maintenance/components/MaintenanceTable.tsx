@@ -40,8 +40,6 @@ import {
 } from '@/lib/utils/maintenanceCalculations';
 import { EditMaintenanceDialog } from './EditMaintenanceDialog';
 import { MaintenanceHistoryDialog } from './MaintenanceHistoryDialog';
-import { DVLASyncButton } from './DVLASyncButton';
-import { DVLA_EXCLUDED_REG_NUMBERS } from '@/lib/constants';
 
 interface MaintenanceTableProps {
   vehicles: VehicleMaintenanceWithStatus[];
@@ -452,15 +450,6 @@ export function MaintenanceTable({
                         {/* Actions */}
                         <TableCell className="text-right">
                           <div className="flex gap-1 justify-end">
-                            {!DVLA_EXCLUDED_REG_NUMBERS.includes(vehicle.vehicle?.reg_number || '') && (
-                              <DVLASyncButton
-                                vehicleId={vehicle.vehicle_id}
-                                registrationNumber={vehicle.vehicle?.reg_number || 'Unknown'}
-                                lastSync={vehicle.last_dvla_sync}
-                                syncStatus={vehicle.dvla_sync_status}
-                                onSyncComplete={onVehicleAdded}
-                              />
-                            )}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -652,15 +641,6 @@ export function MaintenanceTable({
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            {!DVLA_EXCLUDED_REG_NUMBERS.includes(vehicle.vehicle?.reg_number || '') && (
-                              <DVLASyncButton
-                                vehicleId={vehicle.vehicle_id}
-                                registrationNumber={vehicle.vehicle?.reg_number || 'Unknown'}
-                                lastSync={vehicle.last_dvla_sync}
-                                syncStatus={vehicle.dvla_sync_status}
-                                onSyncComplete={onVehicleAdded}
-                              />
-                            )}
                             <Button
                               variant="ghost"
                               size="sm"

@@ -238,14 +238,14 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Fetch MOT history when dialog opens
+  // Fetch MOT history from database when dialog opens (no API call)
   useEffect(() => {
     if (open && vehicleId) {
-      fetchMotHistory();
+      fetchMotHistoryFromDB();
     }
   }, [open, vehicleId]);
   
-  const fetchMotHistory = async () => {
+  const fetchMotHistoryFromDB = async () => {
     setLoading(true);
     setError(null);
     
@@ -318,19 +318,9 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                 <FileText className="h-5 w-5 md:h-6 md:w-6" />
                 <span className="truncate">MOT History - {vehicleReg}</span>
               </DialogTitle>
-              <DialogDescription className="text-slate-400 text-sm mb-3">
+              <DialogDescription className="text-slate-400 text-sm">
                 Complete MOT test history from GOV.UK database
               </DialogDescription>
-              <Button
-                onClick={fetchMotHistory}
-                disabled={loading}
-                variant="outline"
-                size="sm"
-                className="border-blue-600 text-blue-400 hover:bg-blue-600/10"
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                Update
-              </Button>
             </div>
           </div>
         </DialogHeader>

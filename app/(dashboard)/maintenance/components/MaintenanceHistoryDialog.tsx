@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -40,8 +40,32 @@ export function MaintenanceHistoryDialog({
   const history = historyData?.history || [];
   const vesData = historyData?.vesData || null;
   
-  // Handle sync button click
-  const handleSync = async () => {
+  // Auto-sync on modal open if last sync was >24h ago
+  useEffect(() => {
+    if (open && vehicleId && vesData) {
+      const shouldSync = checkIfSyncNeeded(vesData);
+      if (shouldSync) {
+        performAutoSync();
+      }
+    }
+  }, [open, vehicleId]);
+  
+  // Check if sync is needed (>24 hours since last sync)
+  const checkIfSyncNeeded = (data: any): boolean => {
+    const lastDvlaSync = data.last_dvla_sync ? new Date(data.last_dvla_sync).getTime() : 0;
+    const lastMotSync = data.last_mot_api_sync ? new Date(data.last_mot_api_sync).getTime() : 0;
+    const now = Date.now();
+    const twentyFourHours = 24 * 60 * 60 * 1000;
+    
+    // Sync if either TAX or MOT hasn't been synced in 24h
+    const dvlaStale = (now - lastDvlaSync) > twentyFourHours;
+    const motStale = (now - lastMotSync) > twentyFourHours;
+    
+    return dvlaStale || motStale;
+  };
+  
+  // Perform auto-sync in background
+  const performAutoSync = async () => {
     if (!vehicleId || isSyncing) return;
     
     setIsSyncing(true);
@@ -55,15 +79,12 @@ export function MaintenanceHistoryDialog({
       const result = await response.json();
       
       if (result.success) {
-        // Refresh the page to show updated data
+        // Silently refresh data without full page reload
         window.location.reload();
-      } else {
-        console.error('Sync failed:', result.message);
-        alert('Sync failed: ' + (result.message || 'Unknown error'));
       }
     } catch (error) {
-      console.error('Sync error:', error);
-      alert('Failed to sync vehicle data');
+      console.error('Auto-sync error:', error);
+      // Fail silently - don't interrupt user experience
     } finally {
       setIsSyncing(false);
     }
@@ -187,21 +208,13 @@ export function MaintenanceHistoryDialog({
             {/* VES Vehicle Data Section - Show even if no history */}
             {vesData && (vesData.ves_make || vesData.ves_colour || vesData.ves_fuel_type) && (
               <div className="bg-gradient-to-r from-blue-900/20 to-blue-800/10 border border-blue-700/30 rounded-lg p-4">
-                <div className="mb-3 flex items-center justify-between">
+                <div className="mb-3">
                   <h3 className="text-sm font-medium text-blue-300 uppercase tracking-wide flex items-center gap-2">
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     Vehicle Data
                   </h3>
-                  <button
-                    onClick={handleSync}
-                    disabled={isSyncing}
-                    className="p-1.5 rounded-md bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    title="Sync tax & MOT due dates"
-                  >
-                    <RefreshCw className={`h-4 w-4 text-blue-400 ${isSyncing ? 'animate-spin' : ''}`} />
-                  </button>
                 </div>
                 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">

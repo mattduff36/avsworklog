@@ -1,10 +1,11 @@
-// API Route: Scheduled DVLA Sync (for Vercel Cron)
+// API Route: Scheduled DVLA & MOT Sync (for Vercel Cron)
 // POST /api/maintenance/sync-dvla-scheduled
-// Syncs all active vehicles with tax dates updated more than 6 days ago
+// Syncs all active vehicles with TAX and MOT data updated more than 6 days ago
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createDVLAApiService } from '@/lib/services/dvla-api';
+import { createMotHistoryService } from '@/lib/services/mot-history-api';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
 export const dynamic = 'force-dynamic';
@@ -45,6 +46,9 @@ export async function POST(request: NextRequest) {
         skipped: 0,
       });
     }
+
+    // Check if MOT API is configured (optional, sync will continue if not available)
+    const motService = createMotHistoryService();
 
     // Test vehicles to exclude from DVLA sync
     const TEST_VEHICLES = ['TE57VAN', 'TE57HGV'];
@@ -115,18 +119,36 @@ export async function POST(request: NextRequest) {
       const startTime = Date.now();
 
       try {
-        // Fetch data from DVLA API
+        // Fetch data from DVLA VES API (tax & vehicle details)
         const dvlaData = await dvlaService.getVehicleData(vehicle.reg_number);
-        const responseTime = Date.now() - startTime;
+        const dvlaResponseTime = Date.now() - startTime;
+
+        // Fetch MOT expiry data from MOT History API (if configured)
+        let motExpiryData = null;
+        let motResponseTime = null;
+        let motApiError: string | null = null;
+        if (motService) {
+          try {
+            const motStart = Date.now();
+            motExpiryData = await motService.getMotExpiryData(vehicle.reg_number);
+            motResponseTime = Date.now() - motStart;
+            console.log(`[CRON] MOT expiry for ${vehicle.reg_number}: ${motExpiryData.motExpiryDate || 'N/A'}`);
+          } catch (motError: any) {
+            motApiError = motError?.message || motError?.toString() || 'Unknown MOT API error';
+            console.error(`[CRON] MOT API fetch failed for ${vehicle.reg_number}:`, motApiError);
+            // Continue with DVLA data even if MOT fetch fails
+          }
+        }
 
         // Get existing maintenance record
         const { data: existingRecord } = await supabase
           .from('vehicle_maintenance')
-          .select('tax_due_date')
+          .select('tax_due_date, mot_due_date')
           .eq('vehicle_id', vehicle.id)
           .single();
 
         const oldTaxDate = existingRecord?.tax_due_date || null;
+        const oldMotDate = existingRecord?.mot_due_date || null;
 
         // Prepare update data
         const updates: any = {
@@ -164,6 +186,57 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // Update MOT due date from MOT History API (if available)
+        if (motService) {
+          if (motApiError) {
+            // MOT API call failed with an error
+            updates.mot_api_sync_status = 'error';
+            updates.last_mot_api_sync = new Date().toISOString();
+            updates.mot_api_sync_error = motApiError;
+            console.log(`[CRON] ${vehicle.reg_number}: MOT API error: ${motApiError}`);
+          } else if (motExpiryData?.motExpiryDate || motExpiryData?.rawData) {
+            const motRawData = motExpiryData.rawData;
+
+            // Store vehicle-level MOT data
+            updates.mot_make = motRawData.make || null;
+            updates.mot_model = motRawData.model || null;
+            updates.mot_fuel_type = motRawData.fuelType || null;
+            updates.mot_primary_colour = motRawData.primaryColour || null;
+            updates.mot_registration = motRawData.registration || null;
+            updates.mot_year_of_manufacture = motRawData.manufactureYear ? parseInt(motRawData.manufactureYear) : null;
+            updates.mot_first_used_date = motRawData.registrationDate || null;
+
+            // ALWAYS update MOT due date if API provides one (overrides manual entries)
+            if (motExpiryData.motExpiryDate) {
+              updates.mot_due_date = motExpiryData.motExpiryDate;
+              updates.mot_expiry_date = motExpiryData.motExpiryDate;
+              updates.mot_api_sync_status = 'success';
+              updates.last_mot_api_sync = new Date().toISOString();
+              updates.mot_api_sync_error = null;
+              updates.mot_raw_data = motExpiryData.rawData || null;
+
+              if (oldMotDate !== motExpiryData.motExpiryDate) {
+                fieldsUpdated.push('mot_due_date');
+                console.log(`[CRON] ${vehicle.reg_number}: MOT updated from ${oldMotDate} to ${motExpiryData.motExpiryDate}`);
+              }
+            } else {
+              // MOT API succeeded but returned no expiry date
+              updates.mot_api_sync_status = 'success';
+              updates.last_mot_api_sync = new Date().toISOString();
+              updates.mot_api_sync_error = 'No MOT expiry date found';
+              updates.mot_raw_data = motExpiryData?.rawData || null;
+              console.log(`[CRON] ${vehicle.reg_number}: No MOT expiry date found`);
+            }
+          } else {
+            // MOT API succeeded but returned no data
+            updates.mot_api_sync_status = 'success';
+            updates.last_mot_api_sync = new Date().toISOString();
+            updates.mot_api_sync_error = 'No MOT history found';
+            updates.mot_raw_data = motExpiryData?.rawData || null;
+            console.log(`[CRON] ${vehicle.reg_number}: No MOT history found`);
+          }
+        }
+
         // Upsert vehicle_maintenance record
         const { error: upsertError } = await supabase
           .from('vehicle_maintenance')
@@ -188,7 +261,7 @@ export async function POST(request: NextRequest) {
             tax_due_date_old: oldTaxDate,
             tax_due_date_new: dvlaData.taxDueDate,
             api_provider: process.env.DVLA_API_PROVIDER,
-            api_response_time_ms: responseTime,
+            api_response_time_ms: dvlaResponseTime,
             raw_response: dvlaData.rawData,
             triggered_by: null, // Automated sync
             trigger_type: 'automatic',
