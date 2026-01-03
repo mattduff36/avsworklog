@@ -269,11 +269,16 @@ function NewInspectionContent() {
         return true; // Duplicate found
       } else {
         setDuplicateInspection(null);
-        // Only clear errors if explicitly requested (e.g., during save validation)
-        // Background checks should preserve existing validation errors
-        if (clearOtherErrors) {
-          setError('');
-        }
+        // Always clear duplicate-related errors when no duplicate is found
+        // For other validation errors, only clear if explicitly requested
+        setError(prev => {
+          // If previous error was about duplicates, always clear it
+          if (prev.includes('already exists')) {
+            return '';
+          }
+          // For other validation errors, only clear if clearOtherErrors=true
+          return clearOtherErrors ? '' : prev;
+        });
         return false; // No duplicate
       }
     } catch (err) {

@@ -62,7 +62,7 @@ export async function GET(
           success: false,
           error: 'Incomplete MOT data',
           message: `MOT API returned incomplete data for ${vehicle.reg_number}`,
-        });
+        }, { status: 500 }); // Internal server error - API returned incomplete data
       }
 
       // Transform the data to match UI expectations
@@ -115,7 +115,7 @@ export async function GET(
           success: false,
           error: 'No MOT history found',
           message: `No MOT history found for ${vehicle.reg_number}. Vehicle may be too new or exempt from MOT testing.`,
-        });
+        }, { status: 404 }); // Not found - vehicle has no MOT history
       }
 
       return NextResponse.json(
