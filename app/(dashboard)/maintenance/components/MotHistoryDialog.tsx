@@ -467,14 +467,14 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                     }`}
                   >
                     {/* Test Header */}
-                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-2 md:gap-0 mb-3">
-                      <div className="flex items-center gap-3">
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-2 md:gap-3 mb-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
                         {isPassed ? (
                           <CheckCircle className="h-6 w-6 text-green-400 flex-shrink-0" />
                         ) : (
                           <XCircle className="h-6 w-6 text-red-400 flex-shrink-0" />
                         )}
-                        <div>
+                        <div className="min-w-0">
                           <h4 className="text-lg font-semibold text-white flex items-center gap-2">
                             {test.testResult}
                             <span className="text-sm text-slate-400 font-normal">
@@ -488,6 +488,17 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                           )}
                         </div>
                       </div>
+                      
+                      {/* Defect Summary Badges - Top Right on Desktop */}
+                      {test.defects.length > 0 && (
+                        <div className="flex items-center gap-2 flex-wrap md:justify-end">
+                          {Object.entries(defectCounts).map(([type, count]) => (
+                            <Badge key={type} className={`${getDefectColor(type)} border text-xs`}>
+                              {count} {type}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* Test Details Grid */}
@@ -512,18 +523,9 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                       </div>
                     </div>
 
-                    {/* Defect Summary */}
+                    {/* Expandable Defects */}
                     {test.defects.length > 0 && (
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {Object.entries(defectCounts).map(([type, count]) => (
-                            <Badge key={type} className={`${getDefectColor(type)} border`}>
-                              {getDefectIcon(type)} {count} {type}
-                            </Badge>
-                          ))}
-                        </div>
-
-                        {/* Expandable Defects */}
                         <Button
                           variant="ghost"
                           size="sm"
