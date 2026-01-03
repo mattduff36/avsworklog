@@ -329,25 +329,6 @@ export function MaintenanceHistoryDialog({
                       <span className="ml-2 text-white font-medium">{vesData.ves_wheelplan}</span>
                     </div>
                   )}
-                  
-                  {/* Data sync timestamps */}
-                  {(vesData.last_dvla_sync || vesData.last_mot_api_sync) && (
-                    <div className="col-span-2 md:col-span-3 pt-2 border-t border-slate-700/50">
-                      {vesData.last_dvla_sync && (
-                        <span className="text-xs text-slate-500">
-                          VES synced: {new Date(vesData.last_dvla_sync).toLocaleDateString('en-GB')}
-                        </span>
-                      )}
-                      {vesData.last_dvla_sync && vesData.last_mot_api_sync && (
-                        <span className="text-xs text-slate-600 mx-2">•</span>
-                      )}
-                      {vesData.last_mot_api_sync && (
-                        <span className="text-xs text-slate-500">
-                          MOT synced: {new Date(vesData.last_mot_api_sync).toLocaleDateString('en-GB')}
-                        </span>
-                      )}
-                    </div>
-                  )}
                 </div>
               </div>
             )}
