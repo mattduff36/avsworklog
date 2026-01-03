@@ -14,8 +14,15 @@ async function runMigration() {
     process.exit(1);
   }
 
+  // Parse connection string
+  const url = new URL(connectionString);
+  
   const client = new pg.Client({
-    connectionString,
+    host: url.hostname,
+    port: parseInt(url.port) || 5432,
+    database: url.pathname.slice(1),
+    user: url.username,
+    password: url.password,
     ssl: { rejectUnauthorized: false }
   });
 

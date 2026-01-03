@@ -8,6 +8,13 @@
 
 -- Add comprehensive vehicle data from MOT History API
 ALTER TABLE vehicle_maintenance
+-- API sync tracking
+ADD COLUMN IF NOT EXISTS mot_expiry_date DATE,
+ADD COLUMN IF NOT EXISTS mot_api_sync_status TEXT CHECK (mot_api_sync_status IN ('never', 'success', 'error', 'pending')),
+ADD COLUMN IF NOT EXISTS mot_api_sync_error TEXT,
+ADD COLUMN IF NOT EXISTS last_mot_api_sync TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS mot_raw_data JSONB,
+-- Vehicle data from MOT History API
 ADD COLUMN IF NOT EXISTS mot_make TEXT,
 ADD COLUMN IF NOT EXISTS mot_model TEXT,
 ADD COLUMN IF NOT EXISTS mot_first_used_date DATE,
@@ -26,6 +33,15 @@ ADD COLUMN IF NOT EXISTS mot_dvla_id TEXT; -- DVLA ID
 -- Indexes for MOT vehicle data
 CREATE INDEX IF NOT EXISTS idx_vehicle_maintenance_mot_model ON vehicle_maintenance(mot_model);
 CREATE INDEX IF NOT EXISTS idx_vehicle_maintenance_mot_vehicle_id ON vehicle_maintenance(mot_vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_vehicle_maintenance_mot_expiry_date ON vehicle_maintenance(mot_expiry_date);
+CREATE INDEX IF NOT EXISTS idx_vehicle_maintenance_last_mot_api_sync ON vehicle_maintenance(last_mot_api_sync);
+
+-- Comments for MOT API sync tracking fields
+COMMENT ON COLUMN vehicle_maintenance.mot_expiry_date IS 'MOT expiry date from MOT History API';
+COMMENT ON COLUMN vehicle_maintenance.mot_api_sync_status IS 'Status of last MOT API sync (never, success, error, pending)';
+COMMENT ON COLUMN vehicle_maintenance.mot_api_sync_error IS 'Error message from last failed MOT API sync';
+COMMENT ON COLUMN vehicle_maintenance.last_mot_api_sync IS 'Timestamp of last MOT API sync attempt';
+COMMENT ON COLUMN vehicle_maintenance.mot_raw_data IS 'Raw JSON response from MOT History API';
 
 -- Comments for MOT vehicle fields
 COMMENT ON COLUMN vehicle_maintenance.mot_make IS 'Vehicle make from MOT History API';
@@ -159,6 +175,7 @@ ALTER TABLE mot_test_defects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE mot_test_comments ENABLE ROW LEVEL SECURITY;
 
 -- Policies for mot_test_history
+DROP POLICY IF EXISTS "Users can view MOT history for vehicles they can access" ON mot_test_history;
 CREATE POLICY "Users can view MOT history for vehicles they can access"
   ON mot_test_history FOR SELECT
   USING (
@@ -168,11 +185,13 @@ CREATE POLICY "Users can view MOT history for vehicles they can access"
     )
   );
 
+DROP POLICY IF EXISTS "Service role has full access to MOT history" ON mot_test_history;
 CREATE POLICY "Service role has full access to MOT history"
   ON mot_test_history FOR ALL
   USING (auth.jwt() ->> 'role' = 'service_role');
 
 -- Policies for mot_test_defects
+DROP POLICY IF EXISTS "Users can view MOT defects for tests they can access" ON mot_test_defects;
 CREATE POLICY "Users can view MOT defects for tests they can access"
   ON mot_test_defects FOR SELECT
   USING (
@@ -182,11 +201,13 @@ CREATE POLICY "Users can view MOT defects for tests they can access"
     )
   );
 
+DROP POLICY IF EXISTS "Service role has full access to MOT defects" ON mot_test_defects;
 CREATE POLICY "Service role has full access to MOT defects"
   ON mot_test_defects FOR ALL
   USING (auth.jwt() ->> 'role' = 'service_role');
 
 -- Policies for mot_test_comments
+DROP POLICY IF EXISTS "Users can view MOT comments for tests they can access" ON mot_test_comments;
 CREATE POLICY "Users can view MOT comments for tests they can access"
   ON mot_test_comments FOR SELECT
   USING (
@@ -196,6 +217,7 @@ CREATE POLICY "Users can view MOT comments for tests they can access"
     )
   );
 
+DROP POLICY IF EXISTS "Service role has full access to MOT comments" ON mot_test_comments;
 CREATE POLICY "Service role has full access to MOT comments"
   ON mot_test_comments FOR ALL
   USING (auth.jwt() ->> 'role' = 'service_role');
