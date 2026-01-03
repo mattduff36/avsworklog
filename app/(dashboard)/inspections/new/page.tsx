@@ -237,7 +237,14 @@ function NewInspectionContent() {
   };
 
   // Check for duplicate inspection (same vehicle + week ending)
-  const checkForDuplicate = async (vehicleIdToCheck: string, weekEndingToCheck: string): Promise<boolean> => {
+  // clearOtherErrors: whether to clear non-duplicate validation errors
+  //   - false for background checks (useEffect) - preserves validation errors
+  //   - true for explicit save checks - clears stale errors before validation re-runs
+  const checkForDuplicate = async (
+    vehicleIdToCheck: string, 
+    weekEndingToCheck: string,
+    clearOtherErrors: boolean = false
+  ): Promise<boolean> => {
     if (!vehicleIdToCheck || !weekEndingToCheck || existingInspectionId) {
       setDuplicateInspection(null);
       return false;
@@ -262,7 +269,11 @@ function NewInspectionContent() {
         return true; // Duplicate found
       } else {
         setDuplicateInspection(null);
-        setError(''); // Clear all errors when no duplicate found
+        // Only clear errors if explicitly requested (e.g., during save validation)
+        // Background checks should preserve existing validation errors
+        if (clearOtherErrors) {
+          setError('');
+        }
         return false; // No duplicate
       }
     } catch (err) {
@@ -679,7 +690,8 @@ function NewInspectionContent() {
     }
     
     // Re-check for duplicates to prevent race conditions
-    const isDuplicate = await checkForDuplicate(vehicleId, weekEnding);
+    // Pass true to clear other errors since validation will re-run on save anyway
+    const isDuplicate = await checkForDuplicate(vehicleId, weekEnding, true);
     if (isDuplicate) {
       setError('An inspection for this vehicle and week already exists. Please select a different vehicle or week.');
       return;
