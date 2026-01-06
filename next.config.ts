@@ -17,9 +17,31 @@ const nextConfig: NextConfig = {
     // All other type errors have been properly fixed with Database types
     ignoreBuildErrors: true,
   },
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     // Handle canvas package for pdfjs-dist
     config.resolve.alias.canvas = false;
+    
+    // Optimize webpack cache to handle large strings more efficiently
+    // This addresses the "Serializing big strings" warning from Supabase types
+    if (config.cache && typeof config.cache === 'object') {
+      config.cache = {
+        ...config.cache,
+        // Use gzip compression for cache to reduce memory footprint
+        compression: 'gzip',
+        // Set maximum age for cached items
+        maxAge: 5184000000, // 60 days
+      };
+    }
+    
+    // Suppress non-critical warnings
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings || []),
+      // Suppress Supabase realtime warnings about Node.js APIs in Edge Runtime
+      { module: /node_modules\/@supabase\/realtime-js/ },
+      { module: /node_modules\/@supabase\/supabase-js/ },
+      // Suppress the big string serialization warning (cosmetic only)
+      /Serializing big strings/,
+    ];
     
     return config;
   },
