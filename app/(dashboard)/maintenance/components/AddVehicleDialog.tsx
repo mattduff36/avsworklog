@@ -83,7 +83,28 @@ export function AddVehicleDialog({
     }
   }
 
-  // Format UK registration plates (LLNNLLL -> LLNN LLL)
+  // Handle registration input with auto-uppercase and smart spacing
+  function handleRegistrationChange(value: string) {
+    // Convert to uppercase
+    let formatted = value.toUpperCase();
+    
+    // Only allow alphanumeric characters and spaces
+    formatted = formatted.replace(/[^A-Z0-9\s]/g, '');
+    
+    // Smart spacing logic
+    const hasSpace = formatted.includes(' ');
+    const cleanedLength = formatted.replace(/\s/g, '').length;
+    
+    // If user hasn't added a space and we have 4+ chars, auto-add space after 4th char
+    if (!hasSpace && cleanedLength >= 4) {
+      const cleaned = formatted.replace(/\s/g, '');
+      formatted = `${cleaned.slice(0, 4)} ${cleaned.slice(4)}`;
+    }
+    
+    setFormData({ ...formData, reg_number: formatted });
+  }
+
+  // Format UK registration plates for submission (LLNNLLL -> LLNN LLL)
   function formatRegistration(reg: string): string {
     const cleaned = reg.replace(/\s/g, '').toUpperCase();
     
@@ -194,16 +215,15 @@ export function AddVehicleDialog({
             <Input
               id="reg_number"
               value={formData.reg_number}
-              onChange={(e) =>
-                setFormData({ ...formData, reg_number: e.target.value })
-              }
-              placeholder="e.g., AB12 CDE or AB12CDE"
-              className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+              onChange={(e) => handleRegistrationChange(e.target.value)}
+              placeholder="e.g., AB12 CDE or A10 ABC"
+              className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 uppercase"
               disabled={loading}
               required
+              maxLength={9}
             />
             <p className="text-xs text-slate-400">
-              Will be formatted as UK registration (e.g., AB12 CDE)
+              Auto-formatted: UPPERCASE with space after 4th character
             </p>
           </div>
 
