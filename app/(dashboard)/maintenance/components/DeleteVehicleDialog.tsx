@@ -59,8 +59,8 @@ export function DeleteVehicleDialog({
       });
 
       if (response.ok) {
-        toast.success('Vehicle archived successfully', {
-          description: `${vehicle.reg_number} has been moved to Deleted Vehicles. Historic data is preserved.`,
+        toast.success('Vehicle retired successfully', {
+          description: `${vehicle.reg_number} has been moved to Retired Vehicles. Historic data is preserved.`,
         });
 
         // Invalidate queries to refresh data
@@ -98,10 +98,10 @@ export function DeleteVehicleDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-blue-500">
             <Archive className="h-5 w-5" />
-            Archive Vehicle
+            Retire Vehicle
           </DialogTitle>
           <DialogDescription className="text-slate-400">
-            This will move the vehicle to the "Deleted Vehicles" tab. All inspection history and maintenance records will be preserved.
+            This will move the vehicle to the "Retired Vehicles" tab. All inspection history and maintenance records will be preserved.
           </DialogDescription>
         </DialogHeader>
 
@@ -129,7 +129,7 @@ export function DeleteVehicleDialog({
           {/* Reason Selection */}
           <div className="space-y-3">
             <Label className="text-white">
-              Reason for archiving <span className="text-red-400">*</span>
+              Reason for retirement <span className="text-red-400">*</span>
             </Label>
             <RadioGroup value={reason} onValueChange={(value) => setReason(value as DeleteReason)}>
               <div className="flex items-center space-x-2 bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-slate-600 transition-colors">
@@ -175,12 +175,12 @@ export function DeleteVehicleDialog({
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Archiving...
+                Retiring...
               </>
             ) : (
               <>
                 <Archive className="h-4 w-4 mr-2" />
-                Archive Vehicle
+                Retire Vehicle
               </>
             )}
           </Button>

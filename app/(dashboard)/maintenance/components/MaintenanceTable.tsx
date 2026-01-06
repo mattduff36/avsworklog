@@ -30,7 +30,9 @@ import {
   ChevronDown,
   ChevronUp,
   Trash,
-  Loader2
+  Loader2,
+  FolderClock,
+  XCircle
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { VehicleMaintenanceWithStatus, DeletedVehicle } from '@/types/maintenance';
@@ -90,10 +92,10 @@ export function MaintenanceTable({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleMaintenanceWithStatus | null>(null);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
-  const [deletedSearchQuery, setDeletedSearchQuery] = useState('');
+  const [retiredSearchQuery, setRetiredSearchQuery] = useState('');
   
-  // Fetch deleted vehicles
-  const { data: deletedData, isLoading: deletedLoading } = useDeletedVehicles();
+  // Fetch retired vehicles
+  const { data: retiredData, isLoading: retiredLoading } = useDeletedVehicles();
   const permanentlyDelete = usePermanentlyDeleteArchivedVehicle();
   
   // Column visibility state - all columns visible by default
@@ -201,14 +203,15 @@ export function MaintenanceTable({
         
         <CardContent className="space-y-4">
           
-          {/* Internal Tabs for Active vs Deleted Vehicles */}
+          {/* Internal Tabs for Active vs Retired Vehicles */}
           <Tabs defaultValue="active" className="w-full">
             <TabsList className="bg-slate-800 border-slate-700">
               <TabsTrigger value="active" className="data-[state=active]:bg-slate-700">
                 Active Vehicles ({vehicles.length})
               </TabsTrigger>
-              <TabsTrigger value="deleted" className="data-[state=active]:bg-slate-700">
-                Deleted Vehicles ({deletedData?.count || 0})
+              <TabsTrigger value="deleted" className="data-[state=active]:bg-slate-700 flex items-center gap-2">
+                <FolderClock className="h-4 w-4" />
+                Retired Vehicles ({retiredData?.count || 0})
               </TabsTrigger>
             </TabsList>
             
@@ -688,31 +691,32 @@ export function MaintenanceTable({
           )}
             </TabsContent>
             
-            {/* Deleted Vehicles Tab */}
+            {/* Retired Vehicles Tab */}
             <TabsContent value="deleted" className="space-y-4 mt-4">
-              {/* Search Bar for Deleted Vehicles */}
+              {/* Search Bar for Retired Vehicles */}
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Search deleted vehicles by registration..."
-                  value={deletedSearchQuery}
-                  onChange={(e) => setDeletedSearchQuery(e.target.value)}
+                  placeholder="Search retired vehicles by registration..."
+                  value={retiredSearchQuery}
+                  onChange={(e) => setRetiredSearchQuery(e.target.value)}
                   className="pl-11 bg-slate-900/50 border-slate-600 text-white"
                 />
               </div>
               
-              {deletedLoading ? (
+              {retiredLoading ? (
                 <div className="text-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-3" />
-                  <p className="text-slate-400">Loading deleted vehicles...</p>
+                  <p className="text-slate-400">Loading retired vehicles...</p>
                 </div>
-              ) : !deletedData || deletedData.vehicles.length === 0 ? (
+              ) : !retiredData || retiredData.vehicles.length === 0 ? (
                 <div className="text-center py-12 text-slate-400">
-                  No deleted vehicles found.
+                  <FolderClock className="h-12 w-12 mx-auto mb-3 text-slate-600" />
+                  <p>No retired vehicles found.</p>
                 </div>
               ) : (
                 <>
-                  {/* Desktop Table View for Deleted Vehicles */}
+                  {/* Desktop Table View for Retired Vehicles */}
                   <div className="hidden md:block border border-slate-700 rounded-lg">
                     <Table className="min-w-full">
                       <TableHeader>
@@ -733,7 +737,7 @@ export function MaintenanceTable({
                             MOT Due
                           </TableHead>
                           <TableHead className="bg-slate-900 text-slate-300 border-b-2 border-slate-700">
-                            Deleted Date
+                            Retired Date
                           </TableHead>
                           <TableHead className="bg-slate-900 text-slate-300 border-b-2 border-slate-700">
                             Reason
@@ -744,9 +748,9 @@ export function MaintenanceTable({
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {deletedData.vehicles
+                        {retiredData.vehicles
                           .filter(vehicle => 
-                            vehicle.reg_number.toLowerCase().includes(deletedSearchQuery.toLowerCase())
+                            vehicle.reg_number.toLowerCase().includes(retiredSearchQuery.toLowerCase())
                           )
                           .map((vehicle) => (
                           <TableRow 
@@ -812,7 +816,7 @@ export function MaintenanceTable({
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => {
-                                    if (confirm(`⚠️ Permanently delete ${vehicle.reg_number}?\n\nThis will:\n• Remove from Deleted Vehicles tab\n• Preserve all inspection history\n• Cannot be undone\n\nContinue?`)) {
+                                    if (confirm(`⚠️ Permanently remove ${vehicle.reg_number}?\n\nThis will:\n• Remove from Retired Vehicles tab\n• Preserve all inspection history\n• Cannot be undone\n\nContinue?`)) {
                                       permanentlyDelete.mutate(vehicle.id);
                                     }
                                   }}
@@ -823,7 +827,7 @@ export function MaintenanceTable({
                                   {permanentlyDelete.isPending ? (
                                     <Loader2 className="h-3 w-3 animate-spin" />
                                   ) : (
-                                    <Trash className="h-3 w-3" />
+                                    <XCircle className="h-3 w-3" />
                                   )}
                                 </Button>
                               )}
@@ -834,11 +838,11 @@ export function MaintenanceTable({
                     </Table>
                   </div>
                   
-                  {/* Mobile Card View for Deleted Vehicles */}
+                  {/* Mobile Card View for Retired Vehicles */}
                   <div className="md:hidden space-y-3">
-                    {deletedData.vehicles
+                    {retiredData.vehicles
                       .filter(vehicle => 
-                        vehicle.reg_number.toLowerCase().includes(deletedSearchQuery.toLowerCase())
+                        vehicle.reg_number.toLowerCase().includes(retiredSearchQuery.toLowerCase())
                       )
                       .map((vehicle) => (
                       <Card 
@@ -885,7 +889,7 @@ export function MaintenanceTable({
                               <span className="text-white">{formatMaintenanceDate(vehicle.mot_due_date)}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-slate-400">Deleted:</span>
+                              <span className="text-slate-400">Retired:</span>
                               <span className="text-white">{new Date(vehicle.archived_at).toLocaleDateString()}</span>
                             </div>
                           </div>
@@ -897,7 +901,7 @@ export function MaintenanceTable({
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => {
-                                  if (confirm(`⚠️ Permanently delete ${vehicle.reg_number}?\n\nThis will:\n• Remove from Deleted Vehicles tab\n• Preserve all inspection history\n• Cannot be undone\n\nContinue?`)) {
+                                  if (confirm(`⚠️ Permanently remove ${vehicle.reg_number}?\n\nThis will:\n• Remove from Retired Vehicles tab\n• Preserve all inspection history\n• Cannot be undone\n\nContinue?`)) {
                                     permanentlyDelete.mutate(vehicle.id);
                                   }
                                 }}
@@ -911,7 +915,7 @@ export function MaintenanceTable({
                                   </>
                                 ) : (
                                   <>
-                                    <Trash className="h-4 w-4 mr-2" />
+                                    <XCircle className="h-4 w-4 mr-2" />
                                     Permanently Remove
                                   </>
                                 )}
