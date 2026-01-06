@@ -72,6 +72,9 @@ export interface MotHistoryApiResponse {
   
   // MOT test history (array of all tests, newest first)
   motTests?: MotTest[];
+  
+  // For new vehicles without MOT history yet
+  motTestDueDate?: string; // YYYY-MM-DD - first MOT due date
 }
 
 // ============================================================================

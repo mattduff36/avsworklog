@@ -41,6 +41,7 @@ interface MotHistoryResponse {
   fuelType: string;
   primaryColour: string;
   motTests?: MotTest[];
+  motTestDueDate?: string; // For new vehicles without MOT history
 }
 
 export interface MotExpiryData {

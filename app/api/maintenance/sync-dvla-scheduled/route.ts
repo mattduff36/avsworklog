@@ -207,7 +207,8 @@ export async function POST(request: NextRequest) {
             updates.mot_primary_colour = motRawData.primaryColour || null;
             updates.mot_registration = motRawData.registration || null;
             updates.mot_year_of_manufacture = motRawData.manufactureYear ? parseInt(motRawData.manufactureYear) : null;
-            updates.mot_first_used_date = motRawData.registrationDate || null;
+            // BUG FIX: Use firstUsedDate not registrationDate
+            updates.mot_first_used_date = motRawData.firstUsedDate || null;
 
             // ALWAYS update MOT due date if API provides one (overrides manual entries)
             if (motExpiryData.motExpiryDate) {
@@ -221,6 +222,25 @@ export async function POST(request: NextRequest) {
               if (oldMotDate !== motExpiryData.motExpiryDate) {
                 fieldsUpdated.push('mot_due_date');
                 console.log(`[CRON] ${vehicle.reg_number}: MOT updated from ${oldMotDate} to ${motExpiryData.motExpiryDate}`);
+              }
+            } else if (motRawData?.firstUsedDate) {
+              // NEW: Calculate first MOT due date for new vehicles (firstUsedDate + 3 years)
+              // UK vehicles require their first MOT 3 years after first registration
+              const firstUsedDate = new Date(motRawData.firstUsedDate);
+              const firstMotDue = new Date(firstUsedDate);
+              firstMotDue.setFullYear(firstMotDue.getFullYear() + 3);
+              
+              const calculatedMotDue = firstMotDue.toISOString().split('T')[0]; // YYYY-MM-DD
+              updates.mot_due_date = calculatedMotDue;
+              updates.mot_expiry_date = calculatedMotDue;
+              updates.mot_api_sync_status = 'success';
+              updates.last_mot_api_sync = new Date().toISOString();
+              updates.mot_api_sync_error = null;
+              updates.mot_raw_data = motExpiryData.rawData || null;
+              
+              if (oldMotDate !== calculatedMotDue) {
+                fieldsUpdated.push('mot_due_date (calculated)');
+                console.log(`[CRON] ${vehicle.reg_number}: First MOT due calculated: ${calculatedMotDue} (3 years from ${motRawData.firstUsedDate})`);
               }
             } else {
               // MOT API succeeded but returned no expiry date

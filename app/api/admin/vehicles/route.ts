@@ -317,8 +317,9 @@ async function syncVehicleData(
           if (motRawData.manufactureYear) {
             updates.mot_year_of_manufacture = parseInt(motRawData.manufactureYear);
           }
-          if (motRawData.registrationDate) {
-            updates.mot_first_used_date = motRawData.registrationDate;
+          // BUG FIX: Use firstUsedDate not registrationDate
+          if (motRawData.firstUsedDate) {
+            updates.mot_first_used_date = motRawData.firstUsedDate;
           }
         }
         
@@ -326,6 +327,18 @@ async function syncVehicleData(
           updates.mot_due_date = motExpiryData.motExpiryDate;
           updates.mot_expiry_date = motExpiryData.motExpiryDate;
           fieldsUpdated.push('mot_due_date');
+        } else if (motRawData?.firstUsedDate) {
+          // NEW: Calculate first MOT due date for new vehicles (firstUsedDate + 3 years)
+          // UK vehicles require their first MOT 3 years after first registration
+          const firstUsedDate = new Date(motRawData.firstUsedDate);
+          const firstMotDue = new Date(firstUsedDate);
+          firstMotDue.setFullYear(firstMotDue.getFullYear() + 3);
+          
+          const calculatedMotDue = firstMotDue.toISOString().split('T')[0]; // YYYY-MM-DD
+          updates.mot_due_date = calculatedMotDue;
+          updates.mot_expiry_date = calculatedMotDue;
+          fieldsUpdated.push('mot_due_date (calculated)');
+          console.log(`[INFO] ${regNumber}: First MOT due calculated: ${calculatedMotDue} (3 years from ${motRawData.firstUsedDate})`);
         }
         
         updates.mot_api_sync_status = 'success';

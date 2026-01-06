@@ -222,7 +222,8 @@ export async function POST(request: NextRequest) {
               
               // Additional fields from MOT API
               if (motRawData.manufactureYear) updates.mot_year_of_manufacture = parseInt(motRawData.manufactureYear);
-              if (motRawData.registrationDate) updates.mot_first_used_date = motRawData.registrationDate;
+              // BUG FIX: Use firstUsedDate not registrationDate
+              if (motRawData.firstUsedDate) updates.mot_first_used_date = motRawData.firstUsedDate;
             }
             
             // Always update MOT due date if API provides one (overrides manual entries)
@@ -235,6 +236,21 @@ export async function POST(request: NextRequest) {
                 console.log(`[INFO] ${vehicle.reg_number}: MOT updated from ${oldMotDate} to ${motExpiryData.motExpiryDate}`);
               } else {
                 console.log(`[INFO] ${vehicle.reg_number}: MOT unchanged (${oldMotDate})`);
+              }
+            } else if (motRawData?.firstUsedDate && !motExpiryData.motExpiryDate) {
+              // NEW: Calculate first MOT due date for new vehicles (firstUsedDate + 3 years)
+              // UK vehicles require their first MOT 3 years after first registration
+              const firstUsedDate = new Date(motRawData.firstUsedDate);
+              const firstMotDue = new Date(firstUsedDate);
+              firstMotDue.setFullYear(firstMotDue.getFullYear() + 3);
+              
+              const calculatedMotDue = firstMotDue.toISOString().split('T')[0]; // YYYY-MM-DD
+              updates.mot_due_date = calculatedMotDue;
+              updates.mot_expiry_date = calculatedMotDue;
+              
+              if (oldMotDate !== calculatedMotDue) {
+                fieldsUpdated.push('mot_due_date (calculated)');
+                console.log(`[INFO] ${vehicle.reg_number}: First MOT due calculated: ${calculatedMotDue} (3 years from ${motRawData.firstUsedDate})`);
               }
             }
             
