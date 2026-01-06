@@ -287,7 +287,7 @@ export default function DashboardPage() {
           type: 'workshop',
           label: 'Workshop Tasks',
           count: workshopTotal,
-          icon: Activity,
+          icon: Wrench,
           color: 'hsl(13 37% 48%)', // Workshop rust/brown color
           href: '/workshop-tasks'
         },
@@ -295,7 +295,7 @@ export default function DashboardPage() {
           type: 'maintenance',
           label: 'Maintenance & Service',
           count: maintenanceTotal,
-          icon: Settings as any,
+          icon: Settings,
           color: 'hsl(0 84% 60%)', // Red
           href: '/maintenance'
         }
