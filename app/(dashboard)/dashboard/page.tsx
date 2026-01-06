@@ -36,7 +36,7 @@ import type { ModuleName } from '@/types/roles';
 import { toast } from 'sonner';
 
 type PendingApprovalCount = {
-  type: 'timesheets' | 'inspections' | 'absences' | 'pending' | 'logged' | 'completed';
+  type: 'timesheets' | 'inspections' | 'absences' | 'pending' | 'logged' | 'completed' | 'workshop' | 'maintenance';
   label: string;
   count: number;
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
@@ -237,55 +237,67 @@ export default function DashboardPage() {
 
   const fetchTopActions = async () => {
     try {
-      // Get counts for pending actions
-      const { count: pendingCount, error: pendingError } = await supabase
+      // Fetch all actions to count workshop tasks
+      const { data: allActions, error: actionsError } = await supabase
         .from('actions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
+        .select('*');
 
-      if (pendingError) throw pendingError;
+      if (actionsError) throw actionsError;
 
-      // Get counts for logged/in progress actions
-      const { count: loggedCount, error: loggedError } = await supabase
-        .from('actions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'logged');
+      // Filter workshop tasks
+      const workshopTasks = (allActions || []).filter(a => 
+        a.action_type === 'inspection_defect' || a.action_type === 'workshop_vehicle_task'
+      );
 
-      if (loggedError) throw loggedError;
+      const workshopPending = workshopTasks.filter(t => t.status === 'pending').length;
+      const workshopInProgress = workshopTasks.filter(t => t.status === 'logged').length;
+      const workshopTotal = workshopPending + workshopInProgress;
 
-      // Get counts for completed actions (recent)
-      const { count: completedCount, error: completedError } = await supabase
-        .from('actions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'completed');
+      // Fetch maintenance data to count alerts
+      const maintenanceResponse = await fetch('/api/maintenance');
+      let maintenanceOverdue = 0;
+      let maintenanceDueSoon = 0;
 
-      if (completedError) throw completedError;
+      if (maintenanceResponse.ok) {
+        const maintenanceData = await maintenanceResponse.json();
+        const vehicles = maintenanceData.vehicles || [];
+        
+        vehicles.forEach((vehicle: any) => {
+          // Count overdue alerts
+          if (vehicle.tax_status?.status === 'overdue') maintenanceOverdue++;
+          if (vehicle.mot_status?.status === 'overdue') maintenanceOverdue++;
+          if (vehicle.service_status?.status === 'overdue') maintenanceOverdue++;
+          if (vehicle.cambelt_status?.status === 'overdue') maintenanceOverdue++;
+          if (vehicle.first_aid_status?.status === 'overdue') maintenanceOverdue++;
+          
+          // Count due soon alerts
+          if (vehicle.tax_status?.status === 'due_soon') maintenanceDueSoon++;
+          if (vehicle.mot_status?.status === 'due_soon') maintenanceDueSoon++;
+          if (vehicle.service_status?.status === 'due_soon') maintenanceDueSoon++;
+          if (vehicle.cambelt_status?.status === 'due_soon') maintenanceDueSoon++;
+          if (vehicle.first_aid_status?.status === 'due_soon') maintenanceDueSoon++;
+        });
+      }
+
+      const maintenanceTotal = maintenanceOverdue + maintenanceDueSoon;
 
       // Build actions summary array
       const actionTypes: PendingApprovalCount[] = [
         {
-          type: 'pending',
-          label: 'Pending Actions',
-          count: pendingCount || 0,
-          icon: AlertCircle,
-          color: 'hsl(30 95% 55%)', // Orange/Amber
-          href: '/actions'
+          type: 'workshop',
+          label: 'Workshop Tasks',
+          count: workshopTotal,
+          icon: Activity,
+          color: 'hsl(13 37% 48%)', // Workshop rust/brown color
+          href: '/workshop-tasks'
         },
         {
-          type: 'logged',
-          label: 'In Progress',
-          count: loggedCount || 0,
-          icon: Clock,
-          color: 'hsl(210 90% 50%)', // Blue
-          href: '/actions'
-        },
-        {
-          type: 'completed',
-          label: 'Completed',
-          count: completedCount || 0,
-          icon: CheckCircle2,
-          color: 'hsl(142 71% 45%)', // Green
-          href: '/actions'
+          type: 'maintenance',
+          label: 'Maintenance & Service',
+          count: maintenanceTotal,
+          icon: Settings as any,
+          color: 'hsl(0 84% 60%)', // Red
+          href: '/maintenance'
         }
       ];
 
@@ -632,7 +644,7 @@ export default function DashboardPage() {
                               {actionType.label}
                             </p>
                             <p className="text-sm text-slate-400">
-                              {actionType.count === 0 ? 'No' : actionType.count} {actionType.type === 'completed' ? 'total' : 'active'} {actionType.count === 1 ? 'action' : 'actions'}
+                              {actionType.count === 0 ? 'No' : actionType.count} {actionType.count === 1 ? 'item' : 'items'} {actionType.count === 0 ? '' : 'requiring attention'}
                             </p>
                           </div>
                         </div>
