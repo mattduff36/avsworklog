@@ -703,12 +703,7 @@ export default function DashboardPage() {
                           {actionType.count > 0 && (
                             <Badge 
                               variant="outline" 
-                              className="text-base px-3 py-1 font-semibold"
-                              style={{ 
-                                borderColor: `${actionType.color}50`,
-                                color: actionType.color,
-                                backgroundColor: `${actionType.color}15`
-                              }}
+                              className="text-base px-3 py-1 font-semibold border-amber-500/30 text-amber-400 bg-amber-500/10"
                             >
                               {actionType.count}
                             </Badge>
