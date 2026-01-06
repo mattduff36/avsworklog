@@ -35,10 +35,10 @@ import type { ModuleName } from '@/types/roles';
 import { toast } from 'sonner';
 
 type PendingApprovalCount = {
-  type: 'timesheets' | 'inspections' | 'absences';
+  type: 'timesheets' | 'inspections' | 'absences' | 'pending' | 'logged' | 'completed';
   label: string;
   count: number;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   color: string;
   href: string;
 };
@@ -66,7 +66,7 @@ export default function DashboardPage() {
   const supabase = createClient();
 
   const [pendingApprovals, setPendingApprovals] = useState<PendingApprovalCount[]>([]);
-  const [topActions, setTopActions] = useState<Action[]>([]);
+  const [actionsSummary, setActionsSummary] = useState<PendingApprovalCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingRAMSCount, setPendingRAMSCount] = useState(0);
   const [hasRAMSAssignments, setHasRAMSAssignments] = useState(false);
@@ -236,39 +236,61 @@ export default function DashboardPage() {
 
   const fetchTopActions = async () => {
     try {
-      const { data, error } = await supabase
+      // Get counts for pending actions
+      const { count: pendingCount, error: pendingError } = await supabase
         .from('actions')
-        .select(`
-          *,
-          vehicle_inspections (
-            inspection_date,
-            vehicles (
-              reg_number
-            ),
-            profiles!vehicle_inspections_user_id_fkey (
-              full_name
-            )
-          ),
-          inspection_items (
-            item_description,
-            status
-          )
-        `)
-        .eq('actioned', false)
-        .order('created_at', { ascending: false })
-        .limit(5);
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
 
-      if (error) throw error;
+      if (pendingError) throw pendingError;
 
-      // Sort by priority: urgent > high > medium > low
-      const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
-      const sortedData = (data || []).sort(
-        (a, b) => priorityOrder[a.priority as keyof typeof priorityOrder] - priorityOrder[b.priority as keyof typeof priorityOrder]
-      );
+      // Get counts for logged/in progress actions
+      const { count: loggedCount, error: loggedError } = await supabase
+        .from('actions')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'logged');
 
-      setTopActions(sortedData);
+      if (loggedError) throw loggedError;
+
+      // Get counts for completed actions (recent)
+      const { count: completedCount, error: completedError } = await supabase
+        .from('actions')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'completed');
+
+      if (completedError) throw completedError;
+
+      // Build actions summary array
+      const actionTypes: PendingApprovalCount[] = [
+        {
+          type: 'pending',
+          label: 'Pending Actions',
+          count: pendingCount || 0,
+          icon: AlertCircle,
+          color: 'hsl(30 95% 55%)', // Orange/Amber
+          href: '/actions'
+        },
+        {
+          type: 'logged',
+          label: 'In Progress',
+          count: loggedCount || 0,
+          icon: Clock,
+          color: 'hsl(210 90% 50%)', // Blue
+          href: '/actions'
+        },
+        {
+          type: 'completed',
+          label: 'Completed',
+          count: completedCount || 0,
+          icon: CheckCircle2,
+          color: 'hsl(142 71% 45%)', // Green
+          href: '/actions'
+        }
+      ];
+
+      setActionsSummary(actionTypes);
     } catch (error) {
-      console.error('Error fetching top actions:', error);
+      console.error('Error fetching actions summary:', error);
     }
   };
 
@@ -574,7 +596,7 @@ export default function DashboardPage() {
               </Link>
             </CardTitle>
             <CardDescription className="text-slate-400">
-              Action items requiring attention
+              Track and manage all action items
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -582,72 +604,67 @@ export default function DashboardPage() {
               <div className="text-center py-8 text-slate-400">
                 <p>Loading actions...</p>
               </div>
-            ) : topActions.length > 0 ? (
-              <div className="space-y-3">
-                {topActions.map((action) => {
-                  const getPriorityColor = (priority: string) => {
-                    switch (priority) {
-                      case 'urgent':
-                        return 'border-red-500/30 text-red-400 bg-red-500/20';
-                      case 'high':
-                        return 'border-orange-500/30 text-orange-400 bg-orange-500/20';
-                      case 'medium':
-                        return 'border-yellow-500/30 text-yellow-400 bg-yellow-500/20';
-                      case 'low':
-                        return 'border-blue-500/30 text-blue-400 bg-blue-500/20';
-                      default:
-                        return 'border-slate-600 text-slate-400';
-                    }
-                  };
-
+            ) : (
+              <div className="space-y-2">
+                {actionsSummary.map((actionType) => {
+                  const Icon = actionType.icon;
+                  
                   return (
-                    <div
-                      key={action.id}
-                      className="p-4 rounded-lg bg-slate-50 dark:bg-slate-700/30 border border-slate-700/50"
+                    <Link
+                      key={actionType.type}
+                      href={actionType.href}
+                      className="block group"
                     >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                            <h3 className="font-semibold text-white">{action.title}</h3>
-                            <Badge variant="outline" className={getPriorityColor(action.priority)}>
-                              {action.priority.toUpperCase()}
-                            </Badge>
+                      <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-800/30 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-all duration-200 border border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600">
+                        <div className="flex items-center gap-4">
+                          <div 
+                            className="flex items-center justify-center w-10 h-10 rounded-lg"
+                            style={{ backgroundColor: `${actionType.color}15` }}
+                          >
+                            <Icon 
+                              className="h-5 w-5" 
+                              style={{ color: actionType.color }}
+                            />
                           </div>
-                          {action.description && (
-                            <p className="text-sm text-slate-400 mb-2">{action.description}</p>
-                          )}
-                          <div className="flex flex-wrap gap-4 text-sm text-slate-400">
-                            {action.vehicle_inspections && (
-                              <span>
-                                Vehicle: {action.vehicle_inspections.vehicles?.reg_number || 'N/A'}
-                              </span>
-                            )}
-                            {action.vehicle_inspections?.profiles?.full_name && (
-                              <span>
-                                Submitted by: {action.vehicle_inspections.profiles.full_name}
-                              </span>
-                            )}
-                            {action.inspection_items && (
-                              <span>
-                                Issue: {action.inspection_items.item_description}
-                              </span>
-                            )}
-                            <span>Created: {formatDate(action.created_at)}</span>
+                          <div>
+                            <p className="font-medium text-white group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
+                              {actionType.label}
+                            </p>
+                            <p className="text-sm text-slate-400">
+                              {actionType.count === 0 ? 'No' : actionType.count} {actionType.type === 'completed' ? 'total' : 'active'} {actionType.count === 1 ? 'action' : 'actions'}
+                            </p>
                           </div>
                         </div>
+                        <div className="flex items-center gap-3">
+                          {actionType.count > 0 && (
+                            <Badge 
+                              variant="outline" 
+                              className="text-base px-3 py-1 font-semibold"
+                              style={{ 
+                                borderColor: `${actionType.color}50`,
+                                color: actionType.color,
+                                backgroundColor: `${actionType.color}15`
+                              }}
+                            >
+                              {actionType.count}
+                            </Badge>
+                          )}
+                          <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors" />
+                        </div>
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-slate-400">
-                <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-20 text-amber-400" />
-                <p className="text-lg mb-2">No pending actions</p>
-                <p className="text-sm text-slate-500">
-                  Action items will appear here
-                </p>
+                
+                {actionsSummary.reduce((sum, a) => sum + a.count, 0) === 0 && (
+                  <div className="text-center py-8 text-slate-400 mt-4">
+                    <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-20 text-green-400" />
+                    <p className="text-lg mb-1">All clear!</p>
+                    <p className="text-sm text-slate-500">
+                      No actions at the moment
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
