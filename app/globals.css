@@ -61,10 +61,10 @@
     --maintenance-light: 0 100% 96%;
     --maintenance-dark: 0 84% 45%;
     
-    /* Workshop Tasks - Orange/Amber */
-    --workshop-primary: 25 95% 53%;
-    --workshop-light: 25 100% 96%;
-    --workshop-dark: 25 95% 40%;
+    /* Workshop Tasks - Rust/Brown #a6614d */
+    --workshop-primary: 13 37% 48%;
+    --workshop-light: 13 37% 96%;
+    --workshop-dark: 13 37% 35%;
     
     /* Reports - Professional Green */
     --report-primary: 150 70% 45%;
