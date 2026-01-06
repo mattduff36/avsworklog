@@ -531,8 +531,12 @@ export interface Database {
       actions: {
         Row: {
           id: string
+          action_type: 'inspection_defect' | 'workshop_vehicle_task' | 'manager_action'
           inspection_id: string | null
           inspection_item_id: string | null
+          vehicle_id: string | null
+          workshop_category_id: string | null
+          workshop_comments: string | null
           title: string
           description: string | null
           priority: 'low' | 'medium' | 'high' | 'urgent'
@@ -549,8 +553,12 @@ export interface Database {
         }
         Insert: {
           id?: string
+          action_type?: 'inspection_defect' | 'workshop_vehicle_task' | 'manager_action'
           inspection_id?: string | null
           inspection_item_id?: string | null
+          vehicle_id?: string | null
+          workshop_category_id?: string | null
+          workshop_comments?: string | null
           title: string
           description?: string | null
           priority?: 'low' | 'medium' | 'high' | 'urgent'
@@ -567,17 +575,56 @@ export interface Database {
         }
         Update: {
           id?: string
+          action_type?: 'inspection_defect' | 'workshop_vehicle_task' | 'manager_action'
           inspection_id?: string | null
           inspection_item_id?: string | null
+          vehicle_id?: string | null
+          workshop_category_id?: string | null
+          workshop_comments?: string | null
           title?: string
           description?: string | null
           priority?: 'low' | 'medium' | 'high' | 'urgent'
-          status?: 'pending' | 'in_progress' | 'completed'
+          status?: 'pending' | 'in_progress' | 'logged' | 'completed'
           actioned?: boolean
           actioned_at?: string | null
           actioned_by?: string | null
+          logged_comment?: string | null
+          logged_at?: string | null
+          logged_by?: string | null
           created_by?: string
           created_at?: string
+          updated_at?: string
+        }
+      }
+      workshop_task_categories: {
+        Row: {
+          id: string
+          applies_to: 'vehicle' | 'plant' | 'tools'
+          name: string
+          is_active: boolean
+          sort_order: number
+          created_at: string
+          created_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          applies_to?: 'vehicle' | 'plant' | 'tools'
+          name: string
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          created_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          applies_to?: 'vehicle' | 'plant' | 'tools'
+          name?: string
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          created_by?: string | null
           updated_at?: string
         }
       }

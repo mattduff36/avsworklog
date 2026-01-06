@@ -39,6 +39,7 @@ export type ModuleName =
   | 'absence'
   | 'maintenance'
   | 'toolbox-talks'
+  | 'workshop-tasks'
   | 'approvals'
   | 'actions'
   | 'reports'
@@ -52,6 +53,7 @@ export const ALL_MODULES: ModuleName[] = [
   'absence',
   'maintenance',
   'toolbox-talks',
+  'workshop-tasks',
   'approvals',
   'actions',
   'reports',
@@ -66,6 +68,7 @@ export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
   'absence': 'Absence & Leave',
   'maintenance': 'Maintenance & Service',
   'toolbox-talks': 'Toolbox Talks',
+  'workshop-tasks': 'Workshop Tasks',
   'approvals': 'Approvals',
   'actions': 'Actions',
   'reports': 'Reports',
@@ -80,6 +83,7 @@ export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
   'absence': 'Request and manage absence',
   'maintenance': 'Track and manage vehicle maintenance schedules',
   'toolbox-talks': 'Receive and sign toolbox talks',
+  'workshop-tasks': 'Track vehicle repairs and workshop work',
   'approvals': 'Approve timesheets, inspections, and absences',
   'actions': 'Manage and track actions',
   'reports': 'View system reports',

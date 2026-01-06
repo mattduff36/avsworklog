@@ -970,6 +970,7 @@ function NewInspectionContent() {
             const comment = group.comments.length > 0 ? `\nComment: ${group.comments[0]}` : '';
             
             return {
+              action_type: 'inspection_defect',
               inspection_id: inspection.id,
               inspection_item_id: group.item_ids[0], // Link to first occurrence
               title: `${vehicleReg} - ${itemName} (${dayRange})`,

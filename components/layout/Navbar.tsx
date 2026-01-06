@@ -91,7 +91,7 @@ export function Navbar() {
       // When viewing as different roles, simulate their permissions
       if (isSuperAdmin && viewAsRole !== 'actual') {
         if (viewAsRole === 'admin' || viewAsRole === 'manager') {
-          setUserPermissions(new Set(['timesheets', 'inspections', 'absence', 'rams', 'maintenance', 'approvals', 'actions', 'reports'] as ModuleName[]));
+          setUserPermissions(new Set(['timesheets', 'inspections', 'absence', 'rams', 'maintenance', 'workshop-tasks', 'approvals', 'actions', 'reports'] as ModuleName[]));
         } else if (viewAsRole === 'employee') {
           // Simulate basic employee permissions
           setUserPermissions(new Set(['timesheets', 'inspections'] as ModuleName[]));
@@ -102,7 +102,7 @@ export function Navbar() {
 
       // Managers and admins have all permissions
       if (isManager || isAdmin) {
-        setUserPermissions(new Set(['timesheets', 'inspections', 'absence', 'rams', 'maintenance', 'approvals', 'actions', 'reports'] as ModuleName[]));
+        setUserPermissions(new Set(['timesheets', 'inspections', 'absence', 'rams', 'maintenance', 'workshop-tasks', 'approvals', 'actions', 'reports'] as ModuleName[]));
         setPermissionsLoading(false);
         return;
       }

@@ -61,6 +61,11 @@
     --maintenance-light: 0 100% 96%;
     --maintenance-dark: 0 84% 45%;
     
+    /* Workshop Tasks - Orange/Amber */
+    --workshop-primary: 25 95% 53%;
+    --workshop-light: 25 100% 96%;
+    --workshop-dark: 25 95% 40%;
+    
     /* Reports - Professional Green */
     --report-primary: 150 70% 45%;
     --report-light: 150 100% 96%;
@@ -634,6 +639,27 @@
   
   .border-maintenance {
     border-color: hsl(var(--maintenance-primary));
+  }
+  
+  /* Workshop Tasks - Orange/Amber */
+  .bg-workshop {
+    background-color: hsl(var(--workshop-primary));
+  }
+  
+  .bg-workshop-light {
+    background-color: hsl(var(--workshop-light));
+  }
+  
+  .bg-workshop-dark {
+    background-color: hsl(var(--workshop-dark));
+  }
+  
+  .text-workshop {
+    color: hsl(var(--workshop-primary));
+  }
+  
+  .border-workshop {
+    border-color: hsl(var(--workshop-primary));
   }
   
   /* Manager/Admin Notice/Comments Box - Solid background approach

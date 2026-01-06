@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, CheckCircle2, Clock, Trash2, FileText, Undo2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Trash2, FileText, Undo2, Wrench, ArrowRight, Info } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Database } from '@/types/database';
 import { toast } from 'sonner';
@@ -330,9 +330,17 @@ export default function ActionsPage() {
     );
   }
 
-  const pendingActions = actions.filter(a => a.status === 'pending');
-  const loggedActions = actions.filter(a => a.status === 'logged');
-  const completedActions = actions.filter(a => a.status === 'completed');
+  // Filter out workshop tasks (they're managed in Workshop Tasks module now)
+  const managerActions = actions.filter(a => 
+    a.action_type !== 'inspection_defect' && a.action_type !== 'workshop_vehicle_task'
+  );
+  const workshopActions = actions.filter(a => 
+    a.action_type === 'inspection_defect' || a.action_type === 'workshop_vehicle_task'
+  );
+
+  const pendingActions = managerActions.filter(a => a.status === 'pending');
+  const loggedActions = managerActions.filter(a => a.status === 'logged');
+  const completedActions = managerActions.filter(a => a.status === 'completed');
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -340,9 +348,37 @@ export default function ActionsPage() {
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Manager Actions</h1>
         <p className="text-slate-600 dark:text-slate-400">
-          Track and manage manager tasks
+          Track and manage action items and manager tasks
         </p>
       </div>
+
+      {/* Workshop Tasks Notice */}
+      {workshopActions.length > 0 && (
+        <Card className="bg-blue-500/10 border-blue-500/30 dark:bg-blue-500/10 dark:border-blue-500/30">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <Info className="h-6 w-6 text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-blue-300 mb-2">Workshop Tasks Moved</h3>
+                <p className="text-sm text-blue-200 mb-3">
+                  Vehicle inspection defects and workshop repairs are now managed in the dedicated Workshop Tasks module.
+                  You have <strong>{workshopActions.length}</strong> workshop task{workshopActions.length !== 1 ? 's' : ''} that should be managed there.
+                </p>
+                <Button
+                  onClick={() => router.push('/workshop-tasks')}
+                  className="bg-workshop hover:bg-workshop-dark text-white"
+                >
+                  <Wrench className="h-4 w-4 mr-2" />
+                  Open Workshop Tasks
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {error && (
         <div className="p-4 text-sm text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-lg">

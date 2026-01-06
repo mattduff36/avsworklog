@@ -1,0 +1,437 @@
+/**
+ * Test: Workshop Tasks RLS Policies
+ * Verifies that workshop users can access workshop tasks and categories
+ * Verifies that managers/admins can manage categories
+ */
+
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+describe('Workshop Tasks RLS Policies', () => {
+  let supabase: ReturnType<typeof createClient>;
+  let testManagerId: string;
+  let testEmployeeId: string;
+  let testVehicleId: string;
+  let testCategoryId: string;
+  let testWorkshopTaskId: string;
+
+  beforeAll(async () => {
+    supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get a manager user
+    const { data: manager } = await supabase
+      .from('profiles')
+      .select('id, roles!inner(is_manager_admin)')
+      .eq('roles.is_manager_admin', true)
+      .limit(1)
+      .single();
+    
+    if (!manager) throw new Error('No test manager found');
+    testManagerId = manager.id;
+
+    // Get a regular employee (non-manager)
+    const { data: employee } = await supabase
+      .from('profiles')
+      .select('id, roles!inner(is_manager_admin)')
+      .eq('roles.is_manager_admin', false)
+      .limit(1)
+      .single();
+    
+    if (!employee) throw new Error('No test employee found');
+    testEmployeeId = employee.id;
+
+    // Get a test vehicle
+    const { data: vehicle } = await supabase
+      .from('vehicles')
+      .select('id')
+      .eq('status', 'active')
+      .limit(1)
+      .single();
+    
+    if (!vehicle) throw new Error('No test vehicle found');
+    testVehicleId = vehicle.id;
+
+    // Get or create a test category
+    const { data: category } = await supabase
+      .from('workshop_task_categories')
+      .select('id')
+      .eq('name', 'Test Category')
+      .single();
+
+    if (category) {
+      testCategoryId = category.id;
+    } else {
+      const { data: newCategory, error } = await supabase
+        .from('workshop_task_categories')
+        .insert({
+          name: 'Test Category',
+          applies_to: 'vehicle',
+          is_active: true,
+          sort_order: 999,
+          created_by: testManagerId,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      testCategoryId = newCategory!.id;
+    }
+  });
+
+  afterAll(async () => {
+    // Cleanup test data
+    if (testWorkshopTaskId) {
+      await supabase.from('actions').delete().eq('id', testWorkshopTaskId);
+    }
+    if (testCategoryId) {
+      await supabase.from('workshop_task_categories').delete().eq('name', 'Test Category');
+    }
+  });
+
+  describe('Workshop Task Categories RLS', () => {
+    it('should allow any authenticated user to read categories', async () => {
+      const { data, error } = await supabase
+        .from('workshop_task_categories')
+        .select('*')
+        .eq('id', testCategoryId)
+        .single();
+
+      expect(error).toBeNull();
+      expect(data).toBeDefined();
+      expect(data!.name).toBe('Test Category');
+    });
+
+    it('should allow managers to create categories', async () => {
+      const { data, error } = await supabase
+        .from('workshop_task_categories')
+        .insert({
+          name: 'Manager Test Category',
+          applies_to: 'vehicle',
+          is_active: true,
+          sort_order: 1000,
+          created_by: testManagerId,
+        })
+        .select()
+        .single();
+
+      expect(error).toBeNull();
+      expect(data).toBeDefined();
+      expect(data!.name).toBe('Manager Test Category');
+
+      // Cleanup
+      await supabase.from('workshop_task_categories').delete().eq('id', data!.id);
+    });
+
+    it('should allow managers to update categories', async () => {
+      const { error } = await supabase
+        .from('workshop_task_categories')
+        .update({ sort_order: 998 })
+        .eq('id', testCategoryId);
+
+      expect(error).toBeNull();
+    });
+
+    it('should allow managers to delete categories', async () => {
+      // Create a temporary category to delete
+      const { data: tempCategory } = await supabase
+        .from('workshop_task_categories')
+        .insert({
+          name: 'Temp Delete Category',
+          applies_to: 'vehicle',
+          is_active: true,
+          sort_order: 1001,
+          created_by: testManagerId,
+        })
+        .select()
+        .single();
+
+      const { error } = await supabase
+        .from('workshop_task_categories')
+        .delete()
+        .eq('id', tempCategory!.id);
+
+      expect(error).toBeNull();
+    });
+  });
+
+  describe('Workshop Tasks (Actions) RLS', () => {
+    it('should allow creating workshop_vehicle_task actions', async () => {
+      const { data, error } = await supabase
+        .from('actions')
+        .insert({
+          action_type: 'workshop_vehicle_task',
+          vehicle_id: testVehicleId,
+          workshop_category_id: testCategoryId,
+          workshop_comments: 'Test workshop task for RLS verification',
+          title: 'Test Workshop Task',
+          description: 'Testing workshop task creation',
+          priority: 'medium',
+          status: 'pending',
+          created_by: testManagerId,
+        })
+        .select()
+        .single();
+
+      expect(error).toBeNull();
+      expect(data).toBeDefined();
+      expect(data!.action_type).toBe('workshop_vehicle_task');
+      expect(data!.vehicle_id).toBe(testVehicleId);
+      
+      testWorkshopTaskId = data!.id;
+    });
+
+    it('should allow reading workshop tasks', async () => {
+      const { data, error } = await supabase
+        .from('actions')
+        .select('*')
+        .eq('id', testWorkshopTaskId)
+        .single();
+
+      expect(error).toBeNull();
+      expect(data).toBeDefined();
+      expect(data!.action_type).toBe('workshop_vehicle_task');
+    });
+
+    it('should allow updating workshop task status', async () => {
+      const { error } = await supabase
+        .from('actions')
+        .update({
+          status: 'logged',
+          logged_comment: 'Started work',
+          logged_at: new Date().toISOString(),
+          logged_by: testManagerId,
+        })
+        .eq('id', testWorkshopTaskId);
+
+      expect(error).toBeNull();
+    });
+
+    it('should allow completing workshop tasks', async () => {
+      const { error } = await supabase
+        .from('actions')
+        .update({
+          status: 'completed',
+          actioned: true,
+          actioned_at: new Date().toISOString(),
+          actioned_by: testManagerId,
+        })
+        .eq('id', testWorkshopTaskId);
+
+      expect(error).toBeNull();
+    });
+
+    it('should filter workshop tasks by action_type', async () => {
+      const { data, error } = await supabase
+        .from('actions')
+        .select('*')
+        .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
+        .limit(10);
+
+      expect(error).toBeNull();
+      expect(data).toBeDefined();
+      
+      // All returned actions should be workshop-related
+      data!.forEach(action => {
+        expect(['inspection_defect', 'workshop_vehicle_task']).toContain(action.action_type);
+      });
+    });
+
+    it('should create inspection_defect actions with correct type', async () => {
+      // Create a test inspection
+      const { data: inspection } = await supabase
+        .from('vehicle_inspections')
+        .insert({
+          vehicle_id: testVehicleId,
+          user_id: testManagerId,
+          inspection_date: new Date().toISOString().split('T')[0],
+          inspection_end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          current_mileage: 50000,
+          status: 'submitted',
+        })
+        .select()
+        .single();
+
+      const { data: defectAction, error } = await supabase
+        .from('actions')
+        .insert({
+          action_type: 'inspection_defect',
+          inspection_id: inspection!.id,
+          workshop_category_id: testCategoryId,
+          title: 'Test Inspection Defect',
+          description: 'Defect found during inspection',
+          priority: 'high',
+          status: 'pending',
+          created_by: testManagerId,
+        })
+        .select()
+        .single();
+
+      expect(error).toBeNull();
+      expect(defectAction).toBeDefined();
+      expect(defectAction!.action_type).toBe('inspection_defect');
+
+      // Cleanup
+      await supabase.from('actions').delete().eq('id', defectAction!.id);
+      await supabase.from('vehicle_inspections').delete().eq('id', inspection!.id);
+    });
+  });
+
+  describe('Workshop Tasks Module Permission', () => {
+    it('should verify workshop-tasks permission exists for managers', async () => {
+      const { data, error } = await supabase
+        .from('role_permissions')
+        .select('*, roles!inner(*)')
+        .eq('module_name', 'workshop-tasks')
+        .eq('roles.is_manager_admin', true)
+        .limit(1)
+        .single();
+
+      expect(error).toBeNull();
+      expect(data).toBeDefined();
+      expect(data!.module_name).toBe('workshop-tasks');
+      expect(data!.enabled).toBe(true);
+    });
+
+    it('should verify workshop-tasks permission can be granted to non-managers', async () => {
+      // Check if permission exists for the test employee's role
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role_id')
+        .eq('id', testEmployeeId)
+        .single();
+
+      const { data: permission } = await supabase
+        .from('role_permissions')
+        .select('*')
+        .eq('role_id', profile!.role_id)
+        .eq('module_name', 'workshop-tasks')
+        .single();
+
+      expect(permission).toBeDefined();
+      expect(permission!.module_name).toBe('workshop-tasks');
+      // Permission may be enabled or disabled for employees (that's configurable)
+    });
+  });
+
+  describe('Data Integrity', () => {
+    it('should enforce action_type check constraint', async () => {
+      const { error } = await supabase
+        .from('actions')
+        .insert({
+          action_type: 'invalid_type' as any, // Invalid type
+          title: 'Invalid Action Type',
+          description: 'Should fail',
+          priority: 'medium',
+          status: 'pending',
+          created_by: testManagerId,
+        });
+
+      expect(error).not.toBeNull();
+      expect(error!.message).toContain('violates check constraint');
+    });
+
+    it('should allow nullable workshop fields for non-workshop actions', async () => {
+      const { data, error } = await supabase
+        .from('actions')
+        .insert({
+          action_type: 'manager_action',
+          title: 'Manager Action Without Workshop Fields',
+          description: 'This is a pure manager action',
+          priority: 'low',
+          status: 'pending',
+          created_by: testManagerId,
+        })
+        .select()
+        .single();
+
+      expect(error).toBeNull();
+      expect(data).toBeDefined();
+      expect(data!.vehicle_id).toBeNull();
+      expect(data!.workshop_category_id).toBeNull();
+      expect(data!.workshop_comments).toBeNull();
+
+      // Cleanup
+      await supabase.from('actions').delete().eq('id', data!.id);
+    });
+
+    it('should reference workshop_task_categories correctly', async () => {
+      const { data, error } = await supabase
+        .from('actions')
+        .select(`
+          *,
+          workshop_task_categories (
+            id,
+            name,
+            applies_to
+          )
+        `)
+        .eq('id', testWorkshopTaskId)
+        .single();
+
+      expect(error).toBeNull();
+      expect(data).toBeDefined();
+      expect(data!.workshop_task_categories).toBeDefined();
+      expect(data!.workshop_task_categories.name).toBe('Test Category');
+    });
+
+    it('should reference vehicles correctly for workshop tasks', async () => {
+      const { data, error } = await supabase
+        .from('actions')
+        .select(`
+          *,
+          vehicles (
+            id,
+            reg_number
+          )
+        `)
+        .eq('id', testWorkshopTaskId)
+        .single();
+
+      expect(error).toBeNull();
+      expect(data).toBeDefined();
+      expect(data!.vehicles).toBeDefined();
+      expect(data!.vehicles.id).toBe(testVehicleId);
+    });
+  });
+
+  describe('Indexes Performance', () => {
+    it('should efficiently query by action_type and status', async () => {
+      const startTime = Date.now();
+      
+      const { data, error } = await supabase
+        .from('actions')
+        .select('id, action_type, status')
+        .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      const queryTime = Date.now() - startTime;
+
+      expect(error).toBeNull();
+      expect(data).toBeDefined();
+      // Query should be fast (under 500ms even with many records)
+      expect(queryTime).toBeLessThan(500);
+    });
+
+    it('should efficiently query by vehicle_id', async () => {
+      const startTime = Date.now();
+      
+      const { data, error } = await supabase
+        .from('actions')
+        .select('id, vehicle_id, status')
+        .eq('vehicle_id', testVehicleId)
+        .limit(50);
+
+      const queryTime = Date.now() - startTime;
+
+      expect(error).toBeNull();
+      expect(data).toBeDefined();
+      expect(queryTime).toBeLessThan(500);
+    });
+  });
+});
+

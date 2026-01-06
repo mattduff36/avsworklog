@@ -7,6 +7,7 @@ import {
   Clipboard,
   FileCheck2,
   CalendarDays,
+  Settings,
   LucideIcon
 } from 'lucide-react';
 
@@ -86,6 +87,16 @@ export const FORM_TYPES: FormType[] = [
     href: '/maintenance',
     listHref: '/maintenance',
     color: 'maintenance',
+    enabled: true,
+  },
+  {
+    id: 'workshop',
+    title: 'Workshop Tasks',
+    description: 'Vehicle repairs & workshop work',
+    icon: Settings,
+    href: '/workshop-tasks',
+    listHref: '/workshop-tasks',
+    color: 'workshop',
     enabled: true,
   },
   // Future forms - uncomment and configure as needed:
