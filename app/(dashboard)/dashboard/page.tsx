@@ -28,7 +28,11 @@ import {
   MessageSquare,
   BarChart3,
   Users,
-  Bug
+  Bug,
+  Wrench,
+  Settings,
+  Clock,
+  Activity
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
 import { Database } from '@/types/database';
