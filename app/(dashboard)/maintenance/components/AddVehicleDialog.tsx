@@ -129,9 +129,23 @@ export function AddVehicleDialog({
       const data = await response.json();
 
       if (response.ok) {
-        toast.success('Vehicle added successfully', {
-          description: `${formattedReg} has been added to the system.`,
-        });
+        // Check sync result for appropriate messaging
+        const syncResult = data.syncResult;
+        
+        if (syncResult?.success) {
+          toast.success('Vehicle added successfully', {
+            description: `${formattedReg} has been added with TAX and MOT data synced.`,
+          });
+        } else if (syncResult?.skipped) {
+          toast.success('Vehicle added successfully', {
+            description: `${formattedReg} has been added (test vehicle, sync skipped).`,
+          });
+        } else {
+          toast.success('Vehicle added', {
+            description: data.message || `${formattedReg} has been added. ${syncResult?.warning || 'API sync will retry automatically.'}`,
+            duration: 5000,
+          });
+        }
         
         // Invalidate queries to refresh data
         queryClient.invalidateQueries({ queryKey: ['maintenance'] });
@@ -287,7 +301,7 @@ export function AddVehicleDialog({
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding...
+                  Adding & Syncing...
                 </>
               ) : (
                 <>
