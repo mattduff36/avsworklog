@@ -16,6 +16,15 @@ export const metadata: Metadata = {
   title: "Squires - A&V Squires Plant Co. Ltd.",
   description: "Digital forms management system for timesheets and vehicle inspections",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.ico",
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+      { url: "/apple-touch-icon-180x180.png", sizes: "180x180", type: "image/png" },
+      { url: "/apple-touch-icon-152x152.png", sizes: "152x152", type: "image/png" },
+      { url: "/apple-touch-icon-167x167.png", sizes: "167x167", type: "image/png" },
+    ],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -39,12 +48,6 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning style={{ colorScheme: 'dark' }}>
       <head>
-        <link rel="icon" href="/favicon.ico" />
-        <link rel="manifest" href="/manifest.json" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png" />
-        <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png" />
-        <link rel="apple-touch-icon" sizes="167x167" href="/apple-touch-icon-167x167.png" />
         <meta name="color-scheme" content="dark" />
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
