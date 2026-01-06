@@ -197,6 +197,30 @@ export async function POST(request: NextRequest) {
             updates.last_mot_api_sync = new Date().toISOString();
             updates.mot_api_sync_error = motApiError;
             console.log(`[CRON] ${vehicle.reg_number}: MOT API error: ${motApiError}`);
+            
+            // FALLBACK: Calculate first MOT from DVLA monthOfFirstRegistration for very new vehicles
+            if (motApiError.includes('No MOT history found') && dvlaData.monthOfFirstRegistration) {
+              try {
+                const [year, month] = dvlaData.monthOfFirstRegistration.split('.');
+                if (year && month) {
+                  const firstRegDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+                  const firstMotDue = new Date(firstRegDate);
+                  firstMotDue.setFullYear(firstMotDue.getFullYear() + 3);
+                  
+                  const calculatedMotDue = firstMotDue.toISOString().split('T')[0];
+                  updates.mot_due_date = calculatedMotDue;
+                  updates.mot_expiry_date = calculatedMotDue;
+                  updates.mot_first_used_date = firstRegDate.toISOString().split('T')[0];
+                  
+                  if (oldMotDate !== calculatedMotDue) {
+                    fieldsUpdated.push('mot_due_date (calculated from DVLA)');
+                    console.log(`[CRON] ${vehicle.reg_number}: First MOT due calculated from DVLA: ${calculatedMotDue} (3 years from ${dvlaData.monthOfFirstRegistration})`);
+                  }
+                }
+              } catch (err) {
+                console.error(`[CRON] Failed to calculate MOT due date from DVLA data:`, err);
+              }
+            }
           } else if (motExpiryData?.motExpiryDate || motExpiryData?.rawData) {
             const motRawData = motExpiryData.rawData;
 
