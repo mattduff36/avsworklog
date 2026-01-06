@@ -249,6 +249,26 @@ export interface MaintenanceHistoryResponse {
   } | null;
 }
 
+export interface DeletedVehicle {
+  id: string; // Archive record ID
+  vehicle_id: string; // Original vehicle ID
+  reg_number: string;
+  nickname: string | null;
+  current_mileage: number | null;
+  tax_due_date: string | null;
+  mot_due_date: string | null;
+  archive_reason: 'Sold' | 'Scrapped' | 'Other';
+  archived_at: string;
+  archived_by: string | null;
+  archive_comment: string | null;
+}
+
+export interface DeletedVehiclesListResponse {
+  success: boolean;
+  vehicles: DeletedVehicle[];
+  count: number;
+}
+
 // ============================================================================
 // Utility types
 // ============================================================================

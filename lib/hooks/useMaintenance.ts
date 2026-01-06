@@ -13,7 +13,8 @@ import type {
   CategoriesListResponse,
   MaintenanceHistoryResponse,
   CreateCategoryRequest,
-  UpdateCategoryRequest
+  UpdateCategoryRequest,
+  DeletedVehiclesListResponse
 } from '@/types/maintenance';
 
 // ============================================================================
@@ -280,6 +281,64 @@ export function useDeleteCategory() {
     onError: (error: Error) => {
       logger.error('Failed to delete category', error, 'useMaintenance');
       toast.error('Failed to delete category', {
+        description: error.message,
+        duration: 5000,
+      });
+    },
+  });
+}
+
+// ============================================================================
+// Query: Get deleted (archived) vehicles
+// ============================================================================
+
+export function useDeletedVehicles() {
+  return useQuery({
+    queryKey: ['maintenance', 'deleted'],
+    queryFn: async (): Promise<DeletedVehiclesListResponse> => {
+      const response = await fetch('/api/maintenance/deleted');
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch deleted vehicles');
+      }
+      
+      return response.json();
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+  });
+}
+
+// ============================================================================
+// Mutation: Permanently delete an archived vehicle (Admin/Manager only)
+// ============================================================================
+
+export function usePermanentlyDeleteArchivedVehicle() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (archiveId: string) => {
+      const response = await fetch(`/api/maintenance/deleted/${archiveId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to permanently delete archived vehicle');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenance', 'deleted'] });
+      toast.success('Archived vehicle permanently removed', {
+        description: 'The vehicle record has been permanently deleted from the archive.',
+      });
+    },
+    onError: (error: Error) => {
+      logger.error('Failed to permanently delete archived vehicle', error, 'useMaintenance');
+      toast.error('Failed to permanently delete vehicle', {
         description: error.message,
         duration: 5000,
       });

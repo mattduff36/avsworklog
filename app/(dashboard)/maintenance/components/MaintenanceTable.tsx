@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -27,10 +28,12 @@ import {
   Info,
   Monitor,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Trash,
+  Loader2
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
+import type { VehicleMaintenanceWithStatus, DeletedVehicle } from '@/types/maintenance';
 import { AddVehicleDialog } from './AddVehicleDialog';
 import { DeleteVehicleDialog } from './DeleteVehicleDialog';
 import { 
@@ -40,6 +43,8 @@ import {
 } from '@/lib/utils/maintenanceCalculations';
 import { EditMaintenanceDialog } from './EditMaintenanceDialog';
 import { MaintenanceHistoryDialog } from './MaintenanceHistoryDialog';
+import { useDeletedVehicles, usePermanentlyDeleteArchivedVehicle } from '@/lib/hooks/useMaintenance';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 interface MaintenanceTableProps {
   vehicles: VehicleMaintenanceWithStatus[];
@@ -76,6 +81,7 @@ export function MaintenanceTable({
   onSearchChange,
   onVehicleAdded
 }: MaintenanceTableProps) {
+  const { isAdmin, isManager } = useAuth();
   const [sortField, setSortField] = useState<SortField>('reg_number');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -84,6 +90,11 @@ export function MaintenanceTable({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleMaintenanceWithStatus | null>(null);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+  const [deletedSearchQuery, setDeletedSearchQuery] = useState('');
+  
+  // Fetch deleted vehicles
+  const { data: deletedData, isLoading: deletedLoading } = useDeletedVehicles();
+  const permanentlyDelete = usePermanentlyDeleteArchivedVehicle();
   
   // Column visibility state - all columns visible by default
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
@@ -190,8 +201,21 @@ export function MaintenanceTable({
         
         <CardContent className="space-y-4">
           
-          {/* Search Bar and Column Filter */}
-          <div className="flex gap-2">
+          {/* Internal Tabs for Active vs Deleted Vehicles */}
+          <Tabs defaultValue="active" className="w-full">
+            <TabsList className="bg-slate-800 border-slate-700">
+              <TabsTrigger value="active" className="data-[state=active]:bg-slate-700">
+                Active Vehicles ({vehicles.length})
+              </TabsTrigger>
+              <TabsTrigger value="deleted" className="data-[state=active]:bg-slate-700">
+                Deleted Vehicles ({deletedData?.count || 0})
+              </TabsTrigger>
+            </TabsList>
+            
+            {/* Active Vehicles Tab */}
+            <TabsContent value="active" className="space-y-4 mt-4">
+              {/* Search Bar and Column Filter */}
+              <div className="flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
               <Input
@@ -662,6 +686,246 @@ export function MaintenanceTable({
               })}
             </div>
           )}
+            </TabsContent>
+            
+            {/* Deleted Vehicles Tab */}
+            <TabsContent value="deleted" className="space-y-4 mt-4">
+              {/* Search Bar for Deleted Vehicles */}
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Search deleted vehicles by registration..."
+                  value={deletedSearchQuery}
+                  onChange={(e) => setDeletedSearchQuery(e.target.value)}
+                  className="pl-11 bg-slate-900/50 border-slate-600 text-white"
+                />
+              </div>
+              
+              {deletedLoading ? (
+                <div className="text-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-3" />
+                  <p className="text-slate-400">Loading deleted vehicles...</p>
+                </div>
+              ) : !deletedData || deletedData.vehicles.length === 0 ? (
+                <div className="text-center py-12 text-slate-400">
+                  No deleted vehicles found.
+                </div>
+              ) : (
+                <>
+                  {/* Desktop Table View for Deleted Vehicles */}
+                  <div className="hidden md:block border border-slate-700 rounded-lg">
+                    <Table className="min-w-full">
+                      <TableHeader>
+                        <TableRow className="border-slate-700">
+                          <TableHead className="bg-slate-900 text-slate-300 border-b-2 border-slate-700">
+                            Registration
+                          </TableHead>
+                          <TableHead className="bg-slate-900 text-slate-300 border-b-2 border-slate-700">
+                            Nickname
+                          </TableHead>
+                          <TableHead className="bg-slate-900 text-slate-300 border-b-2 border-slate-700">
+                            Mileage
+                          </TableHead>
+                          <TableHead className="bg-slate-900 text-slate-300 border-b-2 border-slate-700">
+                            Tax Due
+                          </TableHead>
+                          <TableHead className="bg-slate-900 text-slate-300 border-b-2 border-slate-700">
+                            MOT Due
+                          </TableHead>
+                          <TableHead className="bg-slate-900 text-slate-300 border-b-2 border-slate-700">
+                            Deleted Date
+                          </TableHead>
+                          <TableHead className="bg-slate-900 text-slate-300 border-b-2 border-slate-700">
+                            Reason
+                          </TableHead>
+                          <TableHead className="bg-slate-900 text-right text-slate-300 border-b-2 border-slate-700">
+                            Actions
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {deletedData.vehicles
+                          .filter(vehicle => 
+                            vehicle.reg_number.toLowerCase().includes(deletedSearchQuery.toLowerCase())
+                          )
+                          .map((vehicle) => (
+                          <TableRow 
+                            key={vehicle.id}
+                            className="border-slate-700 hover:bg-slate-800/30"
+                          >
+                            {/* Registration */}
+                            <TableCell className="font-medium text-white">
+                              {vehicle.reg_number}
+                            </TableCell>
+                            
+                            {/* Nickname */}
+                            <TableCell className="text-slate-300">
+                              {vehicle.nickname || (
+                                <span className="text-slate-400 italic">No nickname</span>
+                              )}
+                            </TableCell>
+                            
+                            {/* Mileage */}
+                            <TableCell className="text-slate-300">
+                              {formatMileage(vehicle.current_mileage)}
+                            </TableCell>
+                            
+                            {/* Tax Due */}
+                            <TableCell>
+                              <span className="text-slate-300">
+                                {formatMaintenanceDate(vehicle.tax_due_date)}
+                              </span>
+                            </TableCell>
+                            
+                            {/* MOT Due */}
+                            <TableCell>
+                              <span className="text-slate-300">
+                                {formatMaintenanceDate(vehicle.mot_due_date)}
+                              </span>
+                            </TableCell>
+                            
+                            {/* Deleted Date */}
+                            <TableCell className="text-slate-300">
+                              {new Date(vehicle.archived_at).toLocaleDateString()}
+                            </TableCell>
+                            
+                            {/* Reason */}
+                            <TableCell>
+                              <Badge 
+                                variant="outline" 
+                                className={
+                                  vehicle.archive_reason === 'Sold' 
+                                    ? 'border-blue-500 text-blue-400' 
+                                    : vehicle.archive_reason === 'Scrapped'
+                                    ? 'border-red-500 text-red-400'
+                                    : 'border-slate-500 text-slate-400'
+                                }
+                              >
+                                {vehicle.archive_reason}
+                              </Badge>
+                            </TableCell>
+                            
+                            {/* Actions */}
+                            <TableCell className="text-right">
+                              {(isAdmin || isManager) && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    if (confirm(`Permanently delete ${vehicle.reg_number}? This cannot be undone.`)) {
+                                      permanentlyDelete.mutate(vehicle.id);
+                                    }
+                                  }}
+                                  disabled={permanentlyDelete.isPending}
+                                  className="text-red-400 hover:text-red-300 hover:bg-slate-800"
+                                  title="Permanently Remove"
+                                >
+                                  {permanentlyDelete.isPending ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Trash className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  
+                  {/* Mobile Card View for Deleted Vehicles */}
+                  <div className="md:hidden space-y-3">
+                    {deletedData.vehicles
+                      .filter(vehicle => 
+                        vehicle.reg_number.toLowerCase().includes(deletedSearchQuery.toLowerCase())
+                      )
+                      .map((vehicle) => (
+                      <Card 
+                        key={vehicle.id}
+                        className="bg-slate-800 border-slate-700"
+                      >
+                        <CardContent className="p-4">
+                          {/* Header */}
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <h3 className="font-semibold text-white text-lg">{vehicle.reg_number}</h3>
+                              {vehicle.nickname && (
+                                <p className="text-xs text-slate-400">{vehicle.nickname}</p>
+                              )}
+                            </div>
+                            <Badge 
+                              variant="outline"
+                              className={
+                                vehicle.archive_reason === 'Sold' 
+                                  ? 'border-blue-500 text-blue-400' 
+                                  : vehicle.archive_reason === 'Scrapped'
+                                  ? 'border-red-500 text-red-400'
+                                  : 'border-slate-500 text-slate-400'
+                              }
+                            >
+                              {vehicle.archive_reason}
+                            </Badge>
+                          </div>
+                          
+                          {/* Details */}
+                          <div className="space-y-2 text-sm">
+                            {vehicle.current_mileage && (
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">Mileage:</span>
+                                <span className="text-white">{formatMileage(vehicle.current_mileage)}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">Tax Due:</span>
+                              <span className="text-white">{formatMaintenanceDate(vehicle.tax_due_date)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">MOT Due:</span>
+                              <span className="text-white">{formatMaintenanceDate(vehicle.mot_due_date)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">Deleted:</span>
+                              <span className="text-white">{new Date(vehicle.archived_at).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                          
+                          {/* Actions */}
+                          {(isAdmin || isManager) && (
+                            <div className="mt-4 pt-3 border-t border-slate-700">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (confirm(`Permanently delete ${vehicle.reg_number}? This cannot be undone.`)) {
+                                    permanentlyDelete.mutate(vehicle.id);
+                                  }
+                                }}
+                                disabled={permanentlyDelete.isPending}
+                                className="w-full text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                              >
+                                {permanentlyDelete.isPending ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Removing...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Trash className="h-4 w-4 mr-2" />
+                                    Permanently Remove
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </>
+              )}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
       
