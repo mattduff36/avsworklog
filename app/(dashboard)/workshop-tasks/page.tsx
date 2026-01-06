@@ -540,6 +540,22 @@ export default function WorkshopTasksPage() {
 
   return (
     <div className="space-y-6 max-w-6xl">
+      {/* Construction Banner */}
+      <div className="bg-amber-500/20 border-2 border-amber-500/50 rounded-lg p-4">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <h3 className="font-semibold text-amber-900 dark:text-amber-400 mb-1">
+              Module Under Construction
+            </h3>
+            <p className="text-sm text-amber-800 dark:text-amber-300">
+              This module is still being tested and refined. Some features may not work as expected. 
+              Please report any issues to the administrator.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between mb-4">
