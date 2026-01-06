@@ -551,34 +551,6 @@ export default function ActionsPage() {
         </div>
       )}
 
-      {/* Statistics - Compact on mobile, full on desktop */}
-      <div className="grid grid-cols-4 md:grid-cols-4 gap-2 md:gap-4">
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
-            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400">Pending</CardDescription>
-            <CardTitle className="text-xl md:text-3xl text-amber-600 dark:text-amber-400">{pendingActions.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
-            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400">Logged</CardDescription>
-            <CardTitle className="text-xl md:text-3xl text-red-600 dark:text-red-400">{loggedActions.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="bg-slate-900 border-slate-700">
-          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
-            <CardDescription className="text-xs md:text-sm text-slate-400">Done</CardDescription>
-            <CardTitle className="text-xl md:text-3xl text-green-400">{completedActions.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
-            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400">Total</CardDescription>
-            <CardTitle className="text-xl md:text-3xl text-slate-900 dark:text-white">{actions.length}</CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
-
       {/* All Actions Content */}
       <div className="space-y-6">
           {/* Pending Actions */}
