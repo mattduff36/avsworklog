@@ -94,30 +94,43 @@ export default function ActionsPage() {
 
   const fetchMaintenanceCounts = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-      // Count overdue tasks
-      const { count: overdueCount, error: overdueError } = await supabase
-        .from('vehicle_maintenance')
-        .select('*', { count: 'exact', head: true })
-        .lt('next_service_date', today)
-        .eq('status', 'active');
-
-      if (overdueError) throw overdueError;
-
-      // Count due soon tasks (within 30 days)
-      const { count: dueSoonCount, error: dueSoonError } = await supabase
-        .from('vehicle_maintenance')
-        .select('*', { count: 'exact', head: true })
-        .gte('next_service_date', today)
-        .lte('next_service_date', thirtyDaysFromNow)
-        .eq('status', 'active');
-
-      if (dueSoonError) throw dueSoonError;
-
-      setMaintenanceOverdue(overdueCount || 0);
-      setMaintenanceDueSoon(dueSoonCount || 0);
+      // Fetch maintenance data from API (same as maintenance page)
+      const response = await fetch('/api/maintenance');
+      if (!response.ok) {
+        throw new Error('Failed to fetch maintenance data');
+      }
+      
+      const data = await response.json();
+      const vehicles = data.vehicles || [];
+      
+      // Count individual alerts (same logic as MaintenanceOverview component)
+      let overdueCount = 0;
+      let dueSoonCount = 0;
+      
+      vehicles.forEach((vehicle: any) => {
+        // Check Tax
+        if (vehicle.tax_status?.status === 'overdue') overdueCount++;
+        else if (vehicle.tax_status?.status === 'due_soon') dueSoonCount++;
+        
+        // Check MOT
+        if (vehicle.mot_status?.status === 'overdue') overdueCount++;
+        else if (vehicle.mot_status?.status === 'due_soon') dueSoonCount++;
+        
+        // Check Service
+        if (vehicle.service_status?.status === 'overdue') overdueCount++;
+        else if (vehicle.service_status?.status === 'due_soon') dueSoonCount++;
+        
+        // Check Cambelt
+        if (vehicle.cambelt_status?.status === 'overdue') overdueCount++;
+        else if (vehicle.cambelt_status?.status === 'due_soon') dueSoonCount++;
+        
+        // Check First Aid
+        if (vehicle.first_aid_status?.status === 'overdue') overdueCount++;
+        else if (vehicle.first_aid_status?.status === 'due_soon') dueSoonCount++;
+      });
+      
+      setMaintenanceOverdue(overdueCount);
+      setMaintenanceDueSoon(dueSoonCount);
     } catch (err) {
       console.error('Error fetching maintenance counts:', err);
     }
