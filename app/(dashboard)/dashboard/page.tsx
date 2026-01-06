@@ -85,7 +85,6 @@ export default function DashboardPage() {
     { id: 'site-diary', title: 'Site Diary', icon: Clipboard, color: 'bg-cyan-500' },
     { id: 'plant-hire', title: 'Plant Hire', icon: Truck, color: 'bg-indigo-500' },
     { id: 'quality-check', title: 'Quality Check', icon: FileCheck, color: 'bg-emerald-500' },
-    { id: 'daily-report', title: 'Daily Report', icon: ScrollText, color: 'bg-amber-500' },
   ];
 
   // Only show placeholders to superadmin when viewing as actual role
