@@ -22,17 +22,16 @@ import {
   ArrowUpDown,
   Plus,
   AlertTriangle,
-  Trash2,
   Settings2,
   User,
   Info,
   Monitor,
   ChevronDown,
   ChevronUp,
-  Trash,
   Loader2,
   FolderClock,
-  XCircle
+  XCircle,
+  Archive
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { VehicleMaintenanceWithStatus, DeletedVehicle } from '@/types/maintenance';
@@ -498,10 +497,10 @@ export function MaintenanceTable({
                                 setSelectedVehicle(vehicle);
                                 setDeleteDialogOpen(true);
                               }}
-                              className="text-red-400 hover:text-red-300 hover:bg-slate-800"
-                              title="Delete Vehicle"
+                              className="text-blue-400 hover:text-blue-300 hover:bg-slate-800"
+                              title="Retire Vehicle"
                             >
-                              <Trash2 className="h-3 w-3" />
+                              <Archive className="h-3 w-3" />
                             </Button>
                           </div>
                         </TableCell>
@@ -676,9 +675,9 @@ export function MaintenanceTable({
                                 setSelectedVehicle(vehicle);
                                 setDeleteDialogOpen(true);
                               }}
-                              className="text-red-400 hover:text-red-300 hover:bg-red-900/20 ml-auto"
+                              className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 ml-auto"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Archive className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
