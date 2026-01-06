@@ -224,6 +224,7 @@ export default function ChangePasswordPage() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Enter your new password"
+                  autoComplete="new-password"
                   className="bg-slate-800 border-slate-600 text-white pr-10"
                   required
                 />
@@ -254,6 +255,7 @@ export default function ChangePasswordPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Confirm your new password"
+                  autoComplete="new-password"
                   className="bg-slate-800 border-slate-600 text-white pr-10"
                   required
                 />

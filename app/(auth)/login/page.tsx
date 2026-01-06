@@ -113,6 +113,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   disabled={loading}
+                  autoComplete="email"
                   className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-avs-yellow focus:ring-avs-yellow/20 h-12"
                 />
               </div>
@@ -127,6 +128,7 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={loading}
+                  autoComplete="current-password"
                   className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-avs-yellow focus:ring-avs-yellow/20 h-12"
                 />
               </div>
