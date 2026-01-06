@@ -216,7 +216,7 @@ export function AddVehicleDialog({
               id="nickname"
               value={formData.nickname}
               onChange={(e) =>
-                setFormData({ ...formData, nickname: e.target.value.trim() })
+                setFormData({ ...formData, nickname: e.target.value })
               }
               placeholder="e.g., Andy's Van, Red Pickup, Main Truck"
               className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
