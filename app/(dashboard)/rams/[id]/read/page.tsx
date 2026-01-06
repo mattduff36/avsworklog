@@ -534,7 +534,15 @@ export default function ReadRAMSPage() {
                   <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
                     <Button
                       size="lg"
-                      onClick={() => setSignModalOpen(true)}
+                      onClick={() => {
+                        // Double-check assignment status before opening modal
+                        if (assignment?.status === 'signed') {
+                          toast.error('This document has already been signed');
+                          fetchDocument(); // Refresh to show current state
+                          return;
+                        }
+                        setSignModalOpen(true);
+                      }}
                       className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg text-base px-8 py-6"
                     >
                       <CheckCircle2 className="h-5 w-5 mr-2" />

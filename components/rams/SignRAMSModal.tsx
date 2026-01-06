@@ -26,6 +26,7 @@ export function SignRAMSModal({
 }: SignRAMSModalProps) {
   const [loading, setLoading] = useState(false);
   const [comments, setComments] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSaveSignature = async (signature: string) => {
     if (!signature) {
@@ -33,7 +34,13 @@ export function SignRAMSModal({
       return;
     }
 
+    // Prevent double submission
+    if (submitting) {
+      return;
+    }
+
     setLoading(true);
+    setSubmitting(true);
 
     try {
       const response = await fetch(`/api/rams/sign`, {
@@ -51,6 +58,8 @@ export function SignRAMSModal({
       const data = await response.json();
 
       if (!response.ok) {
+        // Reset submitting flag only on error to allow retry
+        setSubmitting(false);
         throw new Error(data.error || 'Failed to sign document');
       }
 
@@ -69,7 +78,7 @@ export function SignRAMSModal({
   };
 
   const handleClose = () => {
-    if (loading) return;
+    if (loading || submitting) return;
     onClose();
   };
 
