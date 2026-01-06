@@ -16,14 +16,14 @@ export const metadata: Metadata = {
   title: "Squires - A&V Squires Plant Co. Ltd.",
   description: "Digital forms management system for timesheets and vehicle inspections",
   manifest: "/manifest.json",
-  // Note: favicon.ico in app/ directory is automatically served by Next.js at /favicon.ico
-  icons: [
-    { rel: "icon", url: "/favicon.ico" },
-    { rel: "apple-touch-icon", url: "/apple-touch-icon.png", sizes: "180x180" },
-    { rel: "apple-touch-icon", url: "/apple-touch-icon-180x180.png", sizes: "180x180" },
-    { rel: "apple-touch-icon", url: "/apple-touch-icon-152x152.png", sizes: "152x152" },
-    { rel: "apple-touch-icon", url: "/apple-touch-icon-167x167.png", sizes: "167x167" },
-  ],
+  icons: {
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+      { url: "/apple-touch-icon-180x180.png", sizes: "180x180", type: "image/png" },
+      { url: "/apple-touch-icon-152x152.png", sizes: "152x152", type: "image/png" },
+      { url: "/apple-touch-icon-167x167.png", sizes: "167x167", type: "image/png" },
+    ],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -47,8 +47,6 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning style={{ colorScheme: 'dark' }}>
       <head>
-        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-        <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
         <meta name="color-scheme" content="dark" />
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
