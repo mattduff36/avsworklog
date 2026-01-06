@@ -50,17 +50,24 @@ export async function GET(
       return NextResponse.json({
         success: false,
         error: 'No MOT data found',
-        message: `No MOT data found for ${vehicle.reg_number}. Data will be synced automatically.`,
+        message: `No MOT history available for ${vehicle.reg_number}. This vehicle may be less than 3 years old and not yet required to have an MOT.`,
       }, { status: 404 });
     }
 
     // Check if MOT data exists
     const motHistory = maintenanceData.mot_raw_data;
     if (!motHistory || !motHistory.registration) {
+      // Check if vehicle has a first used date to calculate MOT due date
+      let motDueMessage = `No MOT history available for ${vehicle.reg_number}.`;
+      
+      if (maintenanceData.mot_due_date || maintenanceData.ves_month_of_first_registration) {
+        motDueMessage = `No MOT history available for ${vehicle.reg_number}. This vehicle may be less than 3 years old and not yet required to have an MOT.`;
+      }
+      
       return NextResponse.json({
         success: false,
         error: 'No MOT history',
-        message: `No MOT history available for ${vehicle.reg_number}. Data will be synced when you open the Maintenance History modal.`,
+        message: motDueMessage,
       }, { status: 404 });
     }
 

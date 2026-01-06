@@ -332,16 +332,36 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
           </div>
         ) : error ? (
           <div className="text-center py-12 text-slate-400">
-            <AlertTriangle className="h-12 w-12 mx-auto mb-3 text-yellow-400 opacity-50" />
-            <p className="text-lg font-medium text-white mb-2">Unable to Load MOT History</p>
-            <p className="text-sm">{error}</p>
-            <Button 
-              onClick={fetchMotHistoryFromDB}
-              variant="outline"
-              className="mt-4 border-slate-600 text-white hover:bg-slate-800"
-            >
-              Try Again
-            </Button>
+            {error.includes('No MOT data found') || error.includes('No MOT history') ? (
+              <>
+                <FileText className="h-12 w-12 mx-auto mb-3 text-blue-400 opacity-50" />
+                <p className="text-lg font-medium text-white mb-2">No MOT History Yet</p>
+                <p className="text-sm mb-4">{error}</p>
+                {existingMotDueDate && (
+                  <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4 max-w-md mx-auto">
+                    <p className="text-sm text-blue-300">
+                      This vehicle is likely less than 3 years old and hasn't required an MOT yet.
+                    </p>
+                    <p className="text-sm text-white font-medium mt-2">
+                      First MOT due: <span className="text-blue-400">{new Date(existingMotDueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <AlertTriangle className="h-12 w-12 mx-auto mb-3 text-yellow-400 opacity-50" />
+                <p className="text-lg font-medium text-white mb-2">Unable to Load MOT History</p>
+                <p className="text-sm">{error}</p>
+                <Button 
+                  onClick={fetchMotHistoryFromDB}
+                  variant="outline"
+                  className="mt-4 border-slate-600 text-white hover:bg-slate-800"
+                >
+                  Try Again
+                </Button>
+              </>
+            )}
           </div>
         ) : !motData ? (
           <div className="text-center py-12 text-slate-400">

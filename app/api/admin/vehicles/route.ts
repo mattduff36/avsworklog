@@ -125,18 +125,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate UK registration number format (basic validation)
-    const cleanReg = reg_number.replace(/\s+/g, '').toUpperCase();
-    if (cleanReg.length < 2 || cleanReg.length > 8) {
+    // Preserve spaces but remove leading/trailing whitespace and convert to uppercase
+    const cleanReg = reg_number.trim().toUpperCase();
+    const regNoSpaces = cleanReg.replace(/\s+/g, '');
+    
+    if (regNoSpaces.length < 2 || regNoSpaces.length > 8) {
       return NextResponse.json(
         { error: 'Invalid registration number format. UK registrations should be 2-8 characters.' },
         { status: 400 }
       );
     }
 
-    // Check for invalid characters
-    if (!/^[A-Z0-9]+$/.test(cleanReg)) {
+    // Check for invalid characters (allow spaces)
+    if (!/^[A-Z0-9\s]+$/.test(cleanReg)) {
       return NextResponse.json(
-        { error: 'Registration number can only contain letters and numbers' },
+        { error: 'Registration number can only contain letters, numbers, and spaces' },
         { status: 400 }
       );
     }
@@ -212,8 +215,11 @@ async function syncVehicleData(
 ) {
   const TEST_VEHICLES = ['TE57VAN', 'TE57HGV'];
   
+  // Remove spaces for API calls (APIs don't accept spaces)
+  const regNumberNoSpaces = regNumber.replace(/\s+/g, '');
+  
   // Skip sync for test vehicles
-  if (TEST_VEHICLES.includes(regNumber)) {
+  if (TEST_VEHICLES.includes(regNumberNoSpaces)) {
     console.log(`[INFO] Skipping API sync for test vehicle: ${regNumber}`);
     return { 
       success: true, 
@@ -236,18 +242,18 @@ async function syncVehicleData(
   const startTime = Date.now();
 
   try {
-    // Fetch DVLA data
+    // Fetch DVLA data (use registration without spaces for API)
     console.log(`[INFO] Auto-syncing DVLA data for new vehicle: ${regNumber}`);
-    const dvlaData = await dvlaService.getVehicleData(regNumber);
+    const dvlaData = await dvlaService.getVehicleData(regNumberNoSpaces);
     console.log(`[INFO] DVLA data retrieved for ${regNumber}, tax due: ${dvlaData.taxDueDate || 'N/A'}`);
 
-    // Fetch MOT data (if service available)
+    // Fetch MOT data (if service available, use registration without spaces for API)
     let motExpiryData = null;
     let motApiError: string | null = null;
     if (motService) {
       try {
         console.log(`[INFO] Auto-syncing MOT data for new vehicle: ${regNumber}`);
-        motExpiryData = await motService.getMotExpiryData(regNumber);
+        motExpiryData = await motService.getMotExpiryData(regNumberNoSpaces);
         console.log(`[INFO] MOT data retrieved for ${regNumber}, MOT due: ${motExpiryData.motExpiryDate || 'N/A'}`);
       } catch (motError: any) {
         motApiError = motError?.message || 'MOT API error';
