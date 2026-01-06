@@ -36,6 +36,7 @@ type Action = Database['public']['Tables']['actions']['Row'] & {
 type Vehicle = {
   id: string;
   reg_number: string;
+  nickname: string | null;
 };
 
 type Category = {
@@ -135,7 +136,7 @@ export default function WorkshopTasksPage() {
     try {
       const { data, error } = await supabase
         .from('vehicles')
-        .select('id, reg_number')
+        .select('id, reg_number, nickname')
         .eq('status', 'active')
         .order('reg_number');
 
@@ -611,7 +612,7 @@ export default function WorkshopTasksPage() {
                       <SelectItem value="all">All Vehicles</SelectItem>
                       {vehicles.map((vehicle) => (
                         <SelectItem key={vehicle.id} value={vehicle.id}>
-                          {vehicle.reg_number}
+                          {vehicle.reg_number}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1044,7 +1045,7 @@ export default function WorkshopTasksPage() {
                 <SelectContent>
                   {vehicles.map((vehicle) => (
                     <SelectItem key={vehicle.id} value={vehicle.id}>
-                      {vehicle.reg_number}
+                      {vehicle.reg_number}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -72,9 +72,15 @@ CREATE POLICY "Managers can delete workshop task categories" ON workshop_task_ca
     )
   );
 
--- Create default "Uncategorised" category
+-- Create default categories
 INSERT INTO workshop_task_categories (name, applies_to, is_active, sort_order)
-VALUES ('Uncategorised', 'vehicle', true, 0)
+VALUES 
+  ('Uncategorised', 'vehicle', true, 0),
+  ('Brakes', 'vehicle', true, 1),
+  ('Engine', 'vehicle', true, 2),
+  ('Electrical', 'vehicle', true, 3),
+  ('Suspension & Steering', 'vehicle', true, 4),
+  ('Bodywork', 'vehicle', true, 5)
 ON CONFLICT DO NOTHING;
 
 -- ========================================
