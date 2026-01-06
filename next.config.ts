@@ -23,6 +23,8 @@ const nextConfig: NextConfig = {
     
     return config;
   },
+  // Skip trailing slash redirect for root page
+  skipTrailingSlashRedirect: true,
 };
 
 export default withPWA({
