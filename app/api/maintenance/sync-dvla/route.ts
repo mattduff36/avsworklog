@@ -119,10 +119,13 @@ export async function POST(request: NextRequest) {
     for (const vehicle of vehiclesToSync) {
       const startTime = Date.now();
       
+      // Remove spaces from registration number for API calls
+      const regNumberNoSpaces = vehicle.reg_number.replace(/\s+/g, '');
+      
       try {
         // Fetch data from DVLA VES API (tax & vehicle details)
         console.log(`[INFO] Fetching VES data for ${vehicle.reg_number}`);
-        const dvlaData = await dvlaService.getVehicleData(vehicle.reg_number);
+        const dvlaData = await dvlaService.getVehicleData(regNumberNoSpaces);
         const dvlaResponseTime = Date.now() - startTime;
         console.log(`[INFO] VES data retrieved for ${vehicle.reg_number}, tax due: ${dvlaData.taxDueDate || 'N/A'}`);
 
@@ -133,7 +136,7 @@ export async function POST(request: NextRequest) {
         if (motService) {
           try {
             const motStart = Date.now();
-            motExpiryData = await motService.getMotExpiryData(vehicle.reg_number);
+            motExpiryData = await motService.getMotExpiryData(regNumberNoSpaces);
             motResponseTime = Date.now() - motStart;
             console.log(`[INFO] MOT expiry for ${vehicle.reg_number}: ${motExpiryData.motExpiryDate || 'N/A'}`);
           } catch (motError: any) {
