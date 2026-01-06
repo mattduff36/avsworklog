@@ -170,36 +170,42 @@ export async function DELETE(
       .eq('id', vehicleId)
       .single();
 
-    if (vehicle) {
-      // Archive the vehicle with reason
-      try {
-        await supabase.from('vehicle_archive').insert({
-          vehicle_id: vehicle.id,
-          reg_number: vehicle.reg_number,
-          category_id: vehicle.category_id,
-          status: vehicle.status,
-          archive_reason: reason,
-          archived_by: user.id,
-          vehicle_data: vehicle,
-          maintenance_data: vehicle.vehicle_maintenance || null,
-        });
-      } catch (err) {
-        // Log error but don't fail delete if archiving fails
-        console.error('Failed to archive vehicle:', err);
-      }
+    if (!vehicle) {
+      return NextResponse.json(
+        { error: 'Vehicle not found' },
+        { status: 404 }
+      );
     }
 
-    // Delete vehicle (CASCADE will handle maintenance records)
-    const { error } = await supabase
+    // Archive the vehicle with reason
+    const { error: archiveError } = await supabase.from('vehicle_archive').insert({
+      vehicle_id: vehicle.id,
+      reg_number: vehicle.reg_number,
+      category_id: vehicle.category_id,
+      status: vehicle.status,
+      archive_reason: reason,
+      archived_by: user.id,
+      vehicle_data: vehicle,
+      maintenance_data: vehicle.vehicle_maintenance || null,
+    });
+
+    if (archiveError) {
+      console.error('Failed to archive vehicle:', archiveError);
+      throw new Error(`Failed to archive vehicle: ${archiveError.message}`);
+    }
+
+    // Mark vehicle as archived (soft delete) instead of hard delete
+    // This preserves the vehicle record so inspections can still reference it
+    const { error: updateError } = await supabase
       .from('vehicles')
-      .delete()
+      .update({ status: 'archived' })
       .eq('id', vehicleId);
 
-    if (error) throw error;
+    if (updateError) throw updateError;
 
     return NextResponse.json({ 
       success: true,
-      message: `Vehicle deleted (Reason: ${reason})`
+      message: `Vehicle archived (Reason: ${reason})`
     });
   } catch (error) {
     console.error('Error deleting vehicle:', error);
