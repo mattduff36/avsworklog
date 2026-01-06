@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase/client';
 import { formatDate } from '@/lib/utils/date';
 import { 
   CheckCircle2,
+  AlertCircle,
   AlertTriangle,
   PackageCheck,
   Clipboard,
