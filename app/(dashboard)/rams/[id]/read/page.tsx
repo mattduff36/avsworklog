@@ -245,20 +245,18 @@ export default function ReadRAMSPage() {
       // Open in new tab
       const newWindow = window.open(fileUrl, '_blank');
       
-      // Check if popup was blocked or window failed to open
-      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+      // Check if popup was blocked (null means blocked, undefined means browser doesn't support)
+      if (!newWindow || typeof newWindow.closed === 'undefined') {
         throw new Error('Failed to open document. Please check your popup blocker settings.');
       }
 
-      // Wait a moment to see if the window loads successfully
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Check if window is still open (basic check)
-      if (newWindow.closed) {
-        throw new Error('Document window closed unexpectedly. Please try again or select a different option.');
-      }
-
+      // On mobile browsers, window.closed becomes true immediately even when PDF opens successfully
+      // So we only check if the window failed to open initially (popup blocker)
+      // We don't do a delayed check as it's unreliable on mobile devices
+      
       // Record action (only if assignment exists, not required for signed docs)
+      // Small delay to ensure the window has started loading
+      await new Promise(resolve => setTimeout(resolve, 500));
       await recordAction('opened', !!assignment);
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 
