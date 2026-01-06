@@ -47,7 +47,7 @@ type Category = {
 };
 
 export default function WorkshopTasksPage() {
-  usePermissionCheck('workshop-tasks');
+  const { hasPermission, loading: permissionLoading } = usePermissionCheck('workshop-tasks');
   
   const { user, isManager } = useAuth();
   const supabase = createClient();
@@ -537,6 +537,18 @@ export default function WorkshopTasksPage() {
   const pendingTasks = tasks.filter(t => t.status === 'pending');
   const inProgressTasks = tasks.filter(t => t.status === 'logged');
   const completedTasks = tasks.filter(t => t.status === 'completed');
+
+  // Show loading state while checking permissions
+  if (permissionLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-workshop mx-auto mb-4"></div>
+          <p className="text-slate-400">Checking permissions...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-6xl">

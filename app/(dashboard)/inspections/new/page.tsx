@@ -923,6 +923,16 @@ function NewInspectionContent() {
           
           const vehicleReg = vehicleData?.reg_number || 'Unknown Vehicle';
 
+          // Get default "Uncategorised" category for inspection defects
+          const { data: uncategorisedCategory } = await supabase
+            .from('workshop_task_categories')
+            .select('id')
+            .eq('name', 'Uncategorised')
+            .eq('applies_to', 'vehicle')
+            .single();
+
+          const defaultCategoryId = uncategorisedCategory?.id || null;
+
           // Group defects by item_number and description to consolidate duplicates
           const groupedDefects = new Map<string, { 
             item_number: number; 
@@ -974,6 +984,7 @@ function NewInspectionContent() {
               inspection_id: inspection.id,
               inspection_item_id: group.item_ids[0], // Link to first occurrence
               vehicle_id: vehicleId,
+              workshop_category_id: defaultCategoryId,
               title: `${vehicleReg} - ${itemName} (${dayRange})`,
               description: `Vehicle inspection defect found:\nItem ${group.item_number} - ${itemName} (${dayRange})${comment}`,
               priority: 'high',
