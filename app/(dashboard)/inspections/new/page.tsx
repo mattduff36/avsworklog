@@ -973,6 +973,7 @@ function NewInspectionContent() {
               action_type: 'inspection_defect',
               inspection_id: inspection.id,
               inspection_item_id: group.item_ids[0], // Link to first occurrence
+              vehicle_id: vehicleId,
               title: `${vehicleReg} - ${itemName} (${dayRange})`,
               description: `Vehicle inspection defect found:\nItem ${group.item_number} - ${itemName} (${dayRange})${comment}`,
               priority: 'high',

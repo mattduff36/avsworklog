@@ -81,18 +81,7 @@ export default function ActionsPage() {
     }
   }, [supabase]);
 
-  useEffect(() => {
-    if (!authLoading) {
-      if (!isManager) {
-        router.push('/dashboard');
-        return;
-      }
-      fetchActions();
-      fetchMaintenanceCounts();
-    }
-  }, [authLoading, isManager, router, fetchActions]);
-
-  const fetchMaintenanceCounts = async () => {
+  const fetchMaintenanceCounts = useCallback(async () => {
     try {
       // Fetch maintenance data from API (same as maintenance page)
       const response = await fetch('/api/maintenance');
@@ -134,7 +123,18 @@ export default function ActionsPage() {
     } catch (err) {
       console.error('Error fetching maintenance counts:', err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!authLoading) {
+      if (!isManager) {
+        router.push('/dashboard');
+        return;
+      }
+      fetchActions();
+      fetchMaintenanceCounts();
+    }
+  }, [authLoading, isManager, router, fetchActions, fetchMaintenanceCounts]);
 
   // Mark as logged - opens modal for comment
   const handleMarkAsLogged = (actionId: string) => {
