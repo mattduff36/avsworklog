@@ -36,14 +36,36 @@ export async function DELETE(
     
     const archiveId = (await params).archiveId;
     
-    // Get archive record before deleting (for logging)
+    // Get archive record before deleting (for logging and vehicle_id)
     const { data: archive } = await supabase
       .from('vehicle_archive')
-      .select('reg_number, archive_reason')
+      .select('vehicle_id, reg_number, archive_reason')
       .eq('id', archiveId)
       .single();
     
+    if (!archive) {
+      return NextResponse.json(
+        { error: 'Archived vehicle not found' },
+        { status: 404 }
+      );
+    }
+    
+    // Check if there are inspections for this vehicle
+    const { data: inspections, error: inspectionError } = await supabase
+      .from('vehicle_inspections')
+      .select('id')
+      .eq('vehicle_id', archive.vehicle_id)
+      .limit(1);
+    
+    if (inspectionError) {
+      logger.error('Failed to check vehicle inspections', inspectionError);
+    }
+    
+    const hasInspections = inspections && inspections.length > 0;
+    
     // Permanently delete the archived vehicle record
+    // Note: This only removes the archive entry. Inspections remain in the database
+    // but will become "orphaned" (vehicle_id still exists but vehicle is not in active or archive tables)
     const { error: deleteError } = await supabase
       .from('vehicle_archive')
       .delete()
@@ -56,12 +78,21 @@ export async function DELETE(
     
     logger.info(
       `Archived vehicle permanently removed: ${archive?.reg_number || archiveId}`,
-      { archiveId, reg_number: archive?.reg_number, reason: archive?.archive_reason, deletedBy: user.id }
+      { 
+        archiveId, 
+        reg_number: archive?.reg_number, 
+        reason: archive?.archive_reason, 
+        deletedBy: user.id,
+        hadInspections: hasInspections 
+      }
     );
     
     return NextResponse.json({
       success: true,
-      message: 'Archived vehicle permanently removed'
+      message: hasInspections 
+        ? 'Archived vehicle removed. Historic inspection records preserved.'
+        : 'Archived vehicle permanently removed',
+      hadInspections: hasInspections
     });
     
   } catch (error: any) {

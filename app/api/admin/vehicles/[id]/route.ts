@@ -161,24 +161,9 @@ export async function DELETE(
     const body = await request.json().catch(() => ({}));
     const reason = body.reason || 'Other';
 
-    // Check if vehicle has any inspections
-    const { data: inspections } = await supabase
-      .from('vehicle_inspections')
-      .select('id')
-      .eq('vehicle_id', vehicleId)
-      .limit(1);
-
-    if (inspections && inspections.length > 0) {
-      return NextResponse.json(
-        {
-          error:
-            'Cannot delete vehicle with existing inspections. Set status to inactive instead.',
-        },
-        { status: 400 }
-      );
-    }
-
     // Get vehicle details before deleting (for archiving)
+    // Note: This is actually an "archive" operation, not a true delete.
+    // Inspections are preserved in the database and linked to the vehicle_id.
     const { data: vehicle } = await supabase
       .from('vehicles')
       .select('*, vehicle_maintenance(*)')

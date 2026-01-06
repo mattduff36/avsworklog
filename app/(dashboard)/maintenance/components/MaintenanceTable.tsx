@@ -812,7 +812,7 @@ export function MaintenanceTable({
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => {
-                                    if (confirm(`Permanently delete ${vehicle.reg_number}? This cannot be undone.`)) {
+                                    if (confirm(`⚠️ Permanently delete ${vehicle.reg_number}?\n\nThis will:\n• Remove from Deleted Vehicles tab\n• Preserve all inspection history\n• Cannot be undone\n\nContinue?`)) {
                                       permanentlyDelete.mutate(vehicle.id);
                                     }
                                   }}
@@ -897,7 +897,7 @@ export function MaintenanceTable({
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => {
-                                  if (confirm(`Permanently delete ${vehicle.reg_number}? This cannot be undone.`)) {
+                                  if (confirm(`⚠️ Permanently delete ${vehicle.reg_number}?\n\nThis will:\n• Remove from Deleted Vehicles tab\n• Preserve all inspection history\n• Cannot be undone\n\nContinue?`)) {
                                     permanentlyDelete.mutate(vehicle.id);
                                   }
                                 }}

@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Loader2, Trash2, AlertTriangle } from 'lucide-react';
+import { Loader2, Trash2, AlertTriangle, Archive } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '@/lib/utils/logger';
 
@@ -59,12 +59,13 @@ export function DeleteVehicleDialog({
       });
 
       if (response.ok) {
-        toast.success('Vehicle deleted successfully', {
-          description: `${vehicle.reg_number} has been removed from the system.`,
+        toast.success('Vehicle archived successfully', {
+          description: `${vehicle.reg_number} has been moved to Deleted Vehicles. Historic data is preserved.`,
         });
 
         // Invalidate queries to refresh data
         queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+        queryClient.invalidateQueries({ queryKey: ['maintenance', 'deleted'] });
 
         onSuccess?.();
         onOpenChange(false);
@@ -73,13 +74,13 @@ export function DeleteVehicleDialog({
         setReason('Sold');
       } else {
         const data = await response.json();
-        setError(data.error || 'Failed to delete vehicle');
-        toast.error('Failed to delete vehicle', {
+        setError(data.error || 'Failed to archive vehicle');
+        toast.error('Failed to archive vehicle', {
           description: data.error || 'Please try again.',
         });
       }
     } catch (error: any) {
-      logger.error('Error deleting vehicle', error, 'DeleteVehicleDialog');
+      logger.error('Error archiving vehicle', error, 'DeleteVehicleDialog');
       setError('An unexpected error occurred');
       toast.error('An unexpected error occurred', {
         description: 'Please try again.',
@@ -95,12 +96,12 @@ export function DeleteVehicleDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-red-500">
-            <AlertTriangle className="h-5 w-5" />
-            Delete Vehicle
+          <DialogTitle className="flex items-center gap-2 text-blue-500">
+            <Archive className="h-5 w-5" />
+            Archive Vehicle
           </DialogTitle>
           <DialogDescription className="text-slate-400">
-            Are you sure you want to delete this vehicle? This action cannot be undone.
+            This will move the vehicle to the "Deleted Vehicles" tab. All inspection history and maintenance records will be preserved.
           </DialogDescription>
         </DialogHeader>
 
@@ -128,7 +129,7 @@ export function DeleteVehicleDialog({
           {/* Reason Selection */}
           <div className="space-y-3">
             <Label className="text-white">
-              Reason for deletion <span className="text-red-400">*</span>
+              Reason for archiving <span className="text-red-400">*</span>
             </Label>
             <RadioGroup value={reason} onValueChange={(value) => setReason(value as DeleteReason)}>
               <div className="flex items-center space-x-2 bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-slate-600 transition-colors">
@@ -169,17 +170,17 @@ export function DeleteVehicleDialog({
           <Button
             onClick={handleDelete}
             disabled={loading}
-            className="bg-red-600 hover:bg-red-700"
+            className="bg-blue-600 hover:bg-blue-700"
           >
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Deleting...
+                Archiving...
               </>
             ) : (
               <>
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Vehicle
+                <Archive className="h-4 w-4 mr-2" />
+                Archive Vehicle
               </>
             )}
           </Button>
