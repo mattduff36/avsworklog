@@ -336,7 +336,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
             <p className="text-lg font-medium text-white mb-2">Unable to Load MOT History</p>
             <p className="text-sm">{error}</p>
             <Button 
-              onClick={fetchMotHistory}
+              onClick={fetchMotHistoryFromDB}
               variant="outline"
               className="mt-4 border-slate-600 text-white hover:bg-slate-800"
             >
