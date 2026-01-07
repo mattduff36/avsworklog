@@ -579,13 +579,13 @@ function NewInspectionContent() {
   const validateAndSubmit = () => {
     if (!vehicleId) {
       setError('Please select a vehicle');
-      // Keep dialog open if validation fails
+      // Dialog will stay open due to onOpenChange handler checking error state
       return;
     }
 
     if (!currentMileage || parseInt(currentMileage) < 0) {
       setError('Please enter a valid current mileage');
-      // Keep dialog open if validation fails
+      // Dialog will stay open due to onOpenChange handler checking error state
       return;
     }
 
@@ -593,7 +593,7 @@ function NewInspectionContent() {
     const weekEndDate = new Date(weekEnding + 'T00:00:00');
     if (weekEndDate.getDay() !== 0) {
       setError('Week ending must be a Sunday');
-      // Keep dialog open if validation fails
+      // Dialog will stay open due to onOpenChange handler checking error state
       return;
     }
 
@@ -613,11 +613,12 @@ function NewInspectionContent() {
       toast.error('Missing defect comments', {
         description: `Please add comments for: ${defectsWithoutComments.slice(0, 3).join(', ')}${defectsWithoutComments.length > 3 ? '...' : ''}`,
       });
-      // Keep dialog open if validation fails
+      // Dialog will stay open due to onOpenChange handler checking error state
       return;
     }
     
-    // All validation passed - close confirmation dialog first
+    // All validation passed - clear any previous errors and close confirmation dialog
+    setError('');
     setShowConfirmSubmitDialog(false);
     
     // Use setTimeout to ensure dialog state updates before opening signature dialog
@@ -1872,8 +1873,10 @@ function NewInspectionContent() {
       <Dialog 
         open={showConfirmSubmitDialog} 
         onOpenChange={(open) => {
-          // Prevent closing while saving draft
-          if (!open && savingDraftFromConfirm) return;
+          // Prevent closing while saving draft or if validation errors exist
+          if (!open && (savingDraftFromConfirm || error)) return;
+          // Clear error when dialog closes normally
+          if (!open) setError('');
           setShowConfirmSubmitDialog(open);
         }}
       >
@@ -1885,6 +1888,19 @@ function NewInspectionContent() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
+            {/* Validation Error Display */}
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-red-400 font-semibold mb-1">Validation Error</p>
+                    <p className="text-red-300 text-sm">{error}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-4">
               <p className="text-slate-200">
                 Have you finished using this vehicle for the week?
@@ -1902,7 +1918,10 @@ function NewInspectionContent() {
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               variant="outline"
-              onClick={() => setShowConfirmSubmitDialog(false)}
+              onClick={() => {
+                setError(''); // Clear validation errors
+                setShowConfirmSubmitDialog(false);
+              }}
               disabled={savingDraftFromConfirm}
               className="border-slate-600 text-white hover:bg-slate-800"
             >

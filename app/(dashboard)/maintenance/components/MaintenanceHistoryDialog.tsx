@@ -406,10 +406,25 @@ export function MaintenanceHistoryDialog({
                         )}
                       </div>
                       
-                      {task.workshop_comments && (
-                        <div className="bg-slate-900/50 rounded p-3 border border-slate-700 mt-2">
+                      {/* Show all available comment fields */}
+                      {(task.workshop_comments || task.description || task.logged_comment) && (
+                        <div className="bg-slate-900/50 rounded p-3 border border-slate-700 mt-2 space-y-2">
                           <p className="text-xs text-slate-500 mb-1">Comment:</p>
-                          <p className="text-slate-200 text-sm">{task.workshop_comments}</p>
+                          {task.description && (
+                            <p className="text-slate-200 text-sm">{task.description}</p>
+                          )}
+                          {task.logged_comment && (
+                            <div className="bg-blue-500/10 border border-blue-500/30 rounded p-2">
+                              <p className="text-xs text-blue-400 font-medium mb-1">Progress Note:</p>
+                              <p className="text-blue-300 text-sm">{task.logged_comment}</p>
+                            </div>
+                          )}
+                          {task.workshop_comments && (
+                            <div>
+                              <p className="text-xs text-slate-500 font-medium mb-1">Notes:</p>
+                              <p className="text-slate-200 text-sm">{task.workshop_comments}</p>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -580,10 +595,25 @@ export function MaintenanceHistoryDialog({
                                   )}
                                 </div>
                                 
-                                {task.workshop_comments && (
-                                  <div className="bg-slate-900/50 rounded p-3 border border-slate-700">
+                                {/* Show all available comment fields */}
+                                {(task.workshop_comments || task.description || task.logged_comment) && (
+                                  <div className="bg-slate-900/50 rounded p-3 border border-slate-700 space-y-2">
                                     <p className="text-xs text-slate-500 mb-1">Comment:</p>
-                                    <p className="text-slate-200 text-sm">{task.workshop_comments}</p>
+                                    {task.description && (
+                                      <p className="text-slate-200 text-sm">{task.description}</p>
+                                    )}
+                                    {task.logged_comment && (
+                                      <div className="bg-blue-500/10 border border-blue-500/30 rounded p-2">
+                                        <p className="text-xs text-blue-400 font-medium mb-1">Progress Note:</p>
+                                        <p className="text-blue-300 text-sm">{task.logged_comment}</p>
+                                      </div>
+                                    )}
+                                    {task.workshop_comments && (
+                                      <div>
+                                        <p className="text-xs text-slate-500 font-medium mb-1">Notes:</p>
+                                        <p className="text-slate-200 text-sm">{task.workshop_comments}</p>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </div>
