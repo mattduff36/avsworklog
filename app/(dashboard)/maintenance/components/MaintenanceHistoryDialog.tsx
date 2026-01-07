@@ -145,12 +145,8 @@ export function MaintenanceHistoryDialog({
   // Get latest 3 entries for summary
   const latestEntries = combinedItems.slice(0, 3);
   
-  // Get entries to display in full history
-  const fullHistoryEntries = showFullHistory 
-    ? combinedItems.slice(0, visibleHistoryCount)
-    : [];
-  
-  const hasMoreHistory = combinedItems.length > visibleHistoryCount;
+  // Check if there are more entries beyond the visible count (accounting for the 3 already shown)
+  const hasMoreHistory = combinedItems.length > (visibleHistoryCount + 3);
   
   // Format relative time
   const getRelativeTime = (dateStr: string): string => {
@@ -477,7 +473,7 @@ export function MaintenanceHistoryDialog({
                   className="w-full flex items-center justify-between p-3 bg-slate-800/30 hover:bg-slate-800/50 rounded-lg border border-slate-700/50 transition-colors"
                 >
                   <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">
-                    Complete History ({combinedItems.length} total updates)
+                    {showFullHistory ? 'Hide Older Updates' : `Show More (${combinedItems.length - 3} older)`}
                   </h3>
                   {showFullHistory ? (
                     <ChevronUp className="h-4 w-4 text-slate-400" />
@@ -490,9 +486,18 @@ export function MaintenanceHistoryDialog({
                   <div className="space-y-4 mt-4">
                 
                 <div className="space-y-6">
-                  {Object.entries(groupedHistory)
+                  {/* Skip first 3 entries (already shown in Recent Updates) */}
+                  {Object.entries(
+                    combinedItems.slice(3, visibleHistoryCount + 3).reduce((acc, item) => {
+                      const dateKey = new Date(item.created_at).toISOString().split('T')[0];
+                      if (!acc[dateKey]) {
+                        acc[dateKey] = [];
+                      }
+                      acc[dateKey].push(item);
+                      return acc;
+                    }, {} as Record<string, typeof combinedItems>)
+                  )
                     .sort(([a], [b]) => b.localeCompare(a))
-                    .slice(0, visibleHistoryCount)
                     .map(([dateKey, entries]) => (
                       <div key={dateKey} className="space-y-3">
                         <div className="flex items-center gap-2 text-slate-400 text-sm">
