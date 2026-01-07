@@ -1,7 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { logger } from '@/lib/utils/logger';
 import type { MaintenanceHistoryResponse } from '@/types/maintenance';
+
+// Helper to create service role client for bypassing RLS
+function getSupabaseServiceRole() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+}
 
 /**
  * GET /api/maintenance/history/[vehicleId]
@@ -81,7 +96,10 @@ export async function GET(
     }
     
     // Get workshop tasks for this vehicle
-    const { data: workshopTasks, error: workshopError } = await supabase
+    // Use service role client to bypass RLS - maintenance history should show ALL workshop tasks
+    // regardless of user permissions, as it's an audit trail
+    const supabaseServiceRole = getSupabaseServiceRole();
+    const { data: workshopTasks, error: workshopError } = await supabaseServiceRole
       .from('actions')
       .select(`
         id,
@@ -101,15 +119,21 @@ export async function GET(
     
     if (workshopError) {
       logger.error('Failed to fetch workshop tasks', workshopError);
+      logger.error('Vehicle ID:', vehicleId);
       // Don't fail the whole request if workshop tasks fail
+    } else {
+      logger.info(`Fetched ${workshopTasks?.length || 0} workshop tasks for vehicle ${vehicleId}`);
+      if (workshopTasks && workshopTasks.length > 0) {
+        logger.info('Workshop tasks statuses:', workshopTasks.map(t => ({ id: t.id, status: t.status, created_at: t.created_at })));
+      }
     }
     
-    // Fetch profile names for workshop tasks
+    // Fetch profile names for workshop tasks using service role for consistency
     let tasksWithProfiles = workshopTasks || [];
     if (workshopTasks && workshopTasks.length > 0) {
       const userIds = [...new Set(workshopTasks.map(t => t.created_by).filter(Boolean))];
       if (userIds.length > 0) {
-        const { data: profiles } = await supabase
+        const { data: profiles } = await supabaseServiceRole
           .from('profiles')
           .select('id, full_name')
           .in('id', userIds);
