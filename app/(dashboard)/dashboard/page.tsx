@@ -23,7 +23,11 @@ import {
   Bug,
   Clock,
   Activity,
-  Truck
+  Truck,
+  Wrench,
+  Settings,
+  FileText,
+  Calendar
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
 import { Database } from '@/types/database';
@@ -255,7 +259,37 @@ export default function DashboardPage() {
         .from('actions')
         .select('*');
 
-      if (actionsError) throw actionsError;
+      if (actionsError) {
+        console.error('Error fetching actions:', actionsError);
+        // Initialize with empty data on error
+        setActionsSummary([
+          {
+            type: 'workshop',
+            label: 'Workshop Tasks',
+            count: 0,
+            icon: Wrench,
+            color: 'hsl(13 37% 48%)',
+            href: '/workshop-tasks'
+          },
+          {
+            type: 'maintenance',
+            label: 'Maintenance & Service',
+            count: 0,
+            icon: Settings,
+            color: 'hsl(0 84% 60%)',
+            href: '/maintenance'
+          },
+          {
+            type: 'inspections',
+            label: 'Site Audit Inspections',
+            count: 0,
+            icon: FileText,
+            color: 'hsl(215 20% 50%)',
+            href: '#'
+          }
+        ]);
+        return;
+      }
 
       // Filter workshop tasks
       const workshopTasks = (allActions || []).filter(a => 
@@ -267,35 +301,40 @@ export default function DashboardPage() {
       const workshopTotal = workshopPending + workshopInProgress;
 
       // Fetch maintenance data to count alerts
-      const maintenanceResponse = await fetch('/api/maintenance');
       let maintenanceOverdue = 0;
       let maintenanceDueSoon = 0;
 
-      if (maintenanceResponse.ok) {
-        const maintenanceData = await maintenanceResponse.json();
-        const vehicles = maintenanceData.vehicles || [];
-        
-        vehicles.forEach((vehicle: any) => {
-          // Check Tax
-          if (vehicle.tax_status?.status === 'overdue') maintenanceOverdue++;
-          else if (vehicle.tax_status?.status === 'due_soon') maintenanceDueSoon++;
+      try {
+        const maintenanceResponse = await fetch('/api/maintenance');
+        if (maintenanceResponse.ok) {
+          const maintenanceData = await maintenanceResponse.json();
+          const vehicles = maintenanceData.vehicles || [];
           
-          // Check MOT
-          if (vehicle.mot_status?.status === 'overdue') maintenanceOverdue++;
-          else if (vehicle.mot_status?.status === 'due_soon') maintenanceDueSoon++;
-          
-          // Check Service
-          if (vehicle.service_status?.status === 'overdue') maintenanceOverdue++;
-          else if (vehicle.service_status?.status === 'due_soon') maintenanceDueSoon++;
-          
-          // Check Cambelt
-          if (vehicle.cambelt_status?.status === 'overdue') maintenanceOverdue++;
-          else if (vehicle.cambelt_status?.status === 'due_soon') maintenanceDueSoon++;
-          
-          // Check First Aid
-          if (vehicle.first_aid_status?.status === 'overdue') maintenanceOverdue++;
-          else if (vehicle.first_aid_status?.status === 'due_soon') maintenanceDueSoon++;
-        });
+          vehicles.forEach((vehicle: any) => {
+            // Check Tax
+            if (vehicle.tax_status?.status === 'overdue') maintenanceOverdue++;
+            else if (vehicle.tax_status?.status === 'due_soon') maintenanceDueSoon++;
+            
+            // Check MOT
+            if (vehicle.mot_status?.status === 'overdue') maintenanceOverdue++;
+            else if (vehicle.mot_status?.status === 'due_soon') maintenanceDueSoon++;
+            
+            // Check Service
+            if (vehicle.service_status?.status === 'overdue') maintenanceOverdue++;
+            else if (vehicle.service_status?.status === 'due_soon') maintenanceDueSoon++;
+            
+            // Check Cambelt
+            if (vehicle.cambelt_status?.status === 'overdue') maintenanceOverdue++;
+            else if (vehicle.cambelt_status?.status === 'due_soon') maintenanceDueSoon++;
+            
+            // Check First Aid
+            if (vehicle.first_aid_status?.status === 'overdue') maintenanceOverdue++;
+            else if (vehicle.first_aid_status?.status === 'due_soon') maintenanceDueSoon++;
+          });
+        }
+      } catch (maintenanceError) {
+        console.error('Error fetching maintenance data:', maintenanceError);
+        // Continue with 0 counts if maintenance fetch fails
       }
 
       const maintenanceTotal = maintenanceOverdue + maintenanceDueSoon;
@@ -331,6 +370,33 @@ export default function DashboardPage() {
       setActionsSummary(actionTypes);
     } catch (error) {
       console.error('Error fetching actions summary:', error);
+      // Initialize with empty data on error
+      setActionsSummary([
+        {
+          type: 'workshop',
+          label: 'Workshop Tasks',
+          count: 0,
+          icon: Wrench,
+          color: 'hsl(13 37% 48%)',
+          href: '/workshop-tasks'
+        },
+        {
+          type: 'maintenance',
+          label: 'Maintenance & Service',
+          count: 0,
+          icon: Settings,
+          color: 'hsl(0 84% 60%)',
+          href: '/maintenance'
+        },
+        {
+          type: 'inspections',
+          label: 'Site Audit Inspections',
+          count: 0,
+          icon: FileText,
+          color: 'hsl(215 20% 50%)',
+          href: '#'
+        }
+      ]);
     }
   };
 
