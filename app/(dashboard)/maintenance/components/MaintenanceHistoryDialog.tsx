@@ -478,134 +478,8 @@ export function MaintenanceHistoryDialog({
               <>
                 {/* Recent Updates Summary */}
                 <div className="space-y-3">
-                  <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Recent Updates</h3>
-              {latestEntries.map((item) => {
-                if (item.type === 'workshop') {
-                  // Workshop task item
-                  const task = item.data;
-                  return (
-                    <div 
-                      key={task.id}
-                      className="bg-gradient-to-r from-[#8B4513]/20 to-[#8B4513]/10 border border-[#8B4513]/30 rounded-lg p-4 hover:border-[#8B4513]/50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-[#D2691E]" />
-                          <span className="font-medium text-white">
-                            {task.profiles?.full_name || 'Unknown User'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1 text-xs text-slate-400">
-                          <Clock className="h-3 w-3" />
-                          {getRelativeTime(task.created_at)}
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline" className="text-xs bg-[#8B4513]/20 border-[#8B4513]/40 text-[#D2691E]">
-                            Workshop Task
-                          </Badge>
-                          {task.workshop_task_categories && (
-                            <Badge variant="outline" className="text-xs">
-                              {task.workshop_task_categories.name}
-                            </Badge>
-                          )}
-                          <Badge variant="outline" className={`text-xs ${
-                            task.status === 'completed' ? 'bg-green-500/20 border-green-500/40 text-green-400' :
-                            task.status === 'logged' ? 'bg-blue-500/20 border-blue-500/40 text-blue-400' :
-                            'bg-amber-500/20 border-amber-500/40 text-amber-400'
-                          }`}>
-                            {task.status === 'completed' ? 'Completed' :
-                             task.status === 'logged' ? 'In Progress' : 'Pending'}
-                          </Badge>
-                        </div>
-                        
-                        {task.status === 'completed' && task.actioned_at && (
-                          <div className="text-xs text-green-400">
-                            ✓ Completed: {getRelativeTime(task.actioned_at)}
-                          </div>
-                        )}
-                        {task.status === 'logged' && task.logged_at && (
-                          <div className="text-xs text-blue-400">
-                            ⚙ Started: {getRelativeTime(task.logged_at)}
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Show all available comment fields */}
-                      {(task.workshop_comments || task.description || task.logged_comment) && (
-                        <div className="bg-slate-900/50 rounded p-3 border border-slate-700 mt-2 space-y-2">
-                          <p className="text-xs text-slate-500 mb-1">Comment:</p>
-                          {task.description && (
-                            <p className="text-slate-200 text-sm">{task.description}</p>
-                          )}
-                          {task.logged_comment && (
-                            <div className="bg-blue-500/10 border border-blue-500/30 rounded p-2">
-                              <p className="text-xs text-blue-400 font-medium mb-1">Progress Note:</p>
-                              <p className="text-blue-300 text-sm">{task.logged_comment}</p>
-                            </div>
-                          )}
-                          {task.workshop_comments && (
-                            <div>
-                              <p className="text-xs text-slate-500 font-medium mb-1">Notes:</p>
-                              <p className="text-slate-200 text-sm">{task.workshop_comments}</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                } else {
-                  // Maintenance history item
-                  const entry = item.data;
-                  return (
-                    <div 
-                      key={entry.id}
-                      className="bg-gradient-to-r from-slate-800/50 to-slate-800/30 border border-slate-700/50 rounded-lg p-4 hover:border-slate-600 transition-colors"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-blue-400" />
-                          <span className="font-medium text-white">
-                            {entry.updated_by_name || 'Unknown User'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1 text-xs text-slate-400">
-                          <Clock className="h-3 w-3" />
-                          {getRelativeTime(entry.created_at)}
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-slate-300">Updated</span>
-                          <Badge variant="outline" className="text-xs">
-                            {formatFieldName(entry.field_name)}
-                          </Badge>
-                        </div>
-                        
-                        {entry.field_name !== 'all_fields' && entry.field_name !== 'no_changes' && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <span className="text-slate-500 line-through">
-                              {formatValue(entry.old_value, entry.value_type)}
-                            </span>
-                            <span className="text-slate-500">→</span>
-                            <span className="text-green-400 font-semibold">
-                              {formatValue(entry.new_value, entry.value_type)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="bg-slate-900/50 rounded p-3 border border-slate-700 mt-2">
-                        <p className="text-xs text-slate-500 mb-1">Comment:</p>
-                        <p className="text-slate-200 text-sm">{entry.comment}</p>
-                      </div>
-                    </div>
-                  );
-                }
-              })}
+              <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Recent Updates</h3>
+              {latestEntries.map(renderHistoryCard)}
             </div>
 
             {/* Expandable Complete History Section */}
@@ -627,201 +501,47 @@ export function MaintenanceHistoryDialog({
                 
                 {showFullHistory && (
                   <div className="space-y-4 mt-4">
-                
-                <div className="space-y-6">
-                  {/* Skip first 3 entries (already shown in Recent Updates) */}
-                  {Object.entries(
-                    combinedItems.slice(3, visibleHistoryCount + 3).reduce((acc, item) => {
-                      const dateKey = new Date(item.created_at).toISOString().split('T')[0];
-                      if (!acc[dateKey]) {
-                        acc[dateKey] = [];
-                      }
-                      acc[dateKey].push(item);
-                      return acc;
-                    }, {} as Record<string, typeof combinedItems>)
-                  )
-                    .sort(([a], [b]) => b.localeCompare(a))
-                    .map(([dateKey, entries]) => (
-                      <div key={dateKey} className="space-y-3">
-                        <div className="flex items-center gap-2 text-slate-400 text-sm">
-                          <Calendar className="h-4 w-4" />
-                          {new Date(dateKey).toLocaleDateString('en-GB', {
-                            weekday: 'long',
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric'
-                          })}
-                        </div>
-                        
-                        {entries.map((item) => {
-                          if (item.type === 'workshop') {
-                            // Workshop task in full history
-                            const task = item.data;
-                            return (
-                              <div 
-                                key={task.id}
-                                className="bg-[#8B4513]/10 border border-[#8B4513]/30 rounded-lg p-4 space-y-3"
-                              >
-                                <div className="flex items-center justify-between text-sm">
-                                  <div className="flex items-center gap-2 text-slate-300">
-                                    <User className="h-4 w-4 text-[#D2691E]" />
-                                    <span className="font-medium">
-                                      {task.profiles?.full_name || 'Unknown User'}
-                                    </span>
-                                  </div>
-                                  <span className="text-slate-500">
-                                    {new Date(task.created_at).toLocaleTimeString('en-GB', {
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    })}
-                                  </span>
-                                </div>
-                                
-                                <div className="space-y-2">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <Badge variant="outline" className="text-xs bg-[#8B4513]/20 border-[#8B4513]/40 text-[#D2691E]">
-                                      Workshop Task
-                                    </Badge>
-                                    {task.workshop_task_categories && (
-                                      <Badge variant="outline" className="text-xs">
-                                        {task.workshop_task_categories.name}
-                                      </Badge>
-                                    )}
-                                    <Badge variant="outline" className={`text-xs ${
-                                      task.status === 'completed' ? 'bg-green-500/20 border-green-500/40 text-green-400' :
-                                      task.status === 'logged' ? 'bg-blue-500/20 border-blue-500/40 text-blue-400' :
-                                      'bg-amber-500/20 border-amber-500/40 text-amber-400'
-                                    }`}>
-                                      {task.status === 'completed' ? 'Completed' :
-                                       task.status === 'logged' ? 'In Progress' : 'Pending'}
-                                    </Badge>
-                                  </div>
-                                  
-                                  {task.status === 'completed' && task.actioned_at && (
-                                    <div className="text-xs text-green-400">
-                                      ✓ Completed: {new Date(task.actioned_at).toLocaleString('en-GB', {
-                                        day: '2-digit',
-                                        month: '2-digit',
-                                        year: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                        second: '2-digit'
-                                      })}
-                                    </div>
-                                  )}
-                                  {task.status === 'logged' && task.logged_at && (
-                                    <div className="text-xs text-blue-400">
-                                      ⚙ Started: {new Date(task.logged_at).toLocaleString('en-GB', {
-                                        day: '2-digit',
-                                        month: '2-digit',
-                                        year: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                        second: '2-digit'
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                                
-                                {/* Show all available comment fields */}
-                                {(task.workshop_comments || task.description || task.logged_comment) && (
-                                  <div className="bg-slate-900/50 rounded p-3 border border-slate-700 space-y-2">
-                                    <p className="text-xs text-slate-500 mb-1">Comment:</p>
-                                    {task.description && (
-                                      <p className="text-slate-200 text-sm">{task.description}</p>
-                                    )}
-                                    {task.logged_comment && (
-                                      <div className="bg-blue-500/10 border border-blue-500/30 rounded p-2">
-                                        <p className="text-xs text-blue-400 font-medium mb-1">Progress Note:</p>
-                                        <p className="text-blue-300 text-sm">{task.logged_comment}</p>
-                                      </div>
-                                    )}
-                                    {task.workshop_comments && (
-                                      <div>
-                                        <p className="text-xs text-slate-500 font-medium mb-1">Notes:</p>
-                                        <p className="text-slate-200 text-sm">{task.workshop_comments}</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          } else {
-                            // Maintenance history in full history
-                            const entry = item.data;
-                            return (
-                              <div 
-                                key={entry.id}
-                                className="bg-slate-800/30 border border-slate-700/50 rounded-lg p-4 space-y-3"
-                              >
-                                <div className="flex items-center justify-between text-sm">
-                                  <div className="flex items-center gap-2 text-slate-300">
-                                    <User className="h-4 w-4" />
-                                    <span className="font-medium">
-                                      {entry.updated_by_name || 'Unknown User'}
-                                    </span>
-                                  </div>
-                                  <span className="text-slate-500">
-                                    {new Date(entry.created_at).toLocaleTimeString('en-GB', {
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    })}
-                                  </span>
-                                </div>
-                                
-                                <div className="space-y-2">
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="text-xs">
-                                      {formatFieldName(entry.field_name)}
-                                    </Badge>
-                                    {entry.value_type && (
-                                      <Badge variant="secondary" className="text-xs capitalize">
-                                        {entry.value_type}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  
-                                  {entry.field_name !== 'all_fields' && entry.field_name !== 'no_changes' && (
-                                    <div className="grid grid-cols-2 gap-4 text-sm">
-                                      <div>
-                                        <span className="text-slate-500">Old Value:</span>
-                                        <p className="text-slate-300 font-mono">
-                                          {formatValue(entry.old_value, entry.value_type)}
-                                        </p>
-                                      </div>
-                                      <div>
-                                        <span className="text-slate-500">New Value:</span>
-                                        <p className="text-white font-mono font-semibold">
-                                          {formatValue(entry.new_value, entry.value_type)}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                                
-                                <div className="bg-slate-900/50 rounded p-3 border border-slate-700">
-                                  <p className="text-xs text-slate-500 mb-1">Comment:</p>
-                                  <p className="text-slate-200 text-sm">{entry.comment}</p>
-                                </div>
-                              </div>
-                            );
+                    <div className="space-y-6">
+                      {/* Skip first 3 entries (already shown in Recent Updates) */}
+                      {Object.entries(
+                        combinedItems.slice(3, visibleHistoryCount + 3).reduce((acc, item) => {
+                          const dateKey = new Date(item.created_at).toISOString().split('T')[0];
+                          if (!acc[dateKey]) {
+                            acc[dateKey] = [];
                           }
-                        })}
-                      </div>
-                    ))}
-                </div>
+                          acc[dateKey].push(item);
+                          return acc;
+                        }, {} as Record<string, typeof combinedItems>)
+                      )
+                        .sort(([a], [b]) => b.localeCompare(a))
+                        .map(([dateKey, entries]) => (
+                          <div key={dateKey} className="space-y-3">
+                            <div className="flex items-center gap-2 text-slate-400 text-sm">
+                              <Calendar className="h-4 w-4" />
+                              {new Date(dateKey).toLocaleDateString('en-GB', {
+                                weekday: 'long',
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric'
+                              })}
+                            </div>
+                            
+                            {entries.map(renderHistoryCard)}
+                          </div>
+                        ))}
+                    </div>
 
-                {/* Show More Button */}
-                {hasMoreHistory && (
-                  <Button
-                    onClick={() => setVisibleHistoryCount(prev => prev + 10)}
-                    variant="outline"
-                    className="w-full border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white"
-                  >
-                    <ChevronDown className="h-4 w-4 mr-2" />
-                    Show More ({remainingCount} {remainingCount === 1 ? 'item' : 'items'} remaining)
-                  </Button>
-                )}
+                    {/* Show More Button */}
+                    {hasMoreHistory && (
+                      <Button
+                        onClick={() => setVisibleHistoryCount(prev => prev + 10)}
+                        variant="outline"
+                        className="w-full border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white"
+                      >
+                        <ChevronDown className="h-4 w-4 mr-2" />
+                        Show More ({remainingCount} {remainingCount === 1 ? 'item' : 'items'} remaining)
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
