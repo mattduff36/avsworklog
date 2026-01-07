@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createDVLAApiService } from '@/lib/services/dvla-api';
 import { createMotHistoryService } from '@/lib/services/mot-history-api';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { formatRegistrationForApi } from '@/lib/utils/registration';
 
 export const dynamic = 'force-dynamic';
 
