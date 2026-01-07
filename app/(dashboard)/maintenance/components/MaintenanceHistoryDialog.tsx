@@ -661,7 +661,7 @@ export function MaintenanceHistoryDialog({
                     className="w-full border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white"
                   >
                     <ChevronDown className="h-4 w-4 mr-2" />
-                    Show More ({combinedItems.length - visibleHistoryCount} remaining)
+                    Show More ({combinedItems.length - (visibleHistoryCount + 3)} remaining)
                   </Button>
                 )}
                   </div>
