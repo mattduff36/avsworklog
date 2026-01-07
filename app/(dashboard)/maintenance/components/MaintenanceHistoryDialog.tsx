@@ -487,7 +487,7 @@ export function MaintenanceHistoryDialog({
                 {/* Recent Updates Summary */}
                 <div className="space-y-3">
               <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Recent Updates</h3>
-              {latestEntries.map(renderHistoryCard)}
+              {latestEntries.map((item) => renderHistoryCard(item))}
             </div>
 
             {/* Expandable Complete History Section */}
@@ -511,7 +511,7 @@ export function MaintenanceHistoryDialog({
                   <div className="space-y-4 mt-4">
                     <div className="space-y-3">
                       {/* Skip first 3 entries (already shown in Recent Updates) */}
-                      {combinedItems.slice(3, visibleHistoryCount + 3).map(renderHistoryCard)}
+                      {combinedItems.slice(3, visibleHistoryCount + 3).map((item) => renderHistoryCard(item))}
                     </div>
 
                     {/* Show More Button */}
