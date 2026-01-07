@@ -279,6 +279,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                 });
                 setPopoverOpen(isOpen);
               }}
+              modal={false}
             >
               <PopoverTrigger asChild>
                 {open ? (
@@ -293,6 +294,15 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                         popoverOpen,
                         button: e.currentTarget
                       });
+                      
+                      // If popover is already open, prevent the toggle and keep it open
+                      if (popoverOpen) {
+                        console.log('[SidebarNav] Popover already open - preventing toggle');
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                      }
+                      
                       // Check if button is actually clickable
                       const rect = e.currentTarget.getBoundingClientRect();
                       console.log('[SidebarNav] Button position:', {
@@ -341,6 +351,14 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                         sidebarOpen: open,
                         popoverOpen
                       });
+                      
+                      // If popover is already open, prevent the toggle
+                      if (popoverOpen) {
+                        console.log('[SidebarNav] Popover already open - preventing toggle');
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                      }
                     }}
                   >
                     <Eye className="w-5 h-5 text-slate-400 hover:text-white" />
@@ -352,7 +370,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                 align={open ? "center" : "start"}
                 sideOffset={open ? 8 : 12}
                 alignOffset={open ? 0 : -8}
-                className="w-56 p-2 bg-slate-900 border-slate-700 z-[100]"
+                className="w-56 p-2 bg-slate-900 border-slate-700 z-[200]"
                 onOpenAutoFocus={(e) => {
                   console.log('[SidebarNav] Popover auto focus event');
                   e.preventDefault();
@@ -373,6 +391,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                 onEscapeKeyDown={(e) => {
                   console.log('[SidebarNav] Popover escape key pressed');
                 }}
+                style={{ pointerEvents: 'auto' }}
               >
                 <div className="space-y-1">
                   <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">
