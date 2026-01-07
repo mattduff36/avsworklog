@@ -64,6 +64,24 @@ type Action = Database['public']['Tables']['actions']['Row'] & {
   };
 };
 
+/**
+ * Safely applies alpha/opacity to an HSL color string.
+ * Returns the color with 15% opacity if valid HSL, otherwise returns a fallback.
+ * 
+ * @param color - Color string (expected to be in HSL format like 'hsl(13 37% 48%)')
+ * @returns HSL color with alpha channel or fallback color
+ */
+function applyAlphaToHSL(color: string): string {
+  // Validate that the color is in HSL format
+  if (typeof color === 'string' && color.trim().startsWith('hsl(') && color.includes(')')) {
+    return color.replace(')', ' / 0.15)');
+  }
+  
+  // Fallback: return semi-transparent slate if invalid format
+  console.warn(`Invalid HSL color format: "${color}". Using fallback color.`);
+  return 'hsl(215 16% 47% / 0.15)'; // slate-600 with 15% opacity
+}
+
 export default function DashboardPage() {
   const { profile, isManager, isAdmin } = useAuth();
   const { isOnline } = useOfflineSync();
@@ -566,7 +584,7 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-4">
                           <div 
                             className="flex items-center justify-center w-10 h-10 rounded-lg"
-                            style={{ backgroundColor: approval.color.replace(')', ' / 0.15)') }}
+                            style={{ backgroundColor: applyAlphaToHSL(approval.color) }}
                           >
                             <Icon 
                               className="h-5 w-5" 
@@ -651,7 +669,7 @@ export default function DashboardPage() {
                           <div className="flex items-center gap-4">
                           <div 
                             className="flex items-center justify-center w-10 h-10 rounded-lg"
-                            style={{ backgroundColor: actionType.color.replace(')', ' / 0.15)') }}
+                            style={{ backgroundColor: applyAlphaToHSL(actionType.color) }}
                           >
                             <Icon 
                               className="h-5 w-5" 
@@ -688,7 +706,7 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-4">
                           <div 
                             className="flex items-center justify-center w-10 h-10 rounded-lg"
-                            style={{ backgroundColor: actionType.color.replace(')', ' / 0.15)') }}
+                            style={{ backgroundColor: applyAlphaToHSL(actionType.color) }}
                           >
                             <Icon 
                               className="h-5 w-5" 
