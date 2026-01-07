@@ -22,7 +22,8 @@ import {
   ChevronRight,
   Bug,
   Clock,
-  Activity
+  Activity,
+  Truck
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
 import { Database } from '@/types/database';
