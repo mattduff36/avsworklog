@@ -38,7 +38,18 @@ export function MaintenanceHistoryDialog({
   const [isSyncing, setIsSyncing] = useState(false);
   
   const history = historyData?.history || [];
+  const workshopTasks = historyData?.workshopTasks || [];
   const vesData = historyData?.vesData || null;
+  
+  // Combine maintenance history and workshop tasks, sorted by date
+  type CombinedItem = 
+    | { type: 'maintenance'; data: typeof history[0]; created_at: string }
+    | { type: 'workshop'; data: typeof workshopTasks[0]; created_at: string };
+  
+  const combinedItems: CombinedItem[] = [
+    ...history.map(h => ({ type: 'maintenance' as const, data: h, created_at: h.created_at })),
+    ...workshopTasks.map(w => ({ type: 'workshop' as const, data: w, created_at: w.created_at }))
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   
   // Auto-sync on modal open if last sync was >24h ago
   useEffect(() => {
@@ -90,14 +101,14 @@ export function MaintenanceHistoryDialog({
     }
   };
   
-  // Group history by date (show all changes made together)
-  const groupedHistory: Record<string, typeof history> = {};
-  history.forEach(entry => {
-    const dateKey = new Date(entry.created_at).toISOString().split('T')[0];
+  // Group combined items by date (show all changes made together)
+  const groupedHistory: Record<string, typeof combinedItems> = {};
+  combinedItems.forEach(item => {
+    const dateKey = new Date(item.created_at).toISOString().split('T')[0];
     if (!groupedHistory[dateKey]) {
       groupedHistory[dateKey] = [];
     }
-    groupedHistory[dateKey].push(entry);
+    groupedHistory[dateKey].push(item);
   });
   
   const formatFieldName = (fieldName: string): string => {
@@ -132,14 +143,14 @@ export function MaintenanceHistoryDialog({
   };
   
   // Get latest 3 entries for summary
-  const latestEntries = history.slice(0, 3);
+  const latestEntries = combinedItems.slice(0, 3);
   
   // Get entries to display in full history
   const fullHistoryEntries = showFullHistory 
-    ? history.slice(0, visibleHistoryCount)
+    ? combinedItems.slice(0, visibleHistoryCount)
     : [];
   
-  const hasMoreHistory = history.length > visibleHistoryCount;
+  const hasMoreHistory = combinedItems.length > visibleHistoryCount;
   
   // Format relative time
   const getRelativeTime = (dateStr: string): string => {
@@ -334,72 +345,138 @@ export function MaintenanceHistoryDialog({
             )}
             
             {/* Show "No history" message if no history, but still show DVLA data above */}
-            {history.length === 0 ? (
+            {combinedItems.length === 0 ? (
               <div className="text-center py-12 text-slate-400">
                 <HistoryIcon className="h-12 w-12 mx-auto mb-3 opacity-20" />
                 <p>No maintenance history yet</p>
-                <p className="text-sm mt-1">Changes will appear here when maintenance records are updated</p>
+                <p className="text-sm mt-1">Changes will appear here when maintenance records or workshop tasks are recorded</p>
               </div>
             ) : (
               <>
                 {/* Recent Updates Summary */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Recent Updates</h3>
-              {latestEntries.map((entry) => (
-                <div 
-                  key={entry.id}
-                  className="bg-gradient-to-r from-slate-800/50 to-slate-800/30 border border-slate-700/50 rounded-lg p-4 hover:border-slate-600 transition-colors"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-blue-400" />
-                      <span className="font-medium text-white">
-                        {entry.updated_by_name || 'Unknown User'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-slate-400">
-                      <Clock className="h-3 w-3" />
-                      {getRelativeTime(entry.created_at)}
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-slate-300">Updated</span>
-                      <Badge variant="outline" className="text-xs">
-                        {formatFieldName(entry.field_name)}
-                      </Badge>
-                    </div>
-                    
-                    {entry.field_name !== 'all_fields' && entry.field_name !== 'no_changes' && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="text-slate-500 line-through">
-                          {formatValue(entry.old_value, entry.value_type)}
-                        </span>
-                        <span className="text-slate-500">→</span>
-                        <span className="text-green-400 font-semibold">
-                          {formatValue(entry.new_value, entry.value_type)}
-                        </span>
+              {latestEntries.map((item) => {
+                if (item.type === 'workshop') {
+                  // Workshop task item
+                  const task = item.data;
+                  return (
+                    <div 
+                      key={task.id}
+                      className="bg-gradient-to-r from-[#8B4513]/20 to-[#8B4513]/10 border border-[#8B4513]/30 rounded-lg p-4 hover:border-[#8B4513]/50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-[#D2691E]" />
+                          <span className="font-medium text-white">
+                            {task.profiles?.full_name || 'Unknown User'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-slate-400">
+                          <Clock className="h-3 w-3" />
+                          {getRelativeTime(task.created_at)}
+                        </div>
                       </div>
-                    )}
-                    
-                    <div className="bg-slate-900/50 rounded p-2 border-l-2 border-blue-500">
-                      <p className="text-sm text-slate-300 italic">"{entry.comment}"</p>
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="outline" className="text-xs bg-[#8B4513]/20 border-[#8B4513]/40 text-[#D2691E]">
+                            Workshop Task
+                          </Badge>
+                          {task.workshop_task_categories && (
+                            <Badge variant="outline" className="text-xs">
+                              {task.workshop_task_categories.name}
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className={`text-xs ${
+                            task.status === 'completed' ? 'bg-green-500/20 border-green-500/40 text-green-400' :
+                            task.status === 'logged' ? 'bg-blue-500/20 border-blue-500/40 text-blue-400' :
+                            'bg-amber-500/20 border-amber-500/40 text-amber-400'
+                          }`}>
+                            {task.status === 'completed' ? 'Completed' :
+                             task.status === 'logged' ? 'In Progress' : 'Pending'}
+                          </Badge>
+                        </div>
+                        
+                        {task.workshop_comments && (
+                          <div className="bg-slate-900/50 rounded p-2 border-l-2 border-[#D2691E]">
+                            <p className="text-sm text-slate-300 italic">"{task.workshop_comments}"</p>
+                          </div>
+                        )}
+                        
+                        {task.status === 'completed' && task.actioned_at && (
+                          <div className="text-xs text-green-400">
+                            Completed: {getRelativeTime(task.actioned_at)}
+                          </div>
+                        )}
+                        {task.status === 'logged' && task.logged_at && (
+                          <div className="text-xs text-blue-400">
+                            Started: {getRelativeTime(task.logged_at)}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                  );
+                } else {
+                  // Maintenance history item
+                  const entry = item.data;
+                  return (
+                    <div 
+                      key={entry.id}
+                      className="bg-gradient-to-r from-slate-800/50 to-slate-800/30 border border-slate-700/50 rounded-lg p-4 hover:border-slate-600 transition-colors"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-blue-400" />
+                          <span className="font-medium text-white">
+                            {entry.updated_by_name || 'Unknown User'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-slate-400">
+                          <Clock className="h-3 w-3" />
+                          {getRelativeTime(entry.created_at)}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-slate-300">Updated</span>
+                          <Badge variant="outline" className="text-xs">
+                            {formatFieldName(entry.field_name)}
+                          </Badge>
+                        </div>
+                        
+                        {entry.field_name !== 'all_fields' && entry.field_name !== 'no_changes' && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="text-slate-500 line-through">
+                              {formatValue(entry.old_value, entry.value_type)}
+                            </span>
+                            <span className="text-slate-500">→</span>
+                            <span className="text-green-400 font-semibold">
+                              {formatValue(entry.new_value, entry.value_type)}
+                            </span>
+                          </div>
+                        )}
+                        
+                        <div className="bg-slate-900/50 rounded p-2 border-l-2 border-blue-500">
+                          <p className="text-sm text-slate-300 italic">"{entry.comment}"</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+              })}
             </div>
 
             {/* Show All History Button */}
-            {history.length > 3 && !showFullHistory && (
+            {combinedItems.length > 3 && !showFullHistory && (
               <Button
                 onClick={() => setShowFullHistory(true)}
                 variant="outline"
                 className="w-full border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white"
               >
                 <ChevronDown className="h-4 w-4 mr-2" />
-                Show All History ({history.length} total updates)
+                Show All History ({combinedItems.length} total updates)
               </Button>
             )}
 
@@ -437,62 +514,133 @@ export function MaintenanceHistoryDialog({
                           })}
                         </div>
                         
-                        {entries.map((entry) => (
-                          <div 
-                            key={entry.id}
-                            className="bg-slate-800/30 border border-slate-700/50 rounded-lg p-4 space-y-3"
-                          >
-                            <div className="flex items-center justify-between text-sm">
-                              <div className="flex items-center gap-2 text-slate-300">
-                                <User className="h-4 w-4" />
-                                <span className="font-medium">
-                                  {entry.updated_by_name || 'Unknown User'}
-                                </span>
-                              </div>
-                              <span className="text-slate-500">
-                                {new Date(entry.created_at).toLocaleTimeString('en-GB', {
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
-                              </span>
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="text-xs">
-                                  {formatFieldName(entry.field_name)}
-                                </Badge>
-                                {entry.value_type && (
-                                  <Badge variant="secondary" className="text-xs capitalize">
-                                    {entry.value_type}
-                                  </Badge>
-                                )}
-                              </div>
-                              
-                              {entry.field_name !== 'all_fields' && entry.field_name !== 'no_changes' && (
-                                <div className="grid grid-cols-2 gap-4 text-sm">
-                                  <div>
-                                    <span className="text-slate-500">Old Value:</span>
-                                    <p className="text-slate-300 font-mono">
-                                      {formatValue(entry.old_value, entry.value_type)}
-                                    </p>
+                        {entries.map((item) => {
+                          if (item.type === 'workshop') {
+                            // Workshop task in full history
+                            const task = item.data;
+                            return (
+                              <div 
+                                key={task.id}
+                                className="bg-[#8B4513]/10 border border-[#8B4513]/30 rounded-lg p-4 space-y-3"
+                              >
+                                <div className="flex items-center justify-between text-sm">
+                                  <div className="flex items-center gap-2 text-slate-300">
+                                    <User className="h-4 w-4 text-[#D2691E]" />
+                                    <span className="font-medium">
+                                      {task.profiles?.full_name || 'Unknown User'}
+                                    </span>
                                   </div>
-                                  <div>
-                                    <span className="text-slate-500">New Value:</span>
-                                    <p className="text-white font-mono font-semibold">
-                                      {formatValue(entry.new_value, entry.value_type)}
-                                    </p>
+                                  <span className="text-slate-500">
+                                    {new Date(task.created_at).toLocaleTimeString('en-GB', {
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </span>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <Badge variant="outline" className="text-xs bg-[#8B4513]/20 border-[#8B4513]/40 text-[#D2691E]">
+                                      Workshop Task
+                                    </Badge>
+                                    {task.workshop_task_categories && (
+                                      <Badge variant="outline" className="text-xs">
+                                        {task.workshop_task_categories.name}
+                                      </Badge>
+                                    )}
+                                    <Badge variant="outline" className={`text-xs ${
+                                      task.status === 'completed' ? 'bg-green-500/20 border-green-500/40 text-green-400' :
+                                      task.status === 'logged' ? 'bg-blue-500/20 border-blue-500/40 text-blue-400' :
+                                      'bg-amber-500/20 border-amber-500/40 text-amber-400'
+                                    }`}>
+                                      {task.status === 'completed' ? 'Completed' :
+                                       task.status === 'logged' ? 'In Progress' : 'Pending'}
+                                    </Badge>
                                   </div>
                                 </div>
-                              )}
-                            </div>
-                            
-                            <div className="bg-slate-900/50 rounded p-3 border border-slate-700">
-                              <p className="text-xs text-slate-500 mb-1">Comment:</p>
-                              <p className="text-slate-200 text-sm">{entry.comment}</p>
-                            </div>
-                          </div>
-                        ))}
+                                
+                                {task.workshop_comments && (
+                                  <div className="bg-slate-900/50 rounded p-3 border border-[#D2691E]">
+                                    <p className="text-xs text-slate-500 mb-1">Work Description:</p>
+                                    <p className="text-slate-200 text-sm">{task.workshop_comments}</p>
+                                  </div>
+                                )}
+                                
+                                <div className="flex gap-4 text-xs">
+                                  {task.status === 'completed' && task.actioned_at && (
+                                    <div className="text-green-400">
+                                      ✓ Completed: {new Date(task.actioned_at).toLocaleString('en-GB')}
+                                    </div>
+                                  )}
+                                  {task.status === 'logged' && task.logged_at && (
+                                    <div className="text-blue-400">
+                                      ⚙ Started: {new Date(task.logged_at).toLocaleString('en-GB')}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          } else {
+                            // Maintenance history in full history
+                            const entry = item.data;
+                            return (
+                              <div 
+                                key={entry.id}
+                                className="bg-slate-800/30 border border-slate-700/50 rounded-lg p-4 space-y-3"
+                              >
+                                <div className="flex items-center justify-between text-sm">
+                                  <div className="flex items-center gap-2 text-slate-300">
+                                    <User className="h-4 w-4" />
+                                    <span className="font-medium">
+                                      {entry.updated_by_name || 'Unknown User'}
+                                    </span>
+                                  </div>
+                                  <span className="text-slate-500">
+                                    {new Date(entry.created_at).toLocaleTimeString('en-GB', {
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </span>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-xs">
+                                      {formatFieldName(entry.field_name)}
+                                    </Badge>
+                                    {entry.value_type && (
+                                      <Badge variant="secondary" className="text-xs capitalize">
+                                        {entry.value_type}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  
+                                  {entry.field_name !== 'all_fields' && entry.field_name !== 'no_changes' && (
+                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                      <div>
+                                        <span className="text-slate-500">Old Value:</span>
+                                        <p className="text-slate-300 font-mono">
+                                          {formatValue(entry.old_value, entry.value_type)}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <span className="text-slate-500">New Value:</span>
+                                        <p className="text-white font-mono font-semibold">
+                                          {formatValue(entry.new_value, entry.value_type)}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                <div className="bg-slate-900/50 rounded p-3 border border-slate-700">
+                                  <p className="text-xs text-slate-500 mb-1">Comment:</p>
+                                  <p className="text-slate-200 text-sm">{entry.comment}</p>
+                                </div>
+                              </div>
+                            );
+                          }
+                        })}
                       </div>
                     ))}
                 </div>
@@ -505,7 +653,7 @@ export function MaintenanceHistoryDialog({
                     className="w-full border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white"
                   >
                     <ChevronDown className="h-4 w-4 mr-2" />
-                    Show More ({history.length - visibleHistoryCount} remaining)
+                    Show More ({combinedItems.length - visibleHistoryCount} remaining)
                   </Button>
                 )}
               </div>

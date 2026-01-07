@@ -220,9 +220,25 @@ export interface CategoriesListResponse {
   categories: MaintenanceCategory[];
 }
 
+export interface WorkshopTaskHistoryItem {
+  id: string;
+  created_at: string;
+  status: string;
+  workshop_comments: string | null;
+  actioned_at: string | null;
+  logged_at: string | null;
+  workshop_task_categories?: {
+    name: string;
+  } | null;
+  profiles?: {
+    full_name: string;
+  } | null;
+}
+
 export interface MaintenanceHistoryResponse {
   success: boolean;
   history: MaintenanceHistory[];
+  workshopTasks?: WorkshopTaskHistoryItem[];
   vehicle: {
     id: string;
     reg_number: string;

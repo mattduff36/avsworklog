@@ -111,6 +111,7 @@ function NewInspectionContent() {
   const [error, setError] = useState('');
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
+  const [showConfirmSubmitDialog, setShowConfirmSubmitDialog] = useState(false);
   const [showAddVehicleDialog, setShowAddVehicleDialog] = useState(false);
   const [newVehicleReg, setNewVehicleReg] = useState('');
   const [newVehicleCategoryId, setNewVehicleCategoryId] = useState('');
@@ -564,6 +565,17 @@ function NewInspectionContent() {
   };
 
   const handleSubmit = () => {
+    // For NEW submissions (not editing existing), show confirmation dialog first
+    if (!existingInspectionId) {
+      setShowConfirmSubmitDialog(true);
+      return;
+    }
+    
+    // For editing existing inspections, proceed directly to validation
+    validateAndSubmit();
+  };
+  
+  const validateAndSubmit = () => {
     if (!vehicleId) {
       setError('Please select a vehicle');
       return;
@@ -599,6 +611,9 @@ function NewInspectionContent() {
       });
       return;
     }
+    
+    // Close confirmation dialog if open
+    setShowConfirmSubmitDialog(false);
     
     // Show signature dialog
     setShowSignatureDialog(true);
@@ -1846,6 +1861,60 @@ function NewInspectionContent() {
         </DialogContent>
       </Dialog>
 
+      {/* Confirmation Dialog - NEW SUBMISSIONS ONLY */}
+      <Dialog open={showConfirmSubmitDialog} onOpenChange={setShowConfirmSubmitDialog}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">Confirm Submission</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Before you submit, please confirm
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-4">
+              <p className="text-slate-200">
+                Have you finished using this vehicle for the week?
+              </p>
+            </div>
+            <div className="space-y-2 text-sm text-slate-300">
+              <p>
+                Vehicle inspections should be submitted <strong className="text-white">weekly</strong> when you're done using the vehicle.
+              </p>
+              <p className="text-amber-400">
+                Still using this vehicle this week? Select 'Save Draft' instead.
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowConfirmSubmitDialog(false)}
+              className="border-slate-600 text-white hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowConfirmSubmitDialog(false);
+                saveInspection('draft');
+              }}
+              className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Save Draft
+            </Button>
+            <Button
+              onClick={validateAndSubmit}
+              className="bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Submit Inspection
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       {/* Signature Dialog */}
       <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>
         <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg">

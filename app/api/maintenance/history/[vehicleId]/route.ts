@@ -80,9 +80,36 @@ export async function GET(
       throw error;
     }
     
+    // Get workshop tasks for this vehicle
+    const { data: workshopTasks, error: workshopError } = await supabase
+      .from('actions')
+      .select(`
+        id,
+        created_at,
+        status,
+        workshop_comments,
+        actioned_at,
+        logged_at,
+        workshop_task_categories (
+          name
+        ),
+        profiles:created_by (
+          full_name
+        )
+      `)
+      .eq('vehicle_id', vehicleId)
+      .eq('action_type', 'workshop_vehicle_task')
+      .order('created_at', { ascending: false });
+    
+    if (workshopError) {
+      logger.error('Failed to fetch workshop tasks', workshopError);
+      // Don't fail the whole request if workshop tasks fail
+    }
+    
     const response: MaintenanceHistoryResponse = {
       success: true,
       history: history || [],
+      workshopTasks: workshopTasks || [],
       vehicle: {
         id: vehicle.id,
         reg_number: vehicle.reg_number
