@@ -15,7 +15,7 @@ import {
   Shield,
   Check
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { managerNavItems, adminNavItems } from '@/lib/config/navigation';
 
@@ -33,6 +33,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const [userEmail, setUserEmail] = useState<string>('');
   const [viewAsRole, setViewAsRole] = useState<ViewAsRole>('actual');
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const triggerButtonRef = useRef<HTMLButtonElement>(null);
 
   // Debug logging for sidebar state
   useEffect(() => {
@@ -282,6 +283,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
               <PopoverTrigger asChild>
                 {open ? (
                   <Button
+                    ref={triggerButtonRef}
                     variant="outline"
                     className="w-full justify-start gap-2 bg-slate-800/50 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white text-xs h-9"
                     onClick={(e) => {
@@ -328,6 +330,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                   </Button>
                 ) : (
                   <Button
+                    ref={triggerButtonRef}
                     variant="ghost"
                     size="sm"
                     className="w-full h-10 p-0 hover:bg-slate-800"
@@ -355,7 +358,17 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                   e.preventDefault();
                 }}
                 onInteractOutside={(e) => {
-                  console.log('[SidebarNav] Popover interact outside:', e.target);
+                  const target = e.target as HTMLElement;
+                  console.log('[SidebarNav] Popover interact outside:', target);
+                  console.log('[SidebarNav] Trigger button ref:', triggerButtonRef.current);
+                  
+                  // Check if the interaction is with the trigger button or its children
+                  if (triggerButtonRef.current?.contains(target)) {
+                    console.log('[SidebarNav] ✅ Interaction is with trigger button - PREVENTING CLOSE');
+                    e.preventDefault();
+                  } else {
+                    console.log('[SidebarNav] ❌ Interaction is outside - allowing close');
+                  }
                 }}
                 onEscapeKeyDown={(e) => {
                   console.log('[SidebarNav] Popover escape key pressed');
