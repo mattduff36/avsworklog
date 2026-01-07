@@ -98,8 +98,11 @@ export async function GET(
     // Get workshop tasks for this vehicle
     // Use service role client to bypass RLS - maintenance history should show ALL workshop tasks
     // regardless of user permissions, as it's an audit trail
+    // Note: Includes BOTH 'workshop_vehicle_task' (manual) and 'inspection_defect' (from inspections)
     const supabaseServiceRole = getSupabaseServiceRole();
-    const { data: workshopTasks, error: workshopError } = await supabaseServiceRole
+    
+    // First, try to fetch tasks with vehicle_id (workshop_vehicle_task)
+    const { data: directTasks, error: directError } = await supabaseServiceRole
       .from('actions')
       .select(`
         id,
@@ -114,8 +117,50 @@ export async function GET(
         )
       `)
       .eq('vehicle_id', vehicleId)
-      .eq('action_type', 'workshop_vehicle_task')
+      .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
       .order('created_at', { ascending: false });
+    
+    // Then, fetch inspection defects via vehicle_inspections relationship
+    const { data: inspectionTasks, error: inspectionError } = await supabaseServiceRole
+      .from('actions')
+      .select(`
+        id,
+        created_at,
+        status,
+        workshop_comments,
+        actioned_at,
+        logged_at,
+        created_by,
+        workshop_task_categories (
+          name
+        ),
+        vehicle_inspections!inner (
+          vehicle_id
+        )
+      `)
+      .eq('vehicle_inspections.vehicle_id', vehicleId)
+      .eq('action_type', 'inspection_defect')
+      .order('created_at', { ascending: false });
+    
+    // Combine both sources and deduplicate by ID
+    const taskMap = new Map();
+    
+    if (directTasks) {
+      directTasks.forEach(task => taskMap.set(task.id, task));
+    }
+    
+    if (inspectionTasks) {
+      inspectionTasks.forEach(task => {
+        // Remove the vehicle_inspections property before storing
+        const { vehicle_inspections, ...cleanTask } = task as any;
+        if (!taskMap.has(task.id)) {
+          taskMap.set(task.id, cleanTask);
+        }
+      });
+    }
+    
+    const workshopTasks = Array.from(taskMap.values());
+    const workshopError = directError || inspectionError;
     
     if (workshopError) {
       logger.error('Failed to fetch workshop tasks', workshopError);
