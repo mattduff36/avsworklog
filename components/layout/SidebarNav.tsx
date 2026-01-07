@@ -208,34 +208,31 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
 
         {/* View As Selector - SuperAdmin Only (Bottom) */}
         {isSuperAdmin && (
-          <div className="border-t border-slate-700 p-3">
-            <div className={`flex items-center gap-2 transition-opacity duration-200 ${
-              open ? 'opacity-100 delay-300' : 'opacity-0'
-            }`}>
-              <Eye className="w-4 h-4 text-slate-400 flex-shrink-0" />
-              <Select 
-                value={viewAsRole} 
-                onValueChange={(value) => {
-                  setViewAsRole(value as ViewAsRole);
-                  localStorage.setItem('viewAsRole', value);
-                  // Refresh page to apply new view
-                  setTimeout(() => window.location.reload(), 100);
-                }}
-              >
-                <SelectTrigger className={`bg-slate-800/50 border-slate-600 text-slate-300 text-xs ${
-                  open ? 'w-full' : 'w-0 h-0 p-0 border-0 opacity-0'
-                }`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="actual">Actual Role</SelectItem>
-                  <SelectItem value="employee">View as Employee</SelectItem>
-                  <SelectItem value="manager">View as Manager</SelectItem>
-                  <SelectItem value="admin">View as Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {!open && (
+          <div className="border-t border-slate-700 p-3 mt-auto">
+            {open ? (
+              <div className="flex items-center gap-2">
+                <Eye className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                <Select 
+                  value={viewAsRole} 
+                  onValueChange={(value) => {
+                    setViewAsRole(value as ViewAsRole);
+                    localStorage.setItem('viewAsRole', value);
+                    // Refresh page to apply new view
+                    setTimeout(() => window.location.reload(), 100);
+                  }}
+                >
+                  <SelectTrigger className="w-full bg-slate-800/50 border-slate-600 text-slate-300 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="actual">Actual Role</SelectItem>
+                    <SelectItem value="employee">View as Employee</SelectItem>
+                    <SelectItem value="manager">View as Manager</SelectItem>
+                    <SelectItem value="admin">View as Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
               <div className="flex justify-center">
                 <Eye className="w-5 h-5 text-slate-400" title="View As" />
               </div>
