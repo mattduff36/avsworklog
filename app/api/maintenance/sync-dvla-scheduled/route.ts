@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
       const startTime = Date.now();
 
       // Remove spaces from registration number for API calls
-      const regNumberNoSpaces = vehicle.reg_number.replace(/\s+/g, '');
+      const regNumberNoSpaces = formatRegistrationForApi(vehicle.reg_number);
 
       try {
         // Fetch data from DVLA VES API (tax & vehicle details)

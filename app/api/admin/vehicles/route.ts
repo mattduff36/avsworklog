@@ -5,6 +5,7 @@ import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { createDVLAApiService } from '@/lib/services/dvla-api';
 import { createMotHistoryService } from '@/lib/services/mot-history-api';
+import { formatRegistrationForStorage, formatRegistrationForApi, validateRegistrationNumber } from '@/lib/utils/registration';
 
 // Helper to create admin client with service role key
 function getSupabaseAdmin() {
@@ -124,25 +125,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate UK registration number format (basic validation)
-    // Preserve spaces but remove leading/trailing whitespace and convert to uppercase
-    const cleanReg = reg_number.trim().toUpperCase();
-    const regNoSpaces = cleanReg.replace(/\s+/g, '');
+    // Validate and format registration number
+    const validationError = validateRegistrationNumber(reg_number);
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 });
+    }
     
-    if (regNoSpaces.length < 2 || regNoSpaces.length > 8) {
-      return NextResponse.json(
-        { error: 'Invalid registration number format. UK registrations should be 2-8 characters.' },
-        { status: 400 }
-      );
-    }
-
-    // Check for invalid characters (allow spaces)
-    if (!/^[A-Z0-9\s]+$/.test(cleanReg)) {
-      return NextResponse.json(
-        { error: 'Registration number can only contain letters, numbers, and spaces' },
-        { status: 400 }
-      );
-    }
+    const cleanReg = formatRegistrationForStorage(reg_number);
 
     if (!category_id) {
       return NextResponse.json(
@@ -216,7 +205,7 @@ async function syncVehicleData(
   const TEST_VEHICLES = ['TE57VAN', 'TE57HGV'];
   
   // Remove spaces for API calls (APIs don't accept spaces)
-  const regNumberNoSpaces = regNumber.replace(/\s+/g, '');
+  const regNumberNoSpaces = formatRegistrationForApi(regNumber);
   
   // Skip sync for test vehicles
   if (TEST_VEHICLES.includes(regNumberNoSpaces)) {

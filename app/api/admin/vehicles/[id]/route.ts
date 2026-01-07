@@ -51,7 +51,12 @@ export async function PUT(
     const updates: any = {};
     
     if (reg_number !== undefined) {
-      updates.reg_number = reg_number.toUpperCase();
+      // Validate and format registration number
+      const validationError = validateRegistrationNumber(reg_number);
+      if (validationError) {
+        return NextResponse.json({ error: validationError }, { status: 400 });
+      }
+      updates.reg_number = formatRegistrationForStorage(reg_number);
     }
     
     if (category_id !== undefined) {
