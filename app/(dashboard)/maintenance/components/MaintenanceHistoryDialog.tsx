@@ -150,7 +150,7 @@ export function MaintenanceHistoryDialog({
   const hasMoreHistory = remainingCount > 0;
   
   // Unified card renderer for both workshop tasks and maintenance history
-  const renderHistoryCard = (item: CombinedItem) => {
+  const renderHistoryCard = (item: CombinedItem, showTimestamp: boolean = true) => {
     if (item.type === 'workshop') {
       const task = item.data;
       return (
@@ -165,10 +165,12 @@ export function MaintenanceHistoryDialog({
                 {task.profiles?.full_name || 'Unknown User'}
               </span>
             </div>
-            <div className="flex items-center gap-1 text-xs text-slate-400">
-              <Clock className="h-3 w-3" />
-              {getRelativeTime(task.created_at)}
-            </div>
+            {showTimestamp && (
+              <div className="flex items-center gap-1 text-xs text-slate-400">
+                <Clock className="h-3 w-3" />
+                {getRelativeTime(task.created_at)}
+              </div>
+            )}
           </div>
           
           <div className="space-y-2">
@@ -239,10 +241,12 @@ export function MaintenanceHistoryDialog({
                 {entry.updated_by_name || 'Unknown User'}
               </span>
             </div>
-            <div className="flex items-center gap-1 text-xs text-slate-400">
-              <Clock className="h-3 w-3" />
-              {getRelativeTime(entry.created_at)}
-            </div>
+            {showTimestamp && (
+              <div className="flex items-center gap-1 text-xs text-slate-400">
+                <Clock className="h-3 w-3" />
+                {getRelativeTime(entry.created_at)}
+              </div>
+            )}
           </div>
           
           <div className="space-y-2">
@@ -526,7 +530,7 @@ export function MaintenanceHistoryDialog({
                               })}
                             </div>
                             
-                            {entries.map(renderHistoryCard)}
+                            {entries.map(item => renderHistoryCard(item, false))}
                           </div>
                         ))}
                     </div>
