@@ -5,13 +5,11 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Menu, 
   X, 
   LogOut,
   Bell,
-  Eye,
   Bug,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -344,28 +342,6 @@ export function Navbar() {
                 </Button>
               </div>
 
-              {/* View As Selector (SuperAdmin only) */}
-              {isSuperAdmin && (
-                <div className="hidden lg:flex items-center gap-2">
-                  <Eye className="w-4 h-4 text-slate-400" />
-                  <Select value={viewAsRole} onValueChange={(value) => {
-                    setViewAsRole(value as ViewAsRole);
-                    // Refresh page to apply new view
-                    setTimeout(() => window.location.reload(), 100);
-                  }}>
-                    <SelectTrigger className="w-[140px] h-8 bg-slate-800/50 border-slate-600 text-slate-300 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="actual">Actual Role</SelectItem>
-                      <SelectItem value="employee">View as Employee</SelectItem>
-                      <SelectItem value="manager">View as Manager</SelectItem>
-                      <SelectItem value="admin">View as Admin</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
               {/* Sign Out button only */}
               <div className="hidden md:flex items-center">
                 <Button
@@ -526,35 +502,6 @@ export function Navbar() {
             </div>
             <div className="pt-4 pb-3 border-t border-slate-700/50">
               <div className="px-2 space-y-2">
-                {/* SuperAdmin Tools (Mobile) */}
-                {isSuperAdmin && (
-                  <>
-                    <div className="px-2 py-2">
-                      <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">
-                        View As
-                      </label>
-                      <Select value={viewAsRole} onValueChange={(value) => {
-                        setViewAsRole(value as ViewAsRole);
-                        setMobileMenuOpen(false);
-                        // Refresh page to apply new view
-                        setTimeout(() => window.location.reload(), 100);
-                      }}>
-                        <SelectTrigger className="w-full bg-slate-800/50 border-slate-600 text-slate-300">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="actual">Actual Role</SelectItem>
-                          <SelectItem value="employee">View as Employee</SelectItem>
-                          <SelectItem value="manager">View as Manager</SelectItem>
-                          <SelectItem value="admin">View as Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="border-t border-slate-700/50 my-2"></div>
-                  </>
-                )}
-                
                 <Button
                   variant="ghost"
                   className="w-full justify-start text-slate-300 hover:text-white hover:bg-slate-800/50"

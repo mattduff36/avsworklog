@@ -4,13 +4,17 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   PanelLeftClose,
-  Bug
+  Bug,
+  Eye
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { managerNavItems, adminNavItems } from '@/lib/config/navigation';
+
+type ViewAsRole = 'actual' | 'employee' | 'manager' | 'admin';
 
 interface SidebarNavProps {
   open: boolean;
@@ -22,7 +26,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const { isAdmin, isManager } = useAuth();
   const supabase = createClient();
   const [userEmail, setUserEmail] = useState<string>('');
-  const [viewAsRole, setViewAsRole] = useState<string>('actual');
+  const [viewAsRole, setViewAsRole] = useState<ViewAsRole>('actual');
 
   // Fetch user email and view as role
   useEffect(() => {
@@ -48,10 +52,11 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  if (!isManager) return null;
-
   const isSuperAdmin = userEmail === 'admin@mpdee.co.uk';
   const showDeveloperTools = isSuperAdmin && viewAsRole === 'actual';
+  
+  // Show sidebar for managers/admins or superadmins (who need View As feature)
+  if (!isManager && !isSuperAdmin) return null;
 
   // Use shared navigation config
   const managerLinks = managerNavItems;
@@ -69,7 +74,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
 
       {/* Sidebar - Always visible on desktop, hidden on mobile */}
       <div
-        className={`hidden md:block fixed left-0 top-[68px] bottom-0 bg-slate-900 border-r border-slate-700 z-[70] transition-all duration-300 ease-in-out ${
+        className={`hidden md:flex md:flex-col fixed left-0 top-[68px] bottom-0 bg-slate-900 border-r border-slate-700 z-[70] transition-all duration-300 ease-in-out ${
           open ? 'w-64' : 'w-16'
         }`}
       >
@@ -78,7 +83,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
           <h2 className={`text-lg font-semibold text-white transition-opacity duration-200 ${
             open ? 'opacity-100 delay-300' : 'opacity-0 w-0 overflow-hidden'
           }`}>
-            Manager Menu
+            {isManager ? 'Manager Menu' : 'Admin Tools'}
           </h2>
           <Button
             variant="ghost"
@@ -92,8 +97,9 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         </div>
 
         {/* Navigation */}
-        <div className="overflow-y-auto h-[calc(100vh-8.25rem)] py-4">
+        <div className={`overflow-y-auto py-4 ${isSuperAdmin ? 'h-[calc(100vh-10rem)]' : 'h-[calc(100vh-8.25rem)]'}`}>
           {/* Manager Links */}
+          {isManager && (
           <div className={open ? 'px-3 mb-6' : 'px-2 mb-6'}>
             <div className={`px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider transition-opacity duration-200 ${
               open ? 'opacity-100 delay-300' : 'opacity-0 h-0 overflow-hidden'
@@ -128,6 +134,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
               })}
             </div>
           </div>
+          )}
 
           {/* Admin Links */}
           {isAdmin && (
@@ -198,6 +205,43 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
             </div>
           )}
         </div>
+
+        {/* View As Selector - SuperAdmin Only (Bottom) */}
+        {isSuperAdmin && (
+          <div className="border-t border-slate-700 p-3">
+            <div className={`flex items-center gap-2 transition-opacity duration-200 ${
+              open ? 'opacity-100 delay-300' : 'opacity-0'
+            }`}>
+              <Eye className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              <Select 
+                value={viewAsRole} 
+                onValueChange={(value) => {
+                  setViewAsRole(value as ViewAsRole);
+                  localStorage.setItem('viewAsRole', value);
+                  // Refresh page to apply new view
+                  setTimeout(() => window.location.reload(), 100);
+                }}
+              >
+                <SelectTrigger className={`bg-slate-800/50 border-slate-600 text-slate-300 text-xs ${
+                  open ? 'w-full' : 'w-0 h-0 p-0 border-0 opacity-0'
+                }`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="actual">Actual Role</SelectItem>
+                  <SelectItem value="employee">View as Employee</SelectItem>
+                  <SelectItem value="manager">View as Manager</SelectItem>
+                  <SelectItem value="admin">View as Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {!open && (
+              <div className="flex justify-center">
+                <Eye className="w-5 h-5 text-slate-400" title="View As" />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </>
   );
