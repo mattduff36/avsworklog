@@ -4,11 +4,16 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   PanelLeftClose,
   Bug,
-  Eye
+  Eye,
+  Crown,
+  User,
+  Users,
+  Shield,
+  Check
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -209,34 +214,73 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         {/* View As Selector - SuperAdmin Only (Bottom) */}
         {isSuperAdmin && (
           <div className="border-t border-slate-700 p-3 mt-auto">
-            {open ? (
-              <div className="flex items-center gap-2">
-                <Eye className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                <Select 
-                  value={viewAsRole} 
-                  onValueChange={(value) => {
-                    setViewAsRole(value as ViewAsRole);
-                    localStorage.setItem('viewAsRole', value);
-                    // Refresh page to apply new view
-                    setTimeout(() => window.location.reload(), 100);
-                  }}
-                >
-                  <SelectTrigger className="w-full bg-slate-800/50 border-slate-600 text-slate-300 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="actual">Actual Role</SelectItem>
-                    <SelectItem value="employee">View as Employee</SelectItem>
-                    <SelectItem value="manager">View as Manager</SelectItem>
-                    <SelectItem value="admin">View as Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <div className="flex justify-center">
-                <Eye className="w-5 h-5 text-slate-400" title="View As" />
-              </div>
-            )}
+            <Popover>
+              <PopoverTrigger asChild>
+                {open ? (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2 bg-slate-800/50 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white text-xs h-9"
+                  >
+                    <Eye className="w-4 h-4 flex-shrink-0" />
+                    <span className="flex-1 text-left truncate">
+                      {viewAsRole === 'actual' && 'Actual Role'}
+                      {viewAsRole === 'employee' && 'View as Employee'}
+                      {viewAsRole === 'manager' && 'View as Manager'}
+                      {viewAsRole === 'admin' && 'View as Admin'}
+                    </span>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full h-10 p-0 hover:bg-slate-800"
+                    title="View As"
+                  >
+                    <Eye className="w-5 h-5 text-slate-400 hover:text-white" />
+                  </Button>
+                )}
+              </PopoverTrigger>
+              <PopoverContent 
+                side={open ? "top" : "right"} 
+                align={open ? "center" : "start"}
+                className="w-56 p-2 bg-slate-900 border-slate-700"
+              >
+                <div className="space-y-1">
+                  <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    View As
+                  </div>
+                  {[
+                    { value: 'actual', label: 'Actual Role', icon: Crown },
+                    { value: 'employee', label: 'Employee', icon: User },
+                    { value: 'manager', label: 'Manager', icon: Users },
+                    { value: 'admin', label: 'Admin', icon: Shield },
+                  ].map((role) => {
+                    const Icon = role.icon;
+                    const isActive = viewAsRole === role.value;
+                    return (
+                      <button
+                        key={role.value}
+                        onClick={() => {
+                          setViewAsRole(role.value as ViewAsRole);
+                          localStorage.setItem('viewAsRole', role.value);
+                          // Refresh page to apply new view
+                          setTimeout(() => window.location.reload(), 100);
+                        }}
+                        className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
+                          isActive
+                            ? 'bg-avs-yellow text-slate-900'
+                            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        <span className="flex-1 text-left">{role.label}</span>
+                        {isActive && <Check className="w-4 h-4" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         )}
       </div>
