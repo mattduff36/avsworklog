@@ -80,7 +80,7 @@ export const employeeNavItems: NavItem[] = [
   },
   { 
     href: '/workshop-tasks', 
-    label: 'Workshop Tasks', 
+    label: 'Workshop', 
     icon: Settings, 
     module: 'workshop-tasks',
     category: 'employee'
