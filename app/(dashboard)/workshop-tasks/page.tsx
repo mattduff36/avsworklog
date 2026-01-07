@@ -788,8 +788,8 @@ export default function WorkshopTasksPage() {
           </TabsTrigger>
           {isManager && (
             <TabsTrigger value="settings">
-              <Settings className="h-4 w-4 mr-1" />
-              Settings
+              <Settings className="h-4 w-4 md:mr-1" />
+              <span className="hidden md:inline">Settings</span>
             </TabsTrigger>
           )}
         </TabsList>

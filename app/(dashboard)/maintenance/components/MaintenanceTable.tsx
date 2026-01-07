@@ -651,9 +651,9 @@ export function MaintenanceTable({
                                 setSelectedVehicle(vehicle);
                                 setHistoryDialogOpen(true);
                               }}
-                              className="h-8 w-8 p-0"
+                              className="h-10 w-10 p-0"
                             >
-                              <History className="h-4 w-4" />
+                              <History className="h-5 w-5" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -663,9 +663,9 @@ export function MaintenanceTable({
                                 setSelectedVehicle(vehicle);
                                 setEditDialogOpen(true);
                               }}
-                              className="h-8 w-8 p-0"
+                              className="h-10 w-10 p-0"
                             >
-                              <Edit className="h-4 w-4" />
+                              <Edit className="h-5 w-5" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -675,9 +675,9 @@ export function MaintenanceTable({
                                 setSelectedVehicle(vehicle);
                                 setDeleteDialogOpen(true);
                               }}
-                              className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 ml-auto"
+                              className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 ml-auto h-10 w-10 p-0"
                             >
-                              <Archive className="h-4 w-4" />
+                              <Archive className="h-5 w-5" />
                             </Button>
                           </div>
                         </div>

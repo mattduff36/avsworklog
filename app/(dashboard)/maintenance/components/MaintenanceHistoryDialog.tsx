@@ -321,20 +321,20 @@ export function MaintenanceHistoryDialog({
             <div className="flex gap-2 flex-shrink-0">
               <Button
                 onClick={() => setMotHistoryOpen(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white flex-1 md:flex-initial"
+                className="bg-blue-600 hover:bg-blue-700 text-white flex-1 md:flex-initial h-12 md:h-10"
                 size="sm"
               >
-                <FileText className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">MOT History</span>
+                <FileText className="h-5 w-5 mr-2" />
+                <span className="text-sm">MOT</span>
               </Button>
               {onEditClick && (
                 <Button
                   onClick={onEditClick}
-                  className="bg-red-600 hover:bg-red-700 text-white flex-1 md:flex-initial"
+                  className="bg-red-600 hover:bg-red-700 text-white flex-1 md:flex-initial h-12 md:h-10"
                   size="sm"
                 >
-                  <Edit className="h-4 w-4 md:mr-2" />
-                  <span className="hidden md:inline">Edit</span>
+                  <Edit className="h-5 w-5 mr-2" />
+                  <span className="text-sm">Edit</span>
                 </Button>
               )}
             </div>
