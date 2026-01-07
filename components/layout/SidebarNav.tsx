@@ -32,18 +32,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const supabase = createClient();
   const [userEmail, setUserEmail] = useState<string>('');
   const [viewAsRole, setViewAsRole] = useState<ViewAsRole>('actual');
-  const [popoverOpen, setPopoverOpen] = useState(false);
-  const triggerButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Debug logging for sidebar state
-  useEffect(() => {
-    console.log('[SidebarNav] Sidebar state changed:', { open });
-  }, [open]);
-
-  // Debug logging for popover state
-  useEffect(() => {
-    console.log('[SidebarNav] Popover state changed:', { popoverOpen });
-  }, [popoverOpen]);
 
   // Fetch user email and view as role
   useEffect(() => {
@@ -51,7 +40,6 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (user?.email) {
         setUserEmail(user.email);
-        console.log('[SidebarNav] User email fetched:', user.email);
       }
     }
     fetchUserData();
@@ -59,7 +47,6 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     const storedViewAs = localStorage.getItem('viewAsRole');
     if (storedViewAs) {
       setViewAsRole(storedViewAs);
-      console.log('[SidebarNav] View as role loaded from storage:', storedViewAs);
     }
   }, [supabase]);
 
@@ -88,27 +75,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] transition-opacity duration-300 ${
           open ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
-        style={{ pointerEvents: popoverOpen ? 'none' : (open ? 'auto' : 'none') }}
-        onClick={(e) => {
-          console.log('[SidebarNav] Backdrop clicked:', {
-            sidebarOpen: open,
-            target: e.target,
-            currentTarget: e.currentTarget
-          });
-          onToggle();
-        }}
-        onMouseMove={(e) => {
-          // Only log occasionally to avoid spam
-          if (Math.random() < 0.01) {
-            const elementAtCursor = document.elementFromPoint(e.clientX, e.clientY);
-            console.log('[SidebarNav] Mouse over backdrop area, element at cursor:', {
-              element: elementAtCursor,
-              className: elementAtCursor?.className,
-              x: e.clientX,
-              y: e.clientY
-            });
-          }
-        }}
+        onClick={onToggle}
       />
 
       {/* Sidebar - Always visible on desktop, hidden on mobile */}
@@ -116,7 +83,6 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         className={`hidden md:flex md:flex-col fixed left-0 top-[68px] bottom-0 bg-slate-900 border-r border-slate-700 z-[70] transition-all duration-300 ease-in-out ${
           open ? 'w-64' : 'w-16'
         }`}
-        style={{ pointerEvents: popoverOpen ? 'none' : 'auto' }}
       >
         {/* Header */}
         <div className="h-16 flex items-center justify-between px-3 border-b border-slate-700">
@@ -137,10 +103,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         </div>
 
         {/* Navigation */}
-        <div 
-          className={`overflow-y-auto py-4 ${isSuperAdmin ? 'h-[calc(100vh-10rem)]' : 'h-[calc(100vh-8.25rem)]'}`}
-          style={{ pointerEvents: popoverOpen ? 'none' : 'auto' }}
-        >
+        <div className={`overflow-y-auto py-4 ${isSuperAdmin ? 'h-[calc(100vh-10rem)]' : 'h-[calc(100vh-8.25rem)]'}`}>
           {/* Manager Links */}
           {isManager && (
           <div className={open ? 'px-3 mb-6' : 'px-2 mb-6'}>
@@ -251,90 +214,13 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
 
         {/* View As Selector - SuperAdmin Only (Bottom) */}
         {isSuperAdmin && (
-          <div 
-            className="border-t border-slate-700 p-3 mt-auto relative z-[75]"
-            style={{ pointerEvents: 'auto' }}
-            onClick={(e) => {
-              console.log('[SidebarNav] Container clicked:', {
-                target: e.target,
-                currentTarget: e.currentTarget,
-                sidebarOpen: open,
-                popoverOpen
-              });
-            }}
-            onMouseEnter={() => {
-              console.log('[SidebarNav] Container mouse enter - checking z-index');
-              const container = document.querySelector('.border-t.border-slate-700.p-3.mt-auto');
-              if (container) {
-                const styles = window.getComputedStyle(container);
-                console.log('[SidebarNav] Container computed styles:', {
-                  zIndex: styles.zIndex,
-                  position: styles.position,
-                  pointerEvents: styles.pointerEvents
-                });
-              }
-            }}
-          >
-            <Popover 
-              open={popoverOpen} 
-              onOpenChange={(isOpen) => {
-                console.log('[SidebarNav] Popover onOpenChange called:', {
-                  newState: isOpen,
-                  oldState: popoverOpen,
-                  sidebarOpen: open
-                });
-                setPopoverOpen(isOpen);
-              }}
-              modal={false}
-            >
+          <div className="border-t border-slate-700 p-3 mt-auto">
+            <Popover>
               <PopoverTrigger asChild>
                 {open ? (
                   <Button
-                    ref={triggerButtonRef}
                     variant="outline"
                     className="w-full justify-start gap-2 bg-slate-800/50 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white text-xs h-9"
-                    onClick={(e) => {
-                      console.log('[SidebarNav] Button clicked (expanded mode):', {
-                        event: e,
-                        sidebarOpen: open,
-                        popoverOpen,
-                        button: e.currentTarget
-                      });
-                      
-                      // If popover is already open, prevent the toggle and keep it open
-                      if (popoverOpen) {
-                        console.log('[SidebarNav] Popover already open - preventing toggle');
-                        e.preventDefault();
-                        e.stopPropagation();
-                        return;
-                      }
-                      
-                      // Check if button is actually clickable
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      console.log('[SidebarNav] Button position:', {
-                        top: rect.top,
-                        left: rect.left,
-                        width: rect.width,
-                        height: rect.height,
-                        bottom: rect.bottom,
-                        right: rect.right
-                      });
-                      // Check what element is actually at this position
-                      const elementAtPoint = document.elementFromPoint(
-                        rect.left + rect.width / 2,
-                        rect.top + rect.height / 2
-                      );
-                      console.log('[SidebarNav] Element at button center:', elementAtPoint);
-                    }}
-                    onMouseEnter={(e) => {
-                      console.log('[SidebarNav] Button mouse enter (expanded)');
-                      const styles = window.getComputedStyle(e.currentTarget);
-                      console.log('[SidebarNav] Button computed styles:', {
-                        zIndex: styles.zIndex,
-                        position: styles.position,
-                        pointerEvents: styles.pointerEvents
-                      });
-                    }}
                   >
                     <Eye className="w-4 h-4 flex-shrink-0" />
                     <span className="flex-1 text-left truncate">
@@ -346,26 +232,10 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                   </Button>
                 ) : (
                   <Button
-                    ref={triggerButtonRef}
                     variant="ghost"
                     size="sm"
                     className="w-full h-10 p-0 hover:bg-slate-800"
                     title="View As"
-                    onClick={(e) => {
-                      console.log('[SidebarNav] Button clicked (collapsed mode):', {
-                        event: e,
-                        sidebarOpen: open,
-                        popoverOpen
-                      });
-                      
-                      // If popover is already open, prevent the toggle
-                      if (popoverOpen) {
-                        console.log('[SidebarNav] Popover already open - preventing toggle');
-                        e.preventDefault();
-                        e.stopPropagation();
-                        return;
-                      }
-                    }}
                   >
                     <Eye className="w-5 h-5 text-slate-400 hover:text-white" />
                   </Button>
@@ -375,29 +245,8 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                 side="right"
                 align="start"
                 sideOffset={12}
-                alignOffset={-8}
-                className="w-56 p-2 bg-slate-900 border-slate-700 z-[9999]"
-                onOpenAutoFocus={(e) => {
-                  console.log('[SidebarNav] Popover auto focus event');
-                  e.preventDefault();
-                }}
-                onInteractOutside={(e) => {
-                  const target = e.target as HTMLElement;
-                  console.log('[SidebarNav] Popover interact outside:', target);
-                  console.log('[SidebarNav] Trigger button ref:', triggerButtonRef.current);
-                  
-                  // Check if the interaction is with the trigger button or its children
-                  if (triggerButtonRef.current?.contains(target)) {
-                    console.log('[SidebarNav] ✅ Interaction is with trigger button - PREVENTING CLOSE');
-                    e.preventDefault();
-                  } else {
-                    console.log('[SidebarNav] ❌ Interaction is outside - allowing close');
-                  }
-                }}
-                onEscapeKeyDown={(e) => {
-                  console.log('[SidebarNav] Popover escape key pressed');
-                }}
-                style={{ pointerEvents: 'auto', zIndex: 9999 }}
+                className="w-56 p-2 bg-slate-900 border border-slate-700 shadow-2xl"
+                style={{ zIndex: 999999 }}
               >
                 <div className="space-y-1">
                   <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -415,16 +264,12 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                       <button
                         key={role.value}
                         type="button"
-                        onClick={(e) => {
-                          console.log('[SidebarNav] Role option clicked:', role.value);
-                          e.preventDefault();
-                          e.stopPropagation();
+                        onClick={() => {
                           setViewAsRole(role.value as ViewAsRole);
                           localStorage.setItem('viewAsRole', role.value);
-                          // Refresh page to apply new view
                           setTimeout(() => window.location.reload(), 100);
                         }}
-                        className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors cursor-pointer ${
+                        className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
                           isActive
                             ? 'bg-avs-yellow text-slate-900'
                             : 'text-slate-300 hover:bg-slate-800 hover:text-white'
