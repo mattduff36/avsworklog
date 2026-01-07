@@ -115,6 +115,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         className={`hidden md:flex md:flex-col fixed left-0 top-[68px] bottom-0 bg-slate-900 border-r border-slate-700 z-[70] transition-all duration-300 ease-in-out ${
           open ? 'w-64' : 'w-16'
         }`}
+        style={{ pointerEvents: popoverOpen ? 'none' : 'auto' }}
       >
         {/* Header */}
         <div className="h-16 flex items-center justify-between px-3 border-b border-slate-700">
@@ -251,6 +252,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         {isSuperAdmin && (
           <div 
             className="border-t border-slate-700 p-3 mt-auto relative z-[75]"
+            style={{ pointerEvents: 'auto' }}
             onClick={(e) => {
               console.log('[SidebarNav] Container clicked:', {
                 target: e.target,
