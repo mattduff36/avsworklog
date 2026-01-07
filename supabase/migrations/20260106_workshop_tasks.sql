@@ -117,6 +117,18 @@ SET workshop_category_id = (SELECT id FROM workshop_task_categories WHERE name =
 WHERE action_type = 'inspection_defect' 
   AND workshop_category_id IS NULL;
 
+-- Populate vehicle_id for existing inspection defects (from the related inspection)
+-- CRITICAL: Without this, old inspection defects won't appear in vehicle filters
+UPDATE actions 
+SET vehicle_id = (
+  SELECT vi.vehicle_id 
+  FROM vehicle_inspections vi
+  WHERE vi.id = actions.inspection_id
+)
+WHERE action_type = 'inspection_defect' 
+  AND vehicle_id IS NULL
+  AND inspection_id IS NOT NULL;
+
 -- ========================================
 -- PART 4: CREATE INDEXES
 -- ========================================
