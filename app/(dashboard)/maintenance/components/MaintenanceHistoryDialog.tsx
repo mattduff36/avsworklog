@@ -398,23 +398,24 @@ export function MaintenanceHistoryDialog({
                           </Badge>
                         </div>
                         
-                        {task.workshop_comments && (
-                          <div className="bg-slate-900/50 rounded p-2 border-l-2 border-[#D2691E]">
-                            <p className="text-sm text-slate-300 italic">"{task.workshop_comments}"</p>
-                          </div>
-                        )}
-                        
                         {task.status === 'completed' && task.actioned_at && (
                           <div className="text-xs text-green-400">
-                            Completed: {getRelativeTime(task.actioned_at)}
+                            ✓ Completed: {getRelativeTime(task.actioned_at)}
                           </div>
                         )}
                         {task.status === 'logged' && task.logged_at && (
                           <div className="text-xs text-blue-400">
-                            Started: {getRelativeTime(task.logged_at)}
+                            ⚙ Started: {getRelativeTime(task.logged_at)}
                           </div>
                         )}
                       </div>
+                      
+                      {task.workshop_comments && (
+                        <div className="bg-slate-900/50 rounded p-3 border border-slate-700 mt-2">
+                          <p className="text-xs text-slate-500 mb-1">Comment:</p>
+                          <p className="text-slate-200 text-sm">{task.workshop_comments}</p>
+                        </div>
+                      )}
                     </div>
                   );
                 } else {
@@ -547,27 +548,39 @@ export function MaintenanceHistoryDialog({
                                        task.status === 'logged' ? 'In Progress' : 'Pending'}
                                     </Badge>
                                   </div>
-                                </div>
-                                
-                                {task.workshop_comments && (
-                                  <div className="bg-slate-900/50 rounded p-3 border border-[#D2691E]">
-                                    <p className="text-xs text-slate-500 mb-1">Work Description:</p>
-                                    <p className="text-slate-200 text-sm">{task.workshop_comments}</p>
-                                  </div>
-                                )}
-                                
-                                <div className="flex gap-4 text-xs">
+                                  
                                   {task.status === 'completed' && task.actioned_at && (
-                                    <div className="text-green-400">
-                                      ✓ Completed: {new Date(task.actioned_at).toLocaleString('en-GB')}
+                                    <div className="text-xs text-green-400">
+                                      ✓ Completed: {new Date(task.actioned_at).toLocaleString('en-GB', {
+                                        day: '2-digit',
+                                        month: '2-digit',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        second: '2-digit'
+                                      })}
                                     </div>
                                   )}
                                   {task.status === 'logged' && task.logged_at && (
-                                    <div className="text-blue-400">
-                                      ⚙ Started: {new Date(task.logged_at).toLocaleString('en-GB')}
+                                    <div className="text-xs text-blue-400">
+                                      ⚙ Started: {new Date(task.logged_at).toLocaleString('en-GB', {
+                                        day: '2-digit',
+                                        month: '2-digit',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        second: '2-digit'
+                                      })}
                                     </div>
                                   )}
                                 </div>
+                                
+                                {task.workshop_comments && (
+                                  <div className="bg-slate-900/50 rounded p-3 border border-slate-700">
+                                    <p className="text-xs text-slate-500 mb-1">Comment:</p>
+                                    <p className="text-slate-200 text-sm">{task.workshop_comments}</p>
+                                  </div>
+                                )}
                               </div>
                             );
                           } else {
