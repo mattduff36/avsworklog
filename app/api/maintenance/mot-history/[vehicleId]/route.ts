@@ -42,25 +42,47 @@ export async function GET(
     // Get MOT history from database (mot_raw_data field)
     const { data: maintenanceData, error: maintenanceError } = await supabase
       .from('vehicle_maintenance')
-      .select('mot_raw_data, mot_expiry_date, mot_api_sync_status, last_mot_api_sync')
+      .select(`
+        mot_raw_data, 
+        mot_expiry_date, 
+        mot_api_sync_status, 
+        last_mot_api_sync,
+        mot_api_sync_error,
+        mot_due_date,
+        mot_first_used_date,
+        ves_month_of_first_registration,
+        dvla_sync_status,
+        dvla_raw_data
+      `)
       .eq('vehicle_id', vehicleId)
-      .single();
+      .single() as { data: any; error: any };
 
     if (maintenanceError || !maintenanceData) {
       return NextResponse.json({
         success: false,
         error: 'No MOT data found',
         message: `No MOT history available for ${vehicle.reg_number}. This vehicle may be less than 3 years old and not yet required to have an MOT.`,
+        vehicleNotFound: false,
       }, { status: 404 });
     }
 
     // Check if MOT data exists
     const motHistory = maintenanceData.mot_raw_data;
     if (!motHistory || !motHistory.registration) {
-      // Check if vehicle has a first used date to calculate MOT due date
+      // Determine if vehicle doesn't exist in DVLA vs. too new for MOT
+      const hasVehicleData = maintenanceData.dvla_raw_data || 
+                            maintenanceData.ves_month_of_first_registration || 
+                            maintenanceData.mot_first_used_date;
+      
+      const vehicleNotFound = !hasVehicleData && 
+                             maintenanceData.mot_api_sync_status === 'error' &&
+                             maintenanceData.dvla_sync_status === 'error';
+      
       let motDueMessage = `No MOT history available for ${vehicle.reg_number}.`;
       
-      if (maintenanceData.mot_due_date || maintenanceData.ves_month_of_first_registration) {
+      if (vehicleNotFound) {
+        motDueMessage = `Vehicle registration ${vehicle.reg_number} not found in the DVLA database. This may be a test vehicle or an invalid registration.`;
+      } else if (maintenanceData.mot_due_date || maintenanceData.ves_month_of_first_registration) {
         motDueMessage = `No MOT history available for ${vehicle.reg_number}. This vehicle may be less than 3 years old and not yet required to have an MOT.`;
       }
       
@@ -68,16 +90,17 @@ export async function GET(
         success: false,
         error: 'No MOT history',
         message: motDueMessage,
+        vehicleNotFound,
       }, { status: 404 });
     }
 
     // Transform the stored data to match UI expectations
-    const sortedTests = (motHistory.motTests || []).sort((a, b) => 
+    const sortedTests = (motHistory.motTests || []).sort((a: any, b: any) => 
       new Date(b.completedDate).getTime() - new Date(a.completedDate).getTime()
     );
 
     // Calculate MOT expiry status and days remaining
-    const latestPassedTest = sortedTests.find(test => test.testResult === 'PASSED');
+    const latestPassedTest = sortedTests.find((test: any) => test.testResult === 'PASSED');
     let motExpiryDate = maintenanceData.mot_expiry_date || latestPassedTest?.expiryDate || motHistory.motTestDueDate || null;
     let motStatus = 'Unknown';
     let daysRemaining = null;
@@ -115,7 +138,7 @@ export async function GET(
           lastTestResult: lastTest?.testResult || null,
           motExpiryDate: motExpiryDate, // For backward compatibility
         },
-        tests: sortedTests.map(test => ({
+        tests: sortedTests.map((test: any) => ({
           motTestNumber: test.motTestNumber,
           completedDate: test.completedDate,
           testResult: test.testResult,

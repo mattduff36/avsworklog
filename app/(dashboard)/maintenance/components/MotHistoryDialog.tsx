@@ -17,12 +17,9 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
-  Calendar,
   Gauge,
   MapPin,
-  Clock,
-  Loader2,
-  RefreshCw
+  Loader2
 } from 'lucide-react';
 
 interface MotHistoryDialogProps {
@@ -33,7 +30,8 @@ interface MotHistoryDialogProps {
   existingMotDueDate?: string | null;
 }
 
-// Keep sample data for reference (will be replaced with real API data)
+// Sample data kept for reference (not used in production)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const SAMPLE_MOT_DATA_REFERENCE: Record<string, any> = {
   'TE57 VAN': {
     currentStatus: {
@@ -237,6 +235,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
   const [motData, setMotData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [vehicleNotFound, setVehicleNotFound] = useState(false);
   
   // Fetch MOT history from database when dialog opens (no API call)
   useEffect(() => {
@@ -248,18 +247,21 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
   const fetchMotHistoryFromDB = async () => {
     setLoading(true);
     setError(null);
+    setVehicleNotFound(false);
     
     try {
       const response = await fetch(`/api/maintenance/mot-history/${vehicleId}`);
       const result = await response.json();
       
       if (!response.ok) {
+        setVehicleNotFound(result.vehicleNotFound || false);
         throw new Error(result.message || result.error || 'Failed to fetch MOT history');
       }
       
       if (result.success && result.data) {
         setMotData(result.data);
       } else {
+        setVehicleNotFound(result.vehicleNotFound || false);
         setError(result.message || 'No MOT history available');
       }
     } catch (err: any) {
@@ -332,12 +334,26 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
           </div>
         ) : error ? (
           <div className="text-center py-12 text-slate-400">
-            {error.includes('No MOT data found') || error.includes('No MOT history') ? (
+            {vehicleNotFound ? (
+              <>
+                <AlertTriangle className="h-12 w-12 mx-auto mb-3 text-amber-400 opacity-70" />
+                <p className="text-lg font-medium text-white mb-2">Vehicle Not Found</p>
+                <p className="text-sm mb-4">{error}</p>
+                <div className="bg-amber-900/20 border border-amber-700 rounded-lg p-4 max-w-md mx-auto">
+                  <p className="text-sm text-amber-300">
+                    The registration <span className="font-semibold text-white">{vehicleReg}</span> was not found in the DVLA database.
+                  </p>
+                  <p className="text-xs text-amber-400 mt-2">
+                    This may be a test vehicle, an invalid registration, or a vehicle not yet registered with DVLA.
+                  </p>
+                </div>
+              </>
+            ) : error.includes('No MOT data found') || error.includes('No MOT history') ? (
               <>
                 <FileText className="h-12 w-12 mx-auto mb-3 text-blue-400 opacity-50" />
                 <p className="text-lg font-medium text-white mb-2">No MOT History Yet</p>
                 <p className="text-sm mb-4">{error}</p>
-                {existingMotDueDate && (
+                {existingMotDueDate && !vehicleNotFound && (
                   <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4 max-w-md mx-auto">
                     <p className="text-sm text-blue-300">
                       This vehicle is likely less than 3 years old and hasn't required an MOT yet.
