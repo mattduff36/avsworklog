@@ -7,6 +7,9 @@ import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
+// Test vehicles that are excluded from DVLA sync
+const TEST_VEHICLES = ['TE57VAN', 'TE57HGV'];
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ vehicleId: string }> }
@@ -39,6 +42,10 @@ export async function GET(
       );
     }
 
+    // Check if this is a test vehicle
+    const cleanReg = vehicle.reg_number.replace(/\s+/g, '').toUpperCase();
+    const isTestVehicle = TEST_VEHICLES.includes(cleanReg);
+
     // Get MOT history from database (mot_raw_data field)
     const { data: maintenanceData, error: maintenanceError } = await supabase
       .from('vehicle_maintenance')
@@ -58,10 +65,20 @@ export async function GET(
       .single() as { data: any; error: any };
 
     if (maintenanceError || !maintenanceData) {
+      // No maintenance record exists
+      if (isTestVehicle) {
+        return NextResponse.json({
+          success: false,
+          error: 'No MOT data found',
+          message: `Vehicle registration ${vehicle.reg_number} not found in the DVLA database. This is a test vehicle.`,
+          vehicleNotFound: true,
+        }, { status: 404 });
+      }
+      
       return NextResponse.json({
         success: false,
         error: 'No MOT data found',
-        message: `No MOT history available for ${vehicle.reg_number}. This vehicle may be less than 3 years old and not yet required to have an MOT.`,
+        message: `No MOT history available for ${vehicle.reg_number}. Vehicle data has not been synced yet.`,
         vehicleNotFound: false,
       }, { status: 404 });
     }
@@ -74,14 +91,23 @@ export async function GET(
                             maintenanceData.ves_month_of_first_registration || 
                             maintenanceData.mot_first_used_date;
       
-      const vehicleNotFound = !hasVehicleData && 
-                             maintenanceData.mot_api_sync_status === 'error' &&
-                             maintenanceData.dvla_sync_status === 'error';
+      // Vehicle is not found if:
+      // 1. It's a test vehicle, OR
+      // 2. Has no vehicle data AND both sync attempts failed
+      const vehicleNotFound = isTestVehicle || (
+        !hasVehicleData && 
+        maintenanceData.mot_api_sync_status === 'error' &&
+        maintenanceData.dvla_sync_status === 'error'
+      );
       
       let motDueMessage = `No MOT history available for ${vehicle.reg_number}.`;
       
       if (vehicleNotFound) {
-        motDueMessage = `Vehicle registration ${vehicle.reg_number} not found in the DVLA database. This may be a test vehicle or an invalid registration.`;
+        if (isTestVehicle) {
+          motDueMessage = `Vehicle registration ${vehicle.reg_number} not found in the DVLA database. This is a test vehicle.`;
+        } else {
+          motDueMessage = `Vehicle registration ${vehicle.reg_number} not found in the DVLA database. This may be an invalid registration or a vehicle not yet registered.`;
+        }
       } else if (maintenanceData.mot_due_date || maintenanceData.ves_month_of_first_registration) {
         motDueMessage = `No MOT history available for ${vehicle.reg_number}. This vehicle may be less than 3 years old and not yet required to have an MOT.`;
       }
