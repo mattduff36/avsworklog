@@ -112,6 +112,7 @@ function NewInspectionContent() {
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
   const [showConfirmSubmitDialog, setShowConfirmSubmitDialog] = useState(false);
+  const [savingDraftFromConfirm, setSavingDraftFromConfirm] = useState(false);
   const [showAddVehicleDialog, setShowAddVehicleDialog] = useState(false);
   const [newVehicleReg, setNewVehicleReg] = useState('');
   const [newVehicleCategoryId, setNewVehicleCategoryId] = useState('');
@@ -578,11 +579,13 @@ function NewInspectionContent() {
   const validateAndSubmit = () => {
     if (!vehicleId) {
       setError('Please select a vehicle');
+      // Keep dialog open if validation fails
       return;
     }
 
     if (!currentMileage || parseInt(currentMileage) < 0) {
       setError('Please enter a valid current mileage');
+      // Keep dialog open if validation fails
       return;
     }
 
@@ -590,6 +593,7 @@ function NewInspectionContent() {
     const weekEndDate = new Date(weekEnding + 'T00:00:00');
     if (weekEndDate.getDay() !== 0) {
       setError('Week ending must be a Sunday');
+      // Keep dialog open if validation fails
       return;
     }
 
@@ -609,14 +613,17 @@ function NewInspectionContent() {
       toast.error('Missing defect comments', {
         description: `Please add comments for: ${defectsWithoutComments.slice(0, 3).join(', ')}${defectsWithoutComments.length > 3 ? '...' : ''}`,
       });
+      // Keep dialog open if validation fails
       return;
     }
     
-    // Close confirmation dialog if open
+    // All validation passed - close confirmation dialog first
     setShowConfirmSubmitDialog(false);
     
-    // Show signature dialog
-    setShowSignatureDialog(true);
+    // Use setTimeout to ensure dialog state updates before opening signature dialog
+    setTimeout(() => {
+      setShowSignatureDialog(true);
+    }, 100);
   };
 
   const handleSignatureComplete = async (sig: string) => {
@@ -1862,7 +1869,14 @@ function NewInspectionContent() {
       </Dialog>
 
       {/* Confirmation Dialog - NEW SUBMISSIONS ONLY */}
-      <Dialog open={showConfirmSubmitDialog} onOpenChange={setShowConfirmSubmitDialog}>
+      <Dialog 
+        open={showConfirmSubmitDialog} 
+        onOpenChange={(open) => {
+          // Prevent closing while saving draft
+          if (!open && savingDraftFromConfirm) return;
+          setShowConfirmSubmitDialog(open);
+        }}
+      >
         <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Confirm Submission</DialogTitle>
@@ -1889,23 +1903,38 @@ function NewInspectionContent() {
             <Button
               variant="outline"
               onClick={() => setShowConfirmSubmitDialog(false)}
+              disabled={savingDraftFromConfirm}
               className="border-slate-600 text-white hover:bg-slate-800"
             >
               Cancel
             </Button>
             <Button
               variant="outline"
-              onClick={() => {
-                setShowConfirmSubmitDialog(false);
-                saveInspection('draft');
+              onClick={async () => {
+                setSavingDraftFromConfirm(true);
+                try {
+                  await saveInspection('draft');
+                  // If save succeeds, saveInspection navigates away, so dialog closes automatically
+                  // If save fails, error is shown and we keep dialog open
+                } catch (error) {
+                  // Error is already handled in saveInspection via showErrorWithReport
+                  // Keep dialog open so user can see the error and try again
+                  console.error('Failed to save draft:', error);
+                } finally {
+                  // Only reset loading state if we're still on the page (save failed)
+                  // If navigation happened, component unmounts so this doesn't matter
+                  setSavingDraftFromConfirm(false);
+                }
               }}
+              disabled={savingDraftFromConfirm || loading}
               className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
             >
               <Save className="h-4 w-4 mr-2" />
-              Save Draft
+              {savingDraftFromConfirm ? 'Saving...' : 'Save Draft'}
             </Button>
             <Button
               onClick={validateAndSubmit}
+              disabled={savingDraftFromConfirm}
               className="bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold"
             >
               <Send className="h-4 w-4 mr-2" />
