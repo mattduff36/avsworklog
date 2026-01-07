@@ -30,6 +30,7 @@ export default function ViewInspectionPage() {
   
   const [inspection, setInspection] = useState<InspectionWithDetails | null>(null);
   const [items, setItems] = useState<InspectionItem[]>([]);
+  const [originalDefectItems, setOriginalDefectItems] = useState<InspectionItem[]>([]); // Track original defects for auto-completion
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -80,6 +81,10 @@ export default function ViewInspectionPage() {
       if (itemsError) throw itemsError;
 
       setItems(itemsData || []);
+      
+      // Track original defect items for auto-completion when resolved
+      const defectItems = (itemsData || []).filter(item => item.status === 'attention');
+      setOriginalDefectItems(defectItems);
       
       // Enable editing only for draft inspections
       if (inspectionData && inspectionData.status === 'draft') {
@@ -311,14 +316,76 @@ export default function ViewInspectionPage() {
 
               // Update existing actions
               for (const { id, updates } of actionsToUpdate) {
-                await supabase.from('actions').update(updates).eq('id', id);
-                console.log(`✅ Updated workshop task ${id}`);
+                const { error: updateError } = await supabase.from('actions').update(updates).eq('id', id);
+                if (updateError) {
+                  console.error(`Error updating action ${id}:`, updateError);
+                } else {
+                  console.log(`✅ Updated workshop task ${id}`);
+                }
               }
             }
           } catch (actionError) {
             console.error('[Mobile Debug] Error creating/updating actions:', actionError);
             // Don't throw - we don't want to fail the save if action creation fails
           }
+        }
+      }
+
+      // Auto-complete actions for resolved items (items that were 'attention' but are now 'ok')
+      if (originalDefectItems.length > 0 && inspection.vehicle_id) {
+        try {
+          // Find items that were defects but are now OK
+          const resolvedItems = originalDefectItems.filter(originalItem => {
+            const currentItem = itemsToInsert.find(
+              item => item.item_number === originalItem.item_number && 
+                      item.day_of_week === originalItem.day_of_week
+            );
+            // Item is resolved if it's now 'ok' or 'na', or if it's been removed
+            return !currentItem || currentItem.status === 'ok' || currentItem.status === 'na';
+          });
+
+          if (resolvedItems.length > 0) {
+            console.log(`[Mobile Debug] Found ${resolvedItems.length} resolved items`);
+
+            // Find pending or logged actions for this inspection
+            const { data: pendingActions } = await supabase
+              .from('actions')
+              .select('id, inspection_item_id, description, status')
+              .eq('inspection_id', inspection.id)
+              .eq('action_type', 'inspection_defect')
+              .in('status', ['pending', 'logged']);
+
+            if (pendingActions && pendingActions.length > 0) {
+              // Match resolved items with their actions and complete them
+              for (const resolvedItem of resolvedItems) {
+                const matchingAction = pendingActions.find(
+                  action => action.inspection_item_id === resolvedItem.id
+                );
+
+                if (matchingAction) {
+                  const { error: completeError } = await supabase
+                    .from('actions')
+                    .update({
+                      status: 'completed',
+                      actioned: true,
+                      actioned_at: new Date().toISOString(),
+                      actioned_by: user.id,
+                      description: `${matchingAction.description || ''}\n\nResolution: Item marked as OK/NA during inspection edit`
+                    })
+                    .eq('id', matchingAction.id);
+
+                  if (completeError) {
+                    console.error(`Error auto-completing action ${matchingAction.id}:`, completeError);
+                  } else {
+                    console.log(`✅ Auto-completed action ${matchingAction.id} for resolved item ${resolvedItem.item_number}`);
+                  }
+                }
+              }
+            }
+          }
+        } catch (resolveError) {
+          console.error('[Mobile Debug] Error completing resolved actions:', resolveError);
+          // Don't throw - we don't want to fail the save if this fails
         }
       }
 
@@ -494,7 +561,58 @@ export default function ViewInspectionPage() {
 
           // Update existing actions
           for (const { id, updates } of actionsToUpdate) {
-            await supabase.from('actions').update(updates).eq('id', id);
+            const { error: updateError } = await supabase.from('actions').update(updates).eq('id', id);
+            if (updateError) {
+              console.error(`Error updating action ${id}:`, updateError);
+            }
+          }
+
+          // Auto-complete actions for resolved items
+          if (originalDefectItems.length > 0) {
+            const resolvedItems = originalDefectItems.filter(originalItem => {
+              const currentItem = savedItems.find(
+                item => item.item_number === originalItem.item_number && 
+                        item.day_of_week === originalItem.day_of_week
+              );
+              // Item is resolved if it's now 'ok' or 'na', or if it's been removed
+              return !currentItem || currentItem.status === 'ok' || currentItem.status === 'na';
+            });
+
+            if (resolvedItems.length > 0) {
+              const { data: pendingActions } = await supabase
+                .from('actions')
+                .select('id, inspection_item_id, description, status')
+                .eq('inspection_id', inspection.id)
+                .eq('action_type', 'inspection_defect')
+                .in('status', ['pending', 'logged']);
+
+              if (pendingActions && pendingActions.length > 0) {
+                for (const resolvedItem of resolvedItems) {
+                  const matchingAction = pendingActions.find(
+                    action => action.inspection_item_id === resolvedItem.id
+                  );
+
+                  if (matchingAction) {
+                    const { error: completeError } = await supabase
+                      .from('actions')
+                      .update({
+                        status: 'completed',
+                        actioned: true,
+                        actioned_at: new Date().toISOString(),
+                        actioned_by: user.id,
+                        description: `${matchingAction.description || ''}\n\nResolution: Item marked as OK/NA during inspection submission`
+                      })
+                      .eq('id', matchingAction.id);
+
+                    if (completeError) {
+                      console.error(`Error auto-completing action ${matchingAction.id}:`, completeError);
+                    } else {
+                      console.log(`✅ Auto-completed action ${matchingAction.id} for resolved item ${resolvedItem.item_number}`);
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
