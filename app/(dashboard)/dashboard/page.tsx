@@ -566,7 +566,7 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-4">
                           <div 
                             className="flex items-center justify-center w-10 h-10 rounded-lg"
-                            style={{ backgroundColor: approval.color.replace(')', ' / 0.15)') }}
+                            style={{ backgroundColor: approval.color.replace('hsl(', 'hsla(').replace(')', ', 0.15)') }}
                           >
                             <Icon 
                               className="h-5 w-5" 
@@ -651,7 +651,7 @@ export default function DashboardPage() {
                           <div className="flex items-center gap-4">
                           <div 
                             className="flex items-center justify-center w-10 h-10 rounded-lg"
-                            style={{ backgroundColor: actionType.color.replace(')', ' / 0.15)') }}
+                            style={{ backgroundColor: actionType.color.replace('hsl(', 'hsla(').replace(')', ', 0.15)') }}
                           >
                             <Icon 
                               className="h-5 w-5" 
@@ -688,7 +688,7 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-4">
                           <div 
                             className="flex items-center justify-center w-10 h-10 rounded-lg"
-                            style={{ backgroundColor: actionType.color.replace(')', ' / 0.15)') }}
+                            style={{ backgroundColor: actionType.color.replace('hsl(', 'hsla(').replace(')', ', 0.15)') }}
                           >
                             <Icon 
                               className="h-5 w-5" 
