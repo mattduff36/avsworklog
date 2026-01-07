@@ -23,10 +23,12 @@ type Action = Database['public']['Tables']['actions']['Row'] & {
     inspection_date: string;
     vehicles?: {
       reg_number: string;
+      nickname: string | null;
     };
   };
   vehicles?: {
     reg_number: string;
+    nickname: string | null;
   };
   workshop_task_categories?: {
     name: string;
@@ -64,6 +66,8 @@ export default function WorkshopTasksPage() {
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [workshopComments, setWorkshopComments] = useState('');
+  const [newMileage, setNewMileage] = useState('');
+  const [currentMileage, setCurrentMileage] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   
   // Status Update Modal (for "Mark In Progress" / logged)
@@ -71,6 +75,15 @@ export default function WorkshopTasksPage() {
   const [selectedTask, setSelectedTask] = useState<Action | null>(null);
   const [loggedComment, setLoggedComment] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState<Set<string>>(new Set());
+  
+  // Edit Task Modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTask, setEditingTask] = useState<Action | null>(null);
+  const [editVehicleId, setEditVehicleId] = useState('');
+  const [editCategoryId, setEditCategoryId] = useState('');
+  const [editComments, setEditComments] = useState('');
+  const [editMileage, setEditMileage] = useState('');
+  const [editCurrentMileage, setEditCurrentMileage] = useState<number | null>(null);
   
   // Category Management
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -98,11 +111,13 @@ export default function WorkshopTasksPage() {
           vehicle_inspections (
             inspection_date,
             vehicles (
-              reg_number
+              reg_number,
+              nickname
             )
           ),
           vehicles (
-            reg_number
+            reg_number,
+            nickname
           ),
           workshop_task_categories (
             name
@@ -162,8 +177,31 @@ export default function WorkshopTasksPage() {
     }
   };
 
+  const fetchCurrentMileage = async (vehicleId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('vehicle_maintenance')
+        .select('current_mileage')
+        .eq('vehicle_id', vehicleId)
+        .single();
+
+      if (error) {
+        // If no maintenance record exists, set to null
+        if (error.code === 'PGRST116') {
+          setCurrentMileage(null);
+          return;
+        }
+        throw error;
+      }
+      setCurrentMileage(data?.current_mileage || null);
+    } catch (err) {
+      console.error('Error fetching current mileage:', err);
+      setCurrentMileage(null);
+    }
+  };
+
   const handleAddTask = async () => {
-    if (!selectedVehicleId || !selectedCategoryId || !workshopComments.trim()) {
+    if (!selectedVehicleId || !selectedCategoryId || !workshopComments.trim() || !newMileage.trim()) {
       toast.error('Please fill in all fields');
       return;
     }
@@ -173,9 +211,22 @@ export default function WorkshopTasksPage() {
       return;
     }
 
+    const mileageValue = parseInt(newMileage);
+    if (isNaN(mileageValue) || mileageValue < 0) {
+      toast.error('Please enter a valid mileage');
+      return;
+    }
+
+    // Validate mileage is >= current mileage
+    if (currentMileage !== null && mileageValue < currentMileage) {
+      toast.error(`Mileage must be equal to or greater than current mileage (${currentMileage.toLocaleString()} miles)`);
+      return;
+    }
+
     try {
       setSubmitting(true);
 
+      // Create the workshop task
       const { error } = await supabase
         .from('actions')
         .insert({
@@ -192,7 +243,26 @@ export default function WorkshopTasksPage() {
 
       if (error) throw error;
 
-      toast.success('Workshop task created successfully');
+      // Update vehicle mileage in vehicle_maintenance table
+      const { error: mileageError } = await supabase
+        .from('vehicle_maintenance')
+        .upsert({
+          vehicle_id: selectedVehicleId,
+          current_mileage: mileageValue,
+          last_mileage_update: new Date().toISOString(),
+          last_updated_at: new Date().toISOString(),
+          last_updated_by: user!.id,
+        }, {
+          onConflict: 'vehicle_id',
+        });
+
+      if (mileageError) {
+        console.error('Error updating mileage:', mileageError);
+        toast.error('Task created but failed to update mileage');
+      } else {
+        toast.success('Workshop task created successfully');
+      }
+
       setShowAddModal(false);
       resetAddForm();
       fetchTasks();
@@ -208,6 +278,8 @@ export default function WorkshopTasksPage() {
     setSelectedVehicleId('');
     setSelectedCategoryId('');
     setWorkshopComments('');
+    setNewMileage('');
+    setCurrentMileage(null);
   };
 
   const handleMarkInProgress = (task: Action) => {
@@ -382,6 +454,111 @@ export default function WorkshopTasksPage() {
     }
   };
 
+  const handleEditTask = async (task: Action) => {
+    setEditingTask(task);
+    setEditVehicleId(task.vehicle_id || '');
+    setEditCategoryId(task.workshop_category_id || '');
+    setEditComments(task.workshop_comments || '');
+    setEditMileage('');
+    
+    // Fetch current mileage for the vehicle
+    if (task.vehicle_id) {
+      try {
+        const { data, error } = await supabase
+          .from('vehicle_maintenance')
+          .select('current_mileage')
+          .eq('vehicle_id', task.vehicle_id)
+          .single();
+
+        if (error && error.code !== 'PGRST116') throw error;
+        setEditCurrentMileage(data?.current_mileage || null);
+      } catch (err) {
+        console.error('Error fetching mileage:', err);
+        setEditCurrentMileage(null);
+      }
+    }
+    
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editVehicleId || !editCategoryId || !editComments.trim() || !editMileage.trim()) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    if (editComments.length < 10) {
+      toast.error('Comments must be at least 10 characters');
+      return;
+    }
+
+    const mileageValue = parseInt(editMileage);
+    if (isNaN(mileageValue) || mileageValue < 0) {
+      toast.error('Please enter a valid mileage');
+      return;
+    }
+
+    // Validate mileage is >= current mileage
+    if (editCurrentMileage !== null && mileageValue < editCurrentMileage) {
+      toast.error(`Mileage must be equal to or greater than current mileage (${editCurrentMileage.toLocaleString()} miles)`);
+      return;
+    }
+
+    if (!editingTask) return;
+
+    try {
+      setSubmitting(true);
+
+      // Update the workshop task
+      const { error } = await supabase
+        .from('actions')
+        .update({
+          vehicle_id: editVehicleId,
+          workshop_category_id: editCategoryId,
+          workshop_comments: editComments,
+          title: `Workshop Task - ${vehicles.find(v => v.id === editVehicleId)?.reg_number}`,
+          description: editComments.substring(0, 200),
+        })
+        .eq('id', editingTask.id);
+
+      if (error) throw error;
+
+      // Update vehicle mileage
+      const { error: mileageError } = await supabase
+        .from('vehicle_maintenance')
+        .upsert({
+          vehicle_id: editVehicleId,
+          current_mileage: mileageValue,
+          last_mileage_update: new Date().toISOString(),
+          last_updated_at: new Date().toISOString(),
+          last_updated_by: user!.id,
+        }, {
+          onConflict: 'vehicle_id',
+        });
+
+      if (mileageError) {
+        console.error('Error updating mileage:', mileageError);
+        toast.error('Task updated but failed to update mileage');
+      } else {
+        toast.success('Workshop task updated successfully');
+      }
+
+      setShowEditModal(false);
+      setEditingTask(null);
+      setEditVehicleId('');
+      setEditCategoryId('');
+      setEditComments('');
+      setEditMileage('');
+      setEditCurrentMileage(null);
+      fetchTasks();
+    } catch (err) {
+      console.error('Error updating task:', err);
+      toast.error('Failed to update task');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const styles = {
       pending: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
@@ -414,9 +591,21 @@ export default function WorkshopTasksPage() {
   };
 
   const getVehicleReg = (task: Action) => {
-    if (task.vehicles?.reg_number) return task.vehicles.reg_number;
-    if (task.vehicle_inspections?.vehicles?.reg_number) return task.vehicle_inspections.vehicles.reg_number;
-    return 'Unknown';
+    let reg = 'Unknown';
+    let nickname = null;
+    
+    if (task.vehicles) {
+      reg = task.vehicles.reg_number;
+      nickname = task.vehicles.nickname;
+    } else if (task.vehicle_inspections?.vehicles) {
+      reg = task.vehicle_inspections.vehicles.reg_number;
+      nickname = task.vehicle_inspections.vehicles.nickname;
+    }
+    
+    if (nickname) {
+      return `${reg} (${nickname})`;
+    }
+    return reg;
   };
 
   const getSourceLabel = (task: Action) => {
@@ -743,6 +932,17 @@ export default function WorkshopTasksPage() {
                                     </div>
                                   </div>
                                   <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 w-full md:w-auto">
+                                    {task.action_type === 'workshop_vehicle_task' && (
+                                      <Button
+                                        onClick={() => handleEditTask(task)}
+                                        disabled={isUpdating}
+                                        variant="outline"
+                                        className="h-12 md:h-16 min-w-0 md:min-w-[140px] text-sm md:text-base font-semibold border-slate-600 text-white hover:bg-slate-800"
+                                      >
+                                        <Edit className="h-4 w-4 md:mr-2" />
+                                        <span className="md:inline">Edit</span>
+                                      </Button>
+                                    )}
                                     <Button
                                       onClick={() => handleMarkInProgress(task)}
                                       disabled={isUpdating}
@@ -838,6 +1038,17 @@ export default function WorkshopTasksPage() {
                                     </div>
                                   </div>
                                   <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 w-full md:w-auto">
+                                    {task.action_type === 'workshop_vehicle_task' && (
+                                      <Button
+                                        onClick={() => handleEditTask(task)}
+                                        disabled={isUpdating}
+                                        variant="outline"
+                                        className="h-12 md:h-16 min-w-0 md:min-w-[140px] text-sm md:text-base font-semibold border-slate-600 text-white hover:bg-slate-800"
+                                      >
+                                        <Edit className="h-4 w-4 md:mr-2" />
+                                        <span className="md:inline">Edit</span>
+                                      </Button>
+                                    )}
                                     <Button
                                       onClick={() => handleUndoLogged(task.id)}
                                       variant="outline"
@@ -1071,7 +1282,14 @@ export default function WorkshopTasksPage() {
               <Label htmlFor="vehicle" className="text-slate-900 dark:text-white">
                 Vehicle <span className="text-red-500">*</span>
               </Label>
-              <Select value={selectedVehicleId} onValueChange={setSelectedVehicleId}>
+              <Select value={selectedVehicleId} onValueChange={(value) => {
+                setSelectedVehicleId(value);
+                if (value) {
+                  fetchCurrentMileage(value);
+                } else {
+                  setCurrentMileage(null);
+                }
+              }}>
                 <SelectTrigger id="vehicle" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white">
                   <SelectValue placeholder="Select vehicle" />
                 </SelectTrigger>
@@ -1101,6 +1319,27 @@ export default function WorkshopTasksPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="mileage" className="text-slate-900 dark:text-white">
+                Current Mileage <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="mileage"
+                type="number"
+                value={newMileage}
+                onChange={(e) => setNewMileage(e.target.value)}
+                placeholder="Enter current mileage"
+                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white"
+                min="0"
+                step="1"
+              />
+              {currentMileage !== null && (
+                <p className="text-xs text-slate-600 dark:text-slate-400">
+                  Last recorded: {currentMileage.toLocaleString()} miles
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -1134,7 +1373,7 @@ export default function WorkshopTasksPage() {
             </Button>
             <Button
               onClick={handleAddTask}
-              disabled={submitting || !selectedVehicleId || !selectedCategoryId || workshopComments.length < 10}
+              disabled={submitting || !selectedVehicleId || !selectedCategoryId || workshopComments.length < 10 || !newMileage.trim()}
               className="bg-workshop hover:bg-workshop-dark text-white"
             >
               {submitting ? 'Creating...' : 'Create Task'}
@@ -1202,6 +1441,137 @@ export default function WorkshopTasksPage() {
             >
               <Clock className="h-4 w-4 mr-2" />
               Mark In Progress
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Task Modal */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-white text-xl">Edit Workshop Task</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
+              Update the workshop task details
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-vehicle" className="text-slate-900 dark:text-white">
+                Vehicle <span className="text-red-500">*</span>
+              </Label>
+              <Select value={editVehicleId} onValueChange={(value) => {
+                setEditVehicleId(value);
+                if (value) {
+                  // Fetch current mileage for the new vehicle
+                  supabase
+                    .from('vehicle_maintenance')
+                    .select('current_mileage')
+                    .eq('vehicle_id', value)
+                    .single()
+                    .then(({ data, error }) => {
+                      if (error && error.code !== 'PGRST116') {
+                        console.error('Error fetching mileage:', error);
+                      }
+                      setEditCurrentMileage(data?.current_mileage || null);
+                    });
+                } else {
+                  setEditCurrentMileage(null);
+                }
+              }}>
+                <SelectTrigger id="edit-vehicle" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white">
+                  <SelectValue placeholder="Select vehicle" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vehicles.map((vehicle) => (
+                    <SelectItem key={vehicle.id} value={vehicle.id}>
+                      {vehicle.reg_number}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-category" className="text-slate-900 dark:text-white">
+                Category <span className="text-red-500">*</span>
+              </Label>
+              <Select value={editCategoryId} onValueChange={setEditCategoryId}>
+                <SelectTrigger id="edit-category" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-mileage" className="text-slate-900 dark:text-white">
+                Current Mileage <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="edit-mileage"
+                type="number"
+                value={editMileage}
+                onChange={(e) => setEditMileage(e.target.value)}
+                placeholder="Enter current mileage"
+                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white"
+                min="0"
+                step="1"
+              />
+              {editCurrentMileage !== null && (
+                <p className="text-xs text-slate-600 dark:text-slate-400">
+                  Last recorded: {editCurrentMileage.toLocaleString()} miles
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-comments" className="text-slate-900 dark:text-white">
+                Workshop Comments <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="edit-comments"
+                value={editComments}
+                onChange={(e) => setEditComments(e.target.value)}
+                placeholder="Describe the work needed (minimum 10 characters)"
+                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[100px]"
+                maxLength={500}
+              />
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                {editComments.length}/500 characters (minimum 10)
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowEditModal(false);
+                setEditingTask(null);
+                setEditVehicleId('');
+                setEditCategoryId('');
+                setEditComments('');
+                setEditMileage('');
+                setEditCurrentMileage(null);
+              }}
+              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveEdit}
+              disabled={submitting || !editVehicleId || !editCategoryId || editComments.length < 10 || !editMileage.trim()}
+              className="bg-workshop hover:bg-workshop-dark text-white"
+            >
+              {submitting ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>
         </DialogContent>
