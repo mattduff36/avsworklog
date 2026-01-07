@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, FileText, Wrench, Undo2, Info, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, FileText, Wrench, Undo2, Info, Edit, Trash2, Eye, EyeOff, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import { Database } from '@/types/database';
@@ -726,6 +726,11 @@ export default function WorkshopTasksPage() {
   const pendingTasks = tasks.filter(t => t.status === 'pending');
   const inProgressTasks = tasks.filter(t => t.status === 'logged');
   const completedTasks = tasks.filter(t => t.status === 'completed');
+  
+  // Expandable sections state (Pending and In Progress open by default, Completed closed)
+  const [showPending, setShowPending] = useState(true);
+  const [showInProgress, setShowInProgress] = useState(true);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   // Show loading state while checking permissions
   if (permissionLoading) {
@@ -893,8 +898,22 @@ export default function WorkshopTasksPage() {
               {/* Pending Tasks */}
               {pendingTasks.length > 0 && (
                 <div className="space-y-4">
-                  <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Pending Tasks</h2>
-                  <div className="space-y-3">
+                  <button
+                    onClick={() => setShowPending(!showPending)}
+                    className="w-full flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5 text-amber-400" />
+                      Pending Tasks ({pendingTasks.length})
+                    </h2>
+                    {showPending ? (
+                      <ChevronUp className="h-5 w-5 text-slate-400" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-slate-400" />
+                    )}
+                  </button>
+                  {showPending && (
+                    <div className="space-y-3">
                     {pendingTasks.map((task) => {
                       const isUpdating = updatingStatus.has(task.id);
                       return (
@@ -977,18 +996,30 @@ export default function WorkshopTasksPage() {
                         </Card>
                       );
                     })}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* In Progress Tasks */}
               {inProgressTasks.length > 0 && (
                 <div className="space-y-4">
-                  <h2 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-blue-400" />
-                    In Progress Tasks
-                  </h2>
-                  <div className="space-y-3">
+                  <button
+                    onClick={() => setShowInProgress(!showInProgress)}
+                    className="w-full flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-blue-400" />
+                      In Progress Tasks ({inProgressTasks.length})
+                    </h2>
+                    {showInProgress ? (
+                      <ChevronUp className="h-5 w-5 text-slate-400" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-slate-400" />
+                    )}
+                  </button>
+                  {showInProgress && (
+                    <div className="space-y-3">
                     {inProgressTasks.map((task) => {
                       const isUpdating = updatingStatus.has(task.id);
                       return (
@@ -1084,15 +1115,30 @@ export default function WorkshopTasksPage() {
                         </Card>
                       );
                     })}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Completed Tasks */}
               {completedTasks.length > 0 && (
                 <div className="space-y-4">
-                  <h2 className="text-xl font-semibold text-slate-600 dark:text-slate-400">Completed Tasks</h2>
-                  <div className="space-y-3">
+                  <button
+                    onClick={() => setShowCompleted(!showCompleted)}
+                    className="w-full flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <h2 className="text-xl font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-green-400" />
+                      Completed Tasks ({completedTasks.length})
+                    </h2>
+                    {showCompleted ? (
+                      <ChevronUp className="h-5 w-5 text-slate-400" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-slate-400" />
+                    )}
+                  </button>
+                  {showCompleted && (
+                    <div className="space-y-3">
                     {completedTasks.map((task) => (
                       <Card key={task.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-90 transition-opacity">
                         <CardContent className="pt-6">
@@ -1142,7 +1188,8 @@ export default function WorkshopTasksPage() {
                         </CardContent>
                       </Card>
                     ))}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

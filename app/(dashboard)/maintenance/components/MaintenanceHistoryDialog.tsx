@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, History as HistoryIcon, User, Calendar, Edit, ChevronDown, Clock, FileText, RefreshCw } from 'lucide-react';
+import { Loader2, History as HistoryIcon, User, Calendar, Edit, ChevronDown, ChevronUp, Clock, FileText, RefreshCw } from 'lucide-react';
 import { useMaintenanceHistory } from '@/lib/hooks/useMaintenance';
 import { formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 import { MotHistoryDialog } from './MotHistoryDialog';
@@ -468,35 +468,25 @@ export function MaintenanceHistoryDialog({
               })}
             </div>
 
-            {/* Show All History Button */}
-            {combinedItems.length > 3 && !showFullHistory && (
-              <Button
-                onClick={() => setShowFullHistory(true)}
-                variant="outline"
-                className="w-full border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white"
-              >
-                <ChevronDown className="h-4 w-4 mr-2" />
-                Show All History ({combinedItems.length} total updates)
-              </Button>
-            )}
-
-            {/* Full History Section */}
-            {showFullHistory && (
-              <div className="space-y-4 border-t border-slate-700 pt-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Complete History</h3>
-                  <Button
-                    onClick={() => {
-                      setShowFullHistory(false);
-                      setVisibleHistoryCount(10);
-                    }}
-                    variant="ghost"
-                    size="sm"
-                    className="text-slate-400 hover:text-white"
-                  >
-                    Hide
-                  </Button>
-                </div>
+            {/* Expandable Complete History Section */}
+            {combinedItems.length > 3 && (
+              <div className="border-t border-slate-700 pt-4">
+                <button
+                  onClick={() => setShowFullHistory(!showFullHistory)}
+                  className="w-full flex items-center justify-between p-3 bg-slate-800/30 hover:bg-slate-800/50 rounded-lg border border-slate-700/50 transition-colors"
+                >
+                  <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">
+                    Complete History ({combinedItems.length} total updates)
+                  </h3>
+                  {showFullHistory ? (
+                    <ChevronUp className="h-4 w-4 text-slate-400" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-slate-400" />
+                  )}
+                </button>
+                
+                {showFullHistory && (
+                  <div className="space-y-4 mt-4">
                 
                 <div className="space-y-6">
                   {Object.entries(groupedHistory)
@@ -655,6 +645,8 @@ export function MaintenanceHistoryDialog({
                     <ChevronDown className="h-4 w-4 mr-2" />
                     Show More ({combinedItems.length - visibleHistoryCount} remaining)
                   </Button>
+                )}
+                  </div>
                 )}
               </div>
             )}

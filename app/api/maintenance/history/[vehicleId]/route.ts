@@ -90,11 +90,9 @@ export async function GET(
         workshop_comments,
         actioned_at,
         logged_at,
+        created_by,
         workshop_task_categories (
           name
-        ),
-        profiles:created_by (
-          full_name
         )
       `)
       .eq('vehicle_id', vehicleId)
@@ -106,10 +104,28 @@ export async function GET(
       // Don't fail the whole request if workshop tasks fail
     }
     
+    // Fetch profile names for workshop tasks
+    let tasksWithProfiles = workshopTasks || [];
+    if (workshopTasks && workshopTasks.length > 0) {
+      const userIds = [...new Set(workshopTasks.map(t => t.created_by).filter(Boolean))];
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', userIds);
+        
+        const profileMap = new Map((profiles || []).map(p => [p.id, p.full_name]));
+        tasksWithProfiles = workshopTasks.map(task => ({
+          ...task,
+          profiles: task.created_by ? { full_name: profileMap.get(task.created_by) || null } : null
+        }));
+      }
+    }
+    
     const response: MaintenanceHistoryResponse = {
       success: true,
       history: history || [],
-      workshopTasks: workshopTasks || [],
+      workshopTasks: tasksWithProfiles,
       vehicle: {
         id: vehicle.id,
         reg_number: vehicle.reg_number
