@@ -213,7 +213,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
 
         {/* View As Selector - SuperAdmin Only (Bottom) */}
         {isSuperAdmin && (
-          <div className="border-t border-slate-700 p-3 mt-auto">
+          <div className="border-t border-slate-700 p-3 mt-auto relative z-[75]">
             <Popover>
               <PopoverTrigger asChild>
                 {open ? (

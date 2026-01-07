@@ -609,7 +609,7 @@ export default function WorkshopTasksPage() {
   };
 
   const getSourceLabel = (task: Action) => {
-    return task.action_type === 'inspection_defect' ? 'From Inspection' : 'Manual Entry';
+    return task.action_type === 'inspection_defect' ? 'Inspection Defect Fix' : 'Workshop Task';
   };
 
   // Category Management Functions
@@ -938,7 +938,7 @@ export default function WorkshopTasksPage() {
                                         <strong>Category:</strong> {task.workshop_task_categories.name}
                                       </p>
                                     )}
-                                    {task.description && (
+                                    {task.action_type === 'inspection_defect' && task.description && (
                                       <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{task.description}</p>
                                     )}
                                     {task.workshop_comments && (
@@ -1044,7 +1044,7 @@ export default function WorkshopTasksPage() {
                                         <strong>Category:</strong> {task.workshop_task_categories.name}
                                       </p>
                                     )}
-                                    {task.description && (
+                                    {task.action_type === 'inspection_defect' && task.description && (
                                       <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{task.description}</p>
                                     )}
                                     {task.logged_comment && (
@@ -1161,7 +1161,7 @@ export default function WorkshopTasksPage() {
                                       <strong>Category:</strong> {task.workshop_task_categories.name}
                                     </p>
                                   )}
-                                  {task.description && (
+                                  {task.action_type === 'inspection_defect' && task.description && (
                                     <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{task.description}</p>
                                   )}
                                   <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
