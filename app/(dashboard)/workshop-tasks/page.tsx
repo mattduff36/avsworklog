@@ -881,23 +881,23 @@ export default function WorkshopTasksPage() {
             <div className="space-y-6">
               {/* Pending Tasks */}
               {pendingTasks.length > 0 && (
-                <div className="space-y-4">
+                <div className="border-2 border-amber-500/30 rounded-lg overflow-hidden bg-amber-500/5">
                   <button
                     onClick={() => setShowPending(!showPending)}
-                    className="w-full flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    className="w-full flex items-center justify-between p-4 bg-amber-500/10 hover:bg-amber-500/20 transition-colors border-b-2 border-amber-500/30"
                   >
                     <h2 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                       <AlertTriangle className="h-5 w-5 text-amber-400" />
                       Pending Tasks ({pendingTasks.length})
                     </h2>
                     {showPending ? (
-                      <ChevronUp className="h-5 w-5 text-slate-400" />
+                      <ChevronUp className="h-5 w-5 text-amber-400" />
                     ) : (
-                      <ChevronDown className="h-5 w-5 text-slate-400" />
+                      <ChevronDown className="h-5 w-5 text-amber-400" />
                     )}
                   </button>
                   {showPending && (
-                    <div className="space-y-3">
+                    <div className="space-y-3 p-4">
                     {pendingTasks.map((task) => {
                       const isUpdating = updatingStatus.has(task.id);
                       return (

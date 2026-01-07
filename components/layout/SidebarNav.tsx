@@ -135,7 +135,10 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         </div>
 
         {/* Navigation */}
-        <div className={`overflow-y-auto py-4 ${isSuperAdmin ? 'h-[calc(100vh-10rem)]' : 'h-[calc(100vh-8.25rem)]'}`}>
+        <div 
+          className={`overflow-y-auto py-4 ${isSuperAdmin ? 'h-[calc(100vh-10rem)]' : 'h-[calc(100vh-8.25rem)]'}`}
+          style={{ pointerEvents: popoverOpen ? 'none' : 'auto' }}
+        >
           {/* Manager Links */}
           {isManager && (
           <div className={open ? 'px-3 mb-6' : 'px-2 mb-6'}>
