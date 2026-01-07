@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, CheckCircle2, Clock, Trash2, FileText, Undo2, Wrench, ArrowRight, Info } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Trash2, FileText, Undo2, Wrench, ArrowRight, Info, Settings, Ban } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Database } from '@/types/database';
 import { toast } from 'sonner';
@@ -40,6 +40,8 @@ export default function ActionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [completingActions, setCompletingActions] = useState<Set<string>>(new Set());
+  const [maintenanceOverdue, setMaintenanceOverdue] = useState(0);
+  const [maintenanceDueSoon, setMaintenanceDueSoon] = useState(0);
   
   // Logged modal states
   const [showLoggedDialog, setShowLoggedDialog] = useState(false);
@@ -79,6 +81,50 @@ export default function ActionsPage() {
     }
   }, [supabase]);
 
+  const fetchMaintenanceCounts = useCallback(async () => {
+    try {
+      // Fetch maintenance data from API (same as maintenance page)
+      const response = await fetch('/api/maintenance');
+      if (!response.ok) {
+        throw new Error('Failed to fetch maintenance data');
+      }
+      
+      const data = await response.json();
+      const vehicles = data.vehicles || [];
+      
+      // Count individual alerts (same logic as MaintenanceOverview component)
+      let overdueCount = 0;
+      let dueSoonCount = 0;
+      
+      vehicles.forEach((vehicle: any) => {
+        // Check Tax
+        if (vehicle.tax_status?.status === 'overdue') overdueCount++;
+        else if (vehicle.tax_status?.status === 'due_soon') dueSoonCount++;
+        
+        // Check MOT
+        if (vehicle.mot_status?.status === 'overdue') overdueCount++;
+        else if (vehicle.mot_status?.status === 'due_soon') dueSoonCount++;
+        
+        // Check Service
+        if (vehicle.service_status?.status === 'overdue') overdueCount++;
+        else if (vehicle.service_status?.status === 'due_soon') dueSoonCount++;
+        
+        // Check Cambelt
+        if (vehicle.cambelt_status?.status === 'overdue') overdueCount++;
+        else if (vehicle.cambelt_status?.status === 'due_soon') dueSoonCount++;
+        
+        // Check First Aid
+        if (vehicle.first_aid_status?.status === 'overdue') overdueCount++;
+        else if (vehicle.first_aid_status?.status === 'due_soon') dueSoonCount++;
+      });
+      
+      setMaintenanceOverdue(overdueCount);
+      setMaintenanceDueSoon(dueSoonCount);
+    } catch (err) {
+      console.error('Error fetching maintenance counts:', err);
+    }
+  }, []);
+
   useEffect(() => {
     if (!authLoading) {
       if (!isManager) {
@@ -86,8 +132,9 @@ export default function ActionsPage() {
         return;
       }
       fetchActions();
+      fetchMaintenanceCounts();
     }
-  }, [authLoading, isManager, router, fetchActions]);
+  }, [authLoading, isManager, router, fetchActions, fetchMaintenanceCounts]);
 
   // Mark as logged - opens modal for comment
   const handleMarkAsLogged = (actionId: string) => {
@@ -352,67 +399,170 @@ export default function ActionsPage() {
         </p>
       </div>
 
-      {/* Workshop Tasks Notice */}
-      {workshopActions.length > 0 && (
-        <Card className="bg-blue-500/10 border-blue-500/30 dark:bg-blue-500/10 dark:border-blue-500/30">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0">
-                <Info className="h-6 w-6 text-blue-400" />
+      {/* Action Categories */}
+      <div className="space-y-6">
+        {/* Workshop Tasks Category */}
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-workshop/20">
+                  <Wrench className="h-5 w-5 text-workshop" />
+                </div>
+                <div>
+                  <CardTitle className="text-slate-900 dark:text-white">Workshop Tasks</CardTitle>
+                  <CardDescription className="text-slate-600 dark:text-slate-400">
+                    Vehicle repairs and inspection defects
+                  </CardDescription>
+                </div>
               </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-blue-300 mb-2">Workshop Tasks Moved</h3>
-                <p className="text-sm text-blue-200 mb-3">
-                  Vehicle inspection defects and workshop repairs are now managed in the dedicated Workshop Tasks module.
-                  You have <strong>{workshopActions.length}</strong> workshop task{workshopActions.length !== 1 ? 's' : ''} that should be managed there.
-                </p>
-                <Button
-                  onClick={() => router.push('/workshop-tasks')}
-                  className="bg-workshop hover:bg-workshop-dark text-white"
-                >
-                  <Wrench className="h-4 w-4 mr-2" />
-                  Open Workshop Tasks
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
+              <Button
+                onClick={() => router.push('/workshop-tasks')}
+                className="bg-workshop hover:bg-workshop-dark text-white"
+              >
+                <Wrench className="h-4 w-4 mr-2" />
+                Open Workshop Tasks
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Pending</p>
+                    <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                      {workshopActions.filter(a => a.status === 'pending').length}
+                    </p>
+                  </div>
+                  <AlertTriangle className="h-8 w-8 text-amber-600 dark:text-amber-400 opacity-50" />
+                </div>
+              </div>
+              <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">In Progress</p>
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {workshopActions.filter(a => a.status === 'logged').length}
+                    </p>
+                  </div>
+                  <Clock className="h-8 w-8 text-blue-600 dark:text-blue-400 opacity-50" />
+                </div>
+              </div>
+              <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/30">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Completed</p>
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      {workshopActions.filter(a => a.status === 'completed').length}
+                    </p>
+                  </div>
+                  <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400 opacity-50" />
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
-      )}
+
+        {/* Maintenance & Service Category */}
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-red-500/20">
+                  <Settings className="h-5 w-5 text-red-600 dark:text-red-400" />
+                </div>
+                <div>
+                  <CardTitle className="text-slate-900 dark:text-white">Maintenance & Service</CardTitle>
+                  <CardDescription className="text-slate-600 dark:text-slate-400">
+                    Scheduled vehicle maintenance tracking
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                onClick={() => router.push('/maintenance')}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Open Maintenance
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Overdue Tasks</p>
+                    <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                      {maintenanceOverdue}
+                    </p>
+                  </div>
+                  <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400 opacity-50" />
+                </div>
+              </div>
+              <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Due Soon (30 days)</p>
+                    <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                      {maintenanceDueSoon}
+                    </p>
+                  </div>
+                  <Clock className="h-8 w-8 text-amber-600 dark:text-amber-400 opacity-50" />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Site Audit Inspections - Coming Soon */}
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 opacity-60">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-slate-500/20">
+                  <FileText className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-slate-900 dark:text-white">Site Audit Inspections</CardTitle>
+                    <Badge variant="outline" className="bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30">
+                      Coming Soon
+                    </Badge>
+                  </div>
+                  <CardDescription className="text-slate-600 dark:text-slate-400">
+                    Site safety audits and compliance checks
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                disabled
+                className="bg-slate-600 text-white cursor-not-allowed opacity-50"
+              >
+                <Ban className="h-4 w-4 mr-2" />
+                Coming Soon
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8">
+              <Info className="h-12 w-12 mx-auto mb-3 opacity-20 text-slate-400" />
+              <p className="text-slate-600 dark:text-slate-400">
+                Site audit inspection tracking will be available in a future update
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {error && (
         <div className="p-4 text-sm text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-lg">
           {error}
         </div>
       )}
-
-      {/* Statistics - Compact on mobile, full on desktop */}
-      <div className="grid grid-cols-4 md:grid-cols-4 gap-2 md:gap-4">
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
-            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400">Pending</CardDescription>
-            <CardTitle className="text-xl md:text-3xl text-amber-600 dark:text-amber-400">{pendingActions.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
-            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400">Logged</CardDescription>
-            <CardTitle className="text-xl md:text-3xl text-red-600 dark:text-red-400">{loggedActions.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="bg-slate-900 border-slate-700">
-          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
-            <CardDescription className="text-xs md:text-sm text-slate-400">Done</CardDescription>
-            <CardTitle className="text-xl md:text-3xl text-green-400">{completedActions.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
-            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400">Total</CardDescription>
-            <CardTitle className="text-xl md:text-3xl text-slate-900 dark:text-white">{actions.length}</CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
 
       {/* All Actions Content */}
       <div className="space-y-6">

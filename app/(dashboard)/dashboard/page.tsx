@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase/client';
 import { formatDate } from '@/lib/utils/date';
 import { 
   CheckCircle2,
+  AlertCircle,
   AlertTriangle,
   PackageCheck,
   Clipboard,
@@ -27,7 +28,11 @@ import {
   MessageSquare,
   BarChart3,
   Users,
-  Bug
+  Bug,
+  Wrench,
+  Settings,
+  Clock,
+  Activity
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
 import { Database } from '@/types/database';
@@ -35,7 +40,7 @@ import type { ModuleName } from '@/types/roles';
 import { toast } from 'sonner';
 
 type PendingApprovalCount = {
-  type: 'timesheets' | 'inspections' | 'absences' | 'pending' | 'logged' | 'completed';
+  type: 'timesheets' | 'inspections' | 'absences' | 'pending' | 'logged' | 'completed' | 'workshop' | 'maintenance';
   label: string;
   count: number;
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
@@ -59,6 +64,24 @@ type Action = Database['public']['Tables']['actions']['Row'] & {
   };
 };
 
+/**
+ * Safely applies alpha/opacity to an HSL color string.
+ * Returns the color with 15% opacity if valid HSL, otherwise returns a fallback.
+ * 
+ * @param color - Color string (expected to be in HSL format like 'hsl(13 37% 48%)')
+ * @returns HSL color with alpha channel or fallback color
+ */
+function applyAlphaToHSL(color: string): string {
+  // Validate that the color is in HSL format
+  if (typeof color === 'string' && color.trim().startsWith('hsl(') && color.includes(')')) {
+    return color.replace(')', ' / 0.15)');
+  }
+  
+  // Fallback: return semi-transparent slate if invalid format
+  console.warn(`Invalid HSL color format: "${color}". Using fallback color.`);
+  return 'hsl(215 16% 47% / 0.15)'; // slate-600 with 15% opacity
+}
+
 export default function DashboardPage() {
   const { profile, isManager, isAdmin } = useAuth();
   const { isOnline } = useOfflineSync();
@@ -80,7 +103,6 @@ export default function DashboardPage() {
     { id: 'site-diary', title: 'Site Diary', icon: Clipboard, color: 'bg-cyan-500' },
     { id: 'plant-hire', title: 'Plant Hire', icon: Truck, color: 'bg-indigo-500' },
     { id: 'quality-check', title: 'Quality Check', icon: FileCheck, color: 'bg-emerald-500' },
-    { id: 'daily-report', title: 'Daily Report', icon: ScrollText, color: 'bg-amber-500' },
   ];
 
   // Only show placeholders to superadmin when viewing as actual role
@@ -236,55 +258,81 @@ export default function DashboardPage() {
 
   const fetchTopActions = async () => {
     try {
-      // Get counts for pending actions
-      const { count: pendingCount, error: pendingError } = await supabase
+      // Fetch all actions to count workshop tasks
+      const { data: allActions, error: actionsError } = await supabase
         .from('actions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
+        .select('*');
 
-      if (pendingError) throw pendingError;
+      if (actionsError) throw actionsError;
 
-      // Get counts for logged/in progress actions
-      const { count: loggedCount, error: loggedError } = await supabase
-        .from('actions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'logged');
+      // Filter workshop tasks
+      const workshopTasks = (allActions || []).filter(a => 
+        a.action_type === 'inspection_defect' || a.action_type === 'workshop_vehicle_task'
+      );
 
-      if (loggedError) throw loggedError;
+      const workshopPending = workshopTasks.filter(t => t.status === 'pending').length;
+      const workshopInProgress = workshopTasks.filter(t => t.status === 'logged').length;
+      const workshopTotal = workshopPending + workshopInProgress;
 
-      // Get counts for completed actions (recent)
-      const { count: completedCount, error: completedError } = await supabase
-        .from('actions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'completed');
+      // Fetch maintenance data to count alerts
+      const maintenanceResponse = await fetch('/api/maintenance');
+      let maintenanceOverdue = 0;
+      let maintenanceDueSoon = 0;
 
-      if (completedError) throw completedError;
+      if (maintenanceResponse.ok) {
+        const maintenanceData = await maintenanceResponse.json();
+        const vehicles = maintenanceData.vehicles || [];
+        
+        vehicles.forEach((vehicle: any) => {
+          // Check Tax
+          if (vehicle.tax_status?.status === 'overdue') maintenanceOverdue++;
+          else if (vehicle.tax_status?.status === 'due_soon') maintenanceDueSoon++;
+          
+          // Check MOT
+          if (vehicle.mot_status?.status === 'overdue') maintenanceOverdue++;
+          else if (vehicle.mot_status?.status === 'due_soon') maintenanceDueSoon++;
+          
+          // Check Service
+          if (vehicle.service_status?.status === 'overdue') maintenanceOverdue++;
+          else if (vehicle.service_status?.status === 'due_soon') maintenanceDueSoon++;
+          
+          // Check Cambelt
+          if (vehicle.cambelt_status?.status === 'overdue') maintenanceOverdue++;
+          else if (vehicle.cambelt_status?.status === 'due_soon') maintenanceDueSoon++;
+          
+          // Check First Aid
+          if (vehicle.first_aid_status?.status === 'overdue') maintenanceOverdue++;
+          else if (vehicle.first_aid_status?.status === 'due_soon') maintenanceDueSoon++;
+        });
+      }
+
+      const maintenanceTotal = maintenanceOverdue + maintenanceDueSoon;
 
       // Build actions summary array
       const actionTypes: PendingApprovalCount[] = [
         {
-          type: 'pending',
-          label: 'Pending Actions',
-          count: pendingCount || 0,
-          icon: AlertCircle,
-          color: 'hsl(30 95% 55%)', // Orange/Amber
-          href: '/actions'
+          type: 'workshop',
+          label: 'Workshop Tasks',
+          count: workshopTotal,
+          icon: Wrench,
+          color: 'hsl(13 37% 48%)', // Workshop rust/brown color
+          href: '/workshop-tasks'
         },
         {
-          type: 'logged',
-          label: 'In Progress',
-          count: loggedCount || 0,
-          icon: Clock,
-          color: 'hsl(210 90% 50%)', // Blue
-          href: '/actions'
+          type: 'maintenance',
+          label: 'Maintenance & Service',
+          count: maintenanceTotal,
+          icon: Settings,
+          color: 'hsl(0 84% 60%)', // Red
+          href: '/maintenance'
         },
         {
-          type: 'completed',
-          label: 'Completed',
-          count: completedCount || 0,
-          icon: CheckCircle2,
-          color: 'hsl(142 71% 45%)', // Green
-          href: '/actions'
+          type: 'inspections',
+          label: 'Site Audit Inspections',
+          count: 0,
+          icon: FileText,
+          color: 'hsl(215 20% 50%)', // Slate/Gray
+          href: '#'
         }
       ];
 
@@ -536,7 +584,7 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-4">
                           <div 
                             className="flex items-center justify-center w-10 h-10 rounded-lg"
-                            style={{ backgroundColor: `${approval.color}15` }}
+                            style={{ backgroundColor: applyAlphaToHSL(approval.color) }}
                           >
                             <Icon 
                               className="h-5 w-5" 
@@ -608,7 +656,46 @@ export default function DashboardPage() {
               <div className="space-y-2">
                 {actionsSummary.map((actionType) => {
                   const Icon = actionType.icon;
+                  const isComingSoon = actionType.type === 'inspections';
                   
+                  // For "coming soon" items, render as non-clickable
+                  if (isComingSoon) {
+                    return (
+                      <div
+                        key={actionType.type}
+                        className="opacity-60"
+                      >
+                        <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-800/30 border border-slate-700/50">
+                          <div className="flex items-center gap-4">
+                          <div 
+                            className="flex items-center justify-center w-10 h-10 rounded-lg"
+                            style={{ backgroundColor: applyAlphaToHSL(actionType.color) }}
+                          >
+                            <Icon 
+                              className="h-5 w-5" 
+                              style={{ color: actionType.color }}
+                            />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-white">
+                                {actionType.label}
+                              </p>
+                              <Badge variant="outline" className="bg-slate-500/10 text-slate-400 border-slate-500/30 text-xs">
+                                Coming Soon
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-slate-400">
+                              Site safety audits and compliance checks
+                            </p>
+                          </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  // Regular clickable action type
                   return (
                     <Link
                       key={actionType.type}
@@ -619,7 +706,7 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-4">
                           <div 
                             className="flex items-center justify-center w-10 h-10 rounded-lg"
-                            style={{ backgroundColor: `${actionType.color}15` }}
+                            style={{ backgroundColor: applyAlphaToHSL(actionType.color) }}
                           >
                             <Icon 
                               className="h-5 w-5" 
@@ -631,7 +718,7 @@ export default function DashboardPage() {
                               {actionType.label}
                             </p>
                             <p className="text-sm text-slate-400">
-                              {actionType.count === 0 ? 'No' : actionType.count} {actionType.type === 'completed' ? 'total' : 'active'} {actionType.count === 1 ? 'action' : 'actions'}
+                              {actionType.count === 0 ? 'No' : actionType.count} {actionType.count === 1 ? 'item' : 'items'} {actionType.count === 0 ? '' : 'requiring attention'}
                             </p>
                           </div>
                         </div>
@@ -639,12 +726,7 @@ export default function DashboardPage() {
                           {actionType.count > 0 && (
                             <Badge 
                               variant="outline" 
-                              className="text-base px-3 py-1 font-semibold"
-                              style={{ 
-                                borderColor: `${actionType.color}50`,
-                                color: actionType.color,
-                                backgroundColor: `${actionType.color}15`
-                              }}
+                              className="text-base px-3 py-1 font-semibold border-amber-500/30 text-amber-400 bg-amber-500/10"
                             >
                               {actionType.count}
                             </Badge>
