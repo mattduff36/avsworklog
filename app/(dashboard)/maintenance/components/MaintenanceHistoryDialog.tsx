@@ -509,34 +509,9 @@ export function MaintenanceHistoryDialog({
                 
                 {showFullHistory && (
                   <div className="space-y-4 mt-4">
-                    <div className="space-y-6">
+                    <div className="space-y-3">
                       {/* Skip first 3 entries (already shown in Recent Updates) */}
-                      {Object.entries(
-                        combinedItems.slice(3, visibleHistoryCount + 3).reduce((acc, item) => {
-                          const dateKey = new Date(item.created_at).toISOString().split('T')[0];
-                          if (!acc[dateKey]) {
-                            acc[dateKey] = [];
-                          }
-                          acc[dateKey].push(item);
-                          return acc;
-                        }, {} as Record<string, typeof combinedItems>)
-                      )
-                        .sort(([a], [b]) => b.localeCompare(a))
-                        .map(([dateKey, entries]) => (
-                          <div key={dateKey} className="space-y-3">
-                            <div className="flex items-center gap-2 text-slate-400 text-sm">
-                              <Calendar className="h-4 w-4" />
-                              {new Date(dateKey).toLocaleDateString('en-GB', {
-                                weekday: 'long',
-                                day: 'numeric',
-                                month: 'long',
-                                year: 'numeric'
-                              })}
-                            </div>
-                            
-                            {entries.map(item => renderHistoryCard(item, false))}
-                          </div>
-                        ))}
+                      {combinedItems.slice(3, visibleHistoryCount + 3).map(renderHistoryCard)}
                     </div>
 
                     {/* Show More Button */}
