@@ -244,7 +244,7 @@ export function MaintenanceHistoryDialog({
             {showTimestamp && (
               <div className="flex items-center gap-1 text-xs text-slate-400">
                 <Clock className="h-3 w-3" />
-                {getRelativeTime(entry.created_at)}
+                {getRelativeTime(item.created_at)}
               </div>
             )}
           </div>
