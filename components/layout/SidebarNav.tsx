@@ -32,6 +32,17 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const supabase = createClient();
   const [userEmail, setUserEmail] = useState<string>('');
   const [viewAsRole, setViewAsRole] = useState<ViewAsRole>('actual');
+  const [popoverOpen, setPopoverOpen] = useState(false);
+
+  // Debug logging for sidebar state
+  useEffect(() => {
+    console.log('[SidebarNav] Sidebar state changed:', { open });
+  }, [open]);
+
+  // Debug logging for popover state
+  useEffect(() => {
+    console.log('[SidebarNav] Popover state changed:', { popoverOpen });
+  }, [popoverOpen]);
 
   // Fetch user email and view as role
   useEffect(() => {
@@ -39,6 +50,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (user?.email) {
         setUserEmail(user.email);
+        console.log('[SidebarNav] User email fetched:', user.email);
       }
     }
     fetchUserData();
@@ -46,6 +58,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     const storedViewAs = localStorage.getItem('viewAsRole');
     if (storedViewAs) {
       setViewAsRole(storedViewAs);
+      console.log('[SidebarNav] View as role loaded from storage:', storedViewAs);
     }
   }, [supabase]);
 
@@ -74,7 +87,26 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] transition-opacity duration-300 ${
           open ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
-        onClick={onToggle}
+        onClick={(e) => {
+          console.log('[SidebarNav] Backdrop clicked:', {
+            sidebarOpen: open,
+            target: e.target,
+            currentTarget: e.currentTarget
+          });
+          onToggle();
+        }}
+        onMouseMove={(e) => {
+          // Only log occasionally to avoid spam
+          if (Math.random() < 0.01) {
+            const elementAtCursor = document.elementFromPoint(e.clientX, e.clientY);
+            console.log('[SidebarNav] Mouse over backdrop area, element at cursor:', {
+              element: elementAtCursor,
+              className: elementAtCursor?.className,
+              x: e.clientX,
+              y: e.clientY
+            });
+          }
+        }}
       />
 
       {/* Sidebar - Always visible on desktop, hidden on mobile */}
@@ -213,13 +245,78 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
 
         {/* View As Selector - SuperAdmin Only (Bottom) */}
         {isSuperAdmin && (
-          <div className="border-t border-slate-700 p-3 mt-auto relative z-[75]">
-            <Popover>
+          <div 
+            className="border-t border-slate-700 p-3 mt-auto relative z-[75]"
+            onClick={(e) => {
+              console.log('[SidebarNav] Container clicked:', {
+                target: e.target,
+                currentTarget: e.currentTarget,
+                sidebarOpen: open,
+                popoverOpen
+              });
+            }}
+            onMouseEnter={() => {
+              console.log('[SidebarNav] Container mouse enter - checking z-index');
+              const container = document.querySelector('.border-t.border-slate-700.p-3.mt-auto');
+              if (container) {
+                const styles = window.getComputedStyle(container);
+                console.log('[SidebarNav] Container computed styles:', {
+                  zIndex: styles.zIndex,
+                  position: styles.position,
+                  pointerEvents: styles.pointerEvents
+                });
+              }
+            }}
+          >
+            <Popover 
+              open={popoverOpen} 
+              onOpenChange={(isOpen) => {
+                console.log('[SidebarNav] Popover onOpenChange called:', {
+                  newState: isOpen,
+                  oldState: popoverOpen,
+                  sidebarOpen: open
+                });
+                setPopoverOpen(isOpen);
+              }}
+            >
               <PopoverTrigger asChild>
                 {open ? (
                   <Button
                     variant="outline"
                     className="w-full justify-start gap-2 bg-slate-800/50 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white text-xs h-9"
+                    onClick={(e) => {
+                      console.log('[SidebarNav] Button clicked (expanded mode):', {
+                        event: e,
+                        sidebarOpen: open,
+                        popoverOpen,
+                        button: e.currentTarget
+                      });
+                      // Check if button is actually clickable
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      console.log('[SidebarNav] Button position:', {
+                        top: rect.top,
+                        left: rect.left,
+                        width: rect.width,
+                        height: rect.height,
+                        bottom: rect.bottom,
+                        right: rect.right
+                      });
+                      // Check what element is actually at this position
+                      const elementAtPoint = document.elementFromPoint(
+                        rect.left + rect.width / 2,
+                        rect.top + rect.height / 2
+                      );
+                      console.log('[SidebarNav] Element at button center:', elementAtPoint);
+                    }}
+                    onMouseEnter={(e) => {
+                      console.log('[SidebarNav] Button mouse enter (expanded)');
+                      const styles = window.getComputedStyle(e.currentTarget);
+                      console.log('[SidebarNav] Button computed styles:', {
+                        zIndex: styles.zIndex,
+                        position: styles.position,
+                        pointerEvents: styles.pointerEvents
+                      });
+                    }}
                   >
                     <Eye className="w-4 h-4 flex-shrink-0" />
                     <span className="flex-1 text-left truncate">
@@ -235,6 +332,13 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                     size="sm"
                     className="w-full h-10 p-0 hover:bg-slate-800"
                     title="View As"
+                    onClick={(e) => {
+                      console.log('[SidebarNav] Button clicked (collapsed mode):', {
+                        event: e,
+                        sidebarOpen: open,
+                        popoverOpen
+                      });
+                    }}
                   >
                     <Eye className="w-5 h-5 text-slate-400 hover:text-white" />
                   </Button>
@@ -246,7 +350,16 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                 sideOffset={open ? 8 : 12}
                 alignOffset={open ? 0 : -8}
                 className="w-56 p-2 bg-slate-900 border-slate-700 z-[100]"
-                onOpenAutoFocus={(e) => e.preventDefault()}
+                onOpenAutoFocus={(e) => {
+                  console.log('[SidebarNav] Popover auto focus event');
+                  e.preventDefault();
+                }}
+                onInteractOutside={(e) => {
+                  console.log('[SidebarNav] Popover interact outside:', e.target);
+                }}
+                onEscapeKeyDown={(e) => {
+                  console.log('[SidebarNav] Popover escape key pressed');
+                }}
               >
                 <div className="space-y-1">
                   <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -265,6 +378,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                         key={role.value}
                         type="button"
                         onClick={(e) => {
+                          console.log('[SidebarNav] Role option clicked:', role.value);
                           e.preventDefault();
                           e.stopPropagation();
                           setViewAsRole(role.value as ViewAsRole);
