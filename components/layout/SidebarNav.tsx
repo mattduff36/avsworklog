@@ -88,6 +88,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] transition-opacity duration-300 ${
           open ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
+        style={{ pointerEvents: popoverOpen ? 'none' : (open ? 'auto' : 'none') }}
         onClick={(e) => {
           console.log('[SidebarNav] Backdrop clicked:', {
             sidebarOpen: open,
