@@ -168,7 +168,7 @@ export function MaintenanceHistoryDialog({
             {showTimestamp && (
               <div className="flex items-center gap-1 text-xs text-slate-400">
                 <Clock className="h-3 w-3" />
-                {getRelativeTime(task.created_at)}
+                {getRelativeTime(item.created_at)}
               </div>
             )}
           </div>
@@ -281,7 +281,11 @@ export function MaintenanceHistoryDialog({
   
   // Format relative time
   const getRelativeTime = (dateStr: string): string => {
+    if (!dateStr) return 'Unknown date';
+    
     const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return 'Invalid date';
+    
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);

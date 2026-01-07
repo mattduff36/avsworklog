@@ -376,7 +376,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                 align={open ? "center" : "start"}
                 sideOffset={open ? 8 : 12}
                 alignOffset={open ? 0 : -8}
-                className="w-56 p-2 bg-slate-900 border-slate-700 z-[200]"
+                className="w-56 p-2 bg-slate-900 border-slate-700 z-[9999]"
                 onOpenAutoFocus={(e) => {
                   console.log('[SidebarNav] Popover auto focus event');
                   e.preventDefault();
@@ -397,7 +397,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                 onEscapeKeyDown={(e) => {
                   console.log('[SidebarNav] Popover escape key pressed');
                 }}
-                style={{ pointerEvents: 'auto' }}
+                style={{ pointerEvents: 'auto', zIndex: 9999 }}
               >
                 <div className="space-y-1">
                   <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">
