@@ -1300,7 +1300,7 @@ function NewInspectionContent() {
                   setError('');
                   setWeekEnding(e.target.value);
                 }}
-                max={formatDateISO(new Date())}
+                max={formatDateISO(getWeekEnding())}
                 disabled={checklistStarted}
                 className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
                 required
