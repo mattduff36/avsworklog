@@ -475,7 +475,6 @@ export function MaintenanceHistoryDialog({
                         <p className="text-xs text-slate-500 mb-1">Comment:</p>
                         <p className="text-slate-200 text-sm">{entry.comment}</p>
                       </div>
-                      </div>
                     </div>
                   );
                 }
