@@ -372,10 +372,10 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                 )}
               </PopoverTrigger>
               <PopoverContent 
-                side={open ? "top" : "right"} 
-                align={open ? "center" : "start"}
-                sideOffset={open ? 8 : 12}
-                alignOffset={open ? 0 : -8}
+                side="right"
+                align="start"
+                sideOffset={12}
+                alignOffset={-8}
                 className="w-56 p-2 bg-slate-900 border-slate-700 z-[9999]"
                 onOpenAutoFocus={(e) => {
                   console.log('[SidebarNav] Popover auto focus event');
