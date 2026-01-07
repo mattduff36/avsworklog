@@ -1148,7 +1148,7 @@ export default function WorkshopTasksPage() {
                                 <div className="flex-1 w-full">
                                   <div className="flex items-center gap-2 mb-2">
                                     <CheckCircle2 className="h-5 w-5 text-green-400" />
-                                    <h3 className="font-semibold text-lg text-white line-through">
+                                    <h3 className="font-semibold text-lg text-white">
                                       {getVehicleReg(task)}
                                     </h3>
                                     {getStatusBadge(task.status)}
