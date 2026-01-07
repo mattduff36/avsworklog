@@ -5,17 +5,12 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import {
-  BarChart3,
-  Users,
-  CheckSquare,
-  ListTodo,
-  Truck,
-  MessageSquare,
   PanelLeftClose,
   Bug
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { managerNavItems, adminNavItems } from '@/lib/config/navigation';
 
 interface SidebarNavProps {
   open: boolean;
@@ -58,17 +53,9 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const isSuperAdmin = userEmail === 'admin@mpdee.co.uk';
   const showDeveloperTools = isSuperAdmin && viewAsRole === 'actual';
 
-  const managerLinks = [
-    { href: '/approvals', label: 'Approvals', icon: CheckSquare },
-    { href: '/actions', label: 'Actions', icon: ListTodo },
-    { href: '/toolbox-talks', label: 'Toolbox Talks', icon: MessageSquare },
-    { href: '/reports', label: 'Reports', icon: BarChart3 },
-  ];
-
-  const adminLinks = isAdmin ? [
-    { href: '/admin/users', label: 'Users', icon: Users },
-    { href: '/admin/vehicles', label: 'Vehicles', icon: Truck },
-  ] : [];
+  // Use shared navigation config
+  const managerLinks = managerNavItems;
+  const adminLinks = isAdmin ? adminNavItems : [];
 
   return (
     <>

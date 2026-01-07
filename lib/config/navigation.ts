@@ -1,0 +1,194 @@
+/**
+ * Navigation Configuration - Single Source of Truth
+ * 
+ * This file defines all navigation items used across:
+ * - Dashboard tiles (Quick Actions & Management Tools)
+ * - Top navigation bar
+ * - Left sidebar navigation
+ * 
+ * To add a new module:
+ * 1. Add it to the appropriate array below
+ * 2. It will automatically appear in all navigation areas
+ */
+
+import {
+  Home,
+  FileText,
+  ClipboardCheck,
+  CheckSquare,
+  Calendar,
+  Wrench,
+  Settings,
+  ListTodo,
+  MessageSquare,
+  BarChart3,
+  Users,
+  Truck,
+  LucideIcon
+} from 'lucide-react';
+import { ModuleName } from '@/types/roles';
+
+export interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  module?: ModuleName; // For permission checking
+  category?: 'employee' | 'manager' | 'admin'; // Which nav area it belongs to
+}
+
+/**
+ * Employee Navigation Items
+ * These appear in:
+ * - Dashboard Quick Actions tiles
+ * - Top navigation bar
+ */
+export const employeeNavItems: NavItem[] = [
+  { 
+    href: '/timesheets', 
+    label: 'Timesheets', 
+    icon: FileText, 
+    module: 'timesheets',
+    category: 'employee'
+  },
+  { 
+    href: '/inspections', 
+    label: 'Inspections', 
+    icon: ClipboardCheck, 
+    module: 'inspections',
+    category: 'employee'
+  },
+  { 
+    href: '/rams', 
+    label: 'RAMS', 
+    icon: CheckSquare, 
+    module: 'rams',
+    category: 'employee'
+  },
+  { 
+    href: '/absence', 
+    label: 'Absence', 
+    icon: Calendar, 
+    module: 'absence',
+    category: 'employee'
+  },
+  { 
+    href: '/maintenance', 
+    label: 'Maintenance', 
+    icon: Wrench, 
+    module: 'maintenance',
+    category: 'employee'
+  },
+  { 
+    href: '/workshop-tasks', 
+    label: 'Workshop Tasks', 
+    icon: Settings, 
+    module: 'workshop-tasks',
+    category: 'employee'
+  },
+];
+
+/**
+ * Manager Navigation Items
+ * These appear in:
+ * - Dashboard Management Tools tiles
+ * - Top navigation bar (mobile menu)
+ * - Left sidebar navigation
+ */
+export const managerNavItems: NavItem[] = [
+  { 
+    href: '/approvals', 
+    label: 'Approvals', 
+    icon: CheckSquare,
+    category: 'manager'
+  },
+  { 
+    href: '/actions', 
+    label: 'Actions', 
+    icon: ListTodo,
+    category: 'manager'
+  },
+  { 
+    href: '/toolbox-talks', 
+    label: 'Toolbox Talks', 
+    icon: MessageSquare,
+    category: 'manager'
+  },
+  { 
+    href: '/reports', 
+    label: 'Reports', 
+    icon: BarChart3,
+    category: 'manager'
+  },
+];
+
+/**
+ * Admin Navigation Items
+ * These appear in:
+ * - Dashboard Management Tools tiles
+ * - Top navigation bar (mobile menu)
+ * - Left sidebar navigation
+ */
+export const adminNavItems: NavItem[] = [
+  { 
+    href: '/admin/users', 
+    label: 'Users', 
+    icon: Users,
+    category: 'admin'
+  },
+  { 
+    href: '/admin/vehicles', 
+    label: 'Vehicles', 
+    icon: Truck,
+    category: 'admin'
+  },
+];
+
+/**
+ * Dashboard Navigation Item
+ * Always visible
+ */
+export const dashboardNavItem: NavItem = {
+  href: '/dashboard',
+  label: 'Dashboard',
+  icon: Home,
+};
+
+/**
+ * Get all navigation items filtered by permissions
+ * 
+ * @param userPermissions - Set of modules user has access to
+ * @param isManager - Whether user is a manager
+ * @param isAdmin - Whether user is an admin
+ * @param hasRAMSAssignments - Whether user has RAMS assignments (for filtering)
+ * @returns Filtered navigation items
+ */
+export function getFilteredEmployeeNav(
+  userPermissions: Set<ModuleName>,
+  isManager: boolean,
+  isAdmin: boolean,
+  hasRAMSAssignments: boolean
+): NavItem[] {
+  return employeeNavItems.filter(item => {
+    // Managers and admins always have access (unless viewing as employee)
+    if (isManager || isAdmin) {
+      // Hide RAMS for managers/admins if they have no assignments (when viewing as employee)
+      if (item.module === 'rams' && !hasRAMSAssignments) {
+        return false;
+      }
+      return true;
+    }
+    
+    // Check basic permission for employees
+    if (item.module && !userPermissions.has(item.module)) {
+      return false;
+    }
+    
+    // Special handling for RAMS - hide for employees with no assignments
+    if (item.module === 'rams' && !hasRAMSAssignments) {
+      return false;
+    }
+    
+    return true;
+  });
+}
+

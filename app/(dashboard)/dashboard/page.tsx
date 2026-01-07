@@ -17,20 +17,10 @@ import {
   AlertTriangle,
   PackageCheck,
   Clipboard,
-  Truck,
   FileCheck,
   ScrollText,
-  FileText,
-  Calendar,
   ChevronRight,
-  CheckSquare,
-  ListTodo,
-  MessageSquare,
-  BarChart3,
-  Users,
   Bug,
-  Wrench,
-  Settings,
   Clock,
   Activity
 } from 'lucide-react';
@@ -38,6 +28,7 @@ import { getEnabledForms } from '@/lib/config/forms';
 import { Database } from '@/types/database';
 import type { ModuleName } from '@/types/roles';
 import { toast } from 'sonner';
+import { managerNavItems, adminNavItems } from '@/lib/config/navigation';
 
 type PendingApprovalCount = {
   type: 'timesheets' | 'inspections' | 'absences' | 'pending' | 'logged' | 'completed' | 'workshop' | 'maintenance';
@@ -482,20 +473,24 @@ export default function DashboardPage() {
             Management Tools
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {/* Manager Links */}
-            {[
-              { href: '/approvals', label: 'Approvals', icon: CheckSquare, borderColor: 'border-blue-500', iconColor: 'text-blue-400', hoverBorder: 'hover:border-blue-400' },
-              { href: '/actions', label: 'Actions', icon: ListTodo, borderColor: 'border-purple-500', iconColor: 'text-purple-400', hoverBorder: 'hover:border-purple-400' },
-              { href: '/toolbox-talks', label: 'Toolbox Talks', icon: MessageSquare, borderColor: 'border-red-500', iconColor: 'text-red-400', hoverBorder: 'hover:border-red-400' },
-              { href: '/reports', label: 'Reports', icon: BarChart3, borderColor: 'border-emerald-500', iconColor: 'text-emerald-400', hoverBorder: 'hover:border-emerald-400' },
-            ].map((link) => {
+            {/* Manager Links - Using shared navigation config */}
+            {managerNavItems.map((link) => {
               const Icon = link.icon;
+              // Define colors for each manager link
+              const colorMap: Record<string, { borderColor: string; iconColor: string; hoverBorder: string }> = {
+                '/approvals': { borderColor: 'border-blue-500', iconColor: 'text-blue-400', hoverBorder: 'hover:border-blue-400' },
+                '/actions': { borderColor: 'border-purple-500', iconColor: 'text-purple-400', hoverBorder: 'hover:border-purple-400' },
+                '/toolbox-talks': { borderColor: 'border-red-500', iconColor: 'text-red-400', hoverBorder: 'hover:border-red-400' },
+                '/reports': { borderColor: 'border-emerald-500', iconColor: 'text-emerald-400', hoverBorder: 'hover:border-emerald-400' },
+              };
+              const colors = colorMap[link.href] || { borderColor: 'border-slate-500', iconColor: 'text-slate-400', hoverBorder: 'hover:border-slate-400' };
+              
               return (
                 <Link key={link.href} href={link.href}>
-                  <div className={`bg-slate-800 dark:bg-slate-900 border-4 ${link.borderColor} ${link.hoverBorder} hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer`}
+                  <div className={`bg-slate-800 dark:bg-slate-900 border-4 ${colors.borderColor} ${colors.hoverBorder} hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer`}
                        style={{ height: '100px' }}>
                     <div className="flex flex-col items-start justify-between h-full">
-                      <Icon className={`h-6 w-6 ${link.iconColor}`} />
+                      <Icon className={`h-6 w-6 ${colors.iconColor}`} />
                       <span className="text-white font-semibold text-base leading-tight">
                         {link.label}
                       </span>
@@ -505,18 +500,22 @@ export default function DashboardPage() {
               );
             })}
             
-            {/* Admin Links */}
-            {effectiveIsAdmin && [
-              { href: '/admin/users', label: 'Users', icon: Users, borderColor: 'border-slate-400', iconColor: 'text-slate-300', hoverBorder: 'hover:border-slate-300' },
-              { href: '/admin/vehicles', label: 'Vehicles', icon: Truck, borderColor: 'border-slate-500', iconColor: 'text-slate-400', hoverBorder: 'hover:border-slate-400' },
-            ].map((link) => {
+            {/* Admin Links - Using shared navigation config */}
+            {effectiveIsAdmin && adminNavItems.map((link) => {
               const Icon = link.icon;
+              // Define colors for each admin link
+              const colorMap: Record<string, { borderColor: string; iconColor: string; hoverBorder: string }> = {
+                '/admin/users': { borderColor: 'border-slate-400', iconColor: 'text-slate-300', hoverBorder: 'hover:border-slate-300' },
+                '/admin/vehicles': { borderColor: 'border-slate-500', iconColor: 'text-slate-400', hoverBorder: 'hover:border-slate-400' },
+              };
+              const colors = colorMap[link.href] || { borderColor: 'border-slate-500', iconColor: 'text-slate-400', hoverBorder: 'hover:border-slate-400' };
+              
               return (
                 <Link key={link.href} href={link.href}>
-                  <div className={`bg-slate-800 dark:bg-slate-900 border-4 ${link.borderColor} ${link.hoverBorder} hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer`}
+                  <div className={`bg-slate-800 dark:bg-slate-900 border-4 ${colors.borderColor} ${colors.hoverBorder} hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer`}
                        style={{ height: '100px' }}>
                     <div className="flex flex-col items-start justify-between h-full">
-                      <Icon className={`h-6 w-6 ${link.iconColor}`} />
+                      <Icon className={`h-6 w-6 ${colors.iconColor}`} />
                       <span className="text-white font-semibold text-base leading-tight">
                         {link.label}
                       </span>

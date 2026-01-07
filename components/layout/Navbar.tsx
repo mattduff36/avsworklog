@@ -9,27 +9,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { 
   Menu, 
   X, 
-  Home, 
-  FileText, 
-  ClipboardCheck, 
-  BarChart3, 
-  Users, 
   LogOut,
-  CheckSquare,
-  ListTodo,
-  Truck,
-  Calendar,
   Bell,
-  MessageSquare,
   Eye,
   Bug,
-  Wrench
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { NotificationPanel } from '@/components/messages/NotificationPanel';
 import { SidebarNav } from './SidebarNav';
 import { createClient } from '@/lib/supabase/client';
 import type { ModuleName } from '@/types/roles';
+import { 
+  dashboardNavItem, 
+  getFilteredEmployeeNav, 
+  managerNavItems, 
+  adminNavItems 
+} from '@/lib/config/navigation';
 
 type ViewAsRole = 'actual' | 'employee' | 'manager' | 'admin';
 
@@ -249,46 +244,19 @@ export function Navbar() {
   };
 
   // Dashboard is always visible
-  const dashboardNav = [
-    { href: '/dashboard', label: 'Dashboard', icon: Home },
-  ];
+  const dashboardNav = [dashboardNavItem];
   
-  // Employee navigation - filtered by permissions
-  const allEmployeeNav = [
-    { href: '/timesheets', label: 'Timesheets', icon: FileText, module: 'timesheets' as ModuleName },
-    { href: '/inspections', label: 'Inspections', icon: ClipboardCheck, module: 'inspections' as ModuleName },
-    { href: '/rams', label: 'RAMS', icon: CheckSquare, module: 'rams' as ModuleName },
-    { href: '/absence', label: 'Absence', icon: Calendar, module: 'absence' as ModuleName },
-    { href: '/maintenance', label: 'Maintenance', icon: Wrench, module: 'maintenance' as ModuleName },
-  ];
+  // Employee navigation - filtered by permissions (using shared config)
+  const employeeNav = getFilteredEmployeeNav(
+    userPermissions,
+    effectiveIsManager,
+    effectiveIsAdmin,
+    hasRAMSAssignments
+  );
 
-  // Filter employee nav by permissions
-  const employeeNav = allEmployeeNav.filter(item => {
-    // Check basic permission
-    if (!userPermissions.has(item.module)) {
-      return false;
-    }
-    
-    // Special handling for RAMS - hide for employees with no assignments
-    if (item.module === 'rams' && !effectiveIsManager && !effectiveIsAdmin && !hasRAMSAssignments) {
-      return false;
-    }
-    
-    return true;
-  });
-
-  // Manager/admin links for mobile menu only
-  const managerLinks = [
-    { href: '/approvals', label: 'Approvals', icon: CheckSquare },
-    { href: '/actions', label: 'Actions', icon: ListTodo },
-    { href: '/toolbox-talks', label: 'Toolbox Talks', icon: MessageSquare },
-    { href: '/reports', label: 'Reports', icon: BarChart3 },
-  ];
-
-  const adminLinks = isAdmin ? [
-    { href: '/admin/users', label: 'Users', icon: Users },
-    { href: '/admin/vehicles', label: 'Vehicles', icon: Truck },
-  ] : [];
+  // Manager/admin links for mobile menu only (using shared config)
+  const managerLinks = managerNavItems;
+  const adminLinks = isAdmin ? adminNavItems : [];
 
   return (
     <>
