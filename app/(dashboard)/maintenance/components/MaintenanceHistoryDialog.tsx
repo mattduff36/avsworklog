@@ -145,8 +145,9 @@ export function MaintenanceHistoryDialog({
   // Get latest 3 entries for summary
   const latestEntries = combinedItems.slice(0, 3);
   
-  // Check if there are more entries beyond the visible count (accounting for the 3 already shown)
-  const hasMoreHistory = combinedItems.length > (visibleHistoryCount + 3);
+  // Calculate remaining items (accounting for the 3 already shown in Recent Updates)
+  const remainingCount = Math.max(0, combinedItems.length - (visibleHistoryCount + 3));
+  const hasMoreHistory = remainingCount > 0;
   
   // Format relative time
   const getRelativeTime = (dateStr: string): string => {
@@ -692,7 +693,7 @@ export function MaintenanceHistoryDialog({
                     className="w-full border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white"
                   >
                     <ChevronDown className="h-4 w-4 mr-2" />
-                    Show More ({combinedItems.length - (visibleHistoryCount + 3)} remaining)
+                    Show More ({remainingCount} {remainingCount === 1 ? 'item' : 'items'} remaining)
                   </Button>
                 )}
                   </div>
