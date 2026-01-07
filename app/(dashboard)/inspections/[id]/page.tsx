@@ -179,7 +179,150 @@ export default function ViewInspectionPage() {
         console.log('[Mobile Debug] Items inserted successfully:', insertedData?.length);
       }
 
-      console.log('[Mobile Debug] Save completed, refreshing data...');
+      console.log('[Mobile Debug] Save completed, creating/updating workshop tasks...');
+      
+      // Auto-create/update actions for defects (even in draft mode)
+      if (itemsToInsert.length > 0) {
+        const failedItems = itemsToInsert.filter(item => item.status === 'attention');
+        
+        if (failedItems.length > 0) {
+          try {
+            // Get vehicle registration
+            const vehicleReg = inspection.vehicles?.reg_number || 'Unknown Vehicle';
+
+            // Get default "Uncategorised" category
+            const { data: uncategorisedCategory } = await supabase
+              .from('workshop_task_categories')
+              .select('id')
+              .eq('name', 'Uncategorised')
+              .eq('applies_to', 'vehicle')
+              .single();
+
+            const defaultCategoryId = uncategorisedCategory?.id || null;
+
+            // Day names for formatting
+            const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+            // Group defects by item_number and description
+            const groupedDefects = new Map<string, { 
+              item_number: number; 
+              item_description: string; 
+              days: number[]; 
+              comments: string[];
+              item_ids: string[];
+            }>();
+
+            // Get the inserted items with IDs
+            const { data: insertedItems } = await supabase
+              .from('inspection_items')
+              .select('*')
+              .eq('inspection_id', inspection.id)
+              .eq('status', 'attention');
+
+            if (insertedItems) {
+              insertedItems.forEach((item) => {
+                const key = `${item.item_number}-${item.item_description}`;
+                if (!groupedDefects.has(key)) {
+                  groupedDefects.set(key, {
+                    item_number: item.item_number,
+                    item_description: item.item_description,
+                    days: [],
+                    comments: [],
+                    item_ids: []
+                  });
+                }
+                const group = groupedDefects.get(key)!;
+                group.days.push(item.day_of_week);
+                group.item_ids.push(item.id);
+                if (item.comments) {
+                  group.comments.push(item.comments);
+                }
+              });
+
+              // Check for existing actions
+              const { data: existingActions } = await supabase
+                .from('actions')
+                .select('id, inspection_item_id, status')
+                .eq('inspection_id', inspection.id)
+                .eq('action_type', 'inspection_defect');
+
+              const existingActionsMap = new Map<string, { id: string; status: string }>();
+              existingActions?.forEach(action => {
+                if (action.inspection_item_id) {
+                  existingActionsMap.set(action.inspection_item_id, { id: action.id, status: action.status });
+                }
+              });
+
+              // Process each defect
+              type ActionInsert = Database['public']['Tables']['actions']['Insert'];
+              type ActionUpdate = Database['public']['Tables']['actions']['Update'];
+              const actionsToCreate: ActionInsert[] = [];
+              const actionsToUpdate: { id: string; updates: ActionUpdate }[] = [];
+
+              Array.from(groupedDefects.values()).forEach((group) => {
+                let dayRange: string;
+                if (group.days.length === 1) {
+                  const dayName = DAY_NAMES[group.days[0] - 1] || `Day ${group.days[0]}`;
+                  dayRange = dayName;
+                } else if (group.days.length > 1) {
+                  const firstDay = DAY_NAMES[group.days[0] - 1] || `Day ${group.days[0]}`;
+                  const lastDay = DAY_NAMES[group.days[group.days.length - 1] - 1] || `Day ${group.days[group.days.length - 1]}`;
+                  dayRange = `${firstDay.substring(0, 3)}-${lastDay.substring(0, 3)}`;
+                } else {
+                  dayRange = 'Unknown';
+                }
+
+                const itemName = group.item_description || `Item ${group.item_number}`;
+                const comment = group.comments.length > 0 ? `\nComment: ${group.comments[0]}` : '';
+                const title = `${vehicleReg} - ${itemName} (${dayRange})`;
+                const description = `Vehicle inspection defect found:\nItem ${group.item_number} - ${itemName} (${dayRange})${comment}`;
+                
+                const primaryItemId = group.item_ids[0];
+                const existingAction = existingActionsMap.get(primaryItemId);
+
+                if (existingAction && existingAction.status !== 'completed') {
+                  actionsToUpdate.push({
+                    id: existingAction.id,
+                    updates: { title, description, updated_at: new Date().toISOString() }
+                  });
+                } else if (!existingAction) {
+                  actionsToCreate.push({
+                    action_type: 'inspection_defect',
+                    inspection_id: inspection.id,
+                    inspection_item_id: primaryItemId,
+                    vehicle_id: inspection.vehicle_id,
+                    workshop_category_id: defaultCategoryId,
+                    title,
+                    description,
+                    priority: 'high',
+                    status: 'pending',
+                    created_by: user.id,
+                  });
+                }
+              });
+
+              // Insert new actions
+              if (actionsToCreate.length > 0) {
+                const { error: createError } = await supabase.from('actions').insert(actionsToCreate);
+                if (!createError) {
+                  console.log(`✅ Created ${actionsToCreate.length} new workshop task(s)`);
+                }
+              }
+
+              // Update existing actions
+              for (const { id, updates } of actionsToUpdate) {
+                await supabase.from('actions').update(updates).eq('id', id);
+                console.log(`✅ Updated workshop task ${id}`);
+              }
+            }
+          } catch (actionError) {
+            console.error('[Mobile Debug] Error creating/updating actions:', actionError);
+            // Don't throw - we don't want to fail the save if action creation fails
+          }
+        }
+      }
+
+      console.log('[Mobile Debug] Refreshing data...');
       // Refresh data
       await fetchInspection(inspection.id);
       setEditing(false);
@@ -226,6 +369,135 @@ export default function ViewInspectionPage() {
     try {
       // Save items first
       await handleSave();
+
+      // Get the latest saved items to create/update actions
+      const { data: savedItems } = await supabase
+        .from('inspection_items')
+        .select('*')
+        .eq('inspection_id', inspection.id);
+
+      // Auto-create/update actions for defects
+      if (savedItems && savedItems.length > 0) {
+        const failedItems = savedItems.filter(item => item.status === 'attention');
+        
+        if (failedItems.length > 0) {
+          // Get vehicle registration
+          const vehicleReg = inspection.vehicles?.reg_number || 'Unknown Vehicle';
+
+          // Get default "Uncategorised" category
+          const { data: uncategorisedCategory } = await supabase
+            .from('workshop_task_categories')
+            .select('id')
+            .eq('name', 'Uncategorised')
+            .eq('applies_to', 'vehicle')
+            .single();
+
+          const defaultCategoryId = uncategorisedCategory?.id || null;
+
+          // Day names for formatting
+          const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+          // Group defects by item_number and description
+          const groupedDefects = new Map<string, { 
+            item_number: number; 
+            item_description: string; 
+            days: number[]; 
+            comments: string[];
+            item_ids: string[];
+          }>();
+
+          failedItems.forEach((item) => {
+            const key = `${item.item_number}-${item.item_description}`;
+            if (!groupedDefects.has(key)) {
+              groupedDefects.set(key, {
+                item_number: item.item_number,
+                item_description: item.item_description,
+                days: [],
+                comments: [],
+                item_ids: []
+              });
+            }
+            const group = groupedDefects.get(key)!;
+            group.days.push(item.day_of_week);
+            group.item_ids.push(item.id);
+            if (item.comments) {
+              group.comments.push(item.comments);
+            }
+          });
+
+          // Check for existing actions
+          const { data: existingActions } = await supabase
+            .from('actions')
+            .select('id, inspection_item_id, status')
+            .eq('inspection_id', inspection.id)
+            .eq('action_type', 'inspection_defect');
+
+          const existingActionsMap = new Map<string, { id: string; status: string }>();
+          existingActions?.forEach(action => {
+            if (action.inspection_item_id) {
+              existingActionsMap.set(action.inspection_item_id, { id: action.id, status: action.status });
+            }
+          });
+
+          // Process each defect
+          type ActionInsert = Database['public']['Tables']['actions']['Insert'];
+          type ActionUpdate = Database['public']['Tables']['actions']['Update'];
+          const actionsToCreate: ActionInsert[] = [];
+          const actionsToUpdate: { id: string; updates: ActionUpdate }[] = [];
+
+          Array.from(groupedDefects.values()).forEach((group) => {
+            let dayRange: string;
+            if (group.days.length === 1) {
+              const dayName = DAY_NAMES[group.days[0] - 1] || `Day ${group.days[0]}`;
+              dayRange = dayName;
+            } else if (group.days.length > 1) {
+              const firstDay = DAY_NAMES[group.days[0] - 1] || `Day ${group.days[0]}`;
+              const lastDay = DAY_NAMES[group.days[group.days.length - 1] - 1] || `Day ${group.days[group.days.length - 1]}`;
+              dayRange = `${firstDay.substring(0, 3)}-${lastDay.substring(0, 3)}`;
+            } else {
+              dayRange = 'Unknown';
+            }
+
+            const itemName = group.item_description || `Item ${group.item_number}`;
+            const comment = group.comments.length > 0 ? `\nComment: ${group.comments[0]}` : '';
+            const title = `${vehicleReg} - ${itemName} (${dayRange})`;
+            const description = `Vehicle inspection defect found:\nItem ${group.item_number} - ${itemName} (${dayRange})${comment}`;
+            
+            const primaryItemId = group.item_ids[0];
+            const existingAction = existingActionsMap.get(primaryItemId);
+
+            if (existingAction && existingAction.status !== 'completed') {
+              actionsToUpdate.push({
+                id: existingAction.id,
+                updates: { title, description, updated_at: new Date().toISOString() }
+              });
+            } else if (!existingAction) {
+              actionsToCreate.push({
+                action_type: 'inspection_defect',
+                inspection_id: inspection.id,
+                inspection_item_id: primaryItemId,
+                vehicle_id: inspection.vehicle_id,
+                workshop_category_id: defaultCategoryId,
+                title,
+                description,
+                priority: 'high',
+                status: 'pending',
+                created_by: user.id,
+              });
+            }
+          });
+
+          // Insert new actions
+          if (actionsToCreate.length > 0) {
+            await supabase.from('actions').insert(actionsToCreate);
+          }
+
+          // Update existing actions
+          for (const { id, updates } of actionsToUpdate) {
+            await supabase.from('actions').update(updates).eq('id', id);
+          }
+        }
+      }
 
       // Update inspection status
       const { error: updateError } = await supabase

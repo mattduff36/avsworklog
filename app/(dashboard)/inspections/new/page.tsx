@@ -909,8 +909,8 @@ function NewInspectionContent() {
         inspection = updatedInspection[0];
       }
 
-      // Auto-create actions for failed items (only when submitting, not drafting)
-      if (status === 'submitted' && insertedItems) {
+      // Auto-create/update actions for failed items (works for both draft and submitted)
+      if (insertedItems && insertedItems.length > 0) {
         const failedItems = insertedItems.filter((item: InspectionItem) => item.status === 'attention');
         
         if (failedItems.length > 0) {
@@ -961,9 +961,28 @@ function NewInspectionContent() {
             }
           });
 
-          // Create ONE action per unique defect (so each can be resolved independently)
+          // Check for existing actions for this inspection
+          const { data: existingActions } = await supabase
+            .from('actions')
+            .select('id, inspection_item_id, status')
+            .eq('inspection_id', inspection.id)
+            .eq('action_type', 'inspection_defect');
+
+          // Create a map of existing actions by inspection_item_id
+          const existingActionsMap = new Map<string, { id: string; status: string }>();
+          existingActions?.forEach(action => {
+            if (action.inspection_item_id) {
+              existingActionsMap.set(action.inspection_item_id, { id: action.id, status: action.status });
+            }
+          });
+
+          // Process each grouped defect - update existing or create new
           type ActionInsert = Database['public']['Tables']['actions']['Insert'];
-          const actions: ActionInsert[] = Array.from(groupedDefects.values()).map((group) => {
+          type ActionUpdate = Database['public']['Tables']['actions']['Update'];
+          const actionsToCreate: ActionInsert[] = [];
+          const actionsToUpdate: { id: string; updates: ActionUpdate }[] = [];
+
+          Array.from(groupedDefects.values()).forEach((group) => {
             let dayRange: string;
             if (group.days.length === 1) {
               const dayName = DAY_NAMES[group.days[0] - 1] || `Day ${group.days[0]}`;
@@ -978,47 +997,90 @@ function NewInspectionContent() {
 
             const itemName = group.item_description || `Item ${group.item_number}`;
             const comment = group.comments.length > 0 ? `\nComment: ${group.comments[0]}` : '';
+            const title = `${vehicleReg} - ${itemName} (${dayRange})`;
+            const description = `Vehicle inspection defect found:\nItem ${group.item_number} - ${itemName} (${dayRange})${comment}`;
             
-            return {
-              action_type: 'inspection_defect',
-              inspection_id: inspection.id,
-              inspection_item_id: group.item_ids[0], // Link to first occurrence
-              vehicle_id: vehicleId,
-              workshop_category_id: defaultCategoryId,
-              title: `${vehicleReg} - ${itemName} (${dayRange})`,
-              description: `Vehicle inspection defect found:\nItem ${group.item_number} - ${itemName} (${dayRange})${comment}`,
-              priority: 'high',
-              status: 'pending',
-              created_by: user!.id,
-            };
+            // Check if action already exists for the first item_id in this group
+            const primaryItemId = group.item_ids[0];
+            const existingAction = existingActionsMap.get(primaryItemId);
+
+            if (existingAction) {
+              // Update existing action (only if it's not completed)
+              if (existingAction.status !== 'completed') {
+                actionsToUpdate.push({
+                  id: existingAction.id,
+                  updates: {
+                    title,
+                    description,
+                    updated_at: new Date().toISOString(),
+                  }
+                });
+              }
+            } else {
+              // Create new action
+              actionsToCreate.push({
+                action_type: 'inspection_defect',
+                inspection_id: inspection.id,
+                inspection_item_id: primaryItemId,
+                vehicle_id: vehicleId,
+                workshop_category_id: defaultCategoryId,
+                title,
+                description,
+                priority: 'high',
+                status: 'pending',
+                created_by: user!.id,
+              });
+            }
           });
 
-          const { error: actionsError } = await supabase
-            .from('actions')
-            .insert(actions);
+          // Insert new actions
+          if (actionsToCreate.length > 0) {
+            const { error: createError } = await supabase
+              .from('actions')
+              .insert(actionsToCreate);
 
-          if (actionsError) {
-            console.error('Error creating actions:', actionsError);
-            // Don't throw - we don't want to fail the inspection if action creation fails
+            if (createError) {
+              console.error('Error creating actions:', createError);
+              // Don't throw - we don't want to fail the inspection if action creation fails
+            } else {
+              console.log(`✅ Created ${actionsToCreate.length} new workshop task(s)`);
+            }
+          }
+
+          // Update existing actions
+          for (const { id, updates } of actionsToUpdate) {
+            const { error: updateError } = await supabase
+              .from('actions')
+              .update(updates)
+              .eq('id', id);
+
+            if (updateError) {
+              console.error('Error updating action:', updateError);
+              // Continue processing other actions
+            } else {
+              console.log(`✅ Updated existing workshop task ${id}`);
+            }
           }
         }
       }
 
-      // Auto-complete actions for resolved items
-      if (status === 'submitted' && resolvedItems.size > 0 && vehicleId) {
+      // Auto-complete actions for resolved items (works for both draft and submitted)
+      if (resolvedItems.size > 0 && vehicleId) {
         try {
-          // Find pending actions for this vehicle's defects
+          // Find pending or logged actions for this vehicle's defects
           const { data: pendingActions } = await supabase
             .from('actions')
             .select(`
               id,
               inspection_item_id,
               inspection_id,
+              status,
+              description,
               vehicle_inspections!inner (
                 vehicle_id
               )
             `)
-            .eq('status', 'pending')
+            .in('status', ['pending', 'logged'])
             .eq('vehicle_inspections.vehicle_id', vehicleId);
 
           if (pendingActions && pendingActions.length > 0) {
