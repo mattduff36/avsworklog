@@ -266,19 +266,25 @@ export default function DashboardPage() {
         const vehicles = maintenanceData.vehicles || [];
         
         vehicles.forEach((vehicle: any) => {
-          // Count overdue alerts
+          // Check Tax
           if (vehicle.tax_status?.status === 'overdue') maintenanceOverdue++;
-          if (vehicle.mot_status?.status === 'overdue') maintenanceOverdue++;
-          if (vehicle.service_status?.status === 'overdue') maintenanceOverdue++;
-          if (vehicle.cambelt_status?.status === 'overdue') maintenanceOverdue++;
-          if (vehicle.first_aid_status?.status === 'overdue') maintenanceOverdue++;
+          else if (vehicle.tax_status?.status === 'due_soon') maintenanceDueSoon++;
           
-          // Count due soon alerts
-          if (vehicle.tax_status?.status === 'due_soon') maintenanceDueSoon++;
-          if (vehicle.mot_status?.status === 'due_soon') maintenanceDueSoon++;
-          if (vehicle.service_status?.status === 'due_soon') maintenanceDueSoon++;
-          if (vehicle.cambelt_status?.status === 'due_soon') maintenanceDueSoon++;
-          if (vehicle.first_aid_status?.status === 'due_soon') maintenanceDueSoon++;
+          // Check MOT
+          if (vehicle.mot_status?.status === 'overdue') maintenanceOverdue++;
+          else if (vehicle.mot_status?.status === 'due_soon') maintenanceDueSoon++;
+          
+          // Check Service
+          if (vehicle.service_status?.status === 'overdue') maintenanceOverdue++;
+          else if (vehicle.service_status?.status === 'due_soon') maintenanceDueSoon++;
+          
+          // Check Cambelt
+          if (vehicle.cambelt_status?.status === 'overdue') maintenanceOverdue++;
+          else if (vehicle.cambelt_status?.status === 'due_soon') maintenanceDueSoon++;
+          
+          // Check First Aid
+          if (vehicle.first_aid_status?.status === 'overdue') maintenanceOverdue++;
+          else if (vehicle.first_aid_status?.status === 'due_soon') maintenanceDueSoon++;
         });
       }
 
@@ -560,7 +566,7 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-4">
                           <div 
                             className="flex items-center justify-center w-10 h-10 rounded-lg"
-                            style={{ backgroundColor: `${approval.color}15` }}
+                            style={{ backgroundColor: approval.color.replace('hsl(', 'hsla(').replace(')', ', 0.15)') }}
                           >
                             <Icon 
                               className="h-5 w-5" 
@@ -643,28 +649,28 @@ export default function DashboardPage() {
                       >
                         <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-800/30 border border-slate-700/50">
                           <div className="flex items-center gap-4">
-                            <div 
-                              className="flex items-center justify-center w-10 h-10 rounded-lg"
-                              style={{ backgroundColor: `${actionType.color}15` }}
-                            >
-                              <Icon 
-                                className="h-5 w-5" 
-                                style={{ color: actionType.color }}
-                              />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium text-white">
-                                  {actionType.label}
-                                </p>
-                                <Badge variant="outline" className="bg-slate-500/10 text-slate-400 border-slate-500/30 text-xs">
-                                  Coming Soon
-                                </Badge>
-                              </div>
-                              <p className="text-sm text-slate-400">
-                                Site safety audits and compliance checks
+                          <div 
+                            className="flex items-center justify-center w-10 h-10 rounded-lg"
+                            style={{ backgroundColor: actionType.color.replace('hsl(', 'hsla(').replace(')', ', 0.15)') }}
+                          >
+                            <Icon 
+                              className="h-5 w-5" 
+                              style={{ color: actionType.color }}
+                            />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-white">
+                                {actionType.label}
                               </p>
+                              <Badge variant="outline" className="bg-slate-500/10 text-slate-400 border-slate-500/30 text-xs">
+                                Coming Soon
+                              </Badge>
                             </div>
+                            <p className="text-sm text-slate-400">
+                              Site safety audits and compliance checks
+                            </p>
+                          </div>
                           </div>
                         </div>
                       </div>
@@ -682,7 +688,7 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-4">
                           <div 
                             className="flex items-center justify-center w-10 h-10 rounded-lg"
-                            style={{ backgroundColor: `${actionType.color}15` }}
+                            style={{ backgroundColor: actionType.color.replace('hsl(', 'hsla(').replace(')', ', 0.15)') }}
                           >
                             <Icon 
                               className="h-5 w-5" 
