@@ -243,7 +243,10 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
               <PopoverContent 
                 side={open ? "top" : "right"} 
                 align={open ? "center" : "start"}
-                className="w-56 p-2 bg-slate-900 border-slate-700"
+                sideOffset={open ? 8 : 12}
+                alignOffset={open ? 0 : -8}
+                className="w-56 p-2 bg-slate-900 border-slate-700 z-[100]"
+                onOpenAutoFocus={(e) => e.preventDefault()}
               >
                 <div className="space-y-1">
                   <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -260,13 +263,16 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                     return (
                       <button
                         key={role.value}
-                        onClick={() => {
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           setViewAsRole(role.value as ViewAsRole);
                           localStorage.setItem('viewAsRole', role.value);
                           // Refresh page to apply new view
                           setTimeout(() => window.location.reload(), 100);
                         }}
-                        className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
+                        className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors cursor-pointer ${
                           isActive
                             ? 'bg-avs-yellow text-slate-900'
                             : 'text-slate-300 hover:bg-slate-800 hover:text-white'
