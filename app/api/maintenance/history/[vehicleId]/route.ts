@@ -181,7 +181,9 @@ export async function GET(
     let tasksWithProfiles = workshopTasks || [];
     if (workshopTasks && workshopTasks.length > 0) {
       const userIds = [...new Set(workshopTasks.map(t => t.created_by).filter(Boolean))];
+      
       if (userIds.length > 0) {
+        // Fetch profiles from database
         const { data: profiles } = await supabaseServiceRole
           .from('profiles')
           .select('id, full_name')
@@ -191,6 +193,12 @@ export async function GET(
         tasksWithProfiles = workshopTasks.map(task => ({
           ...task,
           profiles: task.created_by ? { full_name: profileMap.get(task.created_by) || null } : null
+        }));
+      } else {
+        // No user IDs to fetch, but still need to add profiles property (as null) to each task
+        tasksWithProfiles = workshopTasks.map(task => ({
+          ...task,
+          profiles: null
         }));
       }
     }
