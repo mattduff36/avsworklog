@@ -469,10 +469,12 @@ export function MaintenanceHistoryDialog({
                             </span>
                           </div>
                         )}
-                        
-                        <div className="bg-slate-900/50 rounded p-2 border-l-2 border-blue-500">
-                          <p className="text-sm text-slate-300 italic">"{entry.comment}"</p>
-                        </div>
+                      </div>
+                      
+                      <div className="bg-slate-900/50 rounded p-3 border border-slate-700 mt-2">
+                        <p className="text-xs text-slate-500 mb-1">Comment:</p>
+                        <p className="text-slate-200 text-sm">{entry.comment}</p>
+                      </div>
                       </div>
                     </div>
                   );
