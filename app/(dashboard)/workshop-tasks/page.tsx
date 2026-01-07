@@ -987,23 +987,23 @@ export default function WorkshopTasksPage() {
 
               {/* In Progress Tasks */}
               {inProgressTasks.length > 0 && (
-                <div className="space-y-4">
+                <div className="border-2 border-blue-500/30 rounded-lg overflow-hidden bg-blue-500/5">
                   <button
                     onClick={() => setShowInProgress(!showInProgress)}
-                    className="w-full flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    className="w-full flex items-center justify-between p-4 bg-blue-500/10 hover:bg-blue-500/20 transition-colors border-b-2 border-blue-500/30"
                   >
                     <h2 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                       <Clock className="h-5 w-5 text-blue-400" />
                       In Progress Tasks ({inProgressTasks.length})
                     </h2>
                     {showInProgress ? (
-                      <ChevronUp className="h-5 w-5 text-slate-400" />
+                      <ChevronUp className="h-5 w-5 text-blue-400" />
                     ) : (
-                      <ChevronDown className="h-5 w-5 text-slate-400" />
+                      <ChevronDown className="h-5 w-5 text-blue-400" />
                     )}
                   </button>
                   {showInProgress && (
-                    <div className="space-y-3">
+                    <div className="space-y-3 p-4">
                     {inProgressTasks.map((task) => {
                       const isUpdating = updatingStatus.has(task.id);
                       return (
@@ -1106,23 +1106,23 @@ export default function WorkshopTasksPage() {
 
               {/* Completed Tasks */}
               {completedTasks.length > 0 && (
-                <div className="space-y-4">
+                <div className="border-2 border-green-500/30 rounded-lg overflow-hidden bg-green-500/5">
                   <button
                     onClick={() => setShowCompleted(!showCompleted)}
-                    className="w-full flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    className="w-full flex items-center justify-between p-4 bg-green-500/10 hover:bg-green-500/20 transition-colors border-b-2 border-green-500/30"
                   >
-                    <h2 className="text-xl font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-2">
+                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                       <CheckCircle2 className="h-5 w-5 text-green-400" />
                       Completed Tasks ({completedTasks.length})
                     </h2>
                     {showCompleted ? (
-                      <ChevronUp className="h-5 w-5 text-slate-400" />
+                      <ChevronUp className="h-5 w-5 text-green-400" />
                     ) : (
-                      <ChevronDown className="h-5 w-5 text-slate-400" />
+                      <ChevronDown className="h-5 w-5 text-green-400" />
                     )}
                   </button>
                   {showCompleted && (
-                    <div className="space-y-3">
+                    <div className="space-y-3 p-4">
                     {completedTasks.map((task) => (
                       <Card key={task.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-90 transition-opacity">
                         <CardContent className="pt-6">
