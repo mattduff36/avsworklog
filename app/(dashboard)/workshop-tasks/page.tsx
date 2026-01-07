@@ -550,6 +550,11 @@ export default function WorkshopTasksPage() {
     );
   }
 
+  // If no permission, return null and let the hook handle redirect
+  if (!hasPermission) {
+    return null;
+  }
+
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Construction Banner */}
