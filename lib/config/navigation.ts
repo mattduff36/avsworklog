@@ -169,12 +169,9 @@ export function getFilteredEmployeeNav(
   hasRAMSAssignments: boolean
 ): NavItem[] {
   return employeeNavItems.filter(item => {
-    // Managers and admins always have access (unless viewing as employee)
+    // Managers and admins always have access to all modules
+    // (RAMS should be visible to managers/admins regardless of assignments)
     if (isManager || isAdmin) {
-      // Hide RAMS for managers/admins if they have no assignments (when viewing as employee)
-      if (item.module === 'rams' && !hasRAMSAssignments) {
-        return false;
-      }
       return true;
     }
     
