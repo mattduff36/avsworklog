@@ -491,7 +491,7 @@ export function MaintenanceHistoryDialog({
                 <div className="space-y-6">
                   {Object.entries(groupedHistory)
                     .sort(([a], [b]) => b.localeCompare(a))
-                    .slice(0, Math.ceil(visibleHistoryCount / 2))
+                    .slice(0, visibleHistoryCount)
                     .map(([dateKey, entries]) => (
                       <div key={dateKey} className="space-y-3">
                         <div className="flex items-center gap-2 text-slate-400 text-sm">
