@@ -72,7 +72,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     <>
       {/* Backdrop - only show when expanded */}
       <div
-        className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] transition-opacity duration-300 ${
+        className={`fixed inset-0 bg-black/50 z-[60] transition-opacity duration-300 ${
           open ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onToggle}
