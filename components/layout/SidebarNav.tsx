@@ -44,9 +44,14 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     }
     fetchUserData();
     
+    // Retrieve and validate stored View As preference
     const storedViewAs = localStorage.getItem('viewAsRole');
     if (storedViewAs) {
-      setViewAsRole(storedViewAs);
+      // Validate it's a valid ViewAsRole value before using it
+      const validRoles: ViewAsRole[] = ['actual', 'employee', 'manager', 'admin'];
+      if (validRoles.includes(storedViewAs as ViewAsRole)) {
+        setViewAsRole(storedViewAs as ViewAsRole);
+      }
     }
   }, [supabase]);
 

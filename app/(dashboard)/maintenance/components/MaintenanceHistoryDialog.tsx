@@ -145,6 +145,10 @@ export function MaintenanceHistoryDialog({
   // Get latest 3 entries for summary
   const latestEntries = combinedItems.slice(0, 3);
   
+  // Calculate how many items will be shown on initial expansion
+  const totalRemaining = combinedItems.length - 3;
+  const initialExpandCount = Math.min(visibleHistoryCount, totalRemaining);
+  
   // Calculate remaining items (accounting for the 3 already shown in Recent Updates)
   const remainingCount = Math.max(0, combinedItems.length - (visibleHistoryCount + 3));
   const hasMoreHistory = remainingCount > 0;
@@ -498,7 +502,7 @@ export function MaintenanceHistoryDialog({
                   className="w-full flex items-center justify-between p-3 bg-slate-800/30 hover:bg-slate-800/50 rounded-lg border border-slate-700/50 transition-colors"
                 >
                   <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">
-                    {showFullHistory ? 'Hide Older Updates' : `Show More (${combinedItems.length - 3} older)`}
+                    {showFullHistory ? 'Hide Older Updates' : `Show More (${initialExpandCount} ${initialExpandCount === 1 ? 'item' : 'items'})`}
                   </h3>
                   {showFullHistory ? (
                     <ChevronUp className="h-4 w-4 text-slate-400" />
