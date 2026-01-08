@@ -164,15 +164,31 @@ export async function GET(
           lastTestResult: lastTest?.testResult || null,
           motExpiryDate: motExpiryDate, // For backward compatibility
         },
-        tests: sortedTests.map((test: any) => ({
-          motTestNumber: test.motTestNumber,
-          completedDate: test.completedDate,
-          testResult: test.testResult,
-          expiryDate: test.expiryDate,
-          odometerValue: test.odometerValue ? parseInt(test.odometerValue) : null,
-          odometerUnit: test.odometerUnit,
-          defects: test.defects || [],
-        })),
+        tests: sortedTests.map((test: any) => {
+          const rawOdometer = test.odometerValue;
+          const odometerValue =
+            rawOdometer === null || rawOdometer === undefined || rawOdometer === ''
+              ? null
+              : (() => {
+                  const parsed =
+                    typeof rawOdometer === 'number'
+                      ? rawOdometer
+                      : parseInt(String(rawOdometer), 10);
+                  return Number.isFinite(parsed) ? parsed : null;
+                })();
+
+          return {
+            motTestNumber: test.motTestNumber,
+            completedDate: test.completedDate,
+            testResult: test.testResult,
+            expiryDate: test.expiryDate,
+            odometerValue,
+            odometerUnit: test.odometerUnit ?? null,
+            testStationName: test.testStationName ?? null,
+            testStationPcode: test.testStationPcode ?? null,
+            defects: Array.isArray(test.defects) ? test.defects : [],
+          };
+        }),
       },
     });
 

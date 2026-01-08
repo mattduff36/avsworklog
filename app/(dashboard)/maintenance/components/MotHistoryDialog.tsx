@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { formatMileage } from '@/lib/utils/maintenanceCalculations';
 import { 
   FileText, 
   CheckCircle, 
@@ -302,7 +303,8 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
     return counts;
   };
   
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return 'Not Set';
     return new Date(dateString).toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'short',
@@ -486,7 +488,8 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                 <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Test History</h3>
                 
                 {motData.tests.map((test: any) => {
-                const defectCounts = countDefectsByType(test.defects);
+                const defects = Array.isArray(test.defects) ? test.defects : [];
+                const defectCounts = countDefectsByType(defects);
                 const isExpanded = expandedTestId === test.motTestNumber;
                 const isPassed = test.testResult === 'PASSED';
                 
@@ -523,7 +526,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                       </div>
                       
                       {/* Defect Summary Badges - Top Right on Desktop */}
-                      {test.defects.length > 0 && (
+                      {defects.length > 0 && (
                         <div className="flex items-center gap-2 flex-wrap md:justify-end">
                           {Object.entries(defectCounts).map(([type, count]) => (
                             <Badge key={type} className={`${getDefectColor(type)} border text-xs`}>
@@ -539,7 +542,11 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                       <div className="flex items-center gap-2">
                         <Gauge className="h-4 w-4 text-slate-400" />
                         <span className="text-slate-400">Mileage:</span>
-                        <span className="text-white font-medium">{test.odometerValue.toLocaleString()} {test.odometerUnit}</span>
+                        <span className="text-white font-medium">
+                          {test.odometerValue === null || test.odometerValue === undefined
+                            ? 'Not Set'
+                            : `${formatMileage(test.odometerValue)} ${test.odometerUnit || ''}`.trim()}
+                        </span>
                       </div>
                       {(test.testStationName || test.testStationPcode) && (
                         <div className="flex items-center gap-2">
@@ -557,7 +564,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                     </div>
 
                     {/* Expandable Defects */}
-                    {test.defects.length > 0 && (
+                    {defects.length > 0 && (
                       <div className="space-y-2">
                         <Button
                           variant="ghost"
@@ -573,14 +580,14 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                           ) : (
                             <>
                               <ChevronDown className="h-4 w-4 mr-2" />
-                              View {test.defects.length} Defect{test.defects.length !== 1 ? 's' : ''}
+                              View {defects.length} Defect{defects.length !== 1 ? 's' : ''}
                             </>
                           )}
                         </Button>
 
                         {isExpanded && (
                           <div className="mt-3 space-y-2 border-t border-slate-700 pt-3">
-                            {test.defects.map((defect: any, idx: number) => (
+                            {defects.map((defect: any, idx: number) => (
                               <div 
                                 key={idx}
                                 className={`p-3 rounded border ${getDefectColor(defect.type)}`}
@@ -608,7 +615,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                       </div>
                     )}
 
-                    {test.defects.length === 0 && (
+                    {defects.length === 0 && (
                       <div className="flex items-center gap-2 text-sm text-green-400">
                         <CheckCircle className="h-4 w-4" />
                         No defects or advisories recorded
