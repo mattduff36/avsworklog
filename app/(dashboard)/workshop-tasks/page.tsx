@@ -91,6 +91,11 @@ export default function WorkshopTasksPage() {
   const [categoryName, setCategoryName] = useState('');
   const [categorySortOrder, setCategorySortOrder] = useState('0');
   const [submittingCategory, setSubmittingCategory] = useState(false);
+  
+  // Expandable sections state (Pending and In Progress open by default, Completed closed)
+  const [showPending, setShowPending] = useState(true);
+  const [showInProgress, setShowInProgress] = useState(true);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -726,11 +731,6 @@ export default function WorkshopTasksPage() {
   const pendingTasks = tasks.filter(t => t.status === 'pending');
   const inProgressTasks = tasks.filter(t => t.status === 'logged');
   const completedTasks = tasks.filter(t => t.status === 'completed');
-  
-  // Expandable sections state (Pending and In Progress open by default, Completed closed)
-  const [showPending, setShowPending] = useState(true);
-  const [showInProgress, setShowInProgress] = useState(true);
-  const [showCompleted, setShowCompleted] = useState(false);
 
   // Show loading state while checking permissions
   if (permissionLoading) {
