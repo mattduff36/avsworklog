@@ -370,6 +370,9 @@ export default function DashboardPage() {
       setActionsSummary(actionTypes);
     } catch (error) {
       console.error('Error fetching actions summary:', error);
+      toast.error('Unable to load actions data', {
+        description: 'Please check your internet connection and try again.',
+      });
       // Initialize with empty data on error
       setActionsSummary([
         {
@@ -397,6 +400,8 @@ export default function DashboardPage() {
           href: '#'
         }
       ]);
+    } finally {
+      setLoading(false);
     }
   };
 
