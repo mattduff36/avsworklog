@@ -51,7 +51,8 @@ type Category = {
 export default function WorkshopTasksPage() {
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('workshop-tasks');
   
-  const { user, isManager } = useAuth();
+  const { user, isManager, isAdmin } = useAuth();
+  const showSettings = isAdmin || isManager;
   const supabase = createClient();
   
   const [tasks, setTasks] = useState<Action[]>([]);
@@ -772,7 +773,7 @@ export default function WorkshopTasksPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="vehicle" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-4">
+        <TabsList className={`grid w-full ${showSettings ? 'grid-cols-4' : 'grid-cols-3'}`}>
           <TabsTrigger value="vehicle">Vehicle Tasks</TabsTrigger>
           <TabsTrigger value="plant" disabled>
             <span className="flex items-center gap-1">
@@ -786,7 +787,7 @@ export default function WorkshopTasksPage() {
               <Info className="h-3 w-3" />
             </span>
           </TabsTrigger>
-          {isManager && (
+          {showSettings && (
             <TabsTrigger value="settings">
               <Settings className="h-4 w-4 md:mr-1" />
               <span className="hidden md:inline">Settings</span>
@@ -1204,7 +1205,7 @@ export default function WorkshopTasksPage() {
           </Card>
         </TabsContent>
 
-        {isManager && (
+        {showSettings && (
           <TabsContent value="settings">
             <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
               <CardHeader>
@@ -1609,7 +1610,7 @@ export default function WorkshopTasksPage() {
       </Dialog>
 
       {/* Category Management Modal */}
-      {isManager && (
+      {showSettings && (
         <Dialog open={showCategoryModal} onOpenChange={setShowCategoryModal}>
           <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
             <DialogHeader>
