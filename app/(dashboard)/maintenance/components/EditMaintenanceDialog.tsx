@@ -47,7 +47,7 @@ const editMaintenanceSchema = z.object({
     z.number().int().positive('Too small expected number to be >0').optional().nullable()
   ),
   tracker_id: z.string().max(50, 'Tracker ID must be less than 50 characters').optional().nullable(),
-  notes: z.string().max(500, 'Notes must be less than 500 characters').optional().nullable(),
+  // notes field removed from schema - kept in database/backend for future use but not used in form
   comment: z.string()
     .min(10, 'Comment must be at least 10 characters')
     .max(500, 'Comment must be less than 500 characters')
