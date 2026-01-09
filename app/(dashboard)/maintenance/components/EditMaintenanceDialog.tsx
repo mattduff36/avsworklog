@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -20,6 +20,7 @@ import { Loader2, Save, History as HistoryIcon } from 'lucide-react';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useUpdateMaintenance, useCreateMaintenance } from '@/lib/hooks/useMaintenance';
 import { formatDateForInput, formatMileage } from '@/lib/utils/maintenanceCalculations';
+import { triggerShakeAnimation } from '@/lib/utils/animations';
 
 // ============================================================================
 // Zod Validation Schema
@@ -76,6 +77,7 @@ export function EditMaintenanceDialog({
   const updateMutation = useUpdateMaintenance();
   const createMutation = useCreateMaintenance();
   const [isMileageFocused, setIsMileageFocused] = useState(false);
+  const dialogContentRef = useRef<HTMLDivElement>(null);
   
   // Check if this is a new maintenance record (vehicle.id is null for vehicles without maintenance records)
   const isNewRecord = !vehicle?.id;
@@ -84,7 +86,7 @@ export function EditMaintenanceDialog({
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
     reset,
     watch,
   } = useForm<EditMaintenanceFormData>({
@@ -112,6 +114,24 @@ export function EditMaintenanceDialog({
       });
     }
   }, [vehicle, reset]);
+
+  // Handle modal close attempts
+  const handleOpenChange = (newOpen: boolean) => {
+    // If trying to close and form has unsaved changes, prevent close and shake
+    if (!newOpen && isDirty) {
+      triggerShakeAnimation(dialogContentRef.current);
+      return;
+    }
+    
+    // Allow close if no changes or explicitly closing
+    onOpenChange(newOpen);
+  };
+
+  // Handle explicit close button click - discard changes
+  const handleDiscardChanges = () => {
+    reset(); // Reset form to original values
+    onOpenChange(false);
+  };
 
   // Submit handler
   const onSubmit = async (data: EditMaintenanceFormData) => {
@@ -172,8 +192,25 @@ export function EditMaintenanceDialog({
   if (!vehicle) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-white w-full max-w-full md:max-w-2xl h-full md:h-auto max-h-screen md:max-h-[90vh] overflow-y-auto p-4 md:p-6">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent 
+        ref={dialogContentRef}
+        className="bg-slate-900 border-slate-700 text-white w-full max-w-full md:max-w-2xl h-full md:h-auto max-h-screen md:max-h-[90vh] overflow-y-auto p-4 md:p-6"
+        onInteractOutside={(e) => {
+          // Prevent closing when clicking outside if form has changes
+          if (isDirty) {
+            e.preventDefault();
+            triggerShakeAnimation(dialogContentRef.current);
+          }
+        }}
+        onEscapeKeyDown={(e) => {
+          // Prevent closing with Escape key if form has changes
+          if (isDirty) {
+            e.preventDefault();
+            triggerShakeAnimation(dialogContentRef.current);
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="text-2xl">
             {isNewRecord ? 'Create' : 'Edit'} Vehicle Record - {vehicle.vehicle?.reg_number}
@@ -392,11 +429,11 @@ export function EditMaintenanceDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={handleDiscardChanges}
               className="border-slate-600 text-white hover:bg-slate-800"
               disabled={isSubmitting || updateMutation.isPending || createMutation.isPending}
             >
-              Cancel
+              {isDirty ? 'Discard Changes' : 'Cancel'}
             </Button>
             <Button
               type="button"
