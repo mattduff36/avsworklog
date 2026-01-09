@@ -77,6 +77,11 @@ export default function WorkshopTasksPage() {
   const [loggedComment, setLoggedComment] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState<Set<string>>(new Set());
   
+  // Complete Task Modal
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [completingTask, setCompletingTask] = useState<Action | null>(null);
+  const [completedComment, setCompletedComment] = useState('');
+  
   // Edit Task Modal
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Action | null>(null);
@@ -302,8 +307,8 @@ export default function WorkshopTasksPage() {
       return;
     }
 
-    if (loggedComment.length > 40) {
-      toast.error('Comment must be 40 characters or less');
+    if (loggedComment.length > 300) {
+      toast.error('Comment must be 300 characters or less');
       return;
     }
 
@@ -346,9 +351,27 @@ export default function WorkshopTasksPage() {
     }
   };
 
-  const handleMarkComplete = async (taskId: string) => {
+  const handleMarkComplete = (task: Action) => {
+    setCompletingTask(task);
+    setCompletedComment('');
+    setShowCompleteModal(true);
+  };
+
+  const confirmMarkComplete = async () => {
+    if (!completingTask) return;
+
+    if (!completedComment.trim()) {
+      toast.error('Completion note is required');
+      return;
+    }
+
+    if (completedComment.length > 500) {
+      toast.error('Completion note must be 500 characters or less');
+      return;
+    }
+
     try {
-      setUpdatingStatus(prev => new Set(prev).add(taskId));
+      setUpdatingStatus(prev => new Set(prev).add(completingTask.id));
 
       const { error } = await supabase
         .from('actions')
@@ -357,17 +380,21 @@ export default function WorkshopTasksPage() {
           actioned: true,
           actioned_at: new Date().toISOString(),
           actioned_by: user?.id,
+          actioned_comment: completedComment.trim(),
         })
-        .eq('id', taskId);
+        .eq('id', completingTask.id);
 
       if (error) throw error;
 
       toast.success('Task marked as complete');
+      setShowCompleteModal(false);
+      setCompletingTask(null);
+      setCompletedComment('');
 
       setTimeout(() => {
         setUpdatingStatus(prev => {
           const newSet = new Set(prev);
-          newSet.delete(taskId);
+          newSet.delete(completingTask.id);
           return newSet;
         });
         fetchTasks();
@@ -377,7 +404,7 @@ export default function WorkshopTasksPage() {
       toast.error('Failed to mark complete');
       setUpdatingStatus(prev => {
         const newSet = new Set(prev);
-        newSet.delete(taskId);
+        newSet.delete(completingTask.id);
         return newSet;
       });
     }
@@ -956,7 +983,7 @@ export default function WorkshopTasksPage() {
                                       <span className="md:inline">Mark In Progress</span>
                                     </Button>
                                     <Button
-                                      onClick={() => handleMarkComplete(task.id)}
+                                      onClick={() => handleMarkComplete(task)}
                                       disabled={isUpdating}
                                       className={`h-12 md:h-16 min-w-0 md:min-w-[140px] text-sm md:text-base font-semibold transition-all ${
                                         isUpdating
@@ -1075,7 +1102,7 @@ export default function WorkshopTasksPage() {
                                       <span className="md:inline">Undo</span>
                                     </Button>
                                     <Button
-                                      onClick={() => handleMarkComplete(task.id)}
+                                      onClick={() => handleMarkComplete(task)}
                                       disabled={isUpdating}
                                       className={`h-12 md:h-16 min-w-0 md:min-w-[140px] text-sm md:text-base font-semibold transition-all ${
                                         isUpdating
@@ -1376,7 +1403,7 @@ export default function WorkshopTasksPage() {
 
             <div className="space-y-2">
               <Label htmlFor="comments" className="text-slate-900 dark:text-white">
-                Workshop Comments <span className="text-red-500">*</span>
+                Task Details <span className="text-red-500">*</span>
               </Label>
               <Textarea
                 id="comments"
@@ -1384,10 +1411,10 @@ export default function WorkshopTasksPage() {
                 onChange={(e) => setWorkshopComments(e.target.value)}
                 placeholder="Describe the work needed (minimum 10 characters)"
                 className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[100px]"
-                maxLength={500}
+                maxLength={300}
               />
               <p className="text-xs text-slate-600 dark:text-slate-400">
-                {workshopComments.length}/500 characters (minimum 10)
+                {workshopComments.length}/300 characters (minimum 10)
               </p>
             </div>
           </div>
@@ -1433,23 +1460,23 @@ export default function WorkshopTasksPage() {
 
             <div className="space-y-2">
               <Label htmlFor="logged-comment" className="text-slate-900 dark:text-white">
-                Progress Note <span className="text-slate-400">(max 40 chars)</span> <span className="text-red-500">*</span>
+                Progress Note <span className="text-slate-400">(max 300 chars)</span> <span className="text-red-500">*</span>
               </Label>
               <Textarea
                 id="logged-comment"
                 value={loggedComment}
                 onChange={(e) => {
-                  if (e.target.value.length <= 40) {
+                  if (e.target.value.length <= 300) {
                     setLoggedComment(e.target.value);
                   }
                 }}
                 placeholder="e.g., Started work on brakes"
                 className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white"
-                maxLength={40}
-                rows={2}
+                maxLength={300}
+                rows={3}
               />
               <p className="text-xs text-slate-600 dark:text-slate-400">
-                {loggedComment.length}/40 characters
+                {loggedComment.length}/300 characters
               </p>
             </div>
           </div>
@@ -1468,11 +1495,75 @@ export default function WorkshopTasksPage() {
             </Button>
             <Button
               onClick={confirmMarkInProgress}
-              disabled={!loggedComment.trim() || loggedComment.length > 40}
+              disabled={!loggedComment.trim() || loggedComment.length > 300}
               className="bg-blue-500 hover:bg-blue-600 text-white"
             >
               <Clock className="h-4 w-4 mr-2" />
               Mark In Progress
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mark Task Complete Modal */}
+      <Dialog open={showCompleteModal} onOpenChange={setShowCompleteModal}>
+        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-white text-xl">Mark Task Complete</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
+              Add detailed notes about the work completed
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+              <p className="text-sm text-green-300">
+                This task will be marked as "Completed" and moved to the completed tasks section.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="completed-comment" className="text-slate-900 dark:text-white">
+                Completion Note <span className="text-slate-400">(max 500 chars)</span> <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="completed-comment"
+                value={completedComment}
+                onChange={(e) => {
+                  if (e.target.value.length <= 500) {
+                    setCompletedComment(e.target.value);
+                  }
+                }}
+                placeholder="e.g., Replaced brake pads and discs on front axle. Tested and working correctly."
+                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[100px]"
+                maxLength={500}
+                rows={4}
+              />
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                {completedComment.length}/500 characters
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCompleteModal(false);
+                setCompletingTask(null);
+                setCompletedComment('');
+              }}
+              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmMarkComplete}
+              disabled={!completedComment.trim() || completedComment.length > 500}
+              className="bg-green-500 hover:bg-green-600 text-white"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Mark Complete
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1566,7 +1657,7 @@ export default function WorkshopTasksPage() {
 
             <div className="space-y-2">
               <Label htmlFor="edit-comments" className="text-slate-900 dark:text-white">
-                Workshop Comments <span className="text-red-500">*</span>
+                Task Details <span className="text-red-500">*</span>
               </Label>
               <Textarea
                 id="edit-comments"
@@ -1574,10 +1665,10 @@ export default function WorkshopTasksPage() {
                 onChange={(e) => setEditComments(e.target.value)}
                 placeholder="Describe the work needed (minimum 10 characters)"
                 className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[100px]"
-                maxLength={500}
+                maxLength={300}
               />
               <p className="text-xs text-slate-600 dark:text-slate-400">
-                {editComments.length}/500 characters (minimum 10)
+                {editComments.length}/300 characters (minimum 10)
               </p>
             </div>
           </div>
