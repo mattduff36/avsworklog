@@ -180,9 +180,9 @@ export function MaintenanceHistoryDialog({
           <div className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline" className="text-xs bg-[#8B4513]/20 border-[#8B4513]/40 text-[#D2691E]">
-                Workshop Task
+                {task.action_type === 'inspection_defect' ? 'Inspection Defect Fix' : 'Workshop Task'}
               </Badge>
-              {task.workshop_task_categories && (
+              {task.action_type === 'workshop_vehicle_task' && task.workshop_task_categories && (
                 <Badge variant="outline" className="text-xs">
                   {task.workshop_task_categories.name}
                 </Badge>
@@ -209,22 +209,30 @@ export function MaintenanceHistoryDialog({
             )}
           </div>
           
-          {(task.workshop_comments || task.description || task.logged_comment) && (
+          {(task.workshop_comments || task.description || task.logged_comment || task.actioned_comment) && (
             <div className="bg-slate-900/50 rounded p-3 border border-slate-700 mt-2 space-y-2">
-              <p className="text-xs text-slate-500 mb-1">Comment:</p>
-              {task.description && (
-                <p className="text-slate-200 text-sm">{task.description}</p>
+              {task.workshop_comments && (
+                <div>
+                  <p className="text-xs text-slate-500 font-medium mb-1">Task Details:</p>
+                  <p className="text-slate-200 text-sm">{task.workshop_comments}</p>
+                </div>
+              )}
+              {task.description && !task.workshop_comments && (
+                <div>
+                  <p className="text-xs text-slate-500 font-medium mb-1">Description:</p>
+                  <p className="text-slate-200 text-sm">{task.description}</p>
+                </div>
               )}
               {task.logged_comment && (
-                <div className="bg-blue-500/10 border border-blue-500/30 rounded p-2">
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded p-2 mt-2">
                   <p className="text-xs text-blue-400 font-medium mb-1">Progress Note:</p>
                   <p className="text-blue-300 text-sm">{task.logged_comment}</p>
                 </div>
               )}
-              {task.workshop_comments && (
-                <div>
-                  <p className="text-xs text-slate-500 font-medium mb-1">Notes:</p>
-                  <p className="text-slate-200 text-sm">{task.workshop_comments}</p>
+              {task.actioned_comment && (
+                <div className="bg-green-500/10 border border-green-500/30 rounded p-2 mt-2">
+                  <p className="text-xs text-green-400 font-medium mb-1">Completed Note:</p>
+                  <p className="text-green-300 text-sm">{task.actioned_comment}</p>
                 </div>
               )}
             </div>

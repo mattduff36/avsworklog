@@ -162,6 +162,8 @@ export function useUpdateMaintenance() {
     onSuccess: () => {
       // Invalidate maintenance list to refetch with new data
       queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+      // Invalidate maintenance history to show the update in history modal
+      queryClient.invalidateQueries({ queryKey: ['maintenance', 'history'] });
       
       toast.success('Maintenance updated successfully', {
         description: 'The vehicle maintenance record has been updated.',

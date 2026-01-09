@@ -224,9 +224,11 @@ export interface WorkshopTaskHistoryItem {
   id: string;
   created_at: string;
   status: string;
+  action_type: 'inspection_defect' | 'workshop_vehicle_task' | 'manager_action';
   workshop_comments: string | null;
   description: string | null;
   logged_comment: string | null;
+  actioned_comment: string | null;
   actioned_at: string | null;
   logged_at: string | null;
   workshop_task_categories?: {

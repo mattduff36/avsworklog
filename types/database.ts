@@ -544,6 +544,7 @@ export interface Database {
           actioned: boolean
           actioned_at: string | null
           actioned_by: string | null
+          actioned_comment: string | null
           logged_comment: string | null
           logged_at: string | null
           logged_by: string | null
@@ -566,6 +567,7 @@ export interface Database {
           actioned?: boolean
           actioned_at?: string | null
           actioned_by?: string | null
+          actioned_comment?: string | null
           logged_comment?: string | null
           logged_at?: string | null
           logged_by?: string | null
@@ -588,6 +590,7 @@ export interface Database {
           actioned?: boolean
           actioned_at?: string | null
           actioned_by?: string | null
+          actioned_comment?: string | null
           logged_comment?: string | null
           logged_at?: string | null
           logged_by?: string | null
