@@ -140,6 +140,8 @@ export function EditMaintenanceDialog({
     }
 
     // Convert empty strings to null for dates
+    // Note: comment is included here for the API request body (used for audit logging),
+    // but the API will extract it and not include it in the database update
     const updates = {
       current_mileage: data.current_mileage || null,
       tax_due_date: data.tax_due_date || null,
@@ -150,7 +152,7 @@ export function EditMaintenanceDialog({
       cambelt_due_mileage: data.cambelt_due_mileage || null,
       tracker_id: data.tracker_id || null,
       notes: data.notes || null,
-      comment: data.comment.trim(), // Mandatory comment
+      comment: data.comment.trim(), // Mandatory comment for audit trail (not a DB column)
     };
 
     if (isNewRecord) {
@@ -174,7 +176,7 @@ export function EditMaintenanceDialog({
       <DialogContent className="bg-slate-900 border-slate-700 text-white w-full max-w-full md:max-w-2xl h-full md:h-auto max-h-screen md:max-h-[90vh] overflow-y-auto p-4 md:p-6">
         <DialogHeader>
           <DialogTitle className="text-2xl">
-            {isNewRecord ? 'Create' : 'Edit'} Maintenance - {vehicle.vehicle?.reg_number}
+            {isNewRecord ? 'Create' : 'Edit'} Vehicle Record - {vehicle.vehicle?.reg_number}
           </DialogTitle>
           <DialogDescription className="text-slate-400">
             {isNewRecord 
@@ -363,7 +365,9 @@ export function EditMaintenanceDialog({
 
           {/* Notes */}
           <div className="space-y-2">
-            <Label htmlFor="notes">General Notes</Label>
+            <Label htmlFor="notes" className="text-white">
+              General Notes <span className="text-slate-400 text-xs">(Optional)</span>
+            </Label>
             <Textarea
               id="notes"
               {...register('notes')}
@@ -371,6 +375,9 @@ export function EditMaintenanceDialog({
               className="bg-slate-800 border-slate-600 text-white"
               rows={2}
             />
+            <p className="text-xs text-slate-400">
+              General notes stored with the vehicle maintenance record
+            </p>
             {errors.notes && (
               <p className="text-sm text-red-400">{errors.notes.message}</p>
             )}
