@@ -360,6 +360,9 @@ export default function WorkshopTasksPage() {
   const confirmMarkComplete = async () => {
     if (!completingTask) return;
 
+    // Capture task ID at the beginning for safe access throughout the function
+    const taskId = completingTask.id;
+
     if (!completedComment.trim()) {
       toast.error('Completion note is required');
       return;
@@ -371,7 +374,7 @@ export default function WorkshopTasksPage() {
     }
 
     try {
-      setUpdatingStatus(prev => new Set(prev).add(completingTask.id));
+      setUpdatingStatus(prev => new Set(prev).add(taskId));
 
       const { error } = await supabase
         .from('actions')
@@ -382,7 +385,7 @@ export default function WorkshopTasksPage() {
           actioned_by: user?.id,
           actioned_comment: completedComment.trim(),
         })
-        .eq('id', completingTask.id);
+        .eq('id', taskId);
 
       if (error) throw error;
 
@@ -394,7 +397,7 @@ export default function WorkshopTasksPage() {
       setTimeout(() => {
         setUpdatingStatus(prev => {
           const newSet = new Set(prev);
-          newSet.delete(completingTask.id);
+          newSet.delete(taskId);
           return newSet;
         });
         fetchTasks();
@@ -404,7 +407,7 @@ export default function WorkshopTasksPage() {
       toast.error('Failed to mark complete');
       setUpdatingStatus(prev => {
         const newSet = new Set(prev);
-        newSet.delete(completingTask.id);
+        newSet.delete(taskId);
         return newSet;
       });
     }
@@ -1553,14 +1556,19 @@ export default function WorkshopTasksPage() {
                 setCompletingTask(null);
                 setCompletedComment('');
               }}
+              disabled={completingTask ? updatingStatus.has(completingTask.id) : false}
               className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               Cancel
             </Button>
             <Button
               onClick={confirmMarkComplete}
-              disabled={!completedComment.trim() || completedComment.length > 500}
-              className="bg-green-500 hover:bg-green-600 text-white"
+              disabled={
+                !completedComment.trim() || 
+                completedComment.length > 500 || 
+                (completingTask ? updatingStatus.has(completingTask.id) : false)
+              }
+              className="bg-green-500 hover:bg-green-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <CheckCircle2 className="h-4 w-4 mr-2" />
               Mark Complete
