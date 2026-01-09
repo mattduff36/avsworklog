@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save, History as HistoryIcon } from 'lucide-react';
+import { Loader2, Save } from 'lucide-react';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useUpdateMaintenance, useCreateMaintenance } from '@/lib/hooks/useMaintenance';
 import { formatDateForInput, formatMileage } from '@/lib/utils/maintenanceCalculations';
@@ -434,15 +434,6 @@ export function EditMaintenanceDialog({
               disabled={isSubmitting || updateMutation.isPending || createMutation.isPending}
             >
               {isDirty ? 'Discard Changes' : 'Cancel'}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled
-              className="border-slate-600 text-slate-400 hover:bg-slate-800"
-            >
-              <HistoryIcon className="h-4 w-4 mr-2" />
-              View History
             </Button>
             <Button
               type="submit"
