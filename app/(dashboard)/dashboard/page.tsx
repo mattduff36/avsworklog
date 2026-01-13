@@ -244,9 +244,13 @@ export default function DashboardPage() {
       setPendingApprovals(approvalTypes);
     } catch (error) {
       console.error('Error fetching pending approvals:', error);
-      toast.error('Unable to load dashboard data', {
-        description: 'Please check your internet connection and try again.',
-      });
+      try {
+        toast.error('Unable to load dashboard data', {
+          description: 'Please check your internet connection and try again.',
+        });
+      } catch (toastError) {
+        console.error('Unable to load dashboard data (toast unavailable)');
+      }
     } finally {
       setLoading(false);
     }
@@ -370,9 +374,13 @@ export default function DashboardPage() {
       setActionsSummary(actionTypes);
     } catch (error) {
       console.error('Error fetching actions summary:', error);
-      toast.error('Unable to load actions data', {
-        description: 'Please check your internet connection and try again.',
-      });
+      try {
+        toast.error('Unable to load actions data', {
+          description: 'Please check your internet connection and try again.',
+        });
+      } catch (toastError) {
+        console.error('Unable to load actions data (toast unavailable)');
+      }
       // Initialize with empty data on error
       setActionsSummary([
         {

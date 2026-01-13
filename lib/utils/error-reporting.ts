@@ -36,16 +36,24 @@ export async function reportError(options: ReportErrorOptions): Promise<void> {
       throw new Error(errorMessage);
     }
 
-    toast.success('Error reported', {
-      description: 'Thank you! The issue has been reported to our team.',
-      duration: 3000,
-    });
+    try {
+      toast.success('Error reported', {
+        description: 'Thank you! The issue has been reported to our team.',
+        duration: 3000,
+      });
+    } catch (toastError) {
+      console.log('Error reported successfully (toast unavailable)');
+    }
   } catch (err) {
     console.error('Failed to report error:', err);
-    toast.error('Could not send report', {
-      description: 'Please try again or contact support directly.',
-      duration: 3000,
-    });
+    try {
+      toast.error('Could not send report', {
+        description: 'Please try again or contact support directly.',
+        duration: 3000,
+      });
+    } catch (toastError) {
+      console.error('Could not send report (toast unavailable)');
+    }
   }
 }
 
@@ -72,19 +80,24 @@ export function showErrorWithReport(
 ): void {
   const errorCode = generateErrorCode(errorMessage);
   
-  toast.error(title, {
-    description: `${errorMessage}\n\nError Code: ${errorCode}`,
-    duration: 10000, // 10 seconds to give user time to report
-    action: {
-      label: 'Report',
-      onClick: () => {
-        reportError({
-          errorMessage: `${title}: ${errorMessage}`,
-          errorCode,
-          additionalContext,
-        });
+  try {
+    toast.error(title, {
+      description: `${errorMessage}\n\nError Code: ${errorCode}`,
+      duration: 10000, // 10 seconds to give user time to report
+      action: {
+        label: 'Report',
+        onClick: () => {
+          reportError({
+            errorMessage: `${title}: ${errorMessage}`,
+            errorCode,
+            additionalContext,
+          });
+        },
       },
-    },
-  });
+    });
+  } catch (toastError) {
+    // Fallback if toast is not available
+    console.error(`${title}: ${errorMessage} (Error Code: ${errorCode})`);
+  }
 }
 

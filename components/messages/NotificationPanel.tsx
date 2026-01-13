@@ -38,7 +38,11 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
       }
     } catch (error) {
       console.error('Error fetching notifications:', error);
-      toast.error('Failed to load notifications');
+      try {
+        toast.error('Failed to load notifications');
+      } catch (toastError) {
+        console.error('Failed to load notifications (toast unavailable)');
+      }
     } finally {
       setLoading(false);
     }
@@ -57,12 +61,20 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
         throw new Error(data.error || 'Failed to clear notifications');
       }
 
-      toast.success('All notifications cleared');
+      try {
+        toast.success('All notifications cleared');
+      } catch (toastError) {
+        console.log('All notifications cleared (toast unavailable)');
+      }
       setNotifications([]);
       onClose();
     } catch (error) {
       console.error('Error clearing notifications:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to clear notifications');
+      try {
+        toast.error(error instanceof Error ? error.message : 'Failed to clear notifications');
+      } catch (toastError) {
+        console.error('Failed to clear notifications (toast unavailable)');
+      }
     } finally {
       setClearing(false);
     }

@@ -192,9 +192,13 @@ function InspectionsContent() {
       console.error('Error fetching inspections:', error);
       // Show friendly message if offline
       if (!isOnline) {
-        toast.error('Unable to load inspections', {
-          description: 'Please check your internet connection.',
-        });
+        try {
+          toast.error('Unable to load inspections', {
+            description: 'Please check your internet connection.',
+          });
+        } catch (toastError) {
+          console.error('Unable to load inspections (toast unavailable)');
+        }
       }
     } finally {
       setLoading(false);

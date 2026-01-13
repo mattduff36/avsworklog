@@ -48,7 +48,11 @@ export default function NotificationsPage() {
       }
     } catch (error) {
       console.error('Error fetching notifications:', error);
-      toast.error('Failed to load notifications');
+      try {
+        toast.error('Failed to load notifications');
+      } catch (toastError) {
+        console.error('Failed to load notifications (toast unavailable)');
+      }
     } finally {
       setLoading(false);
     }
