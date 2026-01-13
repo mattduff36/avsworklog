@@ -42,7 +42,7 @@ export async function reportError(options: ReportErrorOptions): Promise<void> {
         duration: 3000,
       });
     } catch (toastError) {
-      console.log('Error reported successfully (toast unavailable)');
+      console.error('Error reported successfully (toast unavailable)');
     }
   } catch (err) {
     console.error('Failed to report error:', err);

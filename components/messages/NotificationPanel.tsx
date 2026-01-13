@@ -64,7 +64,7 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
       try {
         toast.success('All notifications cleared');
       } catch (toastError) {
-        console.log('All notifications cleared (toast unavailable)');
+        console.error('All notifications cleared (toast unavailable)');
       }
       setNotifications([]);
       onClose();
