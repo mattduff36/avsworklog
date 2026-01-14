@@ -281,7 +281,7 @@ export default function DashboardPage() {
             count: 0,
             icon: Settings,
             color: 'hsl(0 84% 60%)',
-            href: '/maintenance'
+            href: '/fleet'
           },
           {
             type: 'inspections',
@@ -586,7 +586,7 @@ export default function DashboardPage() {
               // Define colors for each admin link
               const colorMap: Record<string, { borderColor: string; iconColor: string; hoverBorder: string }> = {
                 '/admin/users': { borderColor: 'border-slate-400', iconColor: 'text-slate-300', hoverBorder: 'hover:border-slate-300' },
-                '/admin/vehicles': { borderColor: 'border-slate-500', iconColor: 'text-slate-400', hoverBorder: 'hover:border-slate-400' },
+                '/fleet?tab=vehicles': { borderColor: 'border-slate-500', iconColor: 'text-slate-400', hoverBorder: 'hover:border-slate-400' },
               };
               const colors = colorMap[link.href] || { borderColor: 'border-slate-500', iconColor: 'text-slate-400', hoverBorder: 'hover:border-slate-400' };
               
