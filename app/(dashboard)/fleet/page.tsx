@@ -3,10 +3,14 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter as useNextRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Wrench, Truck, Tag, Settings as SettingsIcon } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Wrench, Truck, Tag, Settings as SettingsIcon, Plus } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
+import Link from 'next/link';
 
 // Import existing components
 import { MaintenanceOverview } from '@/app/(dashboard)/maintenance/components/MaintenanceOverview';
@@ -16,9 +20,19 @@ import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useMaintenance } from '@/lib/hooks/useMaintenance';
 import { createClient } from '@/lib/supabase/client';
 
-// Vehicles Admin Component (will be extracted later)
-// For now, we'll import the full page and use it as a component
-// TODO: Extract vehicle management into reusable components
+type Vehicle = {
+  id: string;
+  reg_number: string;
+  nickname: string | null;
+  status: string;
+  vehicle_categories?: { name: string } | null;
+};
+
+type Category = {
+  id: string;
+  name: string;
+  description: string | null;
+};
 
 function FleetContent() {
   const searchParams = useSearchParams();
@@ -31,6 +45,44 @@ function FleetContent() {
   // Fetch maintenance data
   const { data: maintenanceData, isLoading: maintenanceLoading, error: maintenanceError } = useMaintenance();
   
+  // State for vehicles and categories
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [vehiclesLoading, setVehiclesLoading] = useState(false);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  
+  // Fetch vehicles
+  const fetchVehicles = async () => {
+    try {
+      setVehiclesLoading(true);
+      const response = await fetch('/api/admin/vehicles');
+      const data = await response.json();
+      if (response.ok) {
+        setVehicles(data.vehicles || []);
+      }
+    } catch (error) {
+      logger.error('Failed to fetch vehicles', error, 'FleetPage');
+    } finally {
+      setVehiclesLoading(false);
+    }
+  };
+
+  // Fetch categories
+  const fetchCategories = async () => {
+    try {
+      setCategoriesLoading(true);
+      const response = await fetch('/api/admin/categories');
+      const data = await response.json();
+      if (response.ok) {
+        setCategories(data.categories || []);
+      }
+    } catch (error) {
+      logger.error('Failed to fetch categories', error, 'FleetPage');
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
+
   // Check maintenance module permission
   useEffect(() => {
     async function checkPermission() {
@@ -81,6 +133,13 @@ function FleetContent() {
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     router.push(`/fleet?tab=${value}`, { scroll: false });
+    
+    // Fetch data when switching to tabs
+    if (value === 'vehicles' && vehicles.length === 0) {
+      fetchVehicles();
+    } else if (value === 'categories' && categories.length === 0) {
+      fetchCategories();
+    }
   };
   
   // Handler for navigating to vehicle history
@@ -173,10 +232,28 @@ function FleetContent() {
             </Card>
           ) : (
             <>
-              <MaintenanceOverview data={maintenanceData || []} />
-              <MaintenanceTable 
-                data={maintenanceData || []} 
+              <MaintenanceOverview 
+                vehicles={maintenanceData || []}
+                summary={{
+                  total: maintenanceData?.length || 0,
+                  overdue: maintenanceData?.filter(v => 
+                    v.tax_status?.status === 'overdue' || 
+                    v.mot_status?.status === 'overdue' || 
+                    v.service_status?.status === 'overdue'
+                  ).length || 0,
+                  due_soon: maintenanceData?.filter(v => 
+                    v.tax_status?.status === 'due_soon' || 
+                    v.mot_status?.status === 'due_soon' || 
+                    v.service_status?.status === 'due_soon'
+                  ).length || 0,
+                }}
                 onVehicleClick={handleVehicleClick}
+              />
+              <MaintenanceTable 
+                vehicles={maintenanceData || []}
+                searchQuery=""
+                onSearchChange={() => {}}
+                onVehicleAdded={() => {}}
               />
             </>
           )}
@@ -186,17 +263,60 @@ function FleetContent() {
         {canManageVehicles && (
           <TabsContent value="vehicles" className="space-y-6">
             <Card>
-              <CardContent className="pt-6">
-                <div className="text-center py-12">
-                  <Truck className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold mb-2">Vehicles Management</h3>
-                  <p className="text-gray-600 mb-4">
-                    Vehicle master data management (add/edit/archive)
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    This will be implemented in the component extraction phase
-                  </p>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Vehicles</CardTitle>
+                  <CardDescription>Manage vehicle master data</CardDescription>
                 </div>
+                <Button size="sm" disabled>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Vehicle
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {vehiclesLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  </div>
+                ) : vehicles.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Truck className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">No vehicles found</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Registration</TableHead>
+                        <TableHead>Nickname</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {vehicles.map((vehicle) => (
+                        <TableRow key={vehicle.id}>
+                          <TableCell className="font-medium">{vehicle.reg_number}</TableCell>
+                          <TableCell>{vehicle.nickname || '-'}</TableCell>
+                          <TableCell>{vehicle.vehicle_categories?.name || '-'}</TableCell>
+                          <TableCell>
+                            <Badge variant={vehicle.status === 'active' ? 'default' : 'secondary'}>
+                              {vehicle.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Link href={`/fleet/vehicles/${vehicle.id}/history`}>
+                              <Button variant="ghost" size="sm">
+                                View History
+                              </Button>
+                            </Link>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -206,17 +326,48 @@ function FleetContent() {
         {canManageVehicles && (
           <TabsContent value="categories" className="space-y-6">
             <Card>
-              <CardContent className="pt-6">
-                <div className="text-center py-12">
-                  <Tag className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold mb-2">Vehicle Categories</h3>
-                  <p className="text-gray-600 mb-4">
-                    Manage vehicle categories and classifications
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    This will be implemented in the component extraction phase
-                  </p>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Vehicle Categories</CardTitle>
+                  <CardDescription>Manage vehicle categories and classifications</CardDescription>
                 </div>
+                <Button size="sm" disabled>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Category
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {categoriesLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  </div>
+                ) : categories.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Tag className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">No categories found</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-right">Vehicles</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {categories.map((category) => (
+                        <TableRow key={category.id}>
+                          <TableCell className="font-medium">{category.name}</TableCell>
+                          <TableCell>{category.description || '-'}</TableCell>
+                          <TableCell className="text-right">
+                            {vehicles.filter(v => v.vehicle_categories?.name === category.name).length}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
