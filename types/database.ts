@@ -536,6 +536,7 @@ export interface Database {
           inspection_item_id: string | null
           vehicle_id: string | null
           workshop_category_id: string | null
+          workshop_subcategory_id: string | null
           workshop_comments: string | null
           title: string
           description: string | null
@@ -604,8 +605,12 @@ export interface Database {
           id: string
           applies_to: 'vehicle' | 'plant' | 'tools'
           name: string
+          slug: string | null
           is_active: boolean
           sort_order: number
+          ui_color: string | null
+          ui_icon: string | null
+          ui_badge_style: string | null
           created_at: string
           created_by: string | null
           updated_at: string
@@ -614,8 +619,12 @@ export interface Database {
           id?: string
           applies_to?: 'vehicle' | 'plant' | 'tools'
           name: string
+          slug?: string | null
           is_active?: boolean
           sort_order?: number
+          ui_color?: string | null
+          ui_icon?: string | null
+          ui_badge_style?: string | null
           created_at?: string
           created_by?: string | null
           updated_at?: string
@@ -624,11 +633,59 @@ export interface Database {
           id?: string
           applies_to?: 'vehicle' | 'plant' | 'tools'
           name?: string
+          slug?: string | null
           is_active?: boolean
           sort_order?: number
+          ui_color?: string | null
+          ui_icon?: string | null
+          ui_badge_style?: string | null
           created_at?: string
           created_by?: string | null
           updated_at?: string
+        }
+      }
+      workshop_task_subcategories: {
+        Row: {
+          id: string
+          category_id: string
+          name: string
+          slug: string
+          sort_order: number
+          is_active: boolean
+          ui_color: string | null
+          ui_icon: string | null
+          ui_badge_style: string | null
+          created_at: string
+          created_by: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          category_id: string
+          name: string
+          slug: string
+          sort_order?: number
+          is_active?: boolean
+          ui_color?: string | null
+          ui_icon?: string | null
+          ui_badge_style?: string | null
+          created_at?: string
+          created_by?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          category_id?: string
+          name?: string
+          slug?: string
+          sort_order?: number
+          is_active?: boolean
+          ui_color?: string | null
+          ui_icon?: string | null
+          ui_badge_style?: string | null
+          created_at?: string
+          created_by?: string | null
+          updated_at?: string | null
         }
       }
       workshop_task_comments: {

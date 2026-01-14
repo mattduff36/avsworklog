@@ -45,6 +45,16 @@ type Vehicle = {
 type Category = {
   id: string;
   name: string;
+  slug: string | null;
+  is_active: boolean;
+  sort_order: number;
+};
+
+type Subcategory = {
+  id: string;
+  category_id: string;
+  name: string;
+  slug: string;
   is_active: boolean;
   sort_order: number;
 };
@@ -59,6 +69,7 @@ export default function WorkshopTasksPage() {
   const [tasks, setTasks] = useState<Action[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [vehicleFilter, setVehicleFilter] = useState<string>('all');
@@ -67,6 +78,7 @@ export default function WorkshopTasksPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState('');
   const [workshopComments, setWorkshopComments] = useState('');
   const [newMileage, setNewMileage] = useState('');
   const [currentMileage, setCurrentMileage] = useState<number | null>(null);
@@ -118,6 +130,7 @@ export default function WorkshopTasksPage() {
       fetchTasks();
       fetchVehicles();
       fetchCategories();
+      fetchSubcategories();
     }
   }, [user, statusFilter, vehicleFilter]);
 
@@ -141,7 +154,22 @@ export default function WorkshopTasksPage() {
             nickname
           ),
           workshop_task_categories (
-            name
+            id,
+            name,
+            slug,
+            ui_color
+          ),
+          workshop_task_subcategories!workshop_subcategory_id (
+            id,
+            name,
+            slug,
+            ui_color,
+            workshop_task_categories (
+              id,
+              name,
+              slug,
+              ui_color
+            )
           )
         `)
         .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
@@ -187,14 +215,30 @@ export default function WorkshopTasksPage() {
     try {
       const { data, error } = await supabase
         .from('workshop_task_categories')
-        .select('*')
+        .select('id, name, slug, is_active, sort_order')
         .eq('applies_to', 'vehicle')
+        .eq('is_active', true)
         .order('sort_order');
 
       if (error) throw error;
       setCategories(data || []);
     } catch (err) {
       console.error('Error fetching categories:', err);
+    }
+  };
+
+  const fetchSubcategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('workshop_task_subcategories')
+        .select('id, category_id, name, slug, is_active, sort_order')
+        .eq('is_active', true)
+        .order('sort_order');
+
+      if (error) throw error;
+      setSubcategories(data || []);
+    } catch (err) {
+      console.error('Error fetching subcategories:', err);
     }
   };
 
@@ -221,9 +265,14 @@ export default function WorkshopTasksPage() {
     }
   };
 
+  // Filter subcategories by selected category
+  const filteredSubcategories = selectedCategoryId
+    ? subcategories.filter(sub => sub.category_id === selectedCategoryId)
+    : [];
+
   const handleAddTask = async () => {
-    if (!selectedVehicleId || !selectedCategoryId || !workshopComments.trim() || !newMileage.trim()) {
-      toast.error('Please fill in all fields');
+    if (!selectedVehicleId || !selectedSubcategoryId || !workshopComments.trim() || !newMileage.trim()) {
+      toast.error('Please fill in all required fields');
       return;
     }
 
@@ -253,7 +302,7 @@ export default function WorkshopTasksPage() {
         .insert({
           action_type: 'workshop_vehicle_task',
           vehicle_id: selectedVehicleId,
-          workshop_category_id: selectedCategoryId,
+          workshop_subcategory_id: selectedSubcategoryId,
           workshop_comments: workshopComments,
           title: `Workshop Task - ${vehicles.find(v => v.id === selectedVehicleId)?.reg_number}`,
           description: workshopComments.substring(0, 200),
@@ -298,9 +347,16 @@ export default function WorkshopTasksPage() {
   const resetAddForm = () => {
     setSelectedVehicleId('');
     setSelectedCategoryId('');
+    setSelectedSubcategoryId('');
     setWorkshopComments('');
     setNewMileage('');
     setCurrentMileage(null);
+  };
+
+  // Handle category change (reset subcategory when category changes)
+  const handleCategoryChange = (categoryId: string) => {
+    setSelectedCategoryId(categoryId);
+    setSelectedSubcategoryId('');  // Reset subcategory
   };
 
   const handleMarkInProgress = (task: Action) => {
@@ -958,11 +1014,18 @@ export default function WorkshopTasksPage() {
                                         {getSourceLabel(task)}
                                       </Badge>
                                     </div>
-                                    {task.workshop_task_categories && (
-                                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">
-                                        <strong>Category:</strong> {task.workshop_task_categories.name}
-                                      </p>
-                                    )}
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                      {task.workshop_task_subcategories?.workshop_task_categories && (
+                                        <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30">
+                                          {task.workshop_task_subcategories.workshop_task_categories.name}
+                                        </Badge>
+                                      )}
+                                      {task.workshop_task_subcategories && (
+                                        <Badge variant="outline" className="bg-orange-500/10 text-orange-300 border-orange-500/30">
+                                          {task.workshop_task_subcategories.name}
+                                        </Badge>
+                                      )}
+                                    </div>
                                     {task.action_type === 'inspection_defect' && task.description && (
                                       <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{task.description}</p>
                                     )}
@@ -1073,11 +1136,18 @@ export default function WorkshopTasksPage() {
                                         {getSourceLabel(task)}
                                       </Badge>
                                     </div>
-                                    {task.workshop_task_categories && (
-                                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">
-                                        <strong>Category:</strong> {task.workshop_task_categories.name}
-                                      </p>
-                                    )}
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                      {task.workshop_task_subcategories?.workshop_task_categories && (
+                                        <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30">
+                                          {task.workshop_task_subcategories.workshop_task_categories.name}
+                                        </Badge>
+                                      )}
+                                      {task.workshop_task_subcategories && (
+                                        <Badge variant="outline" className="bg-orange-500/10 text-orange-300 border-orange-500/30">
+                                          {task.workshop_task_subcategories.name}
+                                        </Badge>
+                                      )}
+                                    </div>
                                     {task.action_type === 'inspection_defect' && task.description && (
                                       <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{task.description}</p>
                                     )}
@@ -1405,7 +1475,7 @@ export default function WorkshopTasksPage() {
               <Label htmlFor="category" className="text-slate-900 dark:text-white">
                 Category <span className="text-red-500">*</span>
               </Label>
-              <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
+              <Select value={selectedCategoryId} onValueChange={handleCategoryChange}>
                 <SelectTrigger id="category" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
@@ -1413,6 +1483,28 @@ export default function WorkshopTasksPage() {
                   {categories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="subcategory" className="text-slate-900 dark:text-white">
+                Subcategory <span className="text-red-500">*</span>
+              </Label>
+              <Select 
+                value={selectedSubcategoryId} 
+                onValueChange={setSelectedSubcategoryId}
+                disabled={!selectedCategoryId}
+              >
+                <SelectTrigger id="subcategory" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white">
+                  <SelectValue placeholder={selectedCategoryId ? "Select subcategory" : "Select a category first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredSubcategories.map((subcategory) => (
+                    <SelectItem key={subcategory.id} value={subcategory.id}>
+                      {subcategory.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1471,7 +1563,7 @@ export default function WorkshopTasksPage() {
             </Button>
             <Button
               onClick={handleAddTask}
-              disabled={submitting || !selectedVehicleId || !selectedCategoryId || workshopComments.length < 10 || !newMileage.trim()}
+              disabled={submitting || !selectedVehicleId || !selectedSubcategoryId || workshopComments.length < 10 || !newMileage.trim()}
               className="bg-workshop hover:bg-workshop-dark text-white"
             >
               {submitting ? 'Creating...' : 'Create Task'}
