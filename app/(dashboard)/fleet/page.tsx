@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams, useRouter as useNextRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,7 +12,6 @@ import { logger } from '@/lib/utils/logger';
 import { MaintenanceOverview } from '@/app/(dashboard)/maintenance/components/MaintenanceOverview';
 import { MaintenanceTable } from '@/app/(dashboard)/maintenance/components/MaintenanceTable';
 import { MaintenanceSettings } from '@/app/(dashboard)/maintenance/components/MaintenanceSettings';
-import { EditMaintenanceDialog } from '@/app/(dashboard)/maintenance/components/EditMaintenanceDialog';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useMaintenance } from '@/lib/hooks/useMaintenance';
 import { createClient } from '@/lib/supabase/client';
@@ -23,15 +22,12 @@ import { createClient } from '@/lib/supabase/client';
 
 function FleetContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
+  const router = useNextRouter();
   const { profile, isManager, isAdmin, isSuperAdmin } = useAuth();
   const supabase = createClient();
   
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'maintenance');
   const [hasModulePermission, setHasModulePermission] = useState<boolean | null>(null);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectedVehicle, setSelectedVehicle] = useState<VehicleMaintenanceWithStatus | null>(null);
-  
   // Fetch maintenance data
   const { data: maintenanceData, isLoading: maintenanceLoading, error: maintenanceError } = useMaintenance();
   
@@ -87,10 +83,9 @@ function FleetContent() {
     router.push(`/fleet?tab=${value}`, { scroll: false });
   };
   
-  // Handler for opening edit dialog
+  // Handler for navigating to vehicle history
   const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
-    setSelectedVehicle(vehicle);
-    setEditDialogOpen(true);
+    router.push(`/fleet/vehicles/${vehicle.id}/history`);
   };
   
   // Check access
@@ -234,13 +229,6 @@ function FleetContent() {
           </TabsContent>
         )}
       </Tabs>
-
-      {/* Edit Maintenance Dialog */}
-      <EditMaintenanceDialog
-        open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        vehicle={selectedVehicle}
-      />
     </div>
   );
 }
