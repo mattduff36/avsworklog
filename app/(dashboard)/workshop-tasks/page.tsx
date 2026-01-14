@@ -13,10 +13,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, FileText, Wrench, Undo2, Info, Edit, Trash2, Eye, EyeOff, ChevronDown, ChevronUp } from 'lucide-react';
+import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, FileText, Wrench, Undo2, Info, Edit, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import { Database } from '@/types/database';
+import { TaskCommentsDrawer } from '@/components/workshop-tasks/TaskCommentsDrawer';
 
 type Action = Database['public']['Tables']['actions']['Row'] & {
   vehicle_inspections?: {
@@ -102,6 +103,15 @@ export default function WorkshopTasksPage() {
   const [showPending, setShowPending] = useState(true);
   const [showInProgress, setShowInProgress] = useState(true);
   const [showCompleted, setShowCompleted] = useState(false);
+  
+  // Comments drawer
+  const [showCommentsDrawer, setShowCommentsDrawer] = useState(false);
+  const [commentsTask, setCommentsTask] = useState<Action | null>(null);
+  
+  const handleOpenComments = (task: Action) => {
+    setCommentsTask(task);
+    setShowCommentsDrawer(true);
+  };
 
   useEffect(() => {
     if (user) {
@@ -966,6 +976,15 @@ export default function WorkshopTasksPage() {
                                     </div>
                                   </div>
                                   <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 w-full md:w-auto">
+                                    <Button
+                                      onClick={() => handleOpenComments(task)}
+                                      disabled={isUpdating}
+                                      variant="outline"
+                                      className="h-12 md:h-16 min-w-0 md:min-w-[140px] text-sm md:text-base font-semibold border-slate-400 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                    >
+                                      <MessageSquare className="h-4 w-4 md:mr-2" />
+                                      <span className="md:inline">Comments</span>
+                                    </Button>
                                     {task.action_type === 'workshop_vehicle_task' && (
                                       <Button
                                         onClick={() => handleEditTask(task)}
@@ -1084,6 +1103,15 @@ export default function WorkshopTasksPage() {
                                     </div>
                                   </div>
                                   <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 w-full md:w-auto">
+                                    <Button
+                                      onClick={() => handleOpenComments(task)}
+                                      disabled={isUpdating}
+                                      variant="outline"
+                                      className="h-12 md:h-16 min-w-0 md:min-w-[140px] text-sm md:text-base font-semibold border-slate-400 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                    >
+                                      <MessageSquare className="h-4 w-4 md:mr-2" />
+                                      <span className="md:inline">Comments</span>
+                                    </Button>
                                     {task.action_type === 'workshop_vehicle_task' && (
                                       <Button
                                         onClick={() => handleEditTask(task)}
@@ -1188,6 +1216,14 @@ export default function WorkshopTasksPage() {
                                   </div>
                                 </div>
                                 <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 w-full md:w-auto">
+                                  <Button
+                                    onClick={() => handleOpenComments(task)}
+                                    variant="outline"
+                                    className="h-12 md:h-16 min-w-0 md:min-w-[140px] text-sm md:text-base font-semibold border-slate-400 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                  >
+                                    <MessageSquare className="h-4 w-4 md:mr-2" />
+                                    <span className="md:inline">Comments</span>
+                                  </Button>
                                   <Button
                                     onClick={() => handleUndoComplete(task.id)}
                                     variant="outline"
@@ -1778,6 +1814,16 @@ export default function WorkshopTasksPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Comments Drawer */}
+      {commentsTask && (
+        <TaskCommentsDrawer
+          open={showCommentsDrawer}
+          onOpenChange={setShowCommentsDrawer}
+          taskId={commentsTask.id}
+          taskTitle={getVehicleReg(commentsTask)}
+        />
       )}
     </div>
   );

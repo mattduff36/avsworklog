@@ -631,6 +631,32 @@ export interface Database {
           updated_at?: string
         }
       }
+      workshop_task_comments: {
+        Row: {
+          id: string
+          task_id: string
+          author_id: string
+          body: string
+          created_at: string
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          task_id: string
+          author_id: string
+          body: string
+          created_at?: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          task_id?: string
+          author_id?: string
+          body?: string
+          created_at?: string
+          updated_at?: string | null
+        }
+      }
       rams_documents: {
         Row: {
           id: string

@@ -85,6 +85,29 @@ export const DateRangeSchema = z.object({
   path: ['startDate'],
 });
 
+// Workshop task comment schemas
+export const CreateWorkshopCommentSchema = z.object({
+  taskId: UUIDSchema,
+  body: z.string()
+    .min(1, 'Comment cannot be empty')
+    .max(1000, 'Comment must be less than 1000 characters')
+    .trim(),
+});
+
+export const UpdateWorkshopCommentSchema = z.object({
+  commentId: UUIDSchema,
+  body: z.string()
+    .min(1, 'Comment cannot be empty')
+    .max(1000, 'Comment must be less than 1000 characters')
+    .trim(),
+});
+
+export const ListCommentsQuerySchema = z.object({
+  cursor: z.string().optional(),
+  limit: z.number().int().min(1).max(100).default(20),
+  order: z.enum(['asc', 'desc']).default('asc'),
+});
+
 /**
  * Helper function to validate request body
  * Usage: const result = await validateRequest(req, schema);
