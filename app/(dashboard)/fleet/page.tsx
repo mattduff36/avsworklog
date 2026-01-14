@@ -233,24 +233,16 @@ function FleetContent() {
           ) : (
             <>
               <MaintenanceOverview 
-                vehicles={maintenanceData || []}
-                summary={{
-                  total: maintenanceData?.length || 0,
-                  overdue: maintenanceData?.filter(v => 
-                    v.tax_status?.status === 'overdue' || 
-                    v.mot_status?.status === 'overdue' || 
-                    v.service_status?.status === 'overdue'
-                  ).length || 0,
-                  due_soon: maintenanceData?.filter(v => 
-                    v.tax_status?.status === 'due_soon' || 
-                    v.mot_status?.status === 'due_soon' || 
-                    v.service_status?.status === 'due_soon'
-                  ).length || 0,
+                vehicles={maintenanceData?.vehicles || []}
+                summary={maintenanceData?.summary || {
+                  total: 0,
+                  overdue: 0,
+                  due_soon: 0,
                 }}
                 onVehicleClick={handleVehicleClick}
               />
               <MaintenanceTable 
-                vehicles={maintenanceData || []}
+                vehicles={maintenanceData?.vehicles || []}
                 searchQuery=""
                 onSearchChange={() => {}}
                 onVehicleAdded={() => {}}
