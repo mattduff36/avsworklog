@@ -72,8 +72,8 @@ export const employeeNavItems: NavItem[] = [
     category: 'employee'
   },
   { 
-    href: '/fleet', 
-    label: 'Fleet', 
+    href: '/fleet?tab=maintenance', 
+    label: 'Maintenance', 
     icon: Wrench, 
     module: 'maintenance',
     category: 'employee'
