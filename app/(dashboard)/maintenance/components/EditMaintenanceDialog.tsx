@@ -76,6 +76,7 @@ export function EditMaintenanceDialog({
   onSuccess,
   onRetire
 }: EditMaintenanceDialogProps) {
+  const supabase = createClient();
   const updateMutation = useUpdateMaintenance();
   const createMutation = useCreateMaintenance();
   const [isMileageFocused, setIsMileageFocused] = useState(false);
@@ -431,11 +432,43 @@ export function EditMaintenanceDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={() => {
+              onClick={async () => {
                 if (isDirty) {
                   triggerShakeAnimation(dialogContentRef.current);
                   return;
                 }
+                
+                // Check for open workshop tasks
+                if (vehicle?.vehicle_id) {
+                  try {
+                    const { data: openTasks, error: tasksError } = await supabase
+                      .from('actions')
+                      .select('id, status')
+                      .eq('vehicle_id', vehicle.vehicle_id)
+                      .in('action_type', ['workshop_vehicle_task', 'inspection_defect'])
+                      .neq('status', 'completed')
+                      .limit(1);
+
+                    if (tasksError) {
+                      console.error('Error checking for open tasks:', tasksError);
+                      toast.error('Failed to verify workshop tasks');
+                      return;
+                    }
+                    
+                    if (openTasks && openTasks.length > 0) {
+                      toast.error('Cannot retire vehicle with open workshop tasks', {
+                        description: 'Please complete or delete all open tasks before retiring this vehicle.',
+                        duration: 5000,
+                      });
+                      return;
+                    }
+                  } catch (error) {
+                    console.error('Error checking for open tasks:', error);
+                    toast.error('Failed to verify workshop tasks');
+                    return;
+                  }
+                }
+                
                 onOpenChange(false);
                 onRetire?.();
               }}

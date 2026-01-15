@@ -19,10 +19,10 @@ todos: []
 
 ### Current UI surfaces
 
-- **Maintenance history UI**: `Dialog` at [app/(dashboard)/maintenance/components/MaintenanceHistoryDialog.tsx](app/\\\\(dashboard)/maintenance/components/MaintenanceHistoryDialog.tsx)
-- **MOT history UI**: `Dialog` at [app/(dashboard)/maintenance/components/MotHistoryDialog.tsx](app/\\\\(dashboard)/maintenance/components/MotHistoryDialog.tsx)
-- **Entry from `/maintenance`**: clicking a vehicle row opens history via [app/(dashboard)/maintenance/components/MaintenanceTable.tsx](app/\\\\(dashboard)/maintenance/components/MaintenanceTable.tsx)
-- **Entry from `/admin/vehicles`**: **no direct “history” entry today**; there is still a link to the removed `/admin/maintenance-demo` in [app/(dashboard)/admin/vehicles/page.tsx](app/\\\\(dashboard)/admin/vehicles/page.tsx)
+- **Maintenance history UI**: `Dialog` at [app/(dashboard)/maintenance/components/MaintenanceHistoryDialog.tsx](app/\\\\\(dashboard)/maintenance/components/MaintenanceHistoryDialog.tsx)
+- **MOT history UI**: `Dialog` at [app/(dashboard)/maintenance/components/MotHistoryDialog.tsx](app/\\\\\(dashboard)/maintenance/components/MotHistoryDialog.tsx)
+- **Entry from `/maintenance`**: clicking a vehicle row opens history via [app/(dashboard)/maintenance/components/MaintenanceTable.tsx](app/\\\\\(dashboard)/maintenance/components/MaintenanceTable.tsx)
+- **Entry from `/admin/vehicles`**: **no direct “history” entry today**; there is still a link to the removed `/admin/maintenance-demo` in [app/(dashboard)/admin/vehicles/page.tsx](app/\\\\\(dashboard)/admin/vehicles/page.tsx)
 
 ### Data shown: Maintenance History dialog
 
@@ -210,7 +210,7 @@ historyPage -->|Back| adminVehicles
 
 ### Phase 0: Remove dead navigation and clarify Feature 2 entry points
 
-- Replace the stale `/admin/maintenance-demo` link in [app/(dashboard)/admin/vehicles/page.tsx](app/\\\\(dashboard)/admin/vehicles/page.tsx) with a “Maintenance & Service” link to `/maintenance` and/or the new history destination.
+- Replace the stale `/admin/maintenance-demo` link in [app/(dashboard)/admin/vehicles/page.tsx](app/\\\\\(dashboard)/admin/vehicles/page.tsx) with a “Maintenance & Service” link to `/maintenance` and/or the new history destination.
 - Add a clear “View History” action per vehicle row in `/admin/vehicles` (button/menu).
 
 ### Phase 1: Create the dedicated history page surface

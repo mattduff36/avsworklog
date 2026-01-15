@@ -166,6 +166,28 @@ export async function DELETE(
     const body = await request.json().catch(() => ({}));
     const reason = body.reason || 'Other';
 
+    // Check for open workshop tasks
+    const adminSupabase = getSupabaseAdmin();
+    const { data: openTasks, error: tasksError } = await adminSupabase
+      .from('actions')
+      .select('id, status, workshop_comments')
+      .eq('vehicle_id', vehicleId)
+      .in('action_type', ['workshop_vehicle_task', 'inspection_defect'])
+      .neq('status', 'completed')
+      .limit(1);
+
+    if (tasksError) {
+      console.error('Error checking for open tasks:', tasksError);
+      throw new Error('Failed to check for open workshop tasks');
+    }
+
+    if (openTasks && openTasks.length > 0) {
+      return NextResponse.json(
+        { error: 'Cannot retire vehicle with open workshop tasks. Please complete or delete all open tasks first.' },
+        { status: 400 }
+      );
+    }
+
     // Get vehicle details before deleting (for archiving)
     // Note: This is actually an "archive" operation, not a true delete.
     // Inspections are preserved in the database and linked to the vehicle_id.

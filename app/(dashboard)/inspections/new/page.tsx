@@ -60,6 +60,7 @@ type InspectionWithRelations = {
 
 type LoggedAction = {
   id: string;
+  status: string;
   logged_comment: string | null;
   inspection_items?: {
     item_number: number;
@@ -339,12 +340,13 @@ function NewInspectionContent() {
         setPreviousDefects(defectsMap);
       }
 
-      // Load logged actions for this vehicle
+      // Load logged and on_hold actions for this vehicle
       const { data: loggedActionsData, error: loggedError } = await supabase
         .from('actions')
         .select(`
           id,
           logged_comment,
+          status,
           inspection_items (
             item_number,
             item_description
@@ -353,7 +355,7 @@ function NewInspectionContent() {
             vehicle_id
           )
         `)
-        .eq('status', 'logged')
+        .in('status', ['logged', 'on_hold'])
         .eq('vehicle_inspections.vehicle_id', selectedVehicleId);
 
       if (!loggedError && loggedActionsData) {
@@ -362,8 +364,9 @@ function NewInspectionContent() {
         (loggedActionsData as LoggedAction[]).forEach((action: LoggedAction) => {
           if (action.inspection_items) {
             const key = `${action.inspection_items.item_number}-${action.inspection_items.item_description}`;
+            const statusLabel = action.status === 'on_hold' ? 'on hold' : 'in progress';
             loggedMap.set(key, {
-              comment: action.logged_comment || 'Defect logged by management',
+              comment: action.logged_comment || `Defect ${statusLabel} by management`,
               actionId: action.id
             });
           }
