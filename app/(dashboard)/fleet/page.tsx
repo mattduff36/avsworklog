@@ -13,7 +13,6 @@ import { logger } from '@/lib/utils/logger';
 import { MaintenanceOverview } from '@/app/(dashboard)/maintenance/components/MaintenanceOverview';
 import { MaintenanceTable } from '@/app/(dashboard)/maintenance/components/MaintenanceTable';
 import { MaintenanceSettings } from '@/app/(dashboard)/maintenance/components/MaintenanceSettings';
-import { ExpandingVehicleCard } from '@/components/fleet/ExpandingVehicleCard';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useMaintenance } from '@/lib/hooks/useMaintenance';
 import { createClient } from '@/lib/supabase/client';
@@ -251,64 +250,42 @@ function FleetContent() {
               </CardContent>
             </Card>
           ) : (
-            <>
-              <MaintenanceOverview 
-                vehicles={maintenanceData?.vehicles || []}
-                summary={maintenanceData?.summary || {
-                  total: 0,
-                  overdue: 0,
-                  due_soon: 0,
-                }}
-                onVehicleClick={handleVehicleClick}
-              />
-              <MaintenanceTable 
-                vehicles={maintenanceData?.vehicles || []}
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                onVehicleAdded={() => {}}
-              />
-            </>
+            <MaintenanceOverview 
+              vehicles={maintenanceData?.vehicles || []}
+              summary={maintenanceData?.summary || {
+                total: 0,
+                overdue: 0,
+                due_soon: 0,
+              }}
+              onVehicleClick={handleVehicleClick}
+            />
           )}
         </TabsContent>
 
         {/* Vehicles Tab - Admin/Manager only */}
         {canManageVehicles && (
           <TabsContent value="vehicles" className="space-y-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold tracking-tight">Vehicles</h2>
-                <p className="text-muted-foreground mt-1">
-                  Manage vehicle master data
-                </p>
-              </div>
-              <Button size="sm" disabled>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Vehicle
-              </Button>
-            </div>
-
-            {vehiclesLoading || categoriesLoading ? (
-              <div className="flex items-center justify-center py-12">
+            {maintenanceLoading ? (
+              <div className="flex items-center justify-center min-h-[400px]">
                 <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
               </div>
-            ) : vehicles.length === 0 ? (
-              <Card className="bg-slate-800/50 border-slate-700">
+            ) : maintenanceError ? (
+              <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Truck className="h-16 w-16 text-gray-400 mb-4" />
-                  <p className="text-gray-400">No vehicles found</p>
+                  <Wrench className="h-16 w-16 text-red-400 mb-4" />
+                  <h2 className="text-2xl font-semibold mb-2">Error Loading Vehicle Data</h2>
+                  <p className="text-gray-600 text-center max-w-md">
+                    {maintenanceError?.message || 'Failed to load vehicle records'}
+                  </p>
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid gap-4">
-                {vehicles.map((vehicle) => (
-                  <ExpandingVehicleCard 
-                    key={vehicle.id}
-                    vehicle={vehicle}
-                    categories={categories}
-                    onUpdate={fetchVehicles}
-                  />
-                ))}
-              </div>
+              <MaintenanceTable 
+                vehicles={maintenanceData?.vehicles || []}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                onVehicleAdded={() => {}}
+              />
             )}
           </TabsContent>
         )}
