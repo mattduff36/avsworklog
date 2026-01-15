@@ -35,7 +35,7 @@ type Category = {
 function FleetContent() {
   const searchParams = useSearchParams();
   const router = useNextRouter();
-  const { profile, isManager, isAdmin, isSuperAdmin } = useAuth();
+  const { profile, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const supabase = createClient();
   
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'maintenance');
@@ -170,8 +170,8 @@ function FleetContent() {
   const hasAccess = hasModulePermission;
   const canManageVehicles = isManager || isAdmin || isSuperAdmin;
   
-  // Show loading while checking permissions
-  if (hasModulePermission === null) {
+  // Show loading while auth or permissions are being checked
+  if (authLoading || hasModulePermission === null) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
