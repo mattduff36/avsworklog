@@ -626,14 +626,6 @@ export default function VehicleHistoryPage({
                 </div>
               )}
               
-              {/* Current Mileage */}
-              {vehicleData.current_mileage && (
-                <div>
-                  <span className="text-slate-400">Mileage:</span>
-                  <span className="ml-2 text-white font-medium">{vehicleData.current_mileage.toLocaleString()} miles</span>
-                </div>
-              )}
-              
               {/* First Registration - from MOT API */}
               {vehicleData.mot_first_used_date && (
                 <div>
@@ -664,39 +656,11 @@ export default function VehicleHistoryPage({
                 </div>
               )}
               
-              {/* Tax Due Date */}
-              {vehicleData.tax_due_date && (
-                <div>
-                  <span className="text-slate-400">Tax Due:</span>
-                  <span className="ml-2 text-white font-medium">
-                    {new Date(vehicleData.tax_due_date).toLocaleDateString('en-GB', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric'
-                    })}
-                  </span>
-                </div>
-              )}
-              
               {/* MOT Status - from VES */}
               {vehicleData.ves_mot_status && (
                 <div>
                   <span className="text-slate-400">MOT Status:</span>
                   <span className="ml-2 text-white font-medium">{vehicleData.ves_mot_status}</span>
-                </div>
-              )}
-              
-              {/* MOT Due Date */}
-              {vehicleData.mot_due_date && (
-                <div>
-                  <span className="text-slate-400">MOT Due:</span>
-                  <span className="ml-2 text-white font-medium">
-                    {new Date(vehicleData.mot_due_date).toLocaleDateString('en-GB', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric'
-                    })}
-                  </span>
                 </div>
               )}
               
