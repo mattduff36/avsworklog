@@ -96,6 +96,16 @@ export default function WorkshopTasksPage() {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [completingTask, setCompletingTask] = useState<Action | null>(null);
   const [completedComment, setCompletedComment] = useState('');
+
+  // On Hold modal state
+  const [showOnHoldModal, setShowOnHoldModal] = useState(false);
+  const [onHoldingTask, setOnHoldingTask] = useState<Action | null>(null);
+  const [onHoldComment, setOnHoldComment] = useState('');
+
+  // Resume modal state
+  const [showResumeModal, setShowResumeModal] = useState(false);
+  const [resumingTask, setResumingTask] = useState<Action | null>(null);
+  const [resumeComment, setResumeComment] = useState('');
   
   // Edit Task Modal
   const [showEditModal, setShowEditModal] = useState(false);
@@ -448,9 +458,27 @@ export default function WorkshopTasksPage() {
     setShowCompleteModal(true);
   };
 
-  const handleMarkOnHold = async (task: Action) => {
+  const handleMarkOnHold = (task: Action) => {
+    setOnHoldingTask(task);
+    setOnHoldComment('');
+    setShowOnHoldModal(true);
+  };
+
+  const confirmMarkOnHold = async () => {
+    if (!onHoldingTask) return;
+
+    if (!onHoldComment.trim()) {
+      toast.error('Comment is required');
+      return;
+    }
+
+    if (onHoldComment.length > 300) {
+      toast.error('Comment must be 300 characters or less');
+      return;
+    }
+
     try {
-      setUpdatingStatus(prev => new Set(prev).add(task.id));
+      setUpdatingStatus(prev => new Set(prev).add(onHoldingTask.id));
 
       const { error } = await supabase
         .from('actions')
@@ -458,9 +486,9 @@ export default function WorkshopTasksPage() {
           status: 'on_hold',
           logged_at: new Date().toISOString(),
           logged_by: user?.id,
-          logged_comment: 'Placed on hold',
+          logged_comment: onHoldComment.trim(),
         })
-        .eq('id', task.id);
+        .eq('id', onHoldingTask.id);
 
       if (error) {
         console.error('Supabase error placing task on hold:', {
@@ -473,6 +501,7 @@ export default function WorkshopTasksPage() {
       }
 
       toast.success('Task placed on hold');
+      setShowOnHoldModal(false);
       await fetchTasks();
     } catch (error: any) {
       console.error('Error updating task:', error);
@@ -480,7 +509,64 @@ export default function WorkshopTasksPage() {
     } finally {
       setUpdatingStatus(prev => {
         const next = new Set(prev);
-        next.delete(task.id);
+        next.delete(onHoldingTask.id);
+        return next;
+      });
+    }
+  };
+
+  const handleResumeTask = (task: Action) => {
+    setResumingTask(task);
+    setResumeComment('');
+    setShowResumeModal(true);
+  };
+
+  const confirmResumeTask = async () => {
+    if (!resumingTask) return;
+
+    if (!resumeComment.trim()) {
+      toast.error('Comment is required');
+      return;
+    }
+
+    if (resumeComment.length > 300) {
+      toast.error('Comment must be 300 characters or less');
+      return;
+    }
+
+    try {
+      setUpdatingStatus(prev => new Set(prev).add(resumingTask.id));
+
+      const { error } = await supabase
+        .from('actions')
+        .update({
+          status: 'logged',
+          logged_at: new Date().toISOString(),
+          logged_by: user?.id,
+          logged_comment: resumeComment.trim(),
+        })
+        .eq('id', resumingTask.id);
+
+      if (error) {
+        console.error('Supabase error resuming task:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+        throw error;
+      }
+
+      toast.success('Task resumed');
+      setShowResumeModal(false);
+      await fetchTasks();
+    } catch (error: any) {
+      console.error('Error resuming task:', error);
+      toast.error(error?.message || 'Failed to resume task');
+    } finally {
+      setUpdatingStatus(prev => {
+        const next = new Set(prev);
+        next.delete(resumingTask.id);
         return next;
       });
     }
@@ -2203,6 +2289,144 @@ export default function WorkshopTasksPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Put Task On Hold Modal */}
+      <Dialog open={showOnHoldModal} onOpenChange={setShowOnHoldModal}>
+        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-white text-xl">Put Task On Hold</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
+              Add a note about why this task is being paused
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+              <p className="text-sm text-purple-300">
+                This task will be marked as "On Hold" and can be resumed later. On hold tasks will still appear in driver inspections.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="onhold-comment" className="text-slate-900 dark:text-white">
+                On Hold Reason <span className="text-slate-400">(max 300 chars)</span> <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="onhold-comment"
+                value={onHoldComment}
+                onChange={(e) => {
+                  if (e.target.value.length <= 300) {
+                    setOnHoldComment(e.target.value);
+                  }
+                }}
+                placeholder="e.g., Awaiting parts delivery, Waiting for customer approval"
+                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[80px]"
+                maxLength={300}
+                rows={3}
+              />
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                {onHoldComment.length}/300 characters
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowOnHoldModal(false);
+                setOnHoldingTask(null);
+                setOnHoldComment('');
+              }}
+              disabled={onHoldingTask ? updatingStatus.has(onHoldingTask.id) : false}
+              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmMarkOnHold}
+              disabled={
+                !onHoldComment.trim() || 
+                onHoldComment.length > 300 || 
+                (onHoldingTask ? updatingStatus.has(onHoldingTask.id) : false)
+              }
+              className="bg-purple-500 hover:bg-purple-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Pause className="h-4 w-4 mr-2" />
+              Put On Hold
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resume Task Modal */}
+      <Dialog open={showResumeModal} onOpenChange={setShowResumeModal}>
+        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-white text-xl">Resume Task</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
+              Add a note about resuming work on this task
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+              <p className="text-sm text-blue-300">
+                This task will be moved back to "In Progress" and work can continue.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="resume-comment" className="text-slate-900 dark:text-white">
+                Resume Note <span className="text-slate-400">(max 300 chars)</span> <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="resume-comment"
+                value={resumeComment}
+                onChange={(e) => {
+                  if (e.target.value.length <= 300) {
+                    setResumeComment(e.target.value);
+                  }
+                }}
+                placeholder="e.g., Parts arrived, ready to continue work"
+                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[80px]"
+                maxLength={300}
+                rows={3}
+              />
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                {resumeComment.length}/300 characters
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowResumeModal(false);
+                setResumingTask(null);
+                setResumeComment('');
+              }}
+              disabled={resumingTask ? updatingStatus.has(resumingTask.id) : false}
+              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmResumeTask}
+              disabled={
+                !resumeComment.trim() || 
+                resumeComment.length > 300 || 
+                (resumingTask ? updatingStatus.has(resumingTask.id) : false)
+              }
+              className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Clock className="h-4 w-4 mr-2" />
+              Resume Task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Edit Task Modal */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
         <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
@@ -2486,6 +2710,10 @@ export default function WorkshopTasksPage() {
         onMarkOnHold={(task) => {
           setShowTaskModal(false);
           handleMarkOnHold(task);
+        }}
+        onResume={(task) => {
+          setShowTaskModal(false);
+          handleResumeTask(task);
         }}
         isUpdating={modalTask ? updatingStatus.has(modalTask.id) : false}
       />

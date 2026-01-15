@@ -71,6 +71,7 @@ interface WorkshopTaskModalProps {
   onMarkInProgress: (task: Task) => void;
   onMarkComplete: (task: Task) => void;
   onMarkOnHold: (task: Task) => void;
+  onResume: (task: Task) => void;
   isUpdating: boolean;
 }
 
@@ -83,6 +84,7 @@ export function WorkshopTaskModal({
   onMarkInProgress,
   onMarkComplete,
   onMarkOnHold,
+  onResume,
   isUpdating,
 }: WorkshopTaskModalProps) {
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
@@ -271,7 +273,7 @@ export function WorkshopTaskModal({
                   )}
                   {task.status === 'on_hold' && (
                     <Button
-                      onClick={() => onMarkInProgress(task)}
+                      onClick={() => onResume(task)}
                       disabled={isUpdating}
                       size="sm"
                       className="bg-blue-600/80 hover:bg-blue-600 text-white border-0"
