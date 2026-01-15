@@ -96,6 +96,8 @@ export default function WorkshopTasksPage() {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [completingTask, setCompletingTask] = useState<Action | null>(null);
   const [completedComment, setCompletedComment] = useState('');
+  const [requiresIntermediateStep, setRequiresIntermediateStep] = useState(false);
+  const [intermediateComment, setIntermediateComment] = useState('');
 
   // On Hold modal state
   const [showOnHoldModal, setShowOnHoldModal] = useState(false);
@@ -455,6 +457,16 @@ export default function WorkshopTasksPage() {
   const handleMarkComplete = (task: Action) => {
     setCompletingTask(task);
     setCompletedComment('');
+    
+    // Check if task needs intermediate step (Pending -> In Progress or On Hold -> Resume)
+    if (task.status === 'pending' || task.status === 'on_hold') {
+      setRequiresIntermediateStep(true);
+      setIntermediateComment('');
+    } else {
+      setRequiresIntermediateStep(false);
+      setIntermediateComment('');
+    }
+    
     setShowCompleteModal(true);
   };
 
@@ -480,13 +492,12 @@ export default function WorkshopTasksPage() {
     try {
       setUpdatingStatus(prev => new Set(prev).add(onHoldingTask.id));
 
+      // Preserve original logged_at/logged_by, only update status and add hold comment
       const { error } = await supabase
         .from('actions')
         .update({
           status: 'on_hold',
-          logged_at: new Date().toISOString(),
-          logged_by: user?.id,
-          logged_comment: onHoldComment.trim(),
+          on_hold_comment: onHoldComment.trim(),
         })
         .eq('id', onHoldingTask.id);
 
@@ -537,13 +548,12 @@ export default function WorkshopTasksPage() {
     try {
       setUpdatingStatus(prev => new Set(prev).add(resumingTask.id));
 
+      // Preserve original logged_at/logged_by, only update status and add resume comment
       const { error } = await supabase
         .from('actions')
         .update({
           status: 'logged',
-          logged_at: new Date().toISOString(),
-          logged_by: user?.id,
-          logged_comment: resumeComment.trim(),
+          resume_comment: resumeComment.trim(),
         })
         .eq('id', resumingTask.id);
 
@@ -578,6 +588,19 @@ export default function WorkshopTasksPage() {
     // Capture task ID at the beginning for safe access throughout the function
     const taskId = completingTask.id;
 
+    // Validate intermediate comment if required
+    if (requiresIntermediateStep) {
+      if (!intermediateComment.trim()) {
+        toast.error(completingTask.status === 'on_hold' ? 'Resume note is required' : 'In Progress note is required');
+        return;
+      }
+      if (intermediateComment.length > 300) {
+        toast.error('Intermediate note must be 300 characters or less');
+        return;
+      }
+    }
+
+    // Validate completion comment
     if (!completedComment.trim()) {
       toast.error('Completion note is required');
       return;
@@ -591,6 +614,25 @@ export default function WorkshopTasksPage() {
     try {
       setUpdatingStatus(prev => new Set(prev).add(taskId));
 
+      // Step 1: If needed, move to In Progress first
+      if (requiresIntermediateStep) {
+        const { error: intermediateError } = await supabase
+          .from('actions')
+          .update({
+            status: 'logged',
+            logged_at: new Date().toISOString(),
+            logged_by: user?.id,
+            logged_comment: intermediateComment.trim(),
+          })
+          .eq('id', taskId);
+
+        if (intermediateError) {
+          console.error('Error moving to In Progress:', intermediateError);
+          throw intermediateError;
+        }
+      }
+
+      // Step 2: Mark as complete
       const { error } = await supabase
         .from('actions')
         .update({
@@ -608,6 +650,8 @@ export default function WorkshopTasksPage() {
       setShowCompleteModal(false);
       setCompletingTask(null);
       setCompletedComment('');
+      setIntermediateComment('');
+      setRequiresIntermediateStep(false);
 
       setTimeout(() => {
         setUpdatingStatus(prev => {
@@ -1331,27 +1375,6 @@ export default function WorkshopTasksPage() {
                                     <Clock className="h-3.5 w-3.5 mr-1.5" />
                                     In Progress
                                   </Button>
-                                  <Button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleMarkComplete(task);
-                                    }}
-                                    disabled={isUpdating}
-                                    size="sm"
-                                    className="h-9 px-3 text-xs transition-all border-0 bg-green-600 hover:bg-green-700 text-white"
-                                  >
-                                    {isUpdating ? (
-                                      <>
-                                        <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                                        Complete
-                                      </>
-                                    ) : (
-                                      <>
-                                        <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                                        Complete
-                                      </>
-                                    )}
-                                  </Button>
                                 </div>
                               </div>
                               
@@ -1654,15 +1677,6 @@ export default function WorkshopTasksPage() {
                                   >
                                     <Clock className="h-3.5 w-3.5 mr-1.5" />
                                     Resume
-                                  </Button>
-                                  <Button
-                                    onClick={(e) => { e.stopPropagation(); handleMarkComplete(task); }}
-                                    disabled={isUpdating}
-                                    size="sm"
-                                    className="h-9 px-3 text-xs transition-all border-0 bg-green-600 hover:bg-green-700 text-white"
-                                  >
-                                    <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                                    Complete
                                   </Button>
                                 </div>
                               </div>
@@ -2231,12 +2245,49 @@ export default function WorkshopTasksPage() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
-              <p className="text-sm text-green-300">
-                This task will be marked as "Completed" and moved to the completed tasks section.
-              </p>
-            </div>
+            {requiresIntermediateStep ? (
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                <p className="text-sm text-blue-300">
+                  This task will be moved to "In Progress" and then immediately marked as "Completed". Please provide notes for both steps.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                <p className="text-sm text-green-300">
+                  This task will be marked as "Completed" and moved to the completed tasks section.
+                </p>
+              </div>
+            )}
 
+            {/* Intermediate step comment field (shown for Pending or On Hold tasks) */}
+            {requiresIntermediateStep && (
+              <div className="space-y-2">
+                <Label htmlFor="intermediate-comment" className="text-slate-900 dark:text-white">
+                  {completingTask?.status === 'on_hold' ? 'Resume Note' : 'In Progress Note'} <span className="text-slate-400">(max 300 chars)</span> <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="intermediate-comment"
+                  value={intermediateComment}
+                  onChange={(e) => {
+                    if (e.target.value.length <= 300) {
+                      setIntermediateComment(e.target.value);
+                    }
+                  }}
+                  placeholder={completingTask?.status === 'on_hold' 
+                    ? "e.g., Parts arrived, resuming work on the repair" 
+                    : "e.g., Started work on the vehicle"
+                  }
+                  className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[80px]"
+                  maxLength={300}
+                  rows={3}
+                />
+                <p className="text-xs text-slate-600 dark:text-slate-400">
+                  {intermediateComment.length}/300 characters
+                </p>
+              </div>
+            )}
+
+            {/* Completion comment field (always shown) */}
             <div className="space-y-2">
               <Label htmlFor="completed-comment" className="text-slate-900 dark:text-white">
                 Completion Note <span className="text-slate-400">(max 500 chars)</span> <span className="text-red-500">*</span>
@@ -2267,6 +2318,8 @@ export default function WorkshopTasksPage() {
                 setShowCompleteModal(false);
                 setCompletingTask(null);
                 setCompletedComment('');
+                setIntermediateComment('');
+                setRequiresIntermediateStep(false);
               }}
               disabled={completingTask ? updatingStatus.has(completingTask.id) : false}
               className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -2278,6 +2331,7 @@ export default function WorkshopTasksPage() {
               disabled={
                 !completedComment.trim() || 
                 completedComment.length > 500 || 
+                (requiresIntermediateStep && (!intermediateComment.trim() || intermediateComment.length > 300)) ||
                 (completingTask ? updatingStatus.has(completingTask.id) : false)
               }
               className="bg-green-500 hover:bg-green-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
