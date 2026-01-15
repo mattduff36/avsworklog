@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -43,7 +44,6 @@ import {
   formatMaintenanceDate
 } from '@/lib/utils/maintenanceCalculations';
 import { EditMaintenanceDialog } from './EditMaintenanceDialog';
-import { MaintenanceHistoryDialog } from './MaintenanceHistoryDialog';
 import { useDeletedVehicles, usePermanentlyDeleteArchivedVehicle } from '@/lib/hooks/useMaintenance';
 import { useAuth } from '@/lib/hooks/useAuth';
 
@@ -82,11 +82,11 @@ export function MaintenanceTable({
   onSearchChange,
   onVehicleAdded
 }: MaintenanceTableProps) {
+  const router = useRouter();
   const { isAdmin, isManager } = useAuth();
   const [sortField, setSortField] = useState<SortField>('reg_number');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [addVehicleDialogOpen, setAddVehicleDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleMaintenanceWithStatus | null>(null);
@@ -402,8 +402,10 @@ export function MaintenanceTable({
                       <TableRow 
                         key={vehicle.id || vehicle.vehicle_id || vehicle.vehicle?.id}
                         onClick={() => {
-                          setSelectedVehicle(vehicle);
-                          setHistoryDialogOpen(true);
+                          const vehicleId = vehicle.vehicle_id || vehicle.id;
+                          if (vehicleId) {
+                            router.push(`/fleet/vehicles/${vehicleId}/history`);
+                          }
                         }}
                         className="border-slate-700 hover:bg-slate-800/50 cursor-pointer"
                       >
@@ -648,8 +650,10 @@ export function MaintenanceTable({
                               size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setSelectedVehicle(vehicle);
-                                setHistoryDialogOpen(true);
+                                const vehicleId = vehicle.vehicle_id || vehicle.id;
+                                if (vehicleId) {
+                                  router.push(`/fleet/vehicles/${vehicleId}/history`);
+                                }
                               }}
                               className="h-10 w-10 p-0"
                             >
@@ -944,16 +948,6 @@ export function MaintenanceTable({
       />
       
       {/* History Dialog */}
-      <MaintenanceHistoryDialog
-        open={historyDialogOpen}
-        onOpenChange={setHistoryDialogOpen}
-        vehicleId={selectedVehicle?.vehicle_id || null}
-        vehicleReg={selectedVehicle?.vehicle?.reg_number}
-        onEditClick={() => {
-          setHistoryDialogOpen(false);
-          setEditDialogOpen(true);
-        }}
-      />
       
       {/* Add Vehicle Dialog */}
       <AddVehicleDialog

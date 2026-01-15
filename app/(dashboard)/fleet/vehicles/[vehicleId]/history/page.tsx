@@ -24,7 +24,8 @@ import {
   ChevronDown,
   ChevronUp,
   Gauge,
-  MapPin
+  MapPin,
+  Loader2
 } from 'lucide-react';
 import { formatRelativeTime } from '@/lib/utils/date';
 import { useAuth } from '@/lib/hooks/useAuth';
