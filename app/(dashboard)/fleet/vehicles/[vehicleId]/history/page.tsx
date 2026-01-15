@@ -697,7 +697,7 @@ export default function VehicleHistoryPage({
         <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
           <TabsTrigger value="maintenance" className="gap-2">
             <Wrench className="h-4 w-4" />
-            Maintenance
+            History
           </TabsTrigger>
           <TabsTrigger value="mot" className="gap-2">
             <ClipboardCheck className="h-4 w-4" />
