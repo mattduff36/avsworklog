@@ -129,6 +129,7 @@ export default function WorkshopTasksPage() {
   // Expandable sections state (Pending and In Progress open by default, Completed closed)
   const [showPending, setShowPending] = useState(true);
   const [showInProgress, setShowInProgress] = useState(true);
+  const [showOnHold, setShowOnHold] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   
   // Comments drawer
@@ -998,7 +999,8 @@ export default function WorkshopTasksPage() {
   };
 
   const pendingTasks = tasks.filter(t => t.status === 'pending');
-  const inProgressTasks = tasks.filter(t => t.status === 'logged' || t.status === 'on_hold');
+  const inProgressTasks = tasks.filter(t => t.status === 'logged');
+  const onHoldTasks = tasks.filter(t => t.status === 'on_hold');
   const completedTasks = tasks.filter(t => t.status === 'completed');
 
   // Show loading state while checking permissions
@@ -1104,7 +1106,7 @@ export default function WorkshopTasksPage() {
           </Card>
 
           {/* Statistics */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
               <CardHeader className="pb-3">
                 <CardDescription className="text-slate-600 dark:text-slate-400">Pending</CardDescription>
@@ -1115,6 +1117,12 @@ export default function WorkshopTasksPage() {
               <CardHeader className="pb-3">
                 <CardDescription className="text-slate-600 dark:text-slate-400">In Progress</CardDescription>
                 <CardTitle className="text-3xl text-blue-600 dark:text-blue-400">{inProgressTasks.length}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+              <CardHeader className="pb-3">
+                <CardDescription className="text-slate-600 dark:text-slate-400">On Hold</CardDescription>
+                <CardTitle className="text-3xl text-purple-600 dark:text-purple-400">{onHoldTasks.length}</CardTitle>
               </CardHeader>
             </Card>
             <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
@@ -1455,6 +1463,153 @@ export default function WorkshopTasksPage() {
                                       title="Edit task"
                                     >
                                       <Edit className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* On Hold Tasks */}
+              {onHoldTasks.length > 0 && (
+                <div className="border-2 border-purple-500/30 rounded-lg overflow-hidden bg-purple-500/5">
+                  <button
+                    onClick={() => setShowOnHold(!showOnHold)}
+                    className="w-full flex items-center justify-between p-4 bg-purple-500/10 hover:bg-purple-500/20 transition-colors border-b-2 border-purple-500/30"
+                  >
+                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                      <Pause className="h-5 w-5 text-purple-400" />
+                      On Hold Tasks ({onHoldTasks.length})
+                    </h2>
+                    {showOnHold ? (
+                      <ChevronUp className="h-5 w-5 text-purple-400" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-purple-400" />
+                    )}
+                  </button>
+                  {showOnHold && (
+                    <div className="space-y-3 p-4">
+                    {onHoldTasks.map((task) => {
+                      const isUpdating = updatingStatus.has(task.id);
+                      return (
+                        <Card
+                          key={task.id}
+                          className="bg-white dark:bg-slate-900 border-purple-500/30 dark:border-purple-500/30 hover:shadow-lg hover:border-purple-500/50 transition-all duration-200 cursor-pointer"
+                          onClick={() => handleOpenTaskModal(task)}
+                        >
+                          <CardContent className="pt-6">
+                            <div className="flex flex-col gap-3">
+                              {/* Main content row */}
+                              <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                                <div className="flex-1 w-full">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    {getStatusIcon(task.status)}
+                                    <h3 className="font-semibold text-lg text-slate-900 dark:text-white">
+                                      {getVehicleReg(task)}
+                                    </h3>
+                                    <Badge variant="outline" className="text-xs">
+                                      {getSourceLabel(task)}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2 mb-2">
+                                    {task.workshop_task_subcategories?.workshop_task_categories && (
+                                      <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30">
+                                        {task.workshop_task_subcategories.workshop_task_categories.name}
+                                      </Badge>
+                                    )}
+                                    {task.workshop_task_subcategories && (
+                                      <Badge variant="outline" className="bg-orange-500/10 text-orange-300 border-orange-500/30">
+                                        {task.workshop_task_subcategories.name}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {task.action_type === 'inspection_defect' && task.description && (
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{task.description}</p>
+                                  )}
+                                  {task.logged_comment && (
+                                    <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 mb-2">
+                                      <p className="text-sm text-purple-200 font-medium">Progress Note: {task.logged_comment}</p>
+                                    </div>
+                                  )}
+                                  {task.action_type === 'workshop_vehicle_task' && task.workshop_comments && (
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">{task.workshop_comments}</p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setCommentsTask(task);
+                                      setShowCommentsDrawer(true);
+                                    }}
+                                    disabled={isUpdating}
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-9 px-3 text-xs text-purple-300 hover:text-purple-200 hover:bg-purple-900/30"
+                                  >
+                                    <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                                    Comments
+                                  </Button>
+                                  <Button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleResumeTask(task);
+                                    }}
+                                    disabled={isUpdating}
+                                    size="sm"
+                                    className="h-9 px-3 text-xs transition-all border-0 bg-blue-600 hover:bg-blue-700 text-white"
+                                  >
+                                    <Clock className="h-3.5 w-3.5 mr-1.5" />
+                                    Resume
+                                  </Button>
+                                  <Button
+                                    onClick={(e) => { e.stopPropagation(); handleMarkComplete(task); }}
+                                    disabled={isUpdating}
+                                    size="sm"
+                                    className="h-9 px-3 text-xs transition-all border-0 bg-green-600 hover:bg-green-700 text-white"
+                                  >
+                                    <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                                    Complete
+                                  </Button>
+                                </div>
+                              </div>
+                              
+                              {/* Bottom row: Dates on left, Edit/Delete on right */}
+                              <div className="flex items-center justify-between w-full">
+                                <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
+                                  <span>Created: {formatDate(task.created_at)}</span>
+                                  {task.logged_at && (
+                                    <span>Placed On Hold: {formatDate(task.logged_at)}</span>
+                                  )}
+                                </div>
+                                {task.action_type === 'workshop_vehicle_task' && (
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      onClick={(e) => { e.stopPropagation(); handleEditTask(task); }}
+                                      disabled={isUpdating}
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0 text-slate-500 hover:text-slate-300 hover:bg-slate-800"
+                                      title="Edit task"
+                                    >
+                                      <Edit className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteTask(task); }}
+                                      disabled={isUpdating}
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0 text-red-500 hover:text-red-400 hover:bg-red-950/50"
+                                      title="Delete task"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
                                   </div>
                                 )}
