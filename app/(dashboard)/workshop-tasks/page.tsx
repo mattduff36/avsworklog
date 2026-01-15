@@ -462,9 +462,7 @@ export default function WorkshopTasksPage() {
         .eq('id', task.id);
 
       if (error) {
-        console.error('Supabase error placing task on hold - Full error:', error);
-        console.error('Supabase error placing task on hold - Stringified:', JSON.stringify(error, null, 2));
-        console.error('Supabase error placing task on hold - Properties:', {
+        console.error('Supabase error placing task on hold:', {
           message: error.message,
           details: error.details,
           hint: error.hint,
@@ -476,11 +474,8 @@ export default function WorkshopTasksPage() {
       toast.success('Task placed on hold');
       await fetchTasks();
     } catch (error: any) {
-      console.error('Error updating task - Full error:', error);
-      console.error('Error updating task - Type:', typeof error);
-      console.error('Error updating task - Constructor:', error?.constructor?.name);
-      console.error('Error updating task - Keys:', Object.keys(error || {}));
-      toast.error('Failed to update task - check console for details');
+      console.error('Error updating task:', error);
+      toast.error(error?.message || 'Failed to update task');
     } finally {
       setUpdatingStatus(prev => {
         const next = new Set(prev);
