@@ -50,7 +50,7 @@ function FleetContent() {
   const { profile, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const supabase = createClient();
   
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'maintenance');
+  const [activeTab, setActiveTab] = useState('maintenance'); // Default to maintenance, validate after auth loads
   const [hasModulePermission, setHasModulePermission] = useState<boolean | null>(null);
   
   // Vehicle Category Dialog States
@@ -60,11 +60,33 @@ function FleetContent() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [deletingCategory, setDeletingCategory] = useState(false);
   
-  // Sync activeTab with URL changes (browser back/forward)
+  // Helper function to validate if user can access a tab
+  const canAccessTab = (tab: string, canManage: boolean): boolean => {
+    const restrictedTabs = ['vehicles', 'categories'];
+    if (restrictedTabs.includes(tab)) {
+      return canManage;
+    }
+    return true; // maintenance tab is always accessible
+  };
+  
+  // Validate and set activeTab based on permissions and URL
   useEffect(() => {
-    const tabFromUrl = searchParams.get('tab') || 'maintenance';
-    setActiveTab(tabFromUrl);
-  }, [searchParams]);
+    // Wait for auth to load
+    if (authLoading) return;
+    
+    const canManage = isManager || isAdmin || isSuperAdmin;
+    const requestedTab = searchParams.get('tab') || 'maintenance';
+    
+    // Validate requested tab against user permissions
+    if (canAccessTab(requestedTab, canManage)) {
+      setActiveTab(requestedTab);
+    } else {
+      // Redirect to maintenance tab if user doesn't have permission
+      setActiveTab('maintenance');
+      // Update URL to reflect the actual accessible tab
+      router.push('/fleet?tab=maintenance', { scroll: false });
+    }
+  }, [searchParams, authLoading, isManager, isAdmin, isSuperAdmin, router]);
   // Fetch maintenance data
   const { data: maintenanceData, isLoading: maintenanceLoading, error: maintenanceError } = useMaintenance();
   
@@ -169,6 +191,14 @@ function FleetContent() {
   
   // Update URL when tab changes
   const handleTabChange = (value: string) => {
+    const canManage = isManager || isAdmin || isSuperAdmin;
+    
+    // Validate tab access before changing
+    if (!canAccessTab(value, canManage)) {
+      logger.warn(`Attempted to access restricted tab: ${value}`, 'FleetPage');
+      return;
+    }
+    
     setActiveTab(value);
     router.push(`/fleet?tab=${value}`, { scroll: false });
     
