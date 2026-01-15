@@ -566,6 +566,17 @@ export default function VehicleHistoryPage({
             <p className="text-muted-foreground mt-1">Vehicle History & Records</p>
           </div>
         </div>
+        {maintenanceRecord && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEditDialogOpen(true)}
+            className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white"
+          >
+            <Edit className="h-4 w-4 mr-2" />
+            Edit Vehicle Record
+          </Button>
+        )}
       </div>
 
       {/* Vehicle Data Section */}
@@ -741,20 +752,9 @@ export default function VehicleHistoryPage({
           {/* Vehicle Service Information Summary */}
           {maintenanceRecord && (
             <Card className="bg-slate-800/50 border-slate-700">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Service Information</CardTitle>
-                  <CardDescription>Current maintenance status and schedules</CardDescription>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditDialogOpen(true)}
-                  className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white"
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Vehicle Record
-                </Button>
+              <CardHeader>
+                <CardTitle>Service Information</CardTitle>
+                <CardDescription>Current maintenance status and schedules</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

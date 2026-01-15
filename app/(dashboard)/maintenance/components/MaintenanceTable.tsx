@@ -387,14 +387,8 @@ export function MaintenanceTable({
                             First Aid
                             <ArrowUpDown className="h-3 w-3" />
                           </div>
-                        </TableHead>
-                      )}
-                      <TableHead 
-                        className="sticky z-30 bg-slate-900 text-right text-slate-300 border-b-2 border-slate-700"
-                        style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
-                      >
-                        Actions
                       </TableHead>
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -474,38 +468,6 @@ export function MaintenanceTable({
                             </Badge>
                           </TableCell>
                         )}
-                        
-                        {/* Actions */}
-                        <TableCell className="text-right">
-                          <div className="flex gap-1 justify-end">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation(); // Prevent row click
-                                setSelectedVehicle(vehicle);
-                                setEditDialogOpen(true);
-                              }}
-                              className="text-blue-400 hover:text-blue-300 hover:bg-slate-800"
-                              title="Edit Maintenance"
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation(); // Prevent row click
-                                setSelectedVehicle(vehicle);
-                                setDeleteDialogOpen(true);
-                              }}
-                              className="text-blue-400 hover:text-blue-300 hover:bg-slate-800"
-                              title="Retire Vehicle"
-                            >
-                              <Archive className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
