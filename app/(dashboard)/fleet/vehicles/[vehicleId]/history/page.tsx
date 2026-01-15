@@ -33,7 +33,6 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { EditMaintenanceDialog } from '@/app/(dashboard)/maintenance/components/EditMaintenanceDialog';
 import { getStatusColorClass, formatMileage, formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
-import Link from 'next/link';
 
 type Vehicle = {
   id: string;
@@ -566,22 +565,6 @@ export default function VehicleHistoryPage({
             </h1>
             <p className="text-muted-foreground mt-1">Vehicle History & Records</p>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => {
-              // Open edit modal (will be implemented)
-              alert('Edit functionality coming soon - use fleet?tab=vehicles to edit vehicle details');
-            }}
-          >
-            Edit Vehicle
-          </Button>
-          <Link href={`/fleet?tab=vehicles`}>
-            <Button variant="outline">
-              View in Fleet
-            </Button>
-          </Link>
         </div>
       </div>
 
