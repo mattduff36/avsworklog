@@ -863,7 +863,11 @@ export default function VehicleHistoryPage({
                 <div className="space-y-4">
                   {/* Workshop Tasks */}
                   {workshopTasks.map((task) => (
-                    <Card key={task.id} className="bg-slate-800/50 border-slate-700 border-l-4 border-l-orange-500">
+                    <Card 
+                      key={task.id} 
+                      className="bg-slate-800/50 border-slate-700 border-l-4 border-l-orange-500 cursor-pointer hover:bg-slate-800/70 transition-colors"
+                      onClick={() => toggleTaskExpansion(task.id)}
+                    >
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between">
                           <div className="space-y-2 flex-1">
@@ -890,17 +894,15 @@ export default function VehicleHistoryPage({
                               <p className="text-sm text-muted-foreground">{task.workshop_comments}</p>
                             )}
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toggleTaskExpansion(task.id)}
-                          >
-                            {expandedTasks.has(task.id) ? 'Collapse' : 'Expand'}
-                          </Button>
+                          {expandedTasks.has(task.id) ? (
+                            <ChevronUp className="h-5 w-5 text-slate-400 flex-shrink-0" />
+                          ) : (
+                            <ChevronDown className="h-5 w-5 text-slate-400 flex-shrink-0" />
+                          )}
                         </div>
                       </CardHeader>
                       {expandedTasks.has(task.id) && (
-                        <CardContent className="space-y-4 pt-0">
+                        <CardContent className="space-y-4 pt-0" onClick={(e) => e.stopPropagation()}>
                           {/* Timeline */}
                           <div className="space-y-3 border-l-2 border-slate-700 pl-4 ml-2">
                             {/* Created */}
