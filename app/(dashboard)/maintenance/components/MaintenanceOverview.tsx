@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, Calendar, Wrench, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, Calendar, Wrench, AlertCircle, ChevronDown, ChevronUp, Loader2, Clock } from 'lucide-react';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { formatDaysUntil, formatMilesUntil, formatMileage, formatMaintenanceDate, getStatusColorClass } from '@/lib/utils/maintenanceCalculations';
+import { formatDistanceToNow } from 'date-fns';
 
 interface MaintenanceOverviewProps {
   vehicles: VehicleMaintenanceWithStatus[];
@@ -27,15 +28,62 @@ interface VehicleWithAlerts extends VehicleMaintenanceWithStatus {
   alerts: Alert[];
 }
 
+interface HistoryEntry {
+  id: string;
+  created_at: string;
+  field_name: string;
+  old_value: string;
+  new_value: string;
+  updated_by_name?: string;
+}
+
+interface WorkshopTask {
+  id: string;
+  created_at: string;
+  status: string;
+  description: string;
+  workshop_task_categories?: { name: string } | null;
+  profiles?: { full_name: string | null } | null;
+}
+
 export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: MaintenanceOverviewProps) {
   const [expandedVehicles, setExpandedVehicles] = useState<Set<string>>(new Set());
+  const [vehicleHistory, setVehicleHistory] = useState<Record<string, { history: HistoryEntry[], workshopTasks: WorkshopTask[], loading: boolean }>>({})
   
+  const fetchVehicleHistory = async (vehicleId: string) => {
+    if (vehicleHistory[vehicleId]) return; // Already fetched
+    
+    setVehicleHistory(prev => ({ ...prev, [vehicleId]: { history: [], workshopTasks: [], loading: true } }));
+    
+    try {
+      const response = await fetch(`/api/maintenance/history/${vehicleId}`);
+      if (!response.ok) throw new Error('Failed to fetch history');
+      
+      const data = await response.json();
+      setVehicleHistory(prev => ({
+        ...prev,
+        [vehicleId]: {
+          history: data.history || [],
+          workshopTasks: data.workshopTasks || [],
+          loading: false
+        }
+      }));
+    } catch (error) {
+      console.error('Error fetching vehicle history:', error);
+      setVehicleHistory(prev => ({
+        ...prev,
+        [vehicleId]: { history: [], workshopTasks: [], loading: false }
+      }));
+    }
+  };
+
   const toggleVehicle = (vehicleId: string) => {
     const newExpanded = new Set(expandedVehicles);
     if (newExpanded.has(vehicleId)) {
       newExpanded.delete(vehicleId);
     } else {
       newExpanded.add(vehicleId);
+      fetchVehicleHistory(vehicleId);
     }
     setExpandedVehicles(newExpanded);
   };
@@ -156,8 +204,21 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   const renderVehicleCard = (vehicle: VehicleWithAlerts, isOverdue: boolean) => {
     const vehicleId = vehicle.vehicle_id || vehicle.id;
     const isExpanded = expandedVehicles.has(vehicleId);
-    const overdueAlerts = vehicle.alerts.filter(a => a.severity === 'overdue');
-    const dueSoonAlerts = vehicle.alerts.filter(a => a.severity === 'due_soon');
+    const historyData = vehicleHistory[vehicleId];
+    
+    // Combine and sort history entries (maintenance history + workshop tasks)
+    const getRecentEntries = () => {
+      if (!historyData) return [];
+      
+      const combined: Array<{ type: 'history' | 'workshop', date: string, data: any }> = [
+        ...historyData.history.map(h => ({ type: 'history' as const, date: h.created_at, data: h })),
+        ...historyData.workshopTasks.map(w => ({ type: 'workshop' as const, date: w.created_at, data: w }))
+      ];
+      
+      return combined
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 3);
+    };
     
     return (
       <Card 
@@ -170,112 +231,198 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         onClick={() => toggleVehicle(vehicleId)}
       >
         <CardContent className="p-4">
-          {/* Collapsed View */}
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <h3 className="font-semibold text-lg text-white">
-                  {vehicle.vehicle?.reg_number || 'Unknown'}
-                </h3>
-                {vehicle.vehicle?.nickname && (
-                  <span className="text-sm text-slate-400">({vehicle.vehicle.nickname})</span>
-                )}
+          {/* Collapsed View - Now includes ALL service information */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h3 className="font-semibold text-lg text-white">
+                    {vehicle.vehicle?.reg_number || 'Unknown'}
+                  </h3>
+                  {vehicle.vehicle?.nickname && (
+                    <span className="text-sm text-slate-400">({vehicle.vehicle.nickname})</span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {vehicle.alerts.map((alert, idx) => (
+                    <Badge 
+                      key={idx}
+                      className={`${
+                        alert.severity === 'overdue' 
+                          ? 'bg-red-500/10 text-red-400 border-red-500/30' 
+                          : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                      }`}
+                      variant="outline"
+                    >
+                      {alert.type}: {alert.detail}
+                    </Badge>
+                  ))}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {vehicle.alerts.map((alert, idx) => (
-                  <Badge 
-                    key={idx}
-                    className={`${
-                      alert.severity === 'overdue' 
-                        ? 'bg-red-500/10 text-red-400 border-red-500/30' 
-                        : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                    }`}
-                    variant="outline"
-                  >
-                    {alert.type}: {alert.detail}
-                  </Badge>
-                ))}
-              </div>
+              {isExpanded ? (
+                <ChevronUp className="h-5 w-5 text-slate-400 flex-shrink-0" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-slate-400 flex-shrink-0" />
+              )}
             </div>
-            {isExpanded ? (
-              <ChevronUp className="h-5 w-5 text-slate-400 flex-shrink-0" />
-            ) : (
-              <ChevronDown className="h-5 w-5 text-slate-400 flex-shrink-0" />
-            )}
-          </div>
-
-          {/* Expanded View - Full Service Information */}
-          {isExpanded && (
-            <div className="mt-4 pt-4 border-t border-slate-700 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            
+            {/* Service Information Grid - Always visible, smaller text */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 text-xs">
               {/* Current Mileage */}
-              <div className="space-y-1">
-                <span className="text-xs text-slate-400 uppercase tracking-wide">Current Mileage</span>
-                <p className="text-lg font-semibold text-white">
+              <div className="space-y-0.5">
+                <span className="text-slate-500 uppercase tracking-wide">Mileage</span>
+                <p className="text-sm font-medium text-white">
                   {formatMileage(vehicle.current_mileage)}
                 </p>
               </div>
 
               {/* Tax Due */}
-              <div className="space-y-1">
-                <span className="text-xs text-slate-400 uppercase tracking-wide">Tax Due</span>
-                <p className={`text-lg font-semibold ${vehicle.tax_status?.status === 'overdue' || vehicle.tax_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+              <div className="space-y-0.5">
+                <span className="text-slate-500 uppercase tracking-wide">Tax Due</span>
+                <p className={`text-sm font-medium ${vehicle.tax_status?.status === 'overdue' || vehicle.tax_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
                   {formatMaintenanceDate(vehicle.tax_due_date)}
                 </p>
               </div>
 
               {/* MOT Due */}
-              <div className="space-y-1">
-                <span className="text-xs text-slate-400 uppercase tracking-wide">MOT Due</span>
-                <p className={`text-lg font-semibold ${vehicle.mot_status?.status === 'overdue' || vehicle.mot_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+              <div className="space-y-0.5">
+                <span className="text-slate-500 uppercase tracking-wide">MOT Due</span>
+                <p className={`text-sm font-medium ${vehicle.mot_status?.status === 'overdue' || vehicle.mot_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
                   {formatMaintenanceDate(vehicle.mot_due_date)}
                 </p>
               </div>
 
               {/* Service Due */}
-              <div className="space-y-1">
-                <span className="text-xs text-slate-400 uppercase tracking-wide">Service Due</span>
-                <p className={`text-lg font-semibold ${vehicle.service_status?.status === 'overdue' || vehicle.service_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+              <div className="space-y-0.5">
+                <span className="text-slate-500 uppercase tracking-wide">Service Due</span>
+                <p className={`text-sm font-medium ${vehicle.service_status?.status === 'overdue' || vehicle.service_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
                   {vehicle.next_service_mileage 
-                    ? `${formatMileage(vehicle.next_service_mileage)} miles` 
+                    ? `${formatMileage(vehicle.next_service_mileage)}` 
                     : 'Not Set'}
                 </p>
               </div>
 
               {/* Cambelt Due */}
-              <div className="space-y-1">
-                <span className="text-xs text-slate-400 uppercase tracking-wide">Cambelt Due</span>
-                <p className={`text-lg font-semibold ${vehicle.cambelt_status?.status === 'overdue' || vehicle.cambelt_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+              <div className="space-y-0.5">
+                <span className="text-slate-500 uppercase tracking-wide">Cambelt</span>
+                <p className={`text-sm font-medium ${vehicle.cambelt_status?.status === 'overdue' || vehicle.cambelt_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
                   {vehicle.cambelt_due_mileage 
-                    ? `${formatMileage(vehicle.cambelt_due_mileage)} miles` 
+                    ? `${formatMileage(vehicle.cambelt_due_mileage)}` 
                     : 'Not Set'}
                 </p>
               </div>
 
               {/* First Aid Kit */}
-              <div className="space-y-1">
-                <span className="text-xs text-slate-400 uppercase tracking-wide">First Aid Kit</span>
-                <p className={`text-lg font-semibold ${vehicle.first_aid_status?.status === 'overdue' || vehicle.first_aid_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+              <div className="space-y-0.5">
+                <span className="text-slate-500 uppercase tracking-wide">First Aid</span>
+                <p className={`text-sm font-medium ${vehicle.first_aid_status?.status === 'overdue' || vehicle.first_aid_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
                   {formatMaintenanceDate(vehicle.first_aid_kit_expiry)}
                 </p>
               </div>
 
               {/* Last Service */}
-              <div className="space-y-1">
-                <span className="text-xs text-slate-400 uppercase tracking-wide">Last Service</span>
-                <p className="text-lg font-semibold text-white">
+              <div className="space-y-0.5">
+                <span className="text-slate-500 uppercase tracking-wide">Last Service</span>
+                <p className="text-sm font-medium text-white">
                   {vehicle.last_service_mileage 
-                    ? `${formatMileage(vehicle.last_service_mileage)} miles` 
+                    ? formatMileage(vehicle.last_service_mileage)
                     : 'Not Set'}
                 </p>
               </div>
 
               {/* Tracker ID */}
               {vehicle.tracker_id && (
-                <div className="space-y-1">
-                  <span className="text-xs text-slate-400 uppercase tracking-wide">GPS Tracker</span>
-                  <p className="text-lg font-semibold text-white">
+                <div className="space-y-0.5">
+                  <span className="text-slate-500 uppercase tracking-wide">GPS Tracker</span>
+                  <p className="text-sm font-medium text-white">
                     {vehicle.tracker_id}
                   </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Expanded View - Recent Maintenance & Workshop History */}
+          {isExpanded && (
+            <div className="mt-4 pt-4 border-t border-slate-700" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="h-4 w-4 text-slate-400" />
+                <h4 className="text-sm font-semibold text-slate-300">Recent History</h4>
+              </div>
+              
+              {historyData?.loading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                </div>
+              ) : getRecentEntries().length === 0 ? (
+                <p className="text-sm text-slate-400 py-4 text-center">No recent history</p>
+              ) : (
+                <div className="space-y-2">
+                  {getRecentEntries().map((entry, idx) => (
+                    <div 
+                      key={idx}
+                      className="bg-slate-800/50 rounded-lg p-3 border border-slate-700"
+                    >
+                      {entry.type === 'history' ? (
+                        <div>
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <span className="text-xs font-medium text-blue-400">Maintenance Update</span>
+                            <span className="text-xs text-slate-500">
+                              {formatDistanceToNow(new Date(entry.data.created_at), { addSuffix: true })}
+                            </span>
+                          </div>
+                          <p className="text-sm text-slate-300">
+                            <span className="font-medium">{entry.data.field_name}</span>
+                            {' changed from '}
+                            <span className="text-slate-400">{entry.data.old_value || 'empty'}</span>
+                            {' to '}
+                            <span className="text-white">{entry.data.new_value}</span>
+                          </p>
+                          {entry.data.updated_by_name && (
+                            <p className="text-xs text-slate-500 mt-1">
+                              by {entry.data.updated_by_name}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium text-purple-400">Workshop Task</span>
+                              {entry.data.workshop_task_categories && (
+                                <Badge variant="outline" className="text-xs bg-slate-700/50 text-slate-300 border-slate-600">
+                                  {entry.data.workshop_task_categories.name}
+                                </Badge>
+                              )}
+                            </div>
+                            <span className="text-xs text-slate-500">
+                              {formatDistanceToNow(new Date(entry.data.created_at), { addSuffix: true })}
+                            </span>
+                          </div>
+                          <p className="text-sm text-slate-300">{entry.data.description}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge 
+                              variant="outline" 
+                              className={`text-xs ${
+                                entry.data.status === 'completed' 
+                                  ? 'bg-green-500/10 text-green-400 border-green-500/30'
+                                  : entry.data.status === 'logged'
+                                  ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+                                  : 'bg-slate-500/10 text-slate-400 border-slate-500/30'
+                              }`}
+                            >
+                              {entry.data.status}
+                            </Badge>
+                            {entry.data.profiles?.full_name && (
+                              <span className="text-xs text-slate-500">
+                                by {entry.data.profiles.full_name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
