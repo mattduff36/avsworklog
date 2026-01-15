@@ -786,45 +786,45 @@ export default function VehicleHistoryPage({
                   {/* Tax Due */}
                   <div className="space-y-1">
                     <span className="text-xs text-slate-400 uppercase tracking-wide">Tax Due</span>
-                    <Badge className={`font-medium ${getStatusColorClass(maintenanceRecord.tax_status?.status || 'not_set')}`}>
+                    <p className="text-lg font-semibold text-white">
                       {formatMaintenanceDate(maintenanceRecord.tax_due_date)}
-                    </Badge>
+                    </p>
                   </div>
 
                   {/* MOT Due */}
                   <div className="space-y-1">
                     <span className="text-xs text-slate-400 uppercase tracking-wide">MOT Due</span>
-                    <Badge className={`font-medium ${getStatusColorClass(maintenanceRecord.mot_status?.status || 'not_set')}`}>
+                    <p className="text-lg font-semibold text-white">
                       {formatMaintenanceDate(maintenanceRecord.mot_due_date)}
-                    </Badge>
+                    </p>
                   </div>
 
                   {/* Service Due */}
                   <div className="space-y-1">
                     <span className="text-xs text-slate-400 uppercase tracking-wide">Service Due</span>
-                    <Badge className={`font-medium ${getStatusColorClass(maintenanceRecord.service_status?.status || 'not_set')}`}>
+                    <p className="text-lg font-semibold text-white">
                       {maintenanceRecord.next_service_mileage 
                         ? `${formatMileage(maintenanceRecord.next_service_mileage)} miles` 
                         : 'Not Set'}
-                    </Badge>
+                    </p>
                   </div>
 
                   {/* Cambelt Due */}
                   <div className="space-y-1">
                     <span className="text-xs text-slate-400 uppercase tracking-wide">Cambelt Due</span>
-                    <Badge className={`font-medium ${getStatusColorClass(maintenanceRecord.cambelt_status?.status || 'not_set')}`}>
+                    <p className="text-lg font-semibold text-white">
                       {maintenanceRecord.cambelt_due_mileage 
                         ? `${formatMileage(maintenanceRecord.cambelt_due_mileage)} miles` 
                         : 'Not Set'}
-                    </Badge>
+                    </p>
                   </div>
 
-                  {/* First Aid Kit Expiry */}
+                  {/* First Aid Kit */}
                   <div className="space-y-1">
                     <span className="text-xs text-slate-400 uppercase tracking-wide">First Aid Kit</span>
-                    <Badge className={`font-medium ${getStatusColorClass(maintenanceRecord.first_aid_status?.status || 'not_set')}`}>
+                    <p className="text-lg font-semibold text-white">
                       {formatMaintenanceDate(maintenanceRecord.first_aid_kit_expiry)}
-                    </Badge>
+                    </p>
                   </div>
 
                   {/* Last Service */}
@@ -841,7 +841,7 @@ export default function VehicleHistoryPage({
                   {maintenanceRecord.tracker_id && (
                     <div className="space-y-1">
                       <span className="text-xs text-slate-400 uppercase tracking-wide">GPS Tracker</span>
-                      <p className="text-sm font-mono text-white">
+                      <p className="text-lg font-semibold text-white">
                         {maintenanceRecord.tracker_id}
                       </p>
                     </div>
