@@ -1179,7 +1179,6 @@ export default function WorkshopTasksPage() {
                                     <h3 className="font-semibold text-lg text-slate-900 dark:text-white">
                                       {getVehicleReg(task)}
                                     </h3>
-                                    {getStatusBadge(task.status)}
                                     <Badge variant="outline" className="text-xs">
                                       {getSourceLabel(task)}
                                     </Badge>
@@ -1336,7 +1335,6 @@ export default function WorkshopTasksPage() {
                                     <h3 className="font-semibold text-lg text-slate-900 dark:text-white">
                                       {getVehicleReg(task)}
                                     </h3>
-                                    {getStatusBadge(task.status)}
                                     <Badge variant="outline" className="text-xs">
                                       {getSourceLabel(task)}
                                     </Badge>
@@ -1507,7 +1505,6 @@ export default function WorkshopTasksPage() {
                                     <h3 className="font-semibold text-lg text-white">
                                       {getVehicleReg(task)}
                                     </h3>
-                                    {getStatusBadge(task.status)}
                                     <Badge variant="outline" className="text-xs">
                                       {getSourceLabel(task)}
                                     </Badge>
