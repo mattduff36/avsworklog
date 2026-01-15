@@ -228,7 +228,7 @@ export default function WorkshopTasksPage() {
       if (error) throw error;
       setTasks(data || []);
     } catch (err) {
-      console.error('Error fetching tasks:', err);
+      console.error('Error fetching tasks:', err instanceof Error ? err.message : err);
       toast.error('Failed to load workshop tasks');
     } finally {
       setLoading(false);
@@ -246,7 +246,7 @@ export default function WorkshopTasksPage() {
       if (error) throw error;
       setVehicles(data || []);
     } catch (err) {
-      console.error('Error fetching vehicles:', err);
+      console.error('Error fetching vehicles:', err instanceof Error ? err.message : err);
     }
   };
 
@@ -262,7 +262,7 @@ export default function WorkshopTasksPage() {
       if (error) throw error;
       setCategories(data || []);
     } catch (err) {
-      console.error('Error fetching categories:', err);
+      console.error('Error fetching categories:', err instanceof Error ? err.message : err);
     }
   };
 
@@ -277,7 +277,7 @@ export default function WorkshopTasksPage() {
       if (error) throw error;
       setSubcategories(data || []);
     } catch (err) {
-      console.error('Error fetching subcategories:', err);
+      console.error('Error fetching subcategories:', err instanceof Error ? err.message : err);
     }
   };
 
@@ -299,7 +299,7 @@ export default function WorkshopTasksPage() {
       }
       setCurrentMileage(data?.current_mileage || null);
     } catch (err) {
-      console.error('Error fetching current mileage:', err);
+      console.error('Error fetching current mileage:', err instanceof Error ? err.message : err);
       setCurrentMileage(null);
     }
   };
@@ -376,7 +376,7 @@ export default function WorkshopTasksPage() {
       resetAddForm();
       fetchTasks();
     } catch (err) {
-      console.error('Error creating task:', err);
+      console.error('Error creating task:', err instanceof Error ? err.message : err);
       toast.error('Failed to create task');
     } finally {
       setSubmitting(false);
@@ -446,7 +446,7 @@ export default function WorkshopTasksPage() {
         fetchTasks();
       }, 500);
     } catch (err) {
-      console.error('Error updating status:', err);
+      console.error('Error updating status:', err instanceof Error ? err.message : err);
       toast.error('Failed to update status');
       setUpdatingStatus(prev => {
         const newSet = new Set(prev);
@@ -669,7 +669,7 @@ export default function WorkshopTasksPage() {
         fetchTasks();
       }, 500);
     } catch (err) {
-      console.error('Error marking complete:', err);
+      console.error('Error marking complete:', err instanceof Error ? err.message : err);
       toast.error('Failed to mark complete');
       setUpdatingStatus(prev => {
         const newSet = new Set(prev);
@@ -709,7 +709,7 @@ export default function WorkshopTasksPage() {
         fetchTasks();
       }, 500);
     } catch (err) {
-      console.error('Error undoing complete:', err);
+      console.error('Error undoing complete:', err instanceof Error ? err.message : err);
       toast.error('Failed to undo');
       setUpdatingStatus(prev => {
         const newSet = new Set(prev);
@@ -746,7 +746,7 @@ export default function WorkshopTasksPage() {
         fetchTasks();
       }, 500);
     } catch (err) {
-      console.error('Error undoing logged:', err);
+      console.error('Error undoing logged:', err instanceof Error ? err.message : err);
       toast.error('Failed to undo');
       setUpdatingStatus(prev => {
         const newSet = new Set(prev);
@@ -776,7 +776,7 @@ export default function WorkshopTasksPage() {
         if (error && error.code !== 'PGRST116') throw error;
         setEditCurrentMileage(data?.current_mileage || null);
       } catch (err) {
-        console.error('Error fetching mileage:', err);
+        console.error('Error fetching mileage:', err instanceof Error ? err.message : err);
         setEditCurrentMileage(null);
       }
     }
@@ -807,7 +807,7 @@ export default function WorkshopTasksPage() {
       setTaskToDelete(null);
       fetchTasks();
     } catch (err) {
-      console.error('Error deleting task:', err);
+      console.error('Error deleting task:', err instanceof Error ? err.message : err);
       toast.error('Failed to delete task');
     } finally {
       setDeleting(false);
@@ -887,7 +887,7 @@ export default function WorkshopTasksPage() {
       setEditCurrentMileage(null);
       fetchTasks();
     } catch (err) {
-      console.error('Error updating task:', err);
+      console.error('Error updating task:', err instanceof Error ? err.message : err);
       toast.error('Failed to update task');
     } finally {
       setSubmitting(false);
@@ -1003,7 +1003,7 @@ export default function WorkshopTasksPage() {
       setShowCategoryModal(false);
       fetchCategories();
     } catch (err) {
-      console.error('Error saving category:', err);
+      console.error('Error saving category:', err instanceof Error ? err.message : err);
       toast.error('Failed to save category');
     } finally {
       setSubmittingCategory(false);
@@ -1039,7 +1039,7 @@ export default function WorkshopTasksPage() {
       toast.success('Category deleted successfully');
       fetchCategories();
     } catch (err) {
-      console.error('Error deleting category:', err);
+      console.error('Error deleting category:', err instanceof Error ? err.message : err);
       toast.error('Failed to delete category');
     }
   };

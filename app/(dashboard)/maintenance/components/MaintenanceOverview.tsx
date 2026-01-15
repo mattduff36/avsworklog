@@ -1,14 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Calendar, Wrench, AlertCircle, ChevronDown, ChevronUp, Loader2, Clock, ExternalLink } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { AlertTriangle, Calendar, Wrench, AlertCircle, ChevronDown, ChevronUp, Loader2, Clock, ExternalLink, CheckCircle2, MessageSquare, Pause, Play } from 'lucide-react';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { formatDaysUntil, formatMilesUntil, formatMileage, formatMaintenanceDate, getStatusColorClass } from '@/lib/utils/maintenanceCalculations';
 import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { WorkshopTaskHistoryCard } from '@/components/workshop-tasks/WorkshopTaskHistoryCard';
+import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
+import { CreateWorkshopTaskDialog } from '@/components/workshop-tasks/CreateWorkshopTaskDialog';
+import { TaskCommentsDrawer } from '@/components/workshop-tasks/TaskCommentsDrawer';
+import { getTaskContent } from '@/lib/utils/serviceTaskCreation';
+import { createClient } from '@/lib/supabase/client';
+import { toast } from 'sonner';
 
 interface MaintenanceOverviewProps {
   vehicles: VehicleMaintenanceWithStatus[];
@@ -43,63 +54,65 @@ interface WorkshopTask {
   id: string;
   created_at: string;
   status: string;
+  title?: string;
   description: string;
+  workshop_comments?: string | null;
+  vehicle_id?: string;
   workshop_task_categories?: { name: string } | null;
   profiles?: { full_name: string | null } | null;
 }
 
 export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: MaintenanceOverviewProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const [expandedVehicles, setExpandedVehicles] = useState<Set<string>>(new Set());
-  const [vehicleHistory, setVehicleHistory] = useState<Record<string, { history: HistoryEntry[], workshopTasks: WorkshopTask[], loading: boolean }>>({})
+  const [vehicleHistory, setVehicleHistory] = useState<Record<string, { history: HistoryEntry[], workshopTasks: WorkshopTask[], loading: boolean }>>({});
   
-  const fetchVehicleHistory = async (vehicleId: string) => {
-    if (vehicleHistory[vehicleId]) return; // Already fetched
+  // Track which vehicles we've started fetching (prevents duplicate requests)
+  const fetchingVehicles = useRef<Set<string>>(new Set());
+  
+  // Create Workshop Task Dialog state
+  const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
+  const [createTaskVehicleId, setCreateTaskVehicleId] = useState<string | undefined>();
+  const [createTaskCategoryId, setCreateTaskCategoryId] = useState<string | undefined>();
+  const [createTaskAlertType, setCreateTaskAlertType] = useState<'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | undefined>();
+  const [maintenanceCategoryId, setMaintenanceCategoryId] = useState<string | undefined>();
+  
+  // Task Action Modals state
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<WorkshopTask | null>(null);
+  const [loggedComment, setLoggedComment] = useState('');
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [completingTask, setCompletingTask] = useState<WorkshopTask | null>(null);
+  const [completedComment, setCompletedComment] = useState('');
+  const [intermediateComment, setIntermediateComment] = useState('');
+  const [showOnHoldModal, setShowOnHoldModal] = useState(false);
+  const [onHoldingTask, setOnHoldingTask] = useState<WorkshopTask | null>(null);
+  const [onHoldComment, setOnHoldComment] = useState('');
+  const [showResumeModal, setShowResumeModal] = useState(false);
+  const [resumingTask, setResumingTask] = useState<WorkshopTask | null>(null);
+  const [resumeComment, setResumeComment] = useState('');
+  const [showCommentsDrawer, setShowCommentsDrawer] = useState(false);
+  const [commentsTask, setCommentsTask] = useState<WorkshopTask | null>(null);
+  
+  // Auto-fetch history for vehicles with alerts on mount
+  useEffect(() => {
+    const vehiclesWithAlerts = vehicles.filter(v => {
+      // Check if vehicle has any overdue or due soon status
+      return v.tax_status?.status === 'overdue' || v.tax_status?.status === 'due_soon' ||
+        v.mot_status?.status === 'overdue' || v.mot_status?.status === 'due_soon' ||
+        v.service_status?.status === 'overdue' || v.service_status?.status === 'due_soon' ||
+        v.cambelt_status?.status === 'overdue' || v.cambelt_status?.status === 'due_soon' ||
+        v.first_aid_status?.status === 'overdue' || v.first_aid_status?.status === 'due_soon';
+    });
     
-    setVehicleHistory(prev => ({ ...prev, [vehicleId]: { history: [], workshopTasks: [], loading: true } }));
-    
-    try {
-      const response = await fetch(`/api/maintenance/history/${vehicleId}`);
-      if (!response.ok) throw new Error('Failed to fetch history');
-      
-      const data = await response.json();
-      setVehicleHistory(prev => ({
-        ...prev,
-        [vehicleId]: {
-          history: data.history || [],
-          workshopTasks: data.workshopTasks || [],
-          loading: false
-        }
-      }));
-    } catch (error) {
-      console.error('Error fetching vehicle history:', error);
-      setVehicleHistory(prev => ({
-        ...prev,
-        [vehicleId]: { history: [], workshopTasks: [], loading: false }
-      }));
-    }
-  };
-
-  const toggleVehicle = (vehicleId: string, vehicle?: VehicleMaintenanceWithStatus) => {
-    const newExpanded = new Set(expandedVehicles);
-    if (newExpanded.has(vehicleId)) {
-      newExpanded.delete(vehicleId);
-    } else {
-      newExpanded.add(vehicleId);
-      fetchVehicleHistory(vehicleId);
-    }
-    setExpandedVehicles(newExpanded);
-  };
-
-  const handleCardClick = (vehicleId: string, vehicle: VehicleWithAlerts) => {
-    // If onVehicleClick is provided, use it for navigation
-    if (onVehicleClick) {
-      onVehicleClick(vehicle);
-    } else {
-      // Otherwise, just toggle expansion
-      toggleVehicle(vehicleId, vehicle);
-    }
-  };
+    vehiclesWithAlerts.forEach(vehicle => {
+      const vehicleId = vehicle.vehicle_id || vehicle.id;
+      if (vehicleId) {
+        fetchVehicleHistory(vehicleId);
+      }
+    });
+  }, [vehicles]);
   
   // Group vehicles by their most severe alert status
   const vehiclesWithAlerts: VehicleWithAlerts[] = vehicles.map(vehicle => {
@@ -186,6 +199,450 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     };
   });
   
+  // Get all workshop task IDs from all expanded vehicles
+  const allWorkshopTaskIds = Object.values(vehicleHistory)
+    .flatMap(vh => vh.workshopTasks.map(t => t.id));
+  
+  // Fetch comments for all workshop tasks
+  const { comments: taskComments } = useWorkshopTaskComments({
+    taskIds: allWorkshopTaskIds,
+    enabled: allWorkshopTaskIds.length > 0
+  });
+
+  // Fetch Service category on mount (for pre-filling create task dialog)
+  useEffect(() => {
+    const fetchServiceCategory = async () => {
+      const supabase = createClient();
+      try {
+        const { data: categories } = await supabase
+          .from('workshop_task_categories')
+          .select('id, name')
+          .ilike('name', '%service%')
+          .eq('is_active', true)
+          .limit(1);
+        
+        if (categories && categories.length > 0) {
+          setMaintenanceCategoryId(categories[0].id);
+        }
+      } catch (error) {
+        console.error('Error fetching service category:', error);
+      }
+    };
+    
+    fetchServiceCategory();
+  }, []);
+  
+  const fetchVehicleHistory = async (vehicleId: string) => {
+    // Check if already fetching or already have data
+    if (fetchingVehicles.current.has(vehicleId) || vehicleHistory[vehicleId]) {
+      return; // Already fetching or already fetched
+    }
+    
+    // Mark as fetching
+    fetchingVehicles.current.add(vehicleId);
+    
+    setVehicleHistory(prev => ({ ...prev, [vehicleId]: { history: [], workshopTasks: [], loading: true } }));
+    
+    try {
+      const response = await fetch(`/api/maintenance/history/${vehicleId}`);
+      if (!response.ok) throw new Error('Failed to fetch history');
+      
+      const data = await response.json();
+      
+      setVehicleHistory(prev => ({
+        ...prev,
+        [vehicleId]: {
+          history: data.history || [],
+          workshopTasks: data.workshopTasks || [],
+          loading: false
+        }
+      }));
+    } catch (error) {
+      console.error('Error fetching vehicle history:', error);
+      setVehicleHistory(prev => ({
+        ...prev,
+        [vehicleId]: { history: [], workshopTasks: [], loading: false }
+      }));
+    }
+  };
+
+  // Check if any alerts have matching workshop tasks
+  const hasMatchingTasks = (vehicle: VehicleWithAlerts, tasks: WorkshopTask[]): boolean => {
+    if (!vehicle.alerts || vehicle.alerts.length === 0 || !tasks || tasks.length === 0) {
+      return false;
+    }
+    
+    const regNumber = vehicle.vehicle?.reg_number || 'Unknown';
+    const activeTasks = tasks.filter(t => t.status !== 'completed');
+    
+    return vehicle.alerts.some(alert => {
+      const { title } = getTaskContent(alert.type, regNumber, '');
+      return activeTasks.some(task => task.title === title || task.description?.includes(title));
+    });
+  };
+
+  const handleCreateTask = (vehicleId: string, vehicle: VehicleWithAlerts) => {
+    setCreateTaskVehicleId(vehicleId);
+    // Prefill with Service category if available
+    setCreateTaskCategoryId(maintenanceCategoryId);
+    // Set the alert type from the first alert (prioritize overdue)
+    const alertType = vehicle.alerts?.[0]?.type as 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | undefined;
+    setCreateTaskAlertType(alertType);
+    
+    setShowCreateTaskDialog(true);
+  };
+
+  const handleTaskCreated = async () => {
+    // Refetch history for the vehicle to show the newly created task
+    if (createTaskVehicleId) {
+      // Clear the cache AND ref for this vehicle
+      fetchingVehicles.current.delete(createTaskVehicleId);
+      setVehicleHistory(prev => {
+        const newHistory = { ...prev };
+        delete newHistory[createTaskVehicleId];
+        return newHistory;
+      });
+      
+      // Small delay to ensure the task is committed to the database
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Force refetch
+      const vehicleId = createTaskVehicleId;
+      setVehicleHistory(prev => ({ ...prev, [vehicleId]: { history: [], workshopTasks: [], loading: true } }));
+      
+      try {
+        const response = await fetch(`/api/maintenance/history/${vehicleId}`);
+        if (!response.ok) throw new Error('Failed to fetch history');
+        
+        const data = await response.json();
+        
+        setVehicleHistory(prev => ({
+          ...prev,
+          [vehicleId]: {
+            history: data.history || [],
+            workshopTasks: data.workshopTasks || [],
+            loading: false
+          }
+        }));
+      } catch (error) {
+        console.error('Error fetching vehicle history:', error);
+        setVehicleHistory(prev => ({
+          ...prev,
+          [vehicleId]: { history: [], workshopTasks: [], loading: false }
+        }));
+      }
+    }
+  };
+
+  // Handler: Mark In Progress
+  const handleMarkInProgress = (task: WorkshopTask) => {
+    setSelectedTask(task);
+    setLoggedComment('');
+    setShowStatusModal(true);
+  };
+
+  const confirmMarkInProgress = async () => {
+    if (!selectedTask) return;
+
+    if (!loggedComment.trim()) {
+      toast.error('Please add a comment');
+      return;
+    }
+
+    if (loggedComment.length > 300) {
+      toast.error('Comment must be 300 characters or less');
+      return;
+    }
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('actions')
+        .update({
+          status: 'logged',
+          logged_at: new Date().toISOString(),
+          logged_comment: loggedComment,
+          logged_by: user!.id,
+        })
+        .eq('id', selectedTask.id);
+
+      if (error) throw error;
+
+      toast.success('Task marked as in progress');
+      setShowStatusModal(false);
+      
+      // Refetch vehicle history
+      const vehicleId = selectedTask.vehicle_id;
+      if (vehicleId) {
+        fetchingVehicles.current.delete(vehicleId);
+        setVehicleHistory(prev => {
+          const newHistory = { ...prev };
+          delete newHistory[vehicleId];
+          return newHistory;
+        });
+        await new Promise(resolve => setTimeout(resolve, 100));
+        fetchVehicleHistory(vehicleId);
+      }
+    } catch (error: any) {
+      console.error('Error marking task in progress:', error instanceof Error ? error.message : error);
+      toast.error('Failed to update task');
+    }
+  };
+
+  // Handler: Undo (revert to pending)
+  const handleUndo = async (task: WorkshopTask) => {
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('actions')
+        .update({
+          status: 'pending',
+          logged_at: null,
+          logged_comment: null,
+          logged_by: null,
+        })
+        .eq('id', task.id);
+
+      if (error) throw error;
+
+      toast.success('Task reverted to pending');
+      
+      // Refetch vehicle history
+      const vehicleId = task.vehicle_id;
+      if (vehicleId) {
+        fetchingVehicles.current.delete(vehicleId);
+        setVehicleHistory(prev => {
+          const newHistory = { ...prev };
+          delete newHistory[vehicleId];
+          return newHistory;
+        });
+        await new Promise(resolve => setTimeout(resolve, 100));
+        fetchVehicleHistory(vehicleId);
+      }
+    } catch (error: any) {
+      console.error('Error undoing task:', error instanceof Error ? error.message : error);
+      toast.error('Failed to undo task');
+    }
+  };
+
+  // Handler: Mark Complete
+  const handleMarkComplete = (task: WorkshopTask) => {
+    setCompletingTask(task);
+    setCompletedComment('');
+    setIntermediateComment('');
+    setShowCompleteModal(true);
+  };
+
+  const confirmMarkComplete = async () => {
+    if (!completingTask) return;
+
+    const requiresIntermediateStep = completingTask.status === 'pending' || completingTask.status === 'on_hold';
+
+    if (requiresIntermediateStep && !intermediateComment.trim()) {
+      toast.error('Please add an intermediate comment');
+      return;
+    }
+
+    if (!completedComment.trim()) {
+      toast.error('Please add a completion comment');
+      return;
+    }
+
+    if ((requiresIntermediateStep && intermediateComment.length > 300) || completedComment.length > 300) {
+      toast.error('Comments must be 300 characters or less');
+      return;
+    }
+
+    try {
+      const supabase = createClient();
+      const taskId = completingTask.id;
+      const vehicleId = completingTask.vehicle_id;
+
+      // If requires intermediate step, first mark as logged
+      if (requiresIntermediateStep) {
+        const { error: loggedError } = await supabase
+          .from('actions')
+          .update({
+            status: 'logged',
+            logged_at: new Date().toISOString(),
+            logged_comment: intermediateComment,
+            logged_by: user!.id,
+          })
+          .eq('id', taskId);
+
+        if (loggedError) throw loggedError;
+      }
+
+      // Now mark as complete
+      const { error: completeError } = await supabase
+        .from('actions')
+        .update({
+          status: 'completed',
+          actioned_at: new Date().toISOString(),
+          actioned_comment: completedComment,
+          actioned_by: user!.id,
+        })
+        .eq('id', taskId);
+
+      if (completeError) throw completeError;
+
+      toast.success('Task marked as complete');
+      setShowCompleteModal(false);
+      
+      // Refetch vehicle history
+      if (vehicleId) {
+        fetchingVehicles.current.delete(vehicleId);
+        setVehicleHistory(prev => {
+          const newHistory = { ...prev };
+          delete newHistory[vehicleId];
+          return newHistory;
+        });
+        await new Promise(resolve => setTimeout(resolve, 100));
+        fetchVehicleHistory(vehicleId);
+      }
+    } catch (error: any) {
+      console.error('Error marking task complete:', error instanceof Error ? error.message : error);
+      toast.error('Failed to complete task');
+    }
+  };
+
+  // Handler: On Hold
+  const handleOnHold = (task: WorkshopTask) => {
+    setOnHoldingTask(task);
+    setOnHoldComment('');
+    setShowOnHoldModal(true);
+  };
+
+  const confirmOnHold = async () => {
+    if (!onHoldingTask) return;
+
+    if (!onHoldComment.trim()) {
+      toast.error('Please add a comment explaining why this task is on hold');
+      return;
+    }
+
+    if (onHoldComment.length > 300) {
+      toast.error('Comment must be 300 characters or less');
+      return;
+    }
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('actions')
+        .update({
+          status: 'on_hold',
+          on_hold_at: new Date().toISOString(),
+          on_hold_comment: onHoldComment,
+          on_hold_by: user!.id,
+        })
+        .eq('id', onHoldingTask.id);
+
+      if (error) throw error;
+
+      toast.success('Task marked as on hold');
+      setShowOnHoldModal(false);
+      
+      // Refetch vehicle history
+      const vehicleId = onHoldingTask.vehicle_id;
+      if (vehicleId) {
+        fetchingVehicles.current.delete(vehicleId);
+        setVehicleHistory(prev => {
+          const newHistory = { ...prev };
+          delete newHistory[vehicleId];
+          return newHistory;
+        });
+        await new Promise(resolve => setTimeout(resolve, 100));
+        fetchVehicleHistory(vehicleId);
+      }
+    } catch (error: any) {
+      console.error('Error marking task on hold:', error);
+      toast.error('Failed to update task');
+    }
+  };
+
+  // Handler: Resume
+  const handleResume = (task: WorkshopTask) => {
+    setResumingTask(task);
+    setResumeComment('');
+    setShowResumeModal(true);
+  };
+
+  const confirmResume = async () => {
+    if (!resumingTask) return;
+
+    if (!resumeComment.trim()) {
+      toast.error('Please add a comment about resuming this task');
+      return;
+    }
+
+    if (resumeComment.length > 300) {
+      toast.error('Comment must be 300 characters or less');
+      return;
+    }
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('actions')
+        .update({
+          status: 'logged',
+          resumed_at: new Date().toISOString(),
+          resumed_comment: resumeComment,
+          resumed_by: user!.id,
+        })
+        .eq('id', resumingTask.id);
+
+      if (error) throw error;
+
+      toast.success('Task resumed');
+      setShowResumeModal(false);
+      
+      // Refetch vehicle history
+      const vehicleId = resumingTask.vehicle_id;
+      if (vehicleId) {
+        fetchingVehicles.current.delete(vehicleId);
+        setVehicleHistory(prev => {
+          const newHistory = { ...prev };
+          delete newHistory[vehicleId];
+          return newHistory;
+        });
+        await new Promise(resolve => setTimeout(resolve, 100));
+        fetchVehicleHistory(vehicleId);
+      }
+    } catch (error: any) {
+      console.error('Error resuming task:', error instanceof Error ? error.message : error);
+      toast.error('Failed to resume task');
+    }
+  };
+
+  // Handler: Open Comments Drawer
+  const handleOpenComments = (task: WorkshopTask) => {
+    setCommentsTask(task);
+    setShowCommentsDrawer(true);
+  };
+
+  const toggleVehicle = async (vehicleId: string, vehicle?: VehicleMaintenanceWithStatus) => {
+    const newExpanded = new Set(expandedVehicles);
+    if (newExpanded.has(vehicleId)) {
+      newExpanded.delete(vehicleId);
+    } else {
+      newExpanded.add(vehicleId);
+      fetchVehicleHistory(vehicleId);
+    }
+    setExpandedVehicles(newExpanded);
+  };
+
+  const handleCardClick = (vehicleId: string, vehicle: VehicleWithAlerts) => {
+    // If onVehicleClick is provided, use it for navigation
+    if (onVehicleClick) {
+      onVehicleClick(vehicle);
+    } else {
+      // Otherwise, just toggle expansion
+      toggleVehicle(vehicleId, vehicle);
+    }
+  };
+  
   const overdueVehicles = vehiclesWithAlerts.filter(v => v.alerts.some(a => a.severity === 'overdue'));
   const dueSoonVehicles = vehiclesWithAlerts.filter(v => 
     v.alerts.some(a => a.severity === 'due_soon') && !v.alerts.some(a => a.severity === 'overdue')
@@ -219,19 +676,10 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     const isExpanded = expandedVehicles.has(vehicleId);
     const historyData = vehicleHistory[vehicleId];
     
-    // Combine and sort history entries (maintenance history + workshop tasks)
-    const getRecentEntries = () => {
-      if (!historyData) return [];
-      
-      const combined: Array<{ type: 'history' | 'workshop', date: string, data: any }> = [
-        ...historyData.history.map(h => ({ type: 'history' as const, date: h.created_at, data: h })),
-        ...historyData.workshopTasks.map(w => ({ type: 'workshop' as const, date: w.created_at, data: w }))
-      ];
-      
-      return combined
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, 3);
-    };
+    // Wait for history to load before checking for existing tasks
+    // If still loading, assume no tasks (show Loading button)
+    // If loaded (not loading), check if tasks exist
+    const hasExistingTasks = historyData && !historyData.loading && hasMatchingTasks(vehicle, historyData.workshopTasks);
     
     return (
       <Card 
@@ -276,33 +724,35 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 </div>
               </div>
               
-              {/* Expand/Collapse Button - Top Right (only show when onVehicleClick is provided) */}
-              {onVehicleClick && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="flex-shrink-0 text-slate-400 hover:text-white hover:bg-slate-800"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleVehicle(vehicleId, vehicle);
-                  }}
-                >
-                  {isExpanded ? (
-                    <>
-                      <ChevronUp className="h-4 w-4 mr-1" />
-                      Collapse
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="h-4 w-4 mr-1" />
-                      Expand
-                    </>
-                  )}
-                </Button>
-              )}
+              {/* Status Badge - Top Right Corner (only show if task exists) */}
+              {hasExistingTasks && (() => {
+                const regNumber = vehicle.vehicle?.reg_number || 'Unknown';
+                const relatedTask = historyData?.workshopTasks.find(task => {
+                  if (task.status === 'completed') return false;
+                  return vehicle.alerts.some(alert => {
+                    const { title } = getTaskContent(alert.type, regNumber, '');
+                    return task.title === title;
+                  });
+                });
+                if (!relatedTask) return null;
+                return (
+                  <Badge 
+                    variant="outline" 
+                    className={`text-sm px-3 py-1 font-semibold ${
+                      relatedTask.status === 'pending' 
+                        ? 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30'
+                        : relatedTask.status === 'logged' 
+                        ? 'bg-blue-500/10 text-blue-300 border-blue-500/30'
+                        : 'bg-purple-500/10 text-purple-300 border-purple-500/30'
+                    }`}
+                  >
+                    {relatedTask.status === 'logged' ? 'In Progress' : relatedTask.status === 'pending' ? 'Pending' : 'On Hold'}
+                  </Badge>
+                );
+              })()}
             </div>
             
-            {/* Service Information - Horizontal Row with Chevron */}
+            {/* Service Information - Horizontal Row with Status Badge and Chevron */}
             <div className="flex items-center justify-between gap-4">
               <div className="flex flex-wrap gap-x-6 gap-y-2 flex-1">
                 {/* Current Mileage */}
@@ -378,102 +828,237 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 )}
               </div>
               
-              {/* Chevron Icon - Right side of service info (only show when not using onVehicleClick) */}
-              {!onVehicleClick && (
-                <>
+              {/* Action Button - Bottom Right (mutually exclusive: Create Task OR Expand OR Loading) */}
+              {historyData?.loading ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="flex-shrink-0 text-slate-400"
+                  disabled
+                >
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Loading...
+                </Button>
+              ) : !hasExistingTasks ? (
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="flex-shrink-0 bg-workshop hover:bg-workshop-dark text-white"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCreateTask(vehicleId, vehicle);
+                  }}
+                >
+                  <Wrench className="h-4 w-4 mr-1" />
+                  Create Task
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="flex-shrink-0 text-slate-400 hover:text-white hover:bg-slate-800"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleVehicle(vehicleId, vehicle);
+                  }}
+                >
                   {isExpanded ? (
-                    <ChevronUp className="h-5 w-5 text-slate-400 flex-shrink-0" />
+                    <>
+                      <ChevronUp className="h-4 w-4 mr-1" />
+                      Collapse
+                    </>
                   ) : (
-                    <ChevronDown className="h-5 w-5 text-slate-400 flex-shrink-0" />
+                    <>
+                      <ChevronDown className="h-4 w-4 mr-1" />
+                      Expand
+                    </>
                   )}
-                </>
+                </Button>
               )}
             </div>
           </div>
 
-          {/* Expanded View - Recent Maintenance & Workshop History */}
+          {/* Expanded View - Workshop Tasks */}
           {isExpanded && (
             <div className="mt-4 pt-4 border-t border-slate-700" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center gap-2 mb-3">
-                <Clock className="h-4 w-4 text-slate-400" />
-                <h4 className="text-sm font-semibold text-slate-300">Recent History</h4>
-              </div>
-              
               {historyData?.loading ? (
                 <div className="flex items-center justify-center py-6">
                   <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
                 </div>
-              ) : getRecentEntries().length === 0 ? (
-                <p className="text-sm text-slate-400 py-4 text-center">No recent history</p>
-              ) : (
-                <div className="space-y-2">
-                  {getRecentEntries().map((entry, idx) => (
-                    <div 
-                      key={idx}
-                      className="bg-slate-800/50 rounded-lg p-3 border border-slate-700"
-                    >
-                      {entry.type === 'history' ? (
-                        <div>
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <span className="text-xs font-medium text-blue-400">Maintenance Update</span>
-                            <span className="text-xs text-slate-500">
-                              {formatDistanceToNow(new Date(entry.data.created_at), { addSuffix: true })}
-                            </span>
-                          </div>
-                          <p className="text-sm text-slate-300">
-                            <span className="font-medium">{entry.data.field_name}</span>
-                            {' changed from '}
-                            <span className="text-slate-400">{entry.data.old_value || 'empty'}</span>
-                            {' to '}
-                            <span className="text-white">{entry.data.new_value}</span>
-                          </p>
-                          {entry.data.updated_by_name && (
-                            <p className="text-xs text-slate-500 mt-1">
-                              by {entry.data.updated_by_name}
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <div>
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium text-purple-400">Workshop Task</span>
-                              {entry.data.workshop_task_categories && (
-                                <Badge variant="outline" className="text-xs bg-slate-700/50 text-slate-300 border-slate-600">
-                                  {entry.data.workshop_task_categories.name}
-                                </Badge>
-                              )}
-                            </div>
-                            <span className="text-xs text-slate-500">
-                              {formatDistanceToNow(new Date(entry.data.created_at), { addSuffix: true })}
-                            </span>
-                          </div>
-                          <p className="text-sm text-slate-300">{entry.data.description}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge 
-                              variant="outline" 
-                              className={`text-xs ${
-                                entry.data.status === 'completed' 
-                                  ? 'bg-green-500/10 text-green-400 border-green-500/30'
-                                  : entry.data.status === 'logged'
-                                  ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
-                                  : 'bg-slate-500/10 text-slate-400 border-slate-500/30'
-                              }`}
-                            >
-                              {entry.data.status}
-                            </Badge>
-                            {entry.data.profiles?.full_name && (
-                              <span className="text-xs text-slate-500">
-                                by {entry.data.profiles.full_name}
-                              </span>
-                            )}
-                          </div>
-                        </div>
+              ) : (() => {
+                // Find the related non-completed task that matches the alert
+                const regNumber = vehicle.vehicle?.reg_number || 'Unknown';
+                const relatedTask = historyData?.workshopTasks.find(task => {
+                  if (task.status === 'completed') return false;
+                  return vehicle.alerts.some(alert => {
+                    const { title } = getTaskContent(alert.type, regNumber, '');
+                    return task.title === title;
+                  });
+                });
+                
+                if (!relatedTask) {
+                  return <p className="text-sm text-slate-400 py-4 text-center">No active workshop task found</p>;
+                }
+                
+                // Ensure task has vehicle_id for handlers
+                const taskWithVehicleId = { ...relatedTask, vehicle_id: vehicleId };
+                
+                // Display task details directly
+                return (
+                  <div className="bg-slate-800/50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 space-y-2">
+                        <h5 className="font-medium text-white">{relatedTask.title}</h5>
+                        {relatedTask.workshop_comments && (
+                          <p className="text-sm text-slate-300">{relatedTask.workshop_comments}</p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-4 text-xs text-slate-400">
+                      <span>Created {formatDistanceToNow(new Date(relatedTask.created_at), { addSuffix: true })}</span>
+                      {relatedTask.profiles?.full_name && (
+                        <span>by {relatedTask.profiles.full_name}</span>
                       )}
                     </div>
-                  ))}
-                </div>
-              )}
+                    
+                    {/* Action Buttons - Aligned Right */}
+                    <div className="flex justify-end gap-2 pt-2 border-t border-slate-700">
+                      {/* Pending Status Buttons: Comments, In Progress, Complete */}
+                      {relatedTask.status === 'pending' && (
+                        <>
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenComments(taskWithVehicleId);
+                            }}
+                            size="sm"
+                            variant="outline"
+                            className="h-9 px-3 text-xs transition-all border-slate-600 hover:bg-slate-800"
+                          >
+                            <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                            Comments
+                          </Button>
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMarkInProgress(taskWithVehicleId);
+                            }}
+                            size="sm"
+                            className="h-9 px-3 text-xs transition-all border-0 bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            <Clock className="h-3.5 w-3.5 mr-1.5" />
+                            In Progress
+                          </Button>
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMarkComplete(taskWithVehicleId);
+                            }}
+                            size="sm"
+                            className="h-9 px-3 text-xs transition-all border-0 bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                            Complete
+                          </Button>
+                        </>
+                      )}
+                      
+                      {/* In Progress (Logged) Status Buttons: Comments, Undo, On Hold, Complete */}
+                      {relatedTask.status === 'logged' && (
+                        <>
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenComments(taskWithVehicleId);
+                            }}
+                            size="sm"
+                            variant="outline"
+                            className="h-9 px-3 text-xs transition-all border-slate-600 hover:bg-slate-800"
+                          >
+                            <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                            Comments
+                          </Button>
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUndo(taskWithVehicleId);
+                            }}
+                            size="sm"
+                            variant="outline"
+                            className="h-9 px-3 text-xs transition-all border-slate-600 hover:bg-slate-800"
+                          >
+                            <Clock className="h-3.5 w-3.5 mr-1.5" />
+                            Undo
+                          </Button>
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOnHold(taskWithVehicleId);
+                            }}
+                            size="sm"
+                            className="h-9 px-3 text-xs transition-all border-0 bg-purple-600 hover:bg-purple-700 text-white"
+                          >
+                            <Pause className="h-3.5 w-3.5 mr-1.5" />
+                            On Hold
+                          </Button>
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMarkComplete(taskWithVehicleId);
+                            }}
+                            size="sm"
+                            className="h-9 px-3 text-xs transition-all border-0 bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                            Complete
+                          </Button>
+                        </>
+                      )}
+                      
+                      {/* On Hold Status Buttons: Comments, Resume, Complete */}
+                      {relatedTask.status === 'on_hold' && (
+                        <>
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenComments(taskWithVehicleId);
+                            }}
+                            size="sm"
+                            variant="outline"
+                            className="h-9 px-3 text-xs transition-all border-slate-600 hover:bg-slate-800"
+                          >
+                            <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                            Comments
+                          </Button>
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleResume(taskWithVehicleId);
+                            }}
+                            size="sm"
+                            className="h-9 px-3 text-xs transition-all border-0 bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            <Play className="h-3.5 w-3.5 mr-1.5" />
+                            Resume
+                          </Button>
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMarkComplete(taskWithVehicleId);
+                            }}
+                            size="sm"
+                            className="h-9 px-3 text-xs transition-all border-0 bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                            Complete
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </CardContent>
@@ -525,6 +1110,244 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Create Workshop Task Dialog */}
+      <CreateWorkshopTaskDialog
+        open={showCreateTaskDialog}
+        onOpenChange={setShowCreateTaskDialog}
+        initialVehicleId={createTaskVehicleId}
+        initialCategoryId={createTaskCategoryId}
+        alertType={createTaskAlertType}
+        onSuccess={handleTaskCreated}
+      />
+
+      {/* Mark In Progress Modal */}
+      <Dialog open={showStatusModal} onOpenChange={setShowStatusModal}>
+        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-white text-xl">Mark Task In Progress</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
+              Add a short note about starting this work
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="logged-comment" className="text-slate-900 dark:text-white">
+                Comment <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="logged-comment"
+                value={loggedComment}
+                onChange={(e) => setLoggedComment(e.target.value)}
+                placeholder="What are you starting work on?"
+                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[100px]"
+                maxLength={300}
+              />
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                {loggedComment.length}/300 characters
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowStatusModal(false)}
+              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmMarkInProgress}
+              disabled={!loggedComment.trim() || loggedComment.length > 300}
+              className="bg-blue-500 hover:bg-blue-600 text-white"
+            >
+              <Clock className="h-4 w-4 mr-2" />
+              Mark In Progress
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mark Task Complete Modal */}
+      <Dialog open={showCompleteModal} onOpenChange={setShowCompleteModal}>
+        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-white text-xl">Mark Task Complete</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
+              {completingTask && (completingTask.status === 'pending' || completingTask.status === 'on_hold')
+                ? 'This task will be moved through In Progress and then marked as Complete'
+                : 'Confirm the work has been completed'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {completingTask && (completingTask.status === 'pending' || completingTask.status === 'on_hold') && (
+              <div className="space-y-2">
+                <Label htmlFor="intermediate-comment" className="text-slate-900 dark:text-white">
+                  Started Work Comment <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="intermediate-comment"
+                  value={intermediateComment}
+                  onChange={(e) => setIntermediateComment(e.target.value)}
+                  placeholder="Brief note about starting the work"
+                  className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white"
+                  maxLength={300}
+                />
+                <p className="text-xs text-slate-600 dark:text-slate-400">
+                  {intermediateComment.length}/300 characters
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="completed-comment" className="text-slate-900 dark:text-white">
+                Completion Comment <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="completed-comment"
+                value={completedComment}
+                onChange={(e) => setCompletedComment(e.target.value)}
+                placeholder="What was done to complete this task?"
+                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[100px]"
+                maxLength={300}
+              />
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                {completedComment.length}/300 characters
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCompleteModal(false)}
+              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmMarkComplete}
+              disabled={
+                (completingTask && (completingTask.status === 'pending' || completingTask.status === 'on_hold') && (!intermediateComment.trim() || intermediateComment.length > 300)) ||
+                !completedComment.trim() ||
+                completedComment.length > 300
+              }
+              className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Mark Complete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* On Hold Modal */}
+      <Dialog open={showOnHoldModal} onOpenChange={setShowOnHoldModal}>
+        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-white text-xl">Put Task On Hold</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
+              This task will be marked as "On Hold" and can be resumed later
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+              <p className="text-sm text-purple-300">
+                This task will be marked as "On Hold" and can be resumed later. On hold tasks will still appear in driver inspections.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="onhold-comment" className="text-slate-900 dark:text-white">
+                Reason <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="onhold-comment"
+                value={onHoldComment}
+                onChange={(e) => setOnHoldComment(e.target.value)}
+                placeholder="Why is this task being put on hold?"
+                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[100px]"
+                maxLength={300}
+              />
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                {onHoldComment.length}/300 characters
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowOnHoldModal(false)}
+              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmOnHold}
+              disabled={!onHoldComment.trim() || onHoldComment.length > 300}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              <Pause className="h-4 w-4 mr-2" />
+              Put On Hold
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resume Task Modal */}
+      <Dialog open={showResumeModal} onOpenChange={setShowResumeModal}>
+        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-white text-xl">Resume Task</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
+              This task will be moved back to In Progress
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="resume-comment" className="text-slate-900 dark:text-white">
+                Comment <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="resume-comment"
+                value={resumeComment}
+                onChange={(e) => setResumeComment(e.target.value)}
+                placeholder="Note about resuming this task"
+                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[100px]"
+                maxLength={300}
+              />
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                {resumeComment.length}/300 characters
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowResumeModal(false)}
+              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmResume}
+              disabled={!resumeComment.trim() || resumeComment.length > 300}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Play className="h-4 w-4 mr-2" />
+              Resume Task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Task Comments Drawer */}
+      {commentsTask && (
+        <TaskCommentsDrawer
+          taskId={commentsTask.id}
+          open={showCommentsDrawer}
+          onOpenChange={setShowCommentsDrawer}
+        />
       )}
     </div>
   );
