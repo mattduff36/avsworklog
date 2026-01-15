@@ -462,13 +462,26 @@ export default function WorkshopTasksPage() {
         })
         .eq('id', task.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error placing task on hold:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+        throw error;
+      }
 
       toast.success('Task placed on hold');
       await fetchTasks();
-    } catch (error) {
-      console.error('Error updating task:', error);
-      toast.error('Failed to update task');
+    } catch (error: any) {
+      console.error('Error updating task:', {
+        message: error?.message || 'Unknown error',
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+      });
+      toast.error(error?.message || 'Failed to update task');
     } finally {
       setUpdatingStatus(prev => {
         const next = new Set(prev);
