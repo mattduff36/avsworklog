@@ -559,8 +559,7 @@ export default function VehicleHistoryPage({
             onClick={() => router.back()}
             className="border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white hover:border-slate-500 active:bg-slate-800 transition-all"
           >
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            Back
+            <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
