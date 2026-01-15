@@ -1169,7 +1169,7 @@ export default function WorkshopTasksPage() {
                           className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-workshop/50 transition-all duration-200 cursor-pointer"
                           onClick={() => handleOpenTaskModal(task)}
                         >
-                          <CardContent className="pt-6" onClick={(e) => e.stopPropagation()}>
+                          <CardContent className="pt-6">
                             <div className="flex flex-col gap-3">
                               {/* Main content row */}
                               <div className="flex flex-col md:flex-row items-start justify-between gap-4">
@@ -1207,7 +1207,10 @@ export default function WorkshopTasksPage() {
                                 </div>
                                 <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
                                   <Button
-                                    onClick={() => handleOpenComments(task)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenComments(task);
+                                    }}
                                     disabled={isUpdating}
                                     size="sm"
                                     variant="outline"
@@ -1217,7 +1220,10 @@ export default function WorkshopTasksPage() {
                                     Comments
                                   </Button>
                                   <Button
-                                    onClick={() => handleMarkInProgress(task)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleMarkInProgress(task);
+                                    }}
                                     disabled={isUpdating}
                                     size="sm"
                                     className="h-9 px-3 text-xs bg-blue-600/80 hover:bg-blue-600 text-white border-0"
@@ -1226,7 +1232,10 @@ export default function WorkshopTasksPage() {
                                     In Progress
                                   </Button>
                                   <Button
-                                    onClick={() => handleMarkComplete(task)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleMarkComplete(task);
+                                    }}
                                     disabled={isUpdating}
                                     size="sm"
                                     className={`h-9 px-3 text-xs transition-all border-0 ${
@@ -1258,7 +1267,7 @@ export default function WorkshopTasksPage() {
                                 {task.action_type === 'workshop_vehicle_task' && (
                                   <div className="flex items-center gap-1">
                                     <Button
-                                      onClick={() => handleEditTask(task)}
+                                      onClick={(e) => { e.stopPropagation(); handleEditTask(task); }}
                                       disabled={isUpdating}
                                       size="sm"
                                       variant="ghost"
@@ -1268,7 +1277,7 @@ export default function WorkshopTasksPage() {
                                       <Edit className="h-3.5 w-3.5" />
                                     </Button>
                                     <Button
-                                      onClick={() => handleDeleteTask(task)}
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteTask(task); }}
                                       disabled={isUpdating}
                                       size="sm"
                                       variant="ghost"
@@ -1317,7 +1326,7 @@ export default function WorkshopTasksPage() {
                           className="bg-white dark:bg-slate-900 border-blue-500/30 dark:border-blue-500/30 hover:shadow-lg hover:border-blue-500/50 transition-all duration-200 cursor-pointer"
                           onClick={() => handleOpenTaskModal(task)}
                         >
-                          <CardContent className="pt-6" onClick={(e) => e.stopPropagation()}>
+                          <CardContent className="pt-6">
                             <div className="flex flex-col gap-3">
                               {/* Main content row */}
                               <div className="flex flex-col md:flex-row items-start justify-between gap-4">
@@ -1362,7 +1371,7 @@ export default function WorkshopTasksPage() {
                                 </div>
                                 <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
                                   <Button
-                                    onClick={() => handleOpenComments(task)}
+                                    onClick={(e) => { e.stopPropagation(); handleOpenComments(task); }}
                                     disabled={isUpdating}
                                     size="sm"
                                     variant="outline"
@@ -1372,7 +1381,7 @@ export default function WorkshopTasksPage() {
                                     Comments
                                   </Button>
                                   <Button
-                                    onClick={() => handleUndoLogged(task.id)}
+                                    onClick={(e) => { e.stopPropagation(); handleUndoLogged(task.id); }}
                                     variant="outline"
                                     disabled={isUpdating}
                                     size="sm"
@@ -1383,7 +1392,7 @@ export default function WorkshopTasksPage() {
                                   </Button>
                                   {task.status === 'logged' && (
                                     <Button
-                                      onClick={() => handleMarkOnHold(task)}
+                                      onClick={(e) => { e.stopPropagation(); handleMarkOnHold(task); }}
                                       disabled={isUpdating}
                                       size="sm"
                                       className="h-9 px-3 text-xs bg-purple-600/80 hover:bg-purple-600 text-white border-0"
@@ -1394,7 +1403,7 @@ export default function WorkshopTasksPage() {
                                   )}
                                   {task.status === 'on_hold' && (
                                     <Button
-                                      onClick={() => handleMarkInProgress(task)}
+                                      onClick={(e) => { e.stopPropagation(); handleMarkInProgress(task); }}
                                       disabled={isUpdating}
                                       size="sm"
                                       className="h-9 px-3 text-xs bg-blue-600/80 hover:bg-blue-600 text-white border-0"
@@ -1404,7 +1413,7 @@ export default function WorkshopTasksPage() {
                                     </Button>
                                   )}
                                   <Button
-                                    onClick={() => handleMarkComplete(task)}
+                                    onClick={(e) => { e.stopPropagation(); handleMarkComplete(task); }}
                                     disabled={isUpdating}
                                     size="sm"
                                     className={`h-9 px-3 text-xs transition-all border-0 ${
@@ -1441,7 +1450,7 @@ export default function WorkshopTasksPage() {
                                 {task.action_type === 'workshop_vehicle_task' && (
                                   <div className="flex items-center gap-1">
                                     <Button
-                                      onClick={() => handleEditTask(task)}
+                                      onClick={(e) => { e.stopPropagation(); handleEditTask(task); }}
                                       disabled={isUpdating}
                                       size="sm"
                                       variant="ghost"
@@ -1488,7 +1497,7 @@ export default function WorkshopTasksPage() {
                         className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-90 transition-opacity cursor-pointer"
                         onClick={() => handleOpenTaskModal(task)}
                       >
-                        <CardContent className="pt-6" onClick={(e) => e.stopPropagation()}>
+                        <CardContent className="pt-6">
                           <div className="flex flex-col items-start gap-4">
                             <div className="flex-1 space-y-2 w-full">
                               <div className="flex flex-col md:flex-row items-start justify-between gap-4">
@@ -1521,7 +1530,7 @@ export default function WorkshopTasksPage() {
                                 </div>
                                 <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
                                   <Button
-                                    onClick={() => handleOpenComments(task)}
+                                    onClick={(e) => { e.stopPropagation(); handleOpenComments(task); }}
                                     size="sm"
                                     variant="outline"
                                     className="h-9 px-3 text-xs border-slate-600 text-slate-400 hover:text-white hover:bg-slate-800"
@@ -1530,7 +1539,7 @@ export default function WorkshopTasksPage() {
                                     Comments
                                   </Button>
                                   <Button
-                                    onClick={() => handleUndoComplete(task.id)}
+                                    onClick={(e) => { e.stopPropagation(); handleUndoComplete(task.id); }}
                                     size="sm"
                                     variant="outline"
                                     className="h-9 px-3 text-xs border-slate-600 text-slate-400 hover:text-white hover:bg-slate-800"
