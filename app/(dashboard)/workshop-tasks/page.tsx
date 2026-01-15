@@ -455,7 +455,6 @@ export default function WorkshopTasksPage() {
         .from('actions')
         .update({
           status: 'on_hold',
-          logged: true,
           logged_at: new Date().toISOString(),
           logged_by: user?.id,
           logged_comment: 'Placed on hold',
