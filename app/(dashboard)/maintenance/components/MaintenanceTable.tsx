@@ -32,7 +32,8 @@ import {
   Loader2,
   FolderClock,
   XCircle,
-  Archive
+  Archive,
+  Undo2
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { VehicleMaintenanceWithStatus, DeletedVehicle } from '@/types/maintenance';
@@ -44,7 +45,7 @@ import {
   formatMaintenanceDate
 } from '@/lib/utils/maintenanceCalculations';
 import { EditMaintenanceDialog } from './EditMaintenanceDialog';
-import { useDeletedVehicles, usePermanentlyDeleteArchivedVehicle } from '@/lib/hooks/useMaintenance';
+import { useDeletedVehicles, usePermanentlyDeleteArchivedVehicle, useRestoreArchivedVehicle } from '@/lib/hooks/useMaintenance';
 import { useAuth } from '@/lib/hooks/useAuth';
 
 interface MaintenanceTableProps {
@@ -96,6 +97,7 @@ export function MaintenanceTable({
   // Fetch retired vehicles
   const { data: retiredData, isLoading: retiredLoading } = useDeletedVehicles();
   const permanentlyDelete = usePermanentlyDeleteArchivedVehicle();
+  const restoreVehicle = useRestoreArchivedVehicle();
   
   // Column visibility state - all columns visible by default
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
@@ -777,24 +779,44 @@ export function MaintenanceTable({
                             {/* Actions */}
                             <TableCell className="text-right">
                               {(isAdmin || isManager) && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    if (confirm(`⚠️ Permanently remove ${vehicle.reg_number}?\n\nThis will:\n• Remove from Retired Vehicles tab\n• Preserve all inspection history\n• Cannot be undone\n\nContinue?`)) {
-                                      permanentlyDelete.mutate(vehicle.id);
-                                    }
-                                  }}
-                                  disabled={permanentlyDelete.isPending}
-                                  className="text-red-400 hover:text-red-300 hover:bg-slate-800"
-                                  title="Permanently Remove"
-                                >
-                                  {permanentlyDelete.isPending ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                  ) : (
-                                    <XCircle className="h-3 w-3" />
-                                  )}
-                                </Button>
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (confirm(`Restore ${vehicle.reg_number} to active vehicles?\n\nThis will:\n• Move vehicle back to Active Vehicles tab\n• Restore all maintenance data\n\nContinue?`)) {
+                                        restoreVehicle.mutate(vehicle.id);
+                                      }
+                                    }}
+                                    disabled={restoreVehicle.isPending}
+                                    className="text-green-400 hover:text-green-300 hover:bg-green-900/20"
+                                    title="Restore to Active"
+                                  >
+                                    {restoreVehicle.isPending ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <Undo2 className="h-3 w-3" />
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (confirm(`⚠️ Permanently remove ${vehicle.reg_number}?\n\nThis will:\n• Remove from Retired Vehicles tab\n• Preserve all inspection history\n• Cannot be undone\n\nContinue?`)) {
+                                        permanentlyDelete.mutate(vehicle.id);
+                                      }
+                                    }}
+                                    disabled={permanentlyDelete.isPending}
+                                    className="text-red-400 hover:text-red-300 hover:bg-slate-800"
+                                    title="Permanently Remove"
+                                  >
+                                    {permanentlyDelete.isPending ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <XCircle className="h-3 w-3" />
+                                    )}
+                                  </Button>
+                                </div>
                               )}
                             </TableCell>
                           </TableRow>
@@ -861,7 +883,30 @@ export function MaintenanceTable({
                           
                           {/* Actions */}
                           {(isAdmin || isManager) && (
-                            <div className="mt-4 pt-3 border-t border-slate-700">
+                            <div className="mt-4 pt-3 border-t border-slate-700 space-y-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (confirm(`Restore ${vehicle.reg_number} to active vehicles?\n\nThis will:\n• Move vehicle back to Active Vehicles tab\n• Restore all maintenance data\n\nContinue?`)) {
+                                    restoreVehicle.mutate(vehicle.id);
+                                  }
+                                }}
+                                disabled={restoreVehicle.isPending}
+                                className="w-full text-green-400 hover:text-green-300 hover:bg-green-900/20"
+                              >
+                                {restoreVehicle.isPending ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Restoring...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Undo2 className="h-4 w-4 mr-2" />
+                                    Restore to Active
+                                  </>
+                                )}
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"

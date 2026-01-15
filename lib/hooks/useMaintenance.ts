@@ -347,3 +347,40 @@ export function usePermanentlyDeleteArchivedVehicle() {
     },
   });
 }
+
+// ============================================================================
+// Mutation: Restore an archived vehicle back to active (Admin/Manager only)
+// ============================================================================
+
+export function useRestoreArchivedVehicle() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (archiveId: string) => {
+      const response = await fetch(`/api/maintenance/deleted/${archiveId}/restore`, {
+        method: 'PUT',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to restore archived vehicle');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenance', 'deleted'] });
+      queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+      toast.success('Vehicle restored successfully', {
+        description: 'The vehicle has been moved back to active vehicles.',
+      });
+    },
+    onError: (error: Error) => {
+      logger.error('Failed to restore archived vehicle', error, 'useMaintenance');
+      toast.error('Failed to restore vehicle', {
+        description: error.message,
+        duration: 5000,
+      });
+    },
+  });
+}
