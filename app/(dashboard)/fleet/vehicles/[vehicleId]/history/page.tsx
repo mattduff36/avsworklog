@@ -31,6 +31,7 @@ import {
 import { formatRelativeTime } from '@/lib/utils/date';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { EditMaintenanceDialog } from '@/app/(dashboard)/maintenance/components/EditMaintenanceDialog';
+import { DeleteVehicleDialog } from '@/app/(dashboard)/maintenance/components/DeleteVehicleDialog';
 import { getStatusColorClass, formatMileage, formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 
@@ -153,6 +154,7 @@ export default function VehicleHistoryPage({
   const [motLoading, setMotLoading] = useState(false);
   const [expandedTestId, setExpandedTestId] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user && resolvedParams.vehicleId) {
@@ -1294,6 +1296,22 @@ export default function VehicleHistoryPage({
             fetchMaintenanceHistory();
           }}
           onRetire={() => {
+            setDeleteDialogOpen(true);
+          }}
+        />
+      )}
+
+      {/* Delete Vehicle Dialog */}
+      {vehicle && (
+        <DeleteVehicleDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          vehicle={{
+            id: vehicle.id,
+            reg_number: vehicle.reg_number,
+            category: null
+          }}
+          onSuccess={() => {
             router.push('/fleet?tab=vehicles');
           }}
         />
