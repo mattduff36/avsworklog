@@ -141,8 +141,9 @@ function FleetContent() {
     if (activeTab === 'vehicles') {
       if (vehicles.length === 0) fetchVehicles();
       if (categories.length === 0) fetchCategories();
-    } else if (activeTab === 'categories' && categories.length === 0) {
-      fetchCategories();
+    } else if (activeTab === 'categories') {
+      if (categories.length === 0) fetchCategories();
+      if (vehicles.length === 0) fetchVehicles(); // Need vehicles for category counts
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
@@ -156,14 +157,16 @@ function FleetContent() {
     if (value === 'vehicles') {
       if (vehicles.length === 0) fetchVehicles();
       if (categories.length === 0) fetchCategories();
-    } else if (value === 'categories' && categories.length === 0) {
-      fetchCategories();
+    } else if (value === 'categories') {
+      if (categories.length === 0) fetchCategories();
+      if (vehicles.length === 0) fetchVehicles(); // Need vehicles for category counts
     }
   };
   
   // Handler for navigating to vehicle history
   const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
-    router.push(`/fleet/vehicles/${vehicle.id}/history`);
+    const vehicleId = vehicle.vehicle_id || vehicle.id;
+    router.push(`/fleet/vehicles/${vehicleId}/history`);
   };
   
   // Check access
