@@ -1646,8 +1646,8 @@ export default function WorkshopTasksPage() {
                                     }}
                                     disabled={isUpdating}
                                     size="sm"
-                                    variant="ghost"
-                                    className="h-9 px-3 text-xs text-purple-300 hover:text-purple-200 hover:bg-purple-900/30"
+                                    variant="outline"
+                                    className="h-9 px-3 text-xs border-slate-600 text-slate-400 hover:text-white hover:bg-slate-800"
                                   >
                                     <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                                     Comments
