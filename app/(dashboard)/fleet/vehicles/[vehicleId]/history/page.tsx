@@ -25,10 +25,14 @@ import {
   ChevronUp,
   Gauge,
   MapPin,
-  Loader2
+  Loader2,
+  Edit
 } from 'lucide-react';
 import { formatRelativeTime } from '@/lib/utils/date';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { EditMaintenanceDialog } from '@/app/(dashboard)/maintenance/components/EditMaintenanceDialog';
+import { getStatusColorClass, formatMileage, formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
+import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import Link from 'next/link';
 
 type Vehicle = {
@@ -139,6 +143,7 @@ export default function VehicleHistoryPage({
   
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [vehicleData, setVehicleData] = useState<VehicleData | null>(null);
+  const [maintenanceRecord, setMaintenanceRecord] = useState<VehicleMaintenanceWithStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [maintenanceHistory, setMaintenanceHistory] = useState<MaintenanceHistoryEntry[]>([]);
   const [workshopTasks, setWorkshopTasks] = useState<WorkshopTask[]>([]);
@@ -148,10 +153,12 @@ export default function VehicleHistoryPage({
   const [motData, setMotData] = useState<any>(null);
   const [motLoading, setMotLoading] = useState(false);
   const [expandedTestId, setExpandedTestId] = useState<string | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user && resolvedParams.vehicleId) {
       fetchVehicleData();
+      fetchMaintenanceRecord();
       fetchMaintenanceHistory();
       fetchWorkshopTasks();
     }
@@ -207,6 +214,26 @@ export default function VehicleHistoryPage({
       }
     } catch (error) {
       console.error('Error fetching vehicle:', error);
+    }
+  };
+
+  const fetchMaintenanceRecord = async () => {
+    try {
+      const response = await fetch('/api/maintenance/list');
+      const result = await response.json();
+      
+      if (result.success) {
+        const vehicleMaintenance = result.vehicles.find(
+          (v: VehicleMaintenanceWithStatus) => 
+            v.vehicle_id === resolvedParams.vehicleId || v.vehicle?.id === resolvedParams.vehicleId
+        );
+        
+        if (vehicleMaintenance) {
+          setMaintenanceRecord(vehicleMaintenance);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching maintenance record:', error);
     }
   };
 
@@ -722,6 +749,102 @@ export default function VehicleHistoryPage({
 
         {/* Maintenance Tab */}
         <TabsContent value="maintenance" className="space-y-6">
+          {/* Vehicle Service Information Summary */}
+          {maintenanceRecord && (
+            <Card className="bg-slate-800/50 border-slate-700">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Service Information</CardTitle>
+                  <CardDescription>Current maintenance status and schedules</CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditDialogOpen(true)}
+                  className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Vehicle Record
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {/* Current Mileage */}
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">Current Mileage</span>
+                    <p className="text-lg font-semibold text-white">
+                      {formatMileage(maintenanceRecord.current_mileage)}
+                    </p>
+                  </div>
+
+                  {/* Tax Due */}
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">Tax Due</span>
+                    <Badge className={`font-medium ${getStatusColorClass(maintenanceRecord.tax_status?.status || 'not_set')}`}>
+                      {formatMaintenanceDate(maintenanceRecord.tax_due_date)}
+                    </Badge>
+                  </div>
+
+                  {/* MOT Due */}
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">MOT Due</span>
+                    <Badge className={`font-medium ${getStatusColorClass(maintenanceRecord.mot_status?.status || 'not_set')}`}>
+                      {formatMaintenanceDate(maintenanceRecord.mot_due_date)}
+                    </Badge>
+                  </div>
+
+                  {/* Service Due */}
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">Service Due</span>
+                    <Badge className={`font-medium ${getStatusColorClass(maintenanceRecord.service_status?.status || 'not_set')}`}>
+                      {maintenanceRecord.next_service_mileage 
+                        ? `${formatMileage(maintenanceRecord.next_service_mileage)} miles` 
+                        : 'Not Set'}
+                    </Badge>
+                  </div>
+
+                  {/* Cambelt Due */}
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">Cambelt Due</span>
+                    <Badge className={`font-medium ${getStatusColorClass(maintenanceRecord.cambelt_status?.status || 'not_set')}`}>
+                      {maintenanceRecord.cambelt_due_mileage 
+                        ? `${formatMileage(maintenanceRecord.cambelt_due_mileage)} miles` 
+                        : 'Not Set'}
+                    </Badge>
+                  </div>
+
+                  {/* First Aid Kit Expiry */}
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">First Aid Kit</span>
+                    <Badge className={`font-medium ${getStatusColorClass(maintenanceRecord.first_aid_status?.status || 'not_set')}`}>
+                      {formatMaintenanceDate(maintenanceRecord.first_aid_kit_expiry)}
+                    </Badge>
+                  </div>
+
+                  {/* Last Service */}
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">Last Service</span>
+                    <p className="text-lg font-semibold text-white">
+                      {maintenanceRecord.last_service_mileage 
+                        ? `${formatMileage(maintenanceRecord.last_service_mileage)} miles` 
+                        : 'Not Set'}
+                    </p>
+                  </div>
+
+                  {/* Tracker ID */}
+                  {maintenanceRecord.tracker_id && (
+                    <div className="space-y-1">
+                      <span className="text-xs text-slate-400 uppercase tracking-wide">GPS Tracker</span>
+                      <p className="text-sm font-mono text-white">
+                        {maintenanceRecord.tracker_id}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="bg-slate-800/50 border-slate-700">
             <CardHeader>
               <CardTitle>Maintenance & Workshop History</CardTitle>
@@ -1167,6 +1290,20 @@ export default function VehicleHistoryPage({
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Edit Vehicle Record Dialog */}
+      {maintenanceRecord && (
+        <EditMaintenanceDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          vehicle={maintenanceRecord}
+          onSuccess={() => {
+            setEditDialogOpen(false);
+            fetchMaintenanceRecord();
+            fetchMaintenanceHistory();
+          }}
+        />
+      )}
     </div>
   );
 }
