@@ -510,11 +510,6 @@ export default function VehicleHistoryPage({
     });
   };
 
-  const formatMileage = (value: number | null | undefined): string => {
-    if (value === null || value === undefined) return '0';
-    return value.toLocaleString();
-  };
-
   const getFieldLabel = (fieldName: string): string => {
     const labels: Record<string, string> = {
       mot_expiry_date: 'MOT Expiry',

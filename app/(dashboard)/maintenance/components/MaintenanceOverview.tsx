@@ -80,7 +80,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     }
   };
 
-  const toggleVehicle = (vehicleId: string) => {
+  const toggleVehicle = (vehicleId: string, vehicle?: VehicleMaintenanceWithStatus) => {
     const newExpanded = new Set(expandedVehicles);
     if (newExpanded.has(vehicleId)) {
       newExpanded.delete(vehicleId);
@@ -89,6 +89,16 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       fetchVehicleHistory(vehicleId);
     }
     setExpandedVehicles(newExpanded);
+  };
+
+  const handleCardClick = (vehicleId: string, vehicle: VehicleWithAlerts) => {
+    // If onVehicleClick is provided, use it for navigation
+    if (onVehicleClick) {
+      onVehicleClick(vehicle);
+    } else {
+      // Otherwise, just toggle expansion
+      toggleVehicle(vehicleId, vehicle);
+    }
   };
   
   // Group vehicles by their most severe alert status
@@ -231,7 +241,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
             ? 'bg-white dark:bg-slate-900 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-slate-800/50' 
             : 'bg-white dark:bg-slate-900 border-amber-200 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-slate-800/50'
         }`}
-        onClick={() => toggleVehicle(vehicleId)}
+        onClick={() => handleCardClick(vehicleId, vehicle)}
       >
         <CardContent className="p-4">
           {/* Collapsed View - Now includes ALL service information */}
@@ -266,19 +276,30 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 </div>
               </div>
               
-              {/* More Details Button - Top Right */}
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-shrink-0 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white hover:border-slate-500"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  router.push(`/fleet/vehicles/${vehicleId}/history`);
-                }}
-              >
-                <ExternalLink className="h-4 w-4 mr-1" />
-                More Details
-              </Button>
+              {/* Expand/Collapse Button - Top Right (only show when onVehicleClick is provided) */}
+              {onVehicleClick && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="flex-shrink-0 text-slate-400 hover:text-white hover:bg-slate-800"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleVehicle(vehicleId, vehicle);
+                  }}
+                >
+                  {isExpanded ? (
+                    <>
+                      <ChevronUp className="h-4 w-4 mr-1" />
+                      Collapse
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-4 w-4 mr-1" />
+                      Expand
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
             
             {/* Service Information - Horizontal Row with Chevron */}
@@ -357,11 +378,15 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 )}
               </div>
               
-              {/* Chevron Icon - Right side of service info */}
-              {isExpanded ? (
-                <ChevronUp className="h-5 w-5 text-slate-400 flex-shrink-0" />
-              ) : (
-                <ChevronDown className="h-5 w-5 text-slate-400 flex-shrink-0" />
+              {/* Chevron Icon - Right side of service info (only show when not using onVehicleClick) */}
+              {!onVehicleClick && (
+                <>
+                  {isExpanded ? (
+                    <ChevronUp className="h-5 w-5 text-slate-400 flex-shrink-0" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-slate-400 flex-shrink-0" />
+                  )}
+                </>
               )}
             </div>
           </div>
