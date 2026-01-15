@@ -427,7 +427,7 @@ export function EditMaintenanceDialog({
             )}
           </div>
 
-          <DialogFooter className="flex flex-row items-center justify-between gap-2">
+          <DialogFooter className="!flex-row !justify-between items-center gap-2 w-full">
             <Button
               type="button"
               variant="outline"
@@ -445,7 +445,7 @@ export function EditMaintenanceDialog({
               <Archive className="h-4 w-4 mr-2" />
               Retire Vehicle
             </Button>
-            <div className="flex gap-2">
+            <div className="flex gap-2 ml-auto">
               <Button
                 type="button"
                 variant="outline"
