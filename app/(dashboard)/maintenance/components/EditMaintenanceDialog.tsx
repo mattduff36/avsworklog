@@ -439,7 +439,7 @@ export function EditMaintenanceDialog({
                 onOpenChange(false);
                 onRetire?.();
               }}
-              className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white"
+              className="border-red-600 text-red-400 hover:bg-red-600 hover:text-white"
               disabled={isSubmitting || updateMutation.isPending || createMutation.isPending}
             >
               <Archive className="h-4 w-4 mr-2" />
