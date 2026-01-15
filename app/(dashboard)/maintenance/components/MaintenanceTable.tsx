@@ -94,10 +94,45 @@ export function MaintenanceTable({
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [retiredSearchQuery, setRetiredSearchQuery] = useState('');
   
+  // Track pending operations per vehicle ID
+  const [pendingRestore, setPendingRestore] = useState<Set<string>>(new Set());
+  const [pendingDelete, setPendingDelete] = useState<Set<string>>(new Set());
+  
   // Fetch retired vehicles
   const { data: retiredData, isLoading: retiredLoading } = useDeletedVehicles();
   const permanentlyDelete = usePermanentlyDeleteArchivedVehicle();
   const restoreVehicle = useRestoreArchivedVehicle();
+  
+  // Handlers with per-vehicle loading state
+  const handleRestore = (vehicleId: string, regNumber: string) => {
+    if (confirm(`Restore ${regNumber} to active vehicles?\n\nThis will:\n• Move vehicle back to Active Vehicles tab\n• Restore all maintenance data\n\nContinue?`)) {
+      setPendingRestore(prev => new Set(prev).add(vehicleId));
+      restoreVehicle.mutate(vehicleId, {
+        onSettled: () => {
+          setPendingRestore(prev => {
+            const next = new Set(prev);
+            next.delete(vehicleId);
+            return next;
+          });
+        },
+      });
+    }
+  };
+  
+  const handlePermanentDelete = (vehicleId: string, regNumber: string) => {
+    if (confirm(`⚠️ Permanently remove ${regNumber}?\n\nThis will:\n• Remove from Retired Vehicles tab\n• Preserve all inspection history\n• Cannot be undone\n\nContinue?`)) {
+      setPendingDelete(prev => new Set(prev).add(vehicleId));
+      permanentlyDelete.mutate(vehicleId, {
+        onSettled: () => {
+          setPendingDelete(prev => {
+            const next = new Set(prev);
+            next.delete(vehicleId);
+            return next;
+          });
+        },
+      });
+    }
+  };
   
   // Column visibility state - all columns visible by default
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
@@ -783,16 +818,12 @@ export function MaintenanceTable({
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => {
-                                      if (confirm(`Restore ${vehicle.reg_number} to active vehicles?\n\nThis will:\n• Move vehicle back to Active Vehicles tab\n• Restore all maintenance data\n\nContinue?`)) {
-                                        restoreVehicle.mutate(vehicle.id);
-                                      }
-                                    }}
-                                    disabled={restoreVehicle.isPending}
+                                    onClick={() => handleRestore(vehicle.id, vehicle.reg_number)}
+                                    disabled={pendingRestore.has(vehicle.id)}
                                     className="text-green-400 hover:text-green-300 hover:bg-green-900/20"
                                     title="Restore to Active"
                                   >
-                                    {restoreVehicle.isPending ? (
+                                    {pendingRestore.has(vehicle.id) ? (
                                       <Loader2 className="h-3 w-3 animate-spin" />
                                     ) : (
                                       <Undo2 className="h-3 w-3" />
@@ -801,16 +832,12 @@ export function MaintenanceTable({
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => {
-                                      if (confirm(`⚠️ Permanently remove ${vehicle.reg_number}?\n\nThis will:\n• Remove from Retired Vehicles tab\n• Preserve all inspection history\n• Cannot be undone\n\nContinue?`)) {
-                                        permanentlyDelete.mutate(vehicle.id);
-                                      }
-                                    }}
-                                    disabled={permanentlyDelete.isPending}
+                                    onClick={() => handlePermanentDelete(vehicle.id, vehicle.reg_number)}
+                                    disabled={pendingDelete.has(vehicle.id)}
                                     className="text-red-400 hover:text-red-300 hover:bg-slate-800"
                                     title="Permanently Remove"
                                   >
-                                    {permanentlyDelete.isPending ? (
+                                    {pendingDelete.has(vehicle.id) ? (
                                       <Loader2 className="h-3 w-3 animate-spin" />
                                     ) : (
                                       <XCircle className="h-3 w-3" />
@@ -887,15 +914,11 @@ export function MaintenanceTable({
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => {
-                                  if (confirm(`Restore ${vehicle.reg_number} to active vehicles?\n\nThis will:\n• Move vehicle back to Active Vehicles tab\n• Restore all maintenance data\n\nContinue?`)) {
-                                    restoreVehicle.mutate(vehicle.id);
-                                  }
-                                }}
-                                disabled={restoreVehicle.isPending}
+                                onClick={() => handleRestore(vehicle.id, vehicle.reg_number)}
+                                disabled={pendingRestore.has(vehicle.id)}
                                 className="w-full text-green-400 hover:text-green-300 hover:bg-green-900/20"
                               >
-                                {restoreVehicle.isPending ? (
+                                {pendingRestore.has(vehicle.id) ? (
                                   <>
                                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                                     Restoring...
@@ -910,15 +933,11 @@ export function MaintenanceTable({
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => {
-                                  if (confirm(`⚠️ Permanently remove ${vehicle.reg_number}?\n\nThis will:\n• Remove from Retired Vehicles tab\n• Preserve all inspection history\n• Cannot be undone\n\nContinue?`)) {
-                                    permanentlyDelete.mutate(vehicle.id);
-                                  }
-                                }}
-                                disabled={permanentlyDelete.isPending}
+                                onClick={() => handlePermanentDelete(vehicle.id, vehicle.reg_number)}
+                                disabled={pendingDelete.has(vehicle.id)}
                                 className="w-full text-red-400 hover:text-red-300 hover:bg-red-900/20"
                               >
-                                {permanentlyDelete.isPending ? (
+                                {pendingDelete.has(vehicle.id) ? (
                                   <>
                                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                                     Removing...
