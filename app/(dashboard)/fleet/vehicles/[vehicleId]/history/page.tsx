@@ -1293,6 +1293,9 @@ export default function VehicleHistoryPage({
             fetchMaintenanceRecord();
             fetchMaintenanceHistory();
           }}
+          onRetire={() => {
+            router.push('/fleet?tab=vehicles');
+          }}
         />
       )}
     </div>

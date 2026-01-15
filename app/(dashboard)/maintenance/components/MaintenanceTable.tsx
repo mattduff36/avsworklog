@@ -907,6 +907,9 @@ export function MaintenanceTable({
           setEditDialogOpen(false);
           setSelectedVehicle(null);
         }}
+        onRetire={() => {
+          setDeleteDialogOpen(true);
+        }}
       />
       
       {/* History Dialog */}
