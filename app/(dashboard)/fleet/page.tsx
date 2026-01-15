@@ -291,13 +291,16 @@ function FleetContent() {
   }
   
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Fleet Management</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage vehicles, maintenance schedules, and fleet operations
-          </p>
+    <div className="space-y-6 max-w-6xl">
+      {/* Header */}
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Fleet Management</h1>
+            <p className="text-slate-600 dark:text-slate-400">
+              Manage vehicles, maintenance schedules, and fleet operations
+            </p>
+          </div>
         </div>
       </div>
 
