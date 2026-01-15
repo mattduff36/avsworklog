@@ -5,17 +5,15 @@ import { useSearchParams, useRouter as useNextRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Loader2, Wrench, Truck, Tag, Settings as SettingsIcon, Plus } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
-import Link from 'next/link';
 
 // Import existing components
 import { MaintenanceOverview } from '@/app/(dashboard)/maintenance/components/MaintenanceOverview';
 import { MaintenanceTable } from '@/app/(dashboard)/maintenance/components/MaintenanceTable';
 import { MaintenanceSettings } from '@/app/(dashboard)/maintenance/components/MaintenanceSettings';
+import { ExpandingVehicleCard } from '@/components/fleet/ExpandingVehicleCard';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useMaintenance } from '@/lib/hooks/useMaintenance';
 import { createClient } from '@/lib/supabase/client';
@@ -25,7 +23,8 @@ type Vehicle = {
   reg_number: string;
   nickname: string | null;
   status: string;
-  vehicle_categories?: { name: string } | null;
+  category_id: string;
+  vehicle_categories?: { name: string; id: string } | null;
 };
 
 type Category = {
@@ -42,6 +41,12 @@ function FleetContent() {
   
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'maintenance');
   const [hasModulePermission, setHasModulePermission] = useState<boolean | null>(null);
+  
+  // Sync activeTab with URL changes (browser back/forward)
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab') || 'maintenance';
+    setActiveTab(tabFromUrl);
+  }, [searchParams]);
   // Fetch maintenance data
   const { data: maintenanceData, isLoading: maintenanceLoading, error: maintenanceError } = useMaintenance();
   
@@ -50,6 +55,9 @@ function FleetContent() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
+  
+  // State for maintenance search
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Fetch vehicles
   const fetchVehicles = async () => {
@@ -129,14 +137,26 @@ function FleetContent() {
     checkPermission();
   }, [profile?.id, isManager, isAdmin, isSuperAdmin, supabase]);
   
+  // Fetch data on initial load based on active tab from URL
+  useEffect(() => {
+    if (activeTab === 'vehicles') {
+      if (vehicles.length === 0) fetchVehicles();
+      if (categories.length === 0) fetchCategories();
+    } else if (activeTab === 'categories' && categories.length === 0) {
+      fetchCategories();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+  
   // Update URL when tab changes
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     router.push(`/fleet?tab=${value}`, { scroll: false });
     
     // Fetch data when switching to tabs
-    if (value === 'vehicles' && vehicles.length === 0) {
-      fetchVehicles();
+    if (value === 'vehicles') {
+      if (vehicles.length === 0) fetchVehicles();
+      if (categories.length === 0) fetchCategories();
     } else if (value === 'categories' && categories.length === 0) {
       fetchCategories();
     }
@@ -243,8 +263,8 @@ function FleetContent() {
               />
               <MaintenanceTable 
                 vehicles={maintenanceData?.vehicles || []}
-                searchQuery=""
-                onSearchChange={() => {}}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
                 onVehicleAdded={() => {}}
               />
             </>
@@ -254,114 +274,101 @@ function FleetContent() {
         {/* Vehicles Tab - Admin/Manager only */}
         {canManageVehicles && (
           <TabsContent value="vehicles" className="space-y-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Vehicles</CardTitle>
-                  <CardDescription>Manage vehicle master data</CardDescription>
-                </div>
-                <Button size="sm" disabled>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Vehicle
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {vehiclesLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                  </div>
-                ) : vehicles.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Truck className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600">No vehicles found</p>
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Registration</TableHead>
-                        <TableHead>Nickname</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {vehicles.map((vehicle) => (
-                        <TableRow key={vehicle.id}>
-                          <TableCell className="font-medium">{vehicle.reg_number}</TableCell>
-                          <TableCell>{vehicle.nickname || '-'}</TableCell>
-                          <TableCell>{vehicle.vehicle_categories?.name || '-'}</TableCell>
-                          <TableCell>
-                            <Badge variant={vehicle.status === 'active' ? 'default' : 'secondary'}>
-                              {vehicle.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Link href={`/fleet/vehicles/${vehicle.id}/history`}>
-                              <Button variant="ghost" size="sm">
-                                View History
-                              </Button>
-                            </Link>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight">Vehicles</h2>
+                <p className="text-muted-foreground mt-1">
+                  Manage vehicle master data
+                </p>
+              </div>
+              <Button size="sm" disabled>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Vehicle
+              </Button>
+            </div>
+
+            {vehiclesLoading || categoriesLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+              </div>
+            ) : vehicles.length === 0 ? (
+              <Card className="bg-slate-800/50 border-slate-700">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Truck className="h-16 w-16 text-gray-400 mb-4" />
+                  <p className="text-gray-400">No vehicles found</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4">
+                {vehicles.map((vehicle) => (
+                  <ExpandingVehicleCard 
+                    key={vehicle.id}
+                    vehicle={vehicle}
+                    categories={categories}
+                    onUpdate={fetchVehicles}
+                  />
+                ))}
+              </div>
+            )}
           </TabsContent>
         )}
 
         {/* Categories Tab - Admin/Manager only */}
         {canManageVehicles && (
           <TabsContent value="categories" className="space-y-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Vehicle Categories</CardTitle>
-                  <CardDescription>Manage vehicle categories and classifications</CardDescription>
-                </div>
-                <Button size="sm" disabled>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Category
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {categoriesLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                  </div>
-                ) : categories.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Tag className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600">No categories found</p>
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead className="text-right">Vehicles</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {categories.map((category) => (
-                        <TableRow key={category.id}>
-                          <TableCell className="font-medium">{category.name}</TableCell>
-                          <TableCell>{category.description || '-'}</TableCell>
-                          <TableCell className="text-right">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight">Vehicle Categories</h2>
+                <p className="text-muted-foreground mt-1">
+                  Manage vehicle categories and classifications
+                </p>
+              </div>
+              <Button size="sm" disabled>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Category
+              </Button>
+            </div>
+
+            {categoriesLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+              </div>
+            ) : categories.length === 0 ? (
+              <Card className="bg-slate-800/50 border-slate-700">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Tag className="h-16 w-16 text-gray-400 mb-4" />
+                  <p className="text-gray-400">No categories found</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4">
+                {categories.map((category) => (
+                  <Card key={category.id} className="bg-slate-800/50 border-slate-700">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4 flex-1">
+                          <div className="bg-blue-500/10 p-3 rounded-lg">
+                            <Tag className="h-5 w-5 text-blue-400" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-white">{category.name}</h3>
+                            <p className="text-sm text-slate-400 mt-1">
+                              {category.description || 'No description'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-blue-400">
                             {vehicles.filter(v => v.vehicle_categories?.name === category.name).length}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
+                          </div>
+                          <p className="text-xs text-muted-foreground">vehicles</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
         )}
 
