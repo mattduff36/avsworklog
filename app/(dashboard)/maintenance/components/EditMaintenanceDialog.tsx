@@ -21,6 +21,8 @@ import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useUpdateMaintenance, useCreateMaintenance } from '@/lib/hooks/useMaintenance';
 import { formatDateForInput, formatMileage } from '@/lib/utils/maintenanceCalculations';
 import { triggerShakeAnimation } from '@/lib/utils/animations';
+import { createClient } from '@/lib/supabase/client';
+import { toast } from 'sonner';
 
 // ============================================================================
 // Zod Validation Schema
