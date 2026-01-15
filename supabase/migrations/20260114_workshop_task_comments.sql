@@ -11,7 +11,7 @@
 CREATE TABLE IF NOT EXISTS workshop_task_comments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   task_id UUID NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
-  author_id UUID NOT NULL REFERENCES auth.users(id),
+  author_id UUID NOT NULL REFERENCES profiles(id),
   body TEXT NOT NULL CHECK (char_length(body) >= 1 AND char_length(body) <= 1000),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ
@@ -172,7 +172,7 @@ CREATE TRIGGER set_workshop_task_comments_updated_at
 
 COMMENT ON TABLE workshop_task_comments IS 'Multi-note timeline for workshop tasks (extends single-note logged_comment/actioned_comment)';
 COMMENT ON COLUMN workshop_task_comments.task_id IS 'Foreign key to actions table (workshop tasks only)';
-COMMENT ON COLUMN workshop_task_comments.author_id IS 'User who created this comment';
+COMMENT ON COLUMN workshop_task_comments.author_id IS 'Foreign key to profiles table (comment author)';
 COMMENT ON COLUMN workshop_task_comments.body IS 'Comment text (1-1000 chars)';
 COMMENT ON COLUMN workshop_task_comments.created_at IS 'When this comment was created';
 COMMENT ON COLUMN workshop_task_comments.updated_at IS 'When this comment was last edited (null if never edited)';
