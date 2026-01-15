@@ -6,16 +6,28 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Loader2, Wrench, Truck, Tag, Plus } from 'lucide-react';
+import { Loader2, Wrench, Truck, Tag, Plus, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
 
 // Import existing components
 import { MaintenanceOverview } from '@/app/(dashboard)/maintenance/components/MaintenanceOverview';
 import { MaintenanceTable } from '@/app/(dashboard)/maintenance/components/MaintenanceTable';
 import { MaintenanceSettings } from '@/app/(dashboard)/maintenance/components/MaintenanceSettings';
+import { VehicleCategoryDialog } from './components/VehicleCategoryDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useMaintenance } from '@/lib/hooks/useMaintenance';
 import { createClient } from '@/lib/supabase/client';
+import { toast } from 'sonner';
 
 type Vehicle = {
   id: string;
@@ -40,6 +52,13 @@ function FleetContent() {
   
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'maintenance');
   const [hasModulePermission, setHasModulePermission] = useState<boolean | null>(null);
+  
+  // Vehicle Category Dialog States
+  const [addCategoryDialogOpen, setAddCategoryDialogOpen] = useState(false);
+  const [editCategoryDialogOpen, setEditCategoryDialogOpen] = useState(false);
+  const [deleteCategoryDialogOpen, setDeleteCategoryDialogOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState(false);
   
   // Sync activeTab with URL changes (browser back/forward)
   useEffect(() => {
@@ -169,6 +188,48 @@ function FleetContent() {
     router.push(`/fleet/vehicles/${vehicleId}/history`);
   };
   
+  // Vehicle Category Dialog Handlers
+  const openEditCategoryDialog = (category: Category) => {
+    setSelectedCategory(category);
+    setEditCategoryDialogOpen(true);
+  };
+  
+  const openDeleteCategoryDialog = (category: Category) => {
+    setSelectedCategory(category);
+    setDeleteCategoryDialogOpen(true);
+  };
+  
+  const handleDeleteCategory = async () => {
+    if (!selectedCategory) return;
+    
+    setDeletingCategory(true);
+    
+    try {
+      const response = await fetch(`/api/admin/categories/${selectedCategory.id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete category');
+      }
+      
+      toast.success('Vehicle category deleted successfully');
+      setDeleteCategoryDialogOpen(false);
+      setSelectedCategory(null);
+      fetchCategories(); // Refresh categories
+    } catch (error: any) {
+      console.error('Error deleting vehicle category:', error);
+      toast.error(error.message || 'Failed to delete category');
+    } finally {
+      setDeletingCategory(false);
+    }
+  };
+  
+  const handleCategorySuccess = () => {
+    fetchCategories(); // Refresh categories
+  };
+  
   // Check access
   const hasAccess = hasModulePermission;
   const canManageVehicles = isManager || isAdmin || isSuperAdmin;
@@ -290,75 +351,163 @@ function FleetContent() {
         {/* Categories Tab - Admin/Manager only */}
         {canManageVehicles && (
           <TabsContent value="categories" className="space-y-6">
-            {/* Vehicle Categories Section */}
-            <Card className="bg-slate-900 border-slate-700">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-white">
-                      Vehicle Categories
-                    </CardTitle>
-                    <CardDescription className="text-slate-400">
-                      Manage vehicle categories and classifications
-                    </CardDescription>
+            {/* Vehicle Categories Section - Admin Only */}
+            {isAdmin && (
+              <Card className="bg-slate-900 border-slate-700">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-white">
+                        Vehicle Categories
+                      </CardTitle>
+                      <CardDescription className="text-slate-400">
+                        Manage vehicle categories and classifications
+                      </CardDescription>
+                    </div>
+                    <Button
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700"
+                      onClick={() => setAddCategoryDialogOpen(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Category
+                    </Button>
                   </div>
-                  <Button
-                    size="sm"
-                    className="bg-blue-600 hover:bg-blue-700"
-                    disabled
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Category
-                  </Button>
-                </div>
-              </CardHeader>
-              
-              <CardContent>
-                {categoriesLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                  </div>
-                ) : categories.length === 0 ? (
-                  <div className="text-center py-8 text-slate-400">
-                    No vehicle categories found
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {categories.map((category) => (
-                      <Card key={category.id} className="bg-slate-800/50 border-slate-700">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4 flex-1">
-                              <div className="bg-blue-500/10 p-3 rounded-lg">
-                                <Tag className="h-5 w-5 text-blue-400" />
+                </CardHeader>
+                
+                <CardContent>
+                  {categoriesLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                    </div>
+                  ) : categories.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400">
+                      No vehicle categories found
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {categories.map((category) => (
+                        <Card key={category.id} className="bg-slate-800/50 border-slate-700">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4 flex-1">
+                                <div className="bg-blue-500/10 p-3 rounded-lg">
+                                  <Tag className="h-5 w-5 text-blue-400" />
+                                </div>
+                                <div className="flex-1">
+                                  <h3 className="text-lg font-semibold text-white">{category.name}</h3>
+                                  <p className="text-sm text-slate-400 mt-1">
+                                    {category.description || 'No description'}
+                                  </p>
+                                </div>
                               </div>
-                              <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-white">{category.name}</h3>
-                                <p className="text-sm text-slate-400 mt-1">
-                                  {category.description || 'No description'}
-                                </p>
+                              <div className="flex items-center gap-4">
+                                <div className="text-right">
+                                  <div className="text-2xl font-bold text-blue-400">
+                                    {vehicles.filter(v => v.vehicle_categories?.name === category.name).length}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">vehicles</p>
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => openEditCategoryDialog(category)}
+                                    className="text-blue-400 hover:text-blue-300 hover:bg-slate-800"
+                                    title="Edit Category"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => openDeleteCategoryDialog(category)}
+                                    className="text-red-400 hover:text-red-300 hover:bg-slate-800"
+                                    title="Delete Category"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className="text-2xl font-bold text-blue-400">
-                                {vehicles.filter(v => v.vehicle_categories?.name === category.name).length}
-                              </div>
-                              <p className="text-xs text-muted-foreground">vehicles</p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Maintenance Categories Section */}
             <MaintenanceSettings isAdmin={isAdmin} isManager={isManager} />
           </TabsContent>
         )}
       </Tabs>
+      
+      {/* Vehicle Category Dialogs */}
+      <VehicleCategoryDialog
+        open={addCategoryDialogOpen}
+        onOpenChange={setAddCategoryDialogOpen}
+        mode="create"
+        onSuccess={handleCategorySuccess}
+      />
+      
+      <VehicleCategoryDialog
+        open={editCategoryDialogOpen}
+        onOpenChange={setEditCategoryDialogOpen}
+        mode="edit"
+        category={selectedCategory}
+        onSuccess={handleCategorySuccess}
+      />
+      
+      {/* Delete Category Confirmation Dialog */}
+      <AlertDialog open={deleteCategoryDialogOpen} onOpenChange={setDeleteCategoryDialogOpen}>
+        <AlertDialogContent className="bg-slate-900 border-slate-700 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Delete Vehicle Category
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400">
+              Are you sure you want to delete this vehicle category? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          {selectedCategory && (
+            <div className="bg-slate-800 rounded p-4 space-y-2">
+              <p className="text-sm">
+                <span className="text-slate-400">Name:</span>{' '}
+                <span className="text-white font-medium">{selectedCategory.name}</span>
+              </p>
+              {selectedCategory.description && (
+                <p className="text-sm">
+                  <span className="text-slate-400">Description:</span>{' '}
+                  <span className="text-white">{selectedCategory.description}</span>
+                </p>
+              )}
+            </div>
+          )}
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              className="border-slate-600 text-white hover:bg-slate-800"
+              disabled={deletingCategory}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCategory}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deletingCategory}
+            >
+              {deletingCategory && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Category
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
