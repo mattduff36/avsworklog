@@ -2340,7 +2340,7 @@ export default function WorkshopTasksPage() {
       />
 
       {/* Subcategory Management Dialog */}
-      {showSettings && selectedCategoryForSubcategory && (
+      {selectedCategoryForSubcategory && (
         <SubcategoryDialog
           open={showSubcategoryModal}
           onOpenChange={setShowSubcategoryModal}
