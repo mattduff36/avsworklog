@@ -219,7 +219,21 @@ export default function VehicleHistoryPage({
 
   const fetchMaintenanceRecord = async () => {
     try {
-      const response = await fetch('/api/maintenance/list');
+      const response = await fetch('/api/maintenance');
+      
+      // Check if response is ok and has content
+      if (!response.ok) {
+        console.error('Maintenance API error:', response.status, response.statusText);
+        return;
+      }
+
+      // Check if response has content
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error('Maintenance API returned non-JSON response');
+        return;
+      }
+
       const result = await response.json();
       
       if (result.success) {
