@@ -189,23 +189,23 @@ export function WorkshopTaskModal({
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700">
         <DialogHeader>
           <div className="space-y-4">
-            {/* Header with vehicle and status */}
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3 flex-1">
-                {getTaskTypeIcon()}
-                <div>
-                  <DialogTitle className="text-2xl font-bold text-white">
-                    {getVehicleDisplay()}
-                  </DialogTitle>
-                  <div className="flex items-center gap-2 mt-2">
-                    {getTaskTypeBadge()}
-                    {task.workshop_task_categories && (
-                      <Badge variant="outline" className="bg-workshop/10 text-workshop border-workshop/30">
-                        {task.workshop_task_categories.name}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
+            {/* Header with vehicle */}
+            <div className="flex items-center gap-3">
+              {getTaskTypeIcon()}
+              <DialogTitle className="text-2xl font-bold text-white">
+                {getVehicleDisplay()}
+              </DialogTitle>
+            </div>
+
+            {/* Badges row with status on the right */}
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                {getTaskTypeBadge()}
+                {task.workshop_task_categories && (
+                  <Badge variant="outline" className="bg-workshop/10 text-workshop border-workshop/30">
+                    {task.workshop_task_categories.name}
+                  </Badge>
+                )}
               </div>
               <div className="flex-shrink-0">
                 {getStatusBadge(task.status)}
