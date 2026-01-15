@@ -588,15 +588,7 @@ export default function VehicleHistoryPage({
       {/* Vehicle Data Section */}
       {vehicleData && (vehicleData.ves_make || vehicleData.mot_make) && (
         <Card className="bg-gradient-to-r from-blue-900/20 to-blue-800/10 border-blue-700/30">
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-blue-300 uppercase tracking-wide flex items-center gap-2">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Vehicle Data
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
               {/* Make - prefer VES, fallback to MOT */}
               {(vehicleData.ves_make || vehicleData.mot_make) && (
