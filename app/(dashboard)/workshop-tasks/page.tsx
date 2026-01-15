@@ -1244,11 +1244,7 @@ export default function WorkshopTasksPage() {
                                     }}
                                     disabled={isUpdating}
                                     size="sm"
-                                    className={`h-9 px-3 text-xs transition-all border-0 ${
-                                      isUpdating
-                                        ? 'bg-green-600 hover:bg-green-600 text-white'
-                                        : 'bg-workshop hover:bg-workshop-dark text-white'
-                                    }`}
+                                    className="h-9 px-3 text-xs transition-all border-0 bg-green-600 hover:bg-green-700 text-white"
                                   >
                                     {isUpdating ? (
                                       <>
@@ -1421,11 +1417,7 @@ export default function WorkshopTasksPage() {
                                     onClick={(e) => { e.stopPropagation(); handleMarkComplete(task); }}
                                     disabled={isUpdating}
                                     size="sm"
-                                    className={`h-9 px-3 text-xs transition-all border-0 ${
-                                      isUpdating
-                                        ? 'bg-green-600 hover:bg-green-600 text-white'
-                                        : 'bg-workshop hover:bg-workshop-dark text-white'
-                                    }`}
+                                    className="h-9 px-3 text-xs transition-all border-0 bg-green-600 hover:bg-green-700 text-white"
                                   >
                                     {isUpdating ? (
                                       <>

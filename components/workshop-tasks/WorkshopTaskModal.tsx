@@ -249,7 +249,7 @@ export function WorkshopTaskModal({
                     onClick={() => onMarkComplete(task)}
                     disabled={isUpdating}
                     size="sm"
-                    className="bg-workshop hover:bg-workshop-dark text-white border-0"
+                    className="bg-green-600 hover:bg-green-700 text-white border-0"
                   >
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     Mark Complete
@@ -284,7 +284,7 @@ export function WorkshopTaskModal({
                     onClick={() => onMarkComplete(task)}
                     disabled={isUpdating}
                     size="sm"
-                    className="bg-workshop hover:bg-workshop-dark text-white border-0"
+                    className="bg-green-600 hover:bg-green-700 text-white border-0"
                   >
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     Mark Complete
