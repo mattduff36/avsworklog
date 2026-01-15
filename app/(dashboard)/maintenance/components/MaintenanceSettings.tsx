@@ -70,6 +70,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
               </CardDescription>
             </div>
             <Button
+              size="sm"
               onClick={() => setAddDialogOpen(true)}
               className="bg-blue-600 hover:bg-blue-700"
               disabled={!canModifySettings}

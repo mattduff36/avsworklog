@@ -72,8 +72,8 @@ export const employeeNavItems: NavItem[] = [
     category: 'employee'
   },
   { 
-    href: '/maintenance', 
-    label: 'Maintenance', 
+    href: '/fleet', 
+    label: 'Fleet', 
     icon: Wrench, 
     module: 'maintenance',
     category: 'employee'
@@ -136,7 +136,7 @@ export const adminNavItems: NavItem[] = [
     category: 'admin'
   },
   { 
-    href: '/admin/vehicles', 
+    href: '/fleet?tab=vehicles', 
     label: 'Vehicles', 
     icon: Truck,
     category: 'admin'

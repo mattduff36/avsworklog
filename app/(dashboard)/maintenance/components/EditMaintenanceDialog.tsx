@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, Archive } from 'lucide-react';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useUpdateMaintenance, useCreateMaintenance } from '@/lib/hooks/useMaintenance';
 import { formatDateForInput, formatMileage } from '@/lib/utils/maintenanceCalculations';
@@ -66,13 +66,15 @@ interface EditMaintenanceDialogProps {
   onOpenChange: (open: boolean) => void;
   vehicle: VehicleMaintenanceWithStatus | null;
   onSuccess?: () => void;
+  onRetire?: () => void;
 }
 
 export function EditMaintenanceDialog({
   open,
   onOpenChange,
   vehicle,
-  onSuccess
+  onSuccess,
+  onRetire
 }: EditMaintenanceDialogProps) {
   const updateMutation = useUpdateMaintenance();
   const createMutation = useCreateMaintenance();
@@ -425,33 +427,52 @@ export function EditMaintenanceDialog({
             )}
           </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="!flex-row !justify-between items-center gap-2 w-full">
             <Button
               type="button"
               variant="outline"
-              onClick={handleDiscardChanges}
-              className="border-slate-600 text-white hover:bg-slate-800"
+              onClick={() => {
+                if (isDirty) {
+                  triggerShakeAnimation(dialogContentRef.current);
+                  return;
+                }
+                onOpenChange(false);
+                onRetire?.();
+              }}
+              className="border-red-600 text-red-400 hover:bg-red-600 hover:text-white"
               disabled={isSubmitting || updateMutation.isPending || createMutation.isPending}
             >
-              {isDirty ? 'Discard Changes' : 'Cancel'}
+              <Archive className="h-4 w-4 mr-2" />
+              Retire Vehicle
             </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting || updateMutation.isPending || createMutation.isPending || commentLength < 10}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {(isSubmitting || updateMutation.isPending || createMutation.isPending) ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {isNewRecord ? 'Creating...' : 'Saving...'}
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  {isNewRecord ? 'Create Record' : 'Save Changes'}
-                </>
-              )}
-            </Button>
+            <div className="flex gap-2 ml-auto">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleDiscardChanges}
+                className="border-slate-600 text-white hover:bg-slate-800"
+                disabled={isSubmitting || updateMutation.isPending || createMutation.isPending}
+              >
+                {isDirty ? 'Discard Changes' : 'Cancel'}
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSubmitting || updateMutation.isPending || createMutation.isPending || commentLength < 10}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {(isSubmitting || updateMutation.isPending || createMutation.isPending) ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {isNewRecord ? 'Creating...' : 'Saving...'}
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    {isNewRecord ? 'Create Record' : 'Save Changes'}
+                  </>
+                )}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>

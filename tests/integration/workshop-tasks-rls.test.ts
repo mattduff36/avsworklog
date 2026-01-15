@@ -433,5 +433,225 @@ describe('Workshop Tasks RLS Policies', () => {
       expect(queryTime).toBeLessThan(500);
     });
   });
+
+  describe('Workshop Task Comments RLS', () => {
+    let testCommentId: string;
+
+    it('should allow workshop users to create comments for workshop tasks', async () => {
+      const { data, error } = await supabase
+        .from('workshop_task_comments')
+        .insert({
+          task_id: testWorkshopTaskId,
+          author_id: testManagerId,
+          body: 'Test comment for RLS verification',
+        })
+        .select()
+        .single();
+
+      expect(error).toBeNull();
+      expect(data).toBeDefined();
+      expect(data!.body).toBe('Test comment for RLS verification');
+      expect(data!.task_id).toBe(testWorkshopTaskId);
+      expect(data!.author_id).toBe(testManagerId);
+      
+      testCommentId = data!.id;
+    });
+
+    it('should allow workshop users to read comments for workshop tasks', async () => {
+      const { data, error } = await supabase
+        .from('workshop_task_comments')
+        .select('*')
+        .eq('task_id', testWorkshopTaskId);
+
+      expect(error).toBeNull();
+      expect(data).toBeDefined();
+      expect(data!.length).toBeGreaterThan(0);
+    });
+
+    it('should allow comment author to update their own comment', async () => {
+      const { error } = await supabase
+        .from('workshop_task_comments')
+        .update({ body: 'Updated test comment' })
+        .eq('id', testCommentId);
+
+      expect(error).toBeNull();
+
+      // Verify update
+      const { data } = await supabase
+        .from('workshop_task_comments')
+        .select('body, updated_at')
+        .eq('id', testCommentId)
+        .single();
+
+      expect(data!.body).toBe('Updated test comment');
+      expect(data!.updated_at).not.toBeNull();
+    });
+
+    it('should allow manager to update any comment', async () => {
+      // Create a comment as the test employee
+      const { data: employeeComment } = await supabase
+        .from('workshop_task_comments')
+        .insert({
+          task_id: testWorkshopTaskId,
+          author_id: testEmployeeId,
+          body: 'Employee comment',
+        })
+        .select()
+        .single();
+
+      // Manager should be able to update it
+      const { error } = await supabase
+        .from('workshop_task_comments')
+        .update({ body: 'Manager edited employee comment' })
+        .eq('id', employeeComment!.id);
+
+      expect(error).toBeNull();
+
+      // Cleanup
+      await supabase.from('workshop_task_comments').delete().eq('id', employeeComment!.id);
+    });
+
+    it('should allow comment author to delete their own comment', async () => {
+      // Create a temporary comment
+      const { data: tempComment } = await supabase
+        .from('workshop_task_comments')
+        .insert({
+          task_id: testWorkshopTaskId,
+          author_id: testManagerId,
+          body: 'Temporary comment to delete',
+        })
+        .select()
+        .single();
+
+      const { error } = await supabase
+        .from('workshop_task_comments')
+        .delete()
+        .eq('id', tempComment!.id);
+
+      expect(error).toBeNull();
+
+      // Verify deletion
+      const { data } = await supabase
+        .from('workshop_task_comments')
+        .select('*')
+        .eq('id', tempComment!.id);
+
+      expect(data).toHaveLength(0);
+    });
+
+    it('should allow manager to delete any comment', async () => {
+      // Create a comment as the test employee
+      const { data: employeeComment } = await supabase
+        .from('workshop_task_comments')
+        .insert({
+          task_id: testWorkshopTaskId,
+          author_id: testEmployeeId,
+          body: 'Employee comment to be deleted by manager',
+        })
+        .select()
+        .single();
+
+      // Manager should be able to delete it
+      const { error } = await supabase
+        .from('workshop_task_comments')
+        .delete()
+        .eq('id', employeeComment!.id);
+
+      expect(error).toBeNull();
+    });
+
+    it('should enforce body length constraint', async () => {
+      const longBody = 'a'.repeat(1001); // 1001 chars (max is 1000)
+
+      const { error } = await supabase
+        .from('workshop_task_comments')
+        .insert({
+          task_id: testWorkshopTaskId,
+          author_id: testManagerId,
+          body: longBody,
+        });
+
+      expect(error).not.toBeNull();
+      expect(error!.message).toContain('check constraint');
+    });
+
+    it('should not allow empty body', async () => {
+      const { error } = await supabase
+        .from('workshop_task_comments')
+        .insert({
+          task_id: testWorkshopTaskId,
+          author_id: testManagerId,
+          body: '',
+        });
+
+      expect(error).not.toBeNull();
+      expect(error!.message).toContain('check constraint');
+    });
+
+    it('should cascade delete comments when task is deleted', async () => {
+      // Create a temporary task
+      const { data: tempTask } = await supabase
+        .from('actions')
+        .insert({
+          action_type: 'workshop_vehicle_task',
+          vehicle_id: testVehicleId,
+          workshop_category_id: testCategoryId,
+          title: 'Temp task for cascade test',
+          priority: 'medium',
+          status: 'pending',
+          created_by: testManagerId,
+        })
+        .select()
+        .single();
+
+      // Create a comment on the temp task
+      const { data: tempComment } = await supabase
+        .from('workshop_task_comments')
+        .insert({
+          task_id: tempTask!.id,
+          author_id: testManagerId,
+          body: 'Comment on temp task',
+        })
+        .select()
+        .single();
+
+      // Delete the task
+      await supabase.from('actions').delete().eq('id', tempTask!.id);
+
+      // Verify comment was cascade deleted
+      const { data: commentAfterDelete } = await supabase
+        .from('workshop_task_comments')
+        .select('*')
+        .eq('id', tempComment!.id);
+
+      expect(commentAfterDelete).toHaveLength(0);
+    });
+
+    it('should query comments with author profile data', async () => {
+      const { data, error } = await supabase
+        .from('workshop_task_comments')
+        .select(`
+          *,
+          profiles:author_id (
+            id,
+            full_name
+          )
+        `)
+        .eq('id', testCommentId)
+        .single();
+
+      expect(error).toBeNull();
+      expect(data).toBeDefined();
+      expect(data!.profiles).toBeDefined();
+      expect(data!.profiles.id).toBe(testManagerId);
+    });
+
+    afterAll(async () => {
+      // Cleanup test comments
+      if (testCommentId) {
+        await supabase.from('workshop_task_comments').delete().eq('id', testCommentId);
+      }
+    });
+  });
 });
 

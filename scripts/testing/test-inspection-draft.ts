@@ -78,7 +78,7 @@ async function runTests() {
 
     // Step 2: Get a test vehicle (or create one if none exist)
     log('📋 Step 2: Getting test vehicle...');
-    let { data: vehicles, error: vehicleError } = await supabase
+    const { data: vehicles, error: vehicleError } = await supabase
       .from('vehicles')
       .select('id, reg_number, category_id')
       .eq('status', 'active')
@@ -93,7 +93,7 @@ async function runTests() {
       log('   No active vehicles found, creating test vehicle...');
       
       // Get or create a vehicle category
-      let { data: categories } = await supabase
+      const { data: categories } = await supabase
         .from('vehicle_categories')
         .select('id, name')
         .limit(1);

@@ -33,12 +33,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin
+    // Check if user is admin or manager
     const profile = await getProfileWithRole(user.id);
 
-    if (!profile || profile.role?.name !== 'admin') {
+    if (!profile || !profile.role?.is_manager_admin) {
       return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
+        { error: 'Forbidden: Manager or Admin access required' },
         { status: 403 }
       );
     }

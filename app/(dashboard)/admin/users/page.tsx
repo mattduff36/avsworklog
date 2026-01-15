@@ -49,7 +49,7 @@ type ProfileWithEmail = Profile & { email?: string };
 type TabType = 'users' | 'roles';
 
 export default function UsersAdminPage() {
-  const { user: currentUser, isAdmin } = useAuth();
+  const { user: currentUser, isAdmin, loading: authLoading } = useAuth();
   const supabase = createClient();
   const [activeTab, setActiveTab] = useState<TabType>('users');
 
@@ -413,6 +413,15 @@ export default function UsersAdminPage() {
     } catch (error) {
       console.error('Failed to copy password:', error);
     }
+  }
+
+  // Show loading while auth is being checked
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </div>
+    );
   }
 
   // Check authorization

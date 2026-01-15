@@ -1,4 +1,4 @@
-import { format, startOfWeek, endOfWeek, addDays, parseISO, isValid } from 'date-fns';
+import { format, startOfWeek, endOfWeek, addDays, parseISO, isValid, formatDistanceToNow } from 'date-fns';
 
 /**
  * Get the Sunday (week ending) date for a given date
@@ -190,3 +190,17 @@ export function getFinancialYearMonths(financialYear?: {
   return months;
 }
 
+/**
+ * Format a date as relative time (e.g., "2 hours ago", "3 days ago")
+ */
+export function formatRelativeTime(date: Date | string | null | undefined): string {
+  if (!date) return '';
+  
+  try {
+    const d = typeof date === 'string' ? parseISO(date) : date;
+    if (!isValid(d)) return '';
+    return formatDistanceToNow(d, { addSuffix: true });
+  } catch {
+    return '';
+  }
+}

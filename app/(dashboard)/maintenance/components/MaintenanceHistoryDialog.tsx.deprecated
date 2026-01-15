@@ -1,0 +1,15 @@
+/**
+ * DEPRECATED: This dialog has been replaced by the dedicated history page at
+ * /fleet/vehicles/[vehicleId]/history
+ * 
+ * Kept for reference only. The new page provides:
+ * - Feature 1 integration: Full comments timeline from workshop_task_comments
+ * - Feature 3 integration: Two-tier taxonomy (category + subcategory badges)
+ * - Better UX: Dedicated page instead of modal
+ * - Tab-based UI: Maintenance, MOT, Documents, Notes
+ * 
+ * See: app/(dashboard)/fleet/vehicles/[vehicleId]/history/page.tsx
+ */
+
+// This file has been deprecated and should not be used in new code.
+// All references should be updated to navigate to the new history page instead.

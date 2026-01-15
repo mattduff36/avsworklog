@@ -127,7 +127,7 @@ export async function GET(
 
     // Calculate MOT expiry status and days remaining
     const latestPassedTest = sortedTests.find((test: any) => test.testResult === 'PASSED');
-    let motExpiryDate = maintenanceData.mot_expiry_date || latestPassedTest?.expiryDate || motHistory.motTestDueDate || null;
+    const motExpiryDate = maintenanceData.mot_expiry_date || latestPassedTest?.expiryDate || motHistory.motTestDueDate || null;
     let motStatus = 'Unknown';
     let daysRemaining = null;
 
