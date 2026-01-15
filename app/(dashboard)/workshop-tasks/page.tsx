@@ -13,13 +13,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, FileText, Wrench, Undo2, Info, Edit, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, MessageSquare, Pause } from 'lucide-react';
+import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, FileText, Wrench, Undo2, Info, Edit, Trash2, ChevronDown, ChevronUp, MessageSquare, Pause } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import { Database } from '@/types/database';
 import { TaskCommentsDrawer } from '@/components/workshop-tasks/TaskCommentsDrawer';
 import { WorkshopTaskModal } from '@/components/workshop-tasks/WorkshopTaskModal';
 import { SubcategoryDialog } from '@/components/workshop-tasks/SubcategoryDialog';
+import { CategoryManagementPanel } from '@/components/workshop-tasks/CategoryManagementPanel';
 
 type Action = Database['public']['Tables']['actions']['Row'] & {
   vehicle_inspections?: {
@@ -96,6 +97,8 @@ export default function WorkshopTasksPage() {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [completingTask, setCompletingTask] = useState<Action | null>(null);
   const [completedComment, setCompletedComment] = useState('');
+
+  // Multi-step completion state
   const [requiresIntermediateStep, setRequiresIntermediateStep] = useState(false);
   const [intermediateComment, setIntermediateComment] = useState('');
 
@@ -128,7 +131,6 @@ export default function WorkshopTasksPage() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryName, setCategoryName] = useState('');
-  const [categorySortOrder, setCategorySortOrder] = useState('0');
   const [submittingCategory, setSubmittingCategory] = useState(false);
 
   // Subcategory Management
@@ -255,7 +257,7 @@ export default function WorkshopTasksPage() {
         .select('id, name, slug, is_active, sort_order')
         .eq('applies_to', 'vehicle')
         .eq('is_active', true)
-        .order('sort_order');
+        .order('name');
 
       if (error) throw error;
       setCategories(data || []);
@@ -270,7 +272,7 @@ export default function WorkshopTasksPage() {
         .from('workshop_task_subcategories')
         .select('id, category_id, name, slug, is_active, sort_order')
         .eq('is_active', true)
-        .order('sort_order');
+        .order('name');
 
       if (error) throw error;
       setSubcategories(data || []);
@@ -458,7 +460,7 @@ export default function WorkshopTasksPage() {
     setCompletingTask(task);
     setCompletedComment('');
     
-    // Check if task needs intermediate step (Pending -> In Progress or On Hold -> Resume)
+    // Check if task needs intermediate step (pending or on_hold)
     if (task.status === 'pending' || task.status === 'on_hold') {
       setRequiresIntermediateStep(true);
       setIntermediateComment('');
@@ -492,12 +494,13 @@ export default function WorkshopTasksPage() {
     try {
       setUpdatingStatus(prev => new Set(prev).add(onHoldingTask.id));
 
-      // Preserve original logged_at/logged_by, only update status and add hold comment
       const { error } = await supabase
         .from('actions')
         .update({
           status: 'on_hold',
-          on_hold_comment: onHoldComment.trim(),
+          logged_at: new Date().toISOString(),
+          logged_by: user?.id,
+          logged_comment: onHoldComment.trim(),
         })
         .eq('id', onHoldingTask.id);
 
@@ -548,12 +551,13 @@ export default function WorkshopTasksPage() {
     try {
       setUpdatingStatus(prev => new Set(prev).add(resumingTask.id));
 
-      // Preserve original logged_at/logged_by, only update status and add resume comment
       const { error } = await supabase
         .from('actions')
         .update({
           status: 'logged',
-          resume_comment: resumeComment.trim(),
+          logged_at: new Date().toISOString(),
+          logged_by: user?.id,
+          logged_comment: resumeComment.trim(),
         })
         .eq('id', resumingTask.id);
 
@@ -591,16 +595,16 @@ export default function WorkshopTasksPage() {
     // Validate intermediate comment if required
     if (requiresIntermediateStep) {
       if (!intermediateComment.trim()) {
-        toast.error(completingTask.status === 'on_hold' ? 'Resume note is required' : 'In Progress note is required');
+        toast.error('In Progress/Resume note is required');
         return;
       }
       if (intermediateComment.length > 300) {
-        toast.error('Intermediate note must be 300 characters or less');
+        toast.error('In Progress/Resume note must be 300 characters or less');
         return;
       }
     }
 
-    // Validate completion comment
+    // Validate completion comment (always required)
     if (!completedComment.trim()) {
       toast.error('Completion note is required');
       return;
@@ -627,7 +631,7 @@ export default function WorkshopTasksPage() {
           .eq('id', taskId);
 
         if (intermediateError) {
-          console.error('Error moving to In Progress:', intermediateError);
+          console.error('Error in intermediate step:', intermediateError);
           throw intermediateError;
         }
       }
@@ -644,7 +648,10 @@ export default function WorkshopTasksPage() {
         })
         .eq('id', taskId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error completing task:', error);
+        throw error;
+      }
 
       toast.success('Task marked as complete');
       setShowCompleteModal(false);
@@ -948,14 +955,12 @@ export default function WorkshopTasksPage() {
   const openAddCategoryModal = () => {
     setEditingCategory(null);
     setCategoryName('');
-    setCategorySortOrder('0');
     setShowCategoryModal(true);
   };
 
   const openEditCategoryModal = (category: Category) => {
     setEditingCategory(category);
     setCategoryName(category.name);
-    setCategorySortOrder(category.sort_order.toString());
     setShowCategoryModal(true);
   };
 
@@ -969,26 +974,25 @@ export default function WorkshopTasksPage() {
       setSubmittingCategory(true);
 
       if (editingCategory) {
-        // Update existing category
+        // Update existing category (name only, sort order will be recalculated on fetch)
         const { error } = await supabase
           .from('workshop_task_categories')
           .update({
             name: categoryName.trim(),
-            sort_order: parseInt(categorySortOrder) || 0,
           })
           .eq('id', editingCategory.id);
 
         if (error) throw error;
         toast.success('Category updated successfully');
       } else {
-        // Create new category
+        // Create new category - sort_order will be set to 0, actual ordering happens in fetch
         const { error } = await supabase
           .from('workshop_task_categories')
           .insert({
             name: categoryName.trim(),
             applies_to: 'vehicle',
             is_active: true,
-            sort_order: parseInt(categorySortOrder) || 0,
+            sort_order: 0,
             created_by: user?.id,
           });
 
@@ -1006,21 +1010,6 @@ export default function WorkshopTasksPage() {
     }
   };
 
-  const handleToggleCategoryActive = async (category: Category) => {
-    try {
-      const { error } = await supabase
-        .from('workshop_task_categories')
-        .update({ is_active: !category.is_active })
-        .eq('id', category.id);
-
-      if (error) throw error;
-      toast.success(`Category ${!category.is_active ? 'enabled' : 'disabled'}`);
-      fetchCategories();
-    } catch (err) {
-      console.error('Error toggling category:', err);
-      toast.error('Failed to update category');
-    }
-  };
 
   const handleDeleteCategory = async (category: Category) => {
     if (category.name === 'Uncategorised') {
@@ -1093,30 +1082,6 @@ export default function WorkshopTasksPage() {
     }
   };
 
-  const handleToggleSubcategoryActive = async (subcategory: Subcategory) => {
-    try {
-      const response = await fetch(`/api/workshop-tasks/subcategories/${subcategory.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          is_active: !subcategory.is_active,
-          name: subcategory.name,
-          category_id: subcategory.category_id,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to update subcategory');
-      }
-
-      toast.success(`Subcategory ${!subcategory.is_active ? 'enabled' : 'disabled'}`);
-      await fetchSubcategories();
-    } catch (error: any) {
-      console.error('Error toggling subcategory:', error);
-      toast.error(error.message || 'Failed to update subcategory');
-    }
-  };
 
   const toggleCategoryExpansion = (categoryId: string) => {
     const newExpanded = new Set(expandedCategories);
@@ -1375,6 +1340,27 @@ export default function WorkshopTasksPage() {
                                     <Clock className="h-3.5 w-3.5 mr-1.5" />
                                     In Progress
                                   </Button>
+                                  <Button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleMarkComplete(task);
+                                    }}
+                                    disabled={isUpdating}
+                                    size="sm"
+                                    className="h-9 px-3 text-xs transition-all border-0 bg-green-600 hover:bg-green-700 text-white"
+                                  >
+                                    {isUpdating ? (
+                                      <>
+                                        <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                                        Complete
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                                        Complete
+                                      </>
+                                    )}
+                                  </Button>
                                 </div>
                               </div>
                               
@@ -1521,7 +1507,7 @@ export default function WorkshopTasksPage() {
                                   )}
                                   {task.status === 'on_hold' && (
                                     <Button
-                                      onClick={(e) => { e.stopPropagation(); handleMarkInProgress(task); }}
+                                      onClick={(e) => { e.stopPropagation(); handleResumeTask(task); }}
                                       disabled={isUpdating}
                                       size="sm"
                                       className="h-9 px-3 text-xs bg-blue-600/80 hover:bg-blue-600 text-white border-0"
@@ -1677,6 +1663,15 @@ export default function WorkshopTasksPage() {
                                   >
                                     <Clock className="h-3.5 w-3.5 mr-1.5" />
                                     Resume
+                                  </Button>
+                                  <Button
+                                    onClick={(e) => { e.stopPropagation(); handleMarkComplete(task); }}
+                                    disabled={isUpdating}
+                                    size="sm"
+                                    className="h-9 px-3 text-xs transition-all border-0 bg-green-600 hover:bg-green-700 text-white"
+                                  >
+                                    <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                                    Complete
                                   </Button>
                                 </div>
                               </div>
@@ -1839,196 +1834,16 @@ export default function WorkshopTasksPage() {
 
         {showSettings && (
           <TabsContent value="settings">
-            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-slate-900 dark:text-white">Category Management</CardTitle>
-                    <CardDescription className="text-slate-600 dark:text-slate-400">
-                      Manage workshop task categories for vehicle repairs
-                    </CardDescription>
-                  </div>
-                  <Button
-                    onClick={openAddCategoryModal}
-                    className="bg-workshop hover:bg-workshop-dark text-white"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Category
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {categories.length === 0 ? (
-                    <p className="text-slate-600 dark:text-slate-400 text-center py-8">
-                      No categories yet. Create your first category to get started.
-                    </p>
-                  ) : (
-                    categories.map((category) => {
-                      const categorySubcategories = subcategories.filter(s => s.category_id === category.id);
-                      const isExpanded = expandedCategories.has(category.id);
-                      
-                      return (
-                        <Card key={category.id} className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-                          <CardContent className="p-0">
-                            {/* Category Header */}
-                            <div className="flex items-center justify-between p-4">
-                              <div className="flex items-center gap-3 flex-1">
-                                <span className="text-sm text-slate-600 dark:text-slate-400 w-8">
-                                  #{category.sort_order}
-                                </span>
-                                <span className="font-semibold text-slate-900 dark:text-white">
-                                  {category.name}
-                                </span>
-                                {!category.is_active && (
-                                  <Badge variant="outline" className="bg-slate-500/20 text-slate-400 border-slate-500/30">
-                                    Disabled
-                                  </Badge>
-                                )}
-                                {category.name === 'Uncategorised' && (
-                                  <Badge variant="outline" className="bg-blue-500/20 text-blue-400 border-blue-500/30">
-                                    Default
-                                  </Badge>
-                                )}
-                                <Badge variant="outline" className="bg-workshop/10 text-workshop border-workshop/30">
-                                  {categorySubcategories.length} subcategories
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => openAddSubcategoryModal(category)}
-                                  className="text-workshop hover:text-workshop-dark hover:bg-workshop/10"
-                                  title="Add Subcategory"
-                                >
-                                  <Plus className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => openEditCategoryModal(category)}
-                                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                                  title="Edit Category"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleToggleCategoryActive(category)}
-                                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                                  title={category.is_active ? 'Disable Category' : 'Enable Category'}
-                                >
-                                  {category.is_active ? (
-                                    <Eye className="h-4 w-4" />
-                                  ) : (
-                                    <EyeOff className="h-4 w-4" />
-                                  )}
-                                </Button>
-                                {category.name !== 'Uncategorised' && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteCategory(category)}
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                                    title="Delete Category"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                )}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => toggleCategoryExpansion(category.id)}
-                                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                                >
-                                  {isExpanded ? (
-                                    <ChevronUp className="h-4 w-4" />
-                                  ) : (
-                                    <ChevronDown className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Subcategories List */}
-                            {isExpanded && categorySubcategories.length > 0 && (
-                              <div className="border-t border-slate-200 dark:border-slate-700 p-4 bg-white dark:bg-slate-900">
-                                <div className="space-y-2">
-                                  {categorySubcategories.map((subcategory) => (
-                                    <div
-                                      key={subcategory.id}
-                                      className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700"
-                                    >
-                                      <div className="flex items-center gap-3">
-                                        <span className="text-xs text-slate-600 dark:text-slate-400 w-6">
-                                          #{subcategory.sort_order}
-                                        </span>
-                                        <span className="text-sm font-medium text-slate-900 dark:text-white">
-                                          {subcategory.name}
-                                        </span>
-                                        {!subcategory.is_active && (
-                                          <Badge variant="outline" className="text-xs bg-slate-500/20 text-slate-400 border-slate-500/30">
-                                            Disabled
-                                          </Badge>
-                                        )}
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => openEditSubcategoryModal(subcategory, category)}
-                                          className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                                          title="Edit Subcategory"
-                                        >
-                                          <Edit className="h-3 w-3" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => handleToggleSubcategoryActive(subcategory)}
-                                          className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                                          title={subcategory.is_active ? 'Disable' : 'Enable'}
-                                        >
-                                          {subcategory.is_active ? (
-                                            <Eye className="h-3 w-3" />
-                                          ) : (
-                                            <EyeOff className="h-3 w-3" />
-                                          )}
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => handleDeleteSubcategory(subcategory.id, subcategory.name)}
-                                          className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                                          title="Delete Subcategory"
-                                        >
-                                          <Trash2 className="h-3 w-3" />
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Empty subcategories state */}
-                            {isExpanded && categorySubcategories.length === 0 && (
-                              <div className="border-t border-slate-200 dark:border-slate-700 p-4 bg-white dark:bg-slate-900">
-                                <p className="text-sm text-slate-600 dark:text-slate-400 text-center py-4">
-                                  No subcategories yet. Click the + button above to add one.
-                                </p>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      );
-                    })
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            <CategoryManagementPanel
+              categories={categories}
+              subcategories={subcategories}
+              onAddCategory={openAddCategoryModal}
+              onEditCategory={openEditCategoryModal}
+              onDeleteCategory={handleDeleteCategory}
+              onAddSubcategory={openAddSubcategoryModal}
+              onEditSubcategory={openEditSubcategoryModal}
+              onDeleteSubcategory={handleDeleteSubcategory}
+            />
           </TabsContent>
         )}
       </Tabs>
@@ -2240,16 +2055,21 @@ export default function WorkshopTasksPage() {
           <DialogHeader>
             <DialogTitle className="text-slate-900 dark:text-white text-xl">Mark Task Complete</DialogTitle>
             <DialogDescription className="text-slate-600 dark:text-slate-400">
-              Add detailed notes about the work completed
+              {requiresIntermediateStep 
+                ? 'This task will be moved through In Progress and then marked as Complete' 
+                : 'Add detailed notes about the work completed'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             {requiresIntermediateStep ? (
               <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-                <p className="text-sm text-blue-300">
-                  This task will be moved to "In Progress" and then immediately marked as "Completed". Please provide notes for both steps.
-                </p>
+                <div className="flex items-start gap-2">
+                  <Info className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-blue-300">
+                    This task will be moved to In Progress and then immediately marked as Complete. Please provide notes for both steps.
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
@@ -2259,11 +2079,10 @@ export default function WorkshopTasksPage() {
               </div>
             )}
 
-            {/* Intermediate step comment field (shown for Pending or On Hold tasks) */}
             {requiresIntermediateStep && (
               <div className="space-y-2">
                 <Label htmlFor="intermediate-comment" className="text-slate-900 dark:text-white">
-                  {completingTask?.status === 'on_hold' ? 'Resume Note' : 'In Progress Note'} <span className="text-slate-400">(max 300 chars)</span> <span className="text-red-500">*</span>
+                  Step 1: {completingTask?.status === 'on_hold' ? 'Resume Note' : 'In Progress Note'} <span className="text-slate-400">(max 300 chars)</span> <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
                   id="intermediate-comment"
@@ -2273,9 +2092,10 @@ export default function WorkshopTasksPage() {
                       setIntermediateComment(e.target.value);
                     }
                   }}
-                  placeholder={completingTask?.status === 'on_hold' 
-                    ? "e.g., Parts arrived, resuming work on the repair" 
-                    : "e.g., Started work on the vehicle"
+                  placeholder={
+                    completingTask?.status === 'on_hold'
+                      ? 'e.g., Parts have arrived, resuming work'
+                      : 'e.g., Started work on this task'
                   }
                   className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[80px]"
                   maxLength={300}
@@ -2287,10 +2107,9 @@ export default function WorkshopTasksPage() {
               </div>
             )}
 
-            {/* Completion comment field (always shown) */}
             <div className="space-y-2">
               <Label htmlFor="completed-comment" className="text-slate-900 dark:text-white">
-                Completion Note <span className="text-slate-400">(max 500 chars)</span> <span className="text-red-500">*</span>
+                {requiresIntermediateStep ? 'Step 2: ' : ''}Completion Note <span className="text-slate-400">(max 500 chars)</span> <span className="text-red-500">*</span>
               </Label>
               <Textarea
                 id="completed-comment"
@@ -2329,12 +2148,12 @@ export default function WorkshopTasksPage() {
             <Button
               onClick={confirmMarkComplete}
               disabled={
+                (requiresIntermediateStep && (!intermediateComment.trim() || intermediateComment.length > 300)) ||
                 !completedComment.trim() || 
                 completedComment.length > 500 || 
-                (requiresIntermediateStep && (!intermediateComment.trim() || intermediateComment.length > 300)) ||
                 (completingTask ? updatingStatus.has(completingTask.id) : false)
               }
-              className="bg-green-500 hover:bg-green-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <CheckCircle2 className="h-4 w-4 mr-2" />
               Mark Complete
@@ -2638,23 +2457,8 @@ export default function WorkshopTasksPage() {
                   className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white"
                   maxLength={50}
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="category-sort" className="text-slate-900 dark:text-white">
-                  Sort Order
-                </Label>
-                <Input
-                  id="category-sort"
-                  type="number"
-                  value={categorySortOrder}
-                  onChange={(e) => setCategorySortOrder(e.target.value)}
-                  placeholder="0"
-                  className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white"
-                  min="0"
-                />
                 <p className="text-xs text-slate-600 dark:text-slate-400">
-                  Lower numbers appear first in the list
+                  Categories are automatically organized alphabetically
                 </p>
               </div>
             </div>
@@ -2666,7 +2470,6 @@ export default function WorkshopTasksPage() {
                   setShowCategoryModal(false);
                   setEditingCategory(null);
                   setCategoryName('');
-                  setCategorySortOrder('0');
                 }}
                 className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
               >

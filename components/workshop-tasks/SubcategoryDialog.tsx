@@ -47,17 +47,14 @@ export function SubcategoryDialog({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
-  const [sortOrder, setSortOrder] = useState('0');
 
   // Reset form when dialog opens/closes or subcategory changes
   useEffect(() => {
     if (open) {
       if (mode === 'edit' && subcategory) {
         setName(subcategory.name);
-        setSortOrder(subcategory.sort_order.toString());
       } else {
         setName('');
-        setSortOrder('0');
       }
     }
   }, [open, mode, subcategory]);
@@ -77,15 +74,19 @@ export function SubcategoryDialog({
         ? '/api/workshop-tasks/subcategories'
         : `/api/workshop-tasks/subcategories/${subcategory?.id}`;
       
-      const method = mode === 'create' ? 'POST' : 'PUT';
+      const method = mode === 'create' ? 'POST' : 'PATCH';
+
+      // Generate slug from name (lowercase, replace spaces with hyphens)
+      const slug = name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
+          slug,
           category_id: categoryId,
-          sort_order: parseInt(sortOrder) || 0,
+          sort_order: 0,
           is_active: true,
         }),
       });
@@ -139,22 +140,9 @@ export function SubcategoryDialog({
                 required
                 disabled={loading}
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="sort-order">Sort Order</Label>
-              <Input
-                id="sort-order"
-                type="number"
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value)}
-                placeholder="0"
-                className="bg-slate-800 border-slate-700"
-                disabled={loading}
-                min="0"
-                step="1"
-              />
-              <p className="text-xs text-slate-500">Lower numbers appear first</p>
+              <p className="text-xs text-slate-400">
+                Subcategories are automatically organized alphabetically
+              </p>
             </div>
           </div>
 

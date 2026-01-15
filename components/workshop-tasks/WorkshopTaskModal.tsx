@@ -247,19 +247,6 @@ export function WorkshopTaskModal({
                     <Pause className="h-4 w-4 mr-2" />
                     Put On Hold
                   </Button>
-                </>
-              )}
-              {task.status === 'logged' && (
-                <>
-                  <Button
-                    onClick={() => onMarkOnHold(task)}
-                    disabled={isUpdating}
-                    size="sm"
-                    className="bg-purple-600/80 hover:bg-purple-600 text-white border-0"
-                  >
-                    <Pause className="h-4 w-4 mr-2" />
-                    Put On Hold
-                  </Button>
                   <Button
                     onClick={() => onMarkComplete(task)}
                     disabled={isUpdating}
@@ -271,16 +258,40 @@ export function WorkshopTaskModal({
                   </Button>
                 </>
               )}
-              {task.status === 'on_hold' && (
-                <Button
-                  onClick={() => onResume(task)}
-                  disabled={isUpdating}
-                  size="sm"
-                  className="bg-blue-600/80 hover:bg-blue-600 text-white border-0"
-                >
-                  <Clock className="h-4 w-4 mr-2" />
-                  Resume
-                </Button>
+              {(task.status === 'logged' || task.status === 'on_hold') && (
+                <>
+                  {task.status === 'logged' && (
+                    <Button
+                      onClick={() => onMarkOnHold(task)}
+                      disabled={isUpdating}
+                      size="sm"
+                      className="bg-purple-600/80 hover:bg-purple-600 text-white border-0"
+                    >
+                      <Pause className="h-4 w-4 mr-2" />
+                      Put On Hold
+                    </Button>
+                  )}
+                  {task.status === 'on_hold' && (
+                    <Button
+                      onClick={() => onResume(task)}
+                      disabled={isUpdating}
+                      size="sm"
+                      className="bg-blue-600/80 hover:bg-blue-600 text-white border-0"
+                    >
+                      <Clock className="h-4 w-4 mr-2" />
+                      Resume
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => onMarkComplete(task)}
+                    disabled={isUpdating}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white border-0"
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Mark Complete
+                  </Button>
+                </>
               )}
               {task.action_type === 'workshop_vehicle_task' && task.status !== 'completed' && (
                 <>
