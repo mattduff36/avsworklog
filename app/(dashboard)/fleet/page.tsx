@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Loader2, Wrench, Truck, Tag, Settings as SettingsIcon, Plus } from 'lucide-react';
+import { Loader2, Wrench, Truck, Tag, Plus } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
 
 // Import existing components
@@ -211,7 +211,7 @@ function FleetContent() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
           <TabsTrigger value="maintenance" className="gap-2">
             <Wrench className="h-4 w-4" />
             Maintenance
@@ -227,12 +227,6 @@ function FleetContent() {
                 Categories
               </TabsTrigger>
             </>
-          )}
-          {canManageVehicles && (
-            <TabsTrigger value="settings" className="gap-2">
-              <SettingsIcon className="h-4 w-4" />
-              Settings
-            </TabsTrigger>
           )}
         </TabsList>
 
@@ -296,66 +290,72 @@ function FleetContent() {
         {/* Categories Tab - Admin/Manager only */}
         {canManageVehicles && (
           <TabsContent value="categories" className="space-y-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold tracking-tight">Vehicle Categories</h2>
-                <p className="text-muted-foreground mt-1">
-                  Manage vehicle categories and classifications
-                </p>
-              </div>
-              <Button size="sm" disabled>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Category
-              </Button>
-            </div>
+            {/* Vehicle Categories Section */}
+            <Card className="bg-slate-900 border-slate-700">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-white">
+                      Vehicle Categories
+                    </CardTitle>
+                    <CardDescription className="text-slate-400">
+                      Manage vehicle categories and classifications
+                    </CardDescription>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700"
+                    disabled
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Category
+                  </Button>
+                </div>
+              </CardHeader>
+              
+              <CardContent>
+                {categoriesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  </div>
+                ) : categories.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400">
+                    No vehicle categories found
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {categories.map((category) => (
+                      <Card key={category.id} className="bg-slate-800/50 border-slate-700">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4 flex-1">
+                              <div className="bg-blue-500/10 p-3 rounded-lg">
+                                <Tag className="h-5 w-5 text-blue-400" />
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="text-lg font-semibold text-white">{category.name}</h3>
+                                <p className="text-sm text-slate-400 mt-1">
+                                  {category.description || 'No description'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-blue-400">
+                                {vehicles.filter(v => v.vehicle_categories?.name === category.name).length}
+                              </div>
+                              <p className="text-xs text-muted-foreground">vehicles</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-            {categoriesLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-              </div>
-            ) : categories.length === 0 ? (
-              <Card className="bg-slate-800/50 border-slate-700">
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Tag className="h-16 w-16 text-gray-400 mb-4" />
-                  <p className="text-gray-400">No categories found</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-4">
-                {categories.map((category) => (
-                  <Card key={category.id} className="bg-slate-800/50 border-slate-700">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 flex-1">
-                          <div className="bg-blue-500/10 p-3 rounded-lg">
-                            <Tag className="h-5 w-5 text-blue-400" />
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-white">{category.name}</h3>
-                            <p className="text-sm text-slate-400 mt-1">
-                              {category.description || 'No description'}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-blue-400">
-                            {vehicles.filter(v => v.vehicle_categories?.name === category.name).length}
-                          </div>
-                          <p className="text-xs text-muted-foreground">vehicles</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-        )}
-
-        {/* Settings Tab - Admin/Manager only */}
-        {canManageVehicles && (
-          <TabsContent value="settings" className="space-y-6">
-            <MaintenanceSettings />
+            {/* Maintenance Categories Section */}
+            <MaintenanceSettings isAdmin={isAdmin} isManager={isManager} />
           </TabsContent>
         )}
       </Tabs>
