@@ -232,9 +232,10 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       >
         <CardContent className="p-4">
           {/* Collapsed View - Now includes ALL service information */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              {/* Vehicle Info and Alerts */}
+              <div className="mb-3">
                 <div className="flex items-center gap-3 mb-2">
                   <h3 className="font-semibold text-lg text-white">
                     {vehicle.vehicle?.reg_number || 'Unknown'}
@@ -243,7 +244,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                     <span className="text-sm text-slate-400">({vehicle.vehicle.nickname})</span>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-2 mb-3">
+                <div className="flex flex-wrap gap-2">
                   {vehicle.alerts.map((alert, idx) => (
                     <Badge 
                       key={idx}
@@ -259,87 +260,89 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                   ))}
                 </div>
               </div>
-              {isExpanded ? (
-                <ChevronUp className="h-5 w-5 text-slate-400 flex-shrink-0" />
-              ) : (
-                <ChevronDown className="h-5 w-5 text-slate-400 flex-shrink-0" />
-              )}
+              
+              {/* Service Information - Horizontal Row */}
+              <div className="flex flex-wrap gap-x-6 gap-y-2">
+                {/* Current Mileage */}
+                <div className="space-y-0">
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">Mileage</div>
+                  <div className="text-sm font-medium text-white">
+                    {formatMileage(vehicle.current_mileage)}
+                  </div>
+                </div>
+
+                {/* Cambelt Due */}
+                <div className="space-y-0">
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">Cambelt</div>
+                  <div className={`text-sm font-medium ${vehicle.cambelt_status?.status === 'overdue' || vehicle.cambelt_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                    {vehicle.cambelt_due_mileage 
+                      ? formatMileage(vehicle.cambelt_due_mileage)
+                      : 'Not Set'}
+                  </div>
+                </div>
+
+                {/* Tax Due */}
+                <div className="space-y-0">
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">Tax Due</div>
+                  <div className={`text-sm font-medium ${vehicle.tax_status?.status === 'overdue' || vehicle.tax_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                    {formatMaintenanceDate(vehicle.tax_due_date)}
+                  </div>
+                </div>
+
+                {/* First Aid Kit */}
+                <div className="space-y-0">
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">First Aid</div>
+                  <div className={`text-sm font-medium ${vehicle.first_aid_status?.status === 'overdue' || vehicle.first_aid_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                    {formatMaintenanceDate(vehicle.first_aid_kit_expiry)}
+                  </div>
+                </div>
+
+                {/* MOT Due */}
+                <div className="space-y-0">
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">MOT Due</div>
+                  <div className={`text-sm font-medium ${vehicle.mot_status?.status === 'overdue' || vehicle.mot_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                    {formatMaintenanceDate(vehicle.mot_due_date)}
+                  </div>
+                </div>
+
+                {/* Service Due */}
+                <div className="space-y-0">
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">Service Due</div>
+                  <div className={`text-sm font-medium ${vehicle.service_status?.status === 'overdue' || vehicle.service_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                    {vehicle.next_service_mileage 
+                      ? formatMileage(vehicle.next_service_mileage)
+                      : 'Not Set'}
+                  </div>
+                </div>
+
+                {/* Last Service */}
+                <div className="space-y-0">
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">Last Service</div>
+                  <div className="text-sm font-medium text-white">
+                    {vehicle.last_service_mileage 
+                      ? formatMileage(vehicle.last_service_mileage)
+                      : 'Not Set'}
+                  </div>
+                </div>
+
+                {/* Tracker ID */}
+                {vehicle.tracker_id && (
+                  <div className="space-y-0">
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">GPS Tracker</div>
+                    <div className="text-sm font-medium text-white">
+                      {vehicle.tracker_id}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             
-            {/* Service Information Grid - Always visible, smaller text */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 text-xs">
-              {/* Current Mileage */}
-              <div className="space-y-0.5">
-                <span className="text-slate-500 uppercase tracking-wide">Mileage</span>
-                <p className="text-sm font-medium text-white">
-                  {formatMileage(vehicle.current_mileage)}
-                </p>
-              </div>
-
-              {/* Tax Due */}
-              <div className="space-y-0.5">
-                <span className="text-slate-500 uppercase tracking-wide">Tax Due</span>
-                <p className={`text-sm font-medium ${vehicle.tax_status?.status === 'overdue' || vehicle.tax_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
-                  {formatMaintenanceDate(vehicle.tax_due_date)}
-                </p>
-              </div>
-
-              {/* MOT Due */}
-              <div className="space-y-0.5">
-                <span className="text-slate-500 uppercase tracking-wide">MOT Due</span>
-                <p className={`text-sm font-medium ${vehicle.mot_status?.status === 'overdue' || vehicle.mot_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
-                  {formatMaintenanceDate(vehicle.mot_due_date)}
-                </p>
-              </div>
-
-              {/* Service Due */}
-              <div className="space-y-0.5">
-                <span className="text-slate-500 uppercase tracking-wide">Service Due</span>
-                <p className={`text-sm font-medium ${vehicle.service_status?.status === 'overdue' || vehicle.service_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
-                  {vehicle.next_service_mileage 
-                    ? `${formatMileage(vehicle.next_service_mileage)}` 
-                    : 'Not Set'}
-                </p>
-              </div>
-
-              {/* Cambelt Due */}
-              <div className="space-y-0.5">
-                <span className="text-slate-500 uppercase tracking-wide">Cambelt</span>
-                <p className={`text-sm font-medium ${vehicle.cambelt_status?.status === 'overdue' || vehicle.cambelt_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
-                  {vehicle.cambelt_due_mileage 
-                    ? `${formatMileage(vehicle.cambelt_due_mileage)}` 
-                    : 'Not Set'}
-                </p>
-              </div>
-
-              {/* First Aid Kit */}
-              <div className="space-y-0.5">
-                <span className="text-slate-500 uppercase tracking-wide">First Aid</span>
-                <p className={`text-sm font-medium ${vehicle.first_aid_status?.status === 'overdue' || vehicle.first_aid_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
-                  {formatMaintenanceDate(vehicle.first_aid_kit_expiry)}
-                </p>
-              </div>
-
-              {/* Last Service */}
-              <div className="space-y-0.5">
-                <span className="text-slate-500 uppercase tracking-wide">Last Service</span>
-                <p className="text-sm font-medium text-white">
-                  {vehicle.last_service_mileage 
-                    ? formatMileage(vehicle.last_service_mileage)
-                    : 'Not Set'}
-                </p>
-              </div>
-
-              {/* Tracker ID */}
-              {vehicle.tracker_id && (
-                <div className="space-y-0.5">
-                  <span className="text-slate-500 uppercase tracking-wide">GPS Tracker</span>
-                  <p className="text-sm font-medium text-white">
-                    {vehicle.tracker_id}
-                  </p>
-                </div>
-              )}
-            </div>
+            {/* Chevron Icon */}
+            {isExpanded ? (
+              <ChevronUp className="h-5 w-5 text-slate-400 flex-shrink-0 mt-1" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-slate-400 flex-shrink-0 mt-1" />
+            )}
           </div>
 
           {/* Expanded View - Recent Maintenance & Workshop History */}
