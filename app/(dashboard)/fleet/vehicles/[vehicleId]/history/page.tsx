@@ -15,9 +15,6 @@ import {
   FileText, 
   MessageSquare,
   Calendar,
-  User,
-  Clock,
-  CheckCircle2,
   AlertTriangle,
   CheckCircle,
   XCircle,
@@ -32,7 +29,7 @@ import { formatRelativeTime } from '@/lib/utils/date';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { EditMaintenanceDialog } from '@/app/(dashboard)/maintenance/components/EditMaintenanceDialog';
 import { DeleteVehicleDialog } from '@/app/(dashboard)/maintenance/components/DeleteVehicleDialog';
-import { getStatusColorClass, formatMileage, formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
+import { formatMileage, formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { WorkshopTaskHistoryCard } from '@/components/workshop-tasks/WorkshopTaskHistoryCard';
 import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
@@ -91,7 +88,13 @@ type WorkshopTask = {
   actioned_at: string | null;
   actioned_by: string | null;
   actioned_comment: string | null;
-  status_history?: any[] | null;
+  status_history?: Array<{
+    status: string;
+    timestamp: string;
+    userId: string;
+    userName: string;
+    comment?: string;
+  }> | null;
   created_at: string;
   created_by: string;
   workshop_task_categories: {
@@ -141,7 +144,7 @@ export default function VehicleHistoryPage({
   const [workshopTasks, setWorkshopTasks] = useState<WorkshopTask[]>([]);
   const [activeTab, setActiveTab] = useState('maintenance');
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [motData, setMotData] = useState<any>(null);
+  const [motData, setMotData] = useState<{ tests: Array<{ testDate: string; [key: string]: unknown }> } | null>(null);
   const [motLoading, setMotLoading] = useState(false);
   const [expandedTestId, setExpandedTestId] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -423,7 +426,7 @@ export default function VehicleHistoryPage({
     }
   };
 
-  const countDefectsByType = (defects: any[]) => {
+  const countDefectsByType = (defects: Array<{ type: string }>) => {
     const counts: Record<string, number> = {};
     defects.forEach(defect => {
       counts[defect.type] = (counts[defect.type] || 0) + 1;
@@ -874,7 +877,7 @@ export default function VehicleHistoryPage({
                     <div className="space-y-3">
                       <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Test History</h3>
                       
-                      {motData.tests.map((test: any) => {
+                      {motData.tests.map((test: { motTestNumber: string; testResult: string; completedDate: string; expiryDate?: string; odometerValue?: number; odometerUnit?: string; testStationName?: string; testStationPcode?: string; defects?: Array<{ type: string; text: string; locationLateral?: string }> }) => {
                         const defects = Array.isArray(test.defects) ? test.defects : [];
                         const defectCounts = countDefectsByType(defects);
                         const isExpanded = expandedTestId === test.motTestNumber;
@@ -973,7 +976,7 @@ export default function VehicleHistoryPage({
 
                                   {isExpanded && (
                                     <div className="space-y-2 border-t border-slate-700 pt-3">
-                                      {defects.map((defect: any, idx: number) => (
+                                      {defects.map((defect, idx: number) => (
                                         <div 
                                           key={idx}
                                           className={`p-3 rounded border ${getDefectColor(defect.type)}`}
