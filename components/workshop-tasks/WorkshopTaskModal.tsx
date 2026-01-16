@@ -11,30 +11,13 @@ import {
   Clock,
   Edit,
   Trash2,
-  AlertTriangle,
   Wrench,
   FileText,
-  User,
   Pause,
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
-import { formatDistanceToNow } from 'date-fns';
-import { toast } from 'sonner';
-
-// Types from API
-type TimelineItem = {
-  id: string;
-  type: 'status_event' | 'comment';
-  created_at: string;
-  author: { id: string; full_name: string } | null;
-  body: string;
-  can_edit?: boolean;
-  can_delete?: boolean;
-  meta?: {
-    status: string;
-  };
-  updated_at?: string | null;
-};
+import { WorkshopTaskTimeline } from '@/components/workshop-tasks/WorkshopTaskTimeline';
+import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
 
 type Task = {
   id: string;
@@ -46,6 +29,7 @@ type Task = {
   logged_comment: string | null;
   actioned_at: string | null;
   actioned_comment: string | null;
+  status_history?: any[] | null;
   workshop_task_categories?: {
     name: string;
   };
@@ -87,38 +71,10 @@ export function WorkshopTaskModal({
   onResume,
   isUpdating,
 }: WorkshopTaskModalProps) {
-  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  // Fetch timeline when dialog opens
-  useEffect(() => {
-    if (open && task) {
-      fetchTimeline();
-    }
-  }, [open, task]);
-
-  const fetchTimeline = async () => {
-    if (!task) return;
-    
-    setLoading(true);
-    try {
-      const response = await fetch(
-        `/api/workshop-tasks/tasks/${task.id}/comments?order=asc`
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch timeline');
-      }
-
-      const data = await response.json();
-      setTimeline(data.items || []);
-    } catch (error) {
-      console.error('Error fetching timeline:', error);
-      toast.error('Failed to load timeline');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { comments: taskComments, loading } = useWorkshopTaskComments({
+    taskIds: task ? [task.id] : [],
+    enabled: open && !!task,
+  });
 
   if (!task) return null;
 
@@ -331,60 +287,11 @@ export function WorkshopTaskModal({
                 <Skeleton key={i} className="h-20 w-full bg-slate-800" />
               ))}
             </div>
-          ) : timeline.length === 0 ? (
-            <Card className="bg-slate-800/50 border-slate-700">
-              <CardContent className="py-8 text-center">
-                <p className="text-slate-400">No activity yet</p>
-              </CardContent>
-            </Card>
           ) : (
-            <div className="space-y-3">
-              {timeline.map((item) => (
-                <Card
-                  key={item.id}
-                  className={`${
-                    item.type === 'status_event'
-                      ? 'bg-blue-500/10 border-blue-500/30'
-                      : 'bg-slate-800/50 border-slate-700'
-                  }`}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          {item.type === 'status_event' ? (
-                            <AlertTriangle className="h-4 w-4 text-blue-400" />
-                          ) : (
-                            <User className="h-4 w-4 text-slate-400" />
-                          )}
-                          <span className="text-sm font-medium text-white">
-                            {item.author?.full_name || 'Unknown User'}
-                          </span>
-                          {item.type === 'status_event' && item.meta && (
-                            <Badge
-                              variant="outline"
-                              className="ml-2 text-xs bg-blue-500/10 text-blue-400 border-blue-500/30"
-                            >
-                              {item.meta.status === 'logged'
-                                ? 'Marked In Progress'
-                                : item.meta.status === 'on_hold'
-                                ? 'Put On Hold'
-                                : 'Marked Complete'}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-slate-300 mt-2">{item.body}</p>
-                      </div>
-                      <span className="text-xs text-slate-500 whitespace-nowrap">
-                        {formatDistanceToNow(new Date(item.created_at), {
-                          addSuffix: true,
-                        })}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <WorkshopTaskTimeline
+              task={task}
+              comments={taskComments[task.id] || []}
+            />
           )}
         </div>
 

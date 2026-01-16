@@ -77,7 +77,7 @@ export async function GET(
     // Fetch the task (verify it exists and is a workshop task)
     const { data: task, error: taskError } = await supabase
       .from('actions')
-      .select('id, action_type, created_at, created_by, logged_at, logged_by, logged_comment, actioned_at, actioned_by, actioned_comment')
+      .select('id, action_type, created_at, created_by, logged_at, logged_by, logged_comment, actioned_at, actioned_by, actioned_comment, status_history')
       .eq('id', taskId)
       .single();
 
@@ -116,40 +116,74 @@ export async function GET(
     // Build timeline items array
     const timelineItems: TimelineItem[] = [];
 
-    // Add "Marked In Progress" status event if logged
-    if (task.logged_at && task.logged_by) {
-      const { data: loggedByProfile } = await supabase
+    const statusHistory = Array.isArray(task.status_history) ? task.status_history : [];
+    const historyAuthorIds = [...new Set(
+      statusHistory
+        .map((event: any) => event?.author_id)
+        .filter(Boolean)
+    )];
+
+    let statusAuthorMap = new Map<string, { id: string; full_name: string }>();
+    if (historyAuthorIds.length > 0) {
+      const { data: profiles } = await supabase
         .from('profiles')
         .select('id, full_name')
-        .eq('id', task.logged_by)
-        .single();
-
-      timelineItems.push({
-        id: `status:logged:${task.id}`,
-        type: 'status_event',
-        created_at: task.logged_at,
-        author: loggedByProfile || null,
-        body: task.logged_comment || 'Marked as In Progress',
-        meta: { status: 'logged' },
-      });
+        .in('id', historyAuthorIds);
+      statusAuthorMap = new Map((profiles || []).map((p) => [p.id, p]));
     }
 
-    // Add "Marked Complete" status event if completed
-    if (task.actioned_at && task.actioned_by) {
-      const { data: actionedByProfile } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .eq('id', task.actioned_by)
-        .single();
+    if (statusHistory.length > 0) {
+      for (const event of statusHistory) {
+        if (!event?.created_at || !event?.status) continue;
+        const authorProfile = event.author_id
+          ? statusAuthorMap.get(event.author_id) || null
+          : null;
+        timelineItems.push({
+          id: event.id || `status:${event.status}:${task.id}:${event.created_at}`,
+          type: 'status_event',
+          created_at: event.created_at,
+          author: event.author_name
+            ? { id: event.author_id || '', full_name: event.author_name }
+            : authorProfile,
+          body: event.body || 'Status updated',
+          meta: { status: event.status },
+        });
+      }
+    } else {
+      // Fallback: derive from logged/actioned fields
+      if (task.logged_at && task.logged_by) {
+        const { data: loggedByProfile } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .eq('id', task.logged_by)
+          .single();
 
-      timelineItems.push({
-        id: `status:completed:${task.id}`,
-        type: 'status_event',
-        created_at: task.actioned_at,
-        author: actionedByProfile || null,
-        body: task.actioned_comment || 'Marked as Complete',
-        meta: { status: 'completed' },
-      });
+        timelineItems.push({
+          id: `status:logged:${task.id}`,
+          type: 'status_event',
+          created_at: task.logged_at,
+          author: loggedByProfile || null,
+          body: task.logged_comment || 'Marked as In Progress',
+          meta: { status: task.status === 'on_hold' ? 'on_hold' : 'logged' },
+        });
+      }
+
+      if (task.actioned_at && task.actioned_by) {
+        const { data: actionedByProfile } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .eq('id', task.actioned_by)
+          .single();
+
+        timelineItems.push({
+          id: `status:completed:${task.id}`,
+          type: 'status_event',
+          created_at: task.actioned_at,
+          author: actionedByProfile || null,
+          body: task.actioned_comment || 'Marked as Complete',
+          meta: { status: 'completed' },
+        });
+      }
     }
 
     // Add freeform comments

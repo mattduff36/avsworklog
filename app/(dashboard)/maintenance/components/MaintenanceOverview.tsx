@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { CreateWorkshopTaskDialog } from '@/components/workshop-tasks/CreateWorkshopTaskDialog';
 import { TaskCommentsDrawer } from '@/components/workshop-tasks/TaskCommentsDrawer';
+import { MarkTaskCompleteDialog, type CompletionData } from '@/components/workshop-tasks/MarkTaskCompleteDialog';
 import { getTaskContent } from '@/lib/utils/serviceTaskCreation';
 import { appendStatusHistory, buildStatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
 import { createClient } from '@/lib/supabase/client';
@@ -58,7 +59,11 @@ interface WorkshopTask {
   workshop_comments?: string | null;
   vehicle_id?: string;
   status_history?: any[] | null;
-  workshop_task_categories?: { name: string } | null;
+  workshop_task_categories?: { 
+    id: string;
+    name: string;
+    completion_updates?: any[] | null;
+  } | null;
   profiles?: { full_name: string | null } | null;
 }
 
@@ -84,8 +89,6 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   const [loggedComment, setLoggedComment] = useState('');
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [completingTask, setCompletingTask] = useState<WorkshopTask | null>(null);
-  const [completedComment, setCompletedComment] = useState('');
-  const [intermediateComment, setIntermediateComment] = useState('');
   const [showOnHoldModal, setShowOnHoldModal] = useState(false);
   const [onHoldingTask, setOnHoldingTask] = useState<WorkshopTask | null>(null);
   const [onHoldComment, setOnHoldComment] = useState('');
@@ -411,42 +414,25 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   // Handler: Mark Complete
   const handleMarkComplete = (task: WorkshopTask) => {
     setCompletingTask(task);
-    setCompletedComment('');
-    setIntermediateComment('');
     setShowCompleteModal(true);
   };
 
-  const confirmMarkComplete = async () => {
+  const confirmMarkComplete = async (data: CompletionData) => {
     if (!completingTask) return;
 
+    const taskId = completingTask.id;
+    const vehicleId = completingTask.vehicle_id;
     const requiresIntermediateStep = completingTask.status === 'pending' || completingTask.status === 'on_hold';
-
-    if (requiresIntermediateStep && !intermediateComment.trim()) {
-      toast.error('Please add an intermediate comment');
-      return;
-    }
-
-    if (!completedComment.trim()) {
-      toast.error('Please add a completion comment');
-      return;
-    }
-
-    if ((requiresIntermediateStep && intermediateComment.length > 300) || completedComment.length > 300) {
-      toast.error('Comments must be 300 characters or less');
-      return;
-    }
 
     try {
       const supabase = createClient();
-      const taskId = completingTask.id;
-      const vehicleId = completingTask.vehicle_id;
       const now = new Date();
 
       let nextHistory = completingTask.status_history;
       let updatePayload: Record<string, any> = {
         status: 'completed',
         actioned_at: now.toISOString(),
-        actioned_comment: completedComment.trim(),
+        actioned_comment: data.completedComment,
         actioned_by: user?.id || null,
       };
 
@@ -454,7 +440,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         const intermediateStatus = completingTask.status === 'on_hold' ? 'resumed' : 'logged';
         const intermediateEvent = buildStatusHistoryEvent({
           status: intermediateStatus,
-          body: intermediateComment.trim(),
+          body: data.intermediateComment,
           authorId: user?.id || null,
           authorName: profile?.full_name || null,
           createdAt: now.toISOString(),
@@ -464,14 +450,14 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         updatePayload = {
           ...updatePayload,
           logged_at: now.toISOString(),
-          logged_comment: intermediateComment.trim(),
+          logged_comment: data.intermediateComment,
           logged_by: user?.id || null,
         };
       }
 
       const completeEvent = buildStatusHistoryEvent({
         status: 'completed',
-        body: completedComment.trim(),
+        body: data.completedComment,
         authorId: user?.id || null,
         authorName: profile?.full_name || null,
         createdAt: new Date(now.getTime() + 1).toISOString(),
@@ -480,7 +466,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
       updatePayload.status_history = nextHistory;
 
-      // Now mark as complete
+      // Mark as complete
       const { error: completeError } = await supabase
         .from('actions')
         .update(updatePayload)
@@ -488,8 +474,35 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
       if (completeError) throw completeError;
 
+      // Update maintenance if there are any updates
+      if (data.maintenanceUpdates && vehicleId) {
+        try {
+          const maintenanceResponse = await fetch(
+            `/api/maintenance/by-vehicle/${vehicleId}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ...data.maintenanceUpdates,
+                comment: `Updated from workshop task completion: ${completingTask.title || 'Task'}`,
+              }),
+            }
+          );
+
+          if (!maintenanceResponse.ok) {
+            const error = await maintenanceResponse.json();
+            console.error('Failed to update maintenance:', error);
+            toast.warning('Task completed but maintenance update failed');
+          }
+        } catch (maintError) {
+          console.error('Error updating maintenance:', maintError);
+          toast.warning('Task completed but maintenance update failed');
+        }
+      }
+
       toast.success('Task marked as complete');
       setShowCompleteModal(false);
+      setCompletingTask(null);
       
       // Refetch vehicle history
       if (vehicleId) {
@@ -1188,76 +1201,13 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       </Dialog>
 
       {/* Mark Task Complete Modal */}
-      <Dialog open={showCompleteModal} onOpenChange={setShowCompleteModal}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-white text-xl">Mark Task Complete</DialogTitle>
-            <DialogDescription className="text-slate-600 dark:text-slate-400">
-              {completingTask && (completingTask.status === 'pending' || completingTask.status === 'on_hold')
-                ? 'This task will be moved through In Progress and then marked as Complete'
-                : 'Confirm the work has been completed'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {completingTask && (completingTask.status === 'pending' || completingTask.status === 'on_hold') && (
-              <div className="space-y-2">
-                <Label htmlFor="intermediate-comment" className="text-slate-900 dark:text-white">
-                  Started Work Comment <span className="text-red-500">*</span>
-                </Label>
-                <Textarea
-                  id="intermediate-comment"
-                  value={intermediateComment}
-                  onChange={(e) => setIntermediateComment(e.target.value)}
-                  placeholder="Brief note about starting the work"
-                  className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white"
-                  maxLength={300}
-                />
-                <p className="text-xs text-slate-600 dark:text-slate-400">
-                  {intermediateComment.length}/300 characters
-                </p>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="completed-comment" className="text-slate-900 dark:text-white">
-                Completion Comment <span className="text-red-500">*</span>
-              </Label>
-              <Textarea
-                id="completed-comment"
-                value={completedComment}
-                onChange={(e) => setCompletedComment(e.target.value)}
-                placeholder="What was done to complete this task?"
-                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[100px]"
-                maxLength={300}
-              />
-              <p className="text-xs text-slate-600 dark:text-slate-400">
-                {completedComment.length}/300 characters
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowCompleteModal(false)}
-              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={confirmMarkComplete}
-              disabled={
-                (completingTask && (completingTask.status === 'pending' || completingTask.status === 'on_hold') && (!intermediateComment.trim() || intermediateComment.length > 300)) ||
-                !completedComment.trim() ||
-                completedComment.length > 300
-              }
-              className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Mark Complete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MarkTaskCompleteDialog
+        open={showCompleteModal}
+        onOpenChange={setShowCompleteModal}
+        task={completingTask}
+        onConfirm={confirmMarkComplete}
+        isSubmitting={false}
+      />
 
       {/* On Hold Modal */}
       <Dialog open={showOnHoldModal} onOpenChange={setShowOnHoldModal}>

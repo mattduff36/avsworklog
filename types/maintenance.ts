@@ -231,6 +231,7 @@ export interface WorkshopTaskHistoryItem {
   actioned_comment: string | null;
   actioned_at: string | null;
   logged_at: string | null;
+  status_history?: any[] | null;
   workshop_task_categories?: {
     name: string;
   } | null;

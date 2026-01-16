@@ -24,7 +24,7 @@
 
     "noFallthroughCasesInSwitch": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": false,
+    "noUnusedParameters": true,
     "importsNotUsedAsValues": "remove",
     "forceConsistentCasingInFileNames": true,
 
