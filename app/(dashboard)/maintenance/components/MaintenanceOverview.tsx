@@ -7,17 +7,17 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, Calendar, Wrench, AlertCircle, ChevronDown, ChevronUp, Loader2, Clock, ExternalLink, CheckCircle2, MessageSquare, Pause, Play } from 'lucide-react';
+import { AlertTriangle, Calendar, Wrench, AlertCircle, ChevronDown, ChevronUp, Loader2, Clock, ExternalLink, CheckCircle2, MessageSquare, Pause, Play, Undo2 } from 'lucide-react';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { formatDaysUntil, formatMilesUntil, formatMileage, formatMaintenanceDate, getStatusColorClass } from '@/lib/utils/maintenanceCalculations';
 import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { WorkshopTaskHistoryCard } from '@/components/workshop-tasks/WorkshopTaskHistoryCard';
 import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
 import { CreateWorkshopTaskDialog } from '@/components/workshop-tasks/CreateWorkshopTaskDialog';
 import { TaskCommentsDrawer } from '@/components/workshop-tasks/TaskCommentsDrawer';
 import { getTaskContent } from '@/lib/utils/serviceTaskCreation';
+import { appendStatusHistory, buildStatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 
@@ -58,13 +58,14 @@ interface WorkshopTask {
   description: string;
   workshop_comments?: string | null;
   vehicle_id?: string;
+  status_history?: any[] | null;
   workshop_task_categories?: { name: string } | null;
   profiles?: { full_name: string | null } | null;
 }
 
 export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: MaintenanceOverviewProps) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [expandedVehicles, setExpandedVehicles] = useState<Set<string>>(new Set());
   const [vehicleHistory, setVehicleHistory] = useState<Record<string, { history: HistoryEntry[], workshopTasks: WorkshopTask[], loading: boolean }>>({});
   
@@ -263,6 +264,9 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         ...prev,
         [vehicleId]: { history: [], workshopTasks: [], loading: false }
       }));
+    } finally {
+      // Always remove from fetching set after completion
+      fetchingVehicles.current.delete(vehicleId);
     }
   };
 
@@ -295,8 +299,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   const handleTaskCreated = async () => {
     // Refetch history for the vehicle to show the newly created task
     if (createTaskVehicleId) {
-      // Clear the cache AND ref for this vehicle
-      fetchingVehicles.current.delete(createTaskVehicleId);
+      // Clear the cache for this vehicle
       setVehicleHistory(prev => {
         const newHistory = { ...prev };
         delete newHistory[createTaskVehicleId];
@@ -306,31 +309,8 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       // Small delay to ensure the task is committed to the database
       await new Promise(resolve => setTimeout(resolve, 300));
       
-      // Force refetch
-      const vehicleId = createTaskVehicleId;
-      setVehicleHistory(prev => ({ ...prev, [vehicleId]: { history: [], workshopTasks: [], loading: true } }));
-      
-      try {
-        const response = await fetch(`/api/maintenance/history/${vehicleId}`);
-        if (!response.ok) throw new Error('Failed to fetch history');
-        
-        const data = await response.json();
-        
-        setVehicleHistory(prev => ({
-          ...prev,
-          [vehicleId]: {
-            history: data.history || [],
-            workshopTasks: data.workshopTasks || [],
-            loading: false
-          }
-        }));
-      } catch (error) {
-        console.error('Error fetching vehicle history:', error);
-        setVehicleHistory(prev => ({
-          ...prev,
-          [vehicleId]: { history: [], workshopTasks: [], loading: false }
-        }));
-      }
+      // Refetch using the centralized function
+      fetchVehicleHistory(createTaskVehicleId);
     }
   };
 
@@ -356,13 +336,25 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
     try {
       const supabase = createClient();
+      const statusEvent = buildStatusHistoryEvent({
+        status: 'logged',
+        body: loggedComment.trim(),
+        authorId: user?.id || null,
+        authorName: profile?.full_name || null,
+      });
+      const nextHistory = appendStatusHistory(
+        selectedTask.status_history,
+        statusEvent
+      );
+
       const { error } = await supabase
         .from('actions')
         .update({
           status: 'logged',
           logged_at: new Date().toISOString(),
           logged_comment: loggedComment,
-          logged_by: user!.id,
+          logged_by: user?.id || null,
+          status_history: nextHistory,
         })
         .eq('id', selectedTask.id);
 
@@ -374,13 +366,11 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       // Refetch vehicle history
       const vehicleId = selectedTask.vehicle_id;
       if (vehicleId) {
-        fetchingVehicles.current.delete(vehicleId);
         setVehicleHistory(prev => {
           const newHistory = { ...prev };
           delete newHistory[vehicleId];
           return newHistory;
         });
-        await new Promise(resolve => setTimeout(resolve, 100));
         fetchVehicleHistory(vehicleId);
       }
     } catch (error: any) {
@@ -393,6 +383,14 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   const handleUndo = async (task: WorkshopTask) => {
     try {
       const supabase = createClient();
+      const statusEvent = buildStatusHistoryEvent({
+        status: 'undo',
+        body: 'Returned to pending',
+        authorId: user?.id || null,
+        authorName: profile?.full_name || null,
+        meta: { from: 'logged', to: 'pending' },
+      });
+      const nextHistory = appendStatusHistory(task.status_history, statusEvent);
       const { error } = await supabase
         .from('actions')
         .update({
@@ -400,6 +398,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           logged_at: null,
           logged_comment: null,
           logged_by: null,
+          status_history: nextHistory,
         })
         .eq('id', task.id);
 
@@ -410,13 +409,11 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       // Refetch vehicle history
       const vehicleId = task.vehicle_id;
       if (vehicleId) {
-        fetchingVehicles.current.delete(vehicleId);
         setVehicleHistory(prev => {
           const newHistory = { ...prev };
           delete newHistory[vehicleId];
           return newHistory;
         });
-        await new Promise(resolve => setTimeout(resolve, 100));
         fetchVehicleHistory(vehicleId);
       }
     } catch (error: any) {
@@ -457,31 +454,50 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       const supabase = createClient();
       const taskId = completingTask.id;
       const vehicleId = completingTask.vehicle_id;
+      const now = new Date();
 
-      // If requires intermediate step, first mark as logged
+      let nextHistory = completingTask.status_history;
+      let updatePayload: Record<string, any> = {
+        status: 'completed',
+        actioned_at: now.toISOString(),
+        actioned_comment: completedComment.trim(),
+        actioned_by: user?.id || null,
+      };
+
       if (requiresIntermediateStep) {
-        const { error: loggedError } = await supabase
-          .from('actions')
-          .update({
-            status: 'logged',
-            logged_at: new Date().toISOString(),
-            logged_comment: intermediateComment,
-            logged_by: user!.id,
-          })
-          .eq('id', taskId);
+        const intermediateStatus = completingTask.status === 'on_hold' ? 'resumed' : 'logged';
+        const intermediateEvent = buildStatusHistoryEvent({
+          status: intermediateStatus,
+          body: intermediateComment.trim(),
+          authorId: user?.id || null,
+          authorName: profile?.full_name || null,
+          createdAt: now.toISOString(),
+        });
+        nextHistory = appendStatusHistory(nextHistory, intermediateEvent);
 
-        if (loggedError) throw loggedError;
+        updatePayload = {
+          ...updatePayload,
+          logged_at: now.toISOString(),
+          logged_comment: intermediateComment.trim(),
+          logged_by: user?.id || null,
+        };
       }
+
+      const completeEvent = buildStatusHistoryEvent({
+        status: 'completed',
+        body: completedComment.trim(),
+        authorId: user?.id || null,
+        authorName: profile?.full_name || null,
+        createdAt: new Date(now.getTime() + 1).toISOString(),
+      });
+      nextHistory = appendStatusHistory(nextHistory, completeEvent);
+
+      updatePayload.status_history = nextHistory;
 
       // Now mark as complete
       const { error: completeError } = await supabase
         .from('actions')
-        .update({
-          status: 'completed',
-          actioned_at: new Date().toISOString(),
-          actioned_comment: completedComment,
-          actioned_by: user!.id,
-        })
+        .update(updatePayload)
         .eq('id', taskId);
 
       if (completeError) throw completeError;
@@ -491,13 +507,11 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       
       // Refetch vehicle history
       if (vehicleId) {
-        fetchingVehicles.current.delete(vehicleId);
         setVehicleHistory(prev => {
           const newHistory = { ...prev };
           delete newHistory[vehicleId];
           return newHistory;
         });
-        await new Promise(resolve => setTimeout(resolve, 100));
         fetchVehicleHistory(vehicleId);
       }
     } catch (error: any) {
@@ -528,13 +542,24 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
     try {
       const supabase = createClient();
+      const statusEvent = buildStatusHistoryEvent({
+        status: 'on_hold',
+        body: onHoldComment.trim(),
+        authorId: user?.id || null,
+        authorName: profile?.full_name || null,
+      });
+      const nextHistory = appendStatusHistory(
+        onHoldingTask.status_history,
+        statusEvent
+      );
       const { error } = await supabase
         .from('actions')
         .update({
           status: 'on_hold',
-          on_hold_at: new Date().toISOString(),
-          on_hold_comment: onHoldComment,
-          on_hold_by: user!.id,
+          logged_at: new Date().toISOString(),
+          logged_comment: onHoldComment.trim(),
+          logged_by: user?.id || null,
+          status_history: nextHistory,
         })
         .eq('id', onHoldingTask.id);
 
@@ -546,13 +571,11 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       // Refetch vehicle history
       const vehicleId = onHoldingTask.vehicle_id;
       if (vehicleId) {
-        fetchingVehicles.current.delete(vehicleId);
         setVehicleHistory(prev => {
           const newHistory = { ...prev };
           delete newHistory[vehicleId];
           return newHistory;
         });
-        await new Promise(resolve => setTimeout(resolve, 100));
         fetchVehicleHistory(vehicleId);
       }
     } catch (error: any) {
@@ -583,13 +606,24 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
     try {
       const supabase = createClient();
+      const statusEvent = buildStatusHistoryEvent({
+        status: 'resumed',
+        body: resumeComment.trim(),
+        authorId: user?.id || null,
+        authorName: profile?.full_name || null,
+      });
+      const nextHistory = appendStatusHistory(
+        resumingTask.status_history,
+        statusEvent
+      );
       const { error } = await supabase
         .from('actions')
         .update({
           status: 'logged',
-          resumed_at: new Date().toISOString(),
-          resumed_comment: resumeComment,
-          resumed_by: user!.id,
+          logged_at: new Date().toISOString(),
+          logged_comment: resumeComment.trim(),
+          logged_by: user?.id || null,
+          status_history: nextHistory,
         })
         .eq('id', resumingTask.id);
 
@@ -601,13 +635,11 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       // Refetch vehicle history
       const vehicleId = resumingTask.vehicle_id;
       if (vehicleId) {
-        fetchingVehicles.current.delete(vehicleId);
         setVehicleHistory(prev => {
           const newHistory = { ...prev };
           delete newHistory[vehicleId];
           return newHistory;
         });
-        await new Promise(resolve => setTimeout(resolve, 100));
         fetchVehicleHistory(vehicleId);
       }
     } catch (error: any) {
@@ -741,12 +773,12 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                     className={`text-sm px-3 py-1 font-semibold ${
                       relatedTask.status === 'pending' 
                         ? 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30'
-                        : relatedTask.status === 'logged' 
+                        : relatedTask.status === 'logged' || relatedTask.status === 'in_progress'
                         ? 'bg-blue-500/10 text-blue-300 border-blue-500/30'
                         : 'bg-purple-500/10 text-purple-300 border-purple-500/30'
                     }`}
                   >
-                    {relatedTask.status === 'logged' ? 'In Progress' : relatedTask.status === 'pending' ? 'Pending' : 'On Hold'}
+                    {relatedTask.status === 'logged' || relatedTask.status === 'in_progress' ? 'In Progress' : relatedTask.status === 'pending' ? 'Pending' : 'On Hold'}
                   </Badge>
                 );
               })()}
@@ -934,7 +966,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                             }}
                             size="sm"
                             variant="outline"
-                            className="h-9 px-3 text-xs transition-all border-slate-600 hover:bg-slate-800"
+                            className="h-9 px-3 text-xs border-slate-600 text-slate-400 hover:text-white hover:bg-slate-800"
                           >
                             <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                             Comments
@@ -945,7 +977,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                               handleMarkInProgress(taskWithVehicleId);
                             }}
                             size="sm"
-                            className="h-9 px-3 text-xs transition-all border-0 bg-blue-600 hover:bg-blue-700 text-white"
+                            className="h-9 px-3 text-xs bg-blue-600/80 hover:bg-blue-600 text-white border-0"
                           >
                             <Clock className="h-3.5 w-3.5 mr-1.5" />
                             In Progress
@@ -965,7 +997,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                       )}
                       
                       {/* In Progress (Logged) Status Buttons: Comments, Undo, On Hold, Complete */}
-                      {relatedTask.status === 'logged' && (
+                      {(relatedTask.status === 'logged' || relatedTask.status === 'in_progress') && (
                         <>
                           <Button
                             onClick={(e) => {
@@ -974,7 +1006,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                             }}
                             size="sm"
                             variant="outline"
-                            className="h-9 px-3 text-xs transition-all border-slate-600 hover:bg-slate-800"
+                            className="h-9 px-3 text-xs border-slate-600 text-slate-400 hover:text-white hover:bg-slate-800"
                           >
                             <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                             Comments
@@ -986,9 +1018,9 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                             }}
                             size="sm"
                             variant="outline"
-                            className="h-9 px-3 text-xs transition-all border-slate-600 hover:bg-slate-800"
+                            className="h-9 px-3 text-xs border-slate-600 text-slate-400 hover:text-white hover:bg-slate-800"
                           >
-                            <Clock className="h-3.5 w-3.5 mr-1.5" />
+                            <Undo2 className="h-3.5 w-3.5 mr-1.5" />
                             Undo
                           </Button>
                           <Button
@@ -997,7 +1029,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                               handleOnHold(taskWithVehicleId);
                             }}
                             size="sm"
-                            className="h-9 px-3 text-xs transition-all border-0 bg-purple-600 hover:bg-purple-700 text-white"
+                            className="h-9 px-3 text-xs bg-purple-600/80 hover:bg-purple-600 text-white border-0"
                           >
                             <Pause className="h-3.5 w-3.5 mr-1.5" />
                             On Hold
@@ -1026,7 +1058,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                             }}
                             size="sm"
                             variant="outline"
-                            className="h-9 px-3 text-xs transition-all border-slate-600 hover:bg-slate-800"
+                            className="h-9 px-3 text-xs border-slate-600 text-slate-400 hover:text-white hover:bg-slate-800"
                           >
                             <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                             Comments
@@ -1347,6 +1379,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           taskId={commentsTask.id}
           open={showCommentsDrawer}
           onOpenChange={setShowCommentsDrawer}
+          taskTitle={commentsTask.title || 'Workshop Task'}
         />
       )}
     </div>
