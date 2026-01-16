@@ -255,7 +255,7 @@ export default function RAMSDetailsPage() {
             <FileText className="h-16 w-16 text-slate-400 mb-4" />
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Document not found</h3>
             <p className="text-slate-600 dark:text-slate-400 mb-4">
-              This document may have been deleted or you don't have permission to view it.
+              This document may have been deleted or you don&apos;t have permission to view it.
             </p>
             <Link href="/rams">
               <Button className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95">

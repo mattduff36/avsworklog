@@ -33,7 +33,6 @@ export function MaintenanceHistoryDialog({
   const { data: historyData, isLoading } = useMaintenanceHistory(vehicleId);
   const [showFullHistory, setShowFullHistory] = useState(false);
   const [visibleHistoryCount, setVisibleHistoryCount] = useState(10);
-  const [showVehicleData, setShowVehicleData] = useState(false);
   const [motHistoryOpen, setMotHistoryOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   
