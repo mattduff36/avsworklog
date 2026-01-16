@@ -97,6 +97,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   const [loggedComment, setLoggedComment] = useState('');
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [completingTask, setCompletingTask] = useState<WorkshopTask | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState<Set<string>>(new Set());
   const [showOnHoldModal, setShowOnHoldModal] = useState(false);
   const [onHoldingTask, setOnHoldingTask] = useState<WorkshopTask | null>(null);
   const [onHoldComment, setOnHoldComment] = useState('');
@@ -433,6 +434,8 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     const requiresIntermediateStep = completingTask.status === 'pending' || completingTask.status === 'on_hold';
 
     try {
+      setUpdatingStatus(prev => new Set(prev).add(taskId));
+
       const supabase = createClient();
       const now = new Date();
 
@@ -521,9 +524,20 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         });
         fetchVehicleHistory(vehicleId, true);
       }
+
+      setUpdatingStatus(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
     } catch (error: unknown) {
       console.error('Error marking task complete:', error instanceof Error ? error.message : error);
       toast.error('Failed to complete task');
+      setUpdatingStatus(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
     }
   };
 
@@ -1214,7 +1228,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         onOpenChange={setShowCompleteModal}
         task={completingTask}
         onConfirm={confirmMarkComplete}
-        isSubmitting={false}
+        isSubmitting={completingTask ? updatingStatus.has(completingTask.id) : false}
       />
 
       {/* On Hold Modal */}
