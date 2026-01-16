@@ -249,17 +249,28 @@ export function Navbar() {
     // Parse the href to separate path and query
     const [linkPath, linkQuery] = href.split('?');
     
-    // If no query params in href, just check path
+    // Check if pathname matches (handles nested routes consistently)
+    // Match exact path OR nested paths (e.g., /fleet matches /fleet/vehicles/123)
+    const pathMatches = pathname === linkPath || pathname.startsWith(linkPath + '/');
+    
+    if (!pathMatches) return false;
+    
+    // If no query params in href, path match is sufficient
     if (!linkQuery) {
-      return pathname.startsWith(linkPath);
+      return true;
     }
     
-    // If href has query params, check both path AND query params
+    // If href has query params, verify they all match current URL
     const linkParams = new URLSearchParams(linkQuery);
-    const currentTab = searchParams?.get('tab');
-    const linkTab = linkParams.get('tab');
     
-    return pathname === linkPath && currentTab === linkTab;
+    // Check all link query params exist in current URL with same values
+    for (const [key, value] of linkParams.entries()) {
+      if (searchParams?.get(key) !== value) {
+        return false;
+      }
+    }
+    
+    return true;
   };
 
   // Dashboard is always visible
