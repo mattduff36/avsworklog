@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, Calendar, Wrench, AlertCircle, ChevronDown, ChevronUp, Loader2, Clock, ExternalLink, CheckCircle2, MessageSquare, Pause, Play, Undo2 } from 'lucide-react';
+import { AlertTriangle, Calendar, Wrench, ChevronDown, ChevronUp, Loader2, Clock, CheckCircle2, MessageSquare, Pause, Play, Undo2 } from 'lucide-react';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
-import { formatDaysUntil, formatMilesUntil, formatMileage, formatMaintenanceDate, getStatusColorClass } from '@/lib/utils/maintenanceCalculations';
+import { formatDaysUntil, formatMilesUntil, formatMileage, formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
+import type { CompletionUpdatesArray } from '@/types/workshop-completion';
 import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -50,6 +51,14 @@ interface HistoryEntry {
   updated_by_name?: string;
 }
 
+interface StatusHistoryEvent {
+  status: string;
+  timestamp: string;
+  userId: string;
+  userName: string;
+  comment?: string;
+}
+
 interface WorkshopTask {
   id: string;
   created_at: string;
@@ -58,17 +67,16 @@ interface WorkshopTask {
   description: string;
   workshop_comments?: string | null;
   vehicle_id?: string;
-  status_history?: any[] | null;
+  status_history?: StatusHistoryEvent[] | null;
   workshop_task_categories?: { 
     id: string;
     name: string;
-    completion_updates?: any[] | null;
+    completion_updates?: CompletionUpdatesArray | null;
   } | null;
   profiles?: { full_name: string | null } | null;
 }
 
 export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: MaintenanceOverviewProps) {
-  const router = useRouter();
   const { user, profile } = useAuth();
   const [expandedVehicles, setExpandedVehicles] = useState<Set<string>>(new Set());
   const [vehicleHistory, setVehicleHistory] = useState<Record<string, { history: HistoryEntry[], workshopTasks: WorkshopTask[], loading: boolean }>>({});
@@ -362,7 +370,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         });
         fetchVehicleHistory(vehicleId, true);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error marking task in progress:', error instanceof Error ? error.message : error);
       toast.error('Failed to update task');
     }
@@ -405,7 +413,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         });
         fetchVehicleHistory(vehicleId, true);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error undoing task:', error instanceof Error ? error.message : error);
       toast.error('Failed to undo task');
     }
@@ -513,7 +521,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         });
         fetchVehicleHistory(vehicleId, true);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error marking task complete:', error instanceof Error ? error.message : error);
       toast.error('Failed to complete task');
     }
@@ -577,7 +585,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         });
         fetchVehicleHistory(vehicleId, true);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error marking task on hold:', error);
       toast.error('Failed to update task');
     }
@@ -641,7 +649,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         });
         fetchVehicleHistory(vehicleId, true);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error resuming task:', error instanceof Error ? error.message : error);
       toast.error('Failed to resume task');
     }
@@ -1215,13 +1223,13 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           <DialogHeader>
             <DialogTitle className="text-slate-900 dark:text-white text-xl">Put Task On Hold</DialogTitle>
             <DialogDescription className="text-slate-600 dark:text-slate-400">
-              This task will be marked as "On Hold" and can be resumed later
+              This task will be marked as &quot;On Hold&quot; and can be resumed later
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
               <p className="text-sm text-purple-300">
-                This task will be marked as "On Hold" and can be resumed later. On hold tasks will still appear in driver inspections.
+                This task will be marked as &quot;On Hold&quot; and can be resumed later. On hold tasks will still appear in driver inspections.
               </p>
             </div>
 
