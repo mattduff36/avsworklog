@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,7 @@ type ViewAsRole = 'actual' | 'employee' | 'manager' | 'admin';
 
 export function Navbar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { user, profile, signOut, isAdmin, isManager } = useAuth();
   useOfflineSync(); // Keep hook for potential future use
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -241,6 +242,26 @@ export function Navbar() {
     }
   };
 
+  // Helper function to check if a nav link is active
+  const isLinkActive = (href: string): boolean => {
+    if (!pathname) return false;
+    
+    // Parse the href to separate path and query
+    const [linkPath, linkQuery] = href.split('?');
+    
+    // If no query params in href, just check path
+    if (!linkQuery) {
+      return pathname.startsWith(linkPath);
+    }
+    
+    // If href has query params, check both path AND query params
+    const linkParams = new URLSearchParams(linkQuery);
+    const currentTab = searchParams?.get('tab');
+    const linkTab = linkParams.get('tab');
+    
+    return pathname === linkPath && currentTab === linkTab;
+  };
+
   // Dashboard is always visible
   const dashboardNav = [dashboardNavItem];
   
@@ -281,7 +302,7 @@ export function Navbar() {
                 {/* Dashboard */}
                 {dashboardNav.map((item) => {
                   const Icon = item.icon;
-                  const isActive = pathname?.startsWith(item.href);
+                  const isActive = isLinkActive(item.href);
                   return (
                     <Link
                       key={item.href}
@@ -302,7 +323,7 @@ export function Navbar() {
                 {/* Employee Navigation - Same for all */}
                 {employeeNav.map((item) => {
                   const Icon = item.icon;
-                  const isActive = pathname?.startsWith(item.href);
+                  const isActive = isLinkActive(item.href);
                   return (
                     <Link
                       key={item.href}
@@ -377,7 +398,7 @@ export function Navbar() {
               {/* Dashboard */}
               {dashboardNav.map((item) => {
                 const Icon = item.icon;
-                const isActive = pathname?.startsWith(item.href);
+                const isActive = isLinkActive(item.href);
                 return (
                   <Link
                     key={item.href}
@@ -399,7 +420,7 @@ export function Navbar() {
               {/* Employee Navigation */}
               {employeeNav.map((item) => {
                 const Icon = item.icon;
-                const isActive = pathname?.startsWith(item.href);
+                const isActive = isLinkActive(item.href);
                 return (
                   <Link
                     key={item.href}
@@ -429,7 +450,7 @@ export function Navbar() {
                   </div>
                   {managerLinks.map((item) => {
                     const Icon = item.icon;
-                    const isActive = pathname?.startsWith(item.href);
+                    const isActive = isLinkActive(item.href);
                     return (
                       <Link
                         key={item.href}
@@ -456,7 +477,7 @@ export function Navbar() {
                       </div>
                       {adminLinks.map((item) => {
                         const Icon = item.icon;
-                        const isActive = pathname?.startsWith(item.href);
+                        const isActive = isLinkActive(item.href);
                         return (
                           <Link
                             key={item.href}
