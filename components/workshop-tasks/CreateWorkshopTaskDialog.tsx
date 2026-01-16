@@ -167,6 +167,13 @@ export function CreateWorkshopTaskDialog({
   };
 
   const handleAddTask = async () => {
+    // Validate user is authenticated before proceeding
+    if (!user?.id) {
+      toast.error('You must be logged in to create tasks');
+      onOpenChange(false);
+      return;
+    }
+
     if (!selectedVehicleId || !selectedSubcategoryId || !workshopComments.trim() || !newMileage.trim()) {
       toast.error('Please fill in all required fields');
       return;
@@ -210,7 +217,7 @@ export function CreateWorkshopTaskDialog({
           description: workshopComments.substring(0, 200),
           status: 'pending',
           priority: 'medium',
-          created_by: user!.id,
+          created_by: user.id,
         });
 
       if (error) throw error;
@@ -223,7 +230,7 @@ export function CreateWorkshopTaskDialog({
           current_mileage: mileageValue,
           last_mileage_update: new Date().toISOString(),
           last_updated_at: new Date().toISOString(),
-          last_updated_by: user!.id,
+          last_updated_by: user.id,
         }, {
           onConflict: 'vehicle_id',
         });
