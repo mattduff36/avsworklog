@@ -13,7 +13,6 @@ import { formatDaysUntil, formatMilesUntil, formatMileage, formatMaintenanceDate
 import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
 import { CreateWorkshopTaskDialog } from '@/components/workshop-tasks/CreateWorkshopTaskDialog';
 import { TaskCommentsDrawer } from '@/components/workshop-tasks/TaskCommentsDrawer';
 import { getTaskContent } from '@/lib/utils/serviceTaskCreation';
@@ -198,16 +197,6 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       ...vehicle,
       alerts
     };
-  });
-  
-  // Get all workshop task IDs from all expanded vehicles
-  const allWorkshopTaskIds = Object.values(vehicleHistory)
-    .flatMap(vh => vh.workshopTasks.map(t => t.id));
-  
-  // Fetch comments for all workshop tasks
-  const { comments: taskComments } = useWorkshopTaskComments({
-    taskIds: allWorkshopTaskIds,
-    enabled: allWorkshopTaskIds.length > 0
   });
 
   // Fetch Service category on mount (for pre-filling create task dialog)
