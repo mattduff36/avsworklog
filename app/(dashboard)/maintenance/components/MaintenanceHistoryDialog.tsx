@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, History as HistoryIcon, User, Calendar, Edit, ChevronDown, ChevronUp, Clock, FileText, RefreshCw } from 'lucide-react';
+import { Loader2, History as HistoryIcon, User, Edit, ChevronDown, ChevronUp, Clock, FileText } from 'lucide-react';
 import { useMaintenanceHistory } from '@/lib/hooks/useMaintenance';
 import { formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 import { MotHistoryDialog } from './MotHistoryDialog';
