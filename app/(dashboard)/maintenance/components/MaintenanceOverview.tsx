@@ -349,7 +349,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         .update({
           status: 'logged',
           logged_at: new Date().toISOString(),
-          logged_comment: loggedComment,
+          logged_comment: loggedComment.trim(),
           logged_by: user?.id || null,
           status_history: nextHistory,
         })
