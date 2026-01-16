@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -106,6 +106,66 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   const [showCommentsDrawer, setShowCommentsDrawer] = useState(false);
   const [commentsTask, setCommentsTask] = useState<WorkshopTask | null>(null);
   
+  // Fetch Service category on mount (for pre-filling create task dialog)
+  useEffect(() => {
+    const fetchServiceCategory = async () => {
+      const supabase = createClient();
+      try {
+        const { data: categories } = await supabase
+          .from('workshop_task_categories')
+          .select('id, name')
+          .ilike('name', '%service%')
+          .eq('is_active', true)
+          .limit(1);
+        
+        if (categories && categories.length > 0) {
+          setMaintenanceCategoryId(categories[0].id);
+        }
+      } catch (error) {
+        console.error('Error fetching service category:', error);
+      }
+    };
+    
+    fetchServiceCategory();
+  }, []);
+  
+  const fetchVehicleHistory = useCallback(async (vehicleId: string, force: boolean = false) => {
+    // Check if already fetching or already have data (unless forced)
+    if (!force && (fetchingVehicles.current.has(vehicleId) || vehicleHistory[vehicleId])) {
+      return; // Already fetching or already fetched
+    }
+    
+    // Mark as fetching
+    fetchingVehicles.current.add(vehicleId);
+    
+    setVehicleHistory(prev => ({ ...prev, [vehicleId]: { history: [], workshopTasks: [], loading: true } }));
+    
+    try {
+      const response = await fetch(`/api/maintenance/history/${vehicleId}`);
+      if (!response.ok) throw new Error('Failed to fetch history');
+      
+      const data = await response.json();
+      
+      setVehicleHistory(prev => ({
+        ...prev,
+        [vehicleId]: {
+          history: data.history || [],
+          workshopTasks: data.workshopTasks || [],
+          loading: false
+        }
+      }));
+    } catch (error) {
+      console.error('Error fetching vehicle history:', error);
+      setVehicleHistory(prev => ({
+        ...prev,
+        [vehicleId]: { history: [], workshopTasks: [], loading: false }
+      }));
+    } finally {
+      // Always remove from fetching set after completion
+      fetchingVehicles.current.delete(vehicleId);
+    }
+  }, [vehicleHistory]);
+  
   // Auto-fetch history for vehicles with alerts on mount
   useEffect(() => {
     const vehiclesWithAlerts = vehicles.filter(v => {
@@ -123,7 +183,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         fetchVehicleHistory(vehicleId);
       }
     });
-  }, [vehicles]);
+  }, [vehicles, fetchVehicleHistory]);
   
   // Group vehicles by their most severe alert status
   const vehiclesWithAlerts: VehicleWithAlerts[] = vehicles.map(vehicle => {
@@ -209,66 +269,6 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       alerts
     };
   });
-
-  // Fetch Service category on mount (for pre-filling create task dialog)
-  useEffect(() => {
-    const fetchServiceCategory = async () => {
-      const supabase = createClient();
-      try {
-        const { data: categories } = await supabase
-          .from('workshop_task_categories')
-          .select('id, name')
-          .ilike('name', '%service%')
-          .eq('is_active', true)
-          .limit(1);
-        
-        if (categories && categories.length > 0) {
-          setMaintenanceCategoryId(categories[0].id);
-        }
-      } catch (error) {
-        console.error('Error fetching service category:', error);
-      }
-    };
-    
-    fetchServiceCategory();
-  }, []);
-  
-  const fetchVehicleHistory = async (vehicleId: string, force: boolean = false) => {
-    // Check if already fetching or already have data (unless forced)
-    if (!force && (fetchingVehicles.current.has(vehicleId) || vehicleHistory[vehicleId])) {
-      return; // Already fetching or already fetched
-    }
-    
-    // Mark as fetching
-    fetchingVehicles.current.add(vehicleId);
-    
-    setVehicleHistory(prev => ({ ...prev, [vehicleId]: { history: [], workshopTasks: [], loading: true } }));
-    
-    try {
-      const response = await fetch(`/api/maintenance/history/${vehicleId}`);
-      if (!response.ok) throw new Error('Failed to fetch history');
-      
-      const data = await response.json();
-      
-      setVehicleHistory(prev => ({
-        ...prev,
-        [vehicleId]: {
-          history: data.history || [],
-          workshopTasks: data.workshopTasks || [],
-          loading: false
-        }
-      }));
-    } catch (error) {
-      console.error('Error fetching vehicle history:', error);
-      setVehicleHistory(prev => ({
-        ...prev,
-        [vehicleId]: { history: [], workshopTasks: [], loading: false }
-      }));
-    } finally {
-      // Always remove from fetching set after completion
-      fetchingVehicles.current.delete(vehicleId);
-    }
-  };
 
   // Check if any alerts have matching workshop tasks
   const hasMatchingTasks = (vehicle: VehicleWithAlerts, tasks: WorkshopTask[]): boolean => {
