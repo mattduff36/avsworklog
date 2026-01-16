@@ -10,19 +10,13 @@ import { OfflineBanner } from '@/components/ui/offline-banner';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { formatDate } from '@/lib/utils/date';
 import { 
   CheckCircle2,
-  AlertCircle,
-  AlertTriangle,
   PackageCheck,
   Clipboard,
   FileCheck,
-  ScrollText,
   ChevronRight,
   Bug,
-  Clock,
-  Activity,
   Truck,
   Wrench,
   Settings,
@@ -42,22 +36,6 @@ type PendingApprovalCount = {
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   color: string;
   href: string;
-};
-
-type Action = Database['public']['Tables']['actions']['Row'] & {
-  vehicle_inspections?: {
-    inspection_date: string;
-    vehicles?: {
-      reg_number: string;
-    };
-    profiles?: {
-      full_name: string;
-    };
-  };
-  inspection_items?: {
-    item_description: string;
-    status: string;
-  };
 };
 
 /**
@@ -314,7 +292,7 @@ export default function DashboardPage() {
           const maintenanceData = await maintenanceResponse.json();
           const vehicles = maintenanceData.vehicles || [];
           
-          vehicles.forEach((vehicle: any) => {
+          vehicles.forEach((vehicle: { tax_status?: { status: string }, mot_status?: { status: string }, service_status?: { status: string }, cambelt_status?: { status: string }, first_aid_status?: { status: string } }) => {
             // Check Tax
             if (vehicle.tax_status?.status === 'overdue') maintenanceOverdue++;
             else if (vehicle.tax_status?.status === 'due_soon') maintenanceDueSoon++;
