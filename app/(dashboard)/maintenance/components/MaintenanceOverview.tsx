@@ -1,20 +1,22 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, Calendar, Wrench, AlertCircle, ChevronDown, ChevronUp, Loader2, Clock, ExternalLink, CheckCircle2, MessageSquare, Pause, Play, Undo2 } from 'lucide-react';
+import { AlertTriangle, Calendar, Wrench, ChevronDown, ChevronUp, Loader2, Clock, CheckCircle2, MessageSquare, Pause, Play, Undo2 } from 'lucide-react';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
-import { formatDaysUntil, formatMilesUntil, formatMileage, formatMaintenanceDate, getStatusColorClass } from '@/lib/utils/maintenanceCalculations';
+import { formatDaysUntil, formatMilesUntil, formatMileage, formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
+import type { CompletionUpdatesArray } from '@/types/workshop-completion';
 import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { CreateWorkshopTaskDialog } from '@/components/workshop-tasks/CreateWorkshopTaskDialog';
 import { TaskCommentsDrawer } from '@/components/workshop-tasks/TaskCommentsDrawer';
+import { MarkTaskCompleteDialog, type CompletionData } from '@/components/workshop-tasks/MarkTaskCompleteDialog';
 import { getTaskContent } from '@/lib/utils/serviceTaskCreation';
 import { appendStatusHistory, buildStatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
 import { createClient } from '@/lib/supabase/client';
@@ -49,6 +51,14 @@ interface HistoryEntry {
   updated_by_name?: string;
 }
 
+interface StatusHistoryEvent {
+  status: string;
+  timestamp: string;
+  userId: string;
+  userName: string;
+  comment?: string;
+}
+
 interface WorkshopTask {
   id: string;
   created_at: string;
@@ -57,13 +67,16 @@ interface WorkshopTask {
   description: string;
   workshop_comments?: string | null;
   vehicle_id?: string;
-  status_history?: any[] | null;
-  workshop_task_categories?: { name: string } | null;
+  status_history?: StatusHistoryEvent[] | null;
+  workshop_task_categories?: { 
+    id: string;
+    name: string;
+    completion_updates?: CompletionUpdatesArray | null;
+  } | null;
   profiles?: { full_name: string | null } | null;
 }
 
 export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: MaintenanceOverviewProps) {
-  const router = useRouter();
   const { user, profile } = useAuth();
   const [expandedVehicles, setExpandedVehicles] = useState<Set<string>>(new Set());
   const [vehicleHistory, setVehicleHistory] = useState<Record<string, { history: HistoryEntry[], workshopTasks: WorkshopTask[], loading: boolean }>>({});
@@ -84,8 +97,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   const [loggedComment, setLoggedComment] = useState('');
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [completingTask, setCompletingTask] = useState<WorkshopTask | null>(null);
-  const [completedComment, setCompletedComment] = useState('');
-  const [intermediateComment, setIntermediateComment] = useState('');
+  const [updatingStatus, setUpdatingStatus] = useState<Set<string>>(new Set());
   const [showOnHoldModal, setShowOnHoldModal] = useState(false);
   const [onHoldingTask, setOnHoldingTask] = useState<WorkshopTask | null>(null);
   const [onHoldComment, setOnHoldComment] = useState('');
@@ -94,6 +106,66 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   const [resumeComment, setResumeComment] = useState('');
   const [showCommentsDrawer, setShowCommentsDrawer] = useState(false);
   const [commentsTask, setCommentsTask] = useState<WorkshopTask | null>(null);
+  
+  // Fetch Service category on mount (for pre-filling create task dialog)
+  useEffect(() => {
+    const fetchServiceCategory = async () => {
+      const supabase = createClient();
+      try {
+        const { data: categories } = await supabase
+          .from('workshop_task_categories')
+          .select('id, name')
+          .ilike('name', '%service%')
+          .eq('is_active', true)
+          .limit(1);
+        
+        if (categories && categories.length > 0) {
+          setMaintenanceCategoryId(categories[0].id);
+        }
+      } catch (error) {
+        console.error('Error fetching service category:', error);
+      }
+    };
+    
+    fetchServiceCategory();
+  }, []);
+  
+  const fetchVehicleHistory = useCallback(async (vehicleId: string, force: boolean = false) => {
+    // Check if already fetching or already have data (unless forced)
+    if (!force && (fetchingVehicles.current.has(vehicleId) || vehicleHistory[vehicleId])) {
+      return; // Already fetching or already fetched
+    }
+    
+    // Mark as fetching
+    fetchingVehicles.current.add(vehicleId);
+    
+    setVehicleHistory(prev => ({ ...prev, [vehicleId]: { history: [], workshopTasks: [], loading: true } }));
+    
+    try {
+      const response = await fetch(`/api/maintenance/history/${vehicleId}`);
+      if (!response.ok) throw new Error('Failed to fetch history');
+      
+      const data = await response.json();
+      
+      setVehicleHistory(prev => ({
+        ...prev,
+        [vehicleId]: {
+          history: data.history || [],
+          workshopTasks: data.workshopTasks || [],
+          loading: false
+        }
+      }));
+    } catch (error) {
+      console.error('Error fetching vehicle history:', error);
+      setVehicleHistory(prev => ({
+        ...prev,
+        [vehicleId]: { history: [], workshopTasks: [], loading: false }
+      }));
+    } finally {
+      // Always remove from fetching set after completion
+      fetchingVehicles.current.delete(vehicleId);
+    }
+  }, [vehicleHistory]);
   
   // Auto-fetch history for vehicles with alerts on mount
   useEffect(() => {
@@ -112,7 +184,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         fetchVehicleHistory(vehicleId);
       }
     });
-  }, [vehicles]);
+  }, [vehicles, fetchVehicleHistory]);
   
   // Group vehicles by their most severe alert status
   const vehiclesWithAlerts: VehicleWithAlerts[] = vehicles.map(vehicle => {
@@ -198,66 +270,6 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       alerts
     };
   });
-
-  // Fetch Service category on mount (for pre-filling create task dialog)
-  useEffect(() => {
-    const fetchServiceCategory = async () => {
-      const supabase = createClient();
-      try {
-        const { data: categories } = await supabase
-          .from('workshop_task_categories')
-          .select('id, name')
-          .ilike('name', '%service%')
-          .eq('is_active', true)
-          .limit(1);
-        
-        if (categories && categories.length > 0) {
-          setMaintenanceCategoryId(categories[0].id);
-        }
-      } catch (error) {
-        console.error('Error fetching service category:', error);
-      }
-    };
-    
-    fetchServiceCategory();
-  }, []);
-  
-  const fetchVehicleHistory = async (vehicleId: string, force: boolean = false) => {
-    // Check if already fetching or already have data (unless forced)
-    if (!force && (fetchingVehicles.current.has(vehicleId) || vehicleHistory[vehicleId])) {
-      return; // Already fetching or already fetched
-    }
-    
-    // Mark as fetching
-    fetchingVehicles.current.add(vehicleId);
-    
-    setVehicleHistory(prev => ({ ...prev, [vehicleId]: { history: [], workshopTasks: [], loading: true } }));
-    
-    try {
-      const response = await fetch(`/api/maintenance/history/${vehicleId}`);
-      if (!response.ok) throw new Error('Failed to fetch history');
-      
-      const data = await response.json();
-      
-      setVehicleHistory(prev => ({
-        ...prev,
-        [vehicleId]: {
-          history: data.history || [],
-          workshopTasks: data.workshopTasks || [],
-          loading: false
-        }
-      }));
-    } catch (error) {
-      console.error('Error fetching vehicle history:', error);
-      setVehicleHistory(prev => ({
-        ...prev,
-        [vehicleId]: { history: [], workshopTasks: [], loading: false }
-      }));
-    } finally {
-      // Always remove from fetching set after completion
-      fetchingVehicles.current.delete(vehicleId);
-    }
-  };
 
   // Check if any alerts have matching workshop tasks
   const hasMatchingTasks = (vehicle: VehicleWithAlerts, tasks: WorkshopTask[]): boolean => {
@@ -359,7 +371,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         });
         fetchVehicleHistory(vehicleId, true);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error marking task in progress:', error instanceof Error ? error.message : error);
       toast.error('Failed to update task');
     }
@@ -402,7 +414,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         });
         fetchVehicleHistory(vehicleId, true);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error undoing task:', error instanceof Error ? error.message : error);
       toast.error('Failed to undo task');
     }
@@ -411,42 +423,43 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   // Handler: Mark Complete
   const handleMarkComplete = (task: WorkshopTask) => {
     setCompletingTask(task);
-    setCompletedComment('');
-    setIntermediateComment('');
     setShowCompleteModal(true);
   };
 
-  const confirmMarkComplete = async () => {
+  const confirmMarkComplete = async (data: CompletionData) => {
     if (!completingTask) return;
 
+    const taskId = completingTask.id;
+    const vehicleId = completingTask.vehicle_id;
     const requiresIntermediateStep = completingTask.status === 'pending' || completingTask.status === 'on_hold';
 
-    if (requiresIntermediateStep && !intermediateComment.trim()) {
-      toast.error('Please add an intermediate comment');
-      return;
-    }
-
-    if (!completedComment.trim()) {
-      toast.error('Please add a completion comment');
-      return;
-    }
-
-    if ((requiresIntermediateStep && intermediateComment.length > 300) || completedComment.length > 300) {
-      toast.error('Comments must be 300 characters or less');
-      return;
-    }
-
     try {
+      setUpdatingStatus(prev => new Set(prev).add(taskId));
+
       const supabase = createClient();
-      const taskId = completingTask.id;
-      const vehicleId = completingTask.vehicle_id;
       const now = new Date();
 
-      let nextHistory = completingTask.status_history;
+      // Fetch latest status_history from database to ensure we have current state
+      const { data: latestTask, error: fetchError } = await supabase
+        .from('actions')
+        .select('status_history')
+        .eq('id', taskId)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching latest task state:', fetchError);
+        throw fetchError;
+      }
+
+      // Use database status_history (or empty array if null)
+      let nextHistory = Array.isArray(latestTask.status_history) 
+        ? latestTask.status_history 
+        : [];
+
       let updatePayload: Record<string, any> = {
         status: 'completed',
         actioned_at: now.toISOString(),
-        actioned_comment: completedComment.trim(),
+        actioned_comment: data.completedComment,
         actioned_by: user?.id || null,
       };
 
@@ -454,7 +467,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         const intermediateStatus = completingTask.status === 'on_hold' ? 'resumed' : 'logged';
         const intermediateEvent = buildStatusHistoryEvent({
           status: intermediateStatus,
-          body: intermediateComment.trim(),
+          body: data.intermediateComment,
           authorId: user?.id || null,
           authorName: profile?.full_name || null,
           createdAt: now.toISOString(),
@@ -464,14 +477,14 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         updatePayload = {
           ...updatePayload,
           logged_at: now.toISOString(),
-          logged_comment: intermediateComment.trim(),
+          logged_comment: data.intermediateComment,
           logged_by: user?.id || null,
         };
       }
 
       const completeEvent = buildStatusHistoryEvent({
         status: 'completed',
-        body: completedComment.trim(),
+        body: data.completedComment,
         authorId: user?.id || null,
         authorName: profile?.full_name || null,
         createdAt: new Date(now.getTime() + 1).toISOString(),
@@ -480,7 +493,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
       updatePayload.status_history = nextHistory;
 
-      // Now mark as complete
+      // Mark as complete
       const { error: completeError } = await supabase
         .from('actions')
         .update(updatePayload)
@@ -488,8 +501,35 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
       if (completeError) throw completeError;
 
+      // Update maintenance if there are any updates
+      if (data.maintenanceUpdates && vehicleId) {
+        try {
+          const maintenanceResponse = await fetch(
+            `/api/maintenance/by-vehicle/${vehicleId}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ...data.maintenanceUpdates,
+                comment: `Updated from workshop task completion: ${completingTask.title || 'Task'}`,
+              }),
+            }
+          );
+
+          if (!maintenanceResponse.ok) {
+            const error = await maintenanceResponse.json();
+            console.error('Failed to update maintenance:', error);
+            toast.warning('Task completed but maintenance update failed');
+          }
+        } catch (maintError) {
+          console.error('Error updating maintenance:', maintError);
+          toast.warning('Task completed but maintenance update failed');
+        }
+      }
+
       toast.success('Task marked as complete');
       setShowCompleteModal(false);
+      setCompletingTask(null);
       
       // Refetch vehicle history
       if (vehicleId) {
@@ -500,9 +540,20 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         });
         fetchVehicleHistory(vehicleId, true);
       }
-    } catch (error: any) {
+
+      setUpdatingStatus(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
+    } catch (error: unknown) {
       console.error('Error marking task complete:', error instanceof Error ? error.message : error);
       toast.error('Failed to complete task');
+      setUpdatingStatus(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
     }
   };
 
@@ -564,7 +615,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         });
         fetchVehicleHistory(vehicleId, true);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error marking task on hold:', error);
       toast.error('Failed to update task');
     }
@@ -628,7 +679,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         });
         fetchVehicleHistory(vehicleId, true);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error resuming task:', error instanceof Error ? error.message : error);
       toast.error('Failed to resume task');
     }
@@ -1188,76 +1239,13 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       </Dialog>
 
       {/* Mark Task Complete Modal */}
-      <Dialog open={showCompleteModal} onOpenChange={setShowCompleteModal}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-white text-xl">Mark Task Complete</DialogTitle>
-            <DialogDescription className="text-slate-600 dark:text-slate-400">
-              {completingTask && (completingTask.status === 'pending' || completingTask.status === 'on_hold')
-                ? 'This task will be moved through In Progress and then marked as Complete'
-                : 'Confirm the work has been completed'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {completingTask && (completingTask.status === 'pending' || completingTask.status === 'on_hold') && (
-              <div className="space-y-2">
-                <Label htmlFor="intermediate-comment" className="text-slate-900 dark:text-white">
-                  Started Work Comment <span className="text-red-500">*</span>
-                </Label>
-                <Textarea
-                  id="intermediate-comment"
-                  value={intermediateComment}
-                  onChange={(e) => setIntermediateComment(e.target.value)}
-                  placeholder="Brief note about starting the work"
-                  className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white"
-                  maxLength={300}
-                />
-                <p className="text-xs text-slate-600 dark:text-slate-400">
-                  {intermediateComment.length}/300 characters
-                </p>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="completed-comment" className="text-slate-900 dark:text-white">
-                Completion Comment <span className="text-red-500">*</span>
-              </Label>
-              <Textarea
-                id="completed-comment"
-                value={completedComment}
-                onChange={(e) => setCompletedComment(e.target.value)}
-                placeholder="What was done to complete this task?"
-                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[100px]"
-                maxLength={300}
-              />
-              <p className="text-xs text-slate-600 dark:text-slate-400">
-                {completedComment.length}/300 characters
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowCompleteModal(false)}
-              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={confirmMarkComplete}
-              disabled={
-                (completingTask && (completingTask.status === 'pending' || completingTask.status === 'on_hold') && (!intermediateComment.trim() || intermediateComment.length > 300)) ||
-                !completedComment.trim() ||
-                completedComment.length > 300
-              }
-              className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Mark Complete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MarkTaskCompleteDialog
+        open={showCompleteModal}
+        onOpenChange={setShowCompleteModal}
+        task={completingTask}
+        onConfirm={confirmMarkComplete}
+        isSubmitting={completingTask ? updatingStatus.has(completingTask.id) : false}
+      />
 
       {/* On Hold Modal */}
       <Dialog open={showOnHoldModal} onOpenChange={setShowOnHoldModal}>
@@ -1265,13 +1253,13 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           <DialogHeader>
             <DialogTitle className="text-slate-900 dark:text-white text-xl">Put Task On Hold</DialogTitle>
             <DialogDescription className="text-slate-600 dark:text-slate-400">
-              This task will be marked as "On Hold" and can be resumed later
+              This task will be marked as &quot;On Hold&quot; and can be resumed later
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
               <p className="text-sm text-purple-300">
-                This task will be marked as "On Hold" and can be resumed later. On hold tasks will still appear in driver inspections.
+                This task will be marked as &quot;On Hold&quot; and can be resumed later. On hold tasks will still appear in driver inspections.
               </p>
             </div>
 

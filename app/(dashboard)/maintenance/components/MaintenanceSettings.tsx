@@ -178,11 +178,11 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
             <div className="text-sm text-blue-800 dark:text-blue-200">
               <p className="font-semibold mb-1">About Categories & Thresholds</p>
               <p>
-                Categories define what types of maintenance to track. Each category has an alert threshold that determines when to show "Due Soon" warnings. 
+                Categories define what types of maintenance to track. Each category has an alert threshold that determines when to show &quot;Due Soon&quot; warnings. 
                 Date-based categories (Tax, MOT, First Aid) use days, while mileage-based categories (Service, Cambelt) use miles.
               </p>
               <p className="mt-2">
-                <strong>Note:</strong> You cannot change a category's type (date ↔ mileage) after creation. 
+                <strong>Note:</strong> You cannot change a category&apos;s type (date ↔ mileage) after creation. 
                 Changes to thresholds apply immediately to all vehicles.
               </p>
             </div>

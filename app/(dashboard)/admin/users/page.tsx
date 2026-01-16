@@ -940,7 +940,7 @@ export default function UsersAdminPage() {
                       </div>
                       <p className="text-sm text-slate-400 mt-1">
                         Preserve timesheets, inspections, and other submitted work for audits and reporting.
-                        User will be marked as "{selectedUser.full_name} (Deleted User)" in all records.
+                        User will be marked as &quot;{selectedUser.full_name} (Deleted User)&quot; in all records.
                       </p>
                       <div className="mt-2 text-xs text-slate-500">
                         ✓ Personal account deleted  • ✓ Company data preserved  • ✓ Audit trail maintained

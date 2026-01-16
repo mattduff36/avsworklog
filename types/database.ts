@@ -549,6 +549,7 @@ export interface Database {
           logged_comment: string | null
           logged_at: string | null
           logged_by: string | null
+          status_history: Json | null
           created_by: string
           created_at: string
           updated_at: string
@@ -572,6 +573,7 @@ export interface Database {
           logged_comment?: string | null
           logged_at?: string | null
           logged_by?: string | null
+          status_history?: Json | null
           created_by: string
           created_at?: string
           updated_at?: string
@@ -595,6 +597,7 @@ export interface Database {
           logged_comment?: string | null
           logged_at?: string | null
           logged_by?: string | null
+          status_history?: Json | null
           created_by?: string
           created_at?: string
           updated_at?: string
@@ -611,6 +614,7 @@ export interface Database {
           ui_color: string | null
           ui_icon: string | null
           ui_badge_style: string | null
+          completion_updates: Json | null
           created_at: string
           created_by: string | null
           updated_at: string
@@ -625,6 +629,7 @@ export interface Database {
           ui_color?: string | null
           ui_icon?: string | null
           ui_badge_style?: string | null
+          completion_updates?: Json | null
           created_at?: string
           created_by?: string | null
           updated_at?: string
@@ -639,6 +644,7 @@ export interface Database {
           ui_color?: string | null
           ui_icon?: string | null
           ui_badge_style?: string | null
+          completion_updates?: Json | null
           created_at?: string
           created_by?: string | null
           updated_at?: string

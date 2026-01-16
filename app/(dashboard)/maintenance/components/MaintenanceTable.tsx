@@ -22,10 +22,7 @@ import {
   History,
   ArrowUpDown,
   Plus,
-  AlertTriangle,
   Settings2,
-  User,
-  Info,
   Monitor,
   ChevronDown,
   ChevronUp,
@@ -36,7 +33,7 @@ import {
   Undo2
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import type { VehicleMaintenanceWithStatus, DeletedVehicle } from '@/types/maintenance';
+import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { AddVehicleDialog } from './AddVehicleDialog';
 import { DeleteVehicleDialog } from './DeleteVehicleDialog';
 import { 

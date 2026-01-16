@@ -93,7 +93,6 @@ function FleetContent() {
   // State for vehicles and categories
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [vehiclesLoading, setVehiclesLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   
   // State for maintenance search
@@ -102,7 +101,6 @@ function FleetContent() {
   // Fetch vehicles
   const fetchVehicles = async () => {
     try {
-      setVehiclesLoading(true);
       const response = await fetch('/api/admin/vehicles');
       const data = await response.json();
       if (response.ok) {
@@ -110,8 +108,6 @@ function FleetContent() {
       }
     } catch (error) {
       logger.error('Failed to fetch vehicles', error, 'FleetPage');
-    } finally {
-      setVehiclesLoading(false);
     }
   };
 

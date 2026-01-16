@@ -96,7 +96,7 @@ export default function ActionsPage() {
       let overdueCount = 0;
       let dueSoonCount = 0;
       
-      vehicles.forEach((vehicle: any) => {
+      vehicles.forEach((vehicle: { tax_status?: { status: string }, mot_status?: { status: string }, service_status?: { status: string }, cambelt_status?: { status: string }, first_aid_status?: { status: string } }) => {
         // Check Tax
         if (vehicle.tax_status?.status === 'overdue') overdueCount++;
         else if (vehicle.tax_status?.status === 'due_soon') dueSoonCount++;
