@@ -21,6 +21,8 @@ import { TaskCommentsDrawer } from '@/components/workshop-tasks/TaskCommentsDraw
 import { WorkshopTaskModal } from '@/components/workshop-tasks/WorkshopTaskModal';
 import { SubcategoryDialog } from '@/components/workshop-tasks/SubcategoryDialog';
 import { CategoryManagementPanel } from '@/components/workshop-tasks/CategoryManagementPanel';
+import { MarkTaskCompleteDialog, type CompletionData } from '@/components/workshop-tasks/MarkTaskCompleteDialog';
+import { appendStatusHistory, buildStatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
 
 type Action = Database['public']['Tables']['actions']['Row'] & {
   vehicle_inspections?: {
@@ -35,8 +37,13 @@ type Action = Database['public']['Tables']['actions']['Row'] & {
     nickname: string | null;
   };
   workshop_task_categories?: {
+    id: string;
     name: string;
+    completion_updates?: any[] | null;
   };
+  profiles_created?: {
+    full_name: string | null;
+  } | null;
 };
 
 type Vehicle = {
@@ -65,7 +72,7 @@ type Subcategory = {
 export default function WorkshopTasksPage() {
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('workshop-tasks');
   
-  const { user, isManager, isAdmin } = useAuth();
+  const { user, profile, isManager, isAdmin } = useAuth();
   const showSettings = isAdmin || isManager;
   const supabase = createClient();
   
@@ -96,11 +103,6 @@ export default function WorkshopTasksPage() {
   // Complete Task Modal
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [completingTask, setCompletingTask] = useState<Action | null>(null);
-  const [completedComment, setCompletedComment] = useState('');
-
-  // Multi-step completion state
-  const [requiresIntermediateStep, setRequiresIntermediateStep] = useState(false);
-  const [intermediateComment, setIntermediateComment] = useState('');
 
   // On Hold modal state
   const [showOnHoldModal, setShowOnHoldModal] = useState(false);
@@ -196,7 +198,8 @@ export default function WorkshopTasksPage() {
             id,
             name,
             slug,
-            ui_color
+            ui_color,
+            completion_updates
           ),
           workshop_task_subcategories!workshop_subcategory_id (
             id,
@@ -207,7 +210,8 @@ export default function WorkshopTasksPage() {
               id,
               name,
               slug,
-              ui_color
+              ui_color,
+              completion_updates
             )
           )
         `)
@@ -226,7 +230,29 @@ export default function WorkshopTasksPage() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setTasks(data || []);
+
+      const createdByIds = Array.from(
+        new Set((data || []).map(task => task.created_by).filter(Boolean))
+      );
+      let profileMap = new Map<string, { full_name: string | null }>();
+      if (createdByIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', createdByIds);
+        profileMap = new Map(
+          (profiles || []).map(profile => [profile.id, { full_name: profile.full_name }])
+        );
+      }
+
+      const tasksWithProfiles = (data || []).map(task => ({
+        ...task,
+        profiles_created: task.created_by
+          ? profileMap.get(task.created_by) || null
+          : null,
+      }));
+
+      setTasks(tasksWithProfiles);
     } catch (err) {
       console.error('Error fetching tasks:', err instanceof Error ? err.message : err);
       toast.error('Failed to load workshop tasks');
@@ -420,13 +446,25 @@ export default function WorkshopTasksPage() {
     try {
       setUpdatingStatus(prev => new Set(prev).add(selectedTask.id));
 
+      const statusEvent = buildStatusHistoryEvent({
+        status: 'logged',
+        body: loggedComment.trim(),
+        authorId: user?.id || null,
+        authorName: profile?.full_name || null,
+      });
+      const nextHistory = appendStatusHistory(
+        selectedTask.status_history,
+        statusEvent
+      );
+
       const { error } = await supabase
         .from('actions')
         .update({
           status: 'logged',
           logged_comment: loggedComment.trim(),
           logged_at: new Date().toISOString(),
-          logged_by: user?.id,
+          logged_by: user?.id || null,
+          status_history: nextHistory,
         })
         .eq('id', selectedTask.id);
 
@@ -437,14 +475,12 @@ export default function WorkshopTasksPage() {
       setSelectedTask(null);
       setLoggedComment('');
 
-      setTimeout(() => {
-        setUpdatingStatus(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(selectedTask.id);
-          return newSet;
-        });
-        fetchTasks();
-      }, 500);
+      await fetchTasks();
+      setUpdatingStatus(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(selectedTask.id);
+        return newSet;
+      });
     } catch (err) {
       console.error('Error updating status:', err instanceof Error ? err.message : err);
       toast.error('Failed to update status');
@@ -458,17 +494,6 @@ export default function WorkshopTasksPage() {
 
   const handleMarkComplete = (task: Action) => {
     setCompletingTask(task);
-    setCompletedComment('');
-    
-    // Check if task needs intermediate step (pending or on_hold)
-    if (task.status === 'pending' || task.status === 'on_hold') {
-      setRequiresIntermediateStep(true);
-      setIntermediateComment('');
-    } else {
-      setRequiresIntermediateStep(false);
-      setIntermediateComment('');
-    }
-    
     setShowCompleteModal(true);
   };
 
@@ -494,13 +519,25 @@ export default function WorkshopTasksPage() {
     try {
       setUpdatingStatus(prev => new Set(prev).add(onHoldingTask.id));
 
+      const statusEvent = buildStatusHistoryEvent({
+        status: 'on_hold',
+        body: onHoldComment.trim(),
+        authorId: user?.id || null,
+        authorName: profile?.full_name || null,
+      });
+      const nextHistory = appendStatusHistory(
+        onHoldingTask.status_history,
+        statusEvent
+      );
+
       const { error } = await supabase
         .from('actions')
         .update({
           status: 'on_hold',
           logged_at: new Date().toISOString(),
-          logged_by: user?.id,
+          logged_by: user?.id || null,
           logged_comment: onHoldComment.trim(),
+          status_history: nextHistory,
         })
         .eq('id', onHoldingTask.id);
 
@@ -551,13 +588,25 @@ export default function WorkshopTasksPage() {
     try {
       setUpdatingStatus(prev => new Set(prev).add(resumingTask.id));
 
+      const statusEvent = buildStatusHistoryEvent({
+        status: 'resumed',
+        body: resumeComment.trim(),
+        authorId: user?.id || null,
+        authorName: profile?.full_name || null,
+      });
+      const nextHistory = appendStatusHistory(
+        resumingTask.status_history,
+        statusEvent
+      );
+
       const { error } = await supabase
         .from('actions')
         .update({
           status: 'logged',
           logged_at: new Date().toISOString(),
-          logged_by: user?.id,
+          logged_by: user?.id || null,
           logged_comment: resumeComment.trim(),
+          status_history: nextHistory,
         })
         .eq('id', resumingTask.id);
 
@@ -586,47 +635,39 @@ export default function WorkshopTasksPage() {
     }
   };
 
-  const confirmMarkComplete = async () => {
+  const confirmMarkComplete = async (data: CompletionData) => {
     if (!completingTask) return;
 
-    // Capture task ID at the beginning for safe access throughout the function
     const taskId = completingTask.id;
-
-    // Validate intermediate comment if required
-    if (requiresIntermediateStep) {
-      if (!intermediateComment.trim()) {
-        toast.error('In Progress/Resume note is required');
-        return;
-      }
-      if (intermediateComment.length > 300) {
-        toast.error('In Progress/Resume note must be 300 characters or less');
-        return;
-      }
-    }
-
-    // Validate completion comment (always required)
-    if (!completedComment.trim()) {
-      toast.error('Completion note is required');
-      return;
-    }
-
-    if (completedComment.length > 500) {
-      toast.error('Completion note must be 500 characters or less');
-      return;
-    }
+    const requiresIntermediateStep = completingTask.status === 'pending' || completingTask.status === 'on_hold';
 
     try {
       setUpdatingStatus(prev => new Set(prev).add(taskId));
 
+      const now = new Date();
+      let nextHistory = completingTask?.status_history;
+
       // Step 1: If needed, move to In Progress first
       if (requiresIntermediateStep) {
+        const intermediateStatus =
+          completingTask?.status === 'on_hold' ? 'resumed' : 'logged';
+        const intermediateEvent = buildStatusHistoryEvent({
+          status: intermediateStatus,
+          body: data.intermediateComment,
+          authorId: user?.id || null,
+          authorName: profile?.full_name || null,
+          createdAt: now.toISOString(),
+        });
+        nextHistory = appendStatusHistory(nextHistory, intermediateEvent);
+
         const { error: intermediateError } = await supabase
           .from('actions')
           .update({
             status: 'logged',
-            logged_at: new Date().toISOString(),
-            logged_by: user?.id,
-            logged_comment: intermediateComment.trim(),
+            logged_at: now.toISOString(),
+            logged_by: user?.id || null,
+            logged_comment: data.intermediateComment,
+            status_history: nextHistory,
           })
           .eq('id', taskId);
 
@@ -636,6 +677,15 @@ export default function WorkshopTasksPage() {
         }
       }
 
+      const completeEvent = buildStatusHistoryEvent({
+        status: 'completed',
+        body: data.completedComment,
+        authorId: user?.id || null,
+        authorName: profile?.full_name || null,
+        createdAt: new Date(now.getTime() + 1).toISOString(),
+      });
+      nextHistory = appendStatusHistory(nextHistory, completeEvent);
+
       // Step 2: Mark as complete
       const { error } = await supabase
         .from('actions')
@@ -643,8 +693,9 @@ export default function WorkshopTasksPage() {
           status: 'completed',
           actioned: true,
           actioned_at: new Date().toISOString(),
-          actioned_by: user?.id,
-          actioned_comment: completedComment.trim(),
+          actioned_by: user?.id || null,
+          actioned_comment: data.completedComment,
+          status_history: nextHistory,
         })
         .eq('id', taskId);
 
@@ -653,21 +704,42 @@ export default function WorkshopTasksPage() {
         throw error;
       }
 
+      // Step 3: Update maintenance if there are any updates
+      if (data.maintenanceUpdates && completingTask.vehicle_id) {
+        try {
+          const maintenanceResponse = await fetch(
+            `/api/maintenance/by-vehicle/${completingTask.vehicle_id}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ...data.maintenanceUpdates,
+                comment: `Updated from workshop task completion: ${completingTask.title}`,
+              }),
+            }
+          );
+
+          if (!maintenanceResponse.ok) {
+            const error = await maintenanceResponse.json();
+            console.error('Failed to update maintenance:', error);
+            toast.warning('Task completed but maintenance update failed');
+          }
+        } catch (maintError) {
+          console.error('Error updating maintenance:', maintError);
+          toast.warning('Task completed but maintenance update failed');
+        }
+      }
+
       toast.success('Task marked as complete');
       setShowCompleteModal(false);
       setCompletingTask(null);
-      setCompletedComment('');
-      setIntermediateComment('');
-      setRequiresIntermediateStep(false);
 
-      setTimeout(() => {
-        setUpdatingStatus(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(taskId);
-          return newSet;
-        });
-        fetchTasks();
-      }, 500);
+      await fetchTasks();
+      setUpdatingStatus(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
     } catch (err) {
       console.error('Error marking complete:', err instanceof Error ? err.message : err);
       toast.error('Failed to mark complete');
@@ -686,6 +758,15 @@ export default function WorkshopTasksPage() {
 
       setUpdatingStatus(prev => new Set(prev).add(taskId));
 
+      const statusEvent = buildStatusHistoryEvent({
+        status: 'undo',
+        body: `Returned to ${returnStatus === 'logged' ? 'in progress' : 'pending'}`,
+        authorId: user?.id || null,
+        authorName: profile?.full_name || null,
+        meta: { from: 'completed', to: returnStatus },
+      });
+      const nextHistory = appendStatusHistory(task?.status_history, statusEvent);
+
       const { error } = await supabase
         .from('actions')
         .update({
@@ -693,6 +774,7 @@ export default function WorkshopTasksPage() {
           actioned: false,
           actioned_at: null,
           actioned_by: null,
+          status_history: nextHistory,
         })
         .eq('id', taskId);
 
@@ -700,14 +782,12 @@ export default function WorkshopTasksPage() {
 
       toast.success(`Task returned to ${returnStatus === 'logged' ? 'in progress' : 'pending'}`);
 
-      setTimeout(() => {
-        setUpdatingStatus(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(taskId);
-          return newSet;
-        });
-        fetchTasks();
-      }, 500);
+      await fetchTasks();
+      setUpdatingStatus(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
     } catch (err) {
       console.error('Error undoing complete:', err instanceof Error ? err.message : err);
       toast.error('Failed to undo');
@@ -723,6 +803,16 @@ export default function WorkshopTasksPage() {
     try {
       setUpdatingStatus(prev => new Set(prev).add(taskId));
 
+      const task = tasks.find(t => t.id === taskId);
+      const statusEvent = buildStatusHistoryEvent({
+        status: 'undo',
+        body: 'Returned to pending',
+        authorId: user?.id || null,
+        authorName: profile?.full_name || null,
+        meta: { from: 'logged', to: 'pending' },
+      });
+      const nextHistory = appendStatusHistory(task?.status_history, statusEvent);
+
       const { error } = await supabase
         .from('actions')
         .update({
@@ -730,6 +820,7 @@ export default function WorkshopTasksPage() {
           logged_comment: null,
           logged_at: null,
           logged_by: null,
+          status_history: nextHistory,
         })
         .eq('id', taskId);
 
@@ -737,14 +828,12 @@ export default function WorkshopTasksPage() {
 
       toast.success('Task returned to pending');
 
-      setTimeout(() => {
-        setUpdatingStatus(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(taskId);
-          return newSet;
-        });
-        fetchTasks();
-      }, 500);
+      await fetchTasks();
+      setUpdatingStatus(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
     } catch (err) {
       console.error('Error undoing logged:', err instanceof Error ? err.message : err);
       toast.error('Failed to undo');
@@ -2050,117 +2139,13 @@ export default function WorkshopTasksPage() {
       </Dialog>
 
       {/* Mark Task Complete Modal */}
-      <Dialog open={showCompleteModal} onOpenChange={setShowCompleteModal}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-white text-xl">Mark Task Complete</DialogTitle>
-            <DialogDescription className="text-slate-600 dark:text-slate-400">
-              {requiresIntermediateStep 
-                ? 'This task will be moved through In Progress and then marked as Complete' 
-                : 'Add detailed notes about the work completed'}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {requiresIntermediateStep ? (
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-                <div className="flex items-start gap-2">
-                  <Info className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-blue-300">
-                    This task will be moved to In Progress and then immediately marked as Complete. Please provide notes for both steps.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
-                <p className="text-sm text-green-300">
-                  This task will be marked as "Completed" and moved to the completed tasks section.
-                </p>
-              </div>
-            )}
-
-            {requiresIntermediateStep && (
-              <div className="space-y-2">
-                <Label htmlFor="intermediate-comment" className="text-slate-900 dark:text-white">
-                  Step 1: {completingTask?.status === 'on_hold' ? 'Resume Note' : 'In Progress Note'} <span className="text-slate-400">(max 300 chars)</span> <span className="text-red-500">*</span>
-                </Label>
-                <Textarea
-                  id="intermediate-comment"
-                  value={intermediateComment}
-                  onChange={(e) => {
-                    if (e.target.value.length <= 300) {
-                      setIntermediateComment(e.target.value);
-                    }
-                  }}
-                  placeholder={
-                    completingTask?.status === 'on_hold'
-                      ? 'e.g., Parts have arrived, resuming work'
-                      : 'e.g., Started work on this task'
-                  }
-                  className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[80px]"
-                  maxLength={300}
-                  rows={3}
-                />
-                <p className="text-xs text-slate-600 dark:text-slate-400">
-                  {intermediateComment.length}/300 characters
-                </p>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="completed-comment" className="text-slate-900 dark:text-white">
-                {requiresIntermediateStep ? 'Step 2: ' : ''}Completion Note <span className="text-slate-400">(max 500 chars)</span> <span className="text-red-500">*</span>
-              </Label>
-              <Textarea
-                id="completed-comment"
-                value={completedComment}
-                onChange={(e) => {
-                  if (e.target.value.length <= 500) {
-                    setCompletedComment(e.target.value);
-                  }
-                }}
-                placeholder="e.g., Replaced brake pads and discs on front axle. Tested and working correctly."
-                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[100px]"
-                maxLength={500}
-                rows={4}
-              />
-              <p className="text-xs text-slate-600 dark:text-slate-400">
-                {completedComment.length}/500 characters
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowCompleteModal(false);
-                setCompletingTask(null);
-                setCompletedComment('');
-                setIntermediateComment('');
-                setRequiresIntermediateStep(false);
-              }}
-              disabled={completingTask ? updatingStatus.has(completingTask.id) : false}
-              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={confirmMarkComplete}
-              disabled={
-                (requiresIntermediateStep && (!intermediateComment.trim() || intermediateComment.length > 300)) ||
-                !completedComment.trim() || 
-                completedComment.length > 500 || 
-                (completingTask ? updatingStatus.has(completingTask.id) : false)
-              }
-              className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Mark Complete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MarkTaskCompleteDialog
+        open={showCompleteModal}
+        onOpenChange={setShowCompleteModal}
+        task={completingTask}
+        onConfirm={confirmMarkComplete}
+        isSubmitting={completingTask ? updatingStatus.has(completingTask.id) : false}
+      />
 
       {/* Put Task On Hold Modal */}
       <Dialog open={showOnHoldModal} onOpenChange={setShowOnHoldModal}>
