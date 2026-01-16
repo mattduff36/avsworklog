@@ -25,7 +25,7 @@ export function DVLASyncDebugPanel() {
   const [regNumber, setRegNumber] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [bulkSyncing, setBulkSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<any>(null);
+  const [syncResult, setSyncResult] = useState<{ success: boolean; message?: string; data?: unknown } | null>(null);
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
   const [vehicleCount, setVehicleCount] = useState(0);
 
@@ -48,7 +48,7 @@ export function DVLASyncDebugPanel() {
       }
 
       const normalizedReg = regNumber.replace(/\s+/g, '').toUpperCase();
-      const vehicle = vehiclesData.vehicles.find((v: any) => 
+      const vehicle = vehiclesData.vehicles.find((v: { vehicle?: { reg_number?: string }; vehicle_id: string }) => 
         v.vehicle?.reg_number?.replace(/\s+/g, '').toUpperCase() === normalizedReg
       );
 
@@ -79,10 +79,11 @@ export function DVLASyncDebugPanel() {
         toast.error(`Failed to sync ${regNumber}`);
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to sync vehicle';
       console.error('Sync error:', error);
-      toast.error(error.message || 'Failed to sync vehicle');
-      setSyncResult({ success: false, error: error.message });
+      toast.error(errorMessage);
+      setSyncResult({ success: false, message: errorMessage });
     } finally {
       setSyncing(false);
     }
@@ -95,7 +96,7 @@ export function DVLASyncDebugPanel() {
       const data = await response.json();
       
       if (data.success) {
-        const activeVehicles = data.vehicles.filter((v: any) => 
+        const activeVehicles = data.vehicles.filter((v: { vehicle?: { status?: string } }) => 
           v.vehicle?.status === 'active' || !v.vehicle?.status
         );
         setVehicleCount(activeVehicles.length);
@@ -127,10 +128,11 @@ export function DVLASyncDebugPanel() {
       setSyncResult(data);
       toast.success(`Bulk sync complete: ${data.successful}/${data.total} successful`);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to bulk sync vehicles';
       console.error('Bulk sync error:', error);
-      toast.error(error.message || 'Failed to bulk sync vehicles');
-      setSyncResult({ success: false, error: error.message });
+      toast.error(errorMessage);
+      setSyncResult({ success: false, message: errorMessage });
     } finally {
       setBulkSyncing(false);
     }
