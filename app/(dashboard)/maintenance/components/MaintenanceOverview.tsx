@@ -306,9 +306,6 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         return newHistory;
       });
       
-      // Small delay to ensure the task is committed to the database
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
       // Refetch using the centralized function
       fetchVehicleHistory(createTaskVehicleId);
     }
@@ -763,7 +760,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                   if (task.status === 'completed') return false;
                   return vehicle.alerts.some(alert => {
                     const { title } = getTaskContent(alert.type, regNumber, '');
-                    return task.title === title;
+                    return task.title === title || task.description?.includes(title);
                   });
                 });
                 if (!relatedTask) return null;

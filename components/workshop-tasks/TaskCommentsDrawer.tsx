@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MessageSquare, Send, Edit2, Trash2, CheckCircle2, Clock, User } from 'lucide-react';
+import { MessageSquare, Send, Edit2, Trash2, CheckCircle2, Clock, User, Pause, Undo2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
 
@@ -199,19 +199,46 @@ export function TaskCommentsDrawer({
     const isEditing = editingCommentId === item.id;
 
     if (item.type === 'status_event') {
+      const statusLabel =
+        item.meta?.status === 'logged'
+          ? 'In Progress'
+          : item.meta?.status === 'on_hold'
+          ? 'On Hold'
+          : item.meta?.status === 'resumed'
+          ? 'Resumed'
+          : item.meta?.status === 'undo'
+          ? 'Undo'
+          : 'Completed';
+
+      const statusIcon =
+        item.meta?.status === 'logged' || item.meta?.status === 'resumed' ? (
+          <Clock className="h-5 w-5 text-blue-500 mt-0.5" />
+        ) : item.meta?.status === 'on_hold' ? (
+          <Pause className="h-5 w-5 text-purple-500 mt-0.5" />
+        ) : item.meta?.status === 'undo' ? (
+          <Undo2 className="h-5 w-5 text-slate-400 mt-0.5" />
+        ) : (
+          <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
+        );
+
+      const statusBadgeClass =
+        item.meta?.status === 'logged' || item.meta?.status === 'resumed'
+          ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+          : item.meta?.status === 'on_hold'
+          ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
+          : item.meta?.status === 'undo'
+          ? 'bg-slate-500/10 text-slate-400 border-slate-500/30'
+          : 'bg-green-500/10 text-green-400 border-green-500/30';
+
       return (
         <Card key={item.id} className="border-l-4 border-l-blue-500">
           <CardContent className="pt-4">
             <div className="flex items-start gap-3">
-              {item.meta?.status === 'logged' ? (
-                <Clock className="h-5 w-5 text-blue-500 mt-0.5" />
-              ) : (
-                <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
-              )}
+              {statusIcon}
               <div className="flex-1 space-y-1">
                 <div className="flex items-center gap-2">
-                  <Badge variant={item.meta?.status === 'logged' ? 'default' : 'success'}>
-                    {item.meta?.status === 'logged' ? 'In Progress' : 'Completed'}
+                  <Badge variant="outline" className={statusBadgeClass}>
+                    {statusLabel}
                   </Badge>
                   <span className="text-sm text-muted-foreground">
                     {formatDate(item.created_at)}
@@ -321,8 +348,8 @@ export function TaskCommentsDrawer({
             </>
           ) : timeline.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>No comments yet. Add the first note.</p>
+            <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
+            <p>No comments yet. Add the first comment.</p>
             </div>
           ) : (
             timeline.map(renderTimelineItem)
@@ -334,7 +361,7 @@ export function TaskCommentsDrawer({
           <Textarea
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Add a note..."
+            placeholder="Add a comment..."
             rows={3}
             maxLength={1000}
             disabled={submitting}
@@ -349,7 +376,7 @@ export function TaskCommentsDrawer({
               size="sm"
             >
               <Send className="h-4 w-4 mr-2" />
-              {submitting ? 'Adding...' : 'Add Note'}
+              {submitting ? 'Adding...' : 'Add Comment'}
             </Button>
           </div>
         </div>

@@ -34,6 +34,8 @@ import { EditMaintenanceDialog } from '@/app/(dashboard)/maintenance/components/
 import { DeleteVehicleDialog } from '@/app/(dashboard)/maintenance/components/DeleteVehicleDialog';
 import { getStatusColorClass, formatMileage, formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
+import { WorkshopTaskHistoryCard } from '@/components/workshop-tasks/WorkshopTaskHistoryCard';
+import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
 
 type Vehicle = {
   id: string;
@@ -89,6 +91,7 @@ type WorkshopTask = {
   actioned_at: string | null;
   actioned_by: string | null;
   actioned_comment: string | null;
+  status_history?: any[] | null;
   created_at: string;
   created_by: string;
   workshop_task_categories: {
@@ -120,17 +123,6 @@ type WorkshopTask = {
   } | null;
 };
 
-type WorkshopComment = {
-  id: string;
-  body: string;
-  created_at: string;
-  updated_at: string | null;
-  author: {
-    id: string;
-    full_name: string;
-  } | null;
-};
-
 export default function VehicleHistoryPage({
   params,
 }: {
@@ -147,7 +139,6 @@ export default function VehicleHistoryPage({
   const [loading, setLoading] = useState(true);
   const [maintenanceHistory, setMaintenanceHistory] = useState<MaintenanceHistoryEntry[]>([]);
   const [workshopTasks, setWorkshopTasks] = useState<WorkshopTask[]>([]);
-  const [taskComments, setTaskComments] = useState<Record<string, WorkshopComment[]>>({});
   const [activeTab, setActiveTab] = useState('maintenance');
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [motData, setMotData] = useState<any>(null);
@@ -155,6 +146,12 @@ export default function VehicleHistoryPage({
   const [expandedTestId, setExpandedTestId] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  // Fetch comments for all workshop tasks
+  const { comments: taskComments } = useWorkshopTaskComments({
+    taskIds: workshopTasks.map(t => t.id),
+    enabled: workshopTasks.length > 0
+  });
 
   useEffect(() => {
     if (user && resolvedParams.vehicleId) {
@@ -304,6 +301,7 @@ export default function VehicleHistoryPage({
           actioned_at,
           actioned_by,
           actioned_comment,
+          status_history,
           created_at,
           created_by,
           workshop_task_categories (
@@ -367,11 +365,6 @@ export default function VehicleHistoryPage({
       }
       
       setWorkshopTasks(tasksWithProfiles);
-
-      // Fetch comments for all tasks
-      if (tasksWithProfiles.length > 0) {
-        await fetchTaskComments(tasksWithProfiles.map(t => t.id));
-      }
     } catch (error) {
       console.error('Error fetching workshop tasks:', error instanceof Error ? error.message : error);
     } finally {
@@ -379,58 +372,6 @@ export default function VehicleHistoryPage({
     }
   };
 
-  const fetchTaskComments = async (taskIds: string[]) => {
-    try {
-      const { data, error } = await supabase
-        .from('workshop_task_comments')
-        .select(`
-          id,
-          task_id,
-          body,
-          created_at,
-          updated_at,
-          profiles:author_id (
-            id,
-            full_name
-          )
-        `)
-        .in('task_id', taskIds)
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        console.error('Supabase error fetching task comments:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
-        });
-        throw error;
-      }
-
-      // Group comments by task_id
-      const commentsByTask: Record<string, WorkshopComment[]> = {};
-      (data || []).forEach((comment: { task_id: string; id: string; body: string; created_at: string; updated_at: string | null; profiles: { id: string; full_name: string } | null }) => {
-        const taskId = comment.task_id;
-        if (!commentsByTask[taskId]) {
-          commentsByTask[taskId] = [];
-        }
-        commentsByTask[taskId].push({
-          id: comment.id,
-          body: comment.body,
-          created_at: comment.created_at,
-          updated_at: comment.updated_at,
-          author: comment.profiles ? {
-            id: comment.profiles.id,
-            full_name: comment.profiles.full_name,
-          } : null,
-        });
-      });
-
-      setTaskComments(commentsByTask);
-    } catch (error) {
-      console.error('Error fetching task comments:', error instanceof Error ? error.message : error);
-    }
-  };
 
   const fetchMotHistory = async () => {
     setMotLoading(true);
@@ -458,18 +399,6 @@ export default function VehicleHistoryPage({
       }
       return newSet;
     });
-  };
-
-  const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { label: string; className: string }> = {
-      pending: { label: 'Pending', className: 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30' },
-      in_progress: { label: 'In Progress', className: 'bg-blue-500/10 text-blue-300 border-blue-500/30' },
-      logged: { label: 'In Progress', className: 'bg-blue-500/10 text-blue-300 border-blue-500/30' },
-      on_hold: { label: 'On Hold', className: 'bg-purple-500/10 text-purple-300 border-purple-500/30' },
-      completed: { label: 'Completed', className: 'bg-green-500/10 text-green-300 border-green-500/30' },
-    };
-    const config = statusMap[status] || statusMap.pending;
-    return <Badge variant="outline" className={config.className}>{config.label}</Badge>;
   };
 
   const getDefectColor = (type: string) => {
@@ -815,138 +744,23 @@ export default function VehicleHistoryPage({
                 <div className="space-y-4">
                   {/* Workshop Tasks */}
                   {workshopTasks.map((task) => (
-                    <Card 
-                      key={task.id} 
-                      className="bg-slate-800/50 border-slate-700 border-l-4 border-l-orange-500 cursor-pointer hover:bg-slate-800/70 transition-colors"
-                      onClick={() => toggleTaskExpansion(task.id)}
-                    >
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="space-y-2 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {/* Task type icon instead of badge */}
-                              {task.action_type === 'inspection_defect' ? (
-                                <FileText className="h-5 w-5 text-blue-400" />
-                              ) : (
-                                <Wrench className="h-5 w-5 text-workshop" />
-                              )}
-                              {/* Feature 3: Category + Subcategory badges */}
-                              {/* Show nested category from subcategory (preferred), or direct category (fallback) */}
-                              {(task.workshop_task_subcategories?.workshop_task_categories || task.workshop_task_categories) && (
-                                <Badge variant="outline" className="bg-workshop/10 text-workshop border-workshop/30">
-                                  {task.workshop_task_subcategories?.workshop_task_categories?.name || task.workshop_task_categories?.name}
-                                </Badge>
-                              )}
-                              {task.workshop_task_subcategories && (
-                                <Badge variant="outline" className="bg-purple-500/10 text-purple-300 border-purple-500/30">
-                                  {task.workshop_task_subcategories.name}
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-sm font-medium">{task.title}</p>
-                            {task.workshop_comments && (
-                              <p className="text-sm text-muted-foreground">{task.workshop_comments}</p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {getStatusBadge(task.status)}
-                            {expandedTasks.has(task.id) ? (
-                              <ChevronUp className="h-5 w-5 text-slate-400" />
-                            ) : (
-                              <ChevronDown className="h-5 w-5 text-slate-400" />
-                            )}
-                          </div>
-                        </div>
-                      </CardHeader>
-                      {expandedTasks.has(task.id) && (
-                        <CardContent className="space-y-4 pt-0" onClick={(e) => e.stopPropagation()}>
-                          {/* Timeline */}
-                          <div className="space-y-3 border-l-2 border-slate-700 pl-4 ml-2">
-                            {/* Created */}
-                            <div className="relative">
-                              <div className="absolute -left-[1.3rem] top-1 h-3 w-3 rounded-full bg-slate-700 border-2 border-slate-900"></div>
-                              <div className="flex items-start gap-3">
-                                <User className="h-4 w-4 text-muted-foreground mt-0.5" />
-                                <div className="flex-1 space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium">{task.profiles_created?.full_name || 'Unknown'}</span>
-                                    <span className="text-xs text-muted-foreground">created task</span>
-                                  </div>
-                                  <p className="text-xs text-muted-foreground">
-                                    {formatRelativeTime(task.created_at)}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Logged (In Progress) */}
-                            {task.logged_at && (
-                              <div className="relative">
-                                <div className="absolute -left-[1.3rem] top-1 h-3 w-3 rounded-full bg-blue-500 border-2 border-slate-900"></div>
-                                <div className="flex items-start gap-3">
-                                  <Clock className="h-4 w-4 text-blue-400 mt-0.5" />
-                                  <div className="flex-1 space-y-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm font-medium">{task.profiles_logged?.full_name || 'Unknown'}</span>
-                                      <span className="text-xs text-muted-foreground">marked in progress</span>
-                                    </div>
-                                    {task.logged_comment && (
-                                      <p className="text-sm text-slate-300">{task.logged_comment}</p>
-                                    )}
-                                    <p className="text-xs text-muted-foreground">
-                                      {formatRelativeTime(task.logged_at)}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Feature 1: Comments Timeline */}
-                            {taskComments[task.id]?.map((comment) => (
-                              <div key={comment.id} className="relative">
-                                <div className="absolute -left-[1.3rem] top-1 h-3 w-3 rounded-full bg-purple-500 border-2 border-slate-900"></div>
-                                <div className="flex items-start gap-3">
-                                  <MessageSquare className="h-4 w-4 text-purple-400 mt-0.5" />
-                                  <div className="flex-1 space-y-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm font-medium">{comment.author?.full_name || 'Unknown'}</span>
-                                      <span className="text-xs text-muted-foreground">added comment</span>
-                                    </div>
-                                    <p className="text-sm text-slate-300">{comment.body}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {formatRelativeTime(comment.created_at)}
-                                      {comment.updated_at && <span className="ml-1">(edited)</span>}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-
-                            {/* Completed */}
-                            {task.actioned_at && (
-                              <div className="relative">
-                                <div className="absolute -left-[1.3rem] top-1 h-3 w-3 rounded-full bg-green-500 border-2 border-slate-900"></div>
-                                <div className="flex items-start gap-3">
-                                  <CheckCircle2 className="h-4 w-4 text-green-400 mt-0.5" />
-                                  <div className="flex-1 space-y-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm font-medium">{task.profiles_actioned?.full_name || 'Unknown'}</span>
-                                      <span className="text-xs text-muted-foreground">marked complete</span>
-                                    </div>
-                                    {task.actioned_comment && (
-                                      <p className="text-sm text-slate-300">{task.actioned_comment}</p>
-                                    )}
-                                    <p className="text-xs text-muted-foreground">
-                                      {formatRelativeTime(task.actioned_at)}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </CardContent>
-                      )}
-                    </Card>
+                    <WorkshopTaskHistoryCard
+                      key={task.id}
+                      task={task}
+                      comments={taskComments[task.id] || []}
+                      defaultExpanded={expandedTasks.has(task.id)}
+                      onToggle={(taskId, isExpanded) => {
+                        setExpandedTasks(prev => {
+                          const newSet = new Set(prev);
+                          if (isExpanded) {
+                            newSet.add(taskId);
+                          } else {
+                            newSet.delete(taskId);
+                          }
+                          return newSet;
+                        });
+                      }}
+                    />
                   ))}
 
                   {/* Maintenance History Entries */}
