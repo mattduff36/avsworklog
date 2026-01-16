@@ -81,7 +81,7 @@ export async function POST(
     // Check each field for changes
     if (body.current_mileage !== undefined) {
       updates.current_mileage = body.current_mileage;
-      if (isNewRecord || existingRecord.current_mileage !== body.current_mileage) {
+      if (isNewRecord || (!isNewRecord && existingRecord.current_mileage !== body.current_mileage)) {
         changedFields.push({
           field_name: 'current_mileage',
           old_value: existingRecord?.current_mileage?.toString() || null,
@@ -93,7 +93,7 @@ export async function POST(
 
     if (body.tax_due_date !== undefined) {
       updates.tax_due_date = body.tax_due_date;
-      if (isNewRecord || existingRecord.tax_due_date !== body.tax_due_date) {
+      if (isNewRecord || (!isNewRecord && existingRecord.tax_due_date !== body.tax_due_date)) {
         changedFields.push({
           field_name: 'tax_due_date',
           old_value: existingRecord?.tax_due_date || null,
@@ -105,7 +105,7 @@ export async function POST(
 
     if (body.mot_due_date !== undefined) {
       updates.mot_due_date = body.mot_due_date;
-      if (isNewRecord || existingRecord.mot_due_date !== body.mot_due_date) {
+      if (isNewRecord || (!isNewRecord && existingRecord.mot_due_date !== body.mot_due_date)) {
         changedFields.push({
           field_name: 'mot_due_date',
           old_value: existingRecord?.mot_due_date || null,
@@ -119,7 +119,7 @@ export async function POST(
       updates.first_aid_kit_expiry = body.first_aid_kit_expiry;
       if (
         isNewRecord ||
-        existingRecord.first_aid_kit_expiry !== body.first_aid_kit_expiry
+        (!isNewRecord && existingRecord.first_aid_kit_expiry !== body.first_aid_kit_expiry)
       ) {
         changedFields.push({
           field_name: 'first_aid_kit_expiry',
@@ -134,7 +134,7 @@ export async function POST(
       updates.next_service_mileage = body.next_service_mileage;
       if (
         isNewRecord ||
-        existingRecord.next_service_mileage !== body.next_service_mileage
+        (!isNewRecord && existingRecord.next_service_mileage !== body.next_service_mileage)
       ) {
         changedFields.push({
           field_name: 'next_service_mileage',
@@ -149,7 +149,7 @@ export async function POST(
       updates.last_service_mileage = body.last_service_mileage;
       if (
         isNewRecord ||
-        existingRecord.last_service_mileage !== body.last_service_mileage
+        (!isNewRecord && existingRecord.last_service_mileage !== body.last_service_mileage)
       ) {
         changedFields.push({
           field_name: 'last_service_mileage',
@@ -164,7 +164,7 @@ export async function POST(
       updates.cambelt_due_mileage = body.cambelt_due_mileage;
       if (
         isNewRecord ||
-        existingRecord.cambelt_due_mileage !== body.cambelt_due_mileage
+        (!isNewRecord && existingRecord.cambelt_due_mileage !== body.cambelt_due_mileage)
       ) {
         changedFields.push({
           field_name: 'cambelt_due_mileage',
@@ -177,7 +177,7 @@ export async function POST(
 
     if (body.tracker_id !== undefined) {
       updates.tracker_id = body.tracker_id;
-      if (isNewRecord || existingRecord.tracker_id !== body.tracker_id) {
+      if (isNewRecord || (!isNewRecord && existingRecord.tracker_id !== body.tracker_id)) {
         changedFields.push({
           field_name: 'tracker_id',
           old_value: existingRecord?.tracker_id || null,
@@ -189,7 +189,7 @@ export async function POST(
 
     if (body.notes !== undefined) {
       updates.notes = body.notes;
-      if (isNewRecord || existingRecord.notes !== body.notes) {
+      if (isNewRecord || (!isNewRecord && existingRecord.notes !== body.notes)) {
         changedFields.push({
           field_name: 'notes',
           old_value: existingRecord?.notes || null,

@@ -686,13 +686,13 @@ export default function WorkshopTasksPage() {
       });
       nextHistory = appendStatusHistory(nextHistory, completeEvent);
 
-      // Step 2: Mark as complete
+      // Step 2: Mark as complete (use consistent timestamp)
       const { error } = await supabase
         .from('actions')
         .update({
           status: 'completed',
           actioned: true,
-          actioned_at: new Date().toISOString(),
+          actioned_at: new Date(now.getTime() + 1).toISOString(),
           actioned_by: user?.id || null,
           actioned_comment: data.completedComment,
           status_history: nextHistory,
@@ -904,6 +904,12 @@ export default function WorkshopTasksPage() {
   };
 
   const handleSaveEdit = async () => {
+    // Validate user is authenticated
+    if (!user?.id) {
+      toast.error('You must be logged in to edit tasks');
+      return;
+    }
+
     if (!editVehicleId || !editCategoryId || !editComments.trim() || !editMileage.trim()) {
       toast.error('Please fill in all fields');
       return;
@@ -954,7 +960,7 @@ export default function WorkshopTasksPage() {
           current_mileage: mileageValue,
           last_mileage_update: new Date().toISOString(),
           last_updated_at: new Date().toISOString(),
-          last_updated_by: user!.id,
+          last_updated_by: user.id,
         }, {
           onConflict: 'vehicle_id',
         });
@@ -1165,9 +1171,10 @@ export default function WorkshopTasksPage() {
 
       toast.success('Subcategory deleted successfully');
       await fetchSubcategories();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete subcategory';
       console.error('Error deleting subcategory:', error);
-      toast.error(error.message || 'Failed to delete subcategory');
+      toast.error(errorMessage);
     }
   };
 
