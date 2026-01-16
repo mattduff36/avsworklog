@@ -233,9 +233,9 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     fetchServiceCategory();
   }, []);
   
-  const fetchVehicleHistory = async (vehicleId: string) => {
-    // Check if already fetching or already have data
-    if (fetchingVehicles.current.has(vehicleId) || vehicleHistory[vehicleId]) {
+  const fetchVehicleHistory = async (vehicleId: string, force: boolean = false) => {
+    // Check if already fetching or already have data (unless forced)
+    if (!force && (fetchingVehicles.current.has(vehicleId) || vehicleHistory[vehicleId])) {
       return; // Already fetching or already fetched
     }
     
@@ -306,8 +306,8 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         return newHistory;
       });
       
-      // Refetch using the centralized function
-      fetchVehicleHistory(createTaskVehicleId);
+      // Force refetch (bypass cache check since state update is async)
+      fetchVehicleHistory(createTaskVehicleId, true);
     }
   };
 
@@ -368,7 +368,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           delete newHistory[vehicleId];
           return newHistory;
         });
-        fetchVehicleHistory(vehicleId);
+        fetchVehicleHistory(vehicleId, true);
       }
     } catch (error: any) {
       console.error('Error marking task in progress:', error instanceof Error ? error.message : error);
@@ -411,7 +411,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           delete newHistory[vehicleId];
           return newHistory;
         });
-        fetchVehicleHistory(vehicleId);
+        fetchVehicleHistory(vehicleId, true);
       }
     } catch (error: any) {
       console.error('Error undoing task:', error instanceof Error ? error.message : error);
@@ -509,7 +509,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           delete newHistory[vehicleId];
           return newHistory;
         });
-        fetchVehicleHistory(vehicleId);
+        fetchVehicleHistory(vehicleId, true);
       }
     } catch (error: any) {
       console.error('Error marking task complete:', error instanceof Error ? error.message : error);
@@ -573,7 +573,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           delete newHistory[vehicleId];
           return newHistory;
         });
-        fetchVehicleHistory(vehicleId);
+        fetchVehicleHistory(vehicleId, true);
       }
     } catch (error: any) {
       console.error('Error marking task on hold:', error);
@@ -637,7 +637,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           delete newHistory[vehicleId];
           return newHistory;
         });
-        fetchVehicleHistory(vehicleId);
+        fetchVehicleHistory(vehicleId, true);
       }
     } catch (error: any) {
       console.error('Error resuming task:', error instanceof Error ? error.message : error);
@@ -921,7 +921,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                   if (task.status === 'completed') return false;
                   return vehicle.alerts.some(alert => {
                     const { title } = getTaskContent(alert.type, regNumber, '');
-                    return task.title === title;
+                    return task.title === title || task.description?.includes(title);
                   });
                 });
                 
