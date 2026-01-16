@@ -439,7 +439,23 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       const supabase = createClient();
       const now = new Date();
 
-      let nextHistory = completingTask.status_history;
+      // Fetch latest status_history from database to ensure we have current state
+      const { data: latestTask, error: fetchError } = await supabase
+        .from('actions')
+        .select('status_history')
+        .eq('id', taskId)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching latest task state:', fetchError);
+        throw fetchError;
+      }
+
+      // Use database status_history (or empty array if null)
+      let nextHistory = Array.isArray(latestTask.status_history) 
+        ? latestTask.status_history 
+        : [];
+
       let updatePayload: Record<string, any> = {
         status: 'completed',
         actioned_at: now.toISOString(),

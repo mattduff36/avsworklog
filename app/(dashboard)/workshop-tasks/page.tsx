@@ -645,7 +645,23 @@ export default function WorkshopTasksPage() {
       setUpdatingStatus(prev => new Set(prev).add(taskId));
 
       const now = new Date();
-      let nextHistory = completingTask?.status_history;
+
+      // Fetch latest status_history from database to ensure we have current state
+      const { data: latestTask, error: fetchError } = await supabase
+        .from('actions')
+        .select('status_history')
+        .eq('id', taskId)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching latest task state:', fetchError);
+        throw fetchError;
+      }
+
+      // Use database status_history (or empty array if null)
+      let nextHistory = Array.isArray(latestTask.status_history) 
+        ? latestTask.status_history 
+        : [];
 
       // Step 1: If needed, move to In Progress first
       if (requiresIntermediateStep) {
