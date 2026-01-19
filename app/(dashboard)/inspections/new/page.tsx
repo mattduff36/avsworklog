@@ -285,7 +285,13 @@ function NewInspectionContent() {
         return false; // No duplicate
       }
     } catch (err) {
-      console.error('Error checking for duplicate:', err);
+      const msg = err instanceof Error ? err.message : String(err);
+      // Network failures are common on mobile; don't escalate to console.error (captured by global logger)
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.toLowerCase().includes('network')) {
+        console.warn('Duplicate check skipped (network issue)');
+      } else {
+        console.error('Error checking for duplicate:', err);
+      }
       // Don't block the user if the check fails
       setDuplicateInspection(null);
       return false;

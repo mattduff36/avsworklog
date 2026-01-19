@@ -28,6 +28,23 @@ class ErrorLogger {
   private isLogging = false; // Prevent recursive logging
   private lastEmailSentDate: string | null = null; // Track last daily email sent
 
+  /**
+   * Some errors are caused by browser quirks, extensions, or third-party snippets.
+   * We don't want these to pollute centralized logging (especially on mobile Safari).
+   */
+  private shouldIgnoreRuntimeError(message: string, filename?: string): boolean {
+    const msg = (message || '').trim();
+    const file = filename || '';
+
+    // Mobile Safari noise seen in production logs (no repo reference found).
+    if (msg.includes("Can't find variable: gmo") || msg.includes('gmo is not defined')) return true;
+
+    // Ignore obvious extension / injected script failures (best-effort, keep narrow).
+    if (file.includes('chrome-extension://') || file.includes('safari-extension://')) return true;
+
+    return false;
+  }
+
   private constructor() {
     // Load last email sent date from localStorage
     if (typeof window !== 'undefined') {
@@ -39,6 +56,11 @@ class ErrorLogger {
       window.addEventListener('error', (event) => {
         const errorMessage = event.error?.message || event.message || 'Unknown error';
         const location = event.filename ? `${event.filename}:${event.lineno}:${event.colno}` : 'unknown location';
+
+        // Filter out known noisy runtime errors before logging
+        if (this.shouldIgnoreRuntimeError(errorMessage, event.filename)) {
+          return;
+        }
         
         this.logError({
           error: event.error || new Error(`Uncaught Error: ${errorMessage} at ${location}`),
@@ -127,6 +149,15 @@ class ErrorLogger {
         if (errorMessage.includes('Error fetching error logs') || 
             errorMessage.includes('error_logs') ||
             errorMessage.includes('Failed to log error')) {
+          return;
+        }
+
+        // Filter out noisy network failures that are common on mobile and not actionable.
+        // These should be handled gracefully in-app without escalating to centralized logs.
+        if (
+          errorMessage.includes('TypeError: Failed to fetch') &&
+          (errorMessage.includes('Error fetching profile:') || errorMessage.includes('Error checking for duplicate:'))
+        ) {
           return;
         }
         

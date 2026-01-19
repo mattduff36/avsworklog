@@ -314,9 +314,7 @@
     color: rgb(226 232 240) !important; /* slate-200 - very light */
   }
   
-  .text-slate-900 {
-    color: rgb(248 250 252) !important; /* slate-50 - white text for dark backgrounds */
-  }
+  /* NOTE: .text-slate-900 intentionally NOT inverted - used for dark text on light backgrounds (e.g., yellow buttons) */
   
   .text-white {
     color: rgb(255 255 255) !important;
@@ -1071,16 +1069,27 @@ input[type="date"]::-webkit-datetime-edit-year-field {
 button.bg-avs-yellow,
 button.bg-avs-yellow *,
 button.bg-avs-yellow span,
+button.bg-avs-yellow svg,
 .bg-avs-yellow.text-white,
 .bg-avs-yellow .text-white,
 .bg-avs-yellow[class*="text-"],
 button[class*="bg-avs-yellow"],
 button[class*="bg-avs-yellow"] *,
+button[class*="bg-avs-yellow"] span,
+button[class*="bg-avs-yellow"] svg,
 [class*="bg-avs-yellow"] [class*="text-"],
 [style*="background-color: #F1D64A"],
 [style*="background-color: #F1D64A"] *,
 [style*="background-color: rgb(241, 214, 74)"],
-[style*="background-color: rgb(241, 214, 74)"] * {
+[style*="background-color: rgb(241, 214, 74)"] *,
+/* Explicitly override Tailwind button text colors on yellow backgrounds */
+.bg-avs-yellow.text-primary-foreground,
+.bg-avs-yellow .text-primary-foreground,
+button.bg-avs-yellow.text-primary-foreground,
+.hover\:bg-avs-yellow-hover:hover,
+.hover\:bg-avs-yellow-hover:hover *,
+.hover\:bg-avs-yellow-hover:hover svg,
+.hover\:bg-avs-yellow-hover:hover span {
   color: rgb(15 23 42) !important; /* Dark slate text - same as sidebar */
 }
 

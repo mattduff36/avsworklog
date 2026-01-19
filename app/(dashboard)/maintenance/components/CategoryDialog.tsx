@@ -16,9 +16,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Loader2, Save, Plus } from 'lucide-react';
-import type { MaintenanceCategory, CreateCategoryRequest, UpdateCategoryRequest } from '@/types/maintenance';
+import { Switch } from '@/components/ui/switch';
+import { Loader2, Save, Plus, Briefcase, Wrench, Bell, Mail, Eye } from 'lucide-react';
+import type { MaintenanceCategory, CreateCategoryRequest, UpdateCategoryRequest, CategoryResponsibility } from '@/types/maintenance';
 import { useCreateCategory, useUpdateCategory } from '@/lib/hooks/useMaintenance';
 
 // ============================================================================
@@ -48,6 +48,11 @@ const createCategorySchema = z.object({
     .nullable(),
   sort_order: z.coerce.number().int().optional(),
   is_active: z.boolean().optional(),
+  // New fields for duty/responsibility
+  responsibility: z.enum(['workshop', 'office']).default('workshop'),
+  show_on_overview: z.boolean().default(true),
+  reminder_in_app_enabled: z.boolean().default(false),
+  reminder_email_enabled: z.boolean().default(false),
 }).refine(
   (data) => {
     if (data.type === 'date') {
@@ -102,10 +107,18 @@ export function CategoryDialog({
     defaultValues: {
       type: 'date',
       is_active: true,
+      responsibility: 'workshop',
+      show_on_overview: true,
+      reminder_in_app_enabled: false,
+      reminder_email_enabled: false,
     }
   });
 
   const selectedType = watch('type');
+  const selectedResponsibility = watch('responsibility');
+  const showOnOverview = watch('show_on_overview');
+  const reminderInApp = watch('reminder_in_app_enabled');
+  const reminderEmail = watch('reminder_email_enabled');
 
   // Reset form when dialog opens/closes or category changes
   useEffect(() => {
@@ -118,6 +131,10 @@ export function CategoryDialog({
         alert_threshold_miles: category.alert_threshold_miles || undefined,
         sort_order: category.sort_order,
         is_active: category.is_active,
+        responsibility: category.responsibility || 'workshop',
+        show_on_overview: category.show_on_overview !== false,
+        reminder_in_app_enabled: category.reminder_in_app_enabled || false,
+        reminder_email_enabled: category.reminder_email_enabled || false,
       });
     } else if (open && mode === 'create') {
       reset({
@@ -128,6 +145,10 @@ export function CategoryDialog({
         alert_threshold_miles: undefined,
         sort_order: 999,
         is_active: true,
+        responsibility: 'workshop',
+        show_on_overview: true,
+        reminder_in_app_enabled: false,
+        reminder_email_enabled: false,
       });
     }
   }, [open, mode, category, reset]);
@@ -156,6 +177,10 @@ export function CategoryDialog({
         alert_threshold_days: data.type === 'date' ? data.alert_threshold_days : undefined,
         alert_threshold_miles: data.type === 'mileage' ? data.alert_threshold_miles : undefined,
         sort_order: data.sort_order,
+        responsibility: data.responsibility,
+        show_on_overview: data.show_on_overview,
+        reminder_in_app_enabled: data.reminder_in_app_enabled,
+        reminder_email_enabled: data.reminder_email_enabled,
       };
       await createMutation.mutateAsync(createData);
       onOpenChange(false);
@@ -167,6 +192,10 @@ export function CategoryDialog({
         alert_threshold_miles: data.type === 'mileage' ? data.alert_threshold_miles : undefined,
         is_active: data.is_active,
         sort_order: data.sort_order,
+        responsibility: data.responsibility,
+        show_on_overview: data.show_on_overview,
+        reminder_in_app_enabled: data.reminder_in_app_enabled,
+        reminder_email_enabled: data.reminder_email_enabled,
       };
       await updateMutation.mutateAsync({ id: category.id, updates: updateData });
       onOpenChange(false);
@@ -225,25 +254,69 @@ export function CategoryDialog({
             <Label>
               Type <span className="text-red-400">*</span>
             </Label>
-            <RadioGroup
-              value={selectedType}
-              onValueChange={(value) => setValue('type', value as 'date' | 'mileage')}
-              disabled={mode === 'edit'} // Cannot change type after creation
-              className="flex gap-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="date" id="type-date" disabled={mode === 'edit'} />
-                <Label htmlFor="type-date" className={mode === 'edit' ? 'text-slate-500' : ''}>
-                  Date-based
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="mileage" id="type-mileage" disabled={mode === 'edit'} />
-                <Label htmlFor="type-mileage" className={mode === 'edit' ? 'text-slate-500' : ''}>
-                  Mileage-based
-                </Label>
-              </div>
-            </RadioGroup>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                disabled={mode === 'edit'}
+                onClick={() => mode !== 'edit' && setValue('type', 'date')}
+                className={`p-4 rounded-lg border-2 transition-all text-left ${
+                  mode === 'edit' 
+                    ? 'opacity-50 cursor-not-allowed border-slate-700 bg-slate-800/50' 
+                    : selectedType === 'date'
+                      ? 'border-blue-500 bg-blue-500/20 ring-2 ring-blue-500/30'
+                      : 'border-slate-600 bg-slate-800 hover:border-slate-500'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    selectedType === 'date' 
+                      ? 'border-blue-500 bg-blue-500' 
+                      : 'border-slate-500'
+                  }`}>
+                    {selectedType === 'date' && (
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                  <div>
+                    <p className={`font-medium ${selectedType === 'date' ? 'text-blue-400' : 'text-white'}`}>
+                      Date-based
+                    </p>
+                    <p className="text-xs text-slate-400">Tax, MOT, First Aid</p>
+                  </div>
+                </div>
+              </button>
+              
+              <button
+                type="button"
+                disabled={mode === 'edit'}
+                onClick={() => mode !== 'edit' && setValue('type', 'mileage')}
+                className={`p-4 rounded-lg border-2 transition-all text-left ${
+                  mode === 'edit' 
+                    ? 'opacity-50 cursor-not-allowed border-slate-700 bg-slate-800/50' 
+                    : selectedType === 'mileage'
+                      ? 'border-blue-500 bg-blue-500/20 ring-2 ring-blue-500/30'
+                      : 'border-slate-600 bg-slate-800 hover:border-slate-500'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    selectedType === 'mileage' 
+                      ? 'border-blue-500 bg-blue-500' 
+                      : 'border-slate-500'
+                  }`}>
+                    {selectedType === 'mileage' && (
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                  <div>
+                    <p className={`font-medium ${selectedType === 'mileage' ? 'text-blue-400' : 'text-white'}`}>
+                      Mileage-based
+                    </p>
+                    <p className="text-xs text-slate-400">Service, Cambelt</p>
+                  </div>
+                </div>
+              </button>
+            </div>
             {mode === 'edit' && (
               <p className="text-xs text-slate-500">Type cannot be changed after creation</p>
             )}
@@ -306,6 +379,192 @@ export function CategoryDialog({
               Lower numbers appear first. Default is 999.
             </p>
           </div>
+
+          {/* Divider */}
+          <div className="border-t border-slate-700 pt-4 mt-4">
+            <h3 className="text-lg font-medium text-white mb-4">Duty & Notification Settings</h3>
+          </div>
+
+          {/* Responsibility */}
+          <div className="space-y-3">
+            <Label>
+              Responsibility
+            </Label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setValue('responsibility', 'workshop')}
+                className={`p-4 rounded-lg border-2 transition-all text-left ${
+                  selectedResponsibility === 'workshop'
+                    ? 'border-orange-500 bg-orange-500/20 ring-2 ring-orange-500/30'
+                    : 'border-slate-600 bg-slate-800 hover:border-slate-500'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                    selectedResponsibility === 'workshop' 
+                      ? 'bg-orange-500' 
+                      : 'bg-slate-700'
+                  }`}>
+                    <Wrench className={`h-5 w-5 ${
+                      selectedResponsibility === 'workshop' ? 'text-white' : 'text-orange-400'
+                    }`} />
+                  </div>
+                  <div>
+                    <p className={`font-medium ${selectedResponsibility === 'workshop' ? 'text-orange-400' : 'text-white'}`}>
+                      Workshop
+                    </p>
+                    <p className="text-xs text-slate-400">Create Task button</p>
+                  </div>
+                </div>
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => setValue('responsibility', 'office')}
+                className={`p-4 rounded-lg border-2 transition-all text-left ${
+                  selectedResponsibility === 'office'
+                    ? 'border-avs-yellow bg-avs-yellow/20 ring-2 ring-avs-yellow/30'
+                    : 'border-slate-600 bg-slate-800 hover:border-slate-500'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                    selectedResponsibility === 'office' 
+                      ? 'bg-avs-yellow' 
+                      : 'bg-slate-700'
+                  }`}>
+                    <Briefcase className={`h-5 w-5 ${
+                      selectedResponsibility === 'office' ? 'text-slate-900' : 'text-avs-yellow'
+                    }`} />
+                  </div>
+                  <div>
+                    <p className={`font-medium ${selectedResponsibility === 'office' ? 'text-avs-yellow' : 'text-white'}`}>
+                      Office
+                    </p>
+                    <p className="text-xs text-slate-400">Office Action button</p>
+                  </div>
+                </div>
+              </button>
+            </div>
+            <p className="text-xs text-slate-400">
+              {selectedResponsibility === 'workshop' 
+                ? 'Workshop tasks will show "Create Task" button for workshop staff.'
+                : 'Office duties will show "Office Action" button with reminder and update options.'
+              }
+            </p>
+          </div>
+
+          {/* Show on Overview Toggle */}
+          <div 
+            className={`flex items-center justify-between p-4 rounded-lg border-2 cursor-pointer transition-all ${
+              showOnOverview 
+                ? 'border-green-500/50 bg-green-500/10' 
+                : 'border-slate-600 bg-slate-800 hover:border-slate-500'
+            }`}
+            onClick={() => setValue('show_on_overview', !showOnOverview)}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                showOnOverview ? 'bg-green-500' : 'bg-slate-700'
+              }`}>
+                <Eye className={`h-5 w-5 ${showOnOverview ? 'text-white' : 'text-slate-400'}`} />
+              </div>
+              <div>
+                <Label htmlFor="show_on_overview" className={`text-sm font-medium cursor-pointer ${
+                  showOnOverview ? 'text-green-400' : 'text-white'
+                }`}>Show on Overview</Label>
+                <p className="text-xs text-slate-400">
+                  Display in Overdue/Due Soon sections
+                </p>
+              </div>
+            </div>
+            <Switch
+              id="show_on_overview"
+              checked={showOnOverview}
+              onCheckedChange={(checked) => setValue('show_on_overview', checked)}
+              className="data-[state=checked]:bg-green-500"
+            />
+          </div>
+
+          {/* Reminder Settings (only for office responsibility) */}
+          {selectedResponsibility === 'office' && (
+            <div className="space-y-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+              <h4 className="text-sm font-medium text-white flex items-center gap-2">
+                <Bell className="h-4 w-4 text-blue-400" />
+                Reminder Notifications
+              </h4>
+              
+              <div 
+                className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${
+                  reminderInApp 
+                    ? 'border-blue-500/50 bg-blue-500/10' 
+                    : 'border-slate-600 bg-slate-800/50 hover:border-slate-500'
+                }`}
+                onClick={() => setValue('reminder_in_app_enabled', !reminderInApp)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                    reminderInApp ? 'bg-blue-500' : 'bg-slate-700'
+                  }`}>
+                    <Bell className={`h-4 w-4 ${reminderInApp ? 'text-white' : 'text-blue-400'}`} />
+                  </div>
+                  <div>
+                    <Label htmlFor="reminder_in_app" className={`text-sm cursor-pointer ${
+                      reminderInApp ? 'text-blue-400 font-medium' : 'text-white'
+                    }`}>In-App Notifications</Label>
+                    <p className="text-xs text-slate-400">
+                      Send reminders to notification panel
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="reminder_in_app"
+                  checked={reminderInApp}
+                  onCheckedChange={(checked) => setValue('reminder_in_app_enabled', checked)}
+                  className="data-[state=checked]:bg-blue-500"
+                />
+              </div>
+              
+              <div 
+                className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${
+                  reminderEmail 
+                    ? 'border-green-500/50 bg-green-500/10' 
+                    : 'border-slate-600 bg-slate-800/50 hover:border-slate-500'
+                }`}
+                onClick={() => setValue('reminder_email_enabled', !reminderEmail)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                    reminderEmail ? 'bg-green-500' : 'bg-slate-700'
+                  }`}>
+                    <Mail className={`h-4 w-4 ${reminderEmail ? 'text-white' : 'text-green-400'}`} />
+                  </div>
+                  <div>
+                    <Label htmlFor="reminder_email" className={`text-sm cursor-pointer ${
+                      reminderEmail ? 'text-green-400 font-medium' : 'text-white'
+                    }`}>Email Notifications</Label>
+                    <p className="text-xs text-slate-400">
+                      Send email reminders to configured recipients
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="reminder_email"
+                  checked={reminderEmail}
+                  onCheckedChange={(checked) => setValue('reminder_email_enabled', checked)}
+                  className="data-[state=checked]:bg-green-500"
+                />
+              </div>
+              
+              {(reminderInApp || reminderEmail) && (
+                <p className="text-xs text-avs-yellow mt-2 flex items-center gap-1">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-avs-yellow"></span>
+                  Configure reminder recipients in Settings after saving.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Active Status (Only for edit) */}
           {mode === 'edit' && (

@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, Calendar, Wrench, ChevronDown, ChevronUp, Loader2, Clock, CheckCircle2, MessageSquare, Pause, Play, Undo2 } from 'lucide-react';
-import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
+import { AlertTriangle, Calendar, Wrench, ChevronDown, ChevronUp, Loader2, Clock, CheckCircle2, MessageSquare, Pause, Play, Undo2, Briefcase, Info, RefreshCw, Bell } from 'lucide-react';
+import type { VehicleMaintenanceWithStatus, MaintenanceCategory, CategoryResponsibility } from '@/types/maintenance';
 import { formatDaysUntil, formatMilesUntil, formatMileage, formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 import type { CompletionUpdatesArray } from '@/types/workshop-completion';
 import { formatDistanceToNow } from 'date-fns';
@@ -17,10 +17,20 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { CreateWorkshopTaskDialog } from '@/components/workshop-tasks/CreateWorkshopTaskDialog';
 import { TaskCommentsDrawer } from '@/components/workshop-tasks/TaskCommentsDrawer';
 import { MarkTaskCompleteDialog, type CompletionData } from '@/components/workshop-tasks/MarkTaskCompleteDialog';
+import { OfficeActionDialog } from './OfficeActionDialog';
 import { getTaskContent } from '@/lib/utils/serviceTaskCreation';
 import { appendStatusHistory, buildStatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+
+// Map alert type to category name for lookup
+const ALERT_TO_CATEGORY_NAME: Record<string, string> = {
+  'Tax': 'tax due date',
+  'MOT': 'mot due date',
+  'Service': 'service due',
+  'Cambelt': 'cambelt replacement',
+  'First Aid Kit': 'first aid kit expiry',
+};
 
 interface MaintenanceOverviewProps {
   vehicles: VehicleMaintenanceWithStatus[];
@@ -77,6 +87,7 @@ interface WorkshopTask {
 }
 
 export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: MaintenanceOverviewProps) {
+  const router = useRouter();
   const { user, profile } = useAuth();
   const [expandedVehicles, setExpandedVehicles] = useState<Set<string>>(new Set());
   const [vehicleHistory, setVehicleHistory] = useState<Record<string, { history: HistoryEntry[], workshopTasks: WorkshopTask[], loading: boolean }>>({});
@@ -106,6 +117,50 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   const [resumeComment, setResumeComment] = useState('');
   const [showCommentsDrawer, setShowCommentsDrawer] = useState(false);
   const [commentsTask, setCommentsTask] = useState<WorkshopTask | null>(null);
+  
+  // Maintenance categories (for checking responsibility)
+  const [maintenanceCategories, setMaintenanceCategories] = useState<MaintenanceCategory[]>([]);
+  
+  // Office Action Dialog state
+  const [showOfficeActionDialog, setShowOfficeActionDialog] = useState(false);
+  const [officeActionVehicle, setOfficeActionVehicle] = useState<{
+    vehicleId: string;
+    vehicleReg: string;
+    vehicleNickname?: string | null;
+    alertType: 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit';
+    dueInfo: string;
+    currentDueDate?: string | null;
+  } | null>(null);
+  
+  // Helper to get category responsibility
+  const getCategoryResponsibility = (alertType: string): CategoryResponsibility => {
+    const categoryName = ALERT_TO_CATEGORY_NAME[alertType]?.toLowerCase();
+    const category = maintenanceCategories.find(
+      c => c.name.toLowerCase() === categoryName
+    );
+    return category?.responsibility || 'workshop';
+  };
+  
+  // Fetch maintenance categories on mount
+  useEffect(() => {
+    const fetchMaintenanceCategories = async () => {
+      const supabase = createClient();
+      try {
+        const { data: categories } = await supabase
+          .from('maintenance_categories')
+          .select('*')
+          .eq('is_active', true);
+        
+        if (categories) {
+          setMaintenanceCategories(categories);
+        }
+      } catch (error) {
+        console.error('Error fetching maintenance categories:', error);
+      }
+    };
+    
+    fetchMaintenanceCategories();
+  }, []);
   
   // Fetch Service category on mount (for pre-filling create task dialog)
   useEffect(() => {
@@ -295,6 +350,47 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     setCreateTaskAlertType(alertType);
     
     setShowCreateTaskDialog(true);
+  };
+
+  const handleOfficeAction = (vehicleId: string, vehicle: VehicleWithAlerts) => {
+    const alert = vehicle.alerts?.[0];
+    if (!alert) return;
+    
+    const alertType = alert.type as 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit';
+    
+    // Get the current due date based on alert type
+    let currentDueDate: string | null = null;
+    if (alertType === 'Tax') {
+      currentDueDate = vehicle.tax_due_date || null;
+    } else if (alertType === 'MOT') {
+      currentDueDate = vehicle.mot_due_date || null;
+    } else if (alertType === 'First Aid Kit') {
+      currentDueDate = vehicle.first_aid_kit_expiry || null;
+    }
+    
+    setOfficeActionVehicle({
+      vehicleId,
+      vehicleReg: vehicle.vehicle?.reg_number || 'Unknown',
+      vehicleNickname: vehicle.vehicle?.nickname,
+      alertType,
+      dueInfo: alert.detail,
+      currentDueDate,
+    });
+    setShowOfficeActionDialog(true);
+  };
+
+  const handleOfficeActionSuccess = () => {
+    // Trigger a data refresh by invalidating the history cache
+    if (officeActionVehicle?.vehicleId) {
+      setVehicleHistory(prev => {
+        const newHistory = { ...prev };
+        delete newHistory[officeActionVehicle.vehicleId];
+        return newHistory;
+      });
+      fetchVehicleHistory(officeActionVehicle.vehicleId, true);
+    }
+    // Trigger Next.js soft refresh to refetch server data without losing client state
+    router.refresh();
   };
 
   const handleTaskCreated = async () => {
@@ -897,7 +993,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 )}
               </div>
               
-              {/* Action Button - Bottom Right (mutually exclusive: Create Task OR Expand OR Loading) */}
+              {/* Action Button - Bottom Right (mutually exclusive: Office Action OR Create Task OR Expand OR Loading) */}
               {historyData?.loading ? (
                 <Button
                   size="sm"
@@ -909,18 +1005,43 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                   Loading...
                 </Button>
               ) : !hasExistingTasks ? (
-                <Button
-                  size="sm"
-                  variant="default"
-                  className="flex-shrink-0 bg-workshop hover:bg-workshop-dark text-white"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCreateTask(vehicleId, vehicle);
-                  }}
-                >
-                  <Wrench className="h-4 w-4 mr-1" />
-                  Create Task
-                </Button>
+                // Check if the primary alert is an office responsibility
+                (() => {
+                  const primaryAlertType = vehicle.alerts?.[0]?.type || '';
+                  const responsibility = getCategoryResponsibility(primaryAlertType);
+                  
+                  if (responsibility === 'office') {
+                    return (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="flex-shrink-0 bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOfficeAction(vehicleId, vehicle);
+                        }}
+                      >
+                        <Briefcase className="h-4 w-4 mr-1" />
+                        Office Action
+                      </Button>
+                    );
+                  }
+                  
+                  return (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="flex-shrink-0 bg-workshop hover:bg-workshop-dark text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCreateTask(vehicleId, vehicle);
+                      }}
+                    >
+                      <Wrench className="h-4 w-4 mr-1" />
+                      Create Task
+                    </Button>
+                  );
+                })()
               ) : (
                 <Button
                   size="sm"
@@ -1181,6 +1302,57 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         </Card>
       )}
 
+      {/* About Section */}
+      <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+        <CardContent className="pt-6">
+          <div className="flex items-start gap-3">
+            <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-blue-800 dark:text-blue-200">
+              <p className="font-semibold mb-2">About Maintenance Alerts</p>
+              <p>
+                This page shows vehicles with <span className="font-medium text-red-600 dark:text-red-400">Overdue</span> or <span className="font-medium text-amber-600 dark:text-amber-400">Due Soon</span> maintenance items. 
+                Items appear here based on the alert thresholds configured in Settings.
+              </p>
+              
+              <div className="mt-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <div className="w-6 h-6 rounded bg-workshop flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <Wrench className="h-3.5 w-3.5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Create Task (Workshop)</p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      For maintenance requiring physical workshop work (Service, Cambelt, MOT). Creates a workshop task that can be assigned and tracked.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-2">
+                  <div className="w-6 h-6 rounded bg-avs-yellow flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <Briefcase className="h-3.5 w-3.5 text-slate-900" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Office Action</p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      For administrative tasks like Tax renewal. Opens a dialog with three options:
+                    </p>
+                    <ul className="text-xs text-blue-700 dark:text-blue-300 mt-1 ml-4 list-disc space-y-0.5">
+                      <li><Bell className="h-3 w-3 inline mr-1" /><strong>Send Reminder</strong> - Notify configured recipients via in-app and/or email</li>
+                      <li><Calendar className="h-3 w-3 inline mr-1" /><strong>Update Date</strong> - Manually update the due date after completing the action</li>
+                      <li><RefreshCw className="h-3 w-3 inline mr-1" /><strong>Refresh DVLA</strong> - Sync Tax/MOT dates from DVLA (updates automatically after online renewal)</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              
+              <p className="mt-4 text-xs text-blue-600 dark:text-blue-400">
+                <strong>Tip:</strong> Configure which categories are Workshop vs Office responsibilities in the <span className="font-medium">Settings</span> tab.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Create Workshop Task Dialog */}
       <CreateWorkshopTaskDialog
         open={showCreateTaskDialog}
@@ -1190,6 +1362,21 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         alertType={createTaskAlertType}
         onSuccess={handleTaskCreated}
       />
+
+      {/* Office Action Dialog */}
+      {officeActionVehicle && (
+        <OfficeActionDialog
+          open={showOfficeActionDialog}
+          onOpenChange={setShowOfficeActionDialog}
+          vehicleId={officeActionVehicle.vehicleId}
+          vehicleReg={officeActionVehicle.vehicleReg}
+          vehicleNickname={officeActionVehicle.vehicleNickname}
+          alertType={officeActionVehicle.alertType}
+          dueInfo={officeActionVehicle.dueInfo}
+          currentDueDate={officeActionVehicle.currentDueDate}
+          onSuccess={handleOfficeActionSuccess}
+        />
+      )}
 
       {/* Mark In Progress Modal */}
       <Dialog open={showStatusModal} onOpenChange={setShowStatusModal}>

@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Loader2, Wrench, Truck, Tag, Plus, Edit, Trash2, AlertTriangle } from 'lucide-react';
+import { Loader2, Wrench, Truck, Settings, Tag, Plus, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
 
 // Import existing components
@@ -62,7 +62,7 @@ function FleetContent() {
   
   // Helper function to validate if user can access a tab
   const canAccessTab = (tab: string, canManage: boolean): boolean => {
-    const restrictedTabs = ['vehicles', 'categories'];
+    const restrictedTabs = ['vehicles', 'settings'];
     if (restrictedTabs.includes(tab)) {
       return canManage;
     }
@@ -178,7 +178,7 @@ function FleetContent() {
     if (activeTab === 'vehicles') {
       if (vehicles.length === 0) fetchVehicles();
       if (categories.length === 0) fetchCategories();
-    } else if (activeTab === 'categories') {
+    } else if (activeTab === 'settings') {
       if (categories.length === 0) fetchCategories();
       if (vehicles.length === 0) fetchVehicles(); // Need vehicles for category counts
     }
@@ -202,7 +202,7 @@ function FleetContent() {
     if (value === 'vehicles') {
       if (vehicles.length === 0) fetchVehicles();
       if (categories.length === 0) fetchCategories();
-    } else if (value === 'categories') {
+    } else if (value === 'settings') {
       if (categories.length === 0) fetchCategories();
       if (vehicles.length === 0) fetchVehicles(); // Need vehicles for category counts
     }
@@ -312,9 +312,9 @@ function FleetContent() {
                 <Truck className="h-4 w-4" />
                 Vehicles
               </TabsTrigger>
-              <TabsTrigger value="categories" className="gap-2">
-                <Tag className="h-4 w-4" />
-                Categories
+              <TabsTrigger value="settings" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Settings
               </TabsTrigger>
             </>
           )}
@@ -377,9 +377,9 @@ function FleetContent() {
           </TabsContent>
         )}
 
-        {/* Categories Tab - Admin/Manager only */}
+        {/* Settings Tab - Admin/Manager only */}
         {canManageVehicles && (
-          <TabsContent value="categories" className="space-y-6">
+          <TabsContent value="settings" className="space-y-6">
             {/* Vehicle Categories Section - Admin Only */}
             {isAdmin && (
               <Card className="bg-slate-900 border-slate-700">

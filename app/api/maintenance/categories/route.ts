@@ -124,7 +124,11 @@ export async function POST(request: NextRequest) {
         alert_threshold_days: body.type === 'date' ? body.alert_threshold_days : null,
         alert_threshold_miles: body.type === 'mileage' ? body.alert_threshold_miles : null,
         sort_order: body.sort_order || 999,
-        is_active: true
+        is_active: true,
+        responsibility: body.responsibility || 'workshop',
+        show_on_overview: body.show_on_overview !== false, // Default true
+        reminder_in_app_enabled: body.reminder_in_app_enabled || false,
+        reminder_email_enabled: body.reminder_email_enabled || false,
       })
       .select()
       .single();

@@ -1,5 +1,7 @@
 // Types for Vehicle Maintenance & Service System
 
+export type CategoryResponsibility = 'workshop' | 'office';
+
 export interface MaintenanceCategory {
   id: string;
   name: string;
@@ -11,6 +13,23 @@ export interface MaintenanceCategory {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  
+  // Duty/Responsibility settings (added 2026-01-19)
+  responsibility: CategoryResponsibility;
+  show_on_overview: boolean;
+  reminder_in_app_enabled: boolean;
+  reminder_email_enabled: boolean;
+}
+
+export interface MaintenanceCategoryRecipient {
+  id: string;
+  category_id: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface MaintenanceCategoryWithRecipients extends MaintenanceCategory {
+  recipients?: MaintenanceCategoryRecipient[];
 }
 
 export interface VehicleMaintenance {
@@ -182,6 +201,10 @@ export interface CreateCategoryRequest {
   alert_threshold_days?: number;
   alert_threshold_miles?: number;
   sort_order?: number;
+  responsibility?: CategoryResponsibility;
+  show_on_overview?: boolean;
+  reminder_in_app_enabled?: boolean;
+  reminder_email_enabled?: boolean;
 }
 
 export interface UpdateCategoryRequest {
@@ -191,6 +214,10 @@ export interface UpdateCategoryRequest {
   alert_threshold_miles?: number;
   is_active?: boolean;
   sort_order?: number;
+  responsibility?: CategoryResponsibility;
+  show_on_overview?: boolean;
+  reminder_in_app_enabled?: boolean;
+  reminder_email_enabled?: boolean;
 }
 
 export interface ArchiveVehicleRequest {

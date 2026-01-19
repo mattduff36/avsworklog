@@ -20,6 +20,26 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
+  const isNetworkFetchError = (err: unknown): boolean => {
+    if (!err) return false;
+    if (err instanceof TypeError) {
+      return (
+        err.message.includes('Failed to fetch') ||
+        err.message.includes('NetworkError') ||
+        err.message.toLowerCase().includes('network')
+      );
+    }
+    if (typeof err === 'object' && err !== null && 'message' in err) {
+      const msg = String((err as any).message || '');
+      return (
+        msg.includes('Failed to fetch') ||
+        msg.includes('NetworkError') ||
+        msg.toLowerCase().includes('network')
+      );
+    }
+    return false;
+  };
+
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -150,7 +170,12 @@ export function useAuth() {
           }
         }
       } catch (error) {
-        console.error('Error checking for role changes:', error);
+        // Avoid escalating transient network issues (common on mobile)
+        if (!isNetworkFetchError(error)) {
+          console.error('Error checking for role changes:', error);
+        } else {
+          console.warn('Role change check skipped (network issue)');
+        }
       }
     }, 30000); // Check every 30 seconds
 
@@ -193,21 +218,32 @@ export function useAuth() {
             .single();
           
           if (retryError) {
-            console.error('Profile not found after retry:', retryError);
-            setProfile(null);
+            // Not actionable in most cases (profile creation trigger timing) + avoid console.error interception
+            console.warn('Profile not found after retry:', retryError);
+            // Only clear profile if we didn't already have one
+            if (!profile) setProfile(null);
           } else {
             setProfile(retryData as Profile);
           }
         } else {
+          // If offline / flaky network, don't wipe the existing profile and don't escalate to console.error.
+          if (isNetworkFetchError(error)) {
+            console.warn('Profile fetch failed (network issue)');
+            return;
+          }
           console.error('Error fetching profile:', error);
-          setProfile(null);
+          if (!profile) setProfile(null);
         }
       } else {
         setProfile(data as Profile);
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
-      setProfile(null);
+      if (isNetworkFetchError(error)) {
+        console.warn('Profile fetch failed (network issue)');
+      } else {
+        console.error('Error fetching profile:', error);
+      }
+      if (!profile) setProfile(null);
     } finally {
       setLoading(false);
     }

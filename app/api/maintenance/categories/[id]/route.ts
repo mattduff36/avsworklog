@@ -9,9 +9,10 @@ import type { UpdateCategoryRequest } from '@/types/maintenance';
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
@@ -44,11 +45,15 @@ export async function PUT(
     if (body.alert_threshold_miles !== undefined) updates.alert_threshold_miles = body.alert_threshold_miles;
     if (body.is_active !== undefined) updates.is_active = body.is_active;
     if (body.sort_order !== undefined) updates.sort_order = body.sort_order;
+    if (body.responsibility !== undefined) updates.responsibility = body.responsibility;
+    if (body.show_on_overview !== undefined) updates.show_on_overview = body.show_on_overview;
+    if (body.reminder_in_app_enabled !== undefined) updates.reminder_in_app_enabled = body.reminder_in_app_enabled;
+    if (body.reminder_email_enabled !== undefined) updates.reminder_email_enabled = body.reminder_email_enabled;
     
     const { data, error } = await supabase
       .from('maintenance_categories')
       .update(updates)
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single();
     
@@ -72,9 +77,10 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
@@ -101,7 +107,7 @@ export async function DELETE(
     const { count } = await supabase
       .from('maintenance_history')
       .select('id', { count: 'exact', head: true })
-      .eq('maintenance_category_id', params.id);
+      .eq('maintenance_category_id', id);
     
     if (count && count > 0) {
       return NextResponse.json(
@@ -114,7 +120,7 @@ export async function DELETE(
     const { error } = await supabase
       .from('maintenance_categories')
       .delete()
-      .eq('id', params.id);
+      .eq('id', id);
     
     if (error) {
       logger.error('Failed to delete category', error);

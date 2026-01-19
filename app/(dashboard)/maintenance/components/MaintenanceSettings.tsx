@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, Edit, Trash2, AlertTriangle, Briefcase, Wrench, Bell, Mail, Users } from 'lucide-react';
 import { useMaintenanceCategories, useDeleteCategory } from '@/lib/hooks/useMaintenance';
 import {
   AlertDialog,
@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { CategoryDialog } from './CategoryDialog';
+import { CategoryRecipientsDialog } from './CategoryRecipientsDialog';
 import type { MaintenanceCategory } from '@/types/maintenance';
 
 interface MaintenanceSettingsProps {
@@ -32,6 +33,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [recipientsDialogOpen, setRecipientsDialogOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<MaintenanceCategory | null>(null);
   
   const categories = categoriesData?.categories || [];
@@ -46,6 +48,11 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
   const openDeleteDialog = (category: MaintenanceCategory) => {
     setSelectedCategory(category);
     setDeleteDialogOpen(true);
+  };
+
+  const openRecipientsDialog = (category: MaintenanceCategory) => {
+    setSelectedCategory(category);
+    setRecipientsDialogOpen(true);
   };
   
   const handleDelete = async () => {
@@ -87,15 +94,16 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
               No categories configured yet.
             </div>
           ) : (
-            <div className="border border-slate-700 rounded-lg overflow-hidden">
+            <div className="border border-slate-700 rounded-lg overflow-hidden overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="border-slate-700 hover:bg-slate-800/50">
                     <TableHead className="text-slate-300">Name</TableHead>
                     <TableHead className="text-slate-300">Type</TableHead>
                     <TableHead className="text-slate-300">Alert Threshold</TableHead>
+                    <TableHead className="text-slate-300">Responsibility</TableHead>
+                    <TableHead className="text-slate-300">Reminders</TableHead>
                     <TableHead className="text-slate-300">Status</TableHead>
-                    <TableHead className="text-slate-300">Description</TableHead>
                     <TableHead className="text-right text-slate-300">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -126,6 +134,40 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                         
                         <TableCell>
                           <Badge 
+                            variant="outline" 
+                            className={category.responsibility === 'office' 
+                              ? 'text-avs-yellow border-avs-yellow/50' 
+                              : 'text-orange-400 border-orange-400/50'
+                            }
+                          >
+                            {category.responsibility === 'office' ? (
+                              <><Briefcase className="h-3 w-3 mr-1" />Office</>
+                            ) : (
+                              <><Wrench className="h-3 w-3 mr-1" />Workshop</>
+                            )}
+                          </Badge>
+                        </TableCell>
+                        
+                        <TableCell>
+                          <div className="flex gap-1">
+                            {category.reminder_in_app_enabled && (
+                              <Badge variant="outline" className="text-blue-400 border-blue-400/50" title="In-app notifications enabled">
+                                <Bell className="h-3 w-3" />
+                              </Badge>
+                            )}
+                            {category.reminder_email_enabled && (
+                              <Badge variant="outline" className="text-green-400 border-green-400/50" title="Email notifications enabled">
+                                <Mail className="h-3 w-3" />
+                              </Badge>
+                            )}
+                            {!category.reminder_in_app_enabled && !category.reminder_email_enabled && (
+                              <span className="text-slate-500 text-sm">-</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        
+                        <TableCell>
+                          <Badge 
                             variant={category.is_active ? 'default' : 'secondary'}
                             className={category.is_active ? 'bg-green-600' : ''}
                           >
@@ -133,12 +175,20 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                           </Badge>
                         </TableCell>
                         
-                        <TableCell className="text-slate-300 text-sm max-w-md truncate">
-                          {category.description || '-'}
-                        </TableCell>
-                        
                         <TableCell className="text-right">
                           <div className="flex gap-1 justify-end">
+                            {(category.reminder_in_app_enabled || category.reminder_email_enabled) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openRecipientsDialog(category)}
+                                disabled={!canModifySettings}
+                                className="text-purple-400 hover:text-purple-300 hover:bg-slate-800 disabled:opacity-30"
+                                title="Manage Recipients"
+                              >
+                                <Users className="h-3 w-3" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -176,14 +226,20 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-blue-800 dark:text-blue-200">
-              <p className="font-semibold mb-1">About Categories & Thresholds</p>
+              <p className="font-semibold mb-1">About Categories & Settings</p>
               <p>
                 Categories define what types of maintenance to track. Each category has an alert threshold that determines when to show &quot;Due Soon&quot; warnings. 
                 Date-based categories (Tax, MOT, First Aid) use days, while mileage-based categories (Service, Cambelt) use miles.
               </p>
               <p className="mt-2">
+                <strong>Responsibility:</strong> Categories can be assigned to either Workshop (shows &quot;Create Task&quot; button) or Office (shows &quot;Office Action&quot; button with reminder and update options).
+              </p>
+              <p className="mt-2">
+                <strong>Reminders:</strong> Office categories can have in-app and/or email notifications enabled. Click the <Users className="h-3 w-3 inline mx-1" /> button to manage who receives reminders.
+              </p>
+              <p className="mt-2">
                 <strong>Note:</strong> You cannot change a category&apos;s type (date ↔ mileage) after creation. 
-                Changes to thresholds apply immediately to all vehicles.
+                Changes to settings apply immediately.
               </p>
             </div>
           </div>
@@ -244,6 +300,15 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Recipients Management Dialog */}
+      {selectedCategory && (
+        <CategoryRecipientsDialog
+          open={recipientsDialogOpen}
+          onOpenChange={setRecipientsDialogOpen}
+          category={selectedCategory}
+        />
+      )}
     </div>
   );
 }
