@@ -147,11 +147,6 @@ export function CategoryManagementPanel({
                           <span className="text-xs text-slate-600 dark:text-slate-400">
                             {subcategoryCount} {subcategoryCount === 1 ? 'subcategory' : 'subcategories'}
                           </span>
-                          {category.name === 'Uncategorised' && (
-                            <Badge variant="outline" className="text-xs bg-blue-500/20 text-blue-400 border-blue-500/30">
-                              Default
-                            </Badge>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -186,17 +181,15 @@ export function CategoryManagementPanel({
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
                     </Button>
-                    {selectedCategory.name !== 'Uncategorised' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onDeleteCategory(selectedCategory)}
-                        className="border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
-                      </Button>
-                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onDeleteCategory(selectedCategory)}
+                      className="border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
                   </div>
                 </div>
 

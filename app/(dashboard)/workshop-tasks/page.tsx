@@ -1123,11 +1123,6 @@ export default function WorkshopTasksPage() {
 
 
   const handleDeleteCategory = async (category: Category) => {
-    if (category.name === 'Uncategorised') {
-      toast.error('Cannot delete the default category');
-      return;
-    }
-
     // Check if category is in use
     const { data: tasksUsingCategory } = await supabase
       .from('actions')

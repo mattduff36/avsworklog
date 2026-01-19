@@ -340,23 +340,32 @@ function NewInspectionContent() {
         setPreviousDefects(defectsMap);
       }
 
-      // Load logged and on_hold actions for this vehicle
-      const { data: loggedActionsData, error: loggedError } = await supabase
-        .from('actions')
-        .select(`
-          id,
-          logged_comment,
-          status,
-          inspection_items (
-            item_number,
-            item_description
-          ),
-          vehicle_inspections!inner (
-            vehicle_id
-          )
-        `)
-        .in('status', ['logged', 'on_hold'])
-        .eq('vehicle_inspections.vehicle_id', selectedVehicleId);
+      // Load locked defects from server (includes logged, on_hold, in_progress)
+      const response = await fetch(`/api/inspections/locked-defects?vehicleId=${selectedVehicleId}`);
+      
+      let loggedActionsData: Array<{
+        inspection_items: { item_number: number; item_description: string };
+        status: string;
+        logged_comment: string | null;
+        id: string;
+      }> = [];
+      
+      if (response.ok) {
+        const { lockedItems } = await response.json();
+        
+        // Transform to match existing data structure
+        loggedActionsData = lockedItems.map((item: any) => ({
+          inspection_items: {
+            item_number: item.item_number,
+            item_description: item.item_description
+          },
+          status: item.status,
+          logged_comment: item.comment,
+          id: item.actionId
+        }));
+      }
+      
+      const loggedError = response.ok ? null : new Error('Failed to fetch locked defects');
 
       if (!loggedError && loggedActionsData) {
         const loggedMap = new Map<string, { comment: string; actionId: string }>();
@@ -364,7 +373,10 @@ function NewInspectionContent() {
         (loggedActionsData as LoggedAction[]).forEach((action: LoggedAction) => {
           if (action.inspection_items) {
             const key = `${action.inspection_items.item_number}-${action.inspection_items.item_description}`;
-            const statusLabel = action.status === 'on_hold' ? 'on hold' : 'in progress';
+            const statusLabel = 
+              action.status === 'on_hold' ? 'on hold' :
+              action.status === 'logged' ? 'logged' :
+              'in progress';
             loggedMap.set(key, {
               comment: action.logged_comment || `Defect ${statusLabel} by management`,
               actionId: action.id
@@ -935,31 +947,12 @@ function NewInspectionContent() {
         inspection = updatedInspection[0];
       }
 
-      // Auto-create/update actions for failed items (works for both draft and submitted)
+      // Auto-create/update actions for failed items via server endpoint
       if (insertedItems && insertedItems.length > 0) {
         const failedItems = insertedItems.filter((item: InspectionItem) => item.status === 'attention');
         
         if (failedItems.length > 0) {
-          // Get vehicle registration for action title
-          const { data: vehicleData } = await supabase
-            .from('vehicles')
-            .select('reg_number')
-            .eq('id', vehicleId)
-            .single();
-          
-          const vehicleReg = vehicleData?.reg_number || 'Unknown Vehicle';
-
-          // Get default "Uncategorised" category for inspection defects
-          const { data: uncategorisedCategory } = await supabase
-            .from('workshop_task_categories')
-            .select('id')
-            .eq('name', 'Uncategorised')
-            .eq('applies_to', 'vehicle')
-            .single();
-
-          const defaultCategoryId = uncategorisedCategory?.id || null;
-
-          // Group defects by item_number and description to consolidate duplicates
+          // Group defects by item_number and description
           const groupedDefects = new Map<string, { 
             item_number: number; 
             item_description: string; 
@@ -987,105 +980,41 @@ function NewInspectionContent() {
             }
           });
 
-          // Check for existing actions for this inspection
-          const { data: existingActions } = await supabase
-            .from('actions')
-            .select('id, inspection_item_id, status')
-            .eq('inspection_id', inspection.id)
-            .eq('action_type', 'inspection_defect');
+          // Prepare defects for sync endpoint
+          const defects = Array.from(groupedDefects.values()).map(group => ({
+            item_number: group.item_number,
+            item_description: group.item_description,
+            days: group.days,
+            comment: group.comments.length > 0 ? group.comments[0] : '',
+            primaryInspectionItemId: group.item_ids[0]
+          }));
 
-          // Create a map of existing actions by inspection_item_id
-          const existingActionsMap = new Map<string, { id: string; status: string }>();
-          existingActions?.forEach(action => {
-            if (action.inspection_item_id) {
-              existingActionsMap.set(action.inspection_item_id, { id: action.id, status: action.status });
-            }
-          });
+          // Call server endpoint to sync tasks
+          try {
+            const syncResponse = await fetch('/api/inspections/sync-defect-tasks', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                inspectionId: inspection.id,
+                vehicleId,
+                createdBy: user!.id,
+                defects
+              })
+            });
 
-          // Process each grouped defect - update existing or create new
-          type ActionInsert = Database['public']['Tables']['actions']['Insert'];
-          type ActionUpdate = Database['public']['Tables']['actions']['Update'];
-          const actionsToCreate: ActionInsert[] = [];
-          const actionsToUpdate: { id: string; updates: ActionUpdate }[] = [];
-
-          Array.from(groupedDefects.values()).forEach((group) => {
-            let dayRange: string;
-            if (group.days.length === 1) {
-              const dayName = DAY_NAMES[group.days[0] - 1] || `Day ${group.days[0]}`;
-              dayRange = dayName;
-            } else if (group.days.length > 1) {
-              const firstDay = DAY_NAMES[group.days[0] - 1] || `Day ${group.days[0]}`;
-              const lastDay = DAY_NAMES[group.days[group.days.length - 1] - 1] || `Day ${group.days[group.days.length - 1]}`;
-              dayRange = `${firstDay.substring(0, 3)}-${lastDay.substring(0, 3)}`;
-            } else {
-              dayRange = 'Unknown';
-            }
-
-            const itemName = group.item_description || `Item ${group.item_number}`;
-            const comment = group.comments.length > 0 ? `\nComment: ${group.comments[0]}` : '';
-            const title = `${vehicleReg} - ${itemName} (${dayRange})`;
-            const description = `Vehicle inspection defect found:\nItem ${group.item_number} - ${itemName} (${dayRange})${comment}`;
-            
-            // Check if action already exists for the first item_id in this group
-            const primaryItemId = group.item_ids[0];
-            const existingAction = existingActionsMap.get(primaryItemId);
-
-            if (existingAction) {
-              // Update existing action (only if it's not completed)
-              if (existingAction.status !== 'completed') {
-                actionsToUpdate.push({
-                  id: existingAction.id,
-                  updates: {
-                    title,
-                    description,
-                    updated_at: new Date().toISOString(),
-                  }
-                });
+            if (syncResponse.ok) {
+              const syncResult = await syncResponse.json();
+              console.log(`✅ Sync complete: ${syncResult.message}`);
+              
+              if (syncResult.duplicates && syncResult.duplicates.length > 0) {
+                console.warn('⚠️  Duplicates detected:', syncResult.duplicates);
               }
             } else {
-              // Create new action
-              actionsToCreate.push({
-                action_type: 'inspection_defect',
-                inspection_id: inspection.id,
-                inspection_item_id: primaryItemId,
-                vehicle_id: vehicleId,
-                workshop_category_id: defaultCategoryId,
-                title,
-                description,
-                priority: 'high',
-                status: 'pending',
-                created_by: user!.id,
-              });
+              console.error('Error syncing defect tasks:', await syncResponse.text());
             }
-          });
-
-          // Insert new actions
-          if (actionsToCreate.length > 0) {
-            const { error: createError } = await supabase
-              .from('actions')
-              .insert(actionsToCreate);
-
-            if (createError) {
-              console.error('Error creating actions:', createError);
-              // Don't throw - we don't want to fail the inspection if action creation fails
-            } else {
-              console.log(`✅ Created ${actionsToCreate.length} new workshop task(s)`);
-            }
-          }
-
-          // Update existing actions
-          for (const { id, updates } of actionsToUpdate) {
-            const { error: updateError } = await supabase
-              .from('actions')
-              .update(updates)
-              .eq('id', id);
-
-            if (updateError) {
-              console.error('Error updating action:', updateError);
-              // Continue processing other actions
-            } else {
-              console.log(`✅ Updated existing workshop task ${id}`);
-            }
+          } catch (error) {
+            console.error('Error calling sync endpoint:', error);
+            // Don't throw - we don't want to fail the inspection if sync fails
           }
         }
       }

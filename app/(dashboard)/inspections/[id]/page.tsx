@@ -186,37 +186,12 @@ export default function ViewInspectionPage() {
 
       console.log('[Mobile Debug] Save completed, creating/updating workshop tasks...');
       
-      // Auto-create/update actions for defects (even in draft mode)
+      // Auto-create/update actions for failed items via server endpoint
       if (itemsToInsert.length > 0) {
         const failedItems = itemsToInsert.filter(item => item.status === 'attention');
         
         if (failedItems.length > 0) {
           try {
-            // Get vehicle registration
-            const vehicleReg = inspection.vehicles?.reg_number || 'Unknown Vehicle';
-
-            // Get default "Uncategorised" category
-            const { data: uncategorisedCategory } = await supabase
-              .from('workshop_task_categories')
-              .select('id')
-              .eq('name', 'Uncategorised')
-              .eq('applies_to', 'vehicle')
-              .single();
-
-            const defaultCategoryId = uncategorisedCategory?.id || null;
-
-            // Day names for formatting
-            const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
-            // Group defects by item_number and description
-            const groupedDefects = new Map<string, { 
-              item_number: number; 
-              item_description: string; 
-              days: number[]; 
-              comments: string[];
-              item_ids: string[];
-            }>();
-
             // Get the inserted items with IDs
             const { data: insertedItems } = await supabase
               .from('inspection_items')
@@ -224,8 +199,17 @@ export default function ViewInspectionPage() {
               .eq('inspection_id', inspection.id)
               .eq('status', 'attention');
 
-            if (insertedItems) {
-              insertedItems.forEach((item) => {
+            if (insertedItems && insertedItems.length > 0) {
+              // Group defects by item_number and description
+              const groupedDefects = new Map<string, { 
+                item_number: number; 
+                item_description: string; 
+                days: number[]; 
+                comments: string[];
+                item_ids: string[];
+              }>();
+
+              insertedItems.forEach((item: any) => {
                 const key = `${item.item_number}-${item.item_description}`;
                 if (!groupedDefects.has(key)) {
                   groupedDefects.set(key, {
@@ -244,89 +228,37 @@ export default function ViewInspectionPage() {
                 }
               });
 
-              // Check for existing actions
-              const { data: existingActions } = await supabase
-                .from('actions')
-                .select('id, inspection_item_id, status')
-                .eq('inspection_id', inspection.id)
-                .eq('action_type', 'inspection_defect');
+              // Prepare defects for sync endpoint
+              const defects = Array.from(groupedDefects.values()).map(group => ({
+                item_number: group.item_number,
+                item_description: group.item_description,
+                days: group.days,
+                comment: group.comments.length > 0 ? group.comments[0] : '',
+                primaryInspectionItemId: group.item_ids[0]
+              }));
 
-              const existingActionsMap = new Map<string, { id: string; status: string }>();
-              existingActions?.forEach(action => {
-                if (action.inspection_item_id) {
-                  existingActionsMap.set(action.inspection_item_id, { id: action.id, status: action.status });
-                }
+              // Call server endpoint to sync tasks
+              const syncResponse = await fetch('/api/inspections/sync-defect-tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  inspectionId: inspection.id,
+                  vehicleId: inspection.vehicle_id,
+                  createdBy: user!.id,
+                  defects
+                })
               });
 
-              // Process each defect
-              type ActionInsert = Database['public']['Tables']['actions']['Insert'];
-              type ActionUpdate = Database['public']['Tables']['actions']['Update'];
-              const actionsToCreate: ActionInsert[] = [];
-              const actionsToUpdate: { id: string; updates: ActionUpdate }[] = [];
-
-              Array.from(groupedDefects.values()).forEach((group) => {
-                let dayRange: string;
-                if (group.days.length === 1) {
-                  const dayName = DAY_NAMES[group.days[0] - 1] || `Day ${group.days[0]}`;
-                  dayRange = dayName;
-                } else if (group.days.length > 1) {
-                  const firstDay = DAY_NAMES[group.days[0] - 1] || `Day ${group.days[0]}`;
-                  const lastDay = DAY_NAMES[group.days[group.days.length - 1] - 1] || `Day ${group.days[group.days.length - 1]}`;
-                  dayRange = `${firstDay.substring(0, 3)}-${lastDay.substring(0, 3)}`;
-                } else {
-                  dayRange = 'Unknown';
-                }
-
-                const itemName = group.item_description || `Item ${group.item_number}`;
-                const comment = group.comments.length > 0 ? `\nComment: ${group.comments[0]}` : '';
-                const title = `${vehicleReg} - ${itemName} (${dayRange})`;
-                const description = `Vehicle inspection defect found:\nItem ${group.item_number} - ${itemName} (${dayRange})${comment}`;
-                
-                const primaryItemId = group.item_ids[0];
-                const existingAction = existingActionsMap.get(primaryItemId);
-
-                if (existingAction && existingAction.status !== 'completed') {
-                  actionsToUpdate.push({
-                    id: existingAction.id,
-                    updates: { title, description, updated_at: new Date().toISOString() }
-                  });
-                } else if (!existingAction) {
-                  actionsToCreate.push({
-                    action_type: 'inspection_defect',
-                    inspection_id: inspection.id,
-                    inspection_item_id: primaryItemId,
-                    vehicle_id: inspection.vehicle_id,
-                    workshop_category_id: defaultCategoryId,
-                    title,
-                    description,
-                    priority: 'high',
-                    status: 'pending',
-                    created_by: user.id,
-                  });
-                }
-              });
-
-              // Insert new actions
-              if (actionsToCreate.length > 0) {
-                const { error: createError } = await supabase.from('actions').insert(actionsToCreate);
-                if (!createError) {
-                  console.log(`✅ Created ${actionsToCreate.length} new workshop task(s)`);
-                }
-              }
-
-              // Update existing actions
-              for (const { id, updates } of actionsToUpdate) {
-                const { error: updateError } = await supabase.from('actions').update(updates).eq('id', id);
-                if (updateError) {
-                  console.error(`Error updating action ${id}:`, updateError);
-                } else {
-                  console.log(`✅ Updated workshop task ${id}`);
-                }
+              if (syncResponse.ok) {
+                const syncResult = await syncResponse.json();
+                console.log(`✅ Sync complete: ${syncResult.message}`);
+              } else {
+                console.error('Error syncing defect tasks:', await syncResponse.text());
               }
             }
           } catch (actionError) {
-            console.error('[Mobile Debug] Error creating/updating actions:', actionError);
-            // Don't throw - we don't want to fail the save if action creation fails
+            console.error('[Mobile Debug] Error syncing defect tasks:', actionError);
+            // Don't throw - we don't want to fail the save if sync fails
           }
         }
       }
@@ -443,178 +375,131 @@ export default function ViewInspectionPage() {
         .select('*')
         .eq('inspection_id', inspection.id);
 
-      // Auto-create/update actions for defects
+      // Auto-create/update actions for defects via server endpoint
       if (savedItems && savedItems.length > 0) {
         const failedItems = savedItems.filter(item => item.status === 'attention');
         
         if (failedItems.length > 0) {
-          // Get vehicle registration
-          const vehicleReg = inspection.vehicles?.reg_number || 'Unknown Vehicle';
+          try {
+            // Group defects by item_number and description
+            const groupedDefects = new Map<string, { 
+              item_number: number; 
+              item_description: string; 
+              days: number[]; 
+              comments: string[];
+              item_ids: string[];
+            }>();
 
-          // Get default "Uncategorised" category
-          const { data: uncategorisedCategory } = await supabase
-            .from('workshop_task_categories')
-            .select('id')
-            .eq('name', 'Uncategorised')
-            .eq('applies_to', 'vehicle')
-            .single();
-
-          const defaultCategoryId = uncategorisedCategory?.id || null;
-
-          // Day names for formatting
-          const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
-          // Group defects by item_number and description
-          const groupedDefects = new Map<string, { 
-            item_number: number; 
-            item_description: string; 
-            days: number[]; 
-            comments: string[];
-            item_ids: string[];
-          }>();
-
-          failedItems.forEach((item) => {
-            const key = `${item.item_number}-${item.item_description}`;
-            if (!groupedDefects.has(key)) {
-              groupedDefects.set(key, {
-                item_number: item.item_number,
-                item_description: item.item_description,
-                days: [],
-                comments: [],
-                item_ids: []
-              });
-            }
-            const group = groupedDefects.get(key)!;
-            group.days.push(item.day_of_week);
-            group.item_ids.push(item.id);
-            if (item.comments) {
-              group.comments.push(item.comments);
-            }
-          });
-
-          // Check for existing actions
-          const { data: existingActions } = await supabase
-            .from('actions')
-            .select('id, inspection_item_id, status')
-            .eq('inspection_id', inspection.id)
-            .eq('action_type', 'inspection_defect');
-
-          const existingActionsMap = new Map<string, { id: string; status: string }>();
-          existingActions?.forEach(action => {
-            if (action.inspection_item_id) {
-              existingActionsMap.set(action.inspection_item_id, { id: action.id, status: action.status });
-            }
-          });
-
-          // Process each defect
-          type ActionInsert = Database['public']['Tables']['actions']['Insert'];
-          type ActionUpdate = Database['public']['Tables']['actions']['Update'];
-          const actionsToCreate: ActionInsert[] = [];
-          const actionsToUpdate: { id: string; updates: ActionUpdate }[] = [];
-
-          Array.from(groupedDefects.values()).forEach((group) => {
-            let dayRange: string;
-            if (group.days.length === 1) {
-              const dayName = DAY_NAMES[group.days[0] - 1] || `Day ${group.days[0]}`;
-              dayRange = dayName;
-            } else if (group.days.length > 1) {
-              const firstDay = DAY_NAMES[group.days[0] - 1] || `Day ${group.days[0]}`;
-              const lastDay = DAY_NAMES[group.days[group.days.length - 1] - 1] || `Day ${group.days[group.days.length - 1]}`;
-              dayRange = `${firstDay.substring(0, 3)}-${lastDay.substring(0, 3)}`;
-            } else {
-              dayRange = 'Unknown';
-            }
-
-            const itemName = group.item_description || `Item ${group.item_number}`;
-            const comment = group.comments.length > 0 ? `\nComment: ${group.comments[0]}` : '';
-            const title = `${vehicleReg} - ${itemName} (${dayRange})`;
-            const description = `Vehicle inspection defect found:\nItem ${group.item_number} - ${itemName} (${dayRange})${comment}`;
-            
-            const primaryItemId = group.item_ids[0];
-            const existingAction = existingActionsMap.get(primaryItemId);
-
-            if (existingAction && existingAction.status !== 'completed') {
-              actionsToUpdate.push({
-                id: existingAction.id,
-                updates: { title, description, updated_at: new Date().toISOString() }
-              });
-            } else if (!existingAction) {
-              actionsToCreate.push({
-                action_type: 'inspection_defect',
-                inspection_id: inspection.id,
-                inspection_item_id: primaryItemId,
-                vehicle_id: inspection.vehicle_id,
-                workshop_category_id: defaultCategoryId,
-                title,
-                description,
-                priority: 'high',
-                status: 'pending',
-                created_by: user.id,
-              });
-            }
-          });
-
-          // Insert new actions
-          if (actionsToCreate.length > 0) {
-            await supabase.from('actions').insert(actionsToCreate);
-          }
-
-          // Update existing actions
-          for (const { id, updates } of actionsToUpdate) {
-            const { error: updateError } = await supabase.from('actions').update(updates).eq('id', id);
-            if (updateError) {
-              console.error(`Error updating action ${id}:`, updateError);
-            }
-          }
-
-          // Auto-complete actions for resolved items
-          if (originalDefectItems.length > 0) {
-            const resolvedItems = originalDefectItems.filter(originalItem => {
-              const currentItem = savedItems.find(
-                item => item.item_number === originalItem.item_number && 
-                        item.day_of_week === originalItem.day_of_week
-              );
-              // Item is resolved if it's now 'ok' or 'na', or if it's been removed
-              return !currentItem || currentItem.status === 'ok' || currentItem.status === 'na';
+            failedItems.forEach((item: any) => {
+              const key = `${item.item_number}-${item.item_description}`;
+              if (!groupedDefects.has(key)) {
+                groupedDefects.set(key, {
+                  item_number: item.item_number,
+                  item_description: item.item_description,
+                  days: [],
+                  comments: [],
+                  item_ids: []
+                });
+              }
+              const group = groupedDefects.get(key)!;
+              group.days.push(item.day_of_week);
+              group.item_ids.push(item.id);
+              if (item.comments) {
+                group.comments.push(item.comments);
+              }
             });
 
-            if (resolvedItems.length > 0) {
-              const { data: pendingActions } = await supabase
-                .from('actions')
-                .select('id, inspection_item_id, description, status')
-                .eq('inspection_id', inspection.id)
-                .eq('action_type', 'inspection_defect')
-                .in('status', ['pending', 'logged']);
+            // Prepare defects for sync endpoint
+            const defects = Array.from(groupedDefects.values()).map(group => ({
+              item_number: group.item_number,
+              item_description: group.item_description,
+              days: group.days,
+              comment: group.comments.length > 0 ? group.comments[0] : '',
+              primaryInspectionItemId: group.item_ids[0]
+            }));
 
-              if (pendingActions && pendingActions.length > 0) {
-                for (const resolvedItem of resolvedItems) {
-                  const matchingAction = pendingActions.find(
-                    action => action.inspection_item_id === resolvedItem.id
-                  );
+            // Call server endpoint to sync tasks
+            const syncResponse = await fetch('/api/inspections/sync-defect-tasks', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                inspectionId: inspection.id,
+                vehicleId: inspection.vehicle_id,
+                createdBy: user!.id,
+                defects
+              })
+            });
 
-                  if (matchingAction) {
-                    const { error: completeError } = await supabase
-                      .from('actions')
-                      .update({
-                        status: 'completed',
-                        actioned: true,
-                        actioned_at: new Date().toISOString(),
-                        actioned_by: user.id,
-                        description: `${matchingAction.description || ''}\n\nResolution: Item marked as OK/NA during inspection submission`
-                      })
-                      .eq('id', matchingAction.id);
+            if (syncResponse.ok) {
+              const syncResult = await syncResponse.json();
+              console.log(`✅ Sync complete: ${syncResult.message}`);
+            } else {
+              console.error('Error syncing defect tasks:', await syncResponse.text());
+            }
+          } catch (actionError) {
+            console.error('Error syncing defect tasks:', actionError);
+            // Don't throw - we don't want to fail the submit if sync fails
+          }
+        }
+      }
 
-                    if (completeError) {
-                      console.error(`Error auto-completing action ${matchingAction.id}:`, completeError);
-                    } else {
-                      console.log(`✅ Auto-completed action ${matchingAction.id} for resolved item ${resolvedItem.item_number}`);
-                    }
+      // Auto-complete actions for resolved items
+      try {
+        const { data: originalDefectItems } = await supabase
+          .from('inspection_items')
+          .select('*')
+          .eq('inspection_id', inspection.id)
+          .eq('status', 'attention');
+
+        if (originalDefectItems && originalDefectItems.length > 0) {
+          const resolvedItems = originalDefectItems.filter(originalItem => {
+            const currentItem = savedItems?.find(
+              item => item.item_number === originalItem.item_number && 
+                      item.day_of_week === originalItem.day_of_week
+            );
+            // Item is resolved if it's now 'ok' or 'na', or if it's been removed
+            return !currentItem || currentItem.status === 'ok' || currentItem.status === 'na';
+          });
+
+          if (resolvedItems.length > 0) {
+            const { data: pendingActions } = await supabase
+              .from('actions')
+              .select('id, inspection_item_id, description, status')
+              .eq('inspection_id', inspection.id)
+              .eq('action_type', 'inspection_defect')
+              .in('status', ['pending', 'logged']);
+
+            if (pendingActions && pendingActions.length > 0) {
+              for (const resolvedItem of resolvedItems) {
+                const matchingAction = pendingActions.find(
+                  action => action.inspection_item_id === resolvedItem.id
+                );
+
+                if (matchingAction) {
+                  const { error: completeError } = await supabase
+                    .from('actions')
+                    .update({
+                      status: 'completed',
+                      actioned: true,
+                      actioned_at: new Date().toISOString(),
+                      actioned_by: user.id,
+                      description: `${matchingAction.description || ''}\n\nResolution: Item marked as OK/NA during inspection submission`
+                    })
+                    .eq('id', matchingAction.id);
+
+                  if (completeError) {
+                    console.error(`Error auto-completing action ${matchingAction.id}:`, completeError);
+                  } else {
+                    console.log(`✅ Auto-completed action ${matchingAction.id} for resolved item ${resolvedItem.item_number}`);
                   }
                 }
               }
             }
           }
         }
+      } catch (resolveError) {
+        console.error('Error completing resolved actions:', resolveError);
+        // Don't throw - we don't want to fail the submit if this fails
       }
 
       // Update inspection status

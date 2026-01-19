@@ -541,7 +541,7 @@ export interface Database {
           title: string
           description: string | null
           priority: 'low' | 'medium' | 'high' | 'urgent'
-          status: 'pending' | 'in_progress' | 'logged' | 'completed'
+          status: 'pending' | 'in_progress' | 'logged' | 'on_hold' | 'completed'
           actioned: boolean
           actioned_at: string | null
           actioned_by: string | null
