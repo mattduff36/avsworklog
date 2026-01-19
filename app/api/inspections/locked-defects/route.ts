@@ -80,52 +80,84 @@ export async function GET(request: NextRequest) {
       comment: string;
     }> = [];
 
+    // Fetch inspection items if we have any item IDs
+    let items: Array<{ id: string; item_number: number; item_description: string }> = [];
     if (itemIds.length > 0) {
-      const { data: items } = await supabaseAdmin
+      const { data: fetchedItems } = await supabaseAdmin
         .from('inspection_items')
         .select('id, item_number, item_description')
         .in('id', itemIds);
+      
+      if (fetchedItems) {
+        items = fetchedItems;
+      }
+    }
 
-      if (items) {
-        // Build locked items list
-        for (const task of tasks) {
-          const item = items.find(i => i.id === task.inspection_item_id);
-          
-          if (item) {
-            // Get comment (prefer logged_comment, then workshop_comments, then parse from description)
-            let comment = task.logged_comment || task.workshop_comments || '';
-            if (!comment && task.description) {
-              const commentMatch = task.description.match(/Comment: (.+)/);
-              if (commentMatch) {
-                comment = commentMatch[1];
-              }
-            }
+    // Process ALL tasks (even those with NULL inspection_item_id)
+    for (const task of tasks) {
+      let lockedItem: {
+        item_number: number;
+        item_description: string;
+        status: string;
+        actionId: string;
+        comment: string;
+      } | null = null;
 
-            lockedItems.push({
-              item_number: item.item_number,
-              item_description: item.item_description,
-              status: task.status,
-              actionId: task.id,
-              comment: comment || 'Defect in progress'
-            });
-          } else {
-            // Fallback: parse from description if item is deleted
-            const descMatch = task.description?.match(/Item (\d+) - ([^(]+)/);
-            if (descMatch) {
-              const itemNumber = parseInt(descMatch[1]);
-              const itemDesc = descMatch[2].trim();
-              
-              lockedItems.push({
-                item_number: itemNumber,
-                item_description: itemDesc,
-                status: task.status,
-                actionId: task.id,
-                comment: task.logged_comment || 'Defect in progress'
-              });
+      // Try 1: Find by inspection_item_id in database
+      if (task.inspection_item_id) {
+        const item = items.find(i => i.id === task.inspection_item_id);
+        if (item) {
+          // Get comment (prefer logged_comment, then workshop_comments, then parse from description)
+          let comment = task.logged_comment || task.workshop_comments || '';
+          if (!comment && task.description) {
+            const commentMatch = task.description.match(/Comment: (.+)/);
+            if (commentMatch) {
+              comment = commentMatch[1];
             }
           }
+
+          lockedItem = {
+            item_number: item.item_number,
+            item_description: item.item_description,
+            status: task.status,
+            actionId: task.id,
+            comment: comment || 'Defect in progress'
+          };
         }
       }
+
+      // Try 2: Parse from description if item not found or inspection_item_id is NULL
+      if (!lockedItem && task.description) {
+        const descMatch = task.description.match(/Item (\d+) - ([^(]+)/);
+        if (descMatch) {
+          const itemNumber = parseInt(descMatch[1]);
+          const itemDesc = descMatch[2].trim();
+          
+          lockedItem = {
+            item_number: itemNumber,
+            item_description: itemDesc,
+            status: task.status,
+            actionId: task.id,
+            comment: task.logged_comment || task.workshop_comments || 'Defect in progress'
+          };
+        }
+      }
+
+      // Fallback 3: If all parsing fails, include with generic info and log warning
+      if (!lockedItem) {
+        console.warn(`[locked-defects] Failed to parse task ${task.id} - inspection_item_id: ${task.inspection_item_id}, description: ${task.description?.substring(0, 100)}`);
+        
+        // Still include the task so it doesn't disappear from UI
+        lockedItem = {
+          item_number: 0, // Unknown item number
+          item_description: task.description?.substring(0, 50) || 'Unknown defect',
+          status: task.status,
+          actionId: task.id,
+          comment: task.logged_comment || task.workshop_comments || 'Defect details unavailable'
+        };
+      }
+
+      lockedItems.push(lockedItem);
     }
 
     return NextResponse.json({ lockedItems });
