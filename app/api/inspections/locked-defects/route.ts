@@ -143,18 +143,19 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Fallback 3: If all parsing fails, include with generic info and log warning
+      // Fallback 3: If all parsing fails, log error and skip task
+      // DON'T add with item_number: 0 as it will never match real checklist items (1-5+)
+      // This would break the locking mechanism
       if (!lockedItem) {
-        console.warn(`[locked-defects] Failed to parse task ${task.id} - inspection_item_id: ${task.inspection_item_id}, description: ${task.description?.substring(0, 100)}`);
-        
-        // Still include the task so it doesn't disappear from UI
-        lockedItem = {
-          item_number: 0, // Unknown item number
-          item_description: task.description?.substring(0, 50) || 'Unknown defect',
+        console.error(`[locked-defects] CRITICAL: Unable to parse task ${task.id} for vehicle ${vehicleId}`, {
+          inspection_item_id: task.inspection_item_id,
+          description: task.description,
           status: task.status,
-          actionId: task.id,
-          comment: task.logged_comment || task.workshop_comments || 'Defect details unavailable'
-        };
+          inspection_id: task.inspection_id
+        });
+        // Skip this task rather than adding invalid item_number
+        // Admin should investigate and fix malformed tasks
+        continue;
       }
 
       lockedItems.push(lockedItem);

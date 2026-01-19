@@ -350,6 +350,8 @@ function NewInspectionContent() {
         id: string;
       }> = [];
       
+      let loggedError: Error | null = null;
+      
       if (response.ok) {
         const { lockedItems } = await response.json();
         
@@ -363,9 +365,14 @@ function NewInspectionContent() {
           logged_comment: item.comment,
           id: item.actionId
         }));
+      } else {
+        // API call failed - log error and show user warning
+        loggedError = new Error(`Failed to fetch locked defects: ${response.status} ${response.statusText}`);
+        console.error('[Inspection] Locked defects API failed:', loggedError);
+        
+        // Show user-friendly error
+        setError('Warning: Unable to check for existing defects. Please refresh the page before continuing.');
       }
-      
-      const loggedError = response.ok ? null : new Error('Failed to fetch locked defects');
 
       if (!loggedError && loggedActionsData) {
         const loggedMap = new Map<string, { comment: string; actionId: string }>();
