@@ -1214,6 +1214,28 @@ svg.debug-red circle {
   color: #ef4444 !important;
 }
 
+/* Fix checkbox visibility - ensure checkmark is always visible */
+/* Checkbox component needs special handling to ensure checkmark visibility */
+.checkbox-root[data-state="checked"] {
+  background-color: hsl(var(--primary)) !important; /* Force yellow background when checked */
+}
+
+.checkbox-root[data-state="checked"] .checkbox-indicator,
+.checkbox-root[data-state="checked"] .checkbox-icon,
+.checkbox-root[data-state="checked"] svg,
+button .checkbox-root[data-state="checked"] svg,
+.bg-primary .checkbox-root[data-state="checked"] svg {
+  color: rgb(15 23 42) !important; /* Dark checkmark on yellow background */
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+/* Ensure unchecked checkboxes have visible borders on dark backgrounds */
+.checkbox-root:not([data-state="checked"]) {
+  border-color: hsl(var(--primary)) !important; /* Yellow border for visibility */
+  background-color: transparent !important;
+}
+
 /* Ensure buttons maintain proper text color based on background */
 button:not(.bg-avs-yellow):not(.bg-primary):not([class*="bg-yellow"]):not([class*="bg-white"]) {
   color: rgb(226 232 240) !important; /* Default: light text for dark button backgrounds */
