@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-01-20T22:17:37.288Z",
+  "timestamp": "2026-01-20T22:19:04.669Z",
   "totalFiles": 132,
-  "issuesFound": 26,
+  "issuesFound": 19,
   "issues": [
     {
       "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\absence\\manage\\allowances\\page.tsx",
@@ -60,38 +60,6 @@
       "severity": "high"
     },
     {
-      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\inspections\\new\\page.tsx",
-      "line": 1456,
-      "component": "SelectContent",
-      "issue": "Dark background without explicit text color",
-      "className": "bg-slate-900 border-slate-700 max-h-[300px] md:max-h-[400px]",
-      "severity": "high"
-    },
-    {
-      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\inspections\\new\\page.tsx",
-      "line": 2017,
-      "component": "SelectContent",
-      "issue": "Dark background without explicit text color",
-      "className": "bg-slate-900 border-slate-700 max-h-[300px] md:max-h-[400px]",
-      "severity": "high"
-    },
-    {
-      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\maintenance\\components\\AddVehicleDialog.tsx",
-      "line": 266,
-      "component": "SelectContent",
-      "issue": "Dark background without explicit text color",
-      "className": "bg-slate-800 border-slate-700",
-      "severity": "high"
-    },
-    {
-      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\maintenance\\components\\AddVehicleDialog.tsx",
-      "line": 295,
-      "component": "SelectContent",
-      "issue": "Dark background without explicit text color",
-      "className": "bg-slate-800 border-slate-700",
-      "severity": "high"
-    },
-    {
       "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\suggestions\\manage\\page.tsx",
       "line": 321,
       "component": "DialogContent",
@@ -105,22 +73,6 @@
       "component": "DialogContent",
       "issue": "Dark background without explicit text color",
       "className": "max-w-3xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700",
-      "severity": "high"
-    },
-    {
-      "file": "d:\\Websites\\avsworklog\\components\\fleet\\ExpandingVehicleCard.tsx",
-      "line": 276,
-      "component": "SelectContent",
-      "issue": "Dark background without explicit text color",
-      "className": "bg-slate-800 border-slate-600",
-      "severity": "high"
-    },
-    {
-      "file": "d:\\Websites\\avsworklog\\components\\fleet\\ExpandingVehicleCard.tsx",
-      "line": 305,
-      "component": "SelectContent",
-      "issue": "Dark background without explicit text color",
-      "className": "bg-slate-800 border-slate-600",
       "severity": "high"
     },
     {
@@ -194,14 +146,6 @@
       "issue": "Dark background without explicit text color",
       "className": "max-w-3xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700",
       "severity": "high"
-    },
-    {
-      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\inspections\\new\\page.tsx",
-      "line": 1457,
-      "component": "SelectItem",
-      "issue": "No explicit text color (may inherit problematic color)",
-      "className": "text-avs-yellow font-semibold border-b border-slate-700",
-      "severity": "medium"
     },
     {
       "file": "d:\\Websites\\avsworklog\\components\\workshop-tasks\\TaskCommentsDrawer.tsx",
