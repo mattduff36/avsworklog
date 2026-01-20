@@ -5,23 +5,20 @@ import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { OfflineBanner } from '@/components/ui/offline-banner';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { 
   CheckCircle2,
-  PackageCheck,
-  Clipboard,
-  FileCheck,
   ChevronRight,
   Bug,
-  Truck,
   Wrench,
   Settings,
   FileText,
-  Calendar
+  Calendar,
+  Loader2
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
 import { Database } from '@/types/database';
@@ -68,6 +65,7 @@ export default function DashboardPage() {
   const [pendingRAMSCount, setPendingRAMSCount] = useState(0);
   const [hasRAMSAssignments, setHasRAMSAssignments] = useState(false);
   const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
+  const [permissionsLoading, setPermissionsLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string>('');
   const [viewAsRole, setViewAsRole] = useState<string>('actual');
   
@@ -82,17 +80,8 @@ export default function DashboardPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Placeholder forms for future development (only shown to superadmin)
-  const placeholderForms = [
-    { id: 'delivery', title: 'Delivery Note', icon: PackageCheck, color: 'bg-rose-500' },
-    { id: 'site-diary', title: 'Site Diary', icon: Clipboard, color: 'bg-cyan-500' },
-    { id: 'plant-hire', title: 'Plant Hire', icon: Truck, color: 'bg-indigo-500' },
-    { id: 'quality-check', title: 'Quality Check', icon: FileCheck, color: 'bg-emerald-500' },
-  ];
-
-  // Only show placeholders to superadmin when viewing as actual role
+  // Removed placeholder tiles - no longer needed
   const isSuperAdmin = userEmail === 'admin@mpdee.co.uk';
-  const showPlaceholders = isSuperAdmin && viewAsRole === 'actual';
   
   // Determine if user should see manager/admin features based on View As mode
   const effectiveIsManager = isManager && !(isSuperAdmin && viewAsRole === 'employee');
@@ -118,7 +107,12 @@ export default function DashboardPage() {
   // Fetch user permissions (respects View As mode)
   useEffect(() => {
     async function fetchPermissions() {
-      if (!profile?.id) return;
+      if (!profile?.id) {
+        setPermissionsLoading(false);
+        return;
+      }
+      
+      setPermissionsLoading(true);
       
       // When viewing as different roles, simulate their permissions
       if (isSuperAdmin && viewAsRole !== 'actual') {
@@ -128,6 +122,7 @@ export default function DashboardPage() {
           // Simulate basic employee permissions (timesheets and inspections only)
           setUserPermissions(new Set(['timesheets', 'inspections'] as ModuleName[]));
         }
+        setPermissionsLoading(false);
         return;
       }
       
@@ -137,6 +132,7 @@ export default function DashboardPage() {
           'timesheets', 'inspections', 'rams', 'absence', 'maintenance', 'toolbox-talks', 'workshop-tasks',
           'approvals', 'actions', 'reports', 'admin-users', 'admin-vehicles'
         ] as ModuleName[]));
+        setPermissionsLoading(false);
         return;
       }
       
@@ -167,6 +163,8 @@ export default function DashboardPage() {
       } catch (error) {
         console.error('Error fetching permissions:', error);
         setUserPermissions(new Set());
+      } finally {
+        setPermissionsLoading(false);
       }
     }
     fetchPermissions();
@@ -458,10 +456,15 @@ export default function DashboardPage() {
 
       {/* Quick Actions - Square Button Grid */}
       <div>
-        <TooltipProvider>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {/* Active Forms */}
-            {formTypes
+        {permissionsLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-avs-yellow" />
+          </div>
+        ) : (
+          <TooltipProvider>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              {/* Active Forms */}
+              {formTypes
               .filter(formType => {
                 // Map form IDs to module names for permission checking
                 const moduleMap: Record<string, ModuleName> = {
@@ -499,52 +502,17 @@ export default function DashboardPage() {
                         {pendingRAMSCount}
                       </div>
                     )}
-                    <Icon className="h-8 w-8 text-white" />
-                    <span className="text-white font-semibold text-2xl leading-tight">
+                    <Icon className="h-8 w-8" />
+                    <span className="font-semibold text-2xl leading-tight">
                       {formType.title}
                     </span>
                   </div>
                 </Link>
               );
-            })}
-
-            {/* Placeholder Forms - Only visible to managers/admins */}
-            {showPlaceholders && placeholderForms.map((form) => {
-              const Icon = form.icon;
-              
-              // Check if this form has a working href
-              if (form.href) {
-                return (
-                  <Link key={form.id} href={form.href}>
-                    <div className={`relative ${form.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3 cursor-pointer`}>
-                      <Icon className="h-8 w-8 text-white" />
-                      <span className="text-white font-semibold text-2xl leading-tight">
-                        {form.title}
-                      </span>
-                    </div>
-                  </Link>
-                );
-              }
-              
-              // Disabled placeholder forms
-              return (
-                <Tooltip key={form.id}>
-                  <TooltipTrigger asChild>
-                    <div className={`${form.color} opacity-50 cursor-not-allowed rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3`}>
-                      <Icon className="h-8 w-8 text-white" />
-                      <span className="text-white font-semibold text-2xl leading-tight">
-                        {form.title}
-                      </span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Coming in a future development phase</p>
-                  </TooltipContent>
-                </Tooltip>
-              );
-            })}
-          </div>
-        </TooltipProvider>
+              })}
+            </div>
+          </TooltipProvider>
+        )}
       </div>
 
       {/* Manager/Admin Quick Access - Smaller Tiles */}
@@ -557,21 +525,13 @@ export default function DashboardPage() {
             {/* Manager Links - Using shared navigation config */}
             {managerNavItems.map((link) => {
               const Icon = link.icon;
-              // Define colors for each manager link
-              const colorMap: Record<string, { borderColor: string; iconColor: string; hoverBorder: string }> = {
-                '/approvals': { borderColor: 'border-blue-500', iconColor: 'text-blue-400', hoverBorder: 'hover:border-blue-400' },
-                '/actions': { borderColor: 'border-purple-500', iconColor: 'text-purple-400', hoverBorder: 'hover:border-purple-400' },
-                '/toolbox-talks': { borderColor: 'border-red-500', iconColor: 'text-red-400', hoverBorder: 'hover:border-red-400' },
-                '/reports': { borderColor: 'border-emerald-500', iconColor: 'text-emerald-400', hoverBorder: 'hover:border-emerald-400' },
-              };
-              const colors = colorMap[link.href] || { borderColor: 'border-slate-500', iconColor: 'text-slate-400', hoverBorder: 'hover:border-slate-400' };
               
               return (
                 <Link key={link.href} href={link.href}>
-                  <div className={`bg-slate-800 dark:bg-slate-900 border-4 ${colors.borderColor} ${colors.hoverBorder} hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer`}
+                  <div className="bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer"
                        style={{ height: '100px' }}>
                     <div className="flex flex-col items-start justify-between h-full">
-                      <Icon className={`h-6 w-6 ${colors.iconColor}`} />
+                      <Icon className="h-6 w-6 text-slate-400" />
                       <span className="text-white font-semibold text-base leading-tight">
                         {link.label}
                       </span>
@@ -584,19 +544,13 @@ export default function DashboardPage() {
             {/* Admin Links - Using shared navigation config */}
             {effectiveIsAdmin && adminNavItems.map((link) => {
               const Icon = link.icon;
-              // Define colors for each admin link
-              const colorMap: Record<string, { borderColor: string; iconColor: string; hoverBorder: string }> = {
-                '/admin/users': { borderColor: 'border-slate-400', iconColor: 'text-slate-300', hoverBorder: 'hover:border-slate-300' },
-                '/fleet?tab=vehicles': { borderColor: 'border-slate-500', iconColor: 'text-slate-400', hoverBorder: 'hover:border-slate-400' },
-              };
-              const colors = colorMap[link.href] || { borderColor: 'border-slate-500', iconColor: 'text-slate-400', hoverBorder: 'hover:border-slate-400' };
               
               return (
                 <Link key={link.href} href={link.href}>
-                  <div className={`bg-slate-800 dark:bg-slate-900 border-4 ${colors.borderColor} ${colors.hoverBorder} hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer`}
+                  <div className="bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer"
                        style={{ height: '100px' }}>
                     <div className="flex flex-col items-start justify-between h-full">
-                      <Icon className={`h-6 w-6 ${colors.iconColor}`} />
+                      <Icon className="h-6 w-6 text-slate-400" />
                       <span className="text-white font-semibold text-base leading-tight">
                         {link.label}
                       </span>
@@ -608,16 +562,15 @@ export default function DashboardPage() {
             
             {/* SuperAdmin Only - Debug Link (only when viewing as actual role) */}
             {isSuperAdmin && viewAsRole === 'actual' && (() => {
-              const link = { href: '/debug', label: 'Debug', icon: Bug, borderColor: 'border-yellow-500', iconColor: 'text-yellow-400', hoverBorder: 'hover:border-yellow-400' };
-              const Icon = link.icon;
+              const Icon = Bug;
               return (
-                <Link key={link.href} href={link.href}>
-                  <div className={`bg-slate-800 dark:bg-slate-900 border-4 ${link.borderColor} ${link.hoverBorder} hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer`}
+                <Link key="/debug" href="/debug">
+                  <div className="bg-slate-800 dark:bg-slate-900 border-4 border-red-600 hover:border-red-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer"
                        style={{ height: '100px' }}>
                     <div className="flex flex-col items-start justify-between h-full">
-                      <Icon className={`h-6 w-6 ${link.iconColor}`} />
-                      <span className="text-white font-semibold text-base leading-tight">
-                        {link.label}
+                      <Icon className="h-6 w-6 text-red-500" />
+                      <span className="text-red-500 font-semibold text-base leading-tight">
+                        Debug
                       </span>
                     </div>
                   </div>

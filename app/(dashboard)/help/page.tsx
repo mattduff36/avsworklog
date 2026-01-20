@@ -21,10 +21,13 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { createClient } from '@/lib/supabase/client';
 import type { FAQArticleWithCategory, FAQCategory, Suggestion } from '@/types/faq';
+import type { ModuleName } from '@/types/roles';
 
 export default function HelpPage() {
-  useAuth(); // Authentication check
+  const { profile, isManager, isAdmin } = useAuth(); // Get user info
+  const supabase = createClient();
   
   // FAQ state
   const [articles, setArticles] = useState<FAQArticleWithCategory[]>([]);
@@ -43,6 +46,9 @@ export default function HelpPage() {
   
   // Active tab
   const [activeTab, setActiveTab] = useState('faq');
+  
+  // User permissions
+  const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
 
   const fetchFAQ = useCallback(async (query: string, category: string | null) => {
     try {
@@ -82,6 +88,52 @@ export default function HelpPage() {
     }
   }, []);
 
+  // Fetch user permissions
+  useEffect(() => {
+    async function fetchPermissions() {
+      if (!profile?.id) return;
+      
+      // Managers and admins have all permissions
+      if (isManager || isAdmin) {
+        setUserPermissions(new Set([
+          'timesheets', 'inspections', 'rams', 'absence', 'maintenance', 'workshop-tasks',
+          'approvals', 'actions', 'reports', 'admin-users', 'admin-vehicles'
+        ] as ModuleName[]));
+        return;
+      }
+      
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select(`
+            role_id,
+            roles!inner(
+              role_permissions(
+                module_name,
+                enabled
+              )
+            )
+          `)
+          .eq('id', profile.id)
+          .single();
+        
+        // Build Set of enabled permissions
+        const enabledModules = new Set<ModuleName>();
+        data?.roles?.role_permissions?.forEach((perm: { enabled: boolean; module_name: string }) => {
+          if (perm.enabled) {
+            enabledModules.add(perm.module_name as ModuleName);
+          }
+        });
+        
+        setUserPermissions(enabledModules);
+      } catch (error) {
+        console.error('Error fetching permissions:', error);
+        setUserPermissions(new Set());
+      }
+    }
+    fetchPermissions();
+  }, [profile?.id, isManager, isAdmin, supabase]);
+
   // Fetch FAQ data on mount
   useEffect(() => {
     fetchFAQ('', null);
@@ -102,10 +154,35 @@ export default function HelpPage() {
     return () => clearTimeout(timer);
   }, [searchQuery, selectedCategory, fetchFAQ]);
 
-  // Group articles by category
+  // Filter categories based on user permissions
+  const filteredCategories = useMemo(() => {
+    // Managers and admins see all categories
+    if (isManager || isAdmin) {
+      return categories;
+    }
+    
+    // Filter categories based on module permissions
+    return categories.filter(category => {
+      // If category has no module requirement, show it to everyone
+      if (!category.module_name) {
+        return true;
+      }
+      
+      // Check if user has permission to this module
+      return userPermissions.has(category.module_name as ModuleName);
+    });
+  }, [categories, userPermissions, isManager, isAdmin]);
+
+  // Filter articles to only show those in accessible categories
+  const filteredArticles = useMemo(() => {
+    const accessibleCategoryIds = new Set(filteredCategories.map(cat => cat.id));
+    return articles.filter(article => accessibleCategoryIds.has(article.category_id));
+  }, [articles, filteredCategories]);
+
+  // Group filtered articles by category
   const articlesByCategory = useMemo(() => {
     const grouped: Record<string, FAQArticleWithCategory[]> = {};
-    articles.forEach(article => {
+    filteredArticles.forEach(article => {
       const catSlug = article.category?.slug || 'uncategorized';
       if (!grouped[catSlug]) {
         grouped[catSlug] = [];
@@ -113,7 +190,7 @@ export default function HelpPage() {
       grouped[catSlug].push(article);
     });
     return grouped;
-  }, [articles]);
+  }, [filteredArticles]);
 
   // Handle suggestion submission
   const handleSubmitSuggestion = async () => {
@@ -254,7 +331,7 @@ export default function HelpPage() {
                 >
                   All Categories
                 </Button>
-                {categories.map((category) => (
+                {filteredCategories.map((category) => (
                   <Button
                     key={category.id}
                     variant={selectedCategory === category.slug ? 'default' : 'outline'}
@@ -274,7 +351,7 @@ export default function HelpPage() {
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
             </div>
-          ) : articles.length === 0 ? (
+          ) : filteredArticles.length === 0 ? (
             <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
               <CardContent className="py-12 text-center">
                 <HelpCircle className="h-12 w-12 text-slate-300 mx-auto mb-4" />
@@ -287,7 +364,7 @@ export default function HelpPage() {
             <div className="space-y-6">
               {/* Group by category if no specific category selected */}
               {selectedCategory === null ? (
-                categories.map((category) => {
+                filteredCategories.map((category) => {
                   const catArticles = articlesByCategory[category.slug] || [];
                   if (catArticles.length === 0) return null;
                   
@@ -333,7 +410,7 @@ export default function HelpPage() {
                 <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
                   <CardContent className="pt-6">
                     <Accordion type="single" collapsible className="w-full">
-                      {articles.map((article) => (
+                      {filteredArticles.map((article) => (
                         <AccordionItem key={article.id} value={article.id}>
                           <AccordionTrigger className="text-left text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400">
                             {article.title}

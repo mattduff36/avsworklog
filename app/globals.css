@@ -1167,18 +1167,51 @@ button.bg-primary select {
 
 /* Force light text on all dark slate backgrounds */
 .bg-slate-900,
-.bg-slate-900 *:not(input):not(textarea):not(select),
+.bg-slate-900 *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red),
 .bg-slate-800,
-.bg-slate-800 *:not(input):not(textarea):not(select),
+.bg-slate-800 *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red),
 .bg-slate-700,
-.bg-slate-700 *:not(input):not(textarea):not(select),
+.bg-slate-700 *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red),
 [style*="background-color: rgb(15 23 42)"],
-[style*="background-color: rgb(15 23 42)"] *:not(input):not(textarea):not(select),
+[style*="background-color: rgb(15 23 42)"] *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red),
 [style*="background-color: rgb(30 41 59)"],
-[style*="background-color: rgb(30 41 59)"] *:not(input):not(textarea):not(select),
+[style*="background-color: rgb(30 41 59)"] *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red),
 [style*="background-color: rgb(51 65 85)"],
-[style*="background-color: rgb(51 65 85)"] *:not(input):not(textarea):not(select) {
+[style*="background-color: rgb(51 65 85)"] *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red) {
   color: rgb(226 232 240) !important; /* Light text for dark backgrounds */
+}
+
+/* Allow red text for debug/error elements on dark backgrounds */
+.debug-red,
+.text-red-500,
+svg.debug-red,
+span.debug-red,
+.bg-slate-800 .debug-red,
+.bg-slate-900 .debug-red,
+.bg-slate-800 svg.debug-red,
+.bg-slate-900 svg.debug-red,
+.bg-slate-800 span.debug-red,
+.bg-slate-900 span.debug-red,
+a .debug-red,
+a svg.debug-red,
+a span.debug-red,
+div .debug-red,
+div svg.debug-red,
+div span.debug-red {
+  color: #ef4444 !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+/* Extra specificity for SVG icons with debug-red class */
+svg.debug-red,
+svg.debug-red path,
+svg.debug-red line,
+svg.debug-red polyline,
+svg.debug-red rect,
+svg.debug-red circle {
+  stroke: #ef4444 !important;
+  color: #ef4444 !important;
 }
 
 /* Ensure buttons maintain proper text color based on background */
@@ -1793,4 +1826,41 @@ button[class*="variant-link"]:hover svg {
 
 .animate-shake {
   animation: shake 0.5s ease-in-out;
+}
+
+/* Tile pop-in animation - scales from center */
+@keyframes tile-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  60% {
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-tile-pop {
+  animation: tile-pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  opacity: 0;
+}
+
+/* Card fade-in animation - subtle slide up */
+@keyframes card-fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-card-fade {
+  animation: card-fade-in 0.4s ease-out forwards;
+  opacity: 0;
 }

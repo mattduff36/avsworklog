@@ -55,3 +55,6 @@ build-output.txt
 
 # database backups
 /backups
+
+# private documentation and sensitive materials
+/docs_private

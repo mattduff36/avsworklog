@@ -8,6 +8,7 @@ import {
   FileCheck2,
   CalendarDays,
   Settings,
+  HelpCircle,
   LucideIcon
 } from 'lucide-react';
 
@@ -97,6 +98,16 @@ export const FORM_TYPES: FormType[] = [
     href: '/workshop-tasks',
     listHref: '/workshop-tasks',
     color: 'workshop',
+    enabled: true,
+  },
+  {
+    id: 'help',
+    title: 'Help',
+    description: 'FAQs and support resources',
+    icon: HelpCircle,
+    href: '/help',
+    listHref: '/help',
+    color: 'avs-yellow', // Brand yellow color
     enabled: true,
   },
   // Future forms - uncomment and configure as needed:

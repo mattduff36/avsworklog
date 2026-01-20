@@ -7,6 +7,7 @@ export interface FAQCategory {
   description: string | null;
   sort_order: number;
   is_active: boolean;
+  module_name?: string | null; // Maps to ModuleName for permission filtering
   created_at: string;
   updated_at: string;
 }
