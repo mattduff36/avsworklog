@@ -1279,7 +1279,7 @@ export default function WorkshopTasksPage() {
                 <div className="space-y-2">
                   <Label>Status Filter</Label>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600">
+                    <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 dark:text-slate-100 text-slate-900">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1294,7 +1294,7 @@ export default function WorkshopTasksPage() {
                 <div className="space-y-2">
                   <Label>Vehicle Filter</Label>
                   <Select value={vehicleFilter} onValueChange={setVehicleFilter}>
-                    <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600">
+                    <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 dark:text-slate-100 text-slate-900">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

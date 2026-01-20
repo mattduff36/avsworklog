@@ -591,7 +591,7 @@ function AbsenceApprovalCard({
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   placeholder="Provide a reason for rejection..."
-                  className="bg-white dark:bg-slate-900 border-slate-600"
+                  className="bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
                 />
               </div>
               <div className="flex gap-2">

@@ -531,7 +531,7 @@ export default function ViewTimesheetPage() {
                           type="time"
                           value={entry.time_started || ''}
                           onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
-                          className="w-32"
+                          className="w-32 text-slate-900"
                         />
                       ) : (
                         <span>{entry.time_started || '-'}</span>
@@ -543,7 +543,7 @@ export default function ViewTimesheetPage() {
                           type="time"
                           value={entry.time_finished || ''}
                           onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
-                          className="w-32"
+                          className="w-32 text-slate-900"
                         />
                       ) : (
                         <span>{entry.time_finished || '-'}</span>
@@ -897,7 +897,7 @@ export default function ViewTimesheetPage() {
               onChange={(e) => setRejectionComments(e.target.value)}
               disabled={saving}
               rows={4}
-              className="resize-none bg-slate-800 border-slate-700 focus:border-slate-500"
+              className="resize-none bg-slate-800 border-slate-700 focus:border-slate-500 dark:text-slate-100 text-slate-900"
               required
             />
           </div>

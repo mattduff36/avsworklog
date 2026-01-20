@@ -165,7 +165,7 @@ export function CreateToolboxTalkForm({ onSuccess }: CreateToolboxTalkFormProps)
                 type="file"
                 accept=".pdf,application/pdf"
                 onChange={handleFileChange}
-                className="hidden"
+                className="hidden text-slate-900"
               />
               <Button
                 type="button"

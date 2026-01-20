@@ -155,12 +155,12 @@ export function MessagesReportView() {
             placeholder="Search by subject or sender..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
+            className="pl-10 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
           />
         </div>
 
         <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-full md:w-[180px]">
+          <SelectTrigger className="w-full md:w-[180px] text-slate-900">
             <Filter className="h-4 w-4 mr-2" />
             <SelectValue placeholder="Type" />
           </SelectTrigger>
@@ -172,7 +172,7 @@ export function MessagesReportView() {
         </Select>
 
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full md:w-[180px]">
+          <SelectTrigger className="w-full md:w-[180px] text-slate-900">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>

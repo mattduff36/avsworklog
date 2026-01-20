@@ -241,7 +241,7 @@ export default function AdminAbsencePage() {
             <div>
               <Label>Employee</Label>
               <Select value={profileId} onValueChange={setProfileId}>
-                <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-600">
+                <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900">
                   <SelectValue placeholder="All employees" />
                 </SelectTrigger>
                 <SelectContent>
@@ -261,7 +261,7 @@ export default function AdminAbsencePage() {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="bg-white dark:bg-slate-900 border-slate-600"
+                className="bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
               />
             </div>
             
@@ -271,14 +271,14 @@ export default function AdminAbsencePage() {
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="bg-white dark:bg-slate-900 border-slate-600"
+                className="bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
               />
             </div>
             
             <div>
               <Label>Reason</Label>
               <Select value={reasonId} onValueChange={setReasonId}>
-                <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-600">
+                <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900">
                   <SelectValue placeholder="All reasons" />
                 </SelectTrigger>
                 <SelectContent>
@@ -295,7 +295,7 @@ export default function AdminAbsencePage() {
             <div>
               <Label>Status</Label>
               <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-600">
+                <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900">
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -459,7 +459,7 @@ export default function AdminAbsencePage() {
             <div>
               <Label>Employee *</Label>
               <Select value={selectedProfileId} onValueChange={setSelectedProfileId}>
-                <SelectTrigger className="bg-slate-900 border-slate-600">
+                <SelectTrigger className="bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900">
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
@@ -475,7 +475,7 @@ export default function AdminAbsencePage() {
             <div>
               <Label>Reason *</Label>
               <Select value={selectedReasonId} onValueChange={setSelectedReasonId}>
-                <SelectTrigger className="bg-slate-900 border-slate-600">
+                <SelectTrigger className="bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900">
                   <SelectValue placeholder="Select reason" />
                 </SelectTrigger>
                 <SelectContent>
@@ -500,7 +500,7 @@ export default function AdminAbsencePage() {
                       setEndDate('');
                     }
                   }}
-                  className="bg-slate-900 border-slate-600"
+                  className="bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
                 />
               </div>
               
@@ -512,7 +512,7 @@ export default function AdminAbsencePage() {
                   onChange={(e) => setEndDate(e.target.value)}
                   min={startDate}
                   disabled={!startDate || isHalfDay}
-                  className="bg-slate-900 border-slate-600"
+                  className="bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
                 />
               </div>
             </div>
@@ -563,7 +563,7 @@ export default function AdminAbsencePage() {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Optional notes..."
-                className="bg-slate-900 border-slate-600"
+                className="bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
               />
             </div>
             

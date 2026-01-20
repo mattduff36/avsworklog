@@ -136,7 +136,7 @@ export function SubcategoryDialog({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Engine, Brakes, Body Work"
-                className="bg-slate-800 border-slate-700"
+                className="bg-slate-800 border-slate-700 dark:text-slate-100 text-slate-900"
                 required
                 disabled={loading}
               />

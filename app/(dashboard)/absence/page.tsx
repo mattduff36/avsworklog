@@ -499,7 +499,7 @@ export default function AbsencePage() {
                     }}
                     min={formatDateISO(new Date())}
                     required
-                    className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
+                    className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
                   />
                 </div>
                 
@@ -512,7 +512,7 @@ export default function AbsencePage() {
                     onChange={(e) => setEndDate(e.target.value)}
                     min={startDate || formatDateISO(new Date())}
                     disabled={!startDate || isHalfDay}
-                    className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
+                    className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
                   />
                 </div>
               </div>
@@ -568,7 +568,7 @@ export default function AbsencePage() {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Add any additional information..."
-                  className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
+                  className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
                 />
               </div>
               

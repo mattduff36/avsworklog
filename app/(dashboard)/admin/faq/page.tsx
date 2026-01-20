@@ -470,7 +470,7 @@ export default function FAQEditorPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Select value={selectedCategoryFilter} onValueChange={setSelectedCategoryFilter}>
-                    <SelectTrigger className="w-48 bg-slate-50 dark:bg-slate-800">
+                    <SelectTrigger className="w-48 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900">
                       <SelectValue placeholder="Filter by category" />
                     </SelectTrigger>
                     <SelectContent>
@@ -585,7 +585,7 @@ export default function FAQEditorPage() {
                   });
                 }}
                 placeholder="Category name"
-                className="bg-slate-50 dark:bg-slate-800"
+                className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
               />
             </div>
             
@@ -595,7 +595,7 @@ export default function FAQEditorPage() {
                 value={categoryForm.slug}
                 onChange={(e) => setCategoryForm({ ...categoryForm, slug: e.target.value })}
                 placeholder="category-slug"
-                className="bg-slate-50 dark:bg-slate-800"
+                className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
               />
             </div>
             
@@ -606,7 +606,7 @@ export default function FAQEditorPage() {
                 onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
                 placeholder="Brief description"
                 rows={2}
-                className="bg-slate-50 dark:bg-slate-800"
+                className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
               />
             </div>
             
@@ -616,7 +616,7 @@ export default function FAQEditorPage() {
                 type="number"
                 value={categoryForm.sort_order}
                 onChange={(e) => setCategoryForm({ ...categoryForm, sort_order: parseInt(e.target.value) || 0 })}
-                className="bg-slate-50 dark:bg-slate-800"
+                className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
               />
             </div>
           </div>
@@ -653,7 +653,7 @@ export default function FAQEditorPage() {
                   value={articleForm.category_id} 
                   onValueChange={(v) => setArticleForm({ ...articleForm, category_id: v })}
                 >
-                  <SelectTrigger className="bg-slate-50 dark:bg-slate-800">
+                  <SelectTrigger className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -672,7 +672,7 @@ export default function FAQEditorPage() {
                   type="number"
                   value={articleForm.sort_order}
                   onChange={(e) => setArticleForm({ ...articleForm, sort_order: parseInt(e.target.value) || 0 })}
-                  className="bg-slate-50 dark:bg-slate-800"
+                  className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
                 />
               </div>
             </div>
@@ -689,7 +689,7 @@ export default function FAQEditorPage() {
                   });
                 }}
                 placeholder="Article title"
-                className="bg-slate-50 dark:bg-slate-800"
+                className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
               />
             </div>
             
@@ -699,7 +699,7 @@ export default function FAQEditorPage() {
                 value={articleForm.slug}
                 onChange={(e) => setArticleForm({ ...articleForm, slug: e.target.value })}
                 placeholder="article-slug"
-                className="bg-slate-50 dark:bg-slate-800"
+                className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
               />
             </div>
             
@@ -709,7 +709,7 @@ export default function FAQEditorPage() {
                 value={articleForm.summary}
                 onChange={(e) => setArticleForm({ ...articleForm, summary: e.target.value })}
                 placeholder="Brief summary shown in search results"
-                className="bg-slate-50 dark:bg-slate-800"
+                className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
               />
             </div>
             
@@ -720,7 +720,7 @@ export default function FAQEditorPage() {
                 onChange={(e) => setArticleForm({ ...articleForm, content_md: e.target.value })}
                 placeholder="# Heading&#10;&#10;Article content in markdown format..."
                 rows={12}
-                className="bg-slate-50 dark:bg-slate-800 font-mono text-sm"
+                className="bg-slate-50 dark:bg-slate-800 font-mono text-sm dark:text-slate-100 text-slate-900"
               />
             </div>
             

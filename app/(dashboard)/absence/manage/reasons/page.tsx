@@ -316,7 +316,7 @@ export default function AbsenceReasonsPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Sick Leave"
-                className="bg-slate-900 border-slate-600"
+                className="bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
               />
             </div>
             
@@ -371,7 +371,7 @@ export default function AbsenceReasonsPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Sick Leave"
-                className="bg-slate-900 border-slate-600"
+                className="bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
               />
             </div>
             

@@ -127,7 +127,7 @@ export function VehicleCategoryDialog({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Vans, Cars, HGVs"
-                className="bg-slate-800 border-slate-700"
+                className="bg-slate-800 border-slate-700 dark:text-slate-100 text-slate-900"
                 required
                 disabled={loading}
               />
@@ -140,7 +140,7 @@ export function VehicleCategoryDialog({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optional description..."
-                className="bg-slate-800 border-slate-700 min-h-[80px]"
+                className="bg-slate-800 border-slate-700 min-h-[80px] dark:text-slate-100 text-slate-900"
                 disabled={loading}
               />
             </div>

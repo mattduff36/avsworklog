@@ -317,7 +317,7 @@ export default function HelpPage() {
                   placeholder="Search FAQ articles..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                  className="pl-10 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-slate-100 text-slate-900"
                 />
               </div>
               
@@ -458,7 +458,7 @@ export default function HelpPage() {
                   placeholder="Brief title for your suggestion"
                   value={suggestionTitle}
                   onChange={(e) => setSuggestionTitle(e.target.value)}
-                  className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                  className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-slate-100 text-slate-900"
                 />
               </div>
               
@@ -472,7 +472,7 @@ export default function HelpPage() {
                   value={suggestionBody}
                   onChange={(e) => setSuggestionBody(e.target.value)}
                   rows={5}
-                  className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                  className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-slate-100 text-slate-900"
                 />
               </div>
               
@@ -485,7 +485,7 @@ export default function HelpPage() {
                   placeholder="e.g., Timesheets, Inspections, Dashboard"
                   value={suggestionPageHint}
                   onChange={(e) => setSuggestionPageHint(e.target.value)}
-                  className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                  className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-slate-100 text-slate-900"
                 />
               </div>
 

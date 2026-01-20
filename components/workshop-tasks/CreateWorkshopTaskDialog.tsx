@@ -310,7 +310,7 @@ export function CreateWorkshopTaskDialog({
                 setCurrentMileage(null);
               }
             }}>
-              <SelectTrigger id="vehicle" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white">
+              <SelectTrigger id="vehicle" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 dark:text-slate-100 text-slate-900">
                 <SelectValue placeholder="Select vehicle" />
               </SelectTrigger>
               <SelectContent>
@@ -355,7 +355,7 @@ export function CreateWorkshopTaskDialog({
               Category <span className="text-red-500">*</span>
             </Label>
             <Select value={selectedCategoryId} onValueChange={handleCategoryChange}>
-              <SelectTrigger id="category" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white">
+              <SelectTrigger id="category" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 dark:text-slate-100 text-slate-900">
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
@@ -377,7 +377,7 @@ export function CreateWorkshopTaskDialog({
               onValueChange={setSelectedSubcategoryId}
               disabled={!selectedCategoryId}
             >
-              <SelectTrigger id="subcategory" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white">
+              <SelectTrigger id="subcategory" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 dark:text-slate-100 text-slate-900">
                 <SelectValue placeholder={selectedCategoryId ? "Select subcategory" : "Select a category first"} />
               </SelectTrigger>
               <SelectContent>
@@ -400,7 +400,7 @@ export function CreateWorkshopTaskDialog({
               value={newMileage}
               onChange={(e) => setNewMileage(e.target.value)}
               placeholder="Enter current mileage"
-              className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white"
+              className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 dark:text-slate-100 text-slate-900"
               min="0"
               step="1"
             />
@@ -420,7 +420,7 @@ export function CreateWorkshopTaskDialog({
               value={workshopComments}
               onChange={(e) => setWorkshopComments(e.target.value)}
               placeholder="Describe the work needed (minimum 10 characters)"
-              className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[100px]"
+              className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 min-h-[100px] dark:text-slate-100 text-slate-900"
               maxLength={300}
             />
             <p className="text-xs text-slate-600 dark:text-slate-400">

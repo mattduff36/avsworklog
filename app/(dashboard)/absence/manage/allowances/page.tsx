@@ -188,7 +188,7 @@ export default function AllowancesPage() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search by name or employee ID..."
-              className="pl-11 bg-white dark:bg-slate-900 border-slate-600"
+              className="pl-11 bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
             />
           </div>
         </CardContent>
@@ -247,7 +247,7 @@ export default function AllowancesPage() {
                 value={newAllowance}
                 onChange={(e) => setNewAllowance(e.target.value)}
                 placeholder="28"
-                className="bg-slate-900 border-slate-600"
+                className="bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
               />
               <p className="text-xs text-slate-400 mt-1">
                 Standard UK allowance is 28 days (including bank holidays)

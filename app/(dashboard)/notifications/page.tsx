@@ -130,7 +130,7 @@ export default function NotificationsPage() {
               placeholder="Search notifications..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-11 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
+              className="pl-11 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
             />
           </div>
         </CardContent>

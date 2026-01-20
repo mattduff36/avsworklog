@@ -241,7 +241,7 @@ export function AssignRecipientsModal({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 disabled={loading || fetching}
-                className="pl-10"
+                className="pl-10 text-slate-900"
               />
             </div>
 

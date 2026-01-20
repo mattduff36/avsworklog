@@ -799,7 +799,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                       placeholder="Search errors..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-11 h-9"
+                      className="pl-11 h-9 text-slate-900"
                     />
                   </div>
                 </div>
@@ -830,7 +830,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                   {/* Dropdown Filters */}
                   <div>
                     <Select value={filterErrorType} onValueChange={setFilterErrorType}>
-                      <SelectTrigger className="w-full h-9">
+                      <SelectTrigger className="w-full h-9 text-slate-900">
                         <SelectValue placeholder="Error Type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -846,7 +846,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
                   <div>
                     <Select value={filterDeviceType} onValueChange={setFilterDeviceType}>
-                      <SelectTrigger className="w-full h-9">
+                      <SelectTrigger className="w-full h-9 text-slate-900">
                         <SelectValue placeholder="Device" />
                       </SelectTrigger>
                       <SelectContent>
@@ -871,7 +871,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                   {uniqueComponents.length > 0 && (
                     <div className="lg:col-span-4">
                       <Select value={filterComponent} onValueChange={setFilterComponent}>
-                        <SelectTrigger className="w-full h-9">
+                        <SelectTrigger className="w-full h-9 text-slate-900">
                           <SelectValue placeholder="Component" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1430,7 +1430,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                         onValueChange={(value) => updateStatus(timesheet.id, 'timesheet', value)}
                         disabled={updating === timesheet.id}
                       >
-                        <SelectTrigger className="w-[140px]">
+                        <SelectTrigger className="w-[140px] text-slate-900">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1480,7 +1480,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                         onValueChange={(value) => updateStatus(inspection.id, 'inspection', value)}
                         disabled={updating === inspection.id}
                       >
-                        <SelectTrigger className="w-[140px]">
+                        <SelectTrigger className="w-[140px] text-slate-900">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1530,7 +1530,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                         onValueChange={(value) => updateStatus(absence.id, 'absence', value)}
                         disabled={updating === absence.id}
                       >
-                        <SelectTrigger className="w-[140px]">
+                        <SelectTrigger className="w-[140px] text-slate-900">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

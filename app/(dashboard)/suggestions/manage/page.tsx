@@ -245,7 +245,7 @@ export default function SuggestionsManagePage() {
               placeholder="Search suggestions..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-slate-50 dark:bg-slate-800"
+              className="pl-10 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
             />
           </div>
         </CardContent>
@@ -357,7 +357,7 @@ export default function SuggestionsManagePage() {
                 <div className="space-y-2">
                   <Label className="text-slate-700 dark:text-slate-300">Status</Label>
                   <Select value={newStatus} onValueChange={(v) => setNewStatus(v as SuggestionStatus)}>
-                    <SelectTrigger className="bg-slate-50 dark:bg-slate-800">
+                    <SelectTrigger className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900">
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -379,7 +379,7 @@ export default function SuggestionsManagePage() {
                     onChange={(e) => setAdminNote(e.target.value)}
                     placeholder="Add internal notes..."
                     rows={2}
-                    className="bg-slate-50 dark:bg-slate-800"
+                    className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
                   />
                 </div>
 
@@ -391,7 +391,7 @@ export default function SuggestionsManagePage() {
                     value={updateNote}
                     onChange={(e) => setUpdateNote(e.target.value)}
                     placeholder="Brief note about this update..."
-                    className="bg-slate-50 dark:bg-slate-800"
+                    className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
                   />
                 </div>
               </div>

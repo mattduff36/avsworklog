@@ -13,6 +13,9 @@
     "test:links": "blc http://localhost:3000 --recursive --follow --ordered --verbose",
     "test:lighthouse": "lhci autorun",
     "audit:all": "npm run lint && npm run lint:fast && npm run deps:check",
+    "audit:contrast": "tsx scripts/audit-input-contrast.ts",
+    "fix:contrast": "tsx scripts/fix-input-contrast.ts",
+    "test:contrast": "playwright test contrast.spec.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
@@ -76,6 +79,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.57.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
@@ -103,6 +107,7 @@
     "pg": "^8.16.3",
     "sharp": "^0.34.5",
     "tailwindcss": "^4",
+    "ts-morph": "^27.0.2",
     "tsx": "^4.20.6",
     "typescript": "^5",
     "vitest": "^3.2.4"

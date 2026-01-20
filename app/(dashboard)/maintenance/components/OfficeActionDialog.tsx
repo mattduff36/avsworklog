@@ -336,7 +336,7 @@ export function OfficeActionDialog({
                     type="date"
                     value={newDueDate}
                     onChange={(e) => setNewDueDate(e.target.value)}
-                    className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+                    className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
                   />
                   {currentDueDate && (
                     <p className="text-xs text-slate-500">
@@ -355,7 +355,7 @@ export function OfficeActionDialog({
                     onChange={(e) => setUpdateComment(e.target.value)}
                     placeholder="e.g., Tax renewed online via GOV.UK, confirmation received"
                     rows={3}
-                    className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+                    className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
                   />
                   <p className="text-xs text-slate-500">
                     {updateComment.length}/10 characters minimum

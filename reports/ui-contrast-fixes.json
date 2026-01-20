@@ -1,0 +1,504 @@
+{
+  "timestamp": "2026-01-20T22:03:53.886Z",
+  "totalFiles": 132,
+  "fixesApplied": 71,
+  "fixes": [
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\absence\\manage\\allowances\\page.tsx",
+      "line": 187,
+      "component": "Input",
+      "originalClass": "pl-11 bg-white dark:bg-slate-900 border-slate-600",
+      "fixedClass": "pl-11 bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\absence\\manage\\allowances\\page.tsx",
+      "line": 242,
+      "component": "Input",
+      "originalClass": "bg-slate-900 border-slate-600",
+      "fixedClass": "bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\absence\\manage\\page.tsx",
+      "line": 260,
+      "component": "Input",
+      "originalClass": "bg-white dark:bg-slate-900 border-slate-600",
+      "fixedClass": "bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\absence\\manage\\page.tsx",
+      "line": 270,
+      "component": "Input",
+      "originalClass": "bg-white dark:bg-slate-900 border-slate-600",
+      "fixedClass": "bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\absence\\manage\\page.tsx",
+      "line": 494,
+      "component": "Input",
+      "originalClass": "bg-slate-900 border-slate-600",
+      "fixedClass": "bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\absence\\manage\\page.tsx",
+      "line": 509,
+      "component": "Input",
+      "originalClass": "bg-slate-900 border-slate-600",
+      "fixedClass": "bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\absence\\manage\\page.tsx",
+      "line": 562,
+      "component": "Input",
+      "originalClass": "bg-slate-900 border-slate-600",
+      "fixedClass": "bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\absence\\manage\\page.tsx",
+      "line": 244,
+      "component": "SelectTrigger",
+      "originalClass": "bg-white dark:bg-slate-900 border-slate-600",
+      "fixedClass": "bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\absence\\manage\\page.tsx",
+      "line": 281,
+      "component": "SelectTrigger",
+      "originalClass": "bg-white dark:bg-slate-900 border-slate-600",
+      "fixedClass": "bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\absence\\manage\\page.tsx",
+      "line": 298,
+      "component": "SelectTrigger",
+      "originalClass": "bg-white dark:bg-slate-900 border-slate-600",
+      "fixedClass": "bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\absence\\manage\\page.tsx",
+      "line": 462,
+      "component": "SelectTrigger",
+      "originalClass": "bg-slate-900 border-slate-600",
+      "fixedClass": "bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\absence\\manage\\page.tsx",
+      "line": 478,
+      "component": "SelectTrigger",
+      "originalClass": "bg-slate-900 border-slate-600",
+      "fixedClass": "bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\absence\\manage\\reasons\\page.tsx",
+      "line": 314,
+      "component": "Input",
+      "originalClass": "bg-slate-900 border-slate-600",
+      "fixedClass": "bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\absence\\manage\\reasons\\page.tsx",
+      "line": 369,
+      "component": "Input",
+      "originalClass": "bg-slate-900 border-slate-600",
+      "fixedClass": "bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\absence\\page.tsx",
+      "line": 489,
+      "component": "Input",
+      "originalClass": "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600",
+      "fixedClass": "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\absence\\page.tsx",
+      "line": 508,
+      "component": "Input",
+      "originalClass": "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600",
+      "fixedClass": "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\absence\\page.tsx",
+      "line": 566,
+      "component": "Input",
+      "originalClass": "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600",
+      "fixedClass": "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\admin\\faq\\page.tsx",
+      "line": 578,
+      "component": "Input",
+      "originalClass": "bg-slate-50 dark:bg-slate-800",
+      "fixedClass": "bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\admin\\faq\\page.tsx",
+      "line": 594,
+      "component": "Input",
+      "originalClass": "bg-slate-50 dark:bg-slate-800",
+      "fixedClass": "bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\admin\\faq\\page.tsx",
+      "line": 604,
+      "component": "Textarea",
+      "originalClass": "bg-slate-50 dark:bg-slate-800",
+      "fixedClass": "bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\admin\\faq\\page.tsx",
+      "line": 615,
+      "component": "Input",
+      "originalClass": "bg-slate-50 dark:bg-slate-800",
+      "fixedClass": "bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\admin\\faq\\page.tsx",
+      "line": 671,
+      "component": "Input",
+      "originalClass": "bg-slate-50 dark:bg-slate-800",
+      "fixedClass": "bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\admin\\faq\\page.tsx",
+      "line": 682,
+      "component": "Input",
+      "originalClass": "bg-slate-50 dark:bg-slate-800",
+      "fixedClass": "bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\admin\\faq\\page.tsx",
+      "line": 698,
+      "component": "Input",
+      "originalClass": "bg-slate-50 dark:bg-slate-800",
+      "fixedClass": "bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\admin\\faq\\page.tsx",
+      "line": 708,
+      "component": "Input",
+      "originalClass": "bg-slate-50 dark:bg-slate-800",
+      "fixedClass": "bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\admin\\faq\\page.tsx",
+      "line": 718,
+      "component": "Textarea",
+      "originalClass": "bg-slate-50 dark:bg-slate-800 font-mono text-sm",
+      "fixedClass": "bg-slate-50 dark:bg-slate-800 font-mono text-sm dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\admin\\faq\\page.tsx",
+      "line": 473,
+      "component": "SelectTrigger",
+      "originalClass": "w-48 bg-slate-50 dark:bg-slate-800",
+      "fixedClass": "w-48 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\admin\\faq\\page.tsx",
+      "line": 656,
+      "component": "SelectTrigger",
+      "originalClass": "bg-slate-50 dark:bg-slate-800",
+      "fixedClass": "bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\approvals\\page.tsx",
+      "line": 589,
+      "component": "Input",
+      "originalClass": "bg-white dark:bg-slate-900 border-slate-600",
+      "fixedClass": "bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\debug\\page.tsx",
+      "line": 797,
+      "component": "Input",
+      "originalClass": "pl-11 h-9",
+      "fixedClass": "pl-11 h-9 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\debug\\page.tsx",
+      "line": 833,
+      "component": "SelectTrigger",
+      "originalClass": "w-full h-9",
+      "fixedClass": "w-full h-9 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\debug\\page.tsx",
+      "line": 849,
+      "component": "SelectTrigger",
+      "originalClass": "w-full h-9",
+      "fixedClass": "w-full h-9 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\debug\\page.tsx",
+      "line": 874,
+      "component": "SelectTrigger",
+      "originalClass": "w-full h-9",
+      "fixedClass": "w-full h-9 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\debug\\page.tsx",
+      "line": 1433,
+      "component": "SelectTrigger",
+      "originalClass": "w-[140px]",
+      "fixedClass": "w-[140px] text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\debug\\page.tsx",
+      "line": 1483,
+      "component": "SelectTrigger",
+      "originalClass": "w-[140px]",
+      "fixedClass": "w-[140px] text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\debug\\page.tsx",
+      "line": 1533,
+      "component": "SelectTrigger",
+      "originalClass": "w-[140px]",
+      "fixedClass": "w-[140px] text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\fleet\\components\\VehicleCategoryDialog.tsx",
+      "line": 125,
+      "component": "Input",
+      "originalClass": "bg-slate-800 border-slate-700",
+      "fixedClass": "bg-slate-800 border-slate-700 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\fleet\\components\\VehicleCategoryDialog.tsx",
+      "line": 138,
+      "component": "Textarea",
+      "originalClass": "bg-slate-800 border-slate-700 min-h-[80px]",
+      "fixedClass": "bg-slate-800 border-slate-700 min-h-[80px] dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\help\\page.tsx",
+      "line": 316,
+      "component": "Input",
+      "originalClass": "pl-10 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700",
+      "fixedClass": "pl-10 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\help\\page.tsx",
+      "line": 456,
+      "component": "Input",
+      "originalClass": "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700",
+      "fixedClass": "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\help\\page.tsx",
+      "line": 469,
+      "component": "Textarea",
+      "originalClass": "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700",
+      "fixedClass": "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\help\\page.tsx",
+      "line": 483,
+      "component": "Input",
+      "originalClass": "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700",
+      "fixedClass": "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\maintenance\\components\\OfficeActionDialog.tsx",
+      "line": 334,
+      "component": "Input",
+      "originalClass": "bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600",
+      "fixedClass": "bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\maintenance\\components\\OfficeActionDialog.tsx",
+      "line": 352,
+      "component": "Textarea",
+      "originalClass": "bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600",
+      "fixedClass": "bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\notifications\\page.tsx",
+      "line": 129,
+      "component": "Input",
+      "originalClass": "pl-11 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600",
+      "fixedClass": "pl-11 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\suggestions\\manage\\page.tsx",
+      "line": 244,
+      "component": "Input",
+      "originalClass": "pl-10 bg-slate-50 dark:bg-slate-800",
+      "fixedClass": "pl-10 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\suggestions\\manage\\page.tsx",
+      "line": 377,
+      "component": "Textarea",
+      "originalClass": "bg-slate-50 dark:bg-slate-800",
+      "fixedClass": "bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\suggestions\\manage\\page.tsx",
+      "line": 390,
+      "component": "Input",
+      "originalClass": "bg-slate-50 dark:bg-slate-800",
+      "fixedClass": "bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\suggestions\\manage\\page.tsx",
+      "line": 360,
+      "component": "SelectTrigger",
+      "originalClass": "bg-slate-50 dark:bg-slate-800",
+      "fixedClass": "bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\timesheets\\[id]\\page.tsx",
+      "line": 530,
+      "component": "Input",
+      "originalClass": "w-32",
+      "fixedClass": "w-32 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\timesheets\\[id]\\page.tsx",
+      "line": 542,
+      "component": "Input",
+      "originalClass": "w-32",
+      "fixedClass": "w-32 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\timesheets\\[id]\\page.tsx",
+      "line": 893,
+      "component": "Textarea",
+      "originalClass": "resize-none bg-slate-800 border-slate-700 focus:border-slate-500",
+      "fixedClass": "resize-none bg-slate-800 border-slate-700 focus:border-slate-500 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\workshop-tasks\\page.tsx",
+      "line": 1282,
+      "component": "SelectTrigger",
+      "originalClass": "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600",
+      "fixedClass": "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\app\\(dashboard)\\workshop-tasks\\page.tsx",
+      "line": 1297,
+      "component": "SelectTrigger",
+      "originalClass": "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600",
+      "fixedClass": "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\components\\messages\\AssignRecipientsModal.tsx",
+      "line": 239,
+      "component": "Input",
+      "originalClass": "pl-10",
+      "fixedClass": "pl-10 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\components\\messages\\CreateToolboxTalkForm.tsx",
+      "line": 163,
+      "component": "Input",
+      "originalClass": "hidden",
+      "fixedClass": "hidden text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\components\\messages\\MessagesReportView.tsx",
+      "line": 154,
+      "component": "Input",
+      "originalClass": "pl-10 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600",
+      "fixedClass": "pl-10 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\components\\messages\\MessagesReportView.tsx",
+      "line": 163,
+      "component": "SelectTrigger",
+      "originalClass": "w-full md:w-[180px]",
+      "fixedClass": "w-full md:w-[180px] text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\components\\messages\\MessagesReportView.tsx",
+      "line": 175,
+      "component": "SelectTrigger",
+      "originalClass": "w-full md:w-[180px]",
+      "fixedClass": "w-full md:w-[180px] text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\components\\rams\\AssignEmployeesModal.tsx",
+      "line": 254,
+      "component": "Input",
+      "originalClass": "pl-10",
+      "fixedClass": "pl-10 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\components\\rams\\UploadRAMSModal.tsx",
+      "line": 116,
+      "component": "Input",
+      "originalClass": "placeholder:text-slate-400 dark:placeholder:text-slate-500",
+      "fixedClass": "placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\components\\rams\\UploadRAMSModal.tsx",
+      "line": 130,
+      "component": "Textarea",
+      "originalClass": "placeholder:text-slate-400 dark:placeholder:text-slate-500",
+      "fixedClass": "placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\components\\rams\\UploadRAMSModal.tsx",
+      "line": 152,
+      "component": "Input",
+      "originalClass": "hidden",
+      "fixedClass": "hidden text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\components\\timesheets\\TimesheetAdjustmentModal.tsx",
+      "line": 206,
+      "component": "Textarea",
+      "originalClass": "resize-none",
+      "fixedClass": "resize-none text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\components\\timesheets\\TimesheetAdjustmentModal.tsx",
+      "line": 224,
+      "component": "Input",
+      "originalClass": "pl-10",
+      "fixedClass": "pl-10 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\components\\workshop-tasks\\CreateWorkshopTaskDialog.tsx",
+      "line": 397,
+      "component": "Input",
+      "originalClass": "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600",
+      "fixedClass": "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\components\\workshop-tasks\\CreateWorkshopTaskDialog.tsx",
+      "line": 418,
+      "component": "Textarea",
+      "originalClass": "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 min-h-[100px]",
+      "fixedClass": "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 min-h-[100px] dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\components\\workshop-tasks\\CreateWorkshopTaskDialog.tsx",
+      "line": 313,
+      "component": "SelectTrigger",
+      "originalClass": "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600",
+      "fixedClass": "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\components\\workshop-tasks\\CreateWorkshopTaskDialog.tsx",
+      "line": 358,
+      "component": "SelectTrigger",
+      "originalClass": "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600",
+      "fixedClass": "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\components\\workshop-tasks\\CreateWorkshopTaskDialog.tsx",
+      "line": 380,
+      "component": "SelectTrigger",
+      "originalClass": "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600",
+      "fixedClass": "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+    },
+    {
+      "file": "d:\\Websites\\avsworklog\\components\\workshop-tasks\\SubcategoryDialog.tsx",
+      "line": 134,
+      "component": "Input",
+      "originalClass": "bg-slate-800 border-slate-700",
+      "fixedClass": "bg-slate-800 border-slate-700 dark:text-slate-100 text-slate-900"
+    }
+  ]
+}
