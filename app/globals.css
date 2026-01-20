@@ -1480,6 +1480,8 @@ svg.filled,
 svg.filled *,
 svg[class*="filled"],
 svg[class*="filled"] *,
+svg[data-icon-type="filled"],
+svg[data-icon-type="filled"] *,
 [data-icon-type="filled"] svg,
 [data-icon-type="filled"] svg * {
   fill: currentColor !important;
