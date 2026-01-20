@@ -21,7 +21,6 @@ import {
   Loader2
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
-import { Database } from '@/types/database';
 import type { ModuleName } from '@/types/roles';
 import { toast } from 'sonner';
 import { managerNavItems, adminNavItems } from '@/lib/config/navigation';
@@ -66,6 +65,7 @@ export default function DashboardPage() {
   const [hasRAMSAssignments, setHasRAMSAssignments] = useState(false);
   const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
   const [permissionsLoading, setPermissionsLoading] = useState(true);
+  const [ramsLoading, setRamsLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string>('');
   const [viewAsRole, setViewAsRole] = useState<string>('actual');
   
@@ -283,12 +283,12 @@ export default function DashboardPage() {
       }
 
       // Filter workshop tasks
-      const workshopTasks = (allActions || []).filter(a => 
+      const workshopTasks = (allActions || []).filter((a: any) => 
         a.action_type === 'inspection_defect' || a.action_type === 'workshop_vehicle_task'
       );
 
-      const workshopPending = workshopTasks.filter(t => t.status === 'pending').length;
-      const workshopInProgress = workshopTasks.filter(t => t.status === 'logged').length;
+      const workshopPending = workshopTasks.filter((t: any) => t.status === 'pending').length;
+      const workshopInProgress = workshopTasks.filter((t: any) => t.status === 'logged').length;
       const workshopTotal = workshopPending + workshopInProgress;
 
       // Fetch maintenance data to count alerts
@@ -401,9 +401,13 @@ export default function DashboardPage() {
   };
 
   const fetchPendingRAMS = async () => {
-    if (!profile?.id) return;
+    if (!profile?.id) {
+      setRamsLoading(false);
+      return;
+    }
     
     try {
+      setRamsLoading(true);
       // Get total count of all assignments
       const { count: totalCount, error: totalError } = await supabase
         .from('rams_assignments')
@@ -424,6 +428,8 @@ export default function DashboardPage() {
       setPendingRAMSCount(pendingCount || 0);
     } catch (error) {
       console.error('Error fetching RAMS assignments:', error);
+    } finally {
+      setRamsLoading(false);
     }
   };
 
@@ -456,7 +462,7 @@ export default function DashboardPage() {
 
       {/* Quick Actions - Square Button Grid */}
       <div>
-        {permissionsLoading ? (
+        {(permissionsLoading || ramsLoading || !profile?.id) ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-avs-yellow" />
           </div>
@@ -490,13 +496,16 @@ export default function DashboardPage() {
                 }
                 return true;
               })
-              .map((formType) => {
+              .map((formType, index) => {
               const Icon = formType.icon;
               const showBadge = formType.id === 'rams' && pendingRAMSCount > 0;
               
               return (
                 <Link key={formType.id} href={formType.href}>
-                  <div className={`relative bg-${formType.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3 cursor-pointer`}>
+                  <div 
+                    className={`relative bg-${formType.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3 cursor-pointer animate-tile-pop`}
+                    style={{ animationDelay: `${index * 75}ms` }}
+                  >
                     {showBadge && (
                       <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-10 w-10 flex items-center justify-center text-base font-bold shadow-lg ring-2 ring-white">
                         {pendingRAMSCount}
@@ -523,13 +532,15 @@ export default function DashboardPage() {
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {/* Manager Links - Using shared navigation config */}
-            {managerNavItems.map((link) => {
+            {managerNavItems.map((link, index) => {
               const Icon = link.icon;
               
               return (
                 <Link key={link.href} href={link.href}>
-                  <div className="bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer"
-                       style={{ height: '100px' }}>
+                  <div 
+                    className="bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
+                    style={{ height: '100px', animationDelay: `${index * 75}ms` }}
+                  >
                     <div className="flex flex-col items-start justify-between h-full">
                       <Icon className="h-6 w-6 text-slate-400" />
                       <span className="text-white font-semibold text-base leading-tight">
@@ -542,13 +553,16 @@ export default function DashboardPage() {
             })}
             
             {/* Admin Links - Using shared navigation config */}
-            {effectiveIsAdmin && adminNavItems.map((link) => {
+            {effectiveIsAdmin && adminNavItems.map((link, index) => {
               const Icon = link.icon;
+              const animationIndex = managerNavItems.length + index;
               
               return (
                 <Link key={link.href} href={link.href}>
-                  <div className="bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer"
-                       style={{ height: '100px' }}>
+                  <div 
+                    className="bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
+                    style={{ height: '100px', animationDelay: `${animationIndex * 75}ms` }}
+                  >
                     <div className="flex flex-col items-start justify-between h-full">
                       <Icon className="h-6 w-6 text-slate-400" />
                       <span className="text-white font-semibold text-base leading-tight">
@@ -563,13 +577,17 @@ export default function DashboardPage() {
             {/* SuperAdmin Only - Debug Link (only when viewing as actual role) */}
             {isSuperAdmin && viewAsRole === 'actual' && (() => {
               const Icon = Bug;
+              const animationIndex = managerNavItems.length + (effectiveIsAdmin ? adminNavItems.length : 0);
+              
               return (
                 <Link key="/debug" href="/debug">
-                  <div className="bg-slate-800 dark:bg-slate-900 border-4 border-red-600 hover:border-red-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer"
-                       style={{ height: '100px' }}>
+                  <div 
+                    className="bg-slate-800 dark:bg-slate-900 border-4 border-red-600 hover:border-red-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
+                    style={{ height: '100px', animationDelay: `${animationIndex * 75}ms` }}
+                  >
                     <div className="flex flex-col items-start justify-between h-full">
-                      <Icon className="h-6 w-6 text-red-500" />
-                      <span className="text-red-500 font-semibold text-base leading-tight">
+                      <Icon className="h-6 w-6 debug-red" />
+                      <span className="font-semibold text-base leading-tight debug-red">
                         Debug
                       </span>
                     </div>
@@ -583,7 +601,7 @@ export default function DashboardPage() {
 
       {/* Pending Approvals Summary - Manager/Admin Only */}
       {effectiveIsManager && (
-        <Card className="bg-slate-900 border-slate-700">
+        <Card className="bg-slate-900 border-slate-700 animate-card-fade" style={{ animationDelay: '300ms' }}>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-white">
               <span>Pending Approvals</span>
@@ -666,7 +684,7 @@ export default function DashboardPage() {
 
       {/* Manager Actions Section */}
       {effectiveIsManager && (
-        <Card className="bg-slate-900 border-slate-700">
+        <Card className="bg-slate-900 border-slate-700 animate-card-fade" style={{ animationDelay: '400ms' }}>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-white">
               <span>Manager Actions</span>

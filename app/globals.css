@@ -1139,12 +1139,13 @@ button.bg-avs-yellow.text-primary-foreground,
 .hover\:bg-avs-yellow-hover:hover svg,
 .hover\:bg-avs-yellow-hover:hover span,
 /* Also cover primary color buttons (which use yellow) */
+/* IMPORTANT: Excludes .ui-component elements which manage their own colors */
 .bg-primary,
-.bg-primary *,
+.bg-primary *:not(.ui-component):not(.ui-component *),
 button.bg-primary,
-button.bg-primary *,
-button.bg-primary span,
-button.bg-primary svg {
+button.bg-primary *:not(.ui-component):not(.ui-component *),
+button.bg-primary span:not(.ui-component),
+button.bg-primary svg:not(.ui-component) {
   color: rgb(15 23 42) !important; /* Dark slate text - same as sidebar */
 }
 
@@ -1166,18 +1167,19 @@ button.bg-primary select {
 }
 
 /* Force light text on all dark slate backgrounds */
+/* IMPORTANT: Excludes .ui-component elements which manage their own colors */
 .bg-slate-900,
-.bg-slate-900 *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red),
+.bg-slate-900 *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red):not(.ui-component):not(.ui-component *),
 .bg-slate-800,
-.bg-slate-800 *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red),
+.bg-slate-800 *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red):not(.ui-component):not(.ui-component *),
 .bg-slate-700,
-.bg-slate-700 *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red),
+.bg-slate-700 *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red):not(.ui-component):not(.ui-component *),
 [style*="background-color: rgb(15 23 42)"],
-[style*="background-color: rgb(15 23 42)"] *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red),
+[style*="background-color: rgb(15 23 42)"] *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red):not(.ui-component):not(.ui-component *),
 [style*="background-color: rgb(30 41 59)"],
-[style*="background-color: rgb(30 41 59)"] *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red),
+[style*="background-color: rgb(30 41 59)"] *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red):not(.ui-component):not(.ui-component *),
 [style*="background-color: rgb(51 65 85)"],
-[style*="background-color: rgb(51 65 85)"] *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red) {
+[style*="background-color: rgb(51 65 85)"] *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red):not(.ui-component):not(.ui-component *) {
   color: rgb(226 232 240) !important; /* Light text for dark backgrounds */
 }
 
@@ -1214,26 +1216,136 @@ svg.debug-red circle {
   color: #ef4444 !important;
 }
 
-/* Fix checkbox visibility - ensure checkmark is always visible */
-/* Checkbox component needs special handling to ensure checkmark visibility */
+/* ============================================================================
+ * UI COMPONENT SYSTEM
+ * ============================================================================
+ * Components with .ui-component class opt out of global color inheritance.
+ * This allows form controls to manage their own colors without conflicts.
+ * ============================================================================ */
+
+/* Base UI component - opts out of global color rules */
+.ui-component {
+  /* This class marks elements that should NOT inherit colors from parent backgrounds */
+}
+
+/* ============================================================================
+ * CHECKBOX COMPONENT
+ * ============================================================================ */
+.checkbox-root {
+  /* Base checkbox styling - self-contained */
+  border-color: hsl(var(--primary)) !important;
+  background-color: transparent !important;
+}
+
 .checkbox-root[data-state="checked"] {
-  background-color: hsl(var(--primary)) !important; /* Force yellow background when checked */
+  background-color: hsl(var(--primary)) !important;
+  border-color: hsl(var(--primary)) !important;
 }
 
 .checkbox-root[data-state="checked"] .checkbox-indicator,
 .checkbox-root[data-state="checked"] .checkbox-icon,
-.checkbox-root[data-state="checked"] svg,
-button .checkbox-root[data-state="checked"] svg,
-.bg-primary .checkbox-root[data-state="checked"] svg {
-  color: rgb(15 23 42) !important; /* Dark checkmark on yellow background */
+.checkbox-root[data-state="checked"] svg {
+  color: rgb(15 23 42) !important;
   fill: currentColor !important;
   stroke: currentColor !important;
 }
 
-/* Ensure unchecked checkboxes have visible borders on dark backgrounds */
-.checkbox-root:not([data-state="checked"]) {
-  border-color: hsl(var(--primary)) !important; /* Yellow border for visibility */
+/* ============================================================================
+ * SWITCH COMPONENT
+ * ============================================================================ */
+.switch-root {
+  /* Self-contained switch styling */
+}
+
+.switch-root[data-state="checked"] {
+  background-color: hsl(142 76% 36%) !important; /* Green when on */
+}
+
+.switch-root[data-state="unchecked"] {
+  background-color: rgb(71 85 105) !important; /* Slate-500 when off */
+}
+
+.switch-root .switch-thumb {
+  background-color: white !important;
+}
+
+/* ============================================================================
+ * RADIO GROUP COMPONENT
+ * ============================================================================ */
+.radio-item {
+  border-color: hsl(var(--primary)) !important;
   background-color: transparent !important;
+}
+
+.radio-item[data-state="checked"] {
+  border-color: hsl(var(--primary)) !important;
+}
+
+.radio-item[data-state="checked"] .radio-indicator {
+  background-color: hsl(var(--primary)) !important;
+}
+
+/* ============================================================================
+ * SELECTABLE CARD COMPONENT
+ * ============================================================================ */
+.selectable-card {
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: 2px solid rgb(71 85 105); /* slate-500 */
+  background-color: rgb(30 41 59); /* slate-800 */
+}
+
+.selectable-card:hover:not(.selectable-card-disabled) {
+  border-color: rgb(100 116 139); /* slate-400 */
+  background-color: rgb(51 65 85); /* slate-700 */
+}
+
+.selectable-card-selected {
+  border-color: currentColor !important;
+}
+
+/* Module-specific selected states */
+.selectable-card-selected.selectable-card-rams {
+  background-color: rgba(34, 197, 94, 0.15) !important; /* green-500/15 */
+  border-color: rgb(34 197 94) !important; /* green-500 */
+}
+
+.selectable-card-selected.selectable-card-rams .selectable-card-icon {
+  color: rgb(34 197 94) !important;
+}
+
+.selectable-card-selected.selectable-card-timesheet {
+  background-color: rgba(59, 130, 246, 0.15) !important; /* blue-500/15 */
+  border-color: rgb(59 130 246) !important; /* blue-500 */
+}
+
+.selectable-card-selected.selectable-card-inspection {
+  background-color: rgba(249, 115, 22, 0.15) !important; /* orange-500/15 */
+  border-color: rgb(249 115 22) !important; /* orange-500 */
+}
+
+.selectable-card-selected.selectable-card-absence {
+  background-color: rgba(168, 85, 247, 0.15) !important; /* purple-500/15 */
+  border-color: rgb(168 85 247) !important; /* purple-500 */
+}
+
+.selectable-card-selected.selectable-card-default {
+  background-color: rgba(241, 214, 74, 0.15) !important; /* avs-yellow/15 */
+  border-color: rgb(241 214 74) !important; /* avs-yellow */
+}
+
+.selectable-card-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.selectable-card-locked {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.selectable-card-locked .selectable-card-lock-icon {
+  color: rgb(34 197 94) !important; /* green-500 */
 }
 
 /* Ensure buttons maintain proper text color based on background */

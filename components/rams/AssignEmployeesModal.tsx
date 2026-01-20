@@ -4,12 +4,11 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
+import { SelectableCard } from '@/components/ui/selectable-card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, UserCheck, Search, AlertCircle } from 'lucide-react';
+import { Loader2, UserCheck, Search, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
-import { Database } from '@/types/database';
 
 interface Employee {
   id: string;
@@ -262,25 +261,26 @@ export function AssignEmployeesModal({
             </div>
 
             {/* Select All */}
-            <div className="flex items-center space-x-2 border-b pb-2">
-              <Checkbox
-                id="select-all"
-                checked={allSelected}
-                onCheckedChange={handleSelectAll}
+            <div className="flex items-center justify-between border-b border-slate-700 pb-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleSelectAll(!allSelected)}
                 disabled={loading || fetching || filteredEmployees.length === 0}
-              />
-              <label
-                htmlFor="select-all"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                className="text-xs"
               >
-                Select All ({selectedIds.size} selected)
-              </label>
+                {allSelected ? 'Deselect All' : 'Select All'}
+              </Button>
+              <span className="text-sm text-slate-400">
+                {selectedIds.size} selected
+              </span>
             </div>
 
             {/* Employees List */}
             {fetching ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <Loader2 className="h-6 w-6 animate-spin text-green-500" />
               </div>
             ) : (
               <ScrollArea className="h-[300px] pr-4">
@@ -291,36 +291,29 @@ export function AssignEmployeesModal({
                     </p>
                   ) : (
                     filteredEmployees.map((employee) => (
-                      <div
+                      <SelectableCard
                         key={employee.id}
-                        className={`flex items-center space-x-3 p-3 rounded-lg border ${
-                          employee.alreadySigned
-                            ? 'bg-muted/50 opacity-60'
-                            : 'hover:bg-accent/50'
-                        }`}
+                        selected={selectedIds.has(employee.id)}
+                        onSelect={() => handleToggleEmployee(employee.id)}
+                        disabled={loading}
+                        locked={employee.alreadySigned}
+                        lockedMessage="Signed"
+                        variant="rams"
                       >
-                        <Checkbox
-                          id={employee.id}
-                          checked={selectedIds.has(employee.id)}
-                          onCheckedChange={() => handleToggleEmployee(employee.id)}
-                          disabled={loading || employee.alreadySigned}
-                        />
-                        <label
-                          htmlFor={employee.id}
-                          className="flex-1 text-sm font-medium cursor-pointer peer-disabled:cursor-not-allowed"
-                        >
-                          {employee.full_name}
-                          {employee.alreadySigned && (
-                            <span className="ml-2 text-xs text-green-400 flex items-center gap-1 inline-flex">
-                              <AlertCircle className="h-3 w-3" />
-                              Already signed
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-slate-100">
+                              {employee.full_name}
                             </span>
+                            <span className="text-xs text-slate-400">
+                              {employee.role?.display_name || 'No Role'}
+                            </span>
+                          </div>
+                          {employee.alreadySigned && (
+                            <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
                           )}
-                        </label>
-                        <span className="text-xs text-muted-foreground">
-                          {employee.role?.display_name || 'No Role'}
-                        </span>
-                      </div>
+                        </div>
+                      </SelectableCard>
                     ))
                   )}
                 </div>
@@ -328,9 +321,9 @@ export function AssignEmployeesModal({
             )}
 
             {selectedIds.size > 0 && (
-              <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 p-3">
-                <p className="text-sm text-blue-900 dark:text-blue-100">
-                  ℹ️ {selectedIds.size} employee{selectedIds.size !== 1 ? 's' : ''} will be notified
+              <div className="rounded-md bg-green-950/30 border border-green-800/50 p-3">
+                <p className="text-sm text-green-200">
+                  {selectedIds.size} employee{selectedIds.size !== 1 ? 's' : ''} will be notified
                 </p>
               </div>
             )}
