@@ -1157,7 +1157,10 @@ button.bg-primary svg {
 .bg-primary select,
 button.bg-avs-yellow input:not([type="checkbox"]):not([type="radio"]),
 button.bg-avs-yellow textarea,
-button.bg-avs-yellow select {
+button.bg-avs-yellow select,
+button.bg-primary input:not([type="checkbox"]):not([type="radio"]),
+button.bg-primary textarea,
+button.bg-primary select {
   color: rgb(226 232 240) !important; /* Light text */
   background-color: rgb(30 41 59) !important; /* Dark background */
 }
@@ -1419,57 +1422,51 @@ button[class*="variant-link"] svg,
   color: rgb(226 232 240) !important; /* Light text and icons */
 }
 
-/* Ensure all SVG icons match button text color and use OUTLINE style */
-/* Lucide React icons are stroke-based by default - preserve this */
-button svg,
-svg:not(.logo):not([class*="logo"]):not([class*="image"]) {
+/* Ensure button SVG icons match button text color and use OUTLINE style */
+/* Lucide React icons are stroke-based by default - only enforce in buttons */
+button svg {
   color: inherit !important;
 }
 
-/* CRITICAL: Force outline style for icon elements - no filled icons */
-/* Target lucide-react and similar icon libraries */
+/* CRITICAL: Force outline style ONLY for button icons - no filled icons in buttons */
+/* Target lucide-react and similar icon libraries used in buttons */
 button svg *,
-svg:not(.logo):not([class*="logo"]):not([class*="image"]) * {
-  fill: none !important; /* Remove fill - outline only */
-  stroke: currentColor !important; /* Use stroke with inherited color */
-}
-
-/* Specific targeting for common SVG shapes in icons */
 button svg path,
 button svg circle,
 button svg rect,
 button svg line,
 button svg polyline,
 button svg polygon,
-button svg ellipse,
-svg:not(.logo):not([class*="logo"]):not([class*="image"]) path,
-svg:not(.logo):not([class*="logo"]):not([class*="image"]) circle,
-svg:not(.logo):not([class*="logo"]):not([class*="image"]) rect,
-svg:not(.logo):not([class*="logo"]):not([class*="image"]) line,
-svg:not(.logo):not([class*="logo"]):not([class*="image"]) polyline,
-svg:not(.logo):not([class*="logo"]):not([class*="image"]) polygon,
-svg:not(.logo):not([class*="logo"]):not([class*="image"]) ellipse {
-  fill: none !important;
-  stroke: currentColor !important;
+button svg ellipse {
+  fill: none !important; /* Remove fill - outline only */
+  stroke: currentColor !important; /* Use stroke with inherited color */
 }
 
-/* Exception: Allow logos and images to use fill if needed */
-svg.logo,
-svg[class*="logo"],
-svg[class*="image"],
+/* Exception: SVGs outside buttons maintain their default styling */
+/* This preserves filled SVGs for logos, badges, illustrations, etc. */
+svg:not(button svg) {
+  /* Allow normal SVG rendering - no forced outline style */
+}
+
+/* Specific exceptions for filled SVGs that should never be forced to outline */
 .logo svg,
-[class*="logo"] svg,
-[class*="image"] svg {
-  fill: currentColor;
-  stroke: none;
-}
-
-svg.logo *,
-svg[class*="logo"] *,
-svg[class*="image"] *,
 .logo svg *,
+[class*="logo"] svg,
 [class*="logo"] svg *,
-[class*="image"] svg * {
+.badge svg,
+.badge svg *,
+[class*="badge"] svg,
+[class*="badge"] svg *,
+.illustration svg,
+.illustration svg *,
+[class*="illustration"] svg,
+[class*="illustration"] svg *,
+svg.filled,
+svg.filled *,
+svg[class*="filled"],
+svg[class*="filled"] *,
+[data-icon-type="filled"] svg,
+[data-icon-type="filled"] svg * {
   fill: currentColor !important;
   stroke: none !important;
 }
