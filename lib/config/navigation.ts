@@ -24,6 +24,8 @@ import {
   BarChart3,
   Users,
   Truck,
+  HelpCircle,
+  Lightbulb,
   LucideIcon
 } from 'lucide-react';
 import { ModuleName } from '@/types/roles';
@@ -85,6 +87,13 @@ export const employeeNavItems: NavItem[] = [
     module: 'workshop-tasks',
     category: 'employee'
   },
+  { 
+    href: '/help', 
+    label: 'Help', 
+    icon: HelpCircle, 
+    // No module - always visible to all authenticated users
+    category: 'employee'
+  },
 ];
 
 /**
@@ -119,6 +128,12 @@ export const managerNavItems: NavItem[] = [
     icon: BarChart3,
     category: 'manager'
   },
+  { 
+    href: '/suggestions/manage', 
+    label: 'Suggestions', 
+    icon: Lightbulb,
+    category: 'manager'
+  },
 ];
 
 /**
@@ -139,6 +154,12 @@ export const adminNavItems: NavItem[] = [
     href: '/fleet?tab=vehicles', 
     label: 'Vehicles', 
     icon: Truck,
+    category: 'admin'
+  },
+  { 
+    href: '/admin/faq', 
+    label: 'FAQ Editor', 
+    icon: HelpCircle,
     category: 'admin'
   },
 ];

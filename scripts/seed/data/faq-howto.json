@@ -1,0 +1,438 @@
+{
+  "categories": [
+    {
+      "slug": "getting-started",
+      "name": "Getting Started",
+      "sort_order": 1
+    },
+    {
+      "slug": "timesheets",
+      "name": "Timesheets",
+      "sort_order": 2
+    },
+    {
+      "slug": "inspections",
+      "name": "Vehicle Inspections",
+      "sort_order": 3
+    },
+    {
+      "slug": "rams",
+      "name": "RAMS Documents",
+      "sort_order": 4
+    },
+    {
+      "slug": "absence",
+      "name": "Absence & Leave",
+      "sort_order": 5
+    },
+    {
+      "slug": "fleet-maintenance",
+      "name": "Fleet & Maintenance",
+      "sort_order": 6
+    },
+    {
+      "slug": "workshop-tasks",
+      "name": "Workshop Tasks",
+      "sort_order": 7
+    },
+    {
+      "slug": "approvals",
+      "name": "Approvals (Managers)",
+      "sort_order": 8
+    },
+    {
+      "slug": "actions",
+      "name": "Actions (Managers)",
+      "sort_order": 9
+    },
+    {
+      "slug": "toolbox-talks",
+      "name": "Toolbox Talks & Reminders",
+      "sort_order": 10
+    },
+    {
+      "slug": "reports",
+      "name": "Reports",
+      "sort_order": 11
+    },
+    {
+      "slug": "admin-users",
+      "name": "User Management (Admin)",
+      "sort_order": 12
+    },
+    {
+      "slug": "admin-roles",
+      "name": "Roles & Permissions (Admin)",
+      "sort_order": 13
+    },
+    {
+      "slug": "notifications",
+      "name": "Notifications & Messages",
+      "sort_order": 14
+    },
+    {
+      "slug": "troubleshooting",
+      "name": "Troubleshooting",
+      "sort_order": 15
+    }
+  ],
+  "articles": [
+    {
+      "category_slug": "getting-started",
+      "slug": "what-is-squires-app",
+      "title": "What is the Squires App?",
+      "summary": "Overview of the Squires digital forms management system.",
+      "content_md": "# What is the Squires App?\n\nThe Squires App is a custom-built digital forms management system designed for A&V Squires Plant Co. Ltd. It replaces paper-based forms with a modern, mobile-first Progressive Web Application (PWA) accessible from any device.\n\n## Key Features\n\n- **Employee Timesheets** - Digital weekly timesheets with automatic hour calculations\n- **Vehicle Inspections** - 26-point safety checklist system with photo uploads\n- **RAMS Documents** - Risk Assessment & Method Statement management\n- **Absence Management** - Request and track leave\n- **Fleet Maintenance** - Track MOT, tax, service schedules\n- **Workshop Tasks** - Manage vehicle repairs and work\n- **Approvals** - Manager review and approval workflows\n- **Reports** - Export data as PDF or Excel\n\n## Access\n\nThe app is available at: https://avsworklog.mpdee.uk\n\nIt works on desktop, tablet, and mobile devices. For the best mobile experience, add it to your home screen as a PWA."
+    },
+    {
+      "category_slug": "getting-started",
+      "slug": "how-to-login",
+      "title": "How do I log in?",
+      "summary": "Instructions for logging into the app.",
+      "content_md": "# How do I log in?\n\n1. Go to https://avsworklog.mpdee.uk\n2. Enter your email address\n3. Enter your password\n4. Click **Sign In**\n\n## First Time Login\n\nIf this is your first login, an admin will have created your account and sent you a temporary password by email. You'll be required to change this password on first login.\n\n## Forgot Password?\n\nContact your administrator to reset your password. They can generate a new temporary password from the User Management page."
+    },
+    {
+      "category_slug": "getting-started",
+      "slug": "change-password",
+      "title": "How do I change my password?",
+      "summary": "Instructions for changing your password.",
+      "content_md": "# How do I change my password?\n\nIf you need to change your password (either because it's your first login or you want to update it):\n\n1. You'll be automatically redirected to the Change Password page if a change is required\n2. Enter your new password (must meet security requirements)\n3. Confirm the new password\n4. Click **Change Password**\n\n## Password Requirements\n\n- Minimum length as set by system\n- Should be unique and not easily guessed\n\n## Forgot Your Password?\n\nAsk your administrator to reset it from the User Management page."
+    },
+    {
+      "category_slug": "getting-started",
+      "slug": "dashboard-overview",
+      "title": "Understanding the Dashboard",
+      "summary": "Guide to the main dashboard and navigation.",
+      "content_md": "# Understanding the Dashboard\n\nThe Dashboard is your home screen after logging in. It shows quick actions and important status information.\n\n## Quick Actions (All Users)\n\nSquare buttons for common tasks based on your permissions:\n- **Timesheets** - Create/view timesheets\n- **Inspections** - Perform vehicle inspections\n- **RAMS** - View assigned RAMS documents\n- **Absence** - Request leave\n- **Maintenance** - View maintenance schedules\n- **Workshop** - View workshop tasks\n\n## Management Tools (Managers/Admins Only)\n\nIf you're a Manager or Admin, you'll see a sidebar menu with:\n- **Approvals** - Review submitted forms\n- **Actions** - Manage defects and tasks\n- **Toolbox Talks** - Send safety messages\n- **Reports** - Download reports\n\n## Admin Tools (Admins Only)\n\n- **Users** - Manage user accounts\n- **Vehicles** - Manage fleet\n\n## Top Navigation\n\nThe top bar shows:\n- **SQUIRES** logo (click to return to dashboard)\n- Navigation links based on your role\n- **Bell icon** - View notifications\n- **Sign Out** button"
+    },
+    {
+      "category_slug": "getting-started",
+      "slug": "mobile-pwa-install",
+      "title": "How to install the app on my phone",
+      "summary": "Add the Squires App to your home screen for the best mobile experience.",
+      "content_md": "# How to install the app on my phone\n\nThe Squires App is a Progressive Web App (PWA) that can be installed on your phone for an app-like experience.\n\n## iPhone (Safari)\n\n1. Open Safari and go to https://avsworklog.mpdee.uk\n2. Tap the **Share** button (square with arrow)\n3. Scroll down and tap **Add to Home Screen**\n4. Tap **Add** in the top right\n\n## Android (Chrome)\n\n1. Open Chrome and go to https://avsworklog.mpdee.uk\n2. Tap the **three dots** menu in the top right\n3. Tap **Add to Home screen**\n4. Tap **Add**\n\n## Benefits\n\n- Launch directly from your home screen\n- App-like full-screen experience\n- Works offline for viewing previously loaded data\n- Faster access without opening a browser"
+    },
+    {
+      "category_slug": "getting-started",
+      "slug": "user-roles-explained",
+      "title": "What are the different user roles?",
+      "summary": "Explanation of Employee, Manager, and Admin roles.",
+      "content_md": "# What are the different user roles?\n\nThe app has three main role types that determine what you can access:\n\n## Employee\n\n- Create and submit timesheets\n- Perform vehicle inspections\n- View and sign assigned RAMS documents\n- Request absence/leave\n- View maintenance schedules\n- View assigned workshop tasks\n\n## Manager\n\nEverything an Employee can do, plus:\n- Approve/reject timesheets and absences\n- Review and action inspection defects\n- Send Toolbox Talks and Reminders\n- Download reports\n- Create timesheets on behalf of employees\n- View all employees' data\n\n## Admin\n\nEverything a Manager can do, plus:\n- Create, edit, and delete user accounts\n- Manage roles and permissions\n- Manage vehicle fleet\n- Configure system settings\n- Upload and manage RAMS documents\n- Edit FAQ content\n\n## Super Admin\n\nA special protected account (admin@mpdee.co.uk) that cannot be locked out or modified by other admins. Has full system access including developer tools."
+    },
+    {
+      "category_slug": "timesheets",
+      "slug": "create-timesheet",
+      "title": "How do I create a new timesheet?",
+      "summary": "Step-by-step guide to creating and submitting a weekly timesheet.",
+      "content_md": "# How do I create a new timesheet?\n\n## Quick Steps\n\n1. Go to **Timesheets** from the dashboard or navigation\n2. Click **New Timesheet** button\n3. Select the **Week Ending** date (must be a Sunday)\n4. Fill in each day's hours using the day tabs (Mon-Sun)\n5. Add your digital signature\n6. Click **Submit**\n\n## Entering Daily Hours\n\nFor each day:\n1. Click the day tab (Mon, Tue, etc.)\n2. Enter **Start Time** and **End Time**\n3. The hours are calculated automatically\n4. Optionally add a **Job Number**\n5. Add any **Remarks** if needed\n\n## Special Options\n\n- **In Yard** - Mark if you worked in the yard that day\n- **Did Not Work** - Mark days you didn't work (sick, leave, weekend, etc.)\n\n## Important Rules\n\n- All 7 days must have hours entered OR be marked as \"Did Not Work\"\n- You cannot submit a timesheet for a week that already has one\n- A digital signature is required before submission\n\n## Saving Drafts\n\nClick **Save Draft** at any time to save your progress without submitting. You can return later to complete and submit."
+    },
+    {
+      "category_slug": "timesheets",
+      "slug": "edit-timesheet",
+      "title": "How do I edit a timesheet?",
+      "summary": "Instructions for editing draft or rejected timesheets.",
+      "content_md": "# How do I edit a timesheet?\n\n## When Can I Edit?\n\nYou can only edit timesheets with these statuses:\n- **Draft** - Not yet submitted\n- **Rejected** - Returned by manager with comments\n\nApproved or processed timesheets cannot be edited.\n\n## How to Edit\n\n1. Go to **Timesheets**\n2. Find the timesheet in the list\n3. Click on it to open\n4. Make your changes\n5. Click **Save** or **Submit**\n\n## After Rejection\n\nIf your timesheet was rejected:\n1. Read the manager's comments (shown at the top)\n2. Make the requested corrections\n3. Update your signature if needed\n4. Re-submit the timesheet"
+    },
+    {
+      "category_slug": "timesheets",
+      "slug": "timesheet-statuses",
+      "title": "What do timesheet statuses mean?",
+      "summary": "Explanation of Draft, Submitted, Approved, Rejected, and Processed statuses.",
+      "content_md": "# What do timesheet statuses mean?\n\n## Draft\n\nTimesheet is saved but not submitted. Only you can see it. You can continue editing.\n\n## Submitted\n\nTimesheet has been submitted for manager approval. You cannot edit until reviewed.\n\n## Approved\n\nManager has approved the timesheet. It will be processed for payroll.\n\n## Rejected\n\nManager has returned the timesheet with comments. Read the feedback, make corrections, and re-submit.\n\n## Processed\n\nTimesheet has been processed for payroll. This is the final status.\n\n## Adjusted\n\nThe timesheet was adjusted after approval (rare case for corrections)."
+    },
+    {
+      "category_slug": "timesheets",
+      "slug": "timesheet-pdf-download",
+      "title": "How do I download a timesheet as PDF?",
+      "summary": "Instructions for downloading timesheet PDFs (managers only).",
+      "content_md": "# How do I download a timesheet as PDF?\n\n**Note:** PDF download is available to Managers and Admins only.\n\n## From the Timesheet List\n\n1. Go to **Timesheets**\n2. Find the timesheet you want\n3. Click the **Download** icon (down arrow)\n4. The PDF will download to your device\n\n## From the Timesheet Detail Page\n\n1. Open the timesheet\n2. Click the **Download PDF** button\n3. The PDF will download\n\n## What's Included\n\n- Employee name and details\n- Week ending date\n- All daily entries with hours\n- Total hours\n- Employee signature\n- Approval status and manager comments"
+    },
+    {
+      "category_slug": "timesheets",
+      "slug": "delete-draft-timesheet",
+      "title": "Can I delete a timesheet?",
+      "summary": "Information about deleting draft timesheets.",
+      "content_md": "# Can I delete a timesheet?\n\n## Draft Timesheets\n\nYes, you can delete timesheets that are still in **Draft** status:\n\n1. Go to **Timesheets**\n2. Find the draft timesheet\n3. Click the **Delete** (trash) icon\n4. Confirm deletion\n\n## Submitted/Approved Timesheets\n\nOnce submitted, timesheets cannot be deleted by employees. Contact your manager if there's an issue with a submitted timesheet."
+    },
+    {
+      "category_slug": "inspections",
+      "slug": "create-inspection",
+      "title": "How do I perform a vehicle inspection?",
+      "summary": "Step-by-step guide to completing a 26-point vehicle inspection.",
+      "content_md": "# How do I perform a vehicle inspection?\n\n## Quick Steps\n\n1. Go to **Inspections** from the dashboard\n2. Click **New Inspection**\n3. Select the **Vehicle** from the dropdown\n4. Enter the **Start Date** and **End Date** for the inspection period\n5. Enter the current **Mileage**\n6. Complete all 26 inspection items\n7. Click **Submit**\n\n## The 26-Point Checklist\n\nFor each item, you must mark it as:\n- **Pass** (green tick) - Item is satisfactory\n- **Fail** (red X) - Item has a defect or issue\n\nIf you mark an item as Fail, add comments explaining the defect.\n\n## Adding Photos\n\nFor any item (especially defects):\n1. Click the camera icon\n2. Take a photo or choose from gallery\n3. Add a caption describing the issue\n\n## Progress Tracking\n\nThe header shows your progress (e.g., \"15/26 items completed\"). All 26 items must be marked before you can submit.\n\n## Save as Draft\n\nYou can save your progress and come back later by clicking **Save Draft**."
+    },
+    {
+      "category_slug": "inspections",
+      "slug": "inspection-defects",
+      "title": "What happens when I report a defect?",
+      "summary": "How defects are tracked and actioned.",
+      "content_md": "# What happens when I report a defect?\n\nWhen you mark an inspection item as **Fail** (defect):\n\n1. **Action Created** - A manager action is automatically created for the defect\n2. **Priority Set** - Based on the item type, a priority is assigned (low/medium/high/urgent)\n3. **Manager Notified** - The defect appears in the Actions page for managers\n4. **Tracking** - The defect is tracked until resolved\n\n## Adding Details\n\nAlways add:\n- **Comments** describing the defect\n- **Photos** showing the issue\n\nThis helps managers understand and action the defect quickly.\n\n## After Submission\n\nManagers will review the inspection and:\n- Create workshop tasks if repairs needed\n- Update the action status as work progresses\n- Mark as complete when resolved"
+    },
+    {
+      "category_slug": "inspections",
+      "slug": "inspection-statuses",
+      "title": "What do inspection statuses mean?",
+      "summary": "Explanation of inspection status workflow.",
+      "content_md": "# What do inspection statuses mean?\n\n## Draft\n\nInspection is saved but not complete. You can continue editing.\n\n## Submitted\n\nInspection is submitted and awaiting any necessary follow-up. Defects will be actioned by managers.\n\n## Approved\n\nInspection has been reviewed and approved by management."
+    },
+    {
+      "category_slug": "rams",
+      "slug": "what-is-rams",
+      "title": "What is RAMS?",
+      "summary": "Overview of the RAMS document system.",
+      "content_md": "# What is RAMS?\n\nRAMS stands for **Risk Assessment and Method Statement**. These are important safety documents that outline:\n\n- Potential hazards for a task or site\n- Safety measures and procedures\n- Method of work to be followed\n\n## Legal Requirement\n\nRAMS documents are legally required to ensure workers understand the risks and safety procedures before starting work.\n\n## In the App\n\nManagers upload RAMS documents and assign them to relevant employees. You must:\n1. Read the document\n2. Sign to confirm you've read and understood it\n\nYou cannot proceed with certain app functions until you've signed required RAMS documents."
+    },
+    {
+      "category_slug": "rams",
+      "slug": "view-sign-rams",
+      "title": "How do I view and sign RAMS documents?",
+      "summary": "Instructions for reading and signing assigned RAMS.",
+      "content_md": "# How do I view and sign RAMS documents?\n\n## Viewing Your Assigned RAMS\n\n1. Go to **RAMS** from the dashboard or navigation\n2. You'll see a list of RAMS documents assigned to you\n3. Documents show status: **Pending** (needs signing) or **Signed**\n\n## Signing a RAMS Document\n\n1. Click on a pending RAMS document\n2. Read the document carefully (you can download the PDF)\n3. Scroll to the bottom\n4. Click **Sign to Confirm**\n5. Your signature and timestamp are recorded\n\n## Important\n\n- You must read the full document before signing\n- Your signature confirms you understand the content\n- Signed documents remain accessible for reference"
+    },
+    {
+      "category_slug": "rams",
+      "slug": "rams-visitor-signature",
+      "title": "How do visitors sign RAMS documents?",
+      "summary": "Recording visitor signatures for RAMS documents.",
+      "content_md": "# How do visitors sign RAMS documents?\n\nFor site visitors who need to acknowledge RAMS documents but don't have app accounts:\n\n1. Go to **RAMS**\n2. Find the relevant document\n3. Click **Record Visitor Signature**\n4. Enter the visitor's name\n5. Have them sign on the screen\n6. Submit\n\nThe visitor signature is recorded against that RAMS document with timestamp."
+    },
+    {
+      "category_slug": "rams",
+      "slug": "upload-rams-manager",
+      "title": "How do I upload RAMS documents? (Managers)",
+      "summary": "Instructions for uploading and assigning RAMS documents.",
+      "content_md": "# How do I upload RAMS documents? (Managers)\n\n**Note:** This is for Managers and Admins only.\n\n## Uploading a New RAMS\n\n1. Go to **RAMS**\n2. Click **Manage RAMS** (gear icon)\n3. Click **Upload New RAMS**\n4. Fill in:\n   - **Title** - Clear name for the document\n   - **Description** - Brief summary\n   - **PDF File** - The RAMS document (PDF format)\n5. Click **Upload**\n\n## Assigning to Employees\n\n1. Find the RAMS in the list\n2. Click **Assign Employees**\n3. Select the employees who need to sign\n4. Click **Assign**\n\nAssigned employees will see the document in their RAMS page and receive a notification."
+    },
+    {
+      "category_slug": "absence",
+      "slug": "request-absence",
+      "title": "How do I request absence/leave?",
+      "summary": "Instructions for submitting an absence request.",
+      "content_md": "# How do I request absence/leave?\n\n## Quick Steps\n\n1. Go to **Absence** from the dashboard\n2. Click **Request Absence** button\n3. Fill in:\n   - **Type/Reason** - Select from dropdown (Holiday, Sick, etc.)\n   - **Start Date** - First day of absence\n   - **End Date** - Last day of absence\n   - **Notes** - Any additional information\n4. Click **Submit Request**\n\n## What Happens Next\n\n- Your request status will show as **Pending**\n- Managers are notified to review\n- Once reviewed, status changes to **Approved** or **Rejected**\n- You'll receive a notification of the decision\n\n## Calendar View\n\nThe Absence page shows a calendar with:\n- Your approved absences\n- Pending requests\n- Team absences (if manager)"
+    },
+    {
+      "category_slug": "absence",
+      "slug": "cancel-absence",
+      "title": "How do I cancel an absence request?",
+      "summary": "Instructions for cancelling a pending or approved absence.",
+      "content_md": "# How do I cancel an absence request?\n\n## Cancelling a Pending Request\n\nIf your request hasn't been reviewed yet:\n1. Go to **Absence**\n2. Find your pending request\n3. Click **Cancel**\n4. Confirm cancellation\n\n## After Approval\n\nIf already approved, contact your manager to cancel the absence."
+    },
+    {
+      "category_slug": "absence",
+      "slug": "absence-management-settings",
+      "title": "How do I manage absence settings? (Managers)",
+      "summary": "Configure absence reasons and allowances.",
+      "content_md": "# How do I manage absence settings? (Managers)\n\n**Note:** This is for Managers and Admins only.\n\n## Accessing Settings\n\n1. Go to **Absence**\n2. Click **Manage** button or gear icon\n\n## Absence Reasons\n\nConfigure the types of absence available:\n- Go to **Manage** → **Reasons**\n- Add, edit, or remove absence types\n- Mark reasons as requiring manager approval\n\n## Employee Allowances\n\nSet leave allowances:\n- Go to **Manage** → **Allowances**\n- Set annual leave allowance per employee\n- Track used vs remaining days"
+    },
+    {
+      "category_slug": "fleet-maintenance",
+      "slug": "view-maintenance",
+      "title": "How do I view vehicle maintenance schedules?",
+      "summary": "Understanding the fleet maintenance overview.",
+      "content_md": "# How do I view vehicle maintenance schedules?\n\n## Accessing Maintenance\n\n1. Click **Maintenance** from dashboard or navigation\n2. Or go to **Fleet** → **Maintenance** tab\n\n## Overview Dashboard\n\nThe maintenance page shows:\n- **Summary cards** - Count of overdue and due soon items\n- **Vehicle list** - All vehicles with their maintenance status\n\n## Status Indicators\n\nEach vehicle shows status for:\n- **Tax** - Vehicle tax expiry\n- **MOT** - MOT test due date\n- **Service** - Next service due\n- **Cambelt** - Cambelt replacement (if applicable)\n- **First Aid** - First aid kit check\n\n## Status Colors\n\n- 🟢 **Green** - OK (not due soon)\n- 🟡 **Amber** - Due Soon (within warning period)\n- 🔴 **Red** - Overdue\n- ⚪ **Grey** - Not Applicable\n\n## Search\n\nUse the search bar to find vehicles by registration number."
+    },
+    {
+      "category_slug": "fleet-maintenance",
+      "slug": "maintenance-settings",
+      "title": "How do I configure maintenance settings? (Managers)",
+      "summary": "Configure warning thresholds and notification recipients.",
+      "content_md": "# How do I configure maintenance settings? (Managers)\n\n**Note:** Settings are for Managers and Admins only.\n\n## Accessing Settings\n\n1. Go to **Fleet** → **Settings** tab\n\n## Warning Periods\n\nSet how far in advance warnings appear:\n- **MOT Warning** - Days before MOT expires to show warning\n- **Tax Warning** - Days before tax expires\n- **Service Warning** - Miles or days before service due\n\n## Notification Recipients\n\nConfigure who receives email alerts:\n- Add email addresses for maintenance alerts\n- Alerts sent when items become overdue or due soon"
+    },
+    {
+      "category_slug": "fleet-maintenance",
+      "slug": "manage-vehicles",
+      "title": "How do I manage the vehicle fleet? (Admin)",
+      "summary": "Add, edit, and organize vehicles.",
+      "content_md": "# How do I manage the vehicle fleet? (Admin)\n\n**Note:** This is for Admins only.\n\n## Accessing Vehicle Management\n\n1. Go to **Fleet** → **Vehicles** tab\n2. Or click **Vehicles** in the admin sidebar\n\n## Adding a Vehicle\n\n1. Click **Add Vehicle**\n2. Enter:\n   - **Registration Number** - The vehicle reg\n   - **Nickname** - Optional friendly name\n   - **Category** - Vehicle type (Van, Truck, etc.)\n3. Save\n\n## Editing a Vehicle\n\n1. Click the edit icon on a vehicle row\n2. Update details\n3. Save changes\n\n## Vehicle Categories\n\nManage categories:\n1. Click **Categories** tab or button\n2. Add/edit/delete categories\n3. Categories help organize the fleet\n\n## Archiving Vehicles\n\nVehicles no longer in use can be archived rather than deleted, preserving history."
+    },
+    {
+      "category_slug": "workshop-tasks",
+      "slug": "view-workshop-tasks",
+      "title": "How do I view workshop tasks?",
+      "summary": "Understanding the workshop tasks page.",
+      "content_md": "# How do I view workshop tasks?\n\n## Accessing Workshop Tasks\n\nClick **Workshop** from the dashboard or navigation.\n\n## What You'll See\n\nA list of workshop tasks showing:\n- **Vehicle** - Registration and nickname\n- **Task Description** - What work is needed\n- **Category** - Type of work (e.g., Repairs, Service)\n- **Status** - Current state of the task\n- **Priority** - Urgency level\n\n## Task Statuses\n\n- **Pending** - Not yet started\n- **Logged** - Acknowledged, waiting for parts/scheduling\n- **In Progress** - Work underway\n- **On Hold** - Paused (waiting for parts, etc.)\n- **Completed** - Work finished\n\n## Filtering\n\nUse filters to find tasks:\n- By status (Pending, In Progress, etc.)\n- By vehicle"
+    },
+    {
+      "category_slug": "workshop-tasks",
+      "slug": "create-workshop-task",
+      "title": "How do I create a workshop task? (Managers)",
+      "summary": "Creating manual workshop tasks.",
+      "content_md": "# How do I create a workshop task? (Managers)\n\n**Note:** Managers and Admins can create tasks. Tasks are also auto-created from inspection defects.\n\n## Manual Task Creation\n\n1. Go to **Workshop Tasks**\n2. Click **Add Task** button\n3. Fill in:\n   - **Vehicle** - Select the vehicle\n   - **Category** - Type of work\n   - **Description** - What needs doing\n   - **Mileage** - Current vehicle mileage (optional)\n4. Click **Create Task**\n\n## Automatic Tasks\n\nWhen a vehicle inspection has defects, workshop tasks are automatically created so the issues can be tracked and resolved."
+    },
+    {
+      "category_slug": "workshop-tasks",
+      "slug": "update-workshop-task",
+      "title": "How do I update a workshop task status?",
+      "summary": "Changing task status and adding completion details.",
+      "content_md": "# How do I update a workshop task status?\n\n## Updating Status\n\n1. Go to **Workshop Tasks**\n2. Find the task\n3. Click the status action button:\n   - **Log** - Mark as logged (acknowledged)\n   - **Start** - Mark as in progress\n   - **Hold** - Put on hold\n   - **Complete** - Mark as finished\n\n## Adding Comments\n\nClick the comment icon on a task to:\n- Add notes about progress\n- Record parts ordered\n- Document work done\n\n## Marking Complete\n\nWhen marking a task complete:\n1. Click **Complete**\n2. Add completion notes (what was done)\n3. Enter final mileage if applicable\n4. Confirm completion\n\nCompleted tasks move to the \"Completed\" filter view."
+    },
+    {
+      "category_slug": "workshop-tasks",
+      "slug": "workshop-categories-settings",
+      "title": "How do I manage workshop categories? (Managers)",
+      "summary": "Configure task categories and subcategories.",
+      "content_md": "# How do I manage workshop categories? (Managers)\n\n**Note:** This is for Managers and Admins only.\n\n## Accessing Settings\n\n1. Go to **Workshop Tasks**\n2. Click the **Settings** (gear) icon\n\n## Managing Categories\n\n- **Add Category** - Create new task category\n- **Edit** - Change category name\n- **Reorder** - Drag to change sort order\n- **Deactivate** - Hide category without deleting\n\n## Subcategories\n\nEach category can have subcategories for more specific task types:\n1. Click on a category\n2. Add subcategories as needed\n3. Subcategories appear as options when creating tasks"
+    },
+    {
+      "category_slug": "approvals",
+      "slug": "approvals-overview",
+      "title": "How do I review and approve submissions? (Managers)",
+      "summary": "Overview of the approvals page for managers.",
+      "content_md": "# How do I review and approve submissions? (Managers)\n\n**Note:** This is for Managers and Admins only.\n\n## Accessing Approvals\n\nClick **Approvals** in the sidebar menu.\n\n## Tabs\n\nThe page has tabs for different submission types:\n- **Timesheets** - Employee timesheet submissions\n- **Absences** - Leave requests\n\n## Filtering\n\nFilter submissions by status:\n- **Pending** - Waiting for your review\n- **Approved** - Already approved\n- **Rejected** - Already rejected\n- **All** - View everything\n\n## Quick Actions\n\nFrom the list view:\n- Click **Approve** to approve immediately\n- Click **Reject** to reject (opens comment dialog)\n- Click on a row to view full details"
+    },
+    {
+      "category_slug": "approvals",
+      "slug": "approve-timesheet",
+      "title": "How do I approve or reject a timesheet?",
+      "summary": "Step-by-step timesheet approval process.",
+      "content_md": "# How do I approve or reject a timesheet?\n\n## Quick Approval\n\n1. Go to **Approvals** → **Timesheets** tab\n2. Find the pending timesheet\n3. Click **Approve** button\n\n## Rejection with Comments\n\n1. Find the timesheet\n2. Click **Reject**\n3. Enter comments explaining what needs correction\n4. Confirm rejection\n\nThe employee will be notified and can edit and resubmit.\n\n## Detailed Review\n\n1. Click on the timesheet row to open details\n2. Review:\n   - Daily hours and entries\n   - Job numbers\n   - Employee signature\n3. Approve or reject from the detail view\n\n## Download PDF\n\nFrom the list or detail view, click the download icon to get a PDF copy."
+    },
+    {
+      "category_slug": "approvals",
+      "slug": "approve-absence",
+      "title": "How do I approve or reject absence requests?",
+      "summary": "Processing leave requests.",
+      "content_md": "# How do I approve or reject absence requests?\n\n## Quick Steps\n\n1. Go to **Approvals** → **Absences** tab\n2. Review pending requests\n3. Click **Approve** or **Reject**\n\n## Information Shown\n\n- Employee name\n- Absence type (Holiday, Sick, etc.)\n- Dates and duration\n- Any notes from the employee\n\n## Rejection\n\nWhen rejecting:\n1. Click **Reject**\n2. Add a reason or comments\n3. Confirm\n\nThe employee will be notified of the decision."
+    },
+    {
+      "category_slug": "actions",
+      "slug": "actions-overview",
+      "title": "What is the Actions page?",
+      "summary": "Overview of manager actions and defect tracking.",
+      "content_md": "# What is the Actions page?\n\n**Note:** This is for Managers and Admins only.\n\n## Purpose\n\nThe Actions page tracks items requiring manager attention:\n- **Inspection Defects** - Issues found during vehicle inspections\n- **Maintenance Alerts** - Overdue or due soon maintenance items\n\n## Accessing Actions\n\nClick **Actions** in the sidebar menu.\n\n## What You'll See\n\n- **Summary cards** - Counts of overdue/due soon maintenance\n- **Action list** - All tracked actions with:\n  - Title and description\n  - Related vehicle and inspection\n  - Priority level\n  - Current status"
+    },
+    {
+      "category_slug": "actions",
+      "slug": "manage-actions",
+      "title": "How do I manage actions?",
+      "summary": "Updating action status and creating workshop tasks.",
+      "content_md": "# How do I manage actions?\n\n## Action Statuses\n\n- **Pending** - New, not yet addressed\n- **Logged** - Acknowledged, being worked on\n- **Completed** - Resolved\n\n## Updating an Action\n\n1. Find the action in the list\n2. Click **Mark Logged** to acknowledge\n3. Add notes about what's being done\n4. Click **Mark Complete** when resolved\n\n## Creating Workshop Tasks\n\nFor defects requiring repair:\n1. Click **Create Workshop Task** on the action\n2. A new workshop task is created linked to this action\n3. Track the repair through Workshop Tasks\n\n## Reverting Status\n\nIf needed, you can revert a completed action back to pending."
+    },
+    {
+      "category_slug": "toolbox-talks",
+      "slug": "toolbox-talks-overview",
+      "title": "What are Toolbox Talks?",
+      "summary": "Overview of the messaging system for safety communications.",
+      "content_md": "# What are Toolbox Talks?\n\n**Note:** Sending is for Managers and Admins only. All employees can receive.\n\n## Purpose\n\nToolbox Talks are important safety messages that:\n- Communicate critical safety information\n- Require employee acknowledgment\n- Create a record of who has read and understood the message\n\n## Types of Messages\n\n### Toolbox Talk (High Priority)\n- **Blocking** - Employees cannot use the app until signed\n- Requires digital signature to acknowledge\n- Used for critical safety information\n\n### Reminder (Low Priority)\n- **Non-blocking** - Employees can dismiss after reading\n- General information or updates\n- No signature required"
+    },
+    {
+      "category_slug": "toolbox-talks",
+      "slug": "create-toolbox-talk",
+      "title": "How do I send a Toolbox Talk?",
+      "summary": "Creating and sending important safety messages.",
+      "content_md": "# How do I send a Toolbox Talk?\n\n**Note:** This is for Managers and Admins only.\n\n## Steps\n\n1. Go to **Toolbox Talks** from the sidebar\n2. Click **Create Toolbox Talk** tab\n3. Fill in:\n   - **Title** - Clear, descriptive title\n   - **Message** - Full content of the talk\n   - **Recipients** - Select employees or \"All Employees\"\n4. Click **Send**\n\n## After Sending\n\n- Recipients receive a notification\n- They must sign to acknowledge\n- They cannot use the app until signed\n- Track signatures in the Reports tab"
+    },
+    {
+      "category_slug": "toolbox-talks",
+      "slug": "create-reminder",
+      "title": "How do I send a Reminder?",
+      "summary": "Creating and sending low-priority reminder messages.",
+      "content_md": "# How do I send a Reminder?\n\n**Note:** This is for Managers and Admins only.\n\n## Steps\n\n1. Go to **Toolbox Talks** from the sidebar\n2. Click **Create Reminder** tab\n3. Fill in:\n   - **Title** - Brief title\n   - **Message** - Content\n   - **Recipients** - Select employees\n4. Click **Send**\n\n## Difference from Toolbox Talk\n\nReminders are:\n- Non-blocking (employees can dismiss)\n- Lower priority\n- No signature required\n- Good for general updates and announcements"
+    },
+    {
+      "category_slug": "toolbox-talks",
+      "slug": "toolbox-reports",
+      "title": "How do I track Toolbox Talk signatures?",
+      "summary": "Viewing who has signed Toolbox Talks.",
+      "content_md": "# How do I track Toolbox Talk signatures?\n\n**Note:** This is for Managers and Admins only.\n\n## Accessing Reports\n\n1. Go to **Toolbox Talks**\n2. Click the **Reports** tab\n\n## What You'll See\n\n- List of sent Toolbox Talks and Reminders\n- For each message:\n  - Total recipients\n  - Signed count\n  - Pending count\n  - Individual recipient status\n\n## Checking Compliance\n\nExpand a message to see:\n- Who has signed (with timestamp)\n- Who is still pending\n\nFollow up with employees who haven't signed required Toolbox Talks."
+    },
+    {
+      "category_slug": "reports",
+      "slug": "reports-overview",
+      "title": "How do I download reports?",
+      "summary": "Overview of available reports and exports.",
+      "content_md": "# How do I download reports?\n\n**Note:** This is for Managers and Admins only.\n\n## Accessing Reports\n\nClick **Reports** in the sidebar menu.\n\n## Available Reports\n\n### Timesheets Tab\n- **Excel Export** - All timesheets for date range\n- **PDF Export** - Individual or bulk PDFs\n- **Summary Report** - Hours by employee\n\n### Inspections Tab\n- **Excel Export** - All inspections for date range\n- **Defects Report** - List of reported defects\n\n## Setting Date Range\n\n1. Set **From** date\n2. Set **To** date\n3. Or click quick buttons:\n   - **Last Week**\n   - **Last Month**\n\n## Downloading\n\n1. Set your date range\n2. Click the download button for the report you want\n3. File downloads to your device"
+    },
+    {
+      "category_slug": "reports",
+      "slug": "bulk-pdf-download",
+      "title": "How do I bulk download PDFs?",
+      "summary": "Downloading multiple timesheets as PDFs.",
+      "content_md": "# How do I bulk download PDFs?\n\n**Note:** This is for Managers and Admins only.\n\n## Steps\n\n1. Go to **Reports** → **Timesheets** tab\n2. Set your date range\n3. Click **Bulk Download PDFs**\n4. Wait for progress to complete\n5. A ZIP file downloads containing all PDFs\n\n## Large Downloads\n\nFor many timesheets:\n- Progress bar shows download status\n- Download may be split into multiple parts\n- Each part downloads as a separate ZIP\n\n## Use Cases\n\n- End of month payroll processing\n- Audit requirements\n- Record keeping"
+    },
+    {
+      "category_slug": "admin-users",
+      "slug": "user-management-overview",
+      "title": "How do I manage users? (Admin)",
+      "summary": "Overview of user administration.",
+      "content_md": "# How do I manage users? (Admin)\n\n**Note:** This is for Admins only.\n\n## Accessing User Management\n\nClick **Users** in the admin sidebar.\n\n## Users Tab\n\nView all users with:\n- Name and email\n- Employee ID\n- Role\n- Creation date\n\n## Filter by Role\n\nClick the stat cards to filter:\n- All Users\n- Admins\n- Managers\n- Employees\n\n## Actions\n\nFor each user:\n- **Edit** - Update details\n- **Reset Password** - Generate new password\n- **Delete** - Remove user (with data options)"
+    },
+    {
+      "category_slug": "admin-users",
+      "slug": "create-user",
+      "title": "How do I create a new user?",
+      "summary": "Adding new user accounts.",
+      "content_md": "# How do I create a new user?\n\n**Note:** This is for Admins only.\n\n## Steps\n\n1. Go to **Users**\n2. Click **Add User**\n3. Fill in:\n   - **Email** (required) - Their login email\n   - **Full Name** (required)\n   - **Phone Number** (optional)\n   - **Employee ID** (optional)\n   - **Role** (required) - Select their role\n4. Click **Create User**\n\n## Temporary Password\n\nA temporary password is:\n- Automatically generated\n- Sent to their email\n- Displayed to you (copy it if email fails)\n- Must be changed on first login"
+    },
+    {
+      "category_slug": "admin-users",
+      "slug": "reset-user-password",
+      "title": "How do I reset a user's password?",
+      "summary": "Generating a new password for a user.",
+      "content_md": "# How do I reset a user's password?\n\n**Note:** This is for Admins only.\n\n## Steps\n\n1. Go to **Users**\n2. Find the user\n3. Click the **Reset Password** (key icon)\n4. Confirm the reset\n5. New password is:\n   - Generated automatically\n   - Emailed to the user\n   - Displayed to you to share manually if needed\n\n## After Reset\n\nThe user must change the password on their next login.\n\n## Super Admin\n\nThe super admin password cannot be reset by other admins."
+    },
+    {
+      "category_slug": "admin-users",
+      "slug": "delete-user",
+      "title": "How do I delete a user?",
+      "summary": "Removing user accounts and data options.",
+      "content_md": "# How do I delete a user?\n\n**Note:** This is for Admins only.\n\n## Steps\n\n1. Go to **Users**\n2. Find the user\n3. Click **Delete** (trash icon)\n4. Choose deletion mode:\n\n### Keep Company Data (Recommended)\n- Personal account deleted\n- Timesheets, inspections preserved\n- User shown as \"Name (Deleted User)\" in records\n- Maintains audit trail\n\n### Delete All User Data\n- Everything deleted permanently\n- Affects historical reports\n- Cannot be undone\n\n5. Confirm deletion\n\n## Restrictions\n\n- Cannot delete yourself\n- Cannot delete super admin account"
+    },
+    {
+      "category_slug": "admin-roles",
+      "slug": "roles-overview",
+      "title": "How do roles and permissions work?",
+      "summary": "Understanding the role-based access control system.",
+      "content_md": "# How do roles and permissions work?\n\n## The System\n\nSquires uses Role-Based Access Control (RBAC):\n- **Roles** define job types (Admin, Manager, Employee-Civils, etc.)\n- **Permissions** control which modules each role can access\n\n## Module Permissions\n\nEach role can have access to:\n- Timesheets\n- Inspections\n- RAMS\n- Absence\n- Maintenance\n- Toolbox Talks\n- Workshop Tasks\n- Approvals (manager)\n- Actions (manager)\n- Reports (manager)\n- User Management (admin)\n- Vehicle Management (admin)\n\n## Role Types\n\n### Manager/Admin Roles\nAutomatically have full access to all modules.\n\n### Employee Roles\nAccess controlled by individual permissions. Can be customized per role."
+    },
+    {
+      "category_slug": "admin-roles",
+      "slug": "manage-roles",
+      "title": "How do I manage roles? (Admin)",
+      "summary": "Creating and configuring roles.",
+      "content_md": "# How do I manage roles? (Admin)\n\n**Note:** This is for Admins only.\n\n## Accessing Roles\n\n1. Go to **Users**\n2. Click the **Roles** tab\n\n## Viewing Roles\n\nSee all roles with:\n- Name and description\n- User count (how many users have this role)\n- Permission count (modules enabled)\n\n## Creating a New Role\n\n1. Click **Add Role**\n2. Enter:\n   - **Name** (internal identifier)\n   - **Display Name** (shown in UI)\n   - **Description** (optional)\n   - **Is Manager/Admin** - Toggle if role should have full access\n3. Save the role\n4. Configure permissions\n\n## Editing Permissions\n\n1. Click on a role\n2. Toggle modules on/off\n3. Save changes\n\n## Default Permissions\n\nNew roles default to employee modules enabled:\n- Timesheets, Inspections, RAMS, Absence, Toolbox Talks"
+    },
+    {
+      "category_slug": "admin-roles",
+      "slug": "protected-roles",
+      "title": "What roles cannot be modified?",
+      "summary": "Understanding protected system roles.",
+      "content_md": "# What roles cannot be modified?\n\n## Protected Roles\n\nSome roles have restrictions:\n\n### Super Admin\n- Cannot be edited or deleted\n- Only admin@mpdee.co.uk has this\n- Cannot be locked out\n- Has all permissions always\n\n### Admin & Manager\n- Core permissions cannot be disabled\n- Always have full module access\n- Cannot be demoted below manager level\n\n## Role Deletion\n\nA role cannot be deleted if:\n- Users are still assigned to it\n- Reassign users first, then delete the role"
+    },
+    {
+      "category_slug": "notifications",
+      "slug": "notifications-overview",
+      "title": "How do notifications work?",
+      "summary": "Understanding the notification system.",
+      "content_md": "# How do notifications work?\n\n## The Bell Icon\n\nClick the bell in the top navigation to see notifications.\n\n## Types of Notifications\n\n- **Toolbox Talks** - New safety messages requiring signature\n- **Reminders** - Informational messages\n- **Approval Updates** - When your submissions are approved/rejected\n\n## Notification Badge\n\nThe red number on the bell shows unread notifications.\n\n## Clearing Notifications\n\nClick on a notification to:\n- View the full content\n- Mark as read\n- Take action (e.g., sign Toolbox Talk)"
+    },
+    {
+      "category_slug": "troubleshooting",
+      "slug": "app-not-loading",
+      "title": "The app won't load - what should I do?",
+      "summary": "Troubleshooting loading issues.",
+      "content_md": "# The app won't load - what should I do?\n\n## Basic Steps\n\n1. **Check internet connection** - Ensure you have WiFi or mobile data\n2. **Refresh the page** - Pull down to refresh (mobile) or press F5 (desktop)\n3. **Clear browser cache** - In browser settings, clear cached data\n4. **Try a different browser** - Chrome or Safari recommended\n\n## PWA Issues\n\nIf using the installed app:\n1. Delete the app from home screen\n2. Clear browser cache\n3. Revisit the website\n4. Re-add to home screen\n\n## Still Not Working?\n\nContact your administrator with:\n- What you were trying to do\n- Any error messages shown\n- Your device type and browser"
+    },
+    {
+      "category_slug": "troubleshooting",
+      "slug": "login-issues",
+      "title": "I can't log in - what should I do?",
+      "summary": "Troubleshooting login problems.",
+      "content_md": "# I can't log in - what should I do?\n\n## Check Credentials\n\n- **Email** - Make sure it's your work email (correctly spelled)\n- **Password** - Check caps lock, try typing in a text field first\n\n## Forgot Password?\n\nContact your administrator - they can reset it from User Management.\n\n## Account Locked?\n\nIf you've tried too many times, wait a few minutes before trying again.\n\n## New Account?\n\nIf you just joined:\n- Check your email for welcome message with temporary password\n- Password must be changed on first login\n\n## Still Not Working?\n\nAsk your administrator to:\n- Verify your account exists\n- Reset your password\n- Check your role permissions"
+    },
+    {
+      "category_slug": "troubleshooting",
+      "slug": "data-not-saving",
+      "title": "My data isn't saving - what's wrong?",
+      "summary": "Troubleshooting data save issues.",
+      "content_md": "# My data isn't saving - what's wrong?\n\n## Check Connection\n\nYou need internet to save data. Check:\n- WiFi or mobile data is active\n- You're not in airplane mode\n\n## Required Fields\n\nMake sure all required fields are filled:\n- Look for error messages in red\n- Required fields are marked with *\n\n## Session Expired\n\nIf you've been idle too long:\n- You may need to log in again\n- Try refreshing and logging back in\n\n## Offline Mode\n\nIf you're offline:\n- Changes queue automatically\n- Sync when back online\n- Don't close the app until synced\n\n## Try Again\n\n1. Refresh the page\n2. Re-enter the data\n3. Click save again\n4. If still failing, note any error message and contact admin"
+    },
+    {
+      "category_slug": "troubleshooting",
+      "slug": "permission-denied",
+      "title": "I'm getting 'Access Denied' - why?",
+      "summary": "Understanding permission errors.",
+      "content_md": "# I'm getting 'Access Denied' - why?\n\n## Role Permissions\n\nYou may not have permission for that feature:\n- Your role determines what you can access\n- Ask your admin if you need access\n\n## Manager-Only Features\n\nSome features are only for managers:\n- Approvals\n- Actions\n- Toolbox Talks (sending)\n- Reports\n\n## Admin-Only Features\n\n- User Management\n- Role Management\n- Vehicle Management\n- FAQ Editor\n\n## What To Do\n\n1. Check if the feature is appropriate for your role\n2. Contact your administrator if you need access\n3. They can update your role permissions"
+    }
+  ]
+}
