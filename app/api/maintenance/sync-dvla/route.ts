@@ -309,7 +309,9 @@ export async function POST(request: NextRequest) {
 
         if (upsertError) throw upsertError;
 
-        // Log sync to audit trail
+        // Log sync to audit trail (dvla_sync_log)
+        // Use the actual persisted mot_due_date value (which may be calculated from first registration)
+        const persistedMotDate = updates.mot_due_date || null;
         await supabase
           .from('dvla_sync_log')
           .insert({
@@ -320,7 +322,7 @@ export async function POST(request: NextRequest) {
             tax_due_date_old: oldTaxDate,
             tax_due_date_new: dvlaData.taxDueDate,
             mot_due_date_old: oldMotDate,
-            mot_due_date_new: motExpiryData?.motExpiryDate || null,
+            mot_due_date_new: persistedMotDate,
             api_provider: `${process.env.DVLA_API_PROVIDER}${motService ? '+MOT' : ''}`,
             api_response_time_ms: responseTime,
             raw_response: {
@@ -330,6 +332,75 @@ export async function POST(request: NextRequest) {
             triggered_by: user.id,
             trigger_type: syncAll ? 'bulk' : (vehicleIds ? 'bulk' : 'manual'),
           });
+
+        // Get user profile for history log
+        let updaterName = 'DVLA API Sync';
+        const { data: userProfile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+        if (userProfile?.full_name) {
+          updaterName = `${userProfile.full_name} (via DVLA Sync)`;
+        }
+
+        // Log to maintenance_history for visibility in vehicle history page
+        const historyEntries: Array<{
+          vehicle_id: string;
+          field_name: string;
+          old_value: string | null;
+          new_value: string | null;
+          value_type: 'date';
+          comment: string;
+          updated_by: string;
+          updated_by_name: string;
+        }> = [];
+
+        // Add tax_due_date change to history if changed
+        if (dvlaData.taxDueDate && oldTaxDate !== dvlaData.taxDueDate) {
+          historyEntries.push({
+            vehicle_id: vehicle.id,
+            field_name: 'tax_due_date',
+            old_value: oldTaxDate,
+            new_value: dvlaData.taxDueDate,
+            value_type: 'date',
+            comment: `Tax due date updated automatically via DVLA API sync for ${vehicle.reg_number}`,
+            updated_by: user.id,
+            updated_by_name: updaterName,
+          });
+        }
+
+        // Add mot_due_date change to history if changed
+        // Use the same persistedMotDate value as logged to dvla_sync_log for consistency
+        if (persistedMotDate && oldMotDate !== persistedMotDate) {
+          const wasCalculated = fieldsUpdated.some(f => f.includes('calculated'));
+          historyEntries.push({
+            vehicle_id: vehicle.id,
+            field_name: 'mot_due_date',
+            old_value: oldMotDate,
+            new_value: persistedMotDate,
+            value_type: 'date',
+            comment: wasCalculated 
+              ? `MOT due date calculated from first registration date via DVLA API sync for ${vehicle.reg_number}`
+              : `MOT due date updated automatically via DVLA/MOT API sync for ${vehicle.reg_number}`,
+            updated_by: user.id,
+            updated_by_name: updaterName,
+          });
+        }
+
+        // Insert history entries if any
+        if (historyEntries.length > 0) {
+          const { error: historyError } = await supabase
+            .from('maintenance_history')
+            .insert(historyEntries);
+
+          if (historyError) {
+            console.error(`[WARN] Failed to create maintenance history for ${vehicle.reg_number}:`, historyError);
+            // Don't fail the sync if history logging fails
+          } else {
+            console.log(`[INFO] ${vehicle.reg_number}: Added ${historyEntries.length} entries to maintenance history`);
+          }
+        }
 
         results.push({
           success: true,

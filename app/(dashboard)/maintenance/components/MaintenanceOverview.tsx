@@ -18,6 +18,7 @@ import { CreateWorkshopTaskDialog } from '@/components/workshop-tasks/CreateWork
 import { TaskCommentsDrawer } from '@/components/workshop-tasks/TaskCommentsDrawer';
 import { MarkTaskCompleteDialog, type CompletionData } from '@/components/workshop-tasks/MarkTaskCompleteDialog';
 import { OfficeActionDialog } from './OfficeActionDialog';
+import { QuickEditPopover } from './QuickEditPopover';
 import { getTaskContent } from '@/lib/utils/serviceTaskCreation';
 import { appendStatusHistory, buildStatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
 import { createClient } from '@/lib/supabase/client';
@@ -46,7 +47,12 @@ interface Alert {
   type: string;
   detail: string;
   severity: 'overdue' | 'due_soon';
+  sortValue: number; // Normalized to days equivalent - lower = more urgent
 }
+
+// Estimated average daily mileage for normalizing mileage-based alerts to days
+// This allows comparing date-based (Tax, MOT) with mileage-based (Service, Cambelt) alerts
+const ESTIMATED_DAILY_MILES = 35;
 
 interface VehicleWithAlerts extends VehicleMaintenanceWithStatus {
   alerts: Alert[];
@@ -250,13 +256,15 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       alerts.push({
         type: 'Tax',
         detail: formatDaysUntil(vehicle.tax_status.days_until),
-        severity: 'overdue'
+        severity: 'overdue',
+        sortValue: vehicle.tax_status.days_until ?? 0
       });
     } else if (vehicle.tax_status?.status === 'due_soon') {
       alerts.push({
         type: 'Tax',
         detail: formatDaysUntil(vehicle.tax_status.days_until),
-        severity: 'due_soon'
+        severity: 'due_soon',
+        sortValue: vehicle.tax_status.days_until ?? 0
       });
     }
     
@@ -265,43 +273,53 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       alerts.push({
         type: 'MOT',
         detail: formatDaysUntil(vehicle.mot_status.days_until),
-        severity: 'overdue'
+        severity: 'overdue',
+        sortValue: vehicle.mot_status.days_until ?? 0
       });
     } else if (vehicle.mot_status?.status === 'due_soon') {
       alerts.push({
         type: 'MOT',
         detail: formatDaysUntil(vehicle.mot_status.days_until),
-        severity: 'due_soon'
+        severity: 'due_soon',
+        sortValue: vehicle.mot_status.days_until ?? 0
       });
     }
     
-    // Check Service
+    // Check Service (normalize miles to days equivalent for sorting)
     if (vehicle.service_status?.status === 'overdue') {
+      const milesUntil = vehicle.service_status.miles_until ?? 0;
       alerts.push({
         type: 'Service',
-        detail: formatMilesUntil(vehicle.service_status.miles_until),
-        severity: 'overdue'
+        detail: formatMilesUntil(milesUntil),
+        severity: 'overdue',
+        sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
       });
     } else if (vehicle.service_status?.status === 'due_soon') {
+      const milesUntil = vehicle.service_status.miles_until ?? 0;
       alerts.push({
         type: 'Service',
-        detail: formatMilesUntil(vehicle.service_status.miles_until),
-        severity: 'due_soon'
+        detail: formatMilesUntil(milesUntil),
+        severity: 'due_soon',
+        sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
       });
     }
     
-    // Check Cambelt
+    // Check Cambelt (normalize miles to days equivalent for sorting)
     if (vehicle.cambelt_status?.status === 'overdue') {
+      const milesUntil = vehicle.cambelt_status.miles_until ?? 0;
       alerts.push({
         type: 'Cambelt',
-        detail: formatMilesUntil(vehicle.cambelt_status.miles_until),
-        severity: 'overdue'
+        detail: formatMilesUntil(milesUntil),
+        severity: 'overdue',
+        sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
       });
     } else if (vehicle.cambelt_status?.status === 'due_soon') {
+      const milesUntil = vehicle.cambelt_status.miles_until ?? 0;
       alerts.push({
         type: 'Cambelt',
-        detail: formatMilesUntil(vehicle.cambelt_status.miles_until),
-        severity: 'due_soon'
+        detail: formatMilesUntil(milesUntil),
+        severity: 'due_soon',
+        sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
       });
     }
     
@@ -310,13 +328,15 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       alerts.push({
         type: 'First Aid Kit',
         detail: formatDaysUntil(vehicle.first_aid_status.days_until),
-        severity: 'overdue'
+        severity: 'overdue',
+        sortValue: vehicle.first_aid_status.days_until ?? 0
       });
     } else if (vehicle.first_aid_status?.status === 'due_soon') {
       alerts.push({
         type: 'First Aid Kit',
         detail: formatDaysUntil(vehicle.first_aid_status.days_until),
-        severity: 'due_soon'
+        severity: 'due_soon',
+        sortValue: vehicle.first_aid_status.days_until ?? 0
       });
     }
     
@@ -389,6 +409,11 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       });
       fetchVehicleHistory(officeActionVehicle.vehicleId, true);
     }
+    // Trigger Next.js soft refresh to refetch server data without losing client state
+    router.refresh();
+  };
+
+  const handleQuickEditSuccess = () => {
     // Trigger Next.js soft refresh to refetch server data without losing client state
     router.refresh();
   };
@@ -808,10 +833,25 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     }
   };
   
-  const overdueVehicles = vehiclesWithAlerts.filter(v => v.alerts.some(a => a.severity === 'overdue'));
-  const dueSoonVehicles = vehiclesWithAlerts.filter(v => 
-    v.alerts.some(a => a.severity === 'due_soon') && !v.alerts.some(a => a.severity === 'overdue')
-  );
+  // Helper to get the most urgent sortValue for a vehicle (lowest value = most urgent)
+  // All sortValues are normalized to "days equivalent" for fair comparison between
+  // date-based (Tax, MOT, First Aid) and mileage-based (Service, Cambelt) alerts
+  const getMostUrgentSortValue = (vehicle: VehicleWithAlerts): number => {
+    if (!vehicle.alerts || vehicle.alerts.length === 0) return Infinity;
+    return Math.min(...vehicle.alerts.map(a => a.sortValue));
+  };
+
+  // Filter and sort: most overdue first (most negative days equivalent)
+  const overdueVehicles = vehiclesWithAlerts
+    .filter(v => v.alerts.some(a => a.severity === 'overdue'))
+    .sort((a, b) => getMostUrgentSortValue(a) - getMostUrgentSortValue(b));
+  
+  // Filter and sort: soonest due first (lowest positive days equivalent)
+  const dueSoonVehicles = vehiclesWithAlerts
+    .filter(v => 
+      v.alerts.some(a => a.severity === 'due_soon') && !v.alerts.some(a => a.severity === 'overdue')
+    )
+    .sort((a, b) => getMostUrgentSortValue(a) - getMostUrgentSortValue(b));
   
   // Don't show panels if no alerts
   if (overdueVehicles.length === 0 && dueSoonVehicles.length === 0) {
@@ -873,17 +913,13 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {vehicle.alerts.map((alert, idx) => (
-                      <Badge 
+                      <QuickEditPopover
                         key={idx}
-                        className={`${
-                          alert.severity === 'overdue' 
-                            ? 'bg-red-500/10 text-red-400 border-red-500/30' 
-                            : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                        }`}
-                        variant="outline"
-                      >
-                        {alert.type}: {alert.detail}
-                      </Badge>
+                        alert={alert}
+                        vehicleId={vehicleId}
+                        vehicle={vehicle}
+                        onSuccess={handleQuickEditSuccess}
+                      />
                     ))}
                   </div>
                 </div>
