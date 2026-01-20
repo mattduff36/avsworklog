@@ -13,13 +13,16 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { OfflineBanner } from '@/components/ui/offline-banner';
-import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus, Check, WifiOff } from 'lucide-react';
+import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus, Check, WifiOff, Camera, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { formatDateISO, formatDate, getWeekEnding } from '@/lib/utils/date';
 import { INSPECTION_ITEMS, InspectionStatus, getChecklistForCategory } from '@/types/inspection';
+import { checkMileageSanity, formatMileage, type MileageSanityResult } from '@/lib/utils/mileageSanity';
+import PhotoUpload from '@/components/forms/PhotoUpload';
 import { Database } from '@/types/database';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { Employee } from '@/types/common';
@@ -138,6 +141,21 @@ function NewInspectionContent() {
   const [checklistStarted, setChecklistStarted] = useState(false);
   const [duplicateCheckLoading, setDuplicateCheckLoading] = useState(false);
   const [duplicateInspection, setDuplicateInspection] = useState<string | null>(null);
+  
+  // Mileage sanity check states
+  const [baselineMileage, setBaselineMileage] = useState<number | null>(null);
+  const [baselineMileageSource, setBaselineMileageSource] = useState<string>('none');
+  const [mileageWarning, setMileageWarning] = useState<MileageSanityResult | null>(null);
+  const [mileageConfirmed, setMileageConfirmed] = useState(false);
+  const [showMileageWarningDialog, setShowMileageWarningDialog] = useState(false);
+  
+  // Photo upload state
+  const [photoUploadItem, setPhotoUploadItem] = useState<{ itemNumber: number; dayOfWeek: number } | null>(null);
+  
+  // End of inspection comment + inform workshop states
+  const [inspectorComments, setInspectorComments] = useState('');
+  const [informWorkshop, setInformWorkshop] = useState(false);
+  const [creatingWorkshopTask, setCreatingWorkshopTask] = useState(false);
 
   useEffect(() => {
     fetchVehicles();
@@ -237,6 +255,66 @@ function NewInspectionContent() {
     } catch (err) {
       console.error('Error fetching categories:', err);
     }
+  };
+
+  // Fetch baseline mileage for sanity checking
+  const fetchBaselineMileage = async (selectedVehicleId: string) => {
+    try {
+      const response = await fetch(`/api/vehicles/mileage-baseline?vehicleId=${selectedVehicleId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setBaselineMileage(data.baselineMileage);
+        setBaselineMileageSource(data.baselineSource);
+      } else {
+        // Fallback - don't block if API fails
+        setBaselineMileage(null);
+        setBaselineMileageSource('none');
+      }
+    } catch (err) {
+      console.error('Error fetching baseline mileage:', err);
+      setBaselineMileage(null);
+      setBaselineMileageSource('none');
+    }
+  };
+
+  // Handle mileage change with sanity check
+  const handleMileageChange = (value: string) => {
+    setCurrentMileage(value);
+    
+    // Reset confirmation when mileage changes
+    setMileageConfirmed(false);
+    setMileageWarning(null);
+    
+    // Check sanity if we have a value
+    if (value && !isNaN(parseInt(value))) {
+      const mileageValue = parseInt(value);
+      const sanityResult = checkMileageSanity(mileageValue, baselineMileage);
+      
+      if (sanityResult.warning) {
+        setMileageWarning(sanityResult);
+      } else {
+        setMileageWarning(null);
+        setMileageConfirmed(true); // Auto-confirm if no warning
+      }
+    }
+  };
+
+  // Confirm mileage warning
+  const handleConfirmMileage = () => {
+    setMileageConfirmed(true);
+    setShowMileageWarningDialog(false);
+  };
+
+  // Check if mileage is valid for showing checklist
+  const isMileageValidForChecklist = (): boolean => {
+    if (!currentMileage || currentMileage.trim() === '') return false;
+    const mileageValue = parseInt(currentMileage);
+    if (isNaN(mileageValue) || mileageValue < 0) return false;
+    
+    // If there's a warning, user must have confirmed
+    if (mileageWarning?.warning && !mileageConfirmed) return false;
+    
+    return true;
   };
 
   // Check for duplicate inspection (same vehicle + week ending)
@@ -617,6 +695,13 @@ function NewInspectionContent() {
       return;
     }
 
+    // Check mileage warning confirmation
+    if (mileageWarning?.warning && !mileageConfirmed) {
+      setError('Please confirm the mileage is correct before submitting');
+      setShowMileageWarningDialog(true);
+      return;
+    }
+
     // Validate week ending is a Sunday
     const weekEndDate = new Date(weekEnding + 'T00:00:00');
     if (weekEndDate.getDay() !== 0) {
@@ -642,6 +727,15 @@ function NewInspectionContent() {
         description: `Please add comments for: ${defectsWithoutComments.slice(0, 3).join(', ')}${defectsWithoutComments.length > 3 ? '...' : ''}`,
       });
       // Dialog will stay open due to onOpenChange handler checking error state
+      return;
+    }
+
+    // Validate inform workshop has sufficient comment
+    if (informWorkshop && inspectorComments.trim().length < 10) {
+      setError('Workshop notification requires at least 10 characters in the comment field');
+      toast.error('Comment too short', {
+        description: 'Add at least 10 characters to your end-of-inspection notes to create a workshop task.',
+      });
       return;
     }
     
@@ -780,6 +874,7 @@ function NewInspectionContent() {
         submitted_at: status === 'submitted' ? new Date().toISOString() : null,
         signature_data: signatureData || null,
         signed_at: signatureData ? new Date().toISOString() : null,
+        inspector_comments: inspectorComments.trim() || null,
       };
 
       // Check if offline
@@ -1096,6 +1191,49 @@ function NewInspectionContent() {
         }
       }
 
+      // Handle "Inform Workshop" task creation if enabled
+      if (informWorkshop && inspectorComments.trim().length >= 10) {
+        try {
+          setCreatingWorkshopTask(true);
+          
+          const informResponse = await fetch('/api/inspections/inform-workshop', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              inspectionId: inspection.id,
+              vehicleId,
+              comment: inspectorComments.trim(),
+            }),
+          });
+
+          if (informResponse.ok) {
+            const result = await informResponse.json();
+            console.log(`✅ Workshop task ${result.action}: ${result.taskId} (Category: ${result.subcategory.name})`);
+            toast.success('Workshop task created', {
+              description: `Task categorized as "${result.subcategory.name}"`,
+            });
+          } else {
+            const errorData = await informResponse.json();
+            console.error('Error creating workshop task:', errorData);
+            // If inform workshop was enabled, this is a strict error - don't proceed
+            throw new Error(errorData.error || 'Failed to create workshop task');
+          }
+        } catch (informError) {
+          console.error('Error in inform-workshop flow:', informError);
+          const errorMsg = informError instanceof Error ? informError.message : 'Failed to create workshop task';
+          setError(`Inspection saved, but workshop task creation failed: ${errorMsg}`);
+          toast.error('Workshop task creation failed', {
+            description: errorMsg,
+          });
+          setLoading(false);
+          setCreatingWorkshopTask(false);
+          // Don't navigate away - let user retry or disable inform workshop
+          return;
+        } finally {
+          setCreatingWorkshopTask(false);
+        }
+      }
+
       // Show success message based on status
       if (status === 'draft') {
         toast.success('Draft saved successfully', {
@@ -1284,6 +1422,11 @@ function NewInspectionContent() {
                     }
                     // Load previous defects for resolution tracking
                     loadPreviousDefects(value);
+                    // Fetch baseline mileage for sanity checking
+                    fetchBaselineMileage(value);
+                    // Reset mileage confirmation when vehicle changes
+                    setMileageConfirmed(false);
+                    setMileageWarning(null);
                   }
                 }}
                 onOpenChange={(open) => {
@@ -1343,18 +1486,53 @@ function NewInspectionContent() {
                 Current Mileage
                 <span className="text-red-400">*</span>
               </Label>
-                  <Input
-                    id="mileage"
-                    type="number"
-                    value={currentMileage}
-                    onChange={(e) => setCurrentMileage(e.target.value)}
-                    placeholder="e.g., 45000"
-                    min="0"
-                    step="1"
-                    className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
-                    required
-                  />
+              <Input
+                id="mileage"
+                type="number"
+                value={currentMileage}
+                onChange={(e) => handleMileageChange(e.target.value)}
+                placeholder="e.g., 45000"
+                min="0"
+                step="1"
+                className={`h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 ${
+                  mileageWarning?.warning && !mileageConfirmed ? 'border-amber-500' : ''
+                }`}
+                required
+              />
+              {/* Baseline mileage hint */}
+              {baselineMileage !== null && baselineMileageSource !== 'none' && (
+                <p className="text-xs text-slate-400">
+                  Last recorded: {formatMileage(baselineMileage)}
+                </p>
+              )}
+              {/* Mileage warning indicator */}
+              {mileageWarning?.warning && !mileageConfirmed && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm text-amber-400">{mileageWarning.warning}</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowMileageWarningDialog(true)}
+                        className="mt-2 border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
+                      >
+                        Confirm Mileage is Correct
+                      </Button>
+                    </div>
+                  </div>
                 </div>
+              )}
+              {/* Mileage confirmed indicator */}
+              {mileageWarning?.warning && mileageConfirmed && (
+                <p className="text-xs text-green-400 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Mileage confirmed
+                </p>
+              )}
+            </div>
           </div>
           
           {checklistStarted && (
@@ -1368,8 +1546,8 @@ function NewInspectionContent() {
         </CardContent>
       </Card>
 
-      {/* Safety Check - Only shown when vehicle AND week ending are selected AND no duplicate exists */}
-      {vehicleId && weekEnding && !duplicateInspection && !duplicateCheckLoading && (
+      {/* Safety Check - Only shown when vehicle AND week ending AND mileage are valid AND no duplicate exists */}
+      {vehicleId && weekEnding && isMileageValidForChecklist() && !duplicateInspection && !duplicateCheckLoading && (
       <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
         <CardHeader className="pb-3">
           <CardTitle className="text-slate-900 dark:text-white">{currentChecklist.length}-Point Safety Check</CardTitle>
@@ -1492,6 +1670,27 @@ function NewInspectionContent() {
                       />
                     </div>
                   )}
+
+                  {/* Photo Upload Button - Only for defects */}
+                  {currentStatus === 'attention' && !isLogged && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (existingInspectionId) {
+                          setPhotoUploadItem({ itemNumber, dayOfWeek });
+                        } else {
+                          toast.info('Save as draft first to upload photos');
+                        }
+                      }}
+                      disabled={!existingInspectionId}
+                      className="w-full border-slate-600 text-slate-300 hover:bg-slate-800"
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      {existingInspectionId ? 'Add Photo' : 'Save draft to upload photos'}
+                    </Button>
+                  )}
                 </div>
               );
             })}
@@ -1519,6 +1718,7 @@ function NewInspectionContent() {
                   <th className="text-left p-3 font-medium text-white">Item</th>
                   <th className="text-center p-3 w-48 font-medium text-white">Status</th>
                   <th className="text-left p-3 font-medium text-white">Comments</th>
+                  <th className="text-center p-3 w-20 font-medium text-white">Photo</th>
                 </tr>
               </thead>
               <tbody>
@@ -1574,6 +1774,29 @@ function NewInspectionContent() {
                           readOnly={isLogged}
                         />
                       </td>
+                      <td className="p-3 text-center">
+                        {currentStatus === 'attention' && !isLogged ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              if (existingInspectionId) {
+                                setPhotoUploadItem({ itemNumber, dayOfWeek });
+                              } else {
+                                toast.info('Save as draft first to upload photos');
+                              }
+                            }}
+                            disabled={!existingInspectionId}
+                            title={existingInspectionId ? 'Add photo' : 'Save draft to upload photos'}
+                            className="text-slate-400 hover:text-white"
+                          >
+                            <Camera className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <span className="text-slate-600">-</span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -1605,12 +1828,74 @@ function NewInspectionContent() {
             ))}
           </Tabs>
 
+          {/* End of Inspection Comments */}
+          <div className="mt-6 p-4 bg-slate-800/40 border border-slate-700/50 rounded-lg">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="inspector-comments" className="text-white text-base">
+                  End of Inspection Notes <span className="text-slate-400 text-sm">(Optional)</span>
+                </Label>
+                <Textarea
+                  id="inspector-comments"
+                  value={inspectorComments}
+                  onChange={(e) => setInspectorComments(e.target.value)}
+                  placeholder="Add any additional notes or observations about this inspection..."
+                  className="min-h-[100px] bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
+                  maxLength={500}
+                />
+                <p className="text-xs text-slate-400">
+                  {inspectorComments.length}/500 characters
+                </p>
+              </div>
+
+              {/* Inform Workshop Toggle */}
+              <div className="flex items-start space-x-3 p-3 bg-slate-900/30 rounded-lg border border-slate-700/30">
+                <Checkbox
+                  id="inform-workshop"
+                  checked={informWorkshop}
+                  onCheckedChange={(checked) => setInformWorkshop(checked === true)}
+                  className="mt-0.5 border-slate-500 data-[state=checked]:bg-workshop data-[state=checked]:border-workshop"
+                />
+                <div className="flex-1">
+                  <Label 
+                    htmlFor="inform-workshop" 
+                    className="text-white cursor-pointer flex items-center gap-2"
+                  >
+                    Inform Workshop
+                    <Badge variant="outline" className="text-xs border-workshop/50 text-workshop">
+                      Creates Task
+                    </Badge>
+                  </Label>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Creates a workshop task from your notes. The task will be automatically categorized based on your comments.
+                  </p>
+                  
+                  {/* Validation warning */}
+                  {informWorkshop && inspectorComments.trim().length < 10 && (
+                    <p className="text-xs text-amber-400 mt-2 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Comment must be at least 10 characters to create a workshop task
+                    </p>
+                  )}
+                  
+                  {/* Ready indicator */}
+                  {informWorkshop && inspectorComments.trim().length >= 10 && (
+                    <p className="text-xs text-green-400 mt-2 flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Workshop task will be created on submit
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Desktop Action Buttons */}
           <div className="hidden md:flex flex-row gap-3 justify-end pt-4">
             <Button
               variant="outline"
               onClick={() => saveInspection('draft')}
-              disabled={loading || !vehicleId}
+              disabled={loading || !vehicleId || (informWorkshop && inspectorComments.trim().length < 10)}
               className="border-slate-600 text-white hover:bg-slate-800"
             >
               <Save className="h-4 w-4 mr-2" />
@@ -1618,7 +1903,7 @@ function NewInspectionContent() {
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={loading || !vehicleId}
+              disabled={loading || !vehicleId || (informWorkshop && inspectorComments.trim().length < 10)}
               className="bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold"
             >
               <Send className="h-4 w-4 mr-2" />
@@ -1635,7 +1920,7 @@ function NewInspectionContent() {
           <Button
             variant="outline"
             onClick={() => saveInspection('draft')}
-            disabled={loading || !vehicleId}
+            disabled={loading || !vehicleId || (informWorkshop && inspectorComments.trim().length < 10)}
             className="flex-1 h-14 border-slate-600 text-white hover:bg-slate-800"
           >
             <Save className="h-5 w-5 mr-2" />
@@ -1643,7 +1928,7 @@ function NewInspectionContent() {
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={loading || !vehicleId}
+            disabled={loading || !vehicleId || (informWorkshop && inspectorComments.trim().length < 10)}
             className="flex-1 h-14 bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold text-base"
           >
             <Send className="h-5 w-5 mr-2" />
@@ -1890,7 +2175,7 @@ function NewInspectionContent() {
                   setSavingDraftFromConfirm(false);
                 }
               }}
-              disabled={savingDraftFromConfirm || loading}
+              disabled={savingDraftFromConfirm || loading || (informWorkshop && inspectorComments.trim().length < 10)}
               className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
             >
               <Save className="h-4 w-4 mr-2" />
@@ -1898,11 +2183,65 @@ function NewInspectionContent() {
             </Button>
             <Button
               onClick={validateAndSubmit}
-              disabled={savingDraftFromConfirm}
+              disabled={savingDraftFromConfirm || (informWorkshop && inspectorComments.trim().length < 10)}
               className="bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold"
             >
               <Send className="h-4 w-4 mr-2" />
               Submit Inspection
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mileage Warning Confirmation Dialog */}
+      <Dialog open={showMileageWarningDialog} onOpenChange={setShowMileageWarningDialog}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Confirm Mileage Entry
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              The mileage you entered requires confirmation
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4 space-y-4">
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+              <p className="text-sm text-amber-200">
+                {mileageWarning?.warning}
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <p className="text-sm text-slate-300">
+                <strong>Entered mileage:</strong> {currentMileage ? parseInt(currentMileage).toLocaleString() : '0'} miles
+              </p>
+              {baselineMileage !== null && (
+                <p className="text-sm text-slate-300">
+                  <strong>Last recorded:</strong> {formatMileage(baselineMileage)}
+                </p>
+              )}
+            </div>
+            
+            <p className="text-xs text-slate-400">
+              Please double-check the odometer reading. If the value is correct, click "Confirm" to continue.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowMileageWarningDialog(false)}
+              className="border-slate-600 text-white hover:bg-slate-800"
+            >
+              Edit Mileage
+            </Button>
+            <Button
+              onClick={handleConfirmMileage}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              Confirm Mileage is Correct
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1934,6 +2273,19 @@ function NewInspectionContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Photo Upload Modal */}
+      {photoUploadItem && existingInspectionId && (
+        <PhotoUpload
+          inspectionId={existingInspectionId}
+          itemNumber={photoUploadItem.itemNumber}
+          onClose={() => setPhotoUploadItem(null)}
+          onUploadComplete={() => {
+            setPhotoUploadItem(null);
+            toast.success('Photo uploaded successfully');
+          }}
+        />
+      )}
     </div>
   );
 }
