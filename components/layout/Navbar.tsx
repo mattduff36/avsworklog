@@ -302,14 +302,8 @@ export function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <Link href="/dashboard" className="flex items-center space-x-2 group">
-                <div className="text-xl font-bold text-white group-hover:text-avs-yellow transition-colors">
-                  SQUIRES
-                </div>
-              </Link>
-
               {/* Desktop Navigation - Same for all users */}
-              <div className="hidden md:flex md:ml-10 md:space-x-4">
+              <div className="hidden md:flex md:space-x-4">
                 {/* Dashboard */}
                 {dashboardNav.map((item) => {
                   const Icon = item.icon;

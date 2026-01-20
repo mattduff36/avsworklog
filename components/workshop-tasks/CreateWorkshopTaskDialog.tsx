@@ -6,11 +6,12 @@ import { createClient } from '@/lib/supabase/client';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { getTaskContent } from '@/lib/utils/serviceTaskCreation';
+import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 
 type Vehicle = {
   id: string;
@@ -56,6 +57,7 @@ export function CreateWorkshopTaskDialog({
   const supabase = createClient();
   
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [recentVehicleIds, setRecentVehicleIds] = useState<string[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   
@@ -73,6 +75,11 @@ export function CreateWorkshopTaskDialog({
       fetchVehicles();
       fetchCategories();
       fetchSubcategories();
+      
+      // Load recent vehicle IDs
+      if (user?.id) {
+        setRecentVehicleIds(getRecentVehicleIds(user.id));
+      }
       
       // Set initial values if provided
       if (initialVehicleId) {
@@ -292,6 +299,11 @@ export function CreateWorkshopTaskDialog({
             </Label>
             <Select value={selectedVehicleId} onValueChange={(value) => {
               setSelectedVehicleId(value);
+              // Record as recent vehicle selection
+              if (value && user?.id) {
+                const updatedRecent = recordRecentVehicleId(user.id, value);
+                setRecentVehicleIds(updatedRecent);
+              }
               if (value) {
                 fetchCurrentMileage(value);
               } else {
@@ -302,11 +314,38 @@ export function CreateWorkshopTaskDialog({
                 <SelectValue placeholder="Select vehicle" />
               </SelectTrigger>
               <SelectContent>
-                {vehicles.map((vehicle) => (
-                  <SelectItem key={vehicle.id} value={vehicle.id}>
-                    {vehicle.reg_number}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
-                  </SelectItem>
-                ))}
+                {(() => {
+                  const { recentVehicles, otherVehicles } = splitVehiclesByRecent(vehicles, recentVehicleIds);
+                  return (
+                    <>
+                      {recentVehicles.length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">Recent</SelectLabel>
+                          {recentVehicles.map((vehicle) => (
+                            <SelectItem key={vehicle.id} value={vehicle.id}>
+                              {vehicle.reg_number}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                      {recentVehicles.length > 0 && otherVehicles.length > 0 && (
+                        <SelectSeparator />
+                      )}
+                      {otherVehicles.length > 0 && (
+                        <SelectGroup>
+                          {recentVehicles.length > 0 && (
+                            <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">All Vehicles</SelectLabel>
+                          )}
+                          {otherVehicles.map((vehicle) => (
+                            <SelectItem key={vehicle.id} value={vehicle.id}>
+                              {vehicle.reg_number}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                    </>
+                  );
+                })()}
               </SelectContent>
             </Select>
           </div>

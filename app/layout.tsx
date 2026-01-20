@@ -7,6 +7,9 @@ import { NuqsAdapter } from 'nuqs/adapters/next/app';
 import { ErrorLoggerInit } from "@/components/ErrorLoggerInit";
 import "./globals.css";
 
+// Force dynamic rendering to prevent build-time static generation errors
+export const dynamic = 'force-dynamic';
+
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",

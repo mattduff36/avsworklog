@@ -70,6 +70,17 @@ export default function DashboardPage() {
   const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
   const [userEmail, setUserEmail] = useState<string>('');
   const [viewAsRole, setViewAsRole] = useState<string>('actual');
+  
+  // Intro animation state (desktop only)
+  const [showIntro, setShowIntro] = useState(true);
+  
+  // Hide intro after 3 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowIntro(false);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Placeholder forms for future development (only shown to superadmin)
   const placeholderForms = [
@@ -424,7 +435,19 @@ export default function DashboardPage() {
       {!isOnline && <OfflineBanner />}
       
       {/* Welcome Section */}
-      <div className="bg-slate-900 rounded-lg p-6 border border-slate-700">
+      <div className="bg-slate-900 rounded-lg p-6 border border-slate-700 relative overflow-hidden">
+        {/* Intro Animation Overlay (Desktop Only) */}
+        <div 
+          className={`hidden md:flex absolute inset-0 bg-slate-900 items-center justify-center z-10 transition-opacity duration-700 ${
+            showIntro ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
+        >
+          <span className="text-3xl font-bold text-avs-yellow tracking-wide">
+            SquiresApp.com
+          </span>
+        </div>
+        
+        {/* Actual Content */}
         <h1 className="text-3xl font-bold text-white">
           Welcome back, {profile?.full_name}
         </h1>

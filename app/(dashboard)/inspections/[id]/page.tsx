@@ -805,14 +805,19 @@ export default function ViewInspectionPage() {
                         )}
                       </td>
                       <td className="p-2 text-center">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setPhotoUploadItem(item.item_number)}
-                          disabled={!canEdit}
-                        >
-                          <Camera className="h-4 w-4" />
-                        </Button>
+                        {/* Only show photo upload for defective items */}
+                        {item.status === 'attention' ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setPhotoUploadItem(item.item_number)}
+                            disabled={!canEdit}
+                          >
+                            <Camera className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -904,16 +909,19 @@ export default function ViewInspectionPage() {
                         <p className="text-sm text-muted-foreground">{item.comments}</p>
                       )
                     )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => setPhotoUploadItem(item.item_number)}
-                      disabled={!canEdit}
-                    >
-                      <Camera className="h-4 w-4 mr-2" />
-                      Add Photo
-                    </Button>
+                    {/* Only show photo upload for defective items */}
+                    {item.status === 'attention' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => setPhotoUploadItem(item.item_number)}
+                        disabled={!canEdit}
+                      >
+                        <Camera className="h-4 w-4 mr-2" />
+                        Add Photo
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               ))
