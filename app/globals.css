@@ -1442,12 +1442,6 @@ button svg ellipse {
   stroke: currentColor !important; /* Use stroke with inherited color */
 }
 
-/* Exception: SVGs outside buttons maintain their default styling */
-/* This preserves filled SVGs for logos, badges, illustrations, etc. */
-svg:not(button svg) {
-  /* Allow normal SVG rendering - no forced outline style */
-}
-
 /* Specific exceptions for filled SVGs that should never be forced to outline */
 .logo svg,
 .logo svg *,
