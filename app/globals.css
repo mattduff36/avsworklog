@@ -1422,22 +1422,23 @@ button[class*="variant-link"] svg,
   color: rgb(226 232 240) !important; /* Light text and icons */
 }
 
-/* Ensure button SVG icons match button text color and use OUTLINE style */
-/* Lucide React icons are stroke-based by default - only enforce in buttons */
-button svg {
+/* Ensure all SVG icons use OUTLINE style across the entire application */
+/* Lucide React icons are stroke-based by default - enforce consistency everywhere */
+svg {
   color: inherit !important;
 }
 
-/* CRITICAL: Force outline style ONLY for button icons - no filled icons in buttons */
-/* Target lucide-react and similar icon libraries used in buttons */
-button svg *,
-button svg path,
-button svg circle,
-button svg rect,
-button svg line,
-button svg polyline,
-button svg polygon,
-button svg ellipse {
+/* CRITICAL: Force outline style for ALL icon elements - no filled icons */
+/* Applies globally to ensure consistency in buttons, navigation, links, cards, etc. */
+/* Exception rules below will preserve filled SVGs for logos, badges, illustrations */
+svg *,
+svg path,
+svg circle,
+svg rect,
+svg line,
+svg polyline,
+svg polygon,
+svg ellipse {
   fill: none !important; /* Remove fill - outline only */
   stroke: currentColor !important; /* Use stroke with inherited color */
 }
