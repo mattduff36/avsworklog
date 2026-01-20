@@ -17,7 +17,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  ArrowLeft,
   Loader2,
   FileText,
   Users,
@@ -29,6 +28,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 import Link from 'next/link';
+import { BackButton } from '@/components/ui/back-button';
 import { formatDistanceToNow } from 'date-fns';
 import { AssignEmployeesModal } from '@/components/rams/AssignEmployeesModal';
 import { formatFileSize } from '@/lib/utils/file-validation';
@@ -252,16 +252,11 @@ export default function RAMSDetailsPage() {
         <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-16 w-16 text-slate-400 mb-4" />
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Document not found</h3>
-            <p className="text-slate-600 dark:text-slate-400 mb-4">
-              This document may have been deleted or you don&apos;t have permission to view it.
-            </p>
-            <Link href="/rams">
-              <Button className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to RAMS
-              </Button>
-            </Link>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Document not found</h3>
+          <p className="text-slate-600 dark:text-slate-400 mb-4">
+            This document may have been deleted or you don&apos;t have permission to view it.
+          </p>
+          <BackButton userRole={{ isManager, isAdmin }} />
           </CardContent>
         </Card>
       </div>
@@ -279,12 +274,7 @@ export default function RAMSDetailsPage() {
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <Link href="/rams">
-              <Button variant="ghost" size="sm" className="hover:bg-slate-800/50 text-slate-300 hover:text-white">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-            </Link>
+            <BackButton userRole={{ isManager, isAdmin }} />
             <div>
               <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">{ramsDocument.title}</h1>
               <p className="text-slate-600 dark:text-slate-400">

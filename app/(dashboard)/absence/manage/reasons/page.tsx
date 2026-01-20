@@ -16,7 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Settings, Plus, Edit, Trash2, ArrowLeft } from 'lucide-react';
+import { Settings, Plus, Edit, Trash2 } from 'lucide-react';
+import { BackButton } from '@/components/ui/back-button';
 import {
   useAllAbsenceReasons,
   useCreateAbsenceReason,
@@ -184,17 +185,16 @@ export default function AbsenceReasonsPage() {
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
         <div className="flex items-start justify-between">
-          <div>
-            <Link href="/absence/manage" className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Absence Management
-            </Link>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-              Absence Reasons
-            </h1>
-            <p className="text-slate-600 dark:text-slate-400">
-              Manage absence and leave reasons
-            </p>
+          <div className="flex items-center gap-4">
+            <BackButton />
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+                Absence Reasons
+              </h1>
+              <p className="text-slate-600 dark:text-slate-400">
+                Manage absence and leave reasons
+              </p>
+            </div>
           </div>
           <Button
             onClick={() => {

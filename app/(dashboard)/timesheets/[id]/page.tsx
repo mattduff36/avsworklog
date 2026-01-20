@@ -10,8 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Save, Send, Edit2, CheckCircle2, XCircle, Download, Package, AlertTriangle } from 'lucide-react';
+import { Save, Send, Edit2, CheckCircle2, XCircle, Download, Package, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
+import { BackButton } from '@/components/ui/back-button';
 import { formatDate } from '@/lib/utils/date';
 import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
 import { DAY_NAMES, Timesheet, TimesheetEntry } from '@/types/timesheet';
@@ -448,12 +449,7 @@ export default function ViewTimesheetPage() {
       <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-slate-200 dark:border-slate-700">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center space-x-3 md:space-x-4">
-            <Link href="/timesheets">
-              <Button variant="ghost" size="sm" className="h-9 w-9 p-0 md:w-auto md:px-3">
-                <ArrowLeft className="h-5 w-5 md:mr-2" />
-                <span className="hidden md:inline">Back</span>
-              </Button>
-            </Link>
+            <BackButton />
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white">Timesheet</h1>
               <p className="text-sm md:text-base text-slate-600 dark:text-slate-400">

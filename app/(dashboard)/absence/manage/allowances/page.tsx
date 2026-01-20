@@ -16,7 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Users, Edit, ArrowLeft, Search } from 'lucide-react';
+import { Users, Edit, Search } from 'lucide-react';
+import { BackButton } from '@/components/ui/back-button';
 import { useUpdateEmployeeAllowance, useAbsenceSummaryForEmployee } from '@/lib/hooks/useAbsence';
 import { getCurrentFinancialYear } from '@/lib/utils/date';
 import { createClient } from '@/lib/supabase/client';
@@ -165,17 +166,16 @@ export default function AllowancesPage() {
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
-        <div>
-          <Link href="/absence/manage" className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-2">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Absence Management
-          </Link>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-            Employee Allowances
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400">
-            Manage annual leave allowances for all employees ({financialYear.label})
-          </p>
+        <div className="flex items-center gap-4">
+          <BackButton />
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+              Employee Allowances
+            </h1>
+            <p className="text-slate-600 dark:text-slate-400">
+              Manage annual leave allowances for all employees ({financialYear.label})
+            </p>
+          </div>
         </div>
       </div>
       

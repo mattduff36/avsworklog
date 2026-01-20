@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
-  ArrowLeft, 
   Wrench, 
   ClipboardCheck, 
   FileText, 
@@ -25,6 +24,7 @@ import {
   Loader2,
   Edit
 } from 'lucide-react';
+import { BackButton } from '@/components/ui/back-button';
 import { formatRelativeTime } from '@/lib/utils/date';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { EditMaintenanceDialog } from '@/app/(dashboard)/maintenance/components/EditMaintenanceDialog';
@@ -466,10 +466,7 @@ export default function VehicleHistoryPage({
             <p className="text-gray-600 text-center max-w-md mb-4">
               The requested vehicle could not be found.
             </p>
-            <Button onClick={() => router.back()} variant="outline">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Go Back
-            </Button>
+            <BackButton />
           </CardContent>
         </Card>
       </div>
@@ -481,14 +478,7 @@ export default function VehicleHistoryPage({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={() => router.back()}
-            className="border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white hover:border-slate-500 active:bg-slate-800 transition-all"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <BackButton />
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
               {vehicle?.reg_number || <Skeleton className="h-8 w-32" />}

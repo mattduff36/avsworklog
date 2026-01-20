@@ -6,8 +6,9 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Loader2, FileText, Download, CheckCircle2, Mail, ExternalLink, AlertCircle } from 'lucide-react';
+import { Loader2, FileText, Download, CheckCircle2, Mail, ExternalLink, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { BackButton } from '@/components/ui/back-button';
 import { SignRAMSModal } from '@/components/rams/SignRAMSModal';
 import { toast } from 'sonner';
 import { RAMSErrorBoundary } from '@/components/rams/RAMSErrorBoundary';
@@ -343,12 +344,7 @@ export default function ReadRAMSPage() {
           </div>
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Document not found</h2>
           <p className="text-slate-600 dark:text-slate-400 mb-6">The document you're looking for doesn't exist or has been removed.</p>
-          <Button asChild className="bg-rams hover:bg-rams-dark text-white">
-            <Link href="/rams">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to RAMS
-            </Link>
-          </Button>
+          <BackButton />
         </Card>
       </div>
     );
@@ -365,15 +361,10 @@ export default function ReadRAMSPage() {
     <div className="flex flex-col min-h-screen">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 shadow-sm">
-        <div className="container mx-auto px-4 py-4 max-w-6xl">
+          <div className="container mx-auto px-4 py-4 max-w-6xl">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-4">
-              <Button asChild variant="ghost" size="sm" className="hover:bg-slate-800/50 text-slate-300 hover:text-white">
-                <Link href="/rams">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back
-                </Link>
-              </Button>
+              <BackButton />
               <div>
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{ramsDocument.title}</h1>
                 <p className="text-sm text-slate-600 dark:text-slate-400">

@@ -8,8 +8,9 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Loader2, Upload, Search, FileText, Users, ArrowLeft, Trash2 } from 'lucide-react';
+import { Loader2, Upload, Search, FileText, Users, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { BackButton } from '@/components/ui/back-button';
 import { formatDistanceToNow } from 'date-fns';
 import { UploadRAMSModal } from '@/components/rams/UploadRAMSModal';
 import { formatFileSize } from '@/lib/utils/file-validation';
@@ -159,12 +160,7 @@ export default function RAMSManagePage() {
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <Link href="/rams">
-              <Button variant="ghost" size="sm" className="hover:bg-slate-800/50 text-slate-300 hover:text-white">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to RAMS
-              </Button>
-            </Link>
+            <BackButton />
             <div>
               <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Manage RAMS Documents</h1>
               <p className="text-slate-600 dark:text-slate-400">
@@ -270,7 +266,7 @@ export default function RAMSManagePage() {
                         {doc.total_signed}/{doc.total_assigned} signed
                       </span>
                     </div>
-                    <Link href={`/rams/${doc.id}`}>
+                    <Link href={`/rams/${doc.id}?from=/rams/manage`}>
                       <Button className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95">
                         View Details
                       </Button>

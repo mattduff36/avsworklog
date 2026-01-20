@@ -272,7 +272,7 @@ export default function RAMSPage() {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <Link href={`/rams/${doc.id}/read`}>
+                    <Link href={`/rams/${doc.id}/read?from=/rams`}>
                       <Button className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95">
                         {doc.assignment_status === 'signed' ? 'View Document' : 'Read & Sign'}
                       </Button>
