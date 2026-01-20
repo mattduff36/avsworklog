@@ -10,7 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
+import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -101,6 +102,7 @@ function NewInspectionContent() {
     vehicle_type: string;
     vehicle_categories?: { name: string } | null;
   }>>([]);
+  const [recentVehicleIds, setRecentVehicleIds] = useState<string[]>([]);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [vehicleId, setVehicleId] = useState('');
   const [weekEnding, setWeekEnding] = useState('');
@@ -182,6 +184,13 @@ function NewInspectionContent() {
       setSelectedEmployeeId(user.id);
     }
   }, [user, isManager]);
+
+  // Load recent vehicle IDs for the user
+  useEffect(() => {
+    if (user?.id) {
+      setRecentVehicleIds(getRecentVehicleIds(user.id));
+    }
+  }, [user?.id]);
 
   // Check for duplicate inspection when vehicle or week ending changes
   useEffect(() => {
@@ -1413,6 +1422,11 @@ function NewInspectionContent() {
                     setShowAddVehicleDialog(true);
                   } else {
                     setVehicleId(value);
+                    // Record as recent vehicle selection
+                    if (user?.id) {
+                      const updatedRecent = recordRecentVehicleId(user.id, value);
+                      setRecentVehicleIds(updatedRecent);
+                    }
                     // Update checklist based on vehicle category
                     const selectedVehicle = vehicles.find(v => v.id === value);
                     if (selectedVehicle) {
@@ -1446,11 +1460,38 @@ function NewInspectionContent() {
                       Add New Vehicle
                     </div>
                   </SelectItem>
-                  {vehicles.map((vehicle) => (
-                    <SelectItem key={vehicle.id} value={vehicle.id} className="text-white">
-                      {vehicle.reg_number} - {vehicle.vehicle_categories?.name || vehicle.vehicle_type || 'Uncategorized'}
-                    </SelectItem>
-                  ))}
+                  {(() => {
+                    const { recentVehicles, otherVehicles } = splitVehiclesByRecent(vehicles, recentVehicleIds);
+                    return (
+                      <>
+                        {recentVehicles.length > 0 && (
+                          <SelectGroup>
+                            <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">Recent</SelectLabel>
+                            {recentVehicles.map((vehicle) => (
+                              <SelectItem key={vehicle.id} value={vehicle.id} className="text-white">
+                                {vehicle.reg_number} - {vehicle.vehicle_categories?.name || vehicle.vehicle_type || 'Uncategorized'}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        )}
+                        {recentVehicles.length > 0 && otherVehicles.length > 0 && (
+                          <SelectSeparator className="bg-slate-700" />
+                        )}
+                        {otherVehicles.length > 0 && (
+                          <SelectGroup>
+                            {recentVehicles.length > 0 && (
+                              <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">All Vehicles</SelectLabel>
+                            )}
+                            {otherVehicles.map((vehicle) => (
+                              <SelectItem key={vehicle.id} value={vehicle.id} className="text-white">
+                                {vehicle.reg_number} - {vehicle.vehicle_categories?.name || vehicle.vehicle_type || 'Uncategorized'}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        )}
+                      </>
+                    );
+                  })()}
                 </SelectContent>
               </Select>
             </div>

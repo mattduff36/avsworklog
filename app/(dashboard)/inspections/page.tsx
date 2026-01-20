@@ -10,7 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
+import { getRecentVehicleIds, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { Label } from '@/components/ui/label';
 import { OfflineBanner } from '@/components/ui/offline-banner';
 import Link from 'next/link';
@@ -54,6 +55,7 @@ function InspectionsContent() {
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [recentVehicleIds, setRecentVehicleIds] = useState<string[]>([]);
   // Use URL search params to persist filter selection across navigations
   const [selectedEmployeeId, setSelectedEmployeeId] = useQueryState('employee', { 
     defaultValue: 'all',
@@ -80,6 +82,10 @@ function InspectionsContent() {
       fetchEmployees();
     }
     fetchVehicles();
+    // Load recent vehicle IDs
+    if (user?.id) {
+      setRecentVehicleIds(getRecentVehicleIds(user.id));
+    }
   }, [user?.id, isManager]);
 
   useEffect(() => {
@@ -385,12 +391,43 @@ function InspectionsContent() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Vehicles</SelectItem>
-                    {vehicles.map((vehicle) => (
-                      <SelectItem key={vehicle.id} value={vehicle.id}>
-                        {vehicle.reg_number}
-                        {vehicle.vehicle_categories?.name && ` (${vehicle.vehicle_categories.name})`}
-                      </SelectItem>
-                    ))}
+                    {(() => {
+                      const { recentVehicles, otherVehicles } = splitVehiclesByRecent(vehicles, recentVehicleIds);
+                      return (
+                        <>
+                          {recentVehicles.length > 0 && (
+                            <>
+                              <SelectSeparator className="bg-slate-700" />
+                              <SelectGroup>
+                                <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">Recent</SelectLabel>
+                                {recentVehicles.map((vehicle) => (
+                                  <SelectItem key={vehicle.id} value={vehicle.id}>
+                                    {vehicle.reg_number}
+                                    {vehicle.vehicle_categories?.name && ` (${vehicle.vehicle_categories.name})`}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </>
+                          )}
+                          {otherVehicles.length > 0 && (
+                            <>
+                              <SelectSeparator className="bg-slate-700" />
+                              <SelectGroup>
+                                {recentVehicles.length > 0 && (
+                                  <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">All Vehicles</SelectLabel>
+                                )}
+                                {otherVehicles.map((vehicle) => (
+                                  <SelectItem key={vehicle.id} value={vehicle.id}>
+                                    {vehicle.reg_number}
+                                    {vehicle.vehicle_categories?.name && ` (${vehicle.vehicle_categories.name})`}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </>
+                          )}
+                        </>
+                      );
+                    })()}
                   </SelectContent>
                 </Select>
               </div>

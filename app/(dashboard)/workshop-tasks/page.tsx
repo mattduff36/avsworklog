@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
+import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -78,6 +79,7 @@ export default function WorkshopTasksPage() {
   
   const [tasks, setTasks] = useState<Action[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [recentVehicleIds, setRecentVehicleIds] = useState<string[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -172,6 +174,8 @@ export default function WorkshopTasksPage() {
       fetchVehicles();
       fetchCategories();
       fetchSubcategories();
+      // Load recent vehicle IDs
+      setRecentVehicleIds(getRecentVehicleIds(user.id));
     }
   }, [user, statusFilter, vehicleFilter]);
 
@@ -2320,6 +2324,11 @@ export default function WorkshopTasksPage() {
               </Label>
               <Select value={editVehicleId} onValueChange={(value) => {
                 setEditVehicleId(value);
+                // Record as recent vehicle selection
+                if (value && user?.id) {
+                  const updatedRecent = recordRecentVehicleId(user.id, value);
+                  setRecentVehicleIds(updatedRecent);
+                }
                 if (value) {
                   // Fetch current mileage for the new vehicle
                   supabase
@@ -2341,11 +2350,38 @@ export default function WorkshopTasksPage() {
                   <SelectValue placeholder="Select vehicle" />
                 </SelectTrigger>
                 <SelectContent>
-                  {vehicles.map((vehicle) => (
-                    <SelectItem key={vehicle.id} value={vehicle.id}>
-                      {vehicle.reg_number}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
-                    </SelectItem>
-                  ))}
+                  {(() => {
+                    const { recentVehicles, otherVehicles } = splitVehiclesByRecent(vehicles, recentVehicleIds);
+                    return (
+                      <>
+                        {recentVehicles.length > 0 && (
+                          <SelectGroup>
+                            <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">Recent</SelectLabel>
+                            {recentVehicles.map((vehicle) => (
+                              <SelectItem key={vehicle.id} value={vehicle.id}>
+                                {vehicle.reg_number}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        )}
+                        {recentVehicles.length > 0 && otherVehicles.length > 0 && (
+                          <SelectSeparator />
+                        )}
+                        {otherVehicles.length > 0 && (
+                          <SelectGroup>
+                            {recentVehicles.length > 0 && (
+                              <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">All Vehicles</SelectLabel>
+                            )}
+                            {otherVehicles.map((vehicle) => (
+                              <SelectItem key={vehicle.id} value={vehicle.id}>
+                                {vehicle.reg_number}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        )}
+                      </>
+                    );
+                  })()}
                 </SelectContent>
               </Select>
             </div>
