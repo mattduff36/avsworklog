@@ -273,7 +273,7 @@ export function ExpandingVehicleCard({ vehicle, categories, onUpdate }: Expandin
                   >
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-600">
+                  <SelectContent className="bg-slate-800 border-slate-600 dark:text-slate-100 text-slate-900">
                     {categories.map((category) => (
                       <SelectItem key={category.id} value={category.id}>
                         {category.name}
@@ -302,7 +302,7 @@ export function ExpandingVehicleCard({ vehicle, categories, onUpdate }: Expandin
                   >
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-600">
+                  <SelectContent className="bg-slate-800 border-slate-600 dark:text-slate-100 text-slate-900">
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="inactive">Inactive</SelectItem>
                     <SelectItem value="sold">Sold</SelectItem>

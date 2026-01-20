@@ -399,7 +399,7 @@ function InspectionsContent() {
                             <>
                               <SelectSeparator className="bg-slate-700" />
                               <SelectGroup>
-                                <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">Recent</SelectLabel>
+                                <SelectLabel className="text-slate-400 text-xs px-2 py-1.5 text-slate-900">Recent</SelectLabel>
                                 {recentVehicles.map((vehicle) => (
                                   <SelectItem key={vehicle.id} value={vehicle.id}>
                                     {vehicle.reg_number}
@@ -414,7 +414,7 @@ function InspectionsContent() {
                               <SelectSeparator className="bg-slate-700" />
                               <SelectGroup>
                                 {recentVehicles.length > 0 && (
-                                  <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">All Vehicles</SelectLabel>
+                                  <SelectLabel className="text-slate-400 text-xs px-2 py-1.5 text-slate-900">All Vehicles</SelectLabel>
                                 )}
                                 {otherVehicles.map((vehicle) => (
                                   <SelectItem key={vehicle.id} value={vehicle.id}>

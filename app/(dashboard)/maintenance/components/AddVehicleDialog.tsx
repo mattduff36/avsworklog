@@ -263,7 +263,7 @@ export function AddVehicleDialog({
               <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
                 <SelectValue placeholder="Select category..." />
               </SelectTrigger>
-              <SelectContent className="bg-slate-800 border-slate-700">
+              <SelectContent className="bg-slate-800 border-slate-700 dark:text-slate-100 text-slate-900">
                 {categories.map((category) => (
                   <SelectItem
                     key={category.id}
@@ -292,7 +292,7 @@ export function AddVehicleDialog({
               <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-slate-800 border-slate-700">
+              <SelectContent className="bg-slate-800 border-slate-700 dark:text-slate-100 text-slate-900">
                 <SelectItem value="active" className="text-white hover:bg-slate-700">
                   Active
                 </SelectItem>

@@ -23,7 +23,7 @@ interface AuditReport {
   issues: ContrastIssue[];
 }
 
-const COMPONENTS_TO_CHECK = ['Input', 'Textarea', 'SelectTrigger', 'DialogContent'];
+const COMPONENTS_TO_CHECK = ['Input', 'Textarea', 'SelectTrigger', 'SelectContent', 'SelectItem', 'SelectLabel', 'DialogContent'];
 
 // Patterns that indicate dark backgrounds
 const DARK_BG_PATTERNS = [

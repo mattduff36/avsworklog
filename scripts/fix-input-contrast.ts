@@ -16,7 +16,7 @@ interface FixReport {
   fixedClass: string;
 }
 
-const COMPONENTS_TO_FIX = ['Input', 'Textarea', 'SelectTrigger'];
+const COMPONENTS_TO_FIX = ['Input', 'Textarea', 'SelectTrigger', 'SelectContent', 'SelectItem', 'SelectLabel'];
 
 // Patterns that indicate dark backgrounds
 const DARK_BG_PATTERNS = [

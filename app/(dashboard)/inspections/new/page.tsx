@@ -1453,8 +1453,8 @@ function NewInspectionContent() {
                 <SelectTrigger id="vehicle" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white" disabled={checklistStarted}>
                   <SelectValue placeholder="Select a vehicle" />
                 </SelectTrigger>
-                <SelectContent className="bg-slate-900 border-slate-700 max-h-[300px] md:max-h-[400px]">
-                  <SelectItem value="add-new" className="text-avs-yellow font-semibold border-b border-slate-700">
+                <SelectContent className="bg-slate-900 border-slate-700 max-h-[300px] md:max-h-[400px] dark:text-slate-100 text-slate-900">
+                  <SelectItem value="add-new" className="text-avs-yellow font-semibold border-b border-slate-700 text-slate-900">
                     <div className="flex items-center gap-2">
                       <Plus className="h-4 w-4" />
                       Add New Vehicle
@@ -1466,7 +1466,7 @@ function NewInspectionContent() {
                       <>
                         {recentVehicles.length > 0 && (
                           <SelectGroup>
-                            <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">Recent</SelectLabel>
+                            <SelectLabel className="text-slate-400 text-xs px-2 py-1.5 text-slate-900">Recent</SelectLabel>
                             {recentVehicles.map((vehicle) => (
                               <SelectItem key={vehicle.id} value={vehicle.id} className="text-white">
                                 {vehicle.reg_number} - {vehicle.vehicle_categories?.name || vehicle.vehicle_type || 'Uncategorized'}
@@ -1480,7 +1480,7 @@ function NewInspectionContent() {
                         {otherVehicles.length > 0 && (
                           <SelectGroup>
                             {recentVehicles.length > 0 && (
-                              <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">All Vehicles</SelectLabel>
+                              <SelectLabel className="text-slate-400 text-xs px-2 py-1.5 text-slate-900">All Vehicles</SelectLabel>
                             )}
                             {otherVehicles.map((vehicle) => (
                               <SelectItem key={vehicle.id} value={vehicle.id} className="text-white">
@@ -2014,7 +2014,7 @@ function NewInspectionContent() {
                 <SelectTrigger className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
-                <SelectContent className="bg-slate-900 border-slate-700 max-h-[300px] md:max-h-[400px]">
+                <SelectContent className="bg-slate-900 border-slate-700 max-h-[300px] md:max-h-[400px] dark:text-slate-100 text-slate-900">
                   {categories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
