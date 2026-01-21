@@ -37,11 +37,9 @@ export function getAccentFromRoute(
   if (path.startsWith('/workshop-tasks')) return 'workshop';
   if (path.startsWith('/reports')) return 'reports';
 
-  // Fleet with maintenance tab → maintenance color
-  if (path.startsWith('/fleet')) {
-    const tab = searchParams?.get('tab');
-    if (tab === 'maintenance') return 'maintenance';
-  }
+  // Fleet pages → always use maintenance color for consistency
+  // (prevents jarring color changes when switching between tabs)
+  if (path.startsWith('/fleet')) return 'maintenance';
 
   // All other routes → brand yellow
   // This includes:
@@ -52,6 +50,5 @@ export function getAccentFromRoute(
   // - /toolbox-talks
   // - /suggestions/manage
   // - /admin/*
-  // - /fleet?tab=vehicles
   return 'brand';
 }

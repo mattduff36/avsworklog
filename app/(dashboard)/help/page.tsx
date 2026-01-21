@@ -285,15 +285,15 @@ export default function HelpPage() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full max-w-lg grid-cols-3 bg-slate-100 dark:bg-slate-800 p-1">
-          <TabsTrigger value="faq" className="gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+          <TabsTrigger value="faq" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
             <BookOpen className="h-4 w-4" />
             FAQ
           </TabsTrigger>
-          <TabsTrigger value="suggest" className="gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+          <TabsTrigger value="suggest" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
             <Lightbulb className="h-4 w-4" />
             Suggest
           </TabsTrigger>
-          <TabsTrigger value="my-suggestions" className="gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+          <TabsTrigger value="my-suggestions" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
             <CheckCircle2 className="h-4 w-4" />
             My Suggestions
           </TabsTrigger>
@@ -320,7 +320,7 @@ export default function HelpPage() {
                   variant={selectedCategory === null ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setSelectedCategory(null)}
-                  className={selectedCategory === null ? 'bg-blue-600 hover:bg-blue-700' : ''}
+                  className={selectedCategory === null ? 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900' : ''}
                 >
                   All Categories
                 </Button>
@@ -330,7 +330,7 @@ export default function HelpPage() {
                     variant={selectedCategory === category.slug ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setSelectedCategory(category.slug)}
-                    className={selectedCategory === category.slug ? 'bg-blue-600 hover:bg-blue-700' : ''}
+                    className={selectedCategory === category.slug ? 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900' : ''}
                   >
                     {category.name}
                   </Button>
@@ -342,7 +342,7 @@ export default function HelpPage() {
           {/* FAQ Content */}
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+              <Loader2 className="h-8 w-8 animate-spin text-avs-yellow" />
             </div>
           ) : filteredArticles.length === 0 ? (
             <Card className="">
@@ -365,7 +365,7 @@ export default function HelpPage() {
                     <Card key={category.id} className="">
                       <CardHeader className="pb-2">
                         <CardTitle className="text-lg text-foreground flex items-center gap-2">
-                          <ChevronRight className="h-5 w-5 text-blue-500" />
+                          <ChevronRight className="h-5 w-5 text-avs-yellow" />
                           {category.name}
                         </CardTitle>
                         {category.description && (
@@ -378,7 +378,7 @@ export default function HelpPage() {
                         <Accordion type="single" collapsible className="w-full">
                           {catArticles.map((article) => (
                             <AccordionItem key={article.id} value={article.id}>
-                              <AccordionTrigger className="text-left text-foreground hover:text-blue-600 dark:hover:text-blue-400">
+                              <AccordionTrigger className="text-left text-foreground hover:text-avs-yellow">
                                 {article.title}
                               </AccordionTrigger>
                               <AccordionContent>
@@ -405,7 +405,7 @@ export default function HelpPage() {
                     <Accordion type="single" collapsible className="w-full">
                       {filteredArticles.map((article) => (
                         <AccordionItem key={article.id} value={article.id}>
-                          <AccordionTrigger className="text-left text-foreground hover:text-blue-600 dark:hover:text-blue-400">
+                          <AccordionTrigger className="text-left text-foreground hover:text-avs-yellow">
                             {article.title}
                           </AccordionTrigger>
                           <AccordionContent>
@@ -485,7 +485,7 @@ export default function HelpPage() {
               <Button
                 onClick={handleSubmitSuggestion}
                 disabled={submittingSuggestion || !suggestionTitle.trim() || !suggestionBody.trim()}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
               >
                 {submittingSuggestion ? (
                   <>
@@ -517,7 +517,7 @@ export default function HelpPage() {
             <CardContent>
               {loadingSuggestions ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                  <Loader2 className="h-6 w-6 animate-spin text-avs-yellow" />
                 </div>
               ) : mySuggestions.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">

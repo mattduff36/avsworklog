@@ -130,7 +130,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                       open ? 'gap-3 px-3 py-2' : 'justify-center py-3'
                     } ${
                       isActive
-                        ? 'bg-primary text-primary-foreground'
+                        ? 'bg-avs-yellow text-slate-900'
                         : 'text-muted-foreground hover:bg-slate-800 hover:text-white'
                     }`}
                   >

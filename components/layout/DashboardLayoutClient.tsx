@@ -27,8 +27,7 @@ export function DashboardLayoutClient({
       className="min-h-screen bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 relative"
       data-accent={accent}
     >
-      {/* Subtle background pattern */}
-      <div className="fixed inset-0 bg-[linear-gradient(rgba(241,214,74,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(241,214,74,0.03)_1px,transparent_1px)] bg-[size:64px_64px] pointer-events-none" />
+      {/* Plain gradient background - no grid pattern */}
       
       {/* Blocking Message Check (Password Change → Toolbox Talks → Reminders) */}
       <MessageBlockingCheck />
