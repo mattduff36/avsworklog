@@ -286,7 +286,7 @@
   [role="tab"][data-state="active"] *,
   [role="tab"][data-state="active"] svg,
   [role="tab"][data-state="active"] span {
-    color: rgb(15 23 42) !important;
+    color: hsl(var(--primary-foreground)) !important;
   }
   
   [role="tab"][data-state="active"][data-tab="toolbox-talk"] {
@@ -298,6 +298,16 @@
   [role="tab"][data-state="active"][data-tab="toolbox-talk"] * {
     color: white !important;
   }
+}
+
+/* Debug-specific styling */
+.debug-red {
+  color: rgb(239 68 68) !important; /* red-500 */
+}
+
+.debug-bg {
+  background-color: rgba(220, 38, 38, 0.1) !important;
+  border-color: rgba(220, 38, 38, 0.3) !important;
 }
 
 /* Custom scrollbar */
