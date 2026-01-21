@@ -225,11 +225,11 @@ function ApprovalsContent() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Approvals</h1>
-            <p className="text-slate-600 dark:text-slate-400">
+            <h1 className="text-3xl font-bold text-foreground mb-2">Approvals</h1>
+            <p className="text-muted-foreground">
               Review and manage submissions
             </p>
           </div>
@@ -240,19 +240,19 @@ function ApprovalsContent() {
       </div>
 
       {totalCount === 0 ? (
-        <Card className="bg-slate-900 border-slate-700">
+        <Card className="border-border">
           <CardContent className="flex flex-col items-center justify-center py-12">
             {statusFilter === 'pending' && <CheckCircle2 className="h-16 w-16 text-green-400 mb-4" />}
             {statusFilter === 'approved' && <CheckCircle2 className="h-16 w-16 text-green-400 mb-4" />}
             {statusFilter === 'rejected' && <XCircle className="h-16 w-16 text-red-400 mb-4" />}
-            {statusFilter === 'all' && <FileText className="h-16 w-16 text-slate-400 mb-4" />}
+            {statusFilter === 'all' && <FileText className="h-16 w-16 text-muted-foreground mb-4" />}
             <h3 className="text-lg font-semibold text-white mb-2">
               {statusFilter === 'pending' && 'All caught up!'}
               {statusFilter === 'approved' && 'No approved submissions'}
               {statusFilter === 'rejected' && 'No rejected submissions'}
               {statusFilter === 'all' && 'No submissions yet'}
             </h3>
-            <p className="text-slate-600 dark:text-slate-400">
+            <p className="text-muted-foreground">
               {statusFilter === 'pending' && 'There are no pending approvals at the moment'}
               {statusFilter === 'approved' && 'There are no approved submissions to display'}
               {statusFilter === 'rejected' && 'There are no rejected submissions to display'}
@@ -310,11 +310,11 @@ function ApprovalsContent() {
           </TabsList>
 
           {/* Status Filter Buttons - Now below tabs */}
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 mt-6">
+          <Card className="bg-white dark:bg-slate-900 border-border mt-6">
             <CardContent className="pt-6">
               <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-slate-400" />
-                <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground mr-2">Filter by status:</span>
                 <div className="flex gap-2 flex-wrap">
                   {getFilterOptions().map((filter) => (
                     <Button
@@ -322,7 +322,7 @@ function ApprovalsContent() {
                       variant={statusFilter === filter ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => handleFilterChange(filter)}
-                      className={statusFilter === filter ? '' : 'border-slate-600 text-slate-300 hover:bg-slate-700/50'}
+                      className={statusFilter === filter ? '' : 'border-border text-muted-foreground hover:bg-slate-700/50'}
                     >
                       {filter === 'pending' && <Clock className="h-3 w-3 mr-1" />}
                       {filter === 'approved' && <CheckCircle2 className="h-3 w-3 mr-1" />}
@@ -339,15 +339,15 @@ function ApprovalsContent() {
 
           <TabsContent value="timesheets" className="mt-6 space-y-4">
             {timesheets.length === 0 ? (
-              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-                <CardContent className="py-12 text-center text-slate-600 dark:text-slate-400">
+              <Card className="">
+                <CardContent className="py-12 text-center text-muted-foreground">
                   No pending timesheet approvals
                 </CardContent>
               </Card>
             ) : (
               timesheets.map((timesheet) => (
                 <Link key={timesheet.id} href={`/timesheets/${timesheet.id}`} className="block">
-                  <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-timesheet/50 transition-all duration-200 cursor-pointer">
+                  <Card className="bg-white dark:bg-slate-900 border-border hover:shadow-lg hover:border-timesheet/50 transition-all duration-200 cursor-pointer">
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div className="flex items-center space-x-3">
@@ -414,8 +414,8 @@ function ApprovalsContent() {
 
           <TabsContent value="absences" className="mt-6 space-y-4">
             {!absences || absences.length === 0 ? (
-              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-                <CardContent className="py-12 text-center text-slate-600 dark:text-slate-400">
+              <Card className="">
+                <CardContent className="py-12 text-center text-muted-foreground">
                   No pending absence approvals
                 </CardContent>
               </Card>
@@ -498,7 +498,7 @@ function AbsenceApprovalCard({
     : null;
   
   return (
-    <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-purple-500/50 transition-all duration-200">
+    <Card className="bg-white dark:bg-slate-900 border-border hover:shadow-lg hover:border-purple-500/50 transition-all duration-200">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-3">
@@ -510,7 +510,7 @@ function AbsenceApprovalCard({
               </CardTitle>
               <CardDescription className="mt-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="outline" className="border-slate-600 text-slate-300">
+                  <Badge variant="outline" className="border-border text-muted-foreground">
                     {absence.absence_reasons.name}
                   </Badge>
                   {absence.absence_reasons.is_paid ? (
@@ -518,7 +518,7 @@ function AbsenceApprovalCard({
                       Paid
                     </Badge>
                   ) : (
-                    <Badge variant="outline" className="border-slate-600 text-slate-400">
+                    <Badge variant="outline" className="border-slate-600 text-muted-foreground">
                       Unpaid
                     </Badge>
                   )}
@@ -531,7 +531,7 @@ function AbsenceApprovalCard({
                     }
                     {absence.is_half_day && ` (${absence.half_day_session})`}
                   </div>
-                  <div className="text-slate-500">
+                  <div className="text-muted-foreground">
                     Duration: {absence.duration_days} days
                   </div>
                 </div>
@@ -544,8 +544,8 @@ function AbsenceApprovalCard({
         <div className="space-y-4">
           {absence.notes && (
             <div className="p-3 bg-slate-800/30 rounded-lg">
-              <p className="text-sm text-slate-400">
-                <span className="text-slate-500 font-medium">Notes:</span> {absence.notes}
+              <p className="text-sm text-muted-foreground">
+                <span className="text-muted-foreground font-medium">Notes:</span> {absence.notes}
               </p>
             </div>
           )}
@@ -555,19 +555,19 @@ function AbsenceApprovalCard({
               <h4 className="text-sm font-medium text-white mb-2">Employee Allowance Summary</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                 <div>
-                  <p className="text-slate-500">Allowance</p>
+                  <p className="text-muted-foreground">Allowance</p>
                   <p className="text-white font-medium">{summary.allowance} days</p>
                 </div>
                 <div>
-                  <p className="text-slate-500">Approved Taken</p>
+                  <p className="text-muted-foreground">Approved Taken</p>
                   <p className="text-white font-medium">{summary.approved_taken} days</p>
                 </div>
                 <div>
-                  <p className="text-slate-500">Pending</p>
+                  <p className="text-muted-foreground">Pending</p>
                   <p className="text-amber-400 font-medium">{summary.pending_total} days</p>
                 </div>
                 <div>
-                  <p className="text-slate-500">After Approval</p>
+                  <p className="text-muted-foreground">After Approval</p>
                   <p className={`font-medium ${projectedRemaining !== null && projectedRemaining < 0 ? 'text-red-400' : 'text-green-400'}`}>
                     {projectedRemaining} days
                   </p>
@@ -592,7 +592,7 @@ function AbsenceApprovalCard({
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   placeholder="Provide a reason for rejection..."
-                  className="bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+                  className="bg-white dark:border-border dark:text-slate-100 text-slate-900"
                 />
               </div>
               <div className="flex gap-2">
@@ -603,7 +603,7 @@ function AbsenceApprovalCard({
                     setRejecting(false);
                     setRejectionReason('');
                   }}
-                  className="border-slate-600 text-slate-300"
+                  className="border-border text-muted-foreground"
                 >
                   Cancel
                 </Button>

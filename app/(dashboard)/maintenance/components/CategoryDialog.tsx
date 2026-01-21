@@ -204,12 +204,12 @@ export function CategoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-2xl">
+      <DialogContent className="border-border text-white max-w-2xl">
         <DialogHeader>
           <DialogTitle className="text-2xl">
             {mode === 'create' ? 'Add New Category' : 'Edit Category'}
           </DialogTitle>
-          <DialogDescription className="text-slate-400">
+          <DialogDescription className="text-muted-foreground">
             {mode === 'create' 
               ? 'Create a new maintenance category with custom alert threshold'
               : 'Update category settings. Note: Type cannot be changed after creation.'
@@ -227,7 +227,7 @@ export function CategoryDialog({
               id="name"
               {...register('name')}
               placeholder="e.g., Brake Service, Tyre Replacement"
-              className="bg-slate-800 border-slate-600 text-white"
+              className="bg-input border-border text-white"
             />
             {errors.name && (
               <p className="text-sm text-red-400">{errors.name.message}</p>
@@ -241,7 +241,7 @@ export function CategoryDialog({
               id="description"
               {...register('description')}
               placeholder="Brief description of this maintenance type..."
-              className="bg-slate-800 border-slate-600 text-white"
+              className="bg-input border-border text-white"
               rows={2}
             />
             {errors.description && (
@@ -281,7 +281,7 @@ export function CategoryDialog({
                     <p className={`font-medium ${selectedType === 'date' ? 'text-blue-400' : 'text-white'}`}>
                       Date-based
                     </p>
-                    <p className="text-xs text-slate-400">Tax, MOT, First Aid</p>
+                    <p className="text-xs text-muted-foreground">Tax, MOT, First Aid</p>
                   </div>
                 </div>
               </button>
@@ -312,13 +312,13 @@ export function CategoryDialog({
                     <p className={`font-medium ${selectedType === 'mileage' ? 'text-blue-400' : 'text-white'}`}>
                       Mileage-based
                     </p>
-                    <p className="text-xs text-slate-400">Service, Cambelt</p>
+                    <p className="text-xs text-muted-foreground">Service, Cambelt</p>
                   </div>
                 </div>
               </button>
             </div>
             {mode === 'edit' && (
-              <p className="text-xs text-slate-500">Type cannot be changed after creation</p>
+              <p className="text-xs text-muted-foreground">Type cannot be changed after creation</p>
             )}
           </div>
 
@@ -334,9 +334,9 @@ export function CategoryDialog({
                   type="number"
                   {...register('alert_threshold_days')}
                   placeholder="e.g., 30"
-                  className="bg-slate-800 border-slate-600 text-white"
+                  className="bg-input border-border text-white"
                 />
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-muted-foreground">
                   Show "Due Soon" alert when this many days before the due date
                 </p>
                 {errors.alert_threshold_days && (
@@ -353,9 +353,9 @@ export function CategoryDialog({
                   type="number"
                   {...register('alert_threshold_miles')}
                   placeholder="e.g., 1000"
-                  className="bg-slate-800 border-slate-600 text-white"
+                  className="bg-input border-border text-white"
                 />
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-muted-foreground">
                   Show "Due Soon" alert when this many miles before the due mileage
                 </p>
                 {errors.alert_threshold_miles && (
@@ -373,9 +373,9 @@ export function CategoryDialog({
               type="number"
               {...register('sort_order')}
               placeholder="e.g., 1"
-              className="bg-slate-800 border-slate-600 text-white"
+              className="bg-input border-border text-white"
             />
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-muted-foreground">
               Lower numbers appear first. Default is 999.
             </p>
           </div>
@@ -414,7 +414,7 @@ export function CategoryDialog({
                     <p className={`font-medium ${selectedResponsibility === 'workshop' ? 'text-orange-400' : 'text-white'}`}>
                       Workshop
                     </p>
-                    <p className="text-xs text-slate-400">Create Task button</p>
+                    <p className="text-xs text-muted-foreground">Create Task button</p>
                   </div>
                 </div>
               </button>
@@ -442,12 +442,12 @@ export function CategoryDialog({
                     <p className={`font-medium ${selectedResponsibility === 'office' ? 'text-avs-yellow' : 'text-white'}`}>
                       Office
                     </p>
-                    <p className="text-xs text-slate-400">Office Action button</p>
+                    <p className="text-xs text-muted-foreground">Office Action button</p>
                   </div>
                 </div>
               </button>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-muted-foreground">
               {selectedResponsibility === 'workshop' 
                 ? 'Workshop tasks will show "Create Task" button for workshop staff.'
                 : 'Office duties will show "Office Action" button with reminder and update options.'
@@ -468,13 +468,13 @@ export function CategoryDialog({
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                 showOnOverview ? 'bg-green-500' : 'bg-slate-700'
               }`}>
-                <Eye className={`h-5 w-5 ${showOnOverview ? 'text-white' : 'text-slate-400'}`} />
+                <Eye className={`h-5 w-5 ${showOnOverview ? 'text-white' : 'text-muted-foreground'}`} />
               </div>
               <div>
                 <Label htmlFor="show_on_overview" className={`text-sm font-medium cursor-pointer ${
                   showOnOverview ? 'text-green-400' : 'text-white'
                 }`}>Show on Overview</Label>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-muted-foreground">
                   Display in Overdue/Due Soon sections
                 </p>
               </div>
@@ -489,7 +489,7 @@ export function CategoryDialog({
 
           {/* Reminder Settings (only for office responsibility) */}
           {selectedResponsibility === 'office' && (
-            <div className="space-y-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+            <div className="space-y-3 p-4 bg-slate-800/50 rounded-lg border border-border">
               <h4 className="text-sm font-medium text-white flex items-center gap-2">
                 <Bell className="h-4 w-4 text-blue-400" />
                 Reminder Notifications
@@ -513,7 +513,7 @@ export function CategoryDialog({
                     <Label htmlFor="reminder_in_app" className={`text-sm cursor-pointer ${
                       reminderInApp ? 'text-blue-400 font-medium' : 'text-white'
                     }`}>In-App Notifications</Label>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-muted-foreground">
                       Send reminders to notification panel
                     </p>
                   </div>
@@ -544,7 +544,7 @@ export function CategoryDialog({
                     <Label htmlFor="reminder_email" className={`text-sm cursor-pointer ${
                       reminderEmail ? 'text-green-400 font-medium' : 'text-white'
                     }`}>Email Notifications</Label>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-muted-foreground">
                       Send email reminders to configured recipients
                     </p>
                   </div>
@@ -575,7 +575,7 @@ export function CategoryDialog({
                 {...register('is_active')}
                 className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-blue-600 focus:ring-2 focus:ring-blue-500"
               />
-              <Label htmlFor="is_active" className="text-sm text-slate-300">
+              <Label htmlFor="is_active" className="text-sm text-muted-foreground">
                 Active (uncheck to disable this category)
               </Label>
             </div>

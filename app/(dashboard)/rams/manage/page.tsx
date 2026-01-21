@@ -157,13 +157,13 @@ export default function RAMSManagePage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <BackButton />
             <div>
-              <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Manage RAMS Documents</h1>
-              <p className="text-slate-600 dark:text-slate-400">
+              <h1 className="text-3xl font-bold text-foreground mb-2">Manage RAMS Documents</h1>
+              <p className="text-muted-foreground">
                 Upload and manage Risk Assessment & Method Statement documents
               </p>
             </div>
@@ -180,15 +180,15 @@ export default function RAMSManagePage() {
       </div>
 
       {/* Search */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="">
         <CardContent className="pt-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search documents..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-11 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white"
+              className="pl-11 bg-white dark:bg-slate-900 border-border text-foreground"
             />
           </div>
         </CardContent>
@@ -196,11 +196,11 @@ export default function RAMSManagePage() {
 
       {/* Documents List */}
       {filteredDocuments.length === 0 ? (
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="h-16 w-16 text-slate-400 mb-4" />
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No documents found</h3>
-            <p className="text-slate-600 dark:text-slate-400 mb-4 text-center">
+            <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">No documents found</h3>
+            <p className="text-muted-foreground mb-4 text-center">
               {searchQuery
                 ? 'Try adjusting your search'
                 : 'Upload your first RAMS document to get started'}
@@ -221,7 +221,7 @@ export default function RAMSManagePage() {
           {filteredDocuments.map((doc) => (
             <Card 
               key={doc.id} 
-              className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-rams/50 transition-all duration-200"
+              className="bg-white dark:bg-slate-900 border-border hover:shadow-lg hover:border-rams/50 transition-all duration-200"
             >
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -260,7 +260,7 @@ export default function RAMSManagePage() {
                   </div>
 
                   <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 text-sm text-slate-400">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Users className="h-4 w-4" />
                       <span>
                         {doc.total_signed}/{doc.total_assigned} signed
@@ -288,10 +288,10 @@ export default function RAMSManagePage() {
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <AlertDialogContent className="">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-slate-900 dark:text-white">Delete RAMS Document</AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-600 dark:text-slate-400">
+            <AlertDialogTitle className="text-foreground">Delete RAMS Document</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
               Are you sure you want to delete{' '}
               <span className="font-semibold">{documentToDelete?.title}</span>?
               <br />

@@ -186,7 +186,7 @@ export function TimesheetAdjustmentModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Mark Timesheet as Adjusted</DialogTitle>

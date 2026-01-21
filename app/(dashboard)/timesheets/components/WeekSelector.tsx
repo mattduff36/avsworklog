@@ -113,15 +113,15 @@ export function WeekSelector({ userId, onWeekSelected, initialWeek }: WeekSelect
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="">
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-full bg-timesheet/10 flex items-center justify-center">
               <Calendar className="h-6 w-6 text-timesheet" />
             </div>
             <div>
-              <CardTitle className="text-2xl text-slate-900 dark:text-white">Select Week Ending Date</CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400">
+              <CardTitle className="text-2xl text-foreground">Select Week Ending Date</CardTitle>
+              <CardDescription className="text-muted-foreground">
                 Choose the Sunday for the week you want to record
               </CardDescription>
             </div>
@@ -130,7 +130,7 @@ export function WeekSelector({ userId, onWeekSelected, initialWeek }: WeekSelect
         <CardContent className="space-y-6">
           {/* Date Picker */}
           <div className="space-y-2">
-            <Label htmlFor="week-ending" className="text-slate-900 dark:text-white text-base">
+            <Label htmlFor="week-ending" className="text-foreground text-base">
               Week Ending Date (Must be Sunday)
             </Label>
             <Input
@@ -138,9 +138,9 @@ export function WeekSelector({ userId, onWeekSelected, initialWeek }: WeekSelect
               type="date"
               value={selectedDate}
               onChange={(e) => handleDateChange(e.target.value)}
-              className="h-14 text-lg bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white"
+              className="h-14 text-lg bg-white dark:bg-slate-900 border-border text-foreground"
             />
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground">
               Timesheets must end on Sunday. The selected date should be the last day of your work week.
             </p>
           </div>
@@ -200,9 +200,9 @@ export function WeekSelector({ userId, onWeekSelected, initialWeek }: WeekSelect
           </Button>
 
           {/* Info Box */}
-          <div className="bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
-            <h4 className="font-semibold text-slate-900 dark:text-white mb-2 text-sm">Quick Tips:</h4>
-            <ul className="text-sm text-slate-600 dark:text-slate-400 space-y-1">
+          <div className="bg-slate-100 dark:bg-slate-800/50 border border-border rounded-lg p-4">
+            <h4 className="font-semibold text-foreground mb-2 text-sm">Quick Tips:</h4>
+            <ul className="text-sm text-muted-foreground space-y-1">
               <li>• Week ending date must always be a Sunday</li>
               <li>• You can only have one timesheet per week</li>
               <li>• Draft and rejected timesheets can be edited</li>

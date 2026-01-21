@@ -32,16 +32,16 @@ export default function ToolboxTalksPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-red-100 dark:bg-red-950 rounded-lg">
             <MessageSquare className="h-6 w-6 text-red-600" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+            <h1 className="text-3xl font-bold text-foreground mb-2">
               Toolbox Talks & Reminders
             </h1>
-            <p className="text-slate-600 dark:text-slate-400">
+            <p className="text-muted-foreground">
               Send important safety messages and reminders to employees
             </p>
           </div>
@@ -67,12 +67,12 @@ export default function ToolboxTalksPage() {
 
         {/* Create Toolbox Talk Tab */}
         <TabsContent value="create-toolbox-talk">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardHeader>
-              <CardTitle className="text-slate-900 dark:text-white">
+              <CardTitle className="text-foreground">
                 Create Toolbox Talk Message
               </CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400">
+              <CardDescription className="text-muted-foreground">
                 High priority safety message that requires employee signature. Recipients cannot use the app until signed.
               </CardDescription>
             </CardHeader>
@@ -87,12 +87,12 @@ export default function ToolboxTalksPage() {
 
         {/* Create Reminder Tab */}
         <TabsContent value="create-reminder">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardHeader>
-              <CardTitle className="text-slate-900 dark:text-white">
+              <CardTitle className="text-foreground">
                 Create Reminder Message
               </CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400">
+              <CardDescription className="text-muted-foreground">
                 Low priority informational message. Non-blocking - employees can dismiss after reading.
               </CardDescription>
             </CardHeader>
@@ -106,12 +106,12 @@ export default function ToolboxTalksPage() {
 
         {/* Reports Tab */}
         <TabsContent value="reports">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardHeader>
-              <CardTitle className="text-slate-900 dark:text-white">
+              <CardTitle className="text-foreground">
                 Message Reports
               </CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400">
+              <CardDescription className="text-muted-foreground">
                 View all sent messages, recipient status, and compliance rates
               </CardDescription>
             </CardHeader>

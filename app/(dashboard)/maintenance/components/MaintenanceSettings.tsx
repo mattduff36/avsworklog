@@ -65,14 +65,14 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
   return (
     <div className="space-y-6">
       {/* Header */}
-      <Card className="bg-slate-900 border-slate-700">
+      <Card className="border-border">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-white">
                 Maintenance Categories
               </CardTitle>
-              <CardDescription className="text-slate-400">
+              <CardDescription className="text-muted-foreground">
                 Configure maintenance types and alert thresholds
               </CardDescription>
             </div>
@@ -90,7 +90,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
         
         <CardContent>
           {categories.length === 0 ? (
-            <div className="text-center py-8 text-slate-400">
+            <div className="text-center py-8 text-muted-foreground">
               No categories configured yet.
             </div>
           ) : (
@@ -98,13 +98,13 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
               <Table>
                 <TableHeader>
                   <TableRow className="border-slate-700 hover:bg-slate-800/50">
-                    <TableHead className="text-slate-300">Name</TableHead>
-                    <TableHead className="text-slate-300">Type</TableHead>
-                    <TableHead className="text-slate-300">Alert Threshold</TableHead>
-                    <TableHead className="text-slate-300">Responsibility</TableHead>
-                    <TableHead className="text-slate-300">Reminders</TableHead>
-                    <TableHead className="text-slate-300">Status</TableHead>
-                    <TableHead className="text-right text-slate-300">Actions</TableHead>
+                    <TableHead className="text-muted-foreground">Name</TableHead>
+                    <TableHead className="text-muted-foreground">Type</TableHead>
+                    <TableHead className="text-muted-foreground">Alert Threshold</TableHead>
+                    <TableHead className="text-muted-foreground">Responsibility</TableHead>
+                    <TableHead className="text-muted-foreground">Reminders</TableHead>
+                    <TableHead className="text-muted-foreground">Status</TableHead>
+                    <TableHead className="text-right text-muted-foreground">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -125,7 +125,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                           </Badge>
                         </TableCell>
                         
-                        <TableCell className="text-slate-300">
+                        <TableCell className="text-muted-foreground">
                           {category.type === 'date' 
                             ? `${category.alert_threshold_days} days`
                             : `${category.alert_threshold_miles?.toLocaleString()} miles`
@@ -161,7 +161,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                               </Badge>
                             )}
                             {!category.reminder_in_app_enabled && !category.reminder_email_enabled && (
-                              <span className="text-slate-500 text-sm">-</span>
+                              <span className="text-muted-foreground text-sm">-</span>
                             )}
                           </div>
                         </TableCell>
@@ -262,13 +262,13 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
       
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent className="bg-slate-900 border-slate-700 text-white">
+        <AlertDialogContent className="border-border text-white">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-red-500" />
               Delete Category
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-400">
+            <AlertDialogDescription className="text-muted-foreground">
               Are you sure you want to delete this maintenance category? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -276,11 +276,11 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
           {selectedCategory && (
             <div className="bg-slate-800 rounded p-4 space-y-2">
               <p className="text-sm">
-                <span className="text-slate-400">Name:</span>{' '}
+                <span className="text-muted-foreground">Name:</span>{' '}
                 <span className="text-white font-medium">{selectedCategory.name}</span>
               </p>
               <p className="text-sm">
-                <span className="text-slate-400">Type:</span>{' '}
+                <span className="text-muted-foreground">Type:</span>{' '}
                 <span className="text-white capitalize">{selectedCategory.type}</span>
               </p>
             </div>

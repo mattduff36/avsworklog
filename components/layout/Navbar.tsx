@@ -294,7 +294,7 @@ export function Navbar() {
       <SidebarNav open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
 
       <nav 
-        className="bg-slate-900/50 backdrop-blur-xl border-b border-slate-700/50 sticky top-0 z-50"
+        className="bg-slate-900/50 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50"
         style={{ '--top-nav-h': '68px' } as React.CSSProperties}
       >
         {/* AVS Yellow accent strip */}
@@ -315,7 +315,7 @@ export function Navbar() {
                       className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                         isActive
                           ? 'bg-avs-yellow'
-                          : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                          : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                       }`}
                       style={isActive ? { color: 'rgb(15 23 42)' } : {}}
                     >
@@ -336,7 +336,7 @@ export function Navbar() {
                       className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                         isActive
                           ? 'bg-avs-yellow'
-                          : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                          : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                       }`}
                       style={isActive ? { color: 'rgb(15 23 42)' } : {}}
                     >
@@ -356,7 +356,7 @@ export function Navbar() {
                   variant="ghost"
                   size="sm"
                   onClick={() => setNotificationPanelOpen(!notificationPanelOpen)}
-                  className="text-slate-300 hover:text-white hover:bg-slate-800/50 relative"
+                  className="text-muted-foreground hover:text-white hover:bg-slate-800/50 relative"
                   title="Notifications"
                 >
                   <Bell className="w-4 h-4" />
@@ -374,7 +374,7 @@ export function Navbar() {
                   variant="ghost"
                   size="sm"
                   onClick={handleSignOut}
-                  className="text-slate-300 hover:text-white hover:bg-slate-800/50"
+                  className="text-muted-foreground hover:text-white hover:bg-slate-800/50"
                   title="Sign Out"
                 >
                   <LogOut className="w-4 h-4" />
@@ -384,7 +384,7 @@ export function Navbar() {
               {/* Mobile menu button */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 rounded-md text-slate-300 hover:bg-slate-800/50 hover:text-white"
+                className="md:hidden p-2 rounded-md text-muted-foreground hover:bg-slate-800/50 hover:text-white"
               >
                 {mobileMenuOpen ? (
                   <X className="w-6 h-6" />
@@ -398,7 +398,7 @@ export function Navbar() {
 
         {/* Mobile menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-700/50 bg-slate-900/95 backdrop-blur-xl">
+          <div className="md:hidden border-t border-border/50 bg-slate-900/95 backdrop-blur-xl">
             <div className="px-2 pt-2 pb-3 space-y-1">
               {/* Dashboard */}
               {dashboardNav.map((item) => {
@@ -412,7 +412,7 @@ export function Navbar() {
                     className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                       isActive
                         ? 'bg-avs-yellow'
-                        : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                        : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                     }`}
                     style={isActive ? { color: 'rgb(15 23 42)' } : {}}
                   >
@@ -434,7 +434,7 @@ export function Navbar() {
                     className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                       isActive
                         ? 'bg-avs-yellow'
-                        : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                        : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                     }`}
                     style={isActive ? { color: 'rgb(15 23 42)' } : {}}
                   >
@@ -447,7 +447,7 @@ export function Navbar() {
               {/* Manager/Admin Section (Mobile) */}
               {isManager && (
                 <>
-                  <div className="my-3 border-t border-slate-700/50"></div>
+                  <div className="my-3 border-t border-border/50"></div>
                   
                   {/* Management Section */}
                   <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -464,7 +464,7 @@ export function Navbar() {
                         className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                           isActive
                             ? 'bg-avs-yellow'
-                            : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                            : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                         }`}
                         style={isActive ? { color: 'rgb(15 23 42)' } : {}}
                       >
@@ -491,7 +491,7 @@ export function Navbar() {
                             className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                               isActive
                                 ? 'bg-avs-yellow'
-                                : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                                : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                             }`}
                             style={isActive ? { color: 'rgb(15 23 42)' } : {}}
                           >
@@ -526,11 +526,11 @@ export function Navbar() {
                 </>
               )}
             </div>
-            <div className="pt-4 pb-3 border-t border-slate-700/50">
+            <div className="pt-4 pb-3 border-t border-border/50">
               <div className="px-2 space-y-2">
                 <Button
                   variant="ghost"
-                  className="w-full justify-start text-slate-300 hover:text-white hover:bg-slate-800/50"
+                  className="w-full justify-start text-muted-foreground hover:text-white hover:bg-slate-800/50"
                   onClick={handleSignOut}
                 >
                   <LogOut className="w-4 h-4 mr-2" />

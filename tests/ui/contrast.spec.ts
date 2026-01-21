@@ -221,4 +221,34 @@ test.describe('UI Contrast Tests', () => {
     expect(check.passed, `Base input contrast failed: ${check.details}`).toBeTruthy();
     expect(check.ratio).toBeGreaterThan(7); // AA Large or AAA for normal text
   });
+
+  test('Workshop Tasks Settings - Category list items have proper contrast', async ({ page }) => {
+    await page.goto('http://localhost:3000/workshop-tasks');
+    await page.waitForLoadState('networkidle');
+    
+    // Click on Settings tab
+    const settingsTab = page.getByRole('tab', { name: /settings/i });
+    if (await settingsTab.count() > 0) {
+      await settingsTab.click();
+      await page.waitForTimeout(1000);
+
+      // Check category list items text contrast
+      const categoryButtons = await page.locator('button').filter({ hasText: /categor/i }).all();
+      
+      if (categoryButtons.length > 0) {
+        for (let i = 0; i < Math.min(categoryButtons.length, 3); i++) {
+          const button = categoryButtons[i];
+          const textColor = await button.evaluate(el => window.getComputedStyle(el).color);
+          const bgColor = await button.evaluate(el => window.getComputedStyle(el).backgroundColor);
+          
+          const textRgb = parseRgb(textColor);
+          const bgRgb = parseRgb(bgColor);
+          const ratio = contrastRatio(textRgb, bgRgb);
+          
+          console.log(`Category ${i}: Text ${textColor}, BG ${bgColor}, Ratio ${ratio.toFixed(2)}:1`);
+          expect(ratio, `Category button ${i} has insufficient contrast: ${ratio.toFixed(2)}:1 (need 4.5:1)`).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+    }
+  });
 });

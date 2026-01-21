@@ -207,26 +207,26 @@ export function OfficeActionDialog({
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+      <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-slate-900 dark:text-white text-xl flex items-center gap-2">
+          <DialogTitle className="text-foreground text-xl flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-amber-500" />
             Office Action Required
           </DialogTitle>
-          <DialogDescription className="text-slate-600 dark:text-slate-400">
+          <DialogDescription className="text-muted-foreground">
             {vehicleDisplay} - {categoryName}: {dueInfo}
           </DialogDescription>
         </DialogHeader>
         
         {/* Tab Buttons */}
-        <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700 pb-4">
+        <div className="flex gap-2 border-b border-border pb-4">
           <Button
             variant={activeTab === 'reminder' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setActiveTab('reminder')}
             className={activeTab === 'reminder' 
               ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-              : 'border-slate-300 dark:border-slate-600'}
+              : 'border-border'}
           >
             <Bell className="h-4 w-4 mr-1" />
             Send Reminder
@@ -238,7 +238,7 @@ export function OfficeActionDialog({
               onClick={() => setActiveTab('update')}
               className={activeTab === 'update' 
                 ? 'bg-green-600 hover:bg-green-700 text-white' 
-                : 'border-slate-300 dark:border-slate-600'}
+                : 'border-border'}
             >
               <Calendar className="h-4 w-4 mr-1" />
               Update Date
@@ -251,7 +251,7 @@ export function OfficeActionDialog({
               onClick={() => setActiveTab('refresh')}
               className={activeTab === 'refresh' 
                 ? 'bg-purple-600 hover:bg-purple-700 text-white' 
-                : 'border-slate-300 dark:border-slate-600'}
+                : 'border-border'}
             >
               <RefreshCw className="h-4 w-4 mr-1" />
               Refresh DVLA
@@ -272,7 +272,7 @@ export function OfficeActionDialog({
               </Alert>
               
               <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4">
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Reminder will include:</p>
+                <p className="text-sm text-muted-foreground mb-2">Reminder will include:</p>
                 <ul className="text-sm space-y-1">
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="h-3 w-3 text-green-500" />
@@ -336,10 +336,10 @@ export function OfficeActionDialog({
                     type="date"
                     value={newDueDate}
                     onChange={(e) => setNewDueDate(e.target.value)}
-                    className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+                    className="bg-white dark:bg-slate-800 border-border dark:text-slate-100 text-slate-900"
                   />
                   {currentDueDate && (
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-muted-foreground">
                       Current: {new Date(currentDueDate).toLocaleDateString()}
                     </p>
                   )}
@@ -355,9 +355,9 @@ export function OfficeActionDialog({
                     onChange={(e) => setUpdateComment(e.target.value)}
                     placeholder="e.g., Tax renewed online via GOV.UK, confirmation received"
                     rows={3}
-                    className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+                    className="bg-white dark:bg-slate-800 border-border dark:text-slate-100 text-slate-900"
                   />
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted-foreground">
                     {updateComment.length}/10 characters minimum
                   </p>
                 </div>
@@ -403,7 +403,7 @@ export function OfficeActionDialog({
               </Alert>
               
               <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4">
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">This will refresh:</p>
+                <p className="text-sm text-muted-foreground mb-2">This will refresh:</p>
                 <ul className="text-sm space-y-1">
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="h-3 w-3 text-green-500" />

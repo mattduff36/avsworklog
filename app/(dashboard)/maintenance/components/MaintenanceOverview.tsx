@@ -908,7 +908,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                       {vehicle.vehicle?.reg_number || 'Unknown'}
                     </h3>
                     {vehicle.vehicle?.nickname && (
-                      <span className="text-sm text-slate-400">({vehicle.vehicle.nickname})</span>
+                      <span className="text-sm text-muted-foreground">({vehicle.vehicle.nickname})</span>
                     )}
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -958,7 +958,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
               <div className="flex flex-wrap gap-x-6 gap-y-2 flex-1">
                 {/* Current Mileage */}
                 <div className="space-y-0">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">Mileage</div>
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Mileage</div>
                   <div className="text-sm font-medium text-white">
                     {formatMileage(vehicle.current_mileage)}
                   </div>
@@ -966,7 +966,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
                 {/* Cambelt Due */}
                 <div className="space-y-0">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">Cambelt</div>
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Cambelt</div>
                   <div className={`text-sm font-medium ${vehicle.cambelt_status?.status === 'overdue' || vehicle.cambelt_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
                     {vehicle.cambelt_due_mileage 
                       ? formatMileage(vehicle.cambelt_due_mileage)
@@ -976,7 +976,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
                 {/* Tax Due */}
                 <div className="space-y-0">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">Tax Due</div>
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Tax Due</div>
                   <div className={`text-sm font-medium ${vehicle.tax_status?.status === 'overdue' || vehicle.tax_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
                     {formatMaintenanceDate(vehicle.tax_due_date)}
                   </div>
@@ -984,7 +984,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
                 {/* First Aid Kit */}
                 <div className="space-y-0">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">First Aid</div>
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">First Aid</div>
                   <div className={`text-sm font-medium ${vehicle.first_aid_status?.status === 'overdue' || vehicle.first_aid_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
                     {formatMaintenanceDate(vehicle.first_aid_kit_expiry)}
                   </div>
@@ -992,7 +992,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
                 {/* MOT Due */}
                 <div className="space-y-0">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">MOT Due</div>
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">MOT Due</div>
                   <div className={`text-sm font-medium ${vehicle.mot_status?.status === 'overdue' || vehicle.mot_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
                     {formatMaintenanceDate(vehicle.mot_due_date)}
                   </div>
@@ -1000,7 +1000,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
                 {/* Service Due */}
                 <div className="space-y-0">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">Service Due</div>
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Service Due</div>
                   <div className={`text-sm font-medium ${vehicle.service_status?.status === 'overdue' || vehicle.service_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
                     {vehicle.next_service_mileage 
                       ? formatMileage(vehicle.next_service_mileage)
@@ -1010,7 +1010,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
                 {/* Last Service */}
                 <div className="space-y-0">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">Last Service</div>
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Last Service</div>
                   <div className="text-sm font-medium text-white">
                     {vehicle.last_service_mileage 
                       ? formatMileage(vehicle.last_service_mileage)
@@ -1021,7 +1021,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 {/* Tracker ID */}
                 {vehicle.tracker_id && (
                   <div className="space-y-0">
-                    <div className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">GPS Tracker</div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">GPS Tracker</div>
                     <div className="text-sm font-medium text-white">
                       {vehicle.tracker_id}
                     </div>
@@ -1034,7 +1034,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="flex-shrink-0 text-slate-400"
+                  className="flex-shrink-0 text-muted-foreground"
                   disabled
                 >
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
@@ -1082,7 +1082,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="flex-shrink-0 text-slate-400 hover:text-white hover:bg-slate-800"
+                  className="flex-shrink-0 text-muted-foreground hover:text-white hover:bg-slate-800"
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleVehicle(vehicleId, vehicle);
@@ -1106,7 +1106,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
           {/* Expanded View - Workshop Tasks */}
           {isExpanded && (
-            <div className="mt-4 pt-4 border-t border-slate-700" onClick={(e) => e.stopPropagation()}>
+            <div className="mt-4 pt-4 border-t border-border" onClick={(e) => e.stopPropagation()}>
               {historyData?.loading ? (
                 <div className="flex items-center justify-center py-6">
                   <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
@@ -1123,7 +1123,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 });
                 
                 if (!relatedTask) {
-                  return <p className="text-sm text-slate-400 py-4 text-center">No active workshop task found</p>;
+                  return <p className="text-sm text-muted-foreground py-4 text-center">No active workshop task found</p>;
                 }
                 
                 // Ensure task has vehicle_id for handlers
@@ -1136,12 +1136,12 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                       <div className="flex-1 space-y-2">
                         <h5 className="font-medium text-white">{relatedTask.title}</h5>
                         {relatedTask.workshop_comments && (
-                          <p className="text-sm text-slate-300">{relatedTask.workshop_comments}</p>
+                          <p className="text-sm text-muted-foreground">{relatedTask.workshop_comments}</p>
                         )}
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-4 text-xs text-slate-400">
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span>Created {formatDistanceToNow(new Date(relatedTask.created_at), { addSuffix: true })}</span>
                       {relatedTask.profiles?.full_name && (
                         <span>by {relatedTask.profiles.full_name}</span>
@@ -1149,7 +1149,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                     </div>
                     
                     {/* Action Buttons - Aligned Right */}
-                    <div className="flex justify-end gap-2 pt-2 border-t border-slate-700">
+                    <div className="flex justify-end gap-2 pt-2 border-t border-border">
                       {/* Pending Status Buttons: Comments, In Progress, Complete */}
                       {relatedTask.status === 'pending' && (
                         <>
@@ -1160,7 +1160,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                             }}
                             size="sm"
                             variant="outline"
-                            className="h-9 px-3 text-xs border-slate-600 text-slate-400 hover:text-white hover:bg-slate-800"
+                            className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800"
                           >
                             <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                             Comments
@@ -1200,7 +1200,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                             }}
                             size="sm"
                             variant="outline"
-                            className="h-9 px-3 text-xs border-slate-600 text-slate-400 hover:text-white hover:bg-slate-800"
+                            className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800"
                           >
                             <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                             Comments
@@ -1212,7 +1212,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                             }}
                             size="sm"
                             variant="outline"
-                            className="h-9 px-3 text-xs border-slate-600 text-slate-400 hover:text-white hover:bg-slate-800"
+                            className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800"
                           >
                             <Undo2 className="h-3.5 w-3.5 mr-1.5" />
                             Undo
@@ -1252,7 +1252,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                             }}
                             size="sm"
                             variant="outline"
-                            className="h-9 px-3 text-xs border-slate-600 text-slate-400 hover:text-white hover:bg-slate-800"
+                            className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800"
                           >
                             <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                             Comments
@@ -1416,16 +1416,16 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
       {/* Mark In Progress Modal */}
       <Dialog open={showStatusModal} onOpenChange={setShowStatusModal}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+        <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-white text-xl">Mark Task In Progress</DialogTitle>
-            <DialogDescription className="text-slate-600 dark:text-slate-400">
+            <DialogTitle className="text-foreground text-xl">Mark Task In Progress</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
               Add a short note about starting this work
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="logged-comment" className="text-slate-900 dark:text-white">
+              <Label htmlFor="logged-comment" className="text-foreground">
                 Comment <span className="text-red-500">*</span>
               </Label>
               <Textarea
@@ -1433,10 +1433,10 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 value={loggedComment}
                 onChange={(e) => setLoggedComment(e.target.value)}
                 placeholder="What are you starting work on?"
-                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[100px]"
+                className="bg-white dark:bg-slate-800 border-border text-foreground min-h-[100px]"
                 maxLength={300}
               />
-              <p className="text-xs text-slate-600 dark:text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 {loggedComment.length}/300 characters
               </p>
             </div>
@@ -1445,7 +1445,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
             <Button
               variant="outline"
               onClick={() => setShowStatusModal(false)}
-              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               Cancel
             </Button>
@@ -1472,10 +1472,10 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
       {/* On Hold Modal */}
       <Dialog open={showOnHoldModal} onOpenChange={setShowOnHoldModal}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+        <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-white text-xl">Put Task On Hold</DialogTitle>
-            <DialogDescription className="text-slate-600 dark:text-slate-400">
+            <DialogTitle className="text-foreground text-xl">Put Task On Hold</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
               This task will be marked as &quot;On Hold&quot; and can be resumed later
             </DialogDescription>
           </DialogHeader>
@@ -1487,7 +1487,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="onhold-comment" className="text-slate-900 dark:text-white">
+              <Label htmlFor="onhold-comment" className="text-foreground">
                 Reason <span className="text-red-500">*</span>
               </Label>
               <Textarea
@@ -1495,10 +1495,10 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 value={onHoldComment}
                 onChange={(e) => setOnHoldComment(e.target.value)}
                 placeholder="Why is this task being put on hold?"
-                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[100px]"
+                className="bg-white dark:bg-slate-800 border-border text-foreground min-h-[100px]"
                 maxLength={300}
               />
-              <p className="text-xs text-slate-600 dark:text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 {onHoldComment.length}/300 characters
               </p>
             </div>
@@ -1507,7 +1507,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
             <Button
               variant="outline"
               onClick={() => setShowOnHoldModal(false)}
-              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               Cancel
             </Button>
@@ -1525,16 +1525,16 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
       {/* Resume Task Modal */}
       <Dialog open={showResumeModal} onOpenChange={setShowResumeModal}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+        <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-white text-xl">Resume Task</DialogTitle>
-            <DialogDescription className="text-slate-600 dark:text-slate-400">
+            <DialogTitle className="text-foreground text-xl">Resume Task</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
               This task will be moved back to In Progress
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="resume-comment" className="text-slate-900 dark:text-white">
+              <Label htmlFor="resume-comment" className="text-foreground">
                 Comment <span className="text-red-500">*</span>
               </Label>
               <Textarea
@@ -1542,10 +1542,10 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 value={resumeComment}
                 onChange={(e) => setResumeComment(e.target.value)}
                 placeholder="Note about resuming this task"
-                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[100px]"
+                className="bg-white dark:bg-slate-800 border-border text-foreground min-h-[100px]"
                 maxLength={300}
               />
-              <p className="text-xs text-slate-600 dark:text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 {resumeComment.length}/300 characters
               </p>
             </div>
@@ -1554,7 +1554,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
             <Button
               variant="outline"
               onClick={() => setShowResumeModal(false)}
-              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               Cancel
             </Button>

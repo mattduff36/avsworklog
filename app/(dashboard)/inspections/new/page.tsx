@@ -1299,9 +1299,9 @@ function NewInspectionContent() {
   const getStatusIcon = (status: InspectionStatus, isSelected: boolean) => {
     switch (status) {
       case 'ok':
-        return <CheckCircle2 className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-green-400' : 'text-slate-500'}`} />;
+        return <CheckCircle2 className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-green-400' : 'text-muted-foreground'}`} />;
       case 'attention':
-        return <XCircle className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-red-400' : 'text-slate-500'}`} />;
+        return <XCircle className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-red-400' : 'text-muted-foreground'}`} />;
       default:
         return null;
     }
@@ -1316,7 +1316,7 @@ function NewInspectionContent() {
       case 'attention':
         return 'bg-red-500/20 border-red-500 shadow-lg shadow-red-500/20';
       default:
-        return 'bg-slate-800/30 border-slate-700';
+        return 'bg-slate-800/30 border-border';
     }
   };
 
@@ -1331,15 +1331,15 @@ function NewInspectionContent() {
       {!isOnline && <OfflineBanner />}
       
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-3">
             <BackButton fallbackHref="/inspections" />
             <div>
-              <h1 className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white">
+              <h1 className="text-xl md:text-3xl font-bold text-foreground">
                 {existingInspectionId ? 'Edit Inspection' : 'New Inspection'}
               </h1>
-              <p className="text-sm text-slate-600 dark:text-slate-400 hidden md:block">
+              <p className="text-sm text-muted-foreground hidden md:block">
                 {existingInspectionId ? 'Continue editing your draft' : 'Daily safety check'}
               </p>
             </div>
@@ -1347,8 +1347,8 @@ function NewInspectionContent() {
           {/* Progress Badge - Only show when vehicle is selected */}
           {vehicleId && (
             <div className="bg-inspection/10 dark:bg-inspection/20 border border-inspection/30 rounded-lg px-3 py-2">
-              <div className="text-xs text-slate-600 dark:text-slate-400">Progress</div>
-              <div className="text-lg font-bold text-slate-900 dark:text-white">{completedItems}/{totalItems}</div>
+              <div className="text-xs text-muted-foreground">Progress</div>
+              <div className="text-lg font-bold text-foreground">{completedItems}/{totalItems}</div>
             </div>
           )}
         </div>
@@ -1371,18 +1371,18 @@ function NewInspectionContent() {
       )}
 
       {/* Vehicle Details Card */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="">
         <CardHeader className="pb-4">
-          <CardTitle className="text-slate-900 dark:text-white">Inspection Details</CardTitle>
-          <CardDescription className="text-slate-600 dark:text-slate-400">
+          <CardTitle className="text-foreground">Inspection Details</CardTitle>
+          <CardDescription className="text-muted-foreground">
             Week ending: {formatDate(weekEnding)}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Manager: Employee Selector */}
           {isManager && (
-            <div className="space-y-2 pb-4 border-b border-slate-700">
-              <Label htmlFor="employee" className="text-slate-900 dark:text-white text-base flex items-center gap-2">
+            <div className="space-y-2 pb-4 border-b border-border">
+              <Label htmlFor="employee" className="text-foreground text-base flex items-center gap-2">
                 <User className="h-4 w-4" />
                 Creating inspection for
               </Label>
@@ -1400,7 +1400,7 @@ function NewInspectionContent() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 Select which employee this inspection is for
               </p>
             </div>
@@ -1408,7 +1408,7 @@ function NewInspectionContent() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="vehicle" className="text-slate-900 dark:text-white text-base">Vehicle</Label>
+              <Label htmlFor="vehicle" className="text-foreground text-base">Vehicle</Label>
               <Select 
                 value={vehicleId} 
                 disabled={checklistStarted}
@@ -1449,8 +1449,8 @@ function NewInspectionContent() {
                 <SelectTrigger id="vehicle" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white" disabled={checklistStarted}>
                   <SelectValue placeholder="Select a vehicle" />
                 </SelectTrigger>
-                <SelectContent className="bg-slate-900 border-slate-700 max-h-[300px] md:max-h-[400px] dark:text-slate-100 text-slate-900">
-                  <SelectItem value="add-new" className="text-avs-yellow font-semibold border-b border-slate-700">
+                <SelectContent className="border-border max-h-[300px] md:max-h-[400px] dark:text-slate-100 text-slate-900">
+                  <SelectItem value="add-new" className="text-avs-yellow font-semibold border-b border-border">
                     <div className="flex items-center gap-2">
                       <Plus className="h-4 w-4" />
                       Add New Vehicle
@@ -1462,7 +1462,7 @@ function NewInspectionContent() {
                       <>
                         {recentVehicles.length > 0 && (
                           <SelectGroup>
-                            <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">Recent</SelectLabel>
+                            <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">Recent</SelectLabel>
                             {recentVehicles.map((vehicle) => (
                               <SelectItem key={vehicle.id} value={vehicle.id} className="text-white">
                                 {vehicle.reg_number} - {vehicle.vehicle_categories?.name || vehicle.vehicle_type || 'Uncategorized'}
@@ -1476,7 +1476,7 @@ function NewInspectionContent() {
                         {otherVehicles.length > 0 && (
                           <SelectGroup>
                             {recentVehicles.length > 0 && (
-                              <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">All Vehicles</SelectLabel>
+                              <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">All Vehicles</SelectLabel>
                             )}
                             {otherVehicles.map((vehicle) => (
                               <SelectItem key={vehicle.id} value={vehicle.id} className="text-white">
@@ -1493,7 +1493,7 @@ function NewInspectionContent() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="weekEnding" className="text-slate-900 dark:text-white text-base flex items-center gap-2">
+              <Label htmlFor="weekEnding" className="text-foreground text-base flex items-center gap-2">
                 Week Ending (Sunday)
                 <span className="text-red-400">*</span>
               </Label>
@@ -1515,11 +1515,11 @@ function NewInspectionContent() {
                 className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
                 required
               />
-              <p className="text-xs text-slate-400">Select the Sunday that ends the inspection week</p>
+              <p className="text-xs text-muted-foreground">Select the Sunday that ends the inspection week</p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="mileage" className="text-slate-900 dark:text-white text-base flex items-center gap-2">
+              <Label htmlFor="mileage" className="text-foreground text-base flex items-center gap-2">
                 Current Mileage
                 <span className="text-red-400">*</span>
               </Label>
@@ -1531,14 +1531,14 @@ function NewInspectionContent() {
                 placeholder="e.g., 45000"
                 min="0"
                 step="1"
-                className={`h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 ${
+                className={`h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground ${
                   mileageWarning?.warning && !mileageConfirmed ? 'border-amber-500' : ''
                 }`}
                 required
               />
               {/* Baseline mileage hint */}
               {baselineMileage !== null && baselineMileageSource !== 'none' && (
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-muted-foreground">
                   Last recorded: {formatMileage(baselineMileage)}
                 </p>
               )}
@@ -1585,10 +1585,10 @@ function NewInspectionContent() {
 
       {/* Safety Check - Only shown when vehicle AND week ending AND mileage are valid AND no duplicate exists */}
       {vehicleId && weekEnding && isMileageValidForChecklist() && !duplicateInspection && !duplicateCheckLoading && (
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="">
         <CardHeader className="pb-3">
-          <CardTitle className="text-slate-900 dark:text-white">{currentChecklist.length}-Point Safety Check</CardTitle>
-          <CardDescription className="text-slate-600 dark:text-slate-400">
+          <CardTitle className="text-foreground">{currentChecklist.length}-Point Safety Check</CardTitle>
+          <CardDescription className="text-muted-foreground">
             Mark each item as Pass or Fail for each day
           </CardDescription>
         </CardHeader>
@@ -1609,7 +1609,7 @@ function NewInspectionContent() {
                   <TabsTrigger 
                     key={index} 
                     value={index.toString()} 
-                    className={`text-xs py-3 data-[state=active]:bg-inspection data-[state=active]:text-slate-900 text-slate-400 ${
+                    className={`text-xs py-3 data-[state=active]:bg-inspection data-[state=active]:text-slate-900 text-muted-foreground ${
                       isComplete 
                         ? 'data-[state=active]:border-2 data-[state=active]:border-green-500 border-2 border-green-500/50' 
                         : 'data-[state=active]:border-2 data-[state=active]:border-white'
@@ -1655,12 +1655,12 @@ function NewInspectionContent() {
               
               return (
                 <div key={itemNumber} className={`bg-slate-900/30 border rounded-lg p-4 space-y-3 ${
-                  isLogged ? 'border-red-500/50 bg-red-500/5' : 'border-slate-700/50'
+                  isLogged ? 'border-red-500/50 bg-red-500/5' : 'border-border/50'
                 }`}>
                   {/* Item Header */}
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center">
-                      <span className="text-sm font-bold text-slate-400">{itemNumber}</span>
+                      <span className="text-sm font-bold text-muted-foreground">{itemNumber}</span>
                     </div>
                     <div className="flex-1">
                       <h4 className="text-base font-medium text-white leading-tight">{item}</h4>
@@ -1692,14 +1692,14 @@ function NewInspectionContent() {
                   {/* Comments/Notes */}
                   {(currentStatus === 'attention' || comments[key]) && (
                     <div className="space-y-2">
-                      <Label className="text-slate-900 dark:text-white text-sm">
+                      <Label className="text-foreground text-sm">
                         {currentStatus === 'attention' ? (isLogged ? 'Manager Comment (Read-Only)' : 'Comments (Required)') : 'Notes'}
                       </Label>
                       <Textarea
                         value={comments[key] || ''}
                         onChange={(e) => !isLogged && handleCommentChange(itemNumber, e.target.value)}
                         placeholder={isLogged ? '' : 'Add details...'}
-                        className={`w-full min-h-[80px] text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 ${
+                        className={`w-full min-h-[80px] text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground ${
                           currentStatus === 'attention' && !comments[key] && !isLogged ? 'border-red-500' : ''
                         } ${isLogged ? 'cursor-not-allowed opacity-70' : ''}`}
                         required={currentStatus === 'attention' && !isLogged}
@@ -1722,7 +1722,7 @@ function NewInspectionContent() {
                         }
                       }}
                       disabled={!existingInspectionId}
-                      className="w-full border-slate-600 text-slate-300 hover:bg-slate-800"
+                      className="w-full border-border text-muted-foreground hover:bg-slate-800"
                     >
                       <Camera className="h-4 w-4 mr-2" />
                       {existingInspectionId ? 'Add Photo' : 'Save draft to upload photos'}
@@ -1750,7 +1750,7 @@ function NewInspectionContent() {
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="border-b border-slate-700">
+                <tr className="border-b border-border">
                   <th className="text-left p-3 w-12 font-medium text-white">#</th>
                   <th className="text-left p-3 font-medium text-white">Item</th>
                   <th className="text-center p-3 w-48 font-medium text-white">Status</th>
@@ -1770,10 +1770,10 @@ function NewInspectionContent() {
                   const isLogged = loggedDefects.has(loggedKey);
                   
                   return (
-                    <tr key={itemNumber} className={`border-b border-slate-700/50 hover:bg-slate-800/30 ${
+                    <tr key={itemNumber} className={`border-b border-border/50 hover:bg-slate-800/30 ${
                       isLogged ? 'bg-red-500/5' : ''
                     }`}>
-                      <td className="p-3 text-sm text-slate-400">{itemNumber}</td>
+                      <td className="p-3 text-sm text-muted-foreground">{itemNumber}</td>
                       <td className="p-3 text-sm text-white">
                         {item}
                         {isLogged && (
@@ -1805,7 +1805,7 @@ function NewInspectionContent() {
                           value={comments[key] || ''}
                           onChange={(e) => !isLogged && handleCommentChange(itemNumber, e.target.value)}
                           placeholder={isLogged ? '' : (currentStatus === 'attention' ? 'Required for defects' : 'Optional notes')}
-                          className={`bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 ${
+                          className={`bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground ${
                             currentStatus === 'attention' && !comments[key] && !isLogged ? 'border-red-500' : ''
                           } ${isLogged ? 'cursor-not-allowed opacity-70' : ''}`}
                           readOnly={isLogged}
@@ -1826,7 +1826,7 @@ function NewInspectionContent() {
                             }}
                             disabled={!existingInspectionId}
                             title={existingInspectionId ? 'Add photo' : 'Save draft to upload photos'}
-                            className="text-slate-400 hover:text-white"
+                            className="text-muted-foreground hover:text-white"
                           >
                             <Camera className="h-4 w-4" />
                           </Button>
@@ -1842,12 +1842,12 @@ function NewInspectionContent() {
           </div>
 
           {/* Information Box - Desktop Only */}
-          <div className="hidden md:block p-4 bg-slate-800/40 border border-slate-700/50 rounded-lg backdrop-blur-xl">
+          <div className="hidden md:block p-4 bg-slate-800/40 border border-border/50 rounded-lg backdrop-blur-xl">
             <div className="flex items-start gap-3">
               <Info className="h-5 w-5 text-inspection flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-white mb-2">Inspection Guidelines:</p>
-                <ul className="space-y-2 text-sm text-slate-300">
+                <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="h-5 w-5 text-green-400" />
                     <span><strong>Pass:</strong> Item is in good working condition</span>
@@ -1866,27 +1866,27 @@ function NewInspectionContent() {
           </Tabs>
 
           {/* End of Inspection Comments */}
-          <div className="mt-6 p-4 bg-slate-800/40 border border-slate-700/50 rounded-lg">
+          <div className="mt-6 p-4 bg-slate-800/40 border border-border/50 rounded-lg">
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="inspector-comments" className="text-white text-base">
-                  End of Inspection Notes <span className="text-slate-400 text-sm">(Optional)</span>
+                  End of Inspection Notes <span className="text-muted-foreground text-sm">(Optional)</span>
                 </Label>
                 <Textarea
                   id="inspector-comments"
                   value={inspectorComments}
                   onChange={(e) => setInspectorComments(e.target.value)}
                   placeholder="Add any additional notes or observations about this inspection..."
-                  className="min-h-[100px] bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
+                  className="min-h-[100px] bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground"
                   maxLength={500}
                 />
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-muted-foreground">
                   {inspectorComments.length}/500 characters
                 </p>
               </div>
 
               {/* Inform Workshop Toggle */}
-              <div className="flex items-start space-x-3 p-3 bg-slate-900/30 rounded-lg border border-slate-700/30">
+              <div className="flex items-start space-x-3 p-3 bg-slate-900/30 rounded-lg border border-border/30">
                 <Checkbox
                   id="inform-workshop"
                   checked={informWorkshop}
@@ -1903,7 +1903,7 @@ function NewInspectionContent() {
                       Creates Task
                     </Badge>
                   </Label>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Creates a workshop task from your notes. The task will be automatically categorized based on your comments.
                   </p>
                   
@@ -1952,7 +1952,7 @@ function NewInspectionContent() {
       )}
 
       {/* Mobile Sticky Footer */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-slate-700/50 p-4 z-20">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-border/50 p-4 z-20">
         <div className="flex gap-3">
           <Button
             variant="outline"
@@ -1976,16 +1976,16 @@ function NewInspectionContent() {
 
       {/* Add Vehicle Dialog */}
       <Dialog open={showAddVehicleDialog} onOpenChange={setShowAddVehicleDialog}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
+        <DialogContent className="border-border text-white max-w-md">
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Add New Vehicle</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               Enter the vehicle registration number and select its category
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="newVehicleReg" className="text-slate-900 dark:text-white">
+              <Label htmlFor="newVehicleReg" className="text-foreground">
                 Registration Number <span className="text-red-400">*</span>
               </Label>
               <Input
@@ -1994,12 +1994,12 @@ function NewInspectionContent() {
                 onChange={(e) => setNewVehicleReg(e.target.value.toUpperCase())}
                 onBlur={(e) => setNewVehicleReg(formatRegistration(e.target.value))}
                 placeholder="e.g., BG21 EXH"
-                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 uppercase"
+                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase"
                 disabled={addingVehicle}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="newVehicleCategory" className="text-slate-900 dark:text-white">
+              <Label htmlFor="newVehicleCategory" className="text-foreground">
                 Vehicle Category <span className="text-red-400">*</span>
               </Label>
               <Select 
@@ -2010,7 +2010,7 @@ function NewInspectionContent() {
                 <SelectTrigger className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
-                <SelectContent className="bg-slate-900 border-slate-700 max-h-[300px] md:max-h-[400px] dark:text-slate-100 text-slate-900">
+                <SelectContent className="border-border max-h-[300px] md:max-h-[400px] dark:text-slate-100 text-slate-900">
                   {categories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
@@ -2053,13 +2053,13 @@ function NewInspectionContent() {
         }
         setShowResolutionDialog(open);
       }}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg">
+        <DialogContent className="border-border text-white max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-white text-xl flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-amber-500" />
               Defect Resolution Required
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               This item was defective in the previous inspection
             </DialogDescription>
           </DialogHeader>
@@ -2085,10 +2085,10 @@ function NewInspectionContent() {
                   value={resolutionComment}
                   onChange={(e) => setResolutionComment(e.target.value)}
                   placeholder="e.g., Light bulb replaced on Wednesday by Dave"
-                  className="bg-slate-800 border-slate-600 text-white min-h-[100px]"
+                  className="bg-input border-border text-white min-h-[100px]"
                   required
                 />
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-muted-foreground">
                   This comment will be added to the action and marked as complete.
                 </p>
               </div>
@@ -2147,10 +2147,10 @@ function NewInspectionContent() {
           setShowConfirmSubmitDialog(open);
         }}
       >
-        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
+        <DialogContent className="border-border text-white max-w-md">
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Confirm Submission</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               Before you submit, please confirm
             </DialogDescription>
           </DialogHeader>
@@ -2173,7 +2173,7 @@ function NewInspectionContent() {
                 Have you finished using this vehicle for the week?
               </p>
             </div>
-            <div className="space-y-2 text-sm text-slate-300">
+            <div className="space-y-2 text-sm text-muted-foreground">
               <p>
                 Vehicle inspections should be submitted <strong className="text-white">weekly</strong> when you're done using the vehicle.
               </p>
@@ -2232,13 +2232,13 @@ function NewInspectionContent() {
 
       {/* Mileage Warning Confirmation Dialog */}
       <Dialog open={showMileageWarningDialog} onOpenChange={setShowMileageWarningDialog}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
+        <DialogContent className="border-border text-white max-w-md">
           <DialogHeader>
             <DialogTitle className="text-white text-xl flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
               Confirm Mileage Entry
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               The mileage you entered requires confirmation
             </DialogDescription>
           </DialogHeader>
@@ -2251,17 +2251,17 @@ function NewInspectionContent() {
             </div>
             
             <div className="space-y-2">
-              <p className="text-sm text-slate-300">
+              <p className="text-sm text-muted-foreground">
                 <strong>Entered mileage:</strong> {currentMileage ? parseInt(currentMileage).toLocaleString() : '0'} miles
               </p>
               {baselineMileage !== null && (
-                <p className="text-sm text-slate-300">
+                <p className="text-sm text-muted-foreground">
                   <strong>Last recorded:</strong> {formatMileage(baselineMileage)}
                 </p>
               )}
             </div>
             
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-muted-foreground">
               Please double-check the odometer reading. If the value is correct, click "Confirm" to continue.
             </p>
           </div>
@@ -2286,10 +2286,10 @@ function NewInspectionContent() {
       
       {/* Signature Dialog */}
       <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg">
+        <DialogContent className="border-border text-white max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Sign Inspection</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               Please sign below to confirm your inspection is accurate
             </DialogDescription>
           </DialogHeader>

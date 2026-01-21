@@ -16,8 +16,8 @@ const PDFViewer = dynamic(
     ssr: false,
     loading: () => (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-        <span className="ml-2 text-sm text-slate-600 dark:text-slate-400">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-sm text-muted-foreground">
           Preparing PDF viewer...
         </span>
       </div>
@@ -110,7 +110,7 @@ export function BlockingMessageModal({
             Toolbox Talk - {message.subject}
           </DialogTitle>
           {totalPending > 1 && (
-            <DialogDescription className="text-xs text-slate-600 dark:text-slate-400">
+            <DialogDescription className="text-xs text-muted-foreground">
               Message {currentIndex + 1} of {totalPending}
             </DialogDescription>
           )}
@@ -119,7 +119,7 @@ export function BlockingMessageModal({
         {/* Warning - compact */}
         <div className="flex items-center gap-2 px-6 -mt-2 mb-2">
           <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
-          <p className="text-xs text-slate-700 dark:text-slate-300">
+          <p className="text-xs text-slate-700 dark:text-muted-foreground">
             Read and sign to continue
           </p>
         </div>
@@ -128,7 +128,7 @@ export function BlockingMessageModal({
           <div className="pb-6 space-y-4">
             {/* Message Body - No border, no padding */}
             {message.body && (
-              <div className="text-sm text-slate-900 dark:text-white whitespace-pre-wrap">
+              <div className="text-sm text-foreground whitespace-pre-wrap">
                 {message.body}
               </div>
             )}
@@ -152,8 +152,8 @@ export function BlockingMessageModal({
             )}
 
             {/* Signature Section - At the BOTTOM so users must scroll */}
-            <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-700">
-              <label className="text-sm font-medium text-slate-900 dark:text-white">
+            <div className="space-y-3 pt-4 border-t border-border">
+              <label className="text-sm font-medium text-foreground">
                 Your Signature <span className="text-destructive">*</span>
               </label>
               
@@ -165,7 +165,7 @@ export function BlockingMessageModal({
               />
 
               {signing && (
-                <div className="flex items-center justify-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Recording signature...
                 </div>

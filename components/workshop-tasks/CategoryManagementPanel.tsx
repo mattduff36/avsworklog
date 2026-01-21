@@ -79,13 +79,13 @@ export function CategoryManagementPanel({
 
   if (categories.length === 0) {
     return (
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card>
         <CardContent className="flex flex-col items-center justify-center py-12">
-          <Settings className="h-16 w-16 text-slate-400 mb-4" />
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+          <Settings className="h-16 w-16 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">
             No Categories Yet
           </h3>
-          <p className="text-slate-600 dark:text-slate-400 mb-6 text-center max-w-md">
+          <p className="text-muted-foreground mb-6 text-center max-w-md">
             Create your first workshop task category to organize repairs and maintenance work
           </p>
           <Button onClick={onAddCategory} className="bg-workshop hover:bg-workshop-dark text-white">
@@ -98,12 +98,12 @@ export function CategoryManagementPanel({
   }
 
   return (
-    <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+    <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-slate-900 dark:text-white">Category Management</CardTitle>
-            <CardDescription className="text-slate-600 dark:text-slate-400">
+            <CardTitle>Category Management</CardTitle>
+            <CardDescription>
               Organize workshop tasks with categories and subcategories
             </CardDescription>
           </div>
@@ -117,7 +117,7 @@ export function CategoryManagementPanel({
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
           {/* Left Column: Category List */}
           <div className="space-y-2">
-            <p className="text-xs text-slate-600 dark:text-slate-400 mb-3 uppercase tracking-wide">
+            <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wide">
               Categories ({categories.length})
             </p>
             {categories
@@ -132,19 +132,19 @@ export function CategoryManagementPanel({
                     onClick={() => setSelectedCategoryId(category.id)}
                     className={`w-full text-left p-3 rounded-lg border transition-all ${
                       isSelected
-                        ? 'bg-workshop/10 border-workshop dark:border-workshop'
-                        : 'bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600'
+                        ? 'bg-workshop/10 border-workshop'
+                        : 'bg-muted/30 border-border hover:border-border/80'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <p className={`font-medium truncate ${
-                          isSelected ? 'text-workshop dark:text-workshop' : 'text-slate-900 dark:text-white'
+                          isSelected ? 'text-workshop' : 'text-foreground'
                         }`}>
                           {category.name}
                         </p>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-slate-600 dark:text-slate-400">
+                          <span className="text-xs text-muted-foreground">
                             {subcategoryCount} {subcategoryCount === 1 ? 'subcategory' : 'subcategories'}
                           </span>
                         </div>
@@ -160,13 +160,13 @@ export function CategoryManagementPanel({
             {selectedCategory ? (
               <>
                 {/* Category Header with Actions */}
-                <div className="flex items-start justify-between pb-4 border-b border-slate-200 dark:border-slate-700">
+                <div className="flex items-start justify-between pb-4 border-b border-border">
                   <div>
-                    <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-1">
+                    <h3 className="text-xl font-semibold text-foreground mb-1">
                       {selectedCategory.name}
                     </h3>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-600 dark:text-slate-400">
+                      <span className="text-xs text-muted-foreground">
                         Organized alphabetically
                       </span>
                     </div>
@@ -176,7 +176,6 @@ export function CategoryManagementPanel({
                       variant="outline"
                       size="sm"
                       onClick={() => onEditCategory(selectedCategory)}
-                      className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white"
                     >
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
@@ -196,7 +195,7 @@ export function CategoryManagementPanel({
                 {/* Subcategories Section */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-sm font-semibold text-slate-900 dark:text-white uppercase tracking-wide">
+                    <h4 className="text-sm font-semibold text-foreground uppercase tracking-wide">
                       Subcategories ({categorySubcategories.length})
                     </h4>
                     <Button
@@ -211,8 +210,8 @@ export function CategoryManagementPanel({
                   </div>
 
                   {categorySubcategories.length === 0 ? (
-                    <div className="text-center py-8 bg-slate-50 dark:bg-slate-800/30 rounded-lg border border-slate-200 dark:border-slate-700">
-                      <p className="text-slate-600 dark:text-slate-400 mb-3">
+                    <div className="text-center py-8 bg-muted/30 rounded-lg border border-border">
+                      <p className="text-muted-foreground mb-3">
                         No subcategories yet
                       </p>
                       <Button
@@ -233,12 +232,12 @@ export function CategoryManagementPanel({
                         return (
                           <div
                             key={subcategory.id}
-                            className="bg-slate-50 dark:bg-slate-800/30 rounded-lg border border-slate-200 dark:border-slate-700"
+                            className="bg-muted/30 rounded-lg border border-border"
                           >
                             {/* Subcategory Header */}
                             <div className="flex items-center justify-between p-3">
                               <div className="flex items-center gap-3 flex-1">
-                                <span className="text-sm font-medium text-slate-900 dark:text-white">
+                                <span className="text-sm font-medium text-foreground">
                                   {subcategory.name}
                                 </span>
                               </div>
@@ -247,7 +246,7 @@ export function CategoryManagementPanel({
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => onEditSubcategory(subcategory, selectedCategory)}
-                                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white h-8 w-8 p-0"
+                                  className="h-8 w-8 p-0"
                                   title="Edit Subcategory"
                                 >
                                   <Edit className="h-3 w-3" />
@@ -265,7 +264,7 @@ export function CategoryManagementPanel({
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => toggleSubcategoryExpansion(subcategory.id)}
-                                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white h-8 w-8 p-0"
+                                  className="h-8 w-8 p-0"
                                 >
                                   {isExpanded ? (
                                     <ChevronUp className="h-4 w-4" />
@@ -278,8 +277,8 @@ export function CategoryManagementPanel({
 
                             {/* Expanded Details (placeholder for future info) */}
                             {isExpanded && (
-                              <div className="px-3 pb-3 border-t border-slate-200 dark:border-slate-700 pt-3">
-                                <div className="text-xs text-slate-600 dark:text-slate-400 space-y-1">
+                              <div className="px-3 pb-3 border-t border-border pt-3">
+                                <div className="text-xs text-muted-foreground space-y-1">
                                   <p><span className="font-medium">Slug:</span> {subcategory.slug}</p>
                                 </div>
                               </div>
@@ -293,7 +292,7 @@ export function CategoryManagementPanel({
               </>
             ) : (
               <div className="text-center py-12">
-                <p className="text-slate-600 dark:text-slate-400">
+                <p className="text-muted-foreground">
                   Select a category from the list to view details
                 </p>
               </div>

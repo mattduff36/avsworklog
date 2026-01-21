@@ -85,7 +85,7 @@ export function CreateReminderForm({ onSuccess }: CreateReminderFormProps) {
 
         {/* Subject */}
         <div className="space-y-2">
-          <Label htmlFor="subject" className="text-slate-900 dark:text-white">
+          <Label htmlFor="subject" className="text-foreground">
             Subject *
           </Label>
           <Input
@@ -94,13 +94,13 @@ export function CreateReminderForm({ onSuccess }: CreateReminderFormProps) {
             onChange={(e) => setSubject(e.target.value)}
             placeholder="e.g., Upcoming Site Inspection - Friday 3pm"
             required
-            className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white"
+            className="bg-white dark:bg-slate-900 border-border text-foreground"
           />
         </div>
 
         {/* Message Body */}
         <div className="space-y-2">
-          <Label htmlFor="body" className="text-slate-900 dark:text-white">
+          <Label htmlFor="body" className="text-foreground">
             Message *
           </Label>
           <Textarea
@@ -110,15 +110,15 @@ export function CreateReminderForm({ onSuccess }: CreateReminderFormProps) {
             placeholder="Enter the reminder message..."
             rows={8}
             required
-            className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white"
+            className="bg-white dark:bg-slate-900 border-border text-foreground"
           />
-          <p className="text-xs text-slate-500 dark:text-slate-500">
+          <p className="text-xs text-muted-foreground dark:text-muted-foreground">
             This message will be shown in the notifications panel for 60 days.
           </p>
         </div>
 
         {/* Submit Button */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
           <Button
             type="submit"
             className="bg-blue-600 hover:bg-blue-700 text-white"

@@ -200,7 +200,7 @@ export function EditMaintenanceDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent 
         ref={dialogContentRef}
-        className="bg-slate-900 border-slate-700 text-white w-full max-w-full md:max-w-2xl h-full md:h-auto max-h-screen md:max-h-[90vh] overflow-y-auto p-4 md:p-6"
+        className="border-border text-white w-full max-w-full md:max-w-2xl h-full md:h-auto max-h-screen md:max-h-[90vh] overflow-y-auto p-4 md:p-6"
         onInteractOutside={(e) => {
           // Prevent closing when clicking outside if form has changes
           if (isDirty) {
@@ -220,7 +220,7 @@ export function EditMaintenanceDialog({
           <DialogTitle className="text-2xl">
             {isNewRecord ? 'Create' : 'Edit'} Vehicle Record - {vehicle.vehicle?.reg_number}
           </DialogTitle>
-          <DialogDescription className="text-slate-400">
+          <DialogDescription className="text-muted-foreground">
             {isNewRecord 
               ? 'Set up maintenance schedule for this vehicle. A comment is required to explain the initial setup.' 
               : 'Update maintenance dates and schedules. A comment is required to explain changes.'
@@ -238,9 +238,9 @@ export function EditMaintenanceDialog({
               id="nickname"
               {...register('nickname')}
               placeholder="e.g., Andy's Van, Red Pickup, Main Truck"
-              className="bg-slate-800 border-slate-600 text-white"
+              className="bg-input border-border text-white"
             />
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-muted-foreground">
               A friendly name to help identify this vehicle quickly
             </p>
             {errors.nickname && (
@@ -252,7 +252,7 @@ export function EditMaintenanceDialog({
           <div className={`rounded-lg p-4 transition-colors ${
             isMileageFocused 
               ? 'bg-amber-900/20 border border-amber-800/50' 
-              : 'bg-slate-800/50 border border-slate-700'
+              : 'bg-slate-800/50 border border-border'
           }`}>
             <Label htmlFor="current_mileage" className="text-white">
               Current Mileage {isMileageFocused && <span className="text-amber-400">(Manual Override)</span>}
@@ -264,7 +264,7 @@ export function EditMaintenanceDialog({
               onFocus={() => setIsMileageFocused(true)}
               onBlur={() => setIsMileageFocused(false)}
               placeholder="e.g., 75000"
-              className="bg-slate-800 border-slate-600 text-white mt-2"
+              className="bg-input border-border text-white mt-2"
             />
             {isMileageFocused && (
               <p className="text-xs text-amber-400 mt-2">
@@ -272,7 +272,7 @@ export function EditMaintenanceDialog({
               </p>
             )}
             {!isMileageFocused && vehicle.last_mileage_update && (
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Last updated: {new Date(vehicle.last_mileage_update).toLocaleString()}
               </p>
             )}
@@ -295,7 +295,7 @@ export function EditMaintenanceDialog({
                   id="tax_due_date"
                   type="date"
                   {...register('tax_due_date')}
-                  className="bg-slate-800 border-slate-600 text-white"
+                  className="bg-input border-border text-white"
                 />
                 {errors.tax_due_date && (
                   <p className="text-sm text-red-400">{errors.tax_due_date.message}</p>
@@ -309,7 +309,7 @@ export function EditMaintenanceDialog({
                   id="mot_due_date"
                   type="date"
                   {...register('mot_due_date')}
-                  className="bg-slate-800 border-slate-600 text-white"
+                  className="bg-input border-border text-white"
                 />
                 {errors.mot_due_date && (
                   <p className="text-sm text-red-400">{errors.mot_due_date.message}</p>
@@ -323,7 +323,7 @@ export function EditMaintenanceDialog({
                   id="first_aid_kit_expiry"
                   type="date"
                   {...register('first_aid_kit_expiry')}
-                  className="bg-slate-800 border-slate-600 text-white"
+                  className="bg-input border-border text-white"
                 />
                 {errors.first_aid_kit_expiry && (
                   <p className="text-sm text-red-400">{errors.first_aid_kit_expiry.message}</p>
@@ -347,7 +347,7 @@ export function EditMaintenanceDialog({
                   type="number"
                   {...register('next_service_mileage')}
                   placeholder="e.g., 50000"
-                  className="bg-slate-800 border-slate-600 text-white"
+                  className="bg-input border-border text-white"
                 />
                 {errors.next_service_mileage && (
                   <p className="text-sm text-red-400">{errors.next_service_mileage.message}</p>
@@ -362,7 +362,7 @@ export function EditMaintenanceDialog({
                   type="number"
                   {...register('last_service_mileage')}
                   placeholder="e.g., 40000"
-                  className="bg-slate-800 border-slate-600 text-white"
+                  className="bg-input border-border text-white"
                 />
                 {errors.last_service_mileage && (
                   <p className="text-sm text-red-400">{errors.last_service_mileage.message}</p>
@@ -377,7 +377,7 @@ export function EditMaintenanceDialog({
                   type="number"
                   {...register('cambelt_due_mileage')}
                   placeholder="e.g., 100000"
-                  className="bg-slate-800 border-slate-600 text-white"
+                  className="bg-input border-border text-white"
                 />
                 {errors.cambelt_due_mileage && (
                   <p className="text-sm text-red-400">{errors.cambelt_due_mileage.message}</p>
@@ -395,9 +395,9 @@ export function EditMaintenanceDialog({
               type="text"
               {...register('tracker_id')}
               placeholder="e.g., 359632101982533"
-              className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+              className="bg-input border-border text-white placeholder:text-muted-foreground"
             />
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-muted-foreground">
               GPS tracking device identifier number
             </p>
             {errors.tracker_id && (
@@ -414,11 +414,11 @@ export function EditMaintenanceDialog({
               id="comment"
               {...register('comment')}
               placeholder="e.g., MOT passed on 15 Dec 2025, renewed for 12 months. Cost: £55"
-              className="bg-slate-800 border-slate-600 text-white"
+              className="bg-input border-border text-white"
               rows={3}
             />
             <div className="flex items-center justify-between text-xs">
-              <p className="text-slate-400">
+              <p className="text-muted-foreground">
                 Required: Explain what maintenance was performed and why dates are changing
               </p>
               <p className={`font-mono ${commentLength < 10 ? 'text-red-400' : 'text-green-400'}`}>

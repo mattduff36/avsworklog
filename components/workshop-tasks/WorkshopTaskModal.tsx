@@ -144,7 +144,7 @@ export function WorkshopTaskModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto border-border">
         <DialogHeader>
           <div className="space-y-4">
             {/* Header with vehicle */}
@@ -172,9 +172,9 @@ export function WorkshopTaskModal({
 
             {/* Task Description */}
             {task.workshop_comments && (
-              <Card className="bg-slate-800/50 border-slate-700">
+              <Card className="bg-slate-800/50 border-border">
                 <CardContent className="pt-4">
-                  <p className="text-sm text-slate-300 whitespace-pre-wrap">
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                     {task.workshop_comments}
                   </p>
                 </CardContent>
@@ -256,7 +256,7 @@ export function WorkshopTaskModal({
                     disabled={isUpdating}
                     size="sm"
                     variant="ghost"
-                    className="text-slate-400 hover:text-white hover:bg-slate-800"
+                    className="text-muted-foreground hover:text-foreground hover:bg-accent"
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Edit
@@ -266,7 +266,7 @@ export function WorkshopTaskModal({
                     disabled={isUpdating}
                     size="sm"
                     variant="ghost"
-                    className="text-red-400 hover:text-red-300 hover:bg-slate-800"
+                    className="text-red-400 hover:text-red-300 hover:bg-accent"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete
@@ -296,21 +296,21 @@ export function WorkshopTaskModal({
         </div>
 
         {/* Task Metadata */}
-        <div className="mt-6 pt-6 border-t border-slate-700">
+        <div className="mt-6 pt-6 border-t border-border">
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <span className="text-slate-500">Created:</span>
-              <span className="ml-2 text-slate-300">{formatDate(task.created_at)}</span>
+              <span className="text-muted-foreground">Created:</span>
+              <span className="ml-2 text-muted-foreground">{formatDate(task.created_at)}</span>
             </div>
             {task.logged_at && (
               <div>
-                <span className="text-slate-500">Started:</span>
+                <span className="text-muted-foreground">Started:</span>
                 <span className="ml-2 text-blue-400">{formatDate(task.logged_at)}</span>
               </div>
             )}
             {task.actioned_at && (
               <div>
-                <span className="text-slate-500">Completed:</span>
+                <span className="text-muted-foreground">Completed:</span>
                 <span className="ml-2 text-green-400">{formatDate(task.actioned_at)}</span>
               </div>
             )}

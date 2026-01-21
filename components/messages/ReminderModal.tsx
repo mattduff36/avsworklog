@@ -60,15 +60,15 @@ export function ReminderModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <DialogContent className="max-w-2xl max-h-[80vh]">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <div className="p-2 bg-blue-100 dark:bg-blue-950 rounded">
               <Bell className="h-5 w-5 text-blue-600" />
             </div>
             <div className="flex-1">
-              <DialogTitle className="text-lg text-slate-900 dark:text-white">Reminder</DialogTitle>
-              <DialogDescription className="text-slate-600 dark:text-slate-400">
+              <DialogTitle className="text-lg text-foreground">Reminder</DialogTitle>
+              <DialogDescription className="text-muted-foreground">
                 From: <strong>{message.sender_name}</strong> • {new Date(message.created_at).toLocaleDateString()}
               </DialogDescription>
             </div>
@@ -78,12 +78,12 @@ export function ReminderModal({
         <div className="space-y-4">
           {/* Message Subject */}
           <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-3 border-l-4 border-blue-500">
-            <h3 className="text-base font-semibold text-slate-900 dark:text-white">{message.subject}</h3>
+            <h3 className="text-base font-semibold text-foreground">{message.subject}</h3>
           </div>
 
           {/* Message Body */}
-          <ScrollArea className="h-[200px] w-full rounded-md border border-slate-200 dark:border-slate-700 p-4">
-            <div className="text-sm text-slate-900 dark:text-white whitespace-pre-wrap">
+          <ScrollArea className="h-[200px] w-full rounded-md border border-border p-4">
+            <div className="text-sm text-foreground whitespace-pre-wrap">
               {message.body}
             </div>
           </ScrollArea>
@@ -94,7 +94,7 @@ export function ReminderModal({
             variant="outline"
             onClick={onClose}
             disabled={dismissing}
-            className="border-slate-600 text-slate-300 hover:bg-slate-700/50"
+            className="border-border text-muted-foreground hover:bg-accent"
           >
             Close
           </Button>

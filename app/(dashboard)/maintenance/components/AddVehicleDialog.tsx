@@ -192,10 +192,10 @@ export function AddVehicleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
+      <DialogContent className="border-border text-white max-w-md">
         <DialogHeader>
           <DialogTitle className="text-2xl">Add New Vehicle</DialogTitle>
-          <DialogDescription className="text-slate-400">
+          <DialogDescription className="text-muted-foreground">
             Add a new vehicle to the fleet management system.
           </DialogDescription>
         </DialogHeader>
@@ -217,12 +217,12 @@ export function AddVehicleDialog({
               value={formData.reg_number}
               onChange={(e) => handleRegistrationChange(e.target.value)}
               placeholder="e.g., AB12 CDE or A10 ABC"
-              className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 uppercase"
+              className="bg-input border-border text-white placeholder:text-muted-foreground uppercase"
               disabled={loading}
               required
               maxLength={9}
             />
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-muted-foreground">
               Auto-formatted: UPPERCASE with space after 4th character
             </p>
           </div>
@@ -239,10 +239,10 @@ export function AddVehicleDialog({
                 setFormData({ ...formData, nickname: e.target.value })
               }
               placeholder="e.g., Andy's Van, Red Pickup, Main Truck"
-              className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+              className="bg-input border-border text-white placeholder:text-muted-foreground"
               disabled={loading}
             />
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-muted-foreground">
               A friendly name to help identify this vehicle quickly
             </p>
           </div>
@@ -260,7 +260,7 @@ export function AddVehicleDialog({
               disabled={loading}
               required
             >
-              <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+              <SelectTrigger className="bg-input border-border text-white">
                 <SelectValue placeholder="Select category..." />
               </SelectTrigger>
               <SelectContent className="bg-slate-800 border-slate-700 dark:text-slate-100 text-slate-900">
@@ -289,7 +289,7 @@ export function AddVehicleDialog({
               }
               disabled={loading}
             >
-              <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+              <SelectTrigger className="bg-input border-border text-white">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-slate-800 border-slate-700 dark:text-slate-100 text-slate-900">

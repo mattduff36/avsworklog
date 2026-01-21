@@ -169,9 +169,9 @@ export default function AbsenceReasonsPage() {
   if (authLoading || isLoading) {
     return (
       <div className="space-y-6 max-w-6xl">
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="">
           <CardContent className="flex items-center justify-center py-12">
-            <p className="text-slate-400">Loading...</p>
+            <p className="text-muted-foreground">Loading...</p>
           </CardContent>
         </Card>
       </div>
@@ -183,15 +183,15 @@ export default function AbsenceReasonsPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
             <BackButton />
             <div>
-              <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+              <h1 className="text-3xl font-bold text-foreground mb-2">
                 Absence Reasons
               </h1>
-              <p className="text-slate-600 dark:text-slate-400">
+              <p className="text-muted-foreground">
                 Manage absence and leave reasons
               </p>
             </div>
@@ -211,29 +211,29 @@ export default function AbsenceReasonsPage() {
       </div>
       
       {/* Reasons List */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-white">
+          <CardTitle className="flex items-center gap-2 text-foreground">
             <Settings className="h-5 w-5" />
             Reasons
           </CardTitle>
-          <CardDescription className="text-slate-400">
+          <CardDescription className="text-muted-foreground">
             {reasons?.length || 0} reasons configured
           </CardDescription>
         </CardHeader>
         <CardContent>
           {!reasons || reasons.length === 0 ? (
             <div className="text-center py-12">
-              <Settings className="h-16 w-16 text-slate-400 mx-auto mb-4" />
+              <Settings className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-white mb-2">No reasons configured</h3>
-              <p className="text-slate-400">Add your first absence reason</p>
+              <p className="text-muted-foreground">Add your first absence reason</p>
             </div>
           ) : (
             <div className="space-y-3">
               {reasons.map(reason => (
                 <div
                   key={reason.id}
-                  className="p-4 rounded-lg bg-slate-800/30 border border-slate-700/50 hover:border-slate-600 transition-colors"
+                  className="p-4 rounded-lg bg-slate-800/30 border border-border/50 hover:border-slate-600 transition-colors"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -245,7 +245,7 @@ export default function AbsenceReasonsPage() {
                         className={
                           reason.is_paid
                             ? 'border-blue-500/30 text-blue-400 bg-blue-500/10'
-                            : 'border-slate-600 text-slate-400'
+                            : 'border-slate-600 text-muted-foreground'
                         }
                       >
                         {reason.is_paid ? 'Paid' : 'Unpaid'}
@@ -267,7 +267,7 @@ export default function AbsenceReasonsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleToggleActive(reason)}
-                        className="border-slate-600 text-slate-300"
+                        className="border-border text-muted-foreground"
                       >
                         {reason.is_active ? 'Disable' : 'Enable'}
                       </Button>
@@ -275,7 +275,7 @@ export default function AbsenceReasonsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleEditClick(reason)}
-                        className="border-slate-600 text-slate-300"
+                        className="border-border text-muted-foreground"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -300,10 +300,10 @@ export default function AbsenceReasonsPage() {
       
       {/* Create Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="bg-slate-900 border-slate-700">
+        <DialogContent className="border-border">
           <DialogHeader>
             <DialogTitle className="text-white">Add Absence Reason</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               Create a new reason for absence or leave
             </DialogDescription>
           </DialogHeader>
@@ -316,7 +316,7 @@ export default function AbsenceReasonsPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Sick Leave"
-                className="bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+                className="border-border dark:text-slate-100 text-slate-900"
               />
             </div>
             
@@ -326,9 +326,9 @@ export default function AbsenceReasonsPage() {
                 id="isPaid"
                 checked={isPaid}
                 onChange={(e) => setIsPaid(e.target.checked)}
-                className="rounded border-slate-600"
+                className="rounded border-border"
               />
-              <label htmlFor="isPaid" className="text-sm text-slate-300 cursor-pointer">
+              <label htmlFor="isPaid" className="text-sm text-muted-foreground cursor-pointer">
                 This is a paid absence
               </label>
             </div>
@@ -338,7 +338,7 @@ export default function AbsenceReasonsPage() {
             <Button
               variant="outline"
               onClick={() => setShowCreateDialog(false)}
-              className="border-slate-600 text-slate-300"
+              className="border-border text-muted-foreground"
             >
               Cancel
             </Button>
@@ -355,10 +355,10 @@ export default function AbsenceReasonsPage() {
       
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="bg-slate-900 border-slate-700">
+        <DialogContent className="border-border">
           <DialogHeader>
             <DialogTitle className="text-white">Edit Absence Reason</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               Update the reason details
             </DialogDescription>
           </DialogHeader>
@@ -371,7 +371,7 @@ export default function AbsenceReasonsPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Sick Leave"
-                className="bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+                className="border-border dark:text-slate-100 text-slate-900"
               />
             </div>
             
@@ -381,9 +381,9 @@ export default function AbsenceReasonsPage() {
                 id="editIsPaid"
                 checked={isPaid}
                 onChange={(e) => setIsPaid(e.target.checked)}
-                className="rounded border-slate-600"
+                className="rounded border-border"
               />
-              <label htmlFor="editIsPaid" className="text-sm text-slate-300 cursor-pointer">
+              <label htmlFor="editIsPaid" className="text-sm text-muted-foreground cursor-pointer">
                 This is a paid absence
               </label>
             </div>
@@ -396,7 +396,7 @@ export default function AbsenceReasonsPage() {
                 setShowEditDialog(false);
                 setEditingReason(null);
               }}
-              className="border-slate-600 text-slate-300"
+              className="border-border text-muted-foreground"
             >
               Cancel
             </Button>

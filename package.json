@@ -29,7 +29,9 @@
     "migrate": "tsx scripts/run-migration.ts",
     "migrate:day-of-week": "tsx scripts/run-day-of-week-migration.ts",
     "test:reports": "tsx scripts/test-reports.ts",
-    "test:processed-status": "tsx scripts/test-processed-status.ts"
+    "test:processed-status": "tsx scripts/test-processed-status.ts",
+    "lint:theme": "tsx scripts/lint-high-risk-patterns.ts",
+    "test:contrast:workshop": "playwright test tests/ui/contrast.spec.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

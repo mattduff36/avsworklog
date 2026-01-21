@@ -314,7 +314,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-white w-full max-w-full md:max-w-[80vw] h-full md:h-auto max-h-screen md:max-h-[90vh] overflow-y-auto p-4 md:p-6">
+      <DialogContent className="border-border text-white w-full max-w-full md:max-w-[80vw] h-full md:h-auto max-h-screen md:max-h-[90vh] overflow-y-auto p-4 md:p-6">
         <DialogHeader>
           <div className="flex items-start justify-between gap-4 pr-6 md:pr-8">
             <div className="flex-1 min-w-0">
@@ -332,10 +332,10 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
         {loading ? (
           <div className="text-center py-12">
             <Loader2 className="h-12 w-12 mx-auto mb-3 animate-spin text-blue-400" />
-            <p className="text-slate-400">Loading MOT history from GOV.UK...</p>
+            <p className="text-muted-foreground">Loading MOT history from GOV.UK...</p>
           </div>
         ) : error ? (
-          <div className="text-center py-12 text-slate-400">
+          <div className="text-center py-12 text-muted-foreground">
             {vehicleNotFound ? (
               <>
                 <AlertTriangle className="h-12 w-12 mx-auto mb-3 text-amber-400 opacity-70" />
@@ -382,7 +382,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
             )}
           </div>
         ) : !motData ? (
-          <div className="text-center py-12 text-slate-400">
+          <div className="text-center py-12 text-muted-foreground">
             <FileText className="h-12 w-12 mx-auto mb-3 opacity-20" />
             <p>No MOT history available</p>
             <p className="text-sm mt-1">This vehicle may be too new or exempt from MOT testing</p>
@@ -392,7 +392,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
             {/* Current MOT Status Card */}
             {motData.currentStatus.status === 'No MOT History' || motData.currentStatus.status === 'Not Yet Due' || motData.tests.length === 0 ? (
               // Special card for vehicles with no MOT history (too new)
-              <div className="bg-gradient-to-r from-slate-800/50 to-slate-700/30 border border-slate-600/50 rounded-lg p-4 md:p-6">
+              <div className="bg-gradient-to-r from-slate-800/50 to-slate-700/30 border border-border/50 rounded-lg p-4 md:p-6">
                 <div className="text-center py-4">
                   <AlertTriangle className="h-12 w-12 md:h-16 md:w-16 mx-auto mb-4 text-blue-400 opacity-60" />
                   <h3 className="text-lg md:text-xl font-semibold text-white mb-2">No MOT History</h3>
@@ -400,7 +400,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                     This vehicle is too new to have any MOT tests recorded.
                   </p>
                   <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 max-w-md mx-auto">
-                    <p className="text-sm text-slate-300 mb-2">
+                    <p className="text-sm text-muted-foreground mb-2">
                       <strong className="text-white">First MOT Due:</strong>
                     </p>
                     {existingMotDueDate ? (
@@ -408,7 +408,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                         <p className="text-2xl font-bold text-blue-400 mb-3">
                           {formatDate(existingMotDueDate)}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-muted-foreground">
                           {motData.firstUsedDate ? 
                             'New vehicles are exempt from MOT testing for the first 3 years' :
                             'MOT due date from vehicle records'
@@ -420,7 +420,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                         <p className="text-2xl font-bold text-blue-400 mb-3">
                           {formatDate(motData.currentStatus.expiryDate)}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-muted-foreground">
                           From GOV.UK MOT database
                         </p>
                       </>
@@ -435,7 +435,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                             return formatDate(motDue.toISOString());
                           })()}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-muted-foreground">
                           Calculated: 3 years from first registration
                         </p>
                       </>
@@ -444,7 +444,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                         <p className="text-xl text-slate-400 mb-3">
                           Date not available
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-muted-foreground">
                           Vehicle registration date not found in database
                         </p>
                       </>
@@ -461,21 +461,21 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 text-sm">
                   <div>
-                    <span className="text-slate-400">Expiry Date:</span>
+                    <span className="text-muted-foreground">Expiry Date:</span>
                     <p className="text-white font-semibold text-lg">{formatDate(motData.currentStatus.expiryDate)}</p>
                   </div>
                   <div>
-                    <span className="text-slate-400">Status:</span>
+                    <span className="text-muted-foreground">Status:</span>
                     <p className={`font-semibold text-lg ${motData.currentStatus.status === 'Valid' ? 'text-green-400' : 'text-red-400'}`}>
                       {motData.currentStatus.status}
                     </p>
                   </div>
                   <div>
-                    <span className="text-slate-400">Days Remaining:</span>
+                    <span className="text-muted-foreground">Days Remaining:</span>
                     <p className="text-white font-semibold text-lg">{motData.currentStatus.daysRemaining}</p>
                   </div>
                   <div>
-                    <span className="text-slate-400">Last Test:</span>
+                    <span className="text-muted-foreground">Last Test:</span>
                     <p className="text-white font-semibold text-lg">{formatDate(motData.currentStatus.lastTestDate)}</p>
                   </div>
                 </div>
@@ -518,7 +518,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                             </span>
                           </h4>
                           {test.expiryDate && (
-                            <p className="text-sm text-slate-400">
+                            <p className="text-sm text-muted-foreground">
                               Expiry: <span className="text-white font-medium">{formatDate(test.expiryDate)}</span>
                             </p>
                           )}
@@ -540,8 +540,8 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                     {/* Test Details Grid */}
                     <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-6 text-sm mb-3">
                       <div className="flex items-center gap-2">
-                        <Gauge className="h-4 w-4 text-slate-400" />
-                        <span className="text-slate-400">Mileage:</span>
+                        <Gauge className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Mileage:</span>
                         <span className="text-white font-medium">
                           {test.odometerValue === null || test.odometerValue === undefined
                             ? 'Not Set'
@@ -550,15 +550,15 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                       </div>
                       {(test.testStationName || test.testStationPcode) && (
                         <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-slate-400" />
-                          <span className="text-slate-400">Station:</span>
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Station:</span>
                           <span className="text-white font-medium">
                             {[test.testStationName, test.testStationPcode].filter(Boolean).join(', ')}
                           </span>
                         </div>
                       )}
                       <div className="flex items-center gap-2">
-                        <span className="text-slate-400">Test Number:</span>
+                        <span className="text-muted-foreground">Test Number:</span>
                         <span className="text-white font-medium">{test.motTestNumber}</span>
                       </div>
                     </div>
@@ -600,7 +600,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                                         {defect.type}
                                       </Badge>
                                       {defect.locationLateral && (
-                                        <span className="text-xs text-slate-400">
+                                        <span className="text-xs text-muted-foreground">
                                           {defect.locationLateral}
                                         </span>
                                       )}

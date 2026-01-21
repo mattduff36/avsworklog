@@ -117,7 +117,7 @@ export function CreateToolboxTalkForm({ onSuccess }: CreateToolboxTalkFormProps)
 
         {/* Subject */}
         <div className="space-y-2">
-          <Label htmlFor="subject" className="text-slate-900 dark:text-white">
+          <Label htmlFor="subject" className="text-foreground">
             Subject *
           </Label>
           <Input
@@ -126,13 +126,13 @@ export function CreateToolboxTalkForm({ onSuccess }: CreateToolboxTalkFormProps)
             onChange={(e) => setSubject(e.target.value)}
             placeholder="e.g., Safety Protocol Update - PPE Requirements"
             required
-            className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white"
+            className="bg-white dark:bg-slate-900 border-border text-foreground"
           />
         </div>
 
         {/* Message Body */}
         <div className="space-y-2">
-          <Label htmlFor="body" className="text-slate-900 dark:text-white">
+          <Label htmlFor="body" className="text-foreground">
             Message *
           </Label>
           <Textarea
@@ -142,19 +142,19 @@ export function CreateToolboxTalkForm({ onSuccess }: CreateToolboxTalkFormProps)
             placeholder="Enter the full Toolbox Talk message..."
             rows={10}
             required
-            className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white"
+            className="bg-white dark:bg-slate-900 border-border text-foreground"
           />
-          <p className="text-xs text-slate-500 dark:text-slate-500">
+          <p className="text-xs text-muted-foreground dark:text-muted-foreground">
             This message will be displayed to employees who must sign it.
           </p>
         </div>
 
         {/* PDF Attachment (Optional) */}
         <div className="space-y-2">
-          <Label htmlFor="pdf-upload" className="text-slate-900 dark:text-white">
+          <Label htmlFor="pdf-upload" className="text-foreground">
             PDF Attachment (Optional)
           </Label>
-          <p className="text-xs text-slate-500 dark:text-slate-500">
+          <p className="text-xs text-muted-foreground dark:text-muted-foreground">
             Attach a PDF document for employees to read before signing. Maximum 10MB.
           </p>
 
@@ -171,7 +171,7 @@ export function CreateToolboxTalkForm({ onSuccess }: CreateToolboxTalkFormProps)
                 type="button"
                 variant="outline"
                 onClick={() => document.getElementById('pdf-upload')?.click()}
-                className="w-full h-20 border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all"
+                className="w-full h-20 border-2 border-dashed border-border hover:border-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all"
               >
                 <div className="flex flex-col items-center gap-2">
                   <Upload className="h-6 w-6" />
@@ -181,7 +181,7 @@ export function CreateToolboxTalkForm({ onSuccess }: CreateToolboxTalkFormProps)
               </Button>
             </div>
           ) : (
-            <div className="flex items-center gap-3 p-3 border rounded-md bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-600">
+            <div className="flex items-center gap-3 p-3 border rounded-md bg-slate-50 dark:bg-slate-800 border-border">
               <File className="h-8 w-8 text-red-600 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{pdfFile.name}</p>
@@ -203,7 +203,7 @@ export function CreateToolboxTalkForm({ onSuccess }: CreateToolboxTalkFormProps)
         </div>
 
         {/* Submit Button */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
           <Button
             type="submit"
             className="bg-red-600 hover:bg-red-700 text-white"

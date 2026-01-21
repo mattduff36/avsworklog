@@ -150,16 +150,16 @@ export function DVLASyncDebugPanel() {
       </Alert>
 
       {/* Single Vehicle Sync */}
-      <Card className="bg-slate-900 border-slate-700">
+      <Card className="border-border">
         <CardHeader>
           <CardTitle className="text-white">Sync Single Vehicle</CardTitle>
-          <CardDescription className="text-slate-400">
+          <CardDescription className="text-muted-foreground">
             Sync tax & MOT due dates for a specific vehicle by registration number
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="regNumber" className="text-slate-300">Registration Number</Label>
+            <Label htmlFor="regNumber" className="text-muted-foreground">Registration Number</Label>
             <div className="flex gap-2">
               <Input
                 id="regNumber"
@@ -167,7 +167,7 @@ export function DVLASyncDebugPanel() {
                 value={regNumber}
                 onChange={(e) => setRegNumber(e.target.value.toUpperCase())}
                 disabled={syncing}
-                className="flex-1 bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+                className="flex-1 bg-input border-border text-white placeholder:text-muted-foreground"
               />
               <Button 
                 onClick={handleSingleSync}
@@ -192,10 +192,10 @@ export function DVLASyncDebugPanel() {
       </Card>
 
       {/* Bulk Sync All Vehicles */}
-      <Card className="bg-slate-900 border-slate-700">
+      <Card className="border-border">
         <CardHeader>
           <CardTitle className="text-white">Bulk Sync All Vehicles</CardTitle>
-          <CardDescription className="text-slate-400">
+          <CardDescription className="text-muted-foreground">
             Sync tax & MOT due dates for all active vehicles in the database
           </CardDescription>
         </CardHeader>
@@ -223,7 +223,7 @@ export function DVLASyncDebugPanel() {
 
       {/* Sync Results */}
       {syncResult && (
-        <Card className="bg-slate-900 border-slate-700">
+        <Card className="border-border">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-white">
               {syncResult.success ? (
@@ -235,7 +235,7 @@ export function DVLASyncDebugPanel() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="bg-slate-800 border border-slate-700 p-4 rounded-md overflow-auto text-xs text-slate-300">
+            <pre className="bg-slate-800 border border-slate-700 p-4 rounded-md overflow-auto text-xs text-muted-foreground">
               {JSON.stringify(syncResult, null, 2)}
             </pre>
           </CardContent>
@@ -244,10 +244,10 @@ export function DVLASyncDebugPanel() {
 
       {/* Bulk Sync Confirmation Dialog */}
       <Dialog open={showBulkConfirm} onOpenChange={setShowBulkConfirm}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+        <DialogContent className="border-border text-white">
           <DialogHeader>
             <DialogTitle className="text-xl text-white">Confirm Bulk Sync</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               This will sync tax & MOT due dates for <strong className="text-white">{vehicleCount} active vehicles</strong> from GOV.UK APIs.
               <br /><br />
               <strong className="text-white">API Usage:</strong> ~{vehicleCount * 2} API calls (VES + MOT)

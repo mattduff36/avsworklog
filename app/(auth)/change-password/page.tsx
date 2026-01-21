@@ -159,7 +159,7 @@ export default function ChangePasswordPage() {
   if (success) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
-        <Card className="w-full max-w-md bg-slate-900 border-slate-700">
+        <Card className="w-full max-w-md border-border">
           <CardContent className="pt-6">
             <div className="text-center space-y-4">
               <div className="flex justify-center">
@@ -168,7 +168,7 @@ export default function ChangePasswordPage() {
                 </div>
               </div>
               <h2 className="text-2xl font-bold text-white">Password Changed Successfully!</h2>
-              <p className="text-slate-400">Redirecting you to the dashboard...</p>
+              <p className="text-muted-foreground">Redirecting you to the dashboard...</p>
             </div>
           </CardContent>
         </Card>
@@ -178,7 +178,7 @@ export default function ChangePasswordPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
-      <Card className="w-full max-w-md bg-slate-900 border-slate-700">
+      <Card className="w-full max-w-md border-border">
         <CardHeader className="text-center space-y-2">
           <div className="flex justify-center mb-2">
             <div className="rounded-full bg-amber-500/10 p-3">
@@ -186,7 +186,7 @@ export default function ChangePasswordPage() {
             </div>
           </div>
           <CardTitle className="text-2xl text-white">Change Your Password</CardTitle>
-          <CardDescription className="text-slate-400">
+          <CardDescription className="text-muted-foreground">
             Welcome, <strong className="text-white">{userName}</strong>! For security reasons, you must change your temporary password before continuing.
           </CardDescription>
         </CardHeader>
@@ -225,13 +225,13 @@ export default function ChangePasswordPage() {
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Enter your new password"
                   autoComplete="new-password"
-                  className="bg-slate-800 border-slate-600 text-white pr-10"
+                  className="bg-input border-border text-white pr-10"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-muted-foreground"
                 >
                   {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -256,13 +256,13 @@ export default function ChangePasswordPage() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Confirm your new password"
                   autoComplete="new-password"
-                  className="bg-slate-800 border-slate-600 text-white pr-10"
+                  className="bg-input border-border text-white pr-10"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-muted-foreground"
                 >
                   {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>

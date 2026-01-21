@@ -283,12 +283,12 @@ export function RoleManagement() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <Card className="bg-slate-900 border-slate-700">
+      <Card className="border-border">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-white">Job Roles & Permissions</CardTitle>
-              <CardDescription className="text-slate-400">
+              <CardDescription className="text-muted-foreground">
                 Manage job roles and configure module access permissions
               </CardDescription>
             </div>
@@ -306,7 +306,7 @@ export function RoleManagement() {
         </CardHeader>
         <CardContent>
           {roles.length === 0 ? (
-            <div className="text-center py-8 text-slate-400">
+            <div className="text-center py-8 text-muted-foreground">
               No roles configured yet.
             </div>
           ) : (
@@ -314,12 +314,12 @@ export function RoleManagement() {
               <Table>
                 <TableHeader>
                   <TableRow className="border-slate-700 hover:bg-slate-800/50">
-                    <TableHead className="text-slate-300">Role Name</TableHead>
-                    <TableHead className="text-slate-300">Description</TableHead>
-                    <TableHead className="text-slate-300">Type</TableHead>
-                    <TableHead className="text-slate-300">Users</TableHead>
-                    <TableHead className="text-slate-300">Modules</TableHead>
-                    <TableHead className="text-right text-slate-300">Actions</TableHead>
+                    <TableHead className="text-muted-foreground">Role Name</TableHead>
+                    <TableHead className="text-muted-foreground">Description</TableHead>
+                    <TableHead className="text-muted-foreground">Type</TableHead>
+                    <TableHead className="text-muted-foreground">Users</TableHead>
+                    <TableHead className="text-muted-foreground">Modules</TableHead>
+                    <TableHead className="text-right text-muted-foreground">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -336,7 +336,7 @@ export function RoleManagement() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-slate-300 max-w-xs truncate">
+                      <TableCell className="text-muted-foreground max-w-xs truncate">
                         {role.description || '-'}
                       </TableCell>
                       <TableCell>
@@ -348,13 +348,13 @@ export function RoleManagement() {
                           <Badge variant="secondary">Employee</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-slate-300">
+                      <TableCell className="text-muted-foreground">
                         <div className="flex items-center gap-1">
-                          <Users className="h-3 w-3 text-slate-400" />
+                          <Users className="h-3 w-3 text-muted-foreground" />
                           {role.user_count}
                         </div>
                       </TableCell>
-                      <TableCell className="text-slate-300">
+                      <TableCell className="text-muted-foreground">
                         {role.is_super_admin || role.is_manager_admin ? (
                           <Badge variant="outline" className="text-green-500 border-green-500">
                             All Access
@@ -414,10 +414,10 @@ export function RoleManagement() {
 
       {/* Add Role Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
+        <DialogContent className="border-border text-white max-w-md">
           <DialogHeader>
             <DialogTitle>Add New Role</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               Create a new job role with default permissions
             </DialogDescription>
           </DialogHeader>
@@ -434,9 +434,9 @@ export function RoleManagement() {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="employee-new-department"
-                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+                className="bg-input border-border text-white placeholder:text-muted-foreground"
               />
-              <p className="text-xs text-slate-400">Lowercase, hyphenated (e.g., employee-civils)</p>
+              <p className="text-xs text-muted-foreground">Lowercase, hyphenated (e.g., employee-civils)</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="add-display-name">Display Name *</Label>
@@ -445,7 +445,7 @@ export function RoleManagement() {
                 value={formData.display_name}
                 onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
                 placeholder="Employee - New Department"
-                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+                className="bg-input border-border text-white placeholder:text-muted-foreground"
               />
             </div>
             <div className="space-y-2">
@@ -455,7 +455,7 @@ export function RoleManagement() {
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Brief description of this role..."
-                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 min-h-[80px]"
+                className="bg-input border-border text-white placeholder:text-muted-foreground min-h-[80px]"
               />
             </div>
             <div className="space-y-2">
@@ -467,7 +467,7 @@ export function RoleManagement() {
                 value={formData.timesheet_type} 
                 onValueChange={(value) => setFormData({ ...formData, timesheet_type: value })}
               >
-                <SelectTrigger id="add-timesheet-type" className="bg-slate-800 border-slate-600 text-white">
+                <SelectTrigger id="add-timesheet-type" className="bg-input border-border text-white">
                   <SelectValue placeholder="Select timesheet type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -478,14 +478,14 @@ export function RoleManagement() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 Which timesheet format should employees with this role use?
               </p>
             </div>
             <div className="flex items-center justify-between p-3 bg-slate-800 rounded">
               <div>
                 <Label htmlFor="add-is-manager">Manager/Admin Role</Label>
-                <p className="text-xs text-slate-400">Full access to all modules</p>
+                <p className="text-xs text-muted-foreground">Full access to all modules</p>
               </div>
               <Switch
                 id="add-is-manager"
@@ -517,10 +517,10 @@ export function RoleManagement() {
 
       {/* Edit Role Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
+        <DialogContent className="border-border text-white max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Role</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               Update role details
             </DialogDescription>
           </DialogHeader>
@@ -536,7 +536,7 @@ export function RoleManagement() {
                 id="edit-display-name"
                 value={formData.display_name}
                 onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
-                className="bg-slate-800 border-slate-600 text-white"
+                className="bg-input border-border text-white"
               />
             </div>
             <div className="space-y-2">
@@ -545,7 +545,7 @@ export function RoleManagement() {
                 id="edit-description"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 min-h-[80px]"
+                className="bg-input border-border text-white placeholder:text-muted-foreground min-h-[80px]"
               />
             </div>
             <div className="space-y-2">
@@ -557,7 +557,7 @@ export function RoleManagement() {
                 value={formData.timesheet_type}
                 onValueChange={(value) => setFormData({ ...formData, timesheet_type: value })}
               >
-                <SelectTrigger id="edit-timesheet-type" className="bg-slate-800 border-slate-600 text-white">
+                <SelectTrigger id="edit-timesheet-type" className="bg-input border-border text-white">
                   <SelectValue placeholder="Select timesheet type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -568,14 +568,14 @@ export function RoleManagement() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 Which timesheet format should employees with this role use?
               </p>
             </div>
             <div className="flex items-center justify-between p-3 bg-slate-800 rounded">
               <div>
                 <Label htmlFor="edit-is-manager">Manager/Admin Role</Label>
-                <p className="text-xs text-slate-400">Full access to all modules</p>
+                <p className="text-xs text-muted-foreground">Full access to all modules</p>
               </div>
               <Switch
                 id="edit-is-manager"
@@ -604,24 +604,24 @@ export function RoleManagement() {
 
       {/* Delete Role Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+        <DialogContent className="border-border text-white">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-red-500" />
               Delete Role
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               Are you sure you want to delete this role? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           {selectedRole && (
             <div className="bg-slate-800 rounded p-4 space-y-2">
               <p className="text-sm">
-                <span className="text-slate-400">Role:</span>{' '}
+                <span className="text-muted-foreground">Role:</span>{' '}
                 <span className="text-white font-medium">{selectedRole.display_name}</span>
               </p>
               <p className="text-sm">
-                <span className="text-slate-400">Users:</span>{' '}
+                <span className="text-muted-foreground">Users:</span>{' '}
                 <span className="text-white">{selectedRole.user_count}</span>
               </p>
             </div>
@@ -658,10 +658,10 @@ export function RoleManagement() {
 
       {/* Permissions Dialog */}
       <Dialog open={permissionsDialogOpen} onOpenChange={setPermissionsDialogOpen}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="border-border text-white max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Manage Permissions: {selectedRole?.display_name}</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               Enable or disable access to modules for this role
             </DialogDescription>
           </DialogHeader>

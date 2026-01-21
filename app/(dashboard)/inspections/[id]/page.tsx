@@ -626,13 +626,13 @@ export default function ViewInspectionPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center space-x-3 md:space-x-4">
             <BackButton />
             <div>
-              <h1 className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white">Vehicle Inspection</h1>
-              <p className="text-sm md:text-base text-slate-600 dark:text-slate-400">
+              <h1 className="text-xl md:text-3xl font-bold text-foreground">Vehicle Inspection</h1>
+              <p className="text-sm md:text-base text-muted-foreground">
                 {inspection.vehicles?.reg_number} • {
                   inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
                     ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
@@ -691,13 +691,13 @@ export default function ViewInspectionPage() {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="">
           <CardContent className="pt-6 text-center">
             <div className="text-3xl font-bold text-green-600">{okCount}</div>
             <div className="text-sm text-muted-foreground">OK</div>
           </CardContent>
         </Card>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="">
           <CardContent className="pt-6 text-center">
             <div className="text-3xl font-bold text-red-600">{defectCount}</div>
             <div className="text-sm text-muted-foreground">Defects</div>
@@ -705,7 +705,7 @@ export default function ViewInspectionPage() {
         </Card>
       </div>
 
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Inspection Items</CardTitle>
@@ -722,13 +722,13 @@ export default function ViewInspectionPage() {
           <div className="hidden md:block overflow-x-auto">
             {isWeeklyInspection ? (
               /* Weekly Inspection Table - grouped by day */
-              <table className="w-full border-collapse border border-slate-300 dark:border-slate-600">
+              <table className="w-full border-collapse border border-border">
                 <thead>
-                  <tr className="bg-slate-100 dark:bg-slate-800 border-b border-slate-300 dark:border-slate-600">
-                    <th className="text-left p-2 w-12 font-medium border-r border-slate-300 dark:border-slate-600">#</th>
-                    <th className="text-left p-2 font-medium border-r border-slate-300 dark:border-slate-600">Item</th>
+                  <tr className="bg-slate-100 dark:bg-slate-800 border-b border-border">
+                    <th className="text-left p-2 w-12 font-medium border-r border-border">#</th>
+                    <th className="text-left p-2 font-medium border-r border-border">Item</th>
                     {dayNames.map((day, index) => (
-                      <th key={index} className="text-center p-2 w-16 font-medium border-r border-slate-300 dark:border-slate-600 last:border-r-0">
+                      <th key={index} className="text-center p-2 w-16 font-medium border-r border-border last:border-r-0">
                         {day}
                       </th>
                     ))}
@@ -736,23 +736,23 @@ export default function ViewInspectionPage() {
                 </thead>
                 <tbody>
                   {uniqueItems.map((item) => (
-                    <tr key={item.number} className="border-b border-slate-300 dark:border-slate-600 hover:bg-secondary/20">
-                      <td className="p-2 text-sm text-muted-foreground font-medium border-r border-slate-300 dark:border-slate-600">
+                    <tr key={item.number} className="border-b border-border hover:bg-secondary/20">
+                      <td className="p-2 text-sm text-muted-foreground font-medium border-r border-border">
                         {item.number}
                       </td>
-                      <td className="p-2 text-sm border-r border-slate-300 dark:border-slate-600">
+                      <td className="p-2 text-sm border-r border-border">
                         {item.description}
                       </td>
                       {[1, 2, 3, 4, 5, 6, 7].map((dayOfWeek) => {
                         const status = getItemStatusForDay(item.number, dayOfWeek);
                         return (
-                          <td key={dayOfWeek} className="p-2 text-center border-r border-slate-300 dark:border-slate-600 last:border-r-0">
+                          <td key={dayOfWeek} className="p-2 text-center border-r border-border last:border-r-0">
                             {status ? (
                               <div className="flex items-center justify-center">
                                 {getStatusIcon(status)}
                               </div>
                             ) : (
-                              <span className="text-slate-400">-</span>
+                              <span className="text-muted-foreground">-</span>
                             )}
                           </td>
                         );
@@ -855,8 +855,8 @@ export default function ViewInspectionPage() {
                         const dayOfWeek = index + 1;
                         const status = getItemStatusForDay(item.number, dayOfWeek);
                         return (
-                          <div key={index} className="flex flex-col items-center p-2 border border-slate-200 dark:border-slate-700 rounded">
-                            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                          <div key={index} className="flex flex-col items-center p-2 border border-border rounded">
+                            <span className="text-xs font-medium text-muted-foreground mb-1">
                               {day}
                             </span>
                             {status ? (
@@ -864,7 +864,7 @@ export default function ViewInspectionPage() {
                                 {getStatusIcon(status)}
                               </div>
                             ) : (
-                              <span className="text-slate-400 text-xs">-</span>
+                              <span className="text-muted-foreground text-xs">-</span>
                             )}
                           </div>
                         );
@@ -968,7 +968,7 @@ export default function ViewInspectionPage() {
 
       {/* Defects & Comments Section */}
       {items.some(item => item.status === 'attention' || item.comments) && (
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="">
           <CardHeader>
             <CardTitle>Defects & Comments</CardTitle>
             <CardDescription>

@@ -78,10 +78,10 @@ export function ConfirmationModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !submitting && !isOpen && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 border-border">
         <DialogHeader>
-          <DialogTitle className="text-2xl text-slate-900 dark:text-white">Confirm Timesheet Submission</DialogTitle>
-          <DialogDescription className="text-slate-600 dark:text-slate-400">
+          <DialogTitle className="text-2xl text-foreground">Confirm Timesheet Submission</DialogTitle>
+          <DialogDescription className="text-muted-foreground">
             Please review your timesheet carefully before submitting
           </DialogDescription>
         </DialogHeader>
@@ -100,38 +100,38 @@ export function ConfirmationModal({
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {/* Total Hours */}
-            <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+            <div className="bg-slate-50 dark:bg-slate-800/50 border border-border rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Clock className="h-4 w-4 text-slate-500" />
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Total Hours</p>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground dark:text-muted-foreground font-medium">Total Hours</p>
               </div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatHours(totalHours)}</p>
+              <p className="text-2xl font-bold text-foreground">{formatHours(totalHours)}</p>
             </div>
 
             {/* Days Worked */}
-            <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+            <div className="bg-slate-50 dark:bg-slate-800/50 border border-border rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
                 <CheckCircle2 className="h-4 w-4 text-green-500" />
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Days Worked</p>
+                <p className="text-xs text-muted-foreground dark:text-muted-foreground font-medium">Days Worked</p>
               </div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{daysWorked} / 7</p>
+              <p className="text-2xl font-bold text-foreground">{daysWorked} / 7</p>
             </div>
 
             {/* Job Numbers */}
-            <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+            <div className="bg-slate-50 dark:bg-slate-800/50 border border-border rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Briefcase className="h-4 w-4 text-slate-500" />
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Job Numbers</p>
+                <Briefcase className="h-4 w-4 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground dark:text-muted-foreground font-medium">Job Numbers</p>
               </div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{uniqueJobNumbers.size}</p>
+              <p className="text-2xl font-bold text-foreground">{uniqueJobNumbers.size}</p>
             </div>
 
             {/* Vehicle */}
-            <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+            <div className="bg-slate-50 dark:bg-slate-800/50 border border-border rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Vehicle Reg</p>
+                <p className="text-xs text-muted-foreground dark:text-muted-foreground font-medium">Vehicle Reg</p>
               </div>
-              <p className="text-lg font-bold text-slate-900 dark:text-white">{regNumber || 'N/A'}</p>
+              <p className="text-lg font-bold text-foreground">{regNumber || 'N/A'}</p>
             </div>
           </div>
 
@@ -151,9 +151,9 @@ export function ConfirmationModal({
           )}
 
           {/* Day-by-Day Breakdown */}
-          <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-            <div className="bg-slate-50 dark:bg-slate-800 px-4 py-3 border-b border-slate-200 dark:border-slate-700">
-              <h3 className="font-semibold text-slate-900 dark:text-white">Daily Breakdown</h3>
+          <div className="border border-border rounded-lg overflow-hidden">
+            <div className="bg-slate-50 dark:bg-slate-800 px-4 py-3 border-b border-border">
+              <h3 className="font-semibold text-foreground">Daily Breakdown</h3>
             </div>
             <div className="divide-y divide-slate-200 dark:divide-slate-700">
               {entries.map((entry, index) => {
@@ -166,7 +166,7 @@ export function ConfirmationModal({
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3">
-                          <span className="font-medium text-slate-900 dark:text-white w-24">{DAY_NAMES[index]}</span>
+                          <span className="font-medium text-foreground w-24">{DAY_NAMES[index]}</span>
                           
                           {entry.did_not_work ? (
                             <Badge variant="secondary" className="bg-slate-200 dark:bg-slate-700">
@@ -175,12 +175,12 @@ export function ConfirmationModal({
                             </Badge>
                           ) : (
                             <>
-                              <span className="text-sm text-slate-600 dark:text-slate-400">
+                              <span className="text-sm text-muted-foreground">
                                 {entry.time_started && entry.time_finished
                                   ? `${entry.time_started} - ${entry.time_finished}`
                                   : 'No times'}
                               </span>
-                              <span className="font-semibold text-slate-900 dark:text-white">
+                              <span className="font-semibold text-foreground">
                                 {entry.daily_total ? `${formatHours(entry.daily_total)}h` : '0h'}
                               </span>
                             </>
@@ -211,7 +211,7 @@ export function ConfirmationModal({
                             </Badge>
                           )}
                           {entry.remarks && (
-                            <span className="text-xs text-slate-500 dark:text-slate-400 italic">
+                            <span className="text-xs text-muted-foreground dark:text-muted-foreground italic">
                               Note: {entry.remarks}
                             </span>
                           )}
@@ -225,8 +225,8 @@ export function ConfirmationModal({
           </div>
 
           {/* Info Box */}
-          <div className="bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+          <div className="bg-slate-100 dark:bg-slate-800/50 border border-border rounded-lg p-4">
+            <p className="text-sm text-muted-foreground">
               By confirming, you certify that all times and details are correct and should be used for payroll purposes.
               Once submitted, this timesheet will be sent to your manager for approval.
             </p>
@@ -238,7 +238,7 @@ export function ConfirmationModal({
             variant="outline"
             onClick={onClose}
             disabled={submitting}
-            className="border-slate-300 dark:border-slate-600"
+            className="border-border"
           >
             Go Back to Edit
           </Button>

@@ -284,17 +284,17 @@ export function CreateWorkshopTaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-slate-900 dark:text-white text-xl">Create Workshop Task</DialogTitle>
-          <DialogDescription className="text-slate-600 dark:text-slate-400">
+          <DialogTitle className="text-xl">Create Workshop Task</DialogTitle>
+          <DialogDescription>
             Add a new vehicle repair or maintenance task
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="vehicle" className="text-slate-900 dark:text-white">
+            <Label htmlFor="vehicle">
               Vehicle <span className="text-red-500">*</span>
             </Label>
             <Select value={selectedVehicleId} onValueChange={(value) => {
@@ -310,7 +310,7 @@ export function CreateWorkshopTaskDialog({
                 setCurrentMileage(null);
               }
             }}>
-              <SelectTrigger id="vehicle" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 dark:text-slate-100 text-slate-900">
+              <SelectTrigger id="vehicle">
                 <SelectValue placeholder="Select vehicle" />
               </SelectTrigger>
               <SelectContent>
@@ -320,7 +320,7 @@ export function CreateWorkshopTaskDialog({
                     <>
                       {recentVehicles.length > 0 && (
                         <SelectGroup>
-                          <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">Recent</SelectLabel>
+                          <SelectLabel>Recent</SelectLabel>
                           {recentVehicles.map((vehicle) => (
                             <SelectItem key={vehicle.id} value={vehicle.id}>
                               {vehicle.reg_number}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
@@ -334,7 +334,7 @@ export function CreateWorkshopTaskDialog({
                       {otherVehicles.length > 0 && (
                         <SelectGroup>
                           {recentVehicles.length > 0 && (
-                            <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">All Vehicles</SelectLabel>
+                            <SelectLabel>All Vehicles</SelectLabel>
                           )}
                           {otherVehicles.map((vehicle) => (
                             <SelectItem key={vehicle.id} value={vehicle.id}>
@@ -351,11 +351,11 @@ export function CreateWorkshopTaskDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="category" className="text-slate-900 dark:text-white">
+            <Label htmlFor="category">
               Category <span className="text-red-500">*</span>
             </Label>
             <Select value={selectedCategoryId} onValueChange={handleCategoryChange}>
-              <SelectTrigger id="category" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 dark:text-slate-100 text-slate-900">
+              <SelectTrigger id="category">
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
@@ -369,7 +369,7 @@ export function CreateWorkshopTaskDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="subcategory" className="text-slate-900 dark:text-white">
+            <Label htmlFor="subcategory">
               Subcategory <span className="text-red-500">*</span>
             </Label>
             <Select 
@@ -377,7 +377,7 @@ export function CreateWorkshopTaskDialog({
               onValueChange={setSelectedSubcategoryId}
               disabled={!selectedCategoryId}
             >
-              <SelectTrigger id="subcategory" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 dark:text-slate-100 text-slate-900">
+              <SelectTrigger id="subcategory">
                 <SelectValue placeholder={selectedCategoryId ? "Select subcategory" : "Select a category first"} />
               </SelectTrigger>
               <SelectContent>
@@ -391,7 +391,7 @@ export function CreateWorkshopTaskDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="mileage" className="text-slate-900 dark:text-white">
+            <Label htmlFor="mileage">
               Current Mileage <span className="text-red-500">*</span>
             </Label>
             <Input
@@ -400,19 +400,18 @@ export function CreateWorkshopTaskDialog({
               value={newMileage}
               onChange={(e) => setNewMileage(e.target.value)}
               placeholder="Enter current mileage"
-              className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 dark:text-slate-100 text-slate-900"
               min="0"
               step="1"
             />
             {currentMileage !== null && (
-              <p className="text-xs text-slate-600 dark:text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 Last recorded: {currentMileage.toLocaleString()} miles
               </p>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="comments" className="text-slate-900 dark:text-white">
+            <Label htmlFor="comments">
               Task Details <span className="text-red-500">*</span>
             </Label>
             <Textarea
@@ -420,10 +419,10 @@ export function CreateWorkshopTaskDialog({
               value={workshopComments}
               onChange={(e) => setWorkshopComments(e.target.value)}
               placeholder="Describe the work needed (minimum 10 characters)"
-              className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 min-h-[100px] dark:text-slate-100 text-slate-900"
+              className="min-h-[100px]"
               maxLength={300}
             />
-            <p className="text-xs text-slate-600 dark:text-slate-400">
+            <p className="text-xs text-muted-foreground">
               {workshopComments.length}/300 characters (minimum 10)
             </p>
           </div>
@@ -433,7 +432,6 @@ export function CreateWorkshopTaskDialog({
           <Button
             variant="outline"
             onClick={handleClose}
-            className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             Cancel
           </Button>

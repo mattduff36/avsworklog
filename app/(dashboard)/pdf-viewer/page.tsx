@@ -72,7 +72,7 @@ function PDFViewerContent() {
       <div className="flex items-center justify-center min-h-screen bg-slate-900">
         <div className="text-center space-y-3">
           <Loader2 className="h-12 w-12 animate-spin text-rams mx-auto" />
-          <p className="text-slate-400">Loading PDF...</p>
+          <p className="text-muted-foreground">Loading PDF...</p>
         </div>
       </div>
     );
@@ -86,7 +86,7 @@ function PDFViewerContent() {
             <AlertCircle className="h-8 w-8 text-red-400" />
           </div>
           <h2 className="text-xl font-bold text-white">Unable to load PDF</h2>
-          <p className="text-slate-400">{error || 'An unknown error occurred'}</p>
+          <p className="text-muted-foreground">{error || 'An unknown error occurred'}</p>
           <Button
             onClick={handleBack}
             className="bg-rams hover:bg-rams-dark text-white"

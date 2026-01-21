@@ -129,9 +129,9 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
       {/* Panel */}
       <div className="fixed top-16 right-4 z-50 w-[400px] max-w-[calc(100vw-2rem)] bg-slate-900 rounded-lg shadow-2xl border border-slate-700 animate-in slide-in-from-top-2 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-2">
-            <Bell className="h-5 w-5 text-slate-300" />
+            <Bell className="h-5 w-5 text-muted-foreground" />
             <h3 className="font-semibold text-white">Notifications</h3>
           </div>
           <Button
@@ -147,13 +147,13 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
         {/* Content */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-            <Bell className="h-12 w-12 text-slate-300 dark:text-slate-600 mb-3" />
-            <p className="text-sm text-slate-400">No notifications</p>
-            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+            <Bell className="h-12 w-12 text-muted-foreground dark:text-slate-600 mb-3" />
+            <p className="text-sm text-muted-foreground">No notifications</p>
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
               You&apos;re all caught up!
             </p>
           </div>
@@ -188,7 +188,7 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
                           {truncateText(notification.body)}
                         </p>
 
-                        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-500">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground dark:text-muted-foreground">
                           <span>From: {notification.sender_name}</span>
                           <span>•</span>
                           <span>{formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}</span>

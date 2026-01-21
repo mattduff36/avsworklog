@@ -115,13 +115,13 @@ export function SubcategoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] bg-slate-900 border-slate-700 text-white">
+      <DialogContent className="sm:max-w-[500px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>
               {mode === 'create' ? `Add Subcategory to ${categoryName}` : 'Edit Subcategory'}
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription>
               {mode === 'create'
                 ? 'Create a new subcategory for more specific task classification'
                 : 'Update subcategory details'}
@@ -136,11 +136,10 @@ export function SubcategoryDialog({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Engine, Brakes, Body Work"
-                className="bg-slate-800 border-slate-700 dark:text-slate-100 text-slate-900"
                 required
                 disabled={loading}
               />
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 Subcategories are automatically organized alphabetically
               </p>
             </div>
@@ -152,7 +151,6 @@ export function SubcategoryDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={loading}
-              className="border-slate-600 text-white hover:bg-slate-800"
             >
               Cancel
             </Button>

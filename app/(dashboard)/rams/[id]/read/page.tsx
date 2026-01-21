@@ -347,12 +347,12 @@ export default function ReadRAMSPage() {
   if (!ramsDocument) {
     return (
       <div className="container mx-auto p-6 max-w-4xl">
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 p-12 text-center">
+        <Card className="bg-white dark:bg-slate-900 border-border p-12 text-center">
           <div className="p-4 rounded-full bg-red-100 dark:bg-red-900/20 w-24 h-24 flex items-center justify-center mx-auto mb-4">
             <FileText className="h-12 w-12 text-red-600 dark:text-red-400" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Document not found</h2>
-          <p className="text-slate-600 dark:text-slate-400 mb-6">The document you're looking for doesn't exist or has been removed.</p>
+          <h2 className="text-2xl font-bold text-foreground mb-2">Document not found</h2>
+          <p className="text-muted-foreground mb-6">The document you're looking for doesn't exist or has been removed.</p>
           <BackButton />
         </Card>
       </div>
@@ -369,14 +369,14 @@ export default function ReadRAMSPage() {
     <RAMSErrorBoundary>
     <div className="flex flex-col min-h-screen">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 shadow-sm">
+      <div className="bg-white dark:bg-slate-900 border-b border-border shadow-sm">
           <div className="container mx-auto px-4 py-4 max-w-6xl">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-4">
               <BackButton />
               <div>
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{ramsDocument.title}</h1>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
+                <h1 className="text-2xl font-bold text-foreground">{ramsDocument.title}</h1>
+                <p className="text-sm text-muted-foreground">
                   {ramsDocument.file_type.toUpperCase()} Document
                 </p>
               </div>
@@ -397,7 +397,7 @@ export default function ReadRAMSPage() {
       {/* Main Content */}
       <div className="flex-1 bg-slate-100 dark:bg-slate-900">
         <div className="container mx-auto py-8 max-w-4xl px-4">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 p-8 md:p-12">
+          <Card className="bg-white dark:bg-slate-900 border-border p-8 md:p-12">
             <div className="text-center space-y-6 max-w-2xl mx-auto">
 
               {/* Error Message */}
@@ -413,7 +413,7 @@ export default function ReadRAMSPage() {
               {/* Action Buttons - For unsigned documents */}
               {canTakeAction && (
                 <div className="space-y-4 pt-6">
-                  <p className="text-slate-600 dark:text-slate-400 mb-4">
+                  <p className="text-muted-foreground mb-4">
                     Please choose how you would like to access this document:
                   </p>
                   
@@ -469,7 +469,7 @@ export default function ReadRAMSPage() {
               {/* Action Buttons - For signed documents (view again) */}
               {canViewSigned && (
                 <div className="space-y-4 pt-6">
-                  <p className="text-slate-600 dark:text-slate-400 mb-4">
+                  <p className="text-muted-foreground mb-4">
                     Choose how you would like to access this document:
                   </p>
                   
@@ -525,11 +525,11 @@ export default function ReadRAMSPage() {
               {/* Sign Button */}
               {canSign && actionTaken && (
                 <div className="mt-4 pt-4">
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                  <p className="text-sm text-muted-foreground mb-4">
                     You have accessed this document via <strong>{actionTaken === 'downloaded' ? 'download' : actionTaken === 'opened' ? 'opening in browser' : 'email'}</strong>. 
                     Please review it carefully, then click below to sign and acknowledge that you have read and understood the safety requirements.
                   </p>
-                  <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
+                  <div className="border-t border-border pt-6">
                     <Button
                       size="lg"
                       onClick={() => {
@@ -552,7 +552,7 @@ export default function ReadRAMSPage() {
 
               {/* Already Signed Message */}
               {isSigned && (
-                <div className="mt-8 pt-8 border-t border-slate-700">
+                <div className="mt-8 pt-8 border-t border-border">
                   <div className="bg-green-900/20 border border-green-800 rounded-lg p-4">
                     <p className="text-sm font-medium text-green-300">
                       ✓ You have signed this document on {assignment?.signed_at ? new Date(assignment.signed_at).toLocaleDateString() : 'previously'}

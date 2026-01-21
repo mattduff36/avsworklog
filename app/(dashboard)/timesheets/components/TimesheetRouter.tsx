@@ -31,7 +31,7 @@ export function TimesheetRouter({ weekEnding, existingId, userId }: TimesheetRou
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center space-y-3">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-timesheet mx-auto"></div>
-          <p className="text-slate-600 dark:text-slate-400">Loading timesheet...</p>
+          <p className="text-muted-foreground">Loading timesheet...</p>
         </div>
       </div>
     );
@@ -75,7 +75,7 @@ export function TimesheetRouter({ weekEnding, existingId, userId }: TimesheetRou
         {CivilsTimesheet ? (
           <CivilsTimesheet weekEnding={weekEnding} existingId={existingId} userId={userId} />
         ) : (
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardHeader>
               <CardTitle className="text-red-500">System Error</CardTitle>
               <CardDescription>

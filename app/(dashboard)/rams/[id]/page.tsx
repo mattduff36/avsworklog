@@ -258,11 +258,11 @@ export default function RAMSDetailsPage() {
   if (!ramsDocument) {
     return (
       <div className="space-y-6 max-w-6xl">
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="h-16 w-16 text-slate-400 mb-4" />
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Document not found</h3>
-          <p className="text-slate-600 dark:text-slate-400 mb-4">
+            <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">Document not found</h3>
+          <p className="text-muted-foreground mb-4">
             This document may have been deleted or you don&apos;t have permission to view it.
           </p>
           <BackButton userRole={{ isManager, isAdmin }} />
@@ -280,13 +280,13 @@ export default function RAMSDetailsPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <BackButton userRole={{ isManager, isAdmin }} />
             <div>
-              <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">{ramsDocument.title}</h1>
-              <p className="text-slate-600 dark:text-slate-400">
+              <h1 className="text-3xl font-bold text-foreground mb-2">{ramsDocument.title}</h1>
+              <p className="text-muted-foreground">
                 Uploaded {formatDistanceToNow(new Date(ramsDocument.created_at), { addSuffix: true })} by{' '}
                 {ramsDocument.uploader_name}
               </p>
@@ -296,7 +296,7 @@ export default function RAMSDetailsPage() {
             <Button 
               variant="outline" 
               onClick={exportPDF}
-              className="border-slate-600 text-slate-300 hover:bg-slate-700/50"
+              className="border-border text-muted-foreground hover:bg-slate-700/50"
             >
               <FileDown className="h-4 w-4 mr-2" />
               Export PDF
@@ -304,7 +304,7 @@ export default function RAMSDetailsPage() {
             <Button 
               variant="outline" 
               onClick={downloadDocument}
-              className="border-slate-600 text-slate-300 hover:bg-slate-700/50"
+              className="border-border text-muted-foreground hover:bg-slate-700/50"
             >
               <Download className="h-4 w-4 mr-2" />
               Download
@@ -322,19 +322,19 @@ export default function RAMSDetailsPage() {
 
       {/* Stats Cards */}
       <div className="grid gap-2 md:gap-4 grid-cols-4 md:grid-cols-4">
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 p-1 md:p-6">
+        <Card className="bg-white dark:bg-slate-900 border-border p-1 md:p-6">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 md:pb-2 p-1 md:p-6">
-            <CardTitle className="text-[10px] md:text-sm font-medium text-slate-900 dark:text-white leading-tight">Total Assigned</CardTitle>
-            <Users className="h-2.5 w-2.5 md:h-4 md:w-4 text-slate-400" />
+            <CardTitle className="text-[10px] md:text-sm font-medium text-foreground leading-tight">Total Assigned</CardTitle>
+            <Users className="h-2.5 w-2.5 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent className="p-1 md:p-6 pt-0">
-            <div className="text-sm md:text-2xl font-bold text-slate-900 dark:text-white">{totalAssigned}</div>
-            <p className="text-[9px] md:text-xs text-slate-600 dark:text-slate-400 leading-tight">Employees</p>
+            <div className="text-sm md:text-2xl font-bold text-foreground">{totalAssigned}</div>
+            <p className="text-[9px] md:text-xs text-muted-foreground leading-tight">Employees</p>
           </CardContent>
         </Card>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 p-1 md:p-6">
+        <Card className="bg-white dark:bg-slate-900 border-border p-1 md:p-6">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 md:pb-2 p-1 md:p-6">
-            <CardTitle className="text-[10px] md:text-sm font-medium text-slate-900 dark:text-white leading-tight">Signed</CardTitle>
+            <CardTitle className="text-[10px] md:text-sm font-medium text-foreground leading-tight">Signed</CardTitle>
             <CheckCircle2 className="h-2.5 w-2.5 md:h-4 md:w-4 text-green-400" />
           </CardHeader>
           <CardContent className="p-1 md:p-6 pt-0">
@@ -342,50 +342,50 @@ export default function RAMSDetailsPage() {
             <p className="text-[9px] md:text-xs text-muted-foreground leading-tight">Completed</p>
           </CardContent>
         </Card>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 p-1 md:p-6">
+        <Card className="bg-white dark:bg-slate-900 border-border p-1 md:p-6">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 md:pb-2 p-1 md:p-6">
-            <CardTitle className="text-[10px] md:text-sm font-medium text-slate-900 dark:text-white leading-tight">Pending</CardTitle>
+            <CardTitle className="text-[10px] md:text-sm font-medium text-foreground leading-tight">Pending</CardTitle>
             <Clock className="h-2.5 w-2.5 md:h-4 md:w-4 text-orange-400" />
           </CardHeader>
           <CardContent className="p-1 md:p-6 pt-0">
             <div className="text-sm md:text-2xl font-bold text-orange-600">{totalPending}</div>
-            <p className="text-[9px] md:text-xs text-slate-600 dark:text-slate-400 leading-tight">Awaiting signature</p>
+            <p className="text-[9px] md:text-xs text-muted-foreground leading-tight">Awaiting signature</p>
           </CardContent>
         </Card>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 p-1 md:p-6">
+        <Card className="bg-white dark:bg-slate-900 border-border p-1 md:p-6">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 md:pb-2 p-1 md:p-6">
-            <CardTitle className="text-[10px] md:text-sm font-medium text-slate-900 dark:text-white leading-tight">Compliance</CardTitle>
-            <FileText className="h-2.5 w-2.5 md:h-4 md:w-4 text-slate-400" />
+            <CardTitle className="text-[10px] md:text-sm font-medium text-foreground leading-tight">Compliance</CardTitle>
+            <FileText className="h-2.5 w-2.5 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent className="p-1 md:p-6 pt-0">
-            <div className="text-sm md:text-2xl font-bold text-slate-900 dark:text-white">{complianceRate}%</div>
-            <p className="text-[9px] md:text-xs text-slate-600 dark:text-slate-400 leading-tight">Completion rate</p>
+            <div className="text-sm md:text-2xl font-bold text-foreground">{complianceRate}%</div>
+            <p className="text-[9px] md:text-xs text-muted-foreground leading-tight">Completion rate</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Document Info */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="">
         <CardHeader>
-          <CardTitle className="text-slate-900 dark:text-white">Document Information</CardTitle>
+          <CardTitle className="text-foreground">Document Information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {ramsDocument.description && (
             <div>
-              <span className="font-semibold text-slate-900 dark:text-white">Description: </span>
-              <span className="text-slate-600 dark:text-slate-400">{ramsDocument.description}</span>
+              <span className="font-semibold text-foreground">Description: </span>
+              <span className="text-muted-foreground">{ramsDocument.description}</span>
             </div>
           )}
           <div>
-            <span className="font-semibold text-slate-900 dark:text-white">File: </span>
-            <span className="text-slate-600 dark:text-slate-400">
+            <span className="font-semibold text-foreground">File: </span>
+            <span className="text-muted-foreground">
               {ramsDocument.file_name} ({ramsDocument.file_type.toUpperCase()} •{' '}
               {formatFileSize(ramsDocument.file_size)})
             </span>
           </div>
           <div>
-            <span className="font-semibold text-slate-900 dark:text-white">Created: </span>
-            <span className="text-slate-600 dark:text-slate-400">
+            <span className="font-semibold text-foreground">Created: </span>
+            <span className="text-muted-foreground">
               {new Date(ramsDocument.created_at).toLocaleString()}
             </span>
           </div>
@@ -407,10 +407,10 @@ export default function RAMSDetailsPage() {
 
         {/* Employees Tab */}
         <TabsContent value="employees" className="space-y-4">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardHeader>
-              <CardTitle className="text-slate-900 dark:text-white">Employee Assignments</CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400">
+              <CardTitle className="text-foreground">Employee Assignments</CardTitle>
+              <CardDescription className="text-muted-foreground">
                 Track which employees have been assigned and signed this RAMS document
               </CardDescription>
             </CardHeader>
@@ -488,10 +488,10 @@ export default function RAMSDetailsPage() {
 
         {/* Visitors Tab */}
         <TabsContent value="visitors" className="space-y-4">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardHeader>
-              <CardTitle className="text-slate-900 dark:text-white">Visitor Signatures</CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400">
+              <CardTitle className="text-foreground">Visitor Signatures</CardTitle>
+              <CardDescription className="text-muted-foreground">
                 Signatures captured from visitors and contractors
               </CardDescription>
             </CardHeader>

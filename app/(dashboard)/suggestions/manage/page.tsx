@@ -188,16 +188,16 @@ export default function SuggestionsManagePage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-yellow-100 dark:bg-yellow-950 rounded-lg">
             <Lightbulb className="h-6 w-6 text-yellow-600" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+            <h1 className="text-3xl font-bold text-foreground mb-2">
               Manage Suggestions
             </h1>
-            <p className="text-slate-600 dark:text-slate-400">
+            <p className="text-muted-foreground">
               Review and respond to user suggestions
             </p>
           </div>
@@ -218,14 +218,14 @@ export default function SuggestionsManagePage() {
             key={key}
             className={`cursor-pointer transition-all ${
               statusFilter === key ? 'ring-2 ring-yellow-500' : ''
-            } bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700`}
+            } bg-white dark:bg-slate-900 border-border`}
             onClick={() => setStatusFilter(key)}
           >
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-500">{label}</p>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="text-2xl font-bold text-foreground">
                     {counts[key] || 0}
                   </p>
                 </div>
@@ -237,10 +237,10 @@ export default function SuggestionsManagePage() {
       </div>
 
       {/* Search */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="">
         <CardContent className="pt-4">
           <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search suggestions..."
               value={searchQuery}
@@ -252,12 +252,12 @@ export default function SuggestionsManagePage() {
       </Card>
 
       {/* Suggestions List */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="">
         <CardHeader>
-          <CardTitle className="text-slate-900 dark:text-white">
+          <CardTitle className="text-foreground">
             Suggestions
           </CardTitle>
-          <CardDescription className="text-slate-500">
+          <CardDescription className="text-muted-foreground">
             {filteredSuggestions.length} suggestion{filteredSuggestions.length !== 1 ? 's' : ''}
           </CardDescription>
         </CardHeader>
@@ -267,8 +267,8 @@ export default function SuggestionsManagePage() {
               <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
             </div>
           ) : filteredSuggestions.length === 0 ? (
-            <div className="text-center py-8 text-slate-500">
-              <Lightbulb className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+            <div className="text-center py-8 text-muted-foreground">
+              <Lightbulb className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p>No suggestions found</p>
             </div>
           ) : (
@@ -276,13 +276,13 @@ export default function SuggestionsManagePage() {
               {filteredSuggestions.map((suggestion) => (
                 <div
                   key={suggestion.id}
-                  className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  className="p-4 rounded-lg border border-border bg-slate-50 dark:bg-slate-800 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                   onClick={() => openDetailDialog(suggestion)}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-medium text-slate-900 dark:text-white truncate">
+                        <h3 className="font-medium text-foreground truncate">
                           {suggestion.title}
                         </h3>
                         <Badge className={`${SUGGESTION_STATUS_COLORS[suggestion.status]} text-white shrink-0`}>
@@ -290,10 +290,10 @@ export default function SuggestionsManagePage() {
                           <span className="ml-1">{SUGGESTION_STATUS_LABELS[suggestion.status]}</span>
                         </Badge>
                       </div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2">
+                      <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2">
                         {suggestion.body}
                       </p>
-                      <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
+                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <User className="h-3 w-3" />
                           {suggestion.user?.full_name || 'Unknown'}
@@ -302,7 +302,7 @@ export default function SuggestionsManagePage() {
                           {formatDistanceToNow(new Date(suggestion.created_at), { addSuffix: true })}
                         </span>
                         {suggestion.page_hint && (
-                          <span className="text-slate-500">
+                          <span className="text-muted-foreground">
                             Related to: {suggestion.page_hint}
                           </span>
                         )}
@@ -318,12 +318,12 @@ export default function SuggestionsManagePage() {
 
       {/* Detail Dialog */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="max-w-2xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <DialogContent className="max-w-2xl bg-white dark:bg-slate-900 border-border">
           <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-white">
+            <DialogTitle className="text-foreground">
               Suggestion Details
             </DialogTitle>
-            <DialogDescription className="text-slate-500">
+            <DialogDescription className="text-muted-foreground">
               Review and update this suggestion
             </DialogDescription>
           </DialogHeader>
@@ -333,17 +333,17 @@ export default function SuggestionsManagePage() {
               {/* Suggestion Info */}
               <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800 space-y-3">
                 <div className="flex items-start justify-between">
-                  <h3 className="font-semibold text-slate-900 dark:text-white">
+                  <h3 className="font-semibold text-foreground">
                     {selectedSuggestion.title}
                   </h3>
                   <Badge className={`${SUGGESTION_STATUS_COLORS[selectedSuggestion.status]} text-white`}>
                     {SUGGESTION_STATUS_LABELS[selectedSuggestion.status]}
                   </Badge>
                 </div>
-                <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">
+                <p className="text-sm text-slate-600 dark:text-muted-foreground whitespace-pre-wrap">
                   {selectedSuggestion.body}
                 </p>
-                <div className="flex items-center gap-4 text-xs text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2 border-t border-border">
                   <span>From: {selectedSuggestion.user?.full_name || 'Unknown'}</span>
                   <span>{new Date(selectedSuggestion.created_at).toLocaleString()}</span>
                   {selectedSuggestion.page_hint && (
@@ -355,7 +355,7 @@ export default function SuggestionsManagePage() {
               {/* Update Form */}
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-slate-700 dark:text-slate-300">Status</Label>
+                  <Label className="text-slate-700 dark:text-muted-foreground">Status</Label>
                   <Select value={newStatus} onValueChange={(v) => setNewStatus(v as SuggestionStatus)}>
                     <SelectTrigger className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900">
                       <SelectValue placeholder="Select status" />
@@ -371,7 +371,7 @@ export default function SuggestionsManagePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-slate-700 dark:text-slate-300">
+                  <Label className="text-slate-700 dark:text-muted-foreground">
                     Internal Notes (not visible to submitter)
                   </Label>
                   <Textarea
@@ -384,7 +384,7 @@ export default function SuggestionsManagePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-slate-700 dark:text-slate-300">
+                  <Label className="text-slate-700 dark:text-muted-foreground">
                     Update Note (for history)
                   </Label>
                   <Input
@@ -403,7 +403,7 @@ export default function SuggestionsManagePage() {
                 </div>
               ) : suggestionUpdates.length > 0 && (
                 <div className="space-y-2">
-                  <Label className="text-slate-700 dark:text-slate-300">History</Label>
+                  <Label className="text-slate-700 dark:text-muted-foreground">History</Label>
                   <div className="max-h-32 overflow-y-auto space-y-2">
                     {suggestionUpdates.map((update) => (
                       <div 
@@ -411,7 +411,7 @@ export default function SuggestionsManagePage() {
                         className="text-xs p-2 rounded bg-slate-100 dark:bg-slate-700"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="text-slate-500">
+                          <span className="text-muted-foreground">
                             {update.old_status && update.new_status ? (
                               <>
                                 {SUGGESTION_STATUS_LABELS[update.old_status]} → {SUGGESTION_STATUS_LABELS[update.new_status]}
@@ -420,16 +420,16 @@ export default function SuggestionsManagePage() {
                               'Note added'
                             )}
                           </span>
-                          <span className="text-slate-400">
+                          <span className="text-muted-foreground">
                             {new Date(update.created_at).toLocaleDateString()}
                           </span>
                         </div>
                         {update.note && (
-                          <p className="text-slate-600 dark:text-slate-300 mt-1">
+                          <p className="text-slate-600 dark:text-muted-foreground mt-1">
                             {update.note}
                           </p>
                         )}
-                        <p className="text-slate-400 mt-1">
+                        <p className="text-muted-foreground mt-1">
                           by {update.user?.full_name || 'Unknown'}
                         </p>
                       </div>
@@ -444,7 +444,7 @@ export default function SuggestionsManagePage() {
             <Button
               variant="outline"
               onClick={() => setDetailDialogOpen(false)}
-              className="border-slate-300 dark:border-slate-600"
+              className="border-border"
             >
               Cancel
             </Button>
