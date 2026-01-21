@@ -69,7 +69,7 @@ export default function DashboardPage() {
   const [userEmail, setUserEmail] = useState<string>('');
   const [viewAsRole, setViewAsRole] = useState<string>('actual');
   
-  // Intro animation state (desktop only)
+  // Intro animation state (all devices)
   const [showIntro, setShowIntro] = useState(true);
   
   // Hide intro after 3 seconds
@@ -441,13 +441,13 @@ export default function DashboardPage() {
       
       {/* Welcome Section */}
       <div className="bg-slate-900 rounded-lg p-6 border border-slate-700 relative overflow-hidden">
-        {/* Intro Animation Overlay (Desktop Only) */}
+        {/* Intro Animation Overlay (All Devices) */}
         <div 
-          className={`hidden md:flex absolute inset-0 bg-slate-900 items-center justify-center z-10 transition-opacity duration-700 ${
+          className={`flex absolute inset-0 bg-slate-900 items-center justify-center z-10 transition-opacity duration-700 ${
             showIntro ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}
         >
-          <span className="text-3xl font-bold text-avs-yellow tracking-wide">
+          <span className="text-2xl md:text-3xl font-bold text-avs-yellow tracking-wide">
             SquiresApp.com
           </span>
         </div>
@@ -500,11 +500,14 @@ export default function DashboardPage() {
               .map((formType, index) => {
               const Icon = formType.icon;
               const showBadge = formType.id === 'rams' && pendingRAMSCount > 0;
+              // Yellow backgrounds need dark text for contrast
+              const needsDarkText = formType.color === 'avs-yellow';
+              const textColorClass = needsDarkText ? 'text-slate-900' : 'text-white';
               
               return (
                 <Link key={formType.id} href={formType.href}>
                   <div 
-                    className={`relative bg-${formType.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3 cursor-pointer animate-tile-pop`}
+                    className={`relative bg-${formType.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3 cursor-pointer animate-tile-pop ${textColorClass}`}
                     style={{ animationDelay: `${index * 75}ms` }}
                   >
                     {showBadge && (
