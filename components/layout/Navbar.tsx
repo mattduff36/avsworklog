@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
@@ -344,21 +343,15 @@ export function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              {/* Mobile-only logo (links to Dashboard) */}
-              <Link
-                href="/dashboard"
-                aria-label="Go to dashboard"
+              {/* Mobile-only text logo */}
+              <Link 
+                href="/dashboard" 
+                className="md:hidden flex items-center mr-4 group"
                 onClick={() => setMobileMenuOpen(false)}
-                className="md:hidden flex items-center mr-3"
               >
-                <Image
-                  src="/images/logo.png"
-                  alt="Squires"
-                  width={32}
-                  height={32}
-                  className="h-8 w-8"
-                  priority
-                />
+                <div className="text-xl font-bold text-white group-hover:text-avs-yellow transition-colors">
+                  SQUIRES
+                </div>
               </Link>
 
               {/* Desktop Navigation - Same for all users */}
