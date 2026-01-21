@@ -274,19 +274,12 @@ export default function HelpPage() {
     <div className="space-y-6 max-w-5xl">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-blue-100 dark:bg-blue-950 rounded-lg">
-            <HelpCircle className="h-6 w-6 text-blue-600" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">
-              Help & FAQ
-            </h1>
-            <p className="text-muted-foreground">
-              Find answers to common questions and submit suggestions
-            </p>
-          </div>
-        </div>
+        <h1 className="text-3xl font-bold text-foreground mb-2">
+          Help & FAQ
+        </h1>
+        <p className="text-muted-foreground">
+          Find answers to common questions and submit suggestions
+        </p>
       </div>
 
       {/* Tabs */}
