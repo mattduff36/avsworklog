@@ -195,15 +195,33 @@ function InspectionsContent() {
       if (error) throw error;
       setInspections(data || []);
     } catch (error) {
-      console.error('Error fetching inspections:', error);
-      // Show friendly message if offline
-      if (!isOnline) {
+      const message = (() => {
+        if (error instanceof Error) return error.message;
+        if (typeof error === 'string') return error;
+        try {
+          return JSON.stringify(error);
+        } catch {
+          return String(error);
+        }
+      })();
+      const isNetworkFailure =
+        message.includes('Failed to fetch') || message.includes('NetworkError') || message.toLowerCase().includes('network');
+
+      // Avoid escalating common mobile/offline network failures into centralized error logs
+      if (isNetworkFailure) {
+        console.warn('Unable to load inspections (network):', error);
+      } else {
+        console.error('Error fetching inspections:', error);
+      }
+
+      // Show friendly message if offline or network failure
+      if (!isOnline || isNetworkFailure) {
         try {
           toast.error('Unable to load inspections', {
             description: 'Please check your internet connection.',
           });
-        } catch (toastError) {
-          console.error('Unable to load inspections (toast unavailable)');
+        } catch {
+          console.warn('Unable to load inspections (toast unavailable)');
         }
       }
     } finally {
