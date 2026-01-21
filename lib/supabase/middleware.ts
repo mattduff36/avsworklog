@@ -50,23 +50,18 @@ export async function updateSession(request: NextRequest) {
     // Continue without user
   }
 
-  // Protected routes - ALL dashboard routes require authentication
-  const protectedPaths = [
-    '/dashboard',
-    '/timesheets', 
-    '/inspections',
-    '/absence',      // CRITICAL: Added to prevent unauthenticated access
-    '/reports',
-    '/admin',
-    '/approvals',
-    '/actions',
-    '/toolbox-talks',
-    '/rams'
+  // PUBLIC routes - ONLY these routes are accessible without authentication
+  // All other routes require authentication (safer default)
+  const publicPaths = [
+    '/login',
+    '/change-password',  // Users must access this after temp password login
+    '/offline',          // Service worker offline page
   ]
-  const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))
+  
+  const isPublicPath = publicPaths.some(path => request.nextUrl.pathname.startsWith(path))
 
-  if (isProtectedPath && !user) {
-    // No user, redirect to login
+  // If not a public path and no user, redirect to login
+  if (!isPublicPath && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.searchParams.set('redirect', request.nextUrl.pathname)
