@@ -120,7 +120,7 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
                 onChange={(e) => setTitle(e.target.value)}
                 disabled={uploading}
                 required
-                className="placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-900"
+                className="placeholder:text-slate-400 dark:placeholder:text-slate-500"
               />
             </div>
 
@@ -134,7 +134,7 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={uploading}
                 rows={3}
-                className="placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-900"
+                className="placeholder:text-slate-400 dark:placeholder:text-slate-500"
               />
             </div>
 
@@ -155,7 +155,7 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
                     accept=".pdf,application/pdf"
                     onChange={handleFileChange}
                     disabled={uploading}
-                    className="hidden text-slate-900"
+                    className="hidden"
                   />
                   <Button
                     type="button"

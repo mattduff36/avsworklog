@@ -18,8 +18,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { OfflineBanner } from '@/components/ui/offline-banner';
-import { ArrowLeft, Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus, Check, WifiOff, Camera, AlertTriangle } from 'lucide-react';
+import { Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus, Check, WifiOff, Camera, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
+import { BackButton } from '@/components/ui/back-button';
 import { formatDateISO, formatDate, getWeekEnding } from '@/lib/utils/date';
 import { INSPECTION_ITEMS, InspectionStatus, getChecklistForCategory } from '@/types/inspection';
 import { checkMileageSanity, formatMileage, type MileageSanityResult } from '@/lib/utils/mileageSanity';
@@ -1333,12 +1334,7 @@ function NewInspectionContent() {
       <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-3">
-            <Link href="/inspections">
-              <Button variant="ghost" size="sm" className="h-9 w-9 p-0 md:w-auto md:px-3 hover:bg-slate-100 dark:hover:bg-slate-800">
-                <ArrowLeft className="h-5 w-5 md:mr-2" />
-                <span className="hidden md:inline">Back</span>
-              </Button>
-            </Link>
+            <BackButton fallbackHref="/inspections" />
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white">
                 {existingInspectionId ? 'Edit Inspection' : 'New Inspection'}
@@ -1454,7 +1450,7 @@ function NewInspectionContent() {
                   <SelectValue placeholder="Select a vehicle" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-900 border-slate-700 max-h-[300px] md:max-h-[400px] dark:text-slate-100 text-slate-900">
-                  <SelectItem value="add-new" className="text-avs-yellow font-semibold border-b border-slate-700 text-slate-900">
+                  <SelectItem value="add-new" className="text-avs-yellow font-semibold border-b border-slate-700">
                     <div className="flex items-center gap-2">
                       <Plus className="h-4 w-4" />
                       Add New Vehicle
@@ -1466,7 +1462,7 @@ function NewInspectionContent() {
                       <>
                         {recentVehicles.length > 0 && (
                           <SelectGroup>
-                            <SelectLabel className="text-slate-400 text-xs px-2 py-1.5 text-slate-900">Recent</SelectLabel>
+                            <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">Recent</SelectLabel>
                             {recentVehicles.map((vehicle) => (
                               <SelectItem key={vehicle.id} value={vehicle.id} className="text-white">
                                 {vehicle.reg_number} - {vehicle.vehicle_categories?.name || vehicle.vehicle_type || 'Uncategorized'}
@@ -1480,7 +1476,7 @@ function NewInspectionContent() {
                         {otherVehicles.length > 0 && (
                           <SelectGroup>
                             {recentVehicles.length > 0 && (
-                              <SelectLabel className="text-slate-400 text-xs px-2 py-1.5 text-slate-900">All Vehicles</SelectLabel>
+                              <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">All Vehicles</SelectLabel>
                             )}
                             {otherVehicles.map((vehicle) => (
                               <SelectItem key={vehicle.id} value={vehicle.id} className="text-white">

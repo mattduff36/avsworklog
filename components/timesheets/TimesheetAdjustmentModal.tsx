@@ -210,7 +210,7 @@ export function TimesheetAdjustmentModal({
                 onChange={(e) => setComments(e.target.value)}
                 disabled={loading || fetching}
                 rows={4}
-                className="resize-none text-slate-900"
+                className="resize-none"
                 required
               />
               <p className="text-xs text-muted-foreground">
@@ -226,7 +226,7 @@ export function TimesheetAdjustmentModal({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 disabled={loading || fetching}
-                className="pl-10 text-slate-900"
+                className="pl-10"
               />
             </div>
 

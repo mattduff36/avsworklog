@@ -459,13 +459,28 @@ export default function ViewTimesheetPage() {
           </div>
           <div className="flex items-center gap-2">
             {isManager && (
-              <a href={`/api/timesheets/${timesheet.id}/pdf`} target="_blank" rel="noopener noreferrer">
-                <Button variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Download PDF</span>
-                  <span className="sm:hidden">PDF</span>
-                </Button>
-              </a>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={(e) => {
+                  e.preventDefault();
+                  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+                  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                  const pdfUrl = `/api/timesheets/${timesheet.id}/pdf`;
+                  
+                  if (isStandalone || isMobile) {
+                    // Use in-app PDF viewer for PWA/mobile
+                    router.push(`/pdf-viewer?url=${encodeURIComponent(pdfUrl)}&title=${encodeURIComponent(`Timesheet-${timesheet.week_ending}`)}&return=${encodeURIComponent(`/timesheets/${timesheet.id}`)}`);
+                  } else {
+                    // Desktop: Open in new tab
+                    window.open(pdfUrl, '_blank');
+                  }
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Download PDF</span>
+                <span className="sm:hidden">PDF</span>
+              </Button>
             )}
             {getStatusBadge(timesheet.status)}
           </div>

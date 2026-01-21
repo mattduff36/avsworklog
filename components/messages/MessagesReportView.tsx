@@ -160,7 +160,7 @@ export function MessagesReportView() {
         </div>
 
         <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-full md:w-[180px] text-slate-900">
+          <SelectTrigger className="w-full md:w-[180px]">
             <Filter className="h-4 w-4 mr-2" />
             <SelectValue placeholder="Type" />
           </SelectTrigger>
@@ -172,7 +172,7 @@ export function MessagesReportView() {
         </Select>
 
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full md:w-[180px] text-slate-900">
+          <SelectTrigger className="w-full md:w-[180px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>

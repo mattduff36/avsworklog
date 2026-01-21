@@ -402,7 +402,8 @@ export default function DashboardPage() {
 
   const fetchPendingRAMS = async () => {
     if (!profile?.id) {
-      setRamsLoading(false);
+      // Don't set ramsLoading to false - keep it in loading state until profile loads
+      // The loading condition already handles !profile?.id case
       return;
     }
     

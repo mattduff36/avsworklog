@@ -243,22 +243,31 @@ export default function ReadRAMSPage() {
     setError(null);
 
     try {
-      // Open in new tab
-      const newWindow = window.open(fileUrl, '_blank');
+      // Detect if running in PWA or mobile
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       
-      // Check if popup was blocked (null means blocked, undefined means browser doesn't support)
-      if (!newWindow || typeof newWindow.closed === 'undefined') {
-        throw new Error('Failed to open document. Please check your popup blocker settings.');
-      }
+      // Use in-app PDF viewer for PWA/mobile to ensure back navigation works
+      if (isStandalone || isMobile) {
+        const viewerUrl = `/pdf-viewer?url=${encodeURIComponent(fileUrl)}&title=${encodeURIComponent(ramsDocument.title)}&return=${encodeURIComponent(`/rams/${documentId}/read`)}`;
+        router.push(viewerUrl);
+        
+        // Record action
+        await recordAction('opened', !!assignment);
+      } else {
+        // Desktop: Open in new tab
+        const newWindow = window.open(fileUrl, '_blank');
+        
+        // Check if popup was blocked (null means blocked, undefined means browser doesn't support)
+        if (!newWindow || typeof newWindow.closed === 'undefined') {
+          throw new Error('Failed to open document. Please check your popup blocker settings.');
+        }
 
-      // On mobile browsers, window.closed becomes true immediately even when PDF opens successfully
-      // So we only check if the window failed to open initially (popup blocker)
-      // We don't do a delayed check as it's unreliable on mobile devices
-      
-      // Record action (only if assignment exists, not required for signed docs)
-      // Small delay to ensure the window has started loading
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await recordAction('opened', !!assignment);
+        // Record action (only if assignment exists, not required for signed docs)
+        // Small delay to ensure the window has started loading
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await recordAction('opened', !!assignment);
+      }
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 
                           typeof error === 'string' ? error : 'Unknown error';

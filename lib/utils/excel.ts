@@ -1,7 +1,9 @@
+import 'server-only';
 import * as XLSX from 'xlsx';
 
 /**
  * Excel utility functions for generating reports
+ * SERVER-ONLY: This module must only be imported in Server Components or API routes
  */
 
 export interface ExcelColumn {
@@ -23,6 +25,23 @@ export function generateExcelFile(worksheets: ExcelWorksheetData[]): Buffer {
   const workbook = XLSX.utils.book_new();
 
   worksheets.forEach((worksheet) => {
+    // Guard against empty data - create minimal worksheet with just headers
+    if (!worksheet.data || worksheet.data.length === 0) {
+      const headerRow: any = {};
+      worksheet.columns.forEach((col) => {
+        headerRow[col.key] = col.header;
+      });
+      const ws = XLSX.utils.json_to_sheet([headerRow]);
+      
+      // Set column widths
+      ws['!cols'] = worksheet.columns.map((col) => ({
+        wch: col.width || 15,
+      }));
+      
+      XLSX.utils.book_append_sheet(workbook, ws, worksheet.sheetName);
+      return; // Skip to next worksheet
+    }
+    
     // Create worksheet from data
     const ws = XLSX.utils.json_to_sheet(worksheet.data, {
       header: worksheet.columns.map((col) => col.key),

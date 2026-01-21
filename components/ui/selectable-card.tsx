@@ -70,7 +70,7 @@ const SelectableCard = React.forwardRef<HTMLDivElement, SelectableCardProps>(
           )}
         >
           {(selected || locked) && (
-            <Check className="h-3 w-3 text-slate-900" strokeWidth={3} />
+            <Check className="h-3 w-3 text-white" strokeWidth={3} />
           )}
         </div>
 

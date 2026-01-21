@@ -1,9 +1,13 @@
 @import "tailwindcss";
 
+/* Tailwind v4: enable class-based dark variant */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* AVS Squires Brand Colors - Inspired by avs.mpdee.co.uk */
 /* FORCED DARK MODE - All variables set to match slate-900 exactly */
 @layer base {
   :root {
+    color-scheme: dark;
     /* Force dark theme colors matching Tailwind slate palette exactly */
     --background: 222 47% 11%; /* slate-900: rgb(15 23 42) */
     --foreground: 210 40% 98%; /* slate-50 */
@@ -1181,6 +1185,25 @@ button.bg-primary select {
 [style*="background-color: rgb(51 65 85)"],
 [style*="background-color: rgb(51 65 85)"] *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red):not(.ui-component):not(.ui-component *) {
   color: rgb(226 232 240) !important; /* Light text for dark backgrounds */
+}
+
+/* CRITICAL: Protect .ui-component children from global text color overrides */
+/* Use HIGHER specificity than the aggressive background-based rules above */
+[style*="background-color: rgb(15 23 42)"] .ui-component span,
+[style*="background-color: rgb(30 41 59)"] .ui-component span,
+[style*="background-color: rgb(51 65 85)"] .ui-component span,
+.bg-slate-900 .ui-component span,
+.bg-slate-800 .ui-component span,
+.bg-slate-700 .ui-component span,
+.dark .ui-component span,
+.ui-component span {
+  color: rgb(226 232 240) !important; /* Light text for dark backgrounds */
+}
+
+/* NUCLEAR OPTION: Force light text in all combobox spans (Select components) in dark theme */
+.dark [role="combobox"] > span,
+.dark [role="combobox"] span {
+  color: rgb(226 232 240) !important; /* Light text for dark mode */
 }
 
 /* Allow red text for debug/error elements on dark backgrounds */

@@ -199,16 +199,25 @@ export default function RAMSDetailsPage() {
       }
     } catch (error) {
       console.error('Error downloading document:', error);
-      // Fallback to opening in new tab if download fails
+      // Fallback to opening/viewing if download fails
       try {
         const { data } = await supabase.storage
           .from('rams-documents')
           .createSignedUrl(ramsDocument.file_path, 3600);
         if (data?.signedUrl) {
-          window.open(data.signedUrl, '_blank');
+          const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          
+          if (isStandalone || isMobile) {
+            // Use in-app PDF viewer for PWA/mobile
+            router.push(`/pdf-viewer?url=${encodeURIComponent(data.signedUrl)}&title=${encodeURIComponent(ramsDocument.title)}&return=${encodeURIComponent(`/rams/${documentId}`)}`);
+          } else {
+            // Desktop: Open in new tab
+            window.open(data.signedUrl, '_blank');
+          }
         }
       } catch (fallbackError) {
-        console.error('Fallback download also failed:', fallbackError);
+        console.error('Fallback also failed:', fallbackError);
       }
     }
   };
