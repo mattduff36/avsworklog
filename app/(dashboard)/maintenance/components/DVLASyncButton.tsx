@@ -179,7 +179,7 @@ export function DVLASyncButton({
       size={size}
       onClick={handleSync}
       disabled={isSyncing || isRateLimited}
-      className={`${isRateLimited ? 'text-slate-500' : getStatusColor()} hover:bg-slate-800`}
+      className={`${isRateLimited ? 'text-muted-foreground' : getStatusColor()} hover:bg-slate-800`}
       title={getTooltipText()}
     >
       {getButtonContent()}

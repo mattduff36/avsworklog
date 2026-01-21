@@ -138,12 +138,12 @@ export function MarkTaskCompleteDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-slate-900 dark:text-white text-xl">
+          <DialogTitle className="text-xl">
             Mark Task Complete
           </DialogTitle>
-          <DialogDescription className="text-slate-600 dark:text-slate-400">
+          <DialogDescription>
             {requiresIntermediateStep
               ? 'This task will be moved through In Progress and then marked as Complete'
               : 'Add detailed notes about the work completed'}
@@ -173,9 +173,9 @@ export function MarkTaskCompleteDialog({
           {/* Intermediate Comment (if needed) */}
           {requiresIntermediateStep && (
             <div className="space-y-2">
-              <Label htmlFor="intermediate-comment" className="text-slate-900 dark:text-white">
+              <Label htmlFor="intermediate-comment">
                 Step 1: {task.status === 'on_hold' ? 'Resume Note' : 'In Progress Note'}{' '}
-                <span className="text-slate-400">(max 300 chars)</span>{' '}
+                <span className="text-muted-foreground">(max 300 chars)</span>{' '}
                 <span className="text-red-500">*</span>
               </Label>
               <Textarea
@@ -191,11 +191,11 @@ export function MarkTaskCompleteDialog({
                     ? 'e.g., Parts have arrived, resuming work'
                     : 'e.g., Started work on this task'
                 }
-                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[80px]"
+                className="min-h-[80px]"
                 maxLength={300}
                 rows={3}
               />
-              <p className="text-xs text-slate-600 dark:text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 {intermediateComment.length}/300 characters
               </p>
             </div>
@@ -203,9 +203,9 @@ export function MarkTaskCompleteDialog({
 
           {/* Completion Comment */}
           <div className="space-y-2">
-            <Label htmlFor="completed-comment" className="text-slate-900 dark:text-white">
+            <Label htmlFor="completed-comment">
               {requiresIntermediateStep ? 'Step 2: ' : ''}Completion Note{' '}
-              <span className="text-slate-400">(max 500 chars)</span>{' '}
+              <span className="text-muted-foreground">(max 500 chars)</span>{' '}
               <span className="text-red-500">*</span>
             </Label>
             <Textarea
@@ -217,11 +217,11 @@ export function MarkTaskCompleteDialog({
                 }
               }}
               placeholder="e.g., Replaced brake pads and discs on front axle. Tested and working correctly."
-              className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[100px]"
+              className="min-h-[100px]"
               maxLength={500}
               rows={4}
             />
-            <p className="text-xs text-slate-600 dark:text-slate-400">
+            <p className="text-xs text-muted-foreground">
               {completedComment.length}/500 characters
             </p>
           </div>
@@ -229,11 +229,11 @@ export function MarkTaskCompleteDialog({
           {/* Dynamic Maintenance Fields */}
           {hasMaintenanceUpdates && (
             <>
-              <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
-                <h4 className="text-sm font-medium text-slate-900 dark:text-white mb-3">
+              <div className="border-t border-border pt-4">
+                <h4 className="text-sm font-medium text-foreground mb-3">
                   Update Vehicle Maintenance
                 </h4>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mb-4">
+                <p className="text-xs text-muted-foreground mb-4">
                   Optionally update maintenance records for this vehicle
                 </p>
 
@@ -242,7 +242,6 @@ export function MarkTaskCompleteDialog({
                     <div key={config.field_name} className="space-y-2">
                       <Label
                         htmlFor={`maintenance-${config.field_name}`}
-                        className="text-slate-900 dark:text-white"
                       >
                         {config.label}
                         {config.required && <span className="text-red-500 ml-1">*</span>}
@@ -259,7 +258,6 @@ export function MarkTaskCompleteDialog({
                             handleMaintenanceFieldChange(config.field_name, e.target.value)
                           }
                           placeholder="e.g., 120000"
-                          className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white"
                         />
                       )}
 
@@ -271,7 +269,6 @@ export function MarkTaskCompleteDialog({
                           onChange={(e) =>
                             handleMaintenanceFieldChange(config.field_name, e.target.value)
                           }
-                          className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white"
                         />
                       )}
 
@@ -283,12 +280,11 @@ export function MarkTaskCompleteDialog({
                           onChange={(e) =>
                             handleMaintenanceFieldChange(config.field_name, e.target.value)
                           }
-                          className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white"
                         />
                       )}
 
                       {config.help_text && (
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                        <p className="text-xs text-muted-foreground">
                           {config.help_text}
                         </p>
                       )}
@@ -305,7 +301,6 @@ export function MarkTaskCompleteDialog({
             variant="outline"
             onClick={handleCancel}
             disabled={isSubmitting}
-            className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             Cancel
           </Button>

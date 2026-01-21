@@ -94,13 +94,13 @@ export function DeleteVehicleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
+      <DialogContent className="border-border text-white max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-blue-500">
             <Archive className="h-5 w-5" />
             Retire Vehicle
           </DialogTitle>
-          <DialogDescription className="text-slate-400">
+          <DialogDescription className="text-muted-foreground">
             This will move the vehicle to the "Retired Vehicles" tab. All inspection history and maintenance records will be preserved.
           </DialogDescription>
         </DialogHeader>
@@ -115,12 +115,12 @@ export function DeleteVehicleDialog({
           {/* Vehicle Info */}
           <div className="bg-slate-800 rounded-lg p-4 space-y-2">
             <p className="text-sm">
-              <span className="text-slate-400">Registration:</span>{' '}
+              <span className="text-muted-foreground">Registration:</span>{' '}
               <span className="text-white font-medium">{vehicle.reg_number}</span>
             </p>
             {vehicle.category && (
               <p className="text-sm">
-                <span className="text-slate-400">Category:</span>{' '}
+                <span className="text-muted-foreground">Category:</span>{' '}
                 <span className="text-white">{vehicle.category.name}</span>
               </p>
             )}

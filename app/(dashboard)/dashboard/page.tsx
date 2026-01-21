@@ -69,7 +69,7 @@ export default function DashboardPage() {
   const [userEmail, setUserEmail] = useState<string>('');
   const [viewAsRole, setViewAsRole] = useState<string>('actual');
   
-  // Intro animation state (desktop only)
+  // Intro animation state (all devices)
   const [showIntro, setShowIntro] = useState(true);
   
   // Hide intro after 3 seconds
@@ -441,13 +441,13 @@ export default function DashboardPage() {
       
       {/* Welcome Section */}
       <div className="bg-slate-900 rounded-lg p-6 border border-slate-700 relative overflow-hidden">
-        {/* Intro Animation Overlay (Desktop Only) */}
+        {/* Intro Animation Overlay (All Devices) */}
         <div 
-          className={`hidden md:flex absolute inset-0 bg-slate-900 items-center justify-center z-10 transition-opacity duration-700 ${
+          className={`flex absolute inset-0 bg-slate-900 items-center justify-center z-10 transition-opacity duration-700 ${
             showIntro ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}
         >
-          <span className="text-3xl font-bold text-avs-yellow tracking-wide">
+          <span className="text-2xl md:text-3xl font-bold text-avs-yellow tracking-wide">
             SquiresApp.com
           </span>
         </div>
@@ -500,11 +500,14 @@ export default function DashboardPage() {
               .map((formType, index) => {
               const Icon = formType.icon;
               const showBadge = formType.id === 'rams' && pendingRAMSCount > 0;
+              // Yellow backgrounds need dark text for contrast
+              const needsDarkText = formType.color === 'avs-yellow';
+              const textColorClass = needsDarkText ? 'text-slate-900' : 'text-white';
               
               return (
                 <Link key={formType.id} href={formType.href}>
                   <div 
-                    className={`relative bg-${formType.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3 cursor-pointer animate-tile-pop`}
+                    className={`relative bg-${formType.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3 cursor-pointer animate-tile-pop ${textColorClass}`}
                     style={{ animationDelay: `${index * 75}ms` }}
                   >
                     {showBadge && (
@@ -543,7 +546,7 @@ export default function DashboardPage() {
                     style={{ height: '100px', animationDelay: `${index * 75}ms` }}
                   >
                     <div className="flex flex-col items-start justify-between h-full">
-                      <Icon className="h-6 w-6 text-slate-400" />
+                      <Icon className="h-6 w-6 text-muted-foreground" />
                       <span className="text-white font-semibold text-base leading-tight">
                         {link.label}
                       </span>
@@ -565,7 +568,7 @@ export default function DashboardPage() {
                     style={{ height: '100px', animationDelay: `${animationIndex * 75}ms` }}
                   >
                     <div className="flex flex-col items-start justify-between h-full">
-                      <Icon className="h-6 w-6 text-slate-400" />
+                      <Icon className="h-6 w-6 text-muted-foreground" />
                       <span className="text-white font-semibold text-base leading-tight">
                         {link.label}
                       </span>
@@ -587,8 +590,8 @@ export default function DashboardPage() {
                     style={{ height: '100px', animationDelay: `${animationIndex * 75}ms` }}
                   >
                     <div className="flex flex-col items-start justify-between h-full">
-                      <Icon className="h-6 w-6 debug-red" />
-                      <span className="font-semibold text-base leading-tight debug-red">
+                      <Icon className="h-6 w-6 text-red-500" />
+                      <span className="font-semibold text-base leading-tight text-red-500">
                         Debug
                       </span>
                     </div>
@@ -602,23 +605,23 @@ export default function DashboardPage() {
 
       {/* Pending Approvals Summary - Manager/Admin Only */}
       {effectiveIsManager && (
-        <Card className="bg-slate-900 border-slate-700 animate-card-fade" style={{ animationDelay: '300ms' }}>
+        <Card className="border-border animate-card-fade" style={{ animationDelay: '300ms' }}>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-white">
               <span>Pending Approvals</span>
               <Link href="/approvals">
-                <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-700/50">
+                <Button variant="outline" size="sm" className="border-border text-muted-foreground hover:bg-slate-700/50">
                   View All Approvals
                 </Button>
               </Link>
             </CardTitle>
-            <CardDescription className="text-slate-400">
+            <CardDescription className="text-muted-foreground">
               Outstanding approval requests across all types
             </CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="text-center py-8 text-slate-400">
+              <div className="text-center py-8 text-muted-foreground">
                 <p>Loading pending approvals...</p>
               </div>
             ) : (
@@ -632,7 +635,7 @@ export default function DashboardPage() {
                       href={approval.href}
                       className="block group"
                     >
-                      <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-800/30 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-all duration-200 border border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600">
+                      <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-800/30 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-all duration-200 border border-border/50 hover:border-slate-300 dark:hover:border-border">
                         <div className="flex items-center gap-4">
                           <div 
                             className="flex items-center justify-center w-10 h-10 rounded-lg"
@@ -647,7 +650,7 @@ export default function DashboardPage() {
                             <p className="font-medium text-white group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
                               {approval.label}
                             </p>
-                            <p className="text-sm text-slate-400">
+                            <p className="text-sm text-muted-foreground">
                               {approval.count === 0 ? 'No' : approval.count} pending {approval.count === 1 ? 'request' : 'requests'}
                             </p>
                           </div>
@@ -661,7 +664,7 @@ export default function DashboardPage() {
                               {approval.count}
                             </Badge>
                           )}
-                          <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors" />
+                          <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-muted-foreground transition-colors" />
                         </div>
                       </div>
                     </Link>
@@ -672,7 +675,7 @@ export default function DashboardPage() {
                   <div className="text-center py-8 text-slate-400 mt-4">
                     <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-20 text-green-400" />
                     <p className="text-lg mb-1">All caught up!</p>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-muted-foreground">
                       No pending approvals at the moment
                     </p>
                   </div>
@@ -685,23 +688,23 @@ export default function DashboardPage() {
 
       {/* Manager Actions Section */}
       {effectiveIsManager && (
-        <Card className="bg-slate-900 border-slate-700 animate-card-fade" style={{ animationDelay: '400ms' }}>
+        <Card className="border-border animate-card-fade" style={{ animationDelay: '400ms' }}>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-white">
               <span>Manager Actions</span>
               <Link href="/actions">
-                <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-700/50">
+                <Button variant="outline" size="sm" className="border-border text-muted-foreground hover:bg-slate-700/50">
                   View All Actions
                 </Button>
               </Link>
             </CardTitle>
-            <CardDescription className="text-slate-400">
+            <CardDescription className="text-muted-foreground">
               Track and manage all action items
             </CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="text-center py-8 text-slate-400">
+              <div className="text-center py-8 text-muted-foreground">
                 <p>Loading actions...</p>
               </div>
             ) : (
@@ -717,7 +720,7 @@ export default function DashboardPage() {
                         key={actionType.type}
                         className="opacity-60"
                       >
-                        <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-800/30 border border-slate-700/50">
+                        <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-800/30 border border-border/50">
                           <div className="flex items-center gap-4">
                           <div 
                             className="flex items-center justify-center w-10 h-10 rounded-lg"
@@ -737,7 +740,7 @@ export default function DashboardPage() {
                                 Coming Soon
                               </Badge>
                             </div>
-                            <p className="text-sm text-slate-400">
+                            <p className="text-sm text-muted-foreground">
                               Site safety audits and compliance checks
                             </p>
                           </div>
@@ -754,7 +757,7 @@ export default function DashboardPage() {
                       href={actionType.href}
                       className="block group"
                     >
-                      <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-800/30 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-all duration-200 border border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600">
+                      <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-800/30 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-all duration-200 border border-border/50 hover:border-slate-300 dark:hover:border-border">
                         <div className="flex items-center gap-4">
                           <div 
                             className="flex items-center justify-center w-10 h-10 rounded-lg"
@@ -769,7 +772,7 @@ export default function DashboardPage() {
                             <p className="font-medium text-white group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
                               {actionType.label}
                             </p>
-                            <p className="text-sm text-slate-400">
+                            <p className="text-sm text-muted-foreground">
                               {actionType.count === 0 ? 'No' : actionType.count} {actionType.count === 1 ? 'item' : 'items'} {actionType.count === 0 ? '' : 'requiring attention'}
                             </p>
                           </div>
@@ -783,7 +786,7 @@ export default function DashboardPage() {
                               {actionType.count}
                             </Badge>
                           )}
-                          <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors" />
+                          <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-muted-foreground transition-colors" />
                         </div>
                       </div>
                     </Link>
@@ -794,7 +797,7 @@ export default function DashboardPage() {
                   <div className="text-center py-8 text-slate-400 mt-4">
                     <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-20 text-green-400" />
                     <p className="text-lg mb-1">All clear!</p>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-muted-foreground">
                       No actions at the moment
                     </p>
                   </div>

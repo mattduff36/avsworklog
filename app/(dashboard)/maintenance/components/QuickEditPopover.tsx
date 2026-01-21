@@ -231,13 +231,13 @@ export function QuickEditPopover({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <h4 className="font-medium text-sm text-white">Quick Edit: {fieldLabel}</h4>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-muted-foreground">
               Current: {formatCurrentValue(alert.type, currentValue)}
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="newValue" className="text-slate-300 text-sm">
+            <Label htmlFor="newValue" className="text-muted-foreground text-sm">
               New Value
             </Label>
             {isDateField ? (
@@ -246,7 +246,7 @@ export function QuickEditPopover({
                 type="date"
                 value={newValue}
                 onChange={(e) => setNewValue(e.target.value)}
-                className="bg-slate-900 border-slate-600 text-white"
+                className="border-border text-white"
                 required
               />
             ) : (
@@ -258,26 +258,26 @@ export function QuickEditPopover({
                 placeholder="Enter mileage"
                 value={newValue}
                 onChange={(e) => setNewValue(e.target.value)}
-                className="bg-slate-900 border-slate-600 text-white"
+                className="border-border text-white"
                 required
               />
             )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="comment" className="text-slate-300 text-sm">
-              Reason for change <span className="text-slate-500">(min 10 chars)</span>
+            <Label htmlFor="comment" className="text-muted-foreground text-sm">
+              Reason for change <span className="text-muted-foreground">(min 10 chars)</span>
             </Label>
             <Textarea
               id="comment"
               placeholder="Why is this being changed?"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              className="bg-slate-900 border-slate-600 text-white resize-none h-20"
+              className="border-border text-white resize-none h-20"
               required
               minLength={10}
             />
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted-foreground">
               {comment.length}/10 characters minimum
             </p>
           </div>
@@ -288,7 +288,7 @@ export function QuickEditPopover({
               variant="outline"
               size="sm"
               onClick={() => setOpen(false)}
-              className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
+              className="flex-1 border-border text-muted-foreground hover:bg-slate-700"
               disabled={loading}
             >
               Cancel

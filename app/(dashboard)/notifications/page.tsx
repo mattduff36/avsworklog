@@ -105,16 +105,16 @@ export default function NotificationsPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-blue-100 dark:bg-blue-950 rounded-lg">
             <Bell className="h-6 w-6 text-blue-600" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-1">
+            <h1 className="text-3xl font-bold text-foreground mb-1">
               Notifications
             </h1>
-            <p className="text-slate-600 dark:text-slate-400">
+            <p className="text-muted-foreground">
               View all your messages from the last 60 days
             </p>
           </div>
@@ -122,15 +122,15 @@ export default function NotificationsPage() {
       </div>
 
       {/* Search */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="">
         <CardContent className="pt-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search notifications..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-11 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+              className="pl-11 bg-white dark:bg-slate-900 border-border dark:text-slate-100 text-slate-900"
             />
           </div>
         </CardContent>
@@ -139,16 +139,16 @@ export default function NotificationsPage() {
       {/* Notifications List */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : filteredNotifications.length === 0 ? (
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <Bell className="h-16 w-16 text-slate-300 dark:text-slate-600 mb-3" />
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+            <Bell className="h-16 w-16 text-muted-foreground dark:text-slate-600 mb-3" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">
               No notifications found
             </h3>
-            <p className="text-slate-600 dark:text-slate-400 text-center">
+            <p className="text-muted-foreground text-center">
               {searchQuery ? 'Try adjusting your search' : 'You have no notifications in the last 60 days'}
             </p>
           </CardContent>
@@ -158,7 +158,7 @@ export default function NotificationsPage() {
           {filteredNotifications.map((notification) => (
             <Card
               key={notification.id}
-              className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg transition-shadow cursor-pointer"
+              className="bg-white dark:bg-slate-900 border-border hover:shadow-lg transition-shadow cursor-pointer"
               onClick={() => handleNotificationClick(notification)}
             >
               <CardContent className="p-4">
@@ -179,17 +179,17 @@ export default function NotificationsPage() {
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-2">
-                      <h3 className="font-semibold text-slate-900 dark:text-white">
+                      <h3 className="font-semibold text-foreground">
                         {notification.subject}
                       </h3>
                       {getStatusBadge(notification.status)}
                     </div>
 
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-2 line-clamp-2">
+                    <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
                       {notification.body}
                     </p>
 
-                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-500">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground dark:text-muted-foreground">
                       <span>From: {notification.sender_name}</span>
                       <span>•</span>
                       <span>{formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}</span>

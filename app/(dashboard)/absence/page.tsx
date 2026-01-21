@@ -278,7 +278,7 @@ export default function AbsencePage() {
       <div className="grid grid-cols-7 gap-2">
         {/* Day headers */}
         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-          <div key={day} className="text-center text-sm font-medium text-slate-400 pb-2">
+          <div key={day} className="text-center text-sm font-medium text-muted-foreground pb-2">
             {day}
           </div>
         ))}
@@ -314,7 +314,7 @@ export default function AbsencePage() {
                 hover:bg-slate-700/30 hover:border-purple-500/50 transition-colors
               `}
             >
-              <div className="text-xs text-slate-300 font-medium mb-1">
+              <div className="text-xs text-muted-foreground font-medium mb-1">
                 {format(day, 'd')}
               </div>
               
@@ -324,7 +324,7 @@ export default function AbsencePage() {
                   {annualLeave.map(absence => (
                     <div key={absence.id} className="flex items-start gap-1">
                       <div className="h-1.5 w-1.5 rounded-full bg-purple-500 mt-1 flex-shrink-0" />
-                      <span className="text-slate-300 leading-tight truncate">
+                      <span className="text-muted-foreground leading-tight truncate">
                         {absence.profiles?.full_name || 'Unknown'}
                       </span>
                     </div>
@@ -332,7 +332,7 @@ export default function AbsencePage() {
                   {pending.map(absence => (
                     <div key={absence.id} className="flex items-start gap-1">
                       <div className="h-1.5 w-1.5 rounded-full bg-amber-500 mt-1 flex-shrink-0" />
-                      <span className="text-slate-300 leading-tight truncate">
+                      <span className="text-muted-foreground leading-tight truncate">
                         {absence.profiles?.full_name || 'Unknown'}
                       </span>
                     </div>
@@ -340,7 +340,7 @@ export default function AbsencePage() {
                   {otherAbsences.map(absence => (
                     <div key={absence.id} className="flex items-start gap-1">
                       <div className="h-1.5 w-1.5 rounded-full bg-blue-500 mt-1 flex-shrink-0" />
-                      <span className="text-slate-300 leading-tight truncate">
+                      <span className="text-muted-foreground leading-tight truncate">
                         {absence.profiles?.full_name || 'Unknown'}
                       </span>
                     </div>
@@ -373,9 +373,9 @@ export default function AbsencePage() {
   if (permissionLoading || loadingAbsences || loadingSummary) {
     return (
       <div className="space-y-6 max-w-6xl">
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="">
           <CardContent className="flex items-center justify-center py-12">
-            <p className="text-slate-400">
+            <p className="text-muted-foreground">
               {permissionLoading ? 'Checking access...' : 'Loading absences...'}
             </p>
           </CardContent>
@@ -393,13 +393,13 @@ export default function AbsencePage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+            <h1 className="text-3xl font-bold text-foreground mb-2">
               Absence & Leave
             </h1>
-            <p className="text-slate-600 dark:text-slate-400">
+            <p className="text-muted-foreground">
               {isManager || isAdmin 
                 ? 'Manage annual leave and view absence records'
                 : 'Request annual leave and view your absence records'
@@ -457,13 +457,13 @@ export default function AbsencePage() {
       </Card>
       
       {/* Request Annual Leave Form */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="">
         <CardHeader 
           className="cursor-pointer hover:bg-slate-800/20 transition-colors"
           onClick={() => setShowRequestForm(!showRequestForm)}
         >
           <div className="flex items-center justify-between">
-            <CardTitle className="text-slate-900 dark:text-white">
+            <CardTitle className="text-foreground">
               Request Annual Leave
             </CardTitle>
             <Button
@@ -473,7 +473,7 @@ export default function AbsencePage() {
                 e.stopPropagation();
                 setShowRequestForm(!showRequestForm);
               }}
-              className="border-slate-600 text-slate-300"
+              className="border-border text-muted-foreground"
             >
               {showRequestForm ? 'Hide Form' : 'Show Form'}
             </Button>
@@ -499,7 +499,7 @@ export default function AbsencePage() {
                     }}
                     min={formatDateISO(new Date())}
                     required
-                    className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+                    className="bg-white dark:bg-slate-900 border-border dark:text-slate-100 text-slate-900"
                   />
                 </div>
                 
@@ -512,7 +512,7 @@ export default function AbsencePage() {
                     onChange={(e) => setEndDate(e.target.value)}
                     min={startDate || formatDateISO(new Date())}
                     disabled={!startDate || isHalfDay}
-                    className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+                    className="bg-white dark:bg-slate-900 border-border dark:text-slate-100 text-slate-900"
                   />
                 </div>
               </div>
@@ -528,9 +528,9 @@ export default function AbsencePage() {
                         setEndDate(''); // Clear end date for half-day
                       }
                     }}
-                    className="rounded border-slate-600"
+                    className="rounded border-border"
                   />
-                  <span className="text-sm text-slate-300">Half Day</span>
+                  <span className="text-sm text-muted-foreground">Half Day</span>
                 </label>
                 
                 {isHalfDay && (
@@ -544,7 +544,7 @@ export default function AbsencePage() {
                         onChange={() => setHalfDaySession('AM')}
                         className="text-purple-500"
                       />
-                      <span className="text-sm text-slate-300">AM</span>
+                      <span className="text-sm text-muted-foreground">AM</span>
                     </label>
                     <label className="flex items-center gap-1 cursor-pointer">
                       <input
@@ -555,7 +555,7 @@ export default function AbsencePage() {
                         onChange={() => setHalfDaySession('PM')}
                         className="text-purple-500"
                       />
-                      <span className="text-sm text-slate-300">PM</span>
+                      <span className="text-sm text-muted-foreground">PM</span>
                     </label>
                   </div>
                 )}
@@ -568,7 +568,7 @@ export default function AbsencePage() {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Add any additional information..."
-                  className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+                  className="bg-white dark:bg-slate-900 border-border dark:text-slate-100 text-slate-900"
                 />
               </div>
               
@@ -578,19 +578,19 @@ export default function AbsencePage() {
                   <h4 className="font-semibold text-white">Request Summary</h4>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
-                      <span className="text-slate-400">Requested Days:</span>
+                      <span className="text-muted-foreground">Requested Days:</span>
                       <span className="ml-2 text-white font-medium">{requestedDays}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400">Approved Taken:</span>
+                      <span className="text-muted-foreground">Approved Taken:</span>
                       <span className="ml-2 text-white font-medium">{summary?.approved_taken || 0}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400">Pending:</span>
+                      <span className="text-muted-foreground">Pending:</span>
                       <span className="ml-2 text-white font-medium">{summary?.pending_total || 0}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400">Projected Remaining:</span>
+                      <span className="text-muted-foreground">Projected Remaining:</span>
                       <span className={`ml-2 font-medium ${projectedRemaining < 0 ? 'text-red-400' : 'text-green-400'}`}>
                         {projectedRemaining}
                       </span>
@@ -626,7 +626,7 @@ export default function AbsencePage() {
                     setHalfDaySession('AM');
                     setNotes('');
                   }}
-                  className="border-slate-600 text-slate-300"
+                  className="border-border text-muted-foreground"
                 >
                   Clear
                 </Button>
@@ -645,10 +645,10 @@ export default function AbsencePage() {
         {/* Calendar Tab */}
         <TabsContent value="calendar" className="space-y-6">
           {/* Calendar */}
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardHeader>
               <div className="flex items-center justify-between mb-4">
-                <CardTitle className="text-slate-900 dark:text-white">
+                <CardTitle className="text-foreground">
                   {format(currentMonth, 'MMMM yyyy')}
                 </CardTitle>
                 <div className="flex gap-2">
@@ -656,14 +656,14 @@ export default function AbsencePage() {
                   {(isManager || isAdmin) && employees.length > 0 && (
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className="border-slate-600 text-slate-300">
+                        <Button variant="outline" size="sm" className="border-border text-muted-foreground">
                           <Users className="h-4 w-4 mr-2" />
                           Filter ({selectedEmployeeIds.length}/{employees.length})
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-80 bg-slate-900 border-slate-700" align="end">
+                      <PopoverContent className="w-80 border-border" align="end">
                         <div className="space-y-3">
-                          <div className="flex items-center justify-between pb-2 border-b border-slate-700">
+                          <div className="flex items-center justify-between pb-2 border-b border-border">
                             <h4 className="font-semibold text-white text-sm">Filter Employees</h4>
                             <Button
                               variant="ghost"
@@ -681,11 +681,11 @@ export default function AbsencePage() {
                                   id={`emp-${emp.id}`}
                                   checked={selectedEmployeeIds.includes(emp.id)}
                                   onCheckedChange={() => toggleEmployee(emp.id)}
-                                  className="border-slate-600"
+                                  className="border-border"
                                 />
                                 <label
                                   htmlFor={`emp-${emp.id}`}
-                                  className="text-sm text-slate-300 cursor-pointer flex-1"
+                                  className="text-sm text-muted-foreground cursor-pointer flex-1"
                                 >
                                   {emp.full_name}
                                 </label>
@@ -702,7 +702,7 @@ export default function AbsencePage() {
                     size="sm"
                     onClick={() => setCurrentMonthIndex(Math.max(0, currentMonthIndex - 1))}
                     disabled={currentMonthIndex === 0}
-                    className="border-slate-600 text-slate-300"
+                    className="border-border text-muted-foreground"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
@@ -711,7 +711,7 @@ export default function AbsencePage() {
                     size="sm"
                     onClick={() => setCurrentMonthIndex(Math.min(months.length - 1, currentMonthIndex + 1))}
                     disabled={currentMonthIndex === months.length - 1}
-                    className="border-slate-600 text-slate-300"
+                    className="border-border text-muted-foreground"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
@@ -719,18 +719,18 @@ export default function AbsencePage() {
               </div>
               
               {/* Legend */}
-              <div className="flex flex-wrap gap-4 pt-4 text-sm border-t border-slate-700">
+              <div className="flex flex-wrap gap-4 pt-4 text-sm border-t border-border">
                 <div className="flex items-center gap-2">
                   <div className="h-3 w-3 rounded-full bg-purple-500" />
-                  <span className="text-slate-400">Annual Leave (Approved)</span>
+                  <span className="text-muted-foreground">Annual Leave (Approved)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="h-3 w-3 rounded-full bg-amber-500" />
-                  <span className="text-slate-400">Pending Request</span>
+                  <span className="text-muted-foreground">Pending Request</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="h-3 w-3 rounded-full bg-blue-500" />
-                  <span className="text-slate-400">Other Absence</span>
+                  <span className="text-muted-foreground">Other Absence</span>
                 </div>
               </div>
             </CardHeader>
@@ -742,21 +742,21 @@ export default function AbsencePage() {
         
         {/* Bookings List Tab */}
         <TabsContent value="bookings">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardHeader>
-              <CardTitle className="text-slate-900 dark:text-white">
+              <CardTitle className="text-foreground">
                 My Absence Records ({financialYear.label})
               </CardTitle>
-              <CardDescription className="text-slate-400">
+              <CardDescription className="text-muted-foreground">
                 All absences in the current financial year
               </CardDescription>
             </CardHeader>
             <CardContent>
               {!userAbsences || userAbsences.filter(a => a.status !== 'cancelled').length === 0 ? (
                 <div className="text-center py-12">
-                  <CalendarIcon className="h-16 w-16 text-slate-400 mx-auto mb-4" />
+                  <CalendarIcon className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-white mb-2">No absences recorded</h3>
-                  <p className="text-slate-400">Your absence records will appear here</p>
+                  <p className="text-muted-foreground">Your absence records will appear here</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -768,7 +768,7 @@ export default function AbsencePage() {
                     return (
                       <div
                         key={absence.id}
-                        className="p-4 rounded-lg bg-slate-800/30 border border-slate-700/50 hover:border-slate-600 transition-colors"
+                        className="p-4 rounded-lg bg-slate-800/30 border border-border/50 hover:border-slate-600 transition-colors"
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
@@ -785,7 +785,7 @@ export default function AbsencePage() {
                                     ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
                                     : absence.status === 'rejected'
                                     ? 'border-purple-500/30 text-purple-400 bg-purple-500/10'
-                                    : 'border-slate-600 text-slate-400'
+                                    : 'border-slate-600 text-muted-foreground'
                                 }
                               >
                                 {absence.status}
@@ -795,15 +795,15 @@ export default function AbsencePage() {
                                   Paid
                                 </Badge>
                               ) : (
-                                <Badge variant="outline" className="border-slate-600 text-slate-400">
+                                <Badge variant="outline" className="border-slate-600 text-muted-foreground">
                                   Unpaid
                                 </Badge>
                               )}
                             </div>
                             
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm text-slate-400">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm text-muted-foreground">
                               <div>
-                                <span className="text-slate-500">Date:</span>{' '}
+                                <span className="text-muted-foreground">Date:</span>{' '}
                                 {absence.end_date && absence.date !== absence.end_date
                                   ? `${formatDate(absence.date)} - ${formatDate(absence.end_date)}`
                                   : formatDate(absence.date)
@@ -811,16 +811,16 @@ export default function AbsencePage() {
                                 {absence.is_half_day && ` (${absence.half_day_session})`}
                               </div>
                               <div>
-                                <span className="text-slate-500">Duration:</span> {absence.duration_days} days
+                                <span className="text-muted-foreground">Duration:</span> {absence.duration_days} days
                               </div>
                               <div>
-                                <span className="text-slate-500">Submitted:</span> {formatDate(absence.created_at)}
+                                <span className="text-muted-foreground">Submitted:</span> {formatDate(absence.created_at)}
                               </div>
                             </div>
                             
                             {absence.notes && (
-                              <p className="text-sm text-slate-400 mt-2">
-                                <span className="text-slate-500">Notes:</span> {absence.notes}
+                              <p className="text-sm text-muted-foreground mt-2">
+                                <span className="text-muted-foreground">Notes:</span> {absence.notes}
                               </p>
                             )}
                           </div>
@@ -848,12 +848,12 @@ export default function AbsencePage() {
       
       {/* Day Click Modal */}
       <Dialog open={showDayModal} onOpenChange={setShowDayModal}>
-        <DialogContent className="bg-slate-900 border-slate-700">
+        <DialogContent className="border-border">
           <DialogHeader>
             <DialogTitle className="text-white">
               {selectedDate && format(selectedDate, 'EEEE, MMMM d, yyyy')}
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               What would you like to do?
             </DialogDescription>
           </DialogHeader>
@@ -871,18 +871,18 @@ export default function AbsencePage() {
                   <div className="space-y-3">
                     <h4 className="text-sm font-semibold text-white">Absences on this day:</h4>
                     {dayAbsences.map(absence => (
-                      <div key={absence.id} className="p-3 rounded bg-slate-800/50 border border-slate-700">
+                      <div key={absence.id} className="p-3 rounded bg-slate-800/50 border border-border">
                         <div className="flex items-start justify-between">
                           <div>
                             <p className="font-medium text-white">{absence.absence_reasons.name}</p>
                             {(isManager || isAdmin) && absence.profiles && (
-                              <p className="text-sm text-slate-400">{absence.profiles.full_name}</p>
+                              <p className="text-sm text-muted-foreground">{absence.profiles.full_name}</p>
                             )}
-                            <p className="text-xs text-slate-500 mt-1">
+                            <p className="text-xs text-muted-foreground mt-1">
                               Status: <span className="capitalize">{absence.status}</span>
                             </p>
                             {absence.notes && (
-                              <p className="text-xs text-slate-400 mt-1">{absence.notes}</p>
+                              <p className="text-xs text-muted-foreground mt-1">{absence.notes}</p>
                             )}
                           </div>
                           <Badge
@@ -892,7 +892,7 @@ export default function AbsencePage() {
                                 ? 'border-green-500/30 text-green-400 bg-green-500/10'
                                 : absence.status === 'pending'
                                 ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
-                                : 'border-slate-600 text-slate-400'
+                                : 'border-slate-600 text-muted-foreground'
                             }
                           >
                             {absence.status}
@@ -905,8 +905,8 @@ export default function AbsencePage() {
               } else {
                 return (
                   <div className="py-6 text-center">
-                    <CalendarIcon className="h-12 w-12 text-slate-500 mx-auto mb-3" />
-                    <p className="text-slate-400 mb-4">No absences on this day</p>
+                    <CalendarIcon className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-muted-foreground mb-4">No absences on this day</p>
                     <Button
                       onClick={handleRequestFromDay}
                       className="bg-purple-500 hover:bg-purple-600 text-white"
@@ -923,7 +923,7 @@ export default function AbsencePage() {
             <Button
               variant="outline"
               onClick={() => setShowDayModal(false)}
-              className="border-slate-600 text-slate-300"
+              className="border-border text-muted-foreground"
             >
               Close
             </Button>

@@ -187,7 +187,7 @@ export function AssignRecipientsModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[85vh] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 z-[100]">
+      <DialogContent className="sm:max-w-[700px] max-h-[85vh] bg-white dark:bg-slate-900 border-border z-[100]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>
@@ -203,7 +203,7 @@ export function AssignRecipientsModal({
           <div className="grid gap-4 py-4">
             {/* Role Filter Section */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-900 dark:text-white">
+              <label className="text-sm font-medium text-foreground">
                 Quick Select by Role:
               </label>
               <div className="grid grid-cols-2 gap-2">

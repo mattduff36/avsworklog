@@ -3,20 +3,20 @@
 /* Tailwind v4: enable class-based dark variant */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* AVS Squires Brand Colors - Inspired by avs.mpdee.co.uk */
-/* FORCED DARK MODE - All variables set to match slate-900 exactly */
+/* AVS Squires Brand Colors */
 @layer base {
   :root {
     color-scheme: dark;
-    /* Force dark theme colors matching Tailwind slate palette exactly */
-    --background: 222 47% 11%; /* slate-900: rgb(15 23 42) */
+    
+    /* Semantic theme tokens - Dark theme by default */
+    --background: 222 47% 11%; /* slate-900 */
     --foreground: 210 40% 98%; /* slate-50 */
     --card: 222 47% 11%; /* slate-900 */
     --card-foreground: 210 40% 98%;
     --popover: 222 47% 11%;
     --popover-foreground: 210 40% 98%;
     
-    /* Primary - AVS Signature Yellow (#F1D64A) */
+    /* Primary - AVS Signature Yellow */
     --primary: 48 87% 69%;
     --primary-foreground: 222 47% 11%;
     
@@ -39,61 +39,53 @@
     --warning: 38 92% 50%;
     --error: 0 84% 60%;
     
-    /* Document Type Colors - Unique per form type */
-    /* Timesheets - Professional Blue */
+    /* Document Type Colors */
     --timesheet-primary: 210 90% 50%;
     --timesheet-light: 210 100% 96%;
     --timesheet-dark: 210 90% 35%;
     
-    /* Vehicle Inspections - Safety Orange/Amber */
     --inspection-primary: 30 95% 55%;
     --inspection-light: 30 100% 96%;
     --inspection-dark: 30 95% 40%;
     
-    /* RAMS Documents - Professional Green */
     --rams-primary: 142 76% 36%;
     --rams-light: 142 76% 95%;
     --rams-dark: 142 76% 28%;
     
-    /* Absence & Leave - Purple */
     --absence-primary: 260 60% 50%;
     --absence-light: 260 60% 96%;
     --absence-dark: 260 60% 40%;
     
-    /* Maintenance & Service - Red */
     --maintenance-primary: 0 84% 60%;
     --maintenance-light: 0 100% 96%;
     --maintenance-dark: 0 84% 45%;
     
-    /* Workshop Tasks - Rust/Brown #a6614d */
     --workshop-primary: 13 37% 48%;
     --workshop-light: 13 37% 96%;
     --workshop-dark: 13 37% 35%;
     
-    /* Reports - Professional Green */
     --report-primary: 150 70% 45%;
     --report-light: 150 100% 96%;
     --report-dark: 150 70% 30%;
     
-    /* Admin/Management - Deep Purple */
     --admin-primary: 260 60% 50%;
     --admin-light: 260 100% 96%;
     --admin-dark: 260 60% 35%;
     
-    /* UI Elements - matching slate palette */
+    /* UI Elements */
     --border: 217 33% 17%; /* slate-800 */
     --input: 217 33% 17%;
     --ring: 48 87% 69%;
     --radius: 0.625rem;
     
     /* AVS Yellow variants */
-    --avs-yellow: 48 87% 69%; /* #F1D64A */
-    --avs-yellow-hover: 48 73% 56%; /* #d1b82f */
+    --avs-yellow: 48 87% 69%;
+    --avs-yellow-hover: 48 73% 56%;
     --avs-yellow-light: 48 100% 94%;
   }
 
   .dark {
-    /* Dark mode variables (same as root for consistency) */
+    /* Dark mode (same as root for single-theme approach) */
     --background: 222 47% 11%;
     --foreground: 210 40% 98%;
     --card: 222 47% 11%;
@@ -117,6 +109,56 @@
     --warning: 38 92% 50%;
     --error: 0 84% 60%;
   }
+
+  /* Module-aware accent colors */
+  [data-accent="timesheets"] {
+    --primary: var(--timesheet-primary);
+    --primary-foreground: 210 40% 98%; /* light text for readability */
+    --ring: var(--timesheet-primary);
+  }
+
+  [data-accent="inspections"] {
+    --primary: var(--inspection-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--inspection-primary);
+  }
+
+  [data-accent="rams"] {
+    --primary: var(--rams-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--rams-primary);
+  }
+
+  [data-accent="absence"] {
+    --primary: var(--absence-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--absence-primary);
+  }
+
+  [data-accent="maintenance"] {
+    --primary: var(--maintenance-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--maintenance-primary);
+  }
+
+  [data-accent="workshop"] {
+    --primary: var(--workshop-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--workshop-primary);
+  }
+
+  [data-accent="reports"] {
+    --primary: var(--report-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--report-primary);
+  }
+
+  /* Brand (yellow) remains the default for non-module pages */
+  [data-accent="brand"] {
+    --primary: 48 87% 69%;
+    --primary-foreground: 222 47% 11%; /* dark text for yellow */
+    --ring: 48 87% 69%;
+  }
 }
 
 @layer base {
@@ -132,353 +174,11 @@
     font-feature-settings: "rlig" 1, "calt" 1;
     position: relative;
   }
-  
-  /* Force all white and light backgrounds to dark - override light mode classes */
-  .bg-white {
-    background-color: rgb(15 23 42) !important; /* slate-900 */
-  }
-  
-  /* Force all light slate backgrounds to dark */
-  .bg-slate-50 {
-    background-color: rgb(30 41 59) !important; /* slate-800 */
-  }
-  
-  .bg-slate-100 {
-    background-color: rgb(30 41 59) !important; /* slate-800 */
-  }
-  
-  .bg-slate-200 {
-    background-color: rgb(51 65 85) !important; /* slate-700 */
-  }
-  
-  .bg-slate-300 {
-    background-color: rgb(51 65 85) !important; /* slate-700 */
-  }
-  
-  /* Ensure dark slate backgrounds are consistent */
-  .bg-slate-700 {
-    background-color: rgb(51 65 85) !important; /* slate-700 */
-  }
-  
-  .bg-slate-800 {
-    background-color: rgb(30 41 59) !important; /* slate-800 */
-  }
-  
-  .bg-slate-900 {
-    background-color: rgb(15 23 42) !important; /* slate-900 */
-  }
-  
-  /* Force light red backgrounds to dark red */
-  .bg-red-50 {
-    background-color: rgba(239, 68, 68, 0.1) !important; /* red-500/10 */
-  }
-  
-  .bg-red-100 {
-    background-color: rgba(239, 68, 68, 0.15) !important; /* red-500/15 */
-  }
-  
-  /* Force light blue backgrounds to dark blue */
-  .bg-blue-50 {
-    background-color: rgba(59, 130, 246, 0.1) !important; /* blue-500/10 */
-  }
-  
-  .bg-blue-100 {
-    background-color: rgba(59, 130, 246, 0.15) !important; /* blue-500/15 */
-  }
-  
-  .bg-blue-200 {
-    background-color: rgba(59, 130, 246, 0.2) !important; /* blue-500/20 */
-  }
-  
-  /* Force light amber/yellow backgrounds to dark amber */
-  .bg-amber-50 {
-    background-color: rgba(245, 158, 11, 0.1) !important; /* amber-500/10 */
-  }
-  
-  .bg-amber-100 {
-    background-color: rgba(245, 158, 11, 0.15) !important; /* amber-500/15 */
-  }
-  
-  .bg-yellow-50 {
-    background-color: rgba(234, 179, 8, 0.1) !important; /* yellow-500/10 */
-  }
-  
-  .bg-yellow-100 {
-    background-color: rgba(234, 179, 8, 0.15) !important; /* yellow-500/15 */
-  }
-  
-  /* Force light gray backgrounds to dark (if any gray classes exist) */
-  .bg-gray-50 {
-    background-color: rgb(30 41 59) !important; /* slate-800 */
-  }
-  
-  .bg-gray-100 {
-    background-color: rgb(30 41 59) !important; /* slate-800 */
-  }
-  
-  .bg-gray-200 {
-    background-color: rgb(51 65 85) !important; /* slate-700 */
-  }
-  
-  /* Force light green backgrounds to dark green - CRITICAL for badges */
-  .bg-green-50 {
-    background-color: rgba(34, 197, 94, 0.1) !important; /* green-500/10 */
-  }
-  
-  .bg-green-100 {
-    background-color: rgba(34, 197, 94, 0.2) !important; /* green-500/20 */
-  }
-  
-  .bg-green-200 {
-    background-color: rgba(34, 197, 94, 0.25) !important; /* green-500/25 */
-  }
-  
-  .bg-green-300 {
-    background-color: rgba(34, 197, 94, 0.3) !important; /* green-500/30 */
-  }
-  
-  /* Force light borders to dark slate colors */
-  .border-slate-200 {
-    border-color: rgb(51 65 85) !important; /* slate-700 */
-  }
-  
-  .border-slate-300 {
-    border-color: rgb(51 65 85) !important; /* slate-700 */
-  }
-  
-  .border-slate-600 {
-    border-color: rgb(71 85 105) !important; /* slate-600 */
-  }
-  
-  .border-slate-700 {
-    border-color: rgb(51 65 85) !important; /* slate-700 */
-  }
-  
-  /* Force light blue borders to dark blue */
-  .border-blue-200 {
-    border-color: rgba(59, 130, 246, 0.3) !important; /* blue-500/30 */
-  }
-  
-  .border-blue-300 {
-    border-color: rgba(59, 130, 246, 0.4) !important; /* blue-500/40 */
-  }
-  
-  /* Force light amber borders to dark amber */
-  .border-amber-200 {
-    border-color: rgba(245, 158, 11, 0.3) !important; /* amber-500/30 */
-  }
-  
-  .border-amber-300 {
-    border-color: rgba(245, 158, 11, 0.4) !important; /* amber-500/40 */
-  }
-  
-  .border-yellow-200 {
-    border-color: rgba(234, 179, 8, 0.3) !important; /* yellow-500/30 */
-  }
-  
-  .border-yellow-300 {
-    border-color: rgba(234, 179, 8, 0.4) !important; /* yellow-500/40 */
-  }
-  
-  /* Force light green borders to dark green */
-  .border-green-200 {
-    border-color: rgba(34, 197, 94, 0.3) !important; /* green-500/30 */
-  }
-  
-  .border-green-300 {
-    border-color: rgba(34, 197, 94, 0.4) !important; /* green-500/40 */
-  }
-  
-  .border-green-800 {
-    border-color: rgba(34, 197, 94, 0.5) !important; /* green-500/50 */
-  }
-  
-  /* Force light text to appropriate dark mode colors */
-  .text-slate-300 {
-    color: rgb(203 213 225) !important; /* slate-300 */
-  }
-  
-  .text-slate-400 {
-    color: rgb(148 163 184) !important; /* slate-400 */
-  }
-  
-  .text-slate-500 {
-    color: rgb(148 163 184) !important; /* slate-400 */
-  }
-  
-  .text-slate-600 {
-    color: rgb(148 163 184) !important; /* slate-400 */
-  }
-  
-  .text-slate-700 {
-    color: rgb(203 213 225) !important; /* slate-300 - lighter for visibility */
-  }
-  
-  .text-slate-800 {
-    color: rgb(226 232 240) !important; /* slate-200 - very light */
-  }
-  
-  /* NOTE: .text-slate-900 intentionally NOT inverted - used for dark text on light backgrounds (e.g., yellow buttons) */
-  
-  .text-white {
-    color: rgb(255 255 255) !important;
-  }
-  
-  /* Force gray text colors too */
-  .text-gray-600 {
-    color: rgb(148 163 184) !important; /* slate-400 */
-  }
-  
-  .text-gray-700 {
-    color: rgb(203 213 225) !important; /* slate-300 */
-  }
-  
-  .text-gray-900 {
-    color: rgb(248 250 252) !important; /* slate-50 */
-  }
-  
-  /* Force blue text colors to light blue for dark theme */
-  .text-blue-100 {
-    color: rgb(219 234 254) !important; /* blue-100 */
-  }
-  
-  .text-blue-200 {
-    color: rgb(191 219 254) !important; /* blue-200 */
-  }
-  
-  .text-blue-600 {
-    color: rgb(147 197 253) !important; /* blue-300 - lighter for visibility */
-  }
-  
-  .text-blue-700 {
-    color: rgb(191 219 254) !important; /* blue-200 - lighter for visibility */
-  }
-  
-  .text-blue-900 {
-    color: rgb(219 234 254) !important; /* blue-100 - light text */
-  }
-  
-  /* Force amber/yellow text colors to light amber for dark theme */
-  .text-amber-100 {
-    color: rgb(254 243 199) !important; /* amber-100 */
-  }
-  
-  .text-amber-200 {
-    color: rgb(253 230 138) !important; /* amber-200 */
-  }
-  
-  .text-amber-600 {
-    color: rgb(251 191 36) !important; /* amber-400 - lighter for visibility */
-  }
-  
-  .text-amber-700 {
-    color: rgb(252 211 77) !important; /* amber-300 - lighter for visibility */
-  }
-  
-  .text-amber-800 {
-    color: rgb(253 230 138) !important; /* amber-200 - lighter for visibility */
-  }
-  
-  .text-amber-900 {
-    color: rgb(254 243 199) !important; /* amber-100 - light text */
-  }
-  
-  .text-yellow-600 {
-    color: rgb(250 204 21) !important; /* yellow-400 - lighter for visibility */
-  }
-  
-  .text-yellow-700 {
-    color: rgb(253 224 71) !important; /* yellow-300 - lighter for visibility */
-  }
-  
-  .text-yellow-800 {
-    color: rgb(254 240 138) !important; /* yellow-200 - lighter for visibility */
-  }
-  
-  .text-yellow-900 {
-    color: rgb(254 249 195) !important; /* yellow-100 - light text */
-  }
-  
-  /* Force green text colors to light green for dark theme */
-  .text-green-400 {
-    color: rgb(74 222 128) !important; /* green-400 - bright for dark bg */
-  }
-  
-  .text-green-600 {
-    color: rgb(134 239 172) !important; /* green-300 - lighter for visibility */
-  }
-  
-  .text-green-700 {
-    color: rgb(187 247 208) !important; /* green-200 - lighter for visibility */
-  }
-  
-  .text-green-800 {
-    color: rgb(220 252 231) !important; /* green-100 - very light */
-  }
-  
-  .text-green-900 {
-    color: rgb(240 253 244) !important; /* green-50 - nearly white text */
-  }
-  
-  /* Force hover states to dark */
-  .hover\:bg-slate-50:hover {
-    background-color: rgb(30 41 59) !important; /* slate-800 */
-  }
-  
-  .hover\:bg-slate-100:hover {
-    background-color: rgb(51 65 85) !important; /* slate-700 */
-  }
-  
-  .hover\:bg-slate-800:hover {
-    background-color: rgb(30 41 59) !important; /* slate-800 */
-  }
-  
-  /* Force green hover states to darker green */
-  .hover\:bg-green-600:hover {
-    background-color: rgb(22 163 74) !important; /* green-600 */
-  }
-  
-  /* Custom overflow class for sticky headers - horizontal scroll only */
-  .overflow-x-only {
-    overflow-x: auto !important;
-    overflow-y: visible !important;
-  }
-  
-  /* Mobile View - 20% Smaller */
-  @media (max-width: 768px) {
-    html {
-      font-size: 12.8px; /* 16px * 0.8 = 12.8px base */
-    }
-  }
 
-  body::before {
-    content: "";
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-image: 
-      repeating-linear-gradient(
-        45deg,
-        transparent,
-        transparent 100px,
-        rgba(241, 214, 74, 0.02) 100px,
-        rgba(241, 214, 74, 0.02) 102px
-      ),
-      repeating-linear-gradient(
-        -45deg,
-        transparent,
-        transparent 100px,
-        rgba(241, 214, 74, 0.01) 100px,
-        rgba(241, 214, 74, 0.01) 102px
-      );
-    pointer-events: none;
-    z-index: -1;
-  }
+  /* Grid pattern removed - keeping plain gradient background */
 }
 
-/* AVS Yellow Custom Classes */
+/* Module-specific color utilities */
 @layer utilities {
   .bg-avs-yellow {
     background-color: #F1D64A;
@@ -496,248 +196,77 @@
     border-color: #F1D64A;
   }
   
-  /* Timesheet Colors */
-  .bg-timesheet {
-    background-color: hsl(var(--timesheet-primary));
-  }
+  /* Timesheet */
+  .bg-timesheet { background-color: hsl(var(--timesheet-primary)); }
+  .bg-timesheet-light { background-color: hsl(var(--timesheet-light)); }
+  .bg-timesheet-dark { background-color: hsl(var(--timesheet-dark)); }
+  .text-timesheet { color: hsl(var(--timesheet-primary)); }
+  .border-timesheet { border-color: hsl(var(--timesheet-primary)); }
   
-  .bg-timesheet-light {
-    background-color: hsl(var(--timesheet-light));
-  }
+  /* Inspection */
+  .bg-inspection { background-color: hsl(var(--inspection-primary)); }
+  .bg-inspection-light { background-color: hsl(var(--inspection-light)); }
+  .bg-inspection-dark { background-color: hsl(var(--inspection-dark)); }
+  .text-inspection { color: hsl(var(--inspection-primary)); }
+  .border-inspection { border-color: hsl(var(--inspection-primary)); }
   
-  .bg-timesheet-dark {
-    background-color: hsl(var(--timesheet-dark));
-  }
+  /* Report */
+  .bg-report { background-color: hsl(var(--report-primary)); }
+  .bg-report-light { background-color: hsl(var(--report-light)); }
+  .bg-report-dark { background-color: hsl(var(--report-dark)); }
+  .text-report { color: hsl(var(--report-primary)); }
+  .border-report { border-color: hsl(var(--report-primary)); }
   
-  .text-timesheet {
-    color: hsl(var(--timesheet-primary));
-  }
+  /* Admin */
+  .bg-admin { background-color: hsl(var(--admin-primary)); }
+  .bg-admin-light { background-color: hsl(var(--admin-light)); }
+  .bg-admin-dark { background-color: hsl(var(--admin-dark)); }
+  .text-admin { color: hsl(var(--admin-primary)); }
+  .border-admin { border-color: hsl(var(--admin-primary)); }
   
-  .border-timesheet {
-    border-color: hsl(var(--timesheet-primary));
-  }
+  /* RAMS */
+  .bg-rams { background-color: hsl(var(--rams-primary)); }
+  .bg-rams-light { background-color: hsl(var(--rams-light)); }
+  .bg-rams-dark { background-color: hsl(var(--rams-dark)); }
+  .text-rams { color: hsl(var(--rams-primary)); }
+  .border-rams { border-color: hsl(var(--rams-primary)); }
   
-  /* Inspection Colors */
-  .bg-inspection {
-    background-color: hsl(var(--inspection-primary));
-  }
+  /* Absence */
+  .bg-absence { background-color: hsl(var(--absence-primary)); }
+  .bg-absence-light { background-color: hsl(var(--absence-light)); }
+  .bg-absence-dark { background-color: hsl(var(--absence-dark)); }
+  .text-absence { color: hsl(var(--absence-primary)); }
+  .border-absence { border-color: hsl(var(--absence-primary)); }
   
-  .bg-inspection-light {
-    background-color: hsl(var(--inspection-light));
-  }
+  /* Maintenance */
+  .bg-maintenance { background-color: hsl(var(--maintenance-primary)); }
+  .bg-maintenance-light { background-color: hsl(var(--maintenance-light)); }
+  .bg-maintenance-dark { background-color: hsl(var(--maintenance-dark)); }
+  .text-maintenance { color: hsl(var(--maintenance-primary)); }
+  .border-maintenance { border-color: hsl(var(--maintenance-primary)); }
   
-  .bg-inspection-dark {
-    background-color: hsl(var(--inspection-dark));
-  }
+  /* Workshop */
+  .bg-workshop { background-color: hsl(var(--workshop-primary)); }
+  .bg-workshop-light { background-color: hsl(var(--workshop-light)); }
+  .bg-workshop-dark { background-color: hsl(var(--workshop-dark)); }
+  .text-workshop { color: hsl(var(--workshop-primary)); }
+  .border-workshop { border-color: hsl(var(--workshop-primary)); }
   
-  .text-inspection {
-    color: hsl(var(--inspection-primary));
-  }
-  
-  .border-inspection {
-    border-color: hsl(var(--inspection-primary));
-  }
-  
-  /* Report Colors */
-  .bg-report {
-    background-color: hsl(var(--report-primary));
-  }
-  
-  .bg-report-light {
-    background-color: hsl(var(--report-light));
-  }
-  
-  .bg-report-dark {
-    background-color: hsl(var(--report-dark));
-  }
-  
-  .text-report {
-    color: hsl(var(--report-primary));
-  }
-  
-  .border-report {
-    border-color: hsl(var(--report-primary));
-  }
-  
-  /* Admin Colors */
-  .bg-admin {
-    background-color: hsl(var(--admin-primary));
-  }
-  
-  .bg-admin-light {
-    background-color: hsl(var(--admin-light));
-  }
-  
-  .bg-admin-dark {
-    background-color: hsl(var(--admin-dark));
-  }
-  
-  .text-admin {
-    color: hsl(var(--admin-primary));
-  }
-  
-  .border-admin {
-    border-color: hsl(var(--admin-primary));
-  }
-  
-  /* RAMS Colors */
-  .bg-rams {
-    background-color: hsl(var(--rams-primary));
-  }
-  
-  .bg-rams-light {
-    background-color: hsl(var(--rams-light));
-  }
-  
-  .bg-rams-dark {
-    background-color: hsl(var(--rams-dark));
-  }
-  
-  .text-rams {
-    color: hsl(var(--rams-primary));
-  }
-  
-  .border-rams {
-    border-color: hsl(var(--rams-primary));
-  }
-  
-  /* Absence Colors */
-  .bg-absence {
-    background-color: hsl(var(--absence-primary));
-  }
-  
-  .bg-absence-light {
-    background-color: hsl(var(--absence-light));
-  }
-  
-  .bg-absence-dark {
-    background-color: hsl(var(--absence-dark));
-  }
-  
-  .text-absence {
-    color: hsl(var(--absence-primary));
-  }
-  
-  .border-absence {
-    border-color: hsl(var(--absence-primary));
-  }
-  
-  /* Maintenance & Service - Red */
-  .bg-maintenance {
-    background-color: hsl(var(--maintenance-primary));
-  }
-  
-  .bg-maintenance-light {
-    background-color: hsl(var(--maintenance-light));
-  }
-  
-  .bg-maintenance-dark {
-    background-color: hsl(var(--maintenance-dark));
-  }
-  
-  .text-maintenance {
-    color: hsl(var(--maintenance-primary));
-  }
-  
-  .border-maintenance {
-    border-color: hsl(var(--maintenance-primary));
-  }
-  
-  /* Workshop Tasks - Orange/Amber */
-  .bg-workshop {
-    background-color: hsl(var(--workshop-primary));
-  }
-  
-  .bg-workshop-light {
-    background-color: hsl(var(--workshop-light));
-  }
-  
-  .bg-workshop-dark {
-    background-color: hsl(var(--workshop-dark));
-  }
-  
-  .text-workshop {
-    color: hsl(var(--workshop-primary));
-  }
-  
-  .border-workshop {
-    border-color: hsl(var(--workshop-primary));
-  }
-  
-  /* Manager/Admin Notice/Comments Box - Solid background approach
-   * NOTE: These classes are deprecated. Use inline Tailwind classes instead:
-   * Light mode: "bg-amber-50 border-amber-200"
-   * Dark mode: "dark:bg-amber-950/20 dark:border-amber-900"
-   * Text: "text-amber-900 dark:text-amber-400" (title)
-   *       "text-amber-800 dark:text-amber-300" (content)
-   * 
-   * Example:
-   * <Card className="bg-white dark:bg-slate-900 border-amber-200 bg-amber-50 dark:bg-amber-950/20">
-   *   <CardHeader>
-   *     <CardTitle className="text-amber-900 dark:text-amber-400">Manager Comments</CardTitle>
-   *   </CardHeader>
-   *   <CardContent>
-   *     <p className="text-amber-800 dark:text-amber-300">{comments}</p>
-   *   </CardContent>
-   * </Card>
-   */
-  .manager-notice,
-  .admin-notice {
-    /* Fallback for any legacy usage - matches new inline approach */
-    background-color: rgb(254 252 232) !important; /* amber-50 for light mode */
-    border-color: rgb(254 215 170) !important; /* amber-200 */
-  }
-  
-  @media (prefers-color-scheme: dark) {
-    .manager-notice,
-    .admin-notice {
-      background-color: rgba(69 26 3 / 0.2) !important; /* amber-950/20 for dark mode */
-      border-color: rgb(120 53 15) !important; /* amber-900 */
-    }
-  }
-  
-  .manager-notice-title,
-  .admin-notice-title {
-    color: rgb(120 53 15) !important; /* amber-900 for light mode */
-  }
-  
-  @media (prefers-color-scheme: dark) {
-    .manager-notice-title,
-    .admin-notice-title {
-      color: rgb(251 191 36) !important; /* amber-400 for dark mode */
-    }
-  }
-  
-  .manager-notice-content,
-  .admin-notice-content {
-    color: rgb(146 64 14) !important; /* amber-800 for light mode */
-  }
-  
-  @media (prefers-color-scheme: dark) {
-    .manager-notice-content,
-    .admin-notice-content {
-      color: rgb(252 211 77) !important; /* amber-300 for dark mode */
-    }
-  }
-  
-  /* Tab Styling - Standard Approvals Page Pattern */
-  /* Use data-state="active" to match shadcn/ui tabs component */
+  /* Tab styling */
   [role="tab"][data-state="active"] {
-    background-color: hsl(var(--primary)) !important; /* AVS Yellow */
+    background-color: hsl(var(--primary)) !important;
     border-bottom: 2px solid hsl(var(--primary)) !important;
   }
   
-  /* Text color only for all children */
   [role="tab"][data-state="active"],
   [role="tab"][data-state="active"] *,
   [role="tab"][data-state="active"] svg,
   [role="tab"][data-state="active"] span {
-    color: rgb(15 23 42) !important; /* Dark slate text - same as sidebar */
+    color: hsl(var(--primary-foreground)) !important;
   }
   
-  /* Custom tab colors for specific tabs */
   [role="tab"][data-state="active"][data-tab="toolbox-talk"] {
-    background-color: rgb(220 38 38) !important; /* red-600 */
+    background-color: rgb(220 38 38) !important;
     border-bottom-color: rgb(220 38 38) !important;
   }
   
@@ -745,255 +274,56 @@
   [role="tab"][data-state="active"][data-tab="toolbox-talk"] * {
     color: white !important;
   }
-  
-  [role="tab"][data-state="active"][data-tab="reminder"],
-  [role="tab"][data-state="active"][data-tab="reports"] {
-    background-color: #F1D64A !important; /* AVS Yellow */
-    border-bottom-color: #F1D64A !important;
-  }
-  
-  [role="tab"][data-state="active"][data-tab="reminder"],
-  [role="tab"][data-state="active"][data-tab="reminder"] *,
-  [role="tab"][data-state="active"][data-tab="reports"],
-  [role="tab"][data-state="active"][data-tab="reports"] * {
-    color: rgb(15 23 42) !important;
-  }
 }
+
+/* Debug-specific styling */
+.debug-red {
+  color: rgb(239 68 68) !important; /* red-500 */
+}
+
+.debug-bg {
+  background-color: rgba(220, 38, 38, 0.1) !important;
+  border-color: rgba(220, 38, 38, 0.3) !important;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: #F1D64A; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #d1b82f; }
+
+/* Smooth scrolling */
+html { scroll-behavior: smooth; }
 
 /*
  * MODAL & DIALOG STYLING
- * =======================
- * Clean, simple, functional modal styling that matches the site theme.
- * No fancy shadows or effects - just solid, opaque backgrounds.
  */
-
-/* Modal Overlays - Simple dark backdrop */
 [data-radix-dialog-overlay],
 [data-radix-alert-dialog-overlay] {
   background: rgba(0, 0, 0, 0.5) !important;
   z-index: 50 !important;
 }
 
-/* Modal Content - Clean opaque background */
 [data-radix-dialog-content],
 [data-radix-alert-dialog-content],
 [role="dialog"],
 [role="alertdialog"] {
-  background: rgb(15 23 42) !important; /* slate-900 - solid */
-  background-color: rgb(15 23 42) !important;
-  border: 1px solid rgb(51 65 85) !important; /* slate-700 - subtle border */
+  background: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
   border-radius: 0.5rem !important;
-  opacity: 1 !important;
+  color: hsl(var(--card-foreground)) !important;
   z-index: 50 !important;
-  box-shadow: none !important; /* No shadows - clean and simple */
 }
 
-/* CRITICAL: Ensure dropdowns appear above modals - must override component z-50 */
+/* Dropdowns appear above modals */
 [data-radix-select-content],
 [data-radix-popover-content] {
   z-index: 999 !important;
   position: fixed !important;
 }
 
-/* Fix select dropdown backdrop blur causing visibility issues */
-[data-radix-select-content] {
-  backdrop-filter: none !important;
-}
-
-/*
- * STANDARD PAGE LAYOUT PATTERN
- * ============================
- * All list/index pages should follow this consistent pattern:
- * 
- * 1. Outer Container:
- *    <div className="space-y-6 max-w-6xl">
- * 
- * 2. Header Card:
- *    <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
- *      - Title: text-3xl font-bold text-slate-900 dark:text-white mb-2
- *      - Description: text-slate-600 dark:text-slate-400
- *      - Buttons: bg-{formtype} hover:bg-{formtype}-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg
- * 
- * 3. Search/Filter Card (if needed):
- *    <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
- *      - Input: bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white
- * 
- * 4. Empty State Card:
- *    <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
- *      <CardContent className="flex flex-col items-center justify-center py-12">
- *        - Icon: h-16 w-16 text-slate-400 mb-4
- *        - Title: text-lg font-semibold text-slate-900 dark:text-white mb-2
- *        - Description: text-slate-600 dark:text-slate-400 mb-4
- * 
- * 5. List Items Card:
- *    <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-{formtype}/50 transition-all duration-200 cursor-pointer">
- * 
- * Form type colors available: timesheet, inspection, rams, report, admin
- * Each has: --{formtype}-primary, --{formtype}-light, --{formtype}-dark
- */
-
-/* Custom scrollbar with AVS Yellow */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #F1D64A;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #d1b82f;
-}
-
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
-}
-
-/* Global dark theme text styles for dashboard pages */
-h1, h2, h3, h4, h5, h6 {
-  @apply text-white;
-}
-
-/* Default text color for all elements */
-p, span, label, div {
-  @apply text-slate-300;
-}
-
-/* CRITICAL: Force all input elements to have light text on dark backgrounds */
-input:not([type="checkbox"]):not([type="radio"]), 
-textarea, 
-select {
-  color: rgb(226 232 240) !important; /* slate-200 - light text for dark backgrounds */
-  background-color: rgb(30 41 59) !important; /* slate-800 - dark background */
-}
-
-/* Ensure focused inputs maintain light text */
-input:not([type="checkbox"]):not([type="radio"]):focus, 
-textarea:focus, 
-select:focus {
-  color: rgb(248 250 252) !important; /* slate-50 - even lighter when focused */
-}
-
-/* Special handling for disabled inputs */
-input:not([type="checkbox"]):not([type="radio"]):disabled, 
-textarea:disabled, 
-select:disabled {
-  color: rgb(148 163 184) !important; /* slate-400 - muted but still readable */
-  background-color: rgb(30 41 59) !important; /* slate-800 */
-  opacity: 0.6;
-}
-
-/* Override any browser/OS autocomplete styling that might set light backgrounds */
-input:not([type="checkbox"]):not([type="radio"]):-webkit-autofill,
-input:not([type="checkbox"]):not([type="radio"]):-webkit-autofill:hover,
-input:not([type="checkbox"]):not([type="radio"]):-webkit-autofill:focus,
-textarea:-webkit-autofill,
-textarea:-webkit-autofill:hover,
-textarea:-webkit-autofill:focus,
-select:-webkit-autofill,
-select:-webkit-autofill:hover,
-select:-webkit-autofill:focus {
-  -webkit-text-fill-color: rgb(226 232 240) !important;
-  -webkit-box-shadow: 0 0 0px 1000px rgb(30 41 59) inset !important;
-  transition: background-color 5000s ease-in-out 0s;
-}
-
-/* Placeholder text color - always grey */
-::placeholder {
-  color: rgb(148 163 184) !important; /* slate-400 - grey */
-  opacity: 0.8;
-}
-
-::-webkit-input-placeholder {
-  color: rgb(148 163 184) !important; /* slate-400 */
-  opacity: 0.8;
-}
-
-::-moz-placeholder {
-  color: rgb(148 163 184) !important; /* slate-400 */
-  opacity: 0.8;
-}
-
-:-ms-input-placeholder {
-  color: rgb(148 163 184) !important; /* slate-400 */
-  opacity: 0.8;
-}
-
-/* Override muted foreground globally */
-.text-muted-foreground {
-  color: rgb(148 163 184) !important; /* slate-400 */
-}
-
-/* Ensure medium/semibold text is also white */
-.font-medium, .font-semibold {
-  @apply text-white;
-}
-
-/* Card components - DEPRECATED: Use inline Tailwind classes instead
- * 
- * Standard card styling:
- * <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
- * 
- * This ensures:
- * - Solid backgrounds (no transparency)
- * - Consistent light/dark mode appearance
- * - Better readability and accessibility
- * - Uniform styling across all pages
- * 
- * The classes below are kept for backwards compatibility only.
- */
-.card, [class*="Card"] {
-  /* Fallback - prefer explicit Tailwind classes on components */
-  @apply bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
-}
-
-.card:hover, [class*="Card"]:hover {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-/* Fix iOS Safari time input width overflow */
-input[type="time"] {
-  max-width: 100% !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
-  display: block !important;
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-/* Constrain iOS Safari time input internal elements */
-input[type="time"]::-webkit-datetime-edit {
-  max-width: 100% !important;
-  width: 100% !important;
-  padding: 0 !important;
-  overflow: hidden;
-  display: block;
-}
-
-input[type="time"]::-webkit-datetime-edit-fields-wrapper {
-  max-width: 100% !important;
-  width: 100% !important;
-  padding: 0 !important;
-}
-
-input[type="time"]::-webkit-datetime-edit-text {
-  padding: 0 2px;
-}
-
-input[type="time"]::-webkit-datetime-edit-hour-field,
-input[type="time"]::-webkit-datetime-edit-minute-field {
-  padding: 0 !important;
-}
-
-/* Fix iOS Safari date input width overflow - same treatment as time inputs */
+/* iOS Safari input width fixes */
+input[type="time"],
 input[type="date"] {
   max-width: 100% !important;
   width: 100% !important;
@@ -1003,6 +333,7 @@ input[type="date"] {
   appearance: none;
 }
 
+input[type="time"]::-webkit-datetime-edit,
 input[type="date"]::-webkit-datetime-edit {
   max-width: 100% !important;
   width: 100% !important;
@@ -1011,326 +342,112 @@ input[type="date"]::-webkit-datetime-edit {
   display: block;
 }
 
+input[type="time"]::-webkit-datetime-edit-fields-wrapper,
 input[type="date"]::-webkit-datetime-edit-fields-wrapper {
   max-width: 100% !important;
   width: 100% !important;
   padding: 0 !important;
 }
 
+input[type="time"]::-webkit-datetime-edit-text,
 input[type="date"]::-webkit-datetime-edit-text {
   padding: 0 2px;
 }
 
+input[type="time"]::-webkit-datetime-edit-hour-field,
+input[type="time"]::-webkit-datetime-edit-minute-field,
 input[type="date"]::-webkit-datetime-edit-day-field,
 input[type="date"]::-webkit-datetime-edit-month-field,
 input[type="date"]::-webkit-datetime-edit-year-field {
   padding: 0 !important;
 }
 
-/* Mobile View - Scale down all elements by 20% */
+/* Mobile View - 20% scale reduction */
 @media (max-width: 768px) {
-  /* Scale down specific height classes */
-  .h-10 { height: 2rem !important; } /* 40px -> 32px */
-  .h-12 { height: 2.4rem !important; } /* 48px -> 38.4px */
-  .h-14 { height: 2.8rem !important; } /* 56px -> 44.8px */
+  html { font-size: 12.8px; }
   
-  /* Scale down text sizes */
-  .text-base { font-size: 0.8rem !important; } /* 16px -> 12.8px */
-  .text-lg { font-size: 0.9rem !important; } /* 18px -> 14.4px */
-  .text-xl { font-size: 1rem !important; } /* 20px -> 16px */
-  .text-2xl { font-size: 1.2rem !important; } /* 24px -> 19.2px */
-  .text-3xl { font-size: 1.5rem !important; } /* 30px -> 24px */
-  .text-xs { font-size: 0.6rem !important; } /* 12px -> 9.6px */
-  .text-sm { font-size: 0.7rem !important; } /* 14px -> 11.2px */
+  .h-10 { height: 2rem !important; }
+  .h-12 { height: 2.4rem !important; }
+  .h-14 { height: 2.8rem !important; }
   
-  /* Scale down padding */
-  .p-3 { padding: 0.6rem !important; } /* 12px -> 9.6px */
-  .p-4 { padding: 0.8rem !important; } /* 16px -> 12.8px */
-  .p-5 { padding: 1rem !important; } /* 20px -> 16px */
-  .p-6 { padding: 1.2rem !important; } /* 24px -> 19.2px */
-  .p-8 { padding: 1.6rem !important; } /* 32px -> 25.6px */
+  .text-base { font-size: 0.8rem !important; }
+  .text-lg { font-size: 0.9rem !important; }
+  .text-xl { font-size: 1rem !important; }
+  .text-2xl { font-size: 1.2rem !important; }
+  .text-3xl { font-size: 1.5rem !important; }
+  .text-xs { font-size: 0.6rem !important; }
+  .text-sm { font-size: 0.7rem !important; }
   
-  .py-2 { padding-top: 0.4rem !important; padding-bottom: 0.4rem !important; } /* 8px -> 6.4px */
-  .py-3 { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; } /* 12px -> 9.6px */
-  .py-4 { padding-top: 0.8rem !important; padding-bottom: 0.8rem !important; } /* 16px -> 12.8px */
+  .p-3 { padding: 0.6rem !important; }
+  .p-4 { padding: 0.8rem !important; }
+  .p-5 { padding: 1rem !important; }
+  .p-6 { padding: 1.2rem !important; }
+  .p-8 { padding: 1.6rem !important; }
   
-  .px-3 { padding-left: 0.6rem !important; padding-right: 0.6rem !important; } /* 12px -> 9.6px */
-  .px-4 { padding-left: 0.8rem !important; padding-right: 0.8rem !important; } /* 16px -> 12.8px */
-  .px-6 { padding-left: 1.2rem !important; padding-right: 1.2rem !important; } /* 24px -> 19.2px */
+  .py-2 { padding-top: 0.4rem !important; padding-bottom: 0.4rem !important; }
+  .py-3 { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; }
+  .py-4 { padding-top: 0.8rem !important; padding-bottom: 0.8rem !important; }
   
-  /* Scale down gaps */
-  .gap-2 { gap: 0.4rem !important; } /* 8px -> 6.4px */
-  .gap-3 { gap: 0.6rem !important; } /* 12px -> 9.6px */
-  .gap-4 { gap: 0.8rem !important; } /* 16px -> 12.8px */
-  .gap-6 { gap: 1.2rem !important; } /* 24px -> 19.2px */
+  .px-3 { padding-left: 0.6rem !important; padding-right: 0.6rem !important; }
+  .px-4 { padding-left: 0.8rem !important; padding-right: 0.8rem !important; }
+  .px-6 { padding-left: 1.2rem !important; padding-right: 1.2rem !important; }
   
-  /* Scale down margins */
-  .mb-2 { margin-bottom: 0.4rem !important; } /* 8px -> 6.4px */
-  .mb-3 { margin-bottom: 0.6rem !important; } /* 12px -> 9.6px */
-  .mb-4 { margin-bottom: 0.8rem !important; } /* 16px -> 12.8px */
-  .mb-6 { margin-bottom: 1.2rem !important; } /* 24px -> 19.2px */
-  .mb-8 { margin-bottom: 1.6rem !important; } /* 32px -> 25.6px */
+  .gap-2 { gap: 0.4rem !important; }
+  .gap-3 { gap: 0.6rem !important; }
+  .gap-4 { gap: 0.8rem !important; }
+  .gap-6 { gap: 1.2rem !important; }
   
-  .mt-2 { margin-top: 0.4rem !important; } /* 8px -> 6.4px */
-  .mt-4 { margin-top: 0.8rem !important; } /* 16px -> 12.8px */
-  .mt-6 { margin-top: 1.2rem !important; } /* 24px -> 19.2px */
+  .mb-2 { margin-bottom: 0.4rem !important; }
+  .mb-3 { margin-bottom: 0.6rem !important; }
+  .mb-4 { margin-bottom: 0.8rem !important; }
+  .mb-6 { margin-bottom: 1.2rem !important; }
+  .mb-8 { margin-bottom: 1.6rem !important; }
   
-  /* Scale down icons */
-  .h-4 { height: 0.8rem !important; } /* 16px -> 12.8px */
-  .w-4 { width: 0.8rem !important; } /* 16px -> 12.8px */
-  .h-5 { height: 1rem !important; } /* 20px -> 16px */
-  .w-5 { width: 1rem !important; } /* 20px -> 16px */
-  .h-6 { height: 1.2rem !important; } /* 24px -> 19.2px */
-  .w-6 { width: 1.2rem !important; } /* 24px -> 19.2px */
-  .h-8 { height: 1.6rem !important; } /* 32px -> 25.6px */
-  .w-8 { width: 1.6rem !important; } /* 32px -> 25.6px */
+  .mt-2 { margin-top: 0.4rem !important; }
+  .mt-4 { margin-top: 0.8rem !important; }
+  .mt-6 { margin-top: 1.2rem !important; }
   
-  /* Scale down button-like elements */
-  .w-10 { width: 2rem !important; } /* 40px -> 32px */
+  .h-4 { height: 0.8rem !important; }
+  .w-4 { width: 0.8rem !important; }
+  .h-5 { height: 1rem !important; }
+  .w-5 { width: 1rem !important; }
+  .h-6 { height: 1.2rem !important; }
+  .w-6 { width: 1.2rem !important; }
+  .h-8 { height: 1.6rem !important; }
+  .w-8 { width: 1.6rem !important; }
+  .w-10 { width: 2rem !important; }
   
-  /* Scale down space-y (vertical spacing between children) */
-  .space-y-2 > * + * { margin-top: 0.4rem !important; } /* 8px -> 6.4px */
-  .space-y-3 > * + * { margin-top: 0.6rem !important; } /* 12px -> 9.6px */
-  .space-y-4 > * + * { margin-top: 0.8rem !important; } /* 16px -> 12.8px */
-  .space-y-6 > * + * { margin-top: 1.2rem !important; } /* 24px -> 19.2px */
+  .space-y-2 > * + * { margin-top: 0.4rem !important; }
+  .space-y-3 > * + * { margin-top: 0.6rem !important; }
+  .space-y-4 > * + * { margin-top: 0.8rem !important; }
+  .space-y-6 > * + * { margin-top: 1.2rem !important; }
   
-  /* Scale down rounded corners */
-  .rounded-lg { border-radius: 0.4rem !important; } /* 8px -> 6.4px */
-  .rounded-xl { border-radius: 0.6rem !important; } /* 12px -> 9.6px */
+  .rounded-lg { border-radius: 0.4rem !important; }
+  .rounded-xl { border-radius: 0.6rem !important; }
   
-  /* Scale down border widths */
-  .border-2 { border-width: 1.6px !important; } /* 2px -> 1.6px */
+  .border-2 { border-width: 1.6px !important; }
 }
 
-/* ============================================================================
- * CRITICAL THEME ENFORCEMENT - MUST COME LAST TO OVERRIDE EVERYTHING
- * ============================================================================
- * This section ensures consistent theming regardless of OS preferences:
- * - Dark backgrounds → Light text (white/slate-200)
- * - Light backgrounds (yellow, white, etc.) → Dark text (slate-900)
- * - Input fields → Always light text on dark backgrounds
- * ============================================================================ */
-
-/* Force dark text on ALL yellow/light backgrounds */
-.bg-avs-yellow,
-.bg-avs-yellow *,
-.bg-avs-yellow svg,
-.bg-avs-yellow span,
-.bg-avs-yellow.text-slate-900,
-.bg-avs-yellow .text-slate-900,
-button.bg-avs-yellow,
-button.bg-avs-yellow *,
-button.bg-avs-yellow span,
-button.bg-avs-yellow svg,
-.bg-avs-yellow.text-white,
-.bg-avs-yellow .text-white,
-.bg-avs-yellow[class*="text-"],
-button[class*="bg-avs-yellow"],
-button[class*="bg-avs-yellow"] *,
-button[class*="bg-avs-yellow"] span,
-button[class*="bg-avs-yellow"] svg,
-[class*="bg-avs-yellow"] [class*="text-"],
-[style*="background-color: #F1D64A"],
-[style*="background-color: #F1D64A"] *,
-[style*="background-color: rgb(241, 214, 74)"],
-[style*="background-color: rgb(241, 214, 74)"] *,
-/* Explicitly override Tailwind button text colors on yellow backgrounds */
-.bg-avs-yellow.text-primary-foreground,
-.bg-avs-yellow .text-primary-foreground,
-button.bg-avs-yellow.text-primary-foreground,
-.hover\:bg-avs-yellow-hover:hover,
-.hover\:bg-avs-yellow-hover:hover *,
-.hover\:bg-avs-yellow-hover:hover svg,
-.hover\:bg-avs-yellow-hover:hover span,
-/* Also cover primary color buttons (which use yellow) */
-/* IMPORTANT: Excludes .ui-component elements which manage their own colors */
-.bg-primary,
-.bg-primary *:not(.ui-component):not(.ui-component *),
-button.bg-primary,
-button.bg-primary *:not(.ui-component):not(.ui-component *),
-button.bg-primary span:not(.ui-component),
-button.bg-primary svg:not(.ui-component) {
-  color: rgb(15 23 42) !important; /* Dark slate text - same as sidebar */
-}
-
-/* Exception: Input fields should NEVER inherit text color from parents */
-.bg-avs-yellow input:not([type="checkbox"]):not([type="radio"]),
-.bg-avs-yellow textarea,
-.bg-avs-yellow select,
-.bg-primary input:not([type="checkbox"]):not([type="radio"]),
-.bg-primary textarea,
-.bg-primary select,
-button.bg-avs-yellow input:not([type="checkbox"]):not([type="radio"]),
-button.bg-avs-yellow textarea,
-button.bg-avs-yellow select,
-button.bg-primary input:not([type="checkbox"]):not([type="radio"]),
-button.bg-primary textarea,
-button.bg-primary select {
-  color: rgb(226 232 240) !important; /* Light text */
-  background-color: rgb(30 41 59) !important; /* Dark background */
-}
-
-/* Force light text on all dark slate backgrounds */
-/* IMPORTANT: Excludes .ui-component elements which manage their own colors */
-.bg-slate-900,
-.bg-slate-900 *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red):not(.ui-component):not(.ui-component *),
-.bg-slate-800,
-.bg-slate-800 *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red):not(.ui-component):not(.ui-component *),
-.bg-slate-700,
-.bg-slate-700 *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red):not(.ui-component):not(.ui-component *),
-[style*="background-color: rgb(15 23 42)"],
-[style*="background-color: rgb(15 23 42)"] *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red):not(.ui-component):not(.ui-component *),
-[style*="background-color: rgb(30 41 59)"],
-[style*="background-color: rgb(30 41 59)"] *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red):not(.ui-component):not(.ui-component *),
-[style*="background-color: rgb(51 65 85)"],
-[style*="background-color: rgb(51 65 85)"] *:not(input):not(textarea):not(select):not(.text-red-500):not(.debug-red):not(.ui-component):not(.ui-component *) {
-  color: rgb(226 232 240) !important; /* Light text for dark backgrounds */
-}
-
-/* CRITICAL: Protect .ui-component children from global text color overrides */
-/* Use HIGHER specificity than the aggressive background-based rules above */
-[style*="background-color: rgb(15 23 42)"] .ui-component span,
-[style*="background-color: rgb(30 41 59)"] .ui-component span,
-[style*="background-color: rgb(51 65 85)"] .ui-component span,
-.bg-slate-900 .ui-component span,
-.bg-slate-800 .ui-component span,
-.bg-slate-700 .ui-component span,
-.dark .ui-component span,
-.ui-component span {
-  color: rgb(226 232 240) !important; /* Light text for dark backgrounds */
-}
-
-/* NUCLEAR OPTION: Force light text in all combobox spans (Select components) in dark theme */
-.dark [role="combobox"] > span,
-.dark [role="combobox"] span {
-  color: rgb(226 232 240) !important; /* Light text for dark mode */
-}
-
-/* Allow red text for debug/error elements on dark backgrounds */
-.debug-red,
-.text-red-500,
-svg.debug-red,
-span.debug-red,
-.bg-slate-800 .debug-red,
-.bg-slate-900 .debug-red,
-.bg-slate-800 svg.debug-red,
-.bg-slate-900 svg.debug-red,
-.bg-slate-800 span.debug-red,
-.bg-slate-900 span.debug-red,
-a .debug-red,
-a svg.debug-red,
-a span.debug-red,
-div .debug-red,
-div svg.debug-red,
-div span.debug-red {
-  color: #ef4444 !important;
-  fill: currentColor !important;
-  stroke: currentColor !important;
-}
-
-/* Extra specificity for SVG icons with debug-red class */
-svg.debug-red,
-svg.debug-red path,
-svg.debug-red line,
-svg.debug-red polyline,
-svg.debug-red rect,
-svg.debug-red circle {
-  stroke: #ef4444 !important;
-  color: #ef4444 !important;
-}
-
-/* ============================================================================
- * UI COMPONENT SYSTEM
- * ============================================================================
- * Components with .ui-component class opt out of global color inheritance.
- * This allows form controls to manage their own colors without conflicts.
- * ============================================================================ */
-
-/* Base UI component - opts out of global color rules */
-.ui-component {
-  /* This class marks elements that should NOT inherit colors from parent backgrounds */
-}
-
-/* ============================================================================
- * CHECKBOX COMPONENT
- * ============================================================================ */
-.checkbox-root {
-  /* Base checkbox styling - self-contained */
-  border-color: hsl(var(--primary)) !important;
-  background-color: transparent !important;
-}
-
-.checkbox-root[data-state="checked"] {
-  background-color: hsl(var(--primary)) !important;
-  border-color: hsl(var(--primary)) !important;
-}
-
-.checkbox-root[data-state="checked"] .checkbox-indicator,
-.checkbox-root[data-state="checked"] .checkbox-icon,
-.checkbox-root[data-state="checked"] svg {
-  color: rgb(15 23 42) !important;
-  fill: currentColor !important;
-  stroke: currentColor !important;
-}
-
-/* ============================================================================
- * SWITCH COMPONENT
- * ============================================================================ */
-.switch-root {
-  /* Self-contained switch styling */
-}
-
-.switch-root[data-state="checked"] {
-  background-color: hsl(142 76% 36%) !important; /* Green when on */
-}
-
-.switch-root[data-state="unchecked"] {
-  background-color: rgb(71 85 105) !important; /* Slate-500 when off */
-}
-
-.switch-root .switch-thumb {
-  background-color: white !important;
-}
-
-/* ============================================================================
- * RADIO GROUP COMPONENT
- * ============================================================================ */
-.radio-item {
-  border-color: hsl(var(--primary)) !important;
-  background-color: transparent !important;
-}
-
-.radio-item[data-state="checked"] {
-  border-color: hsl(var(--primary)) !important;
-}
-
-.radio-item[data-state="checked"] .radio-indicator {
-  background-color: hsl(var(--primary)) !important;
-}
-
-/* ============================================================================
- * SELECTABLE CARD COMPONENT
- * ============================================================================ */
+/* Selectable Card Component */
 .selectable-card {
   transition: all 0.2s ease;
   cursor: pointer;
-  border: 2px solid rgb(71 85 105); /* slate-500 */
-  background-color: rgb(30 41 59); /* slate-800 */
+  border: 2px solid hsl(var(--border));
+  background-color: hsl(var(--muted));
 }
 
 .selectable-card:hover:not(.selectable-card-disabled) {
-  border-color: rgb(100 116 139); /* slate-400 */
-  background-color: rgb(51 65 85); /* slate-700 */
+  border-color: hsl(var(--accent));
+  background-color: hsl(var(--accent));
 }
 
 .selectable-card-selected {
   border-color: currentColor !important;
 }
 
-/* Module-specific selected states */
 .selectable-card-selected.selectable-card-rams {
-  background-color: rgba(34, 197, 94, 0.15) !important; /* green-500/15 */
-  border-color: rgb(34 197 94) !important; /* green-500 */
+  background-color: rgba(34, 197, 94, 0.15) !important;
+  border-color: rgb(34 197 94) !important;
 }
 
 .selectable-card-selected.selectable-card-rams .selectable-card-icon {
@@ -1338,23 +455,23 @@ svg.debug-red circle {
 }
 
 .selectable-card-selected.selectable-card-timesheet {
-  background-color: rgba(59, 130, 246, 0.15) !important; /* blue-500/15 */
-  border-color: rgb(59 130 246) !important; /* blue-500 */
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  border-color: rgb(59 130 246) !important;
 }
 
 .selectable-card-selected.selectable-card-inspection {
-  background-color: rgba(249, 115, 22, 0.15) !important; /* orange-500/15 */
-  border-color: rgb(249 115 22) !important; /* orange-500 */
+  background-color: rgba(249, 115, 22, 0.15) !important;
+  border-color: rgb(249 115 22) !important;
 }
 
 .selectable-card-selected.selectable-card-absence {
-  background-color: rgba(168, 85, 247, 0.15) !important; /* purple-500/15 */
-  border-color: rgb(168 85 247) !important; /* purple-500 */
+  background-color: rgba(168, 85, 247, 0.15) !important;
+  border-color: rgb(168 85 247) !important;
 }
 
 .selectable-card-selected.selectable-card-default {
-  background-color: rgba(241, 214, 74, 0.15) !important; /* avs-yellow/15 */
-  border-color: rgb(241 214 74) !important; /* avs-yellow */
+  background-color: rgba(241, 214, 74, 0.15) !important;
+  border-color: rgb(241 214 74) !important;
 }
 
 .selectable-card-disabled {
@@ -1368,636 +485,96 @@ svg.debug-red circle {
 }
 
 .selectable-card-locked .selectable-card-lock-icon {
-  color: rgb(34 197 94) !important; /* green-500 */
+  color: rgb(34 197 94) !important;
 }
 
-/* Ensure buttons maintain proper text color based on background */
-button:not(.bg-avs-yellow):not(.bg-primary):not([class*="bg-yellow"]):not([class*="bg-white"]) {
-  color: rgb(226 232 240) !important; /* Default: light text for dark button backgrounds */
+/* Primary (yellow) buttons get dark text */
+.bg-primary,
+.bg-primary *,
+button.bg-primary,
+button.bg-primary * {
+  color: hsl(var(--primary-foreground)) !important;
 }
 
-/* Force white buttons to have dark text */
-button.bg-white,
-button.bg-white *,
-button.bg-white span,
-button.bg-white svg,
-.bg-white button,
-.bg-white button *,
-[style*="background-color: white"] button,
-[style*="background-color: #fff"] button,
-[style*="background-color: #ffffff"] button {
-  color: rgb(15 23 42) !important; /* Dark text on white backgrounds */
+/* Parent cards (sitting directly on background) - more opaque borders */
+/* Targets cards with border-border class that are direct children of page containers */
+.space-y-6 > .rounded-lg.border,
+.space-y-6 > .border-border,
+.space-y-6 > [data-slot="card"],
+.space-y-6 > div > .rounded-lg.border,
+.space-y-6 > div > .border-border,
+.space-y-6 > div > [data-slot="card"],
+.max-w-6xl > .rounded-lg.border,
+.max-w-6xl > [data-slot="card"],
+.max-w-5xl > .rounded-lg.border,
+.max-w-5xl > [data-slot="card"] {
+  border-color: rgba(148, 163, 184, 0.4) !important; /* slate-400 at 40% opacity */
 }
 
-/* ============================================================================
- * COLORED BUTTONS - Ensure text and icons match
- * ============================================================================
- * All colored document type buttons should have matching text and icon colors
- * for consistency and readability
- * ============================================================================ */
-
-/* Purple Buttons (Absence, Admin) - White text and icons */
-.bg-absence,
-.bg-absence *,
-.bg-absence span,
-.bg-absence svg,
-button.bg-absence,
-button.bg-absence *,
-button.bg-absence span,
-button.bg-absence svg,
-.bg-admin,
-.bg-admin *,
-.bg-admin span,
-.bg-admin svg,
-button.bg-admin,
-button.bg-admin *,
-button.bg-admin span,
-button.bg-admin svg,
-.bg-purple-600,
-.bg-purple-600 *,
-.bg-purple-600 span,
-.bg-purple-600 svg,
-button.bg-purple-600,
-button.bg-purple-600 *,
-button.bg-purple-600 span,
-button.bg-purple-600 svg {
-  color: rgb(255 255 255) !important; /* White text and icons */
+/* Coloured cards (blue, purple, green, etc) - also more opaque borders */
+[class*="border-blue-500"],
+[class*="border-purple-500"],
+[class*="border-green-500"],
+[class*="border-amber-500"],
+[class*="border-workshop"] {
+  border-color: rgba(148, 163, 184, 0.4) !important;
 }
 
-/* Green Buttons (RAMS, Reports) - White text and icons */
-.bg-rams,
-.bg-rams *,
-.bg-rams span,
-.bg-rams svg,
-button.bg-rams,
-button.bg-rams *,
-button.bg-rams span,
-button.bg-rams svg,
-.bg-report,
-.bg-report *,
-.bg-report span,
-.bg-report svg,
-button.bg-report,
-button.bg-report *,
-button.bg-report span,
-button.bg-report svg,
-.bg-green-600,
-.bg-green-600 *,
-.bg-green-600 span,
-.bg-green-600 svg,
-.bg-green-700,
-.bg-green-700 *,
-.bg-green-700 span,
-.bg-green-700 svg,
-button.bg-green-600,
-button.bg-green-600 *,
-button.bg-green-600 span,
-button.bg-green-600 svg,
-button.bg-green-700,
-button.bg-green-700 *,
-button.bg-green-700 span,
-button.bg-green-700 svg {
-  color: rgb(255 255 255) !important; /* White text and icons */
+/* Override with actual colors but at higher opacity */
+[class*="border-blue-500\/30"] {
+  border-color: rgba(59, 130, 246, 0.4) !important; /* blue-500 at 40% */
 }
 
-/* Blue Buttons (Timesheet) - White text and icons */
-.bg-timesheet,
-.bg-timesheet *,
-.bg-timesheet span,
-.bg-timesheet svg,
-button.bg-timesheet,
-button.bg-timesheet *,
-button.bg-timesheet span,
-button.bg-timesheet svg,
-.bg-blue-600,
-.bg-blue-600 *,
-.bg-blue-600 span,
-.bg-blue-600 svg,
-.bg-blue-700,
-.bg-blue-700 *,
-.bg-blue-700 span,
-.bg-blue-700 svg,
-button.bg-blue-600,
-button.bg-blue-600 *,
-button.bg-blue-600 span,
-button.bg-blue-600 svg,
-button.bg-blue-700,
-button.bg-blue-700 *,
-button.bg-blue-700 span,
-button.bg-blue-700 svg {
-  color: rgb(255 255 255) !important; /* White text and icons */
+[class*="border-purple-500\/30"] {
+  border-color: rgba(168, 85, 247, 0.4) !important; /* purple-500 at 40% */
 }
 
-/* Orange/Amber Buttons (Inspection, Workshop) - White text and icons */
-.bg-inspection,
-.bg-inspection *,
-.bg-inspection span,
-.bg-inspection svg,
-button.bg-inspection,
-button.bg-inspection *,
-button.bg-inspection span,
-button.bg-inspection svg,
-.bg-workshop,
-.bg-workshop *,
-.bg-workshop span,
-.bg-workshop svg,
-button.bg-workshop,
-button.bg-workshop *,
-button.bg-workshop span,
-button.bg-workshop svg,
-.bg-orange-600,
-.bg-orange-600 *,
-.bg-orange-600 span,
-.bg-orange-600 svg,
-.bg-amber-600,
-.bg-amber-600 *,
-.bg-amber-600 span,
-.bg-amber-600 svg,
-button.bg-orange-600,
-button.bg-orange-600 *,
-button.bg-orange-600 span,
-button.bg-orange-600 svg,
-button.bg-amber-600,
-button.bg-amber-600 *,
-button.bg-amber-600 span,
-button.bg-amber-600 svg {
-  color: rgb(255 255 255) !important; /* White text and icons */
+[class*="border-green-500\/30"] {
+  border-color: rgba(34, 197, 94, 0.4) !important; /* green-500 at 40% */
 }
 
-/* Red Buttons (Maintenance, Destructive) - White text and icons */
-.bg-maintenance,
-.bg-maintenance *,
-.bg-maintenance span,
-.bg-maintenance svg,
-button.bg-maintenance,
-button.bg-maintenance *,
-button.bg-maintenance span,
-button.bg-maintenance svg,
-.bg-red-600,
-.bg-red-600 *,
-.bg-red-600 span,
-.bg-red-600 svg,
-.bg-red-700,
-.bg-red-700 *,
-.bg-red-700 span,
-.bg-red-700 svg,
-button.bg-red-600,
-button.bg-red-600 *,
-button.bg-red-600 span,
-button.bg-red-600 svg,
-button.bg-red-700,
-button.bg-red-700 *,
-button.bg-red-700 span,
-button.bg-red-700 svg,
-.bg-destructive,
-.bg-destructive *,
-.bg-destructive span,
-.bg-destructive svg,
-button.bg-destructive,
-button.bg-destructive *,
-button.bg-destructive span,
-button.bg-destructive svg {
-  color: rgb(255 255 255) !important; /* White text and icons */
+/* Tab styling - consistent height and appearance across all tabs */
+[role="tablist"] {
+  margin-bottom: 1rem !important; /* Consistent gap under all tab bars */
 }
 
-/* Dark Slate Buttons (Secondary) - Light text and icons */
-.bg-secondary,
-.bg-secondary *,
-.bg-secondary span,
-.bg-secondary svg,
-button.bg-secondary,
-button.bg-secondary *,
-button.bg-secondary span,
-button.bg-secondary svg,
-button.bg-slate-700,
-button.bg-slate-700 *,
-button.bg-slate-700 span,
-button.bg-slate-700 svg,
-button.bg-slate-800,
-button.bg-slate-800 *,
-button.bg-slate-800 span,
-button.bg-slate-800 svg,
-button.bg-slate-900,
-button.bg-slate-900 *,
-button.bg-slate-900 span,
-button.bg-slate-900 svg {
-  color: rgb(226 232 240) !important; /* Light text and icons for dark backgrounds */
+[role="tablist"] [role="tab"] {
+  border-radius: 0 !important;
+  box-sizing: border-box !important;
+  height: 2.25rem !important; /* 36px - consistent height for all tabs */
+  border-bottom: 2px solid transparent !important; /* Same border as active, but transparent */
 }
 
-/* Ghost/Outline/Link Button Variants - Light text and icons matching */
-button[class*="variant-ghost"],
-button[class*="variant-ghost"] *,
-button[class*="variant-ghost"] span,
-button[class*="variant-ghost"] svg,
-button[class*="variant-outline"],
-button[class*="variant-outline"] *,
-button[class*="variant-outline"] span,
-button[class*="variant-outline"] svg,
-button[class*="variant-link"],
-button[class*="variant-link"] *,
-button[class*="variant-link"] span,
-button[class*="variant-link"] svg,
-.variant-ghost,
-.variant-ghost *,
-.variant-ghost span,
-.variant-ghost svg,
-.variant-outline,
-.variant-outline *,
-.variant-outline span,
-.variant-outline svg,
-.variant-link,
-.variant-link *,
-.variant-link span,
-.variant-link svg {
-  color: rgb(226 232 240) !important; /* Light text and icons */
+/* Inactive tabs - consistent visible background across all pages */
+[role="tablist"] [role="tab"]:not([data-state="active"]) {
+  background-color: rgba(51, 65, 85, 0.5) !important; /* slate-700 at 50% */
 }
 
-/* Ensure all SVG icons use OUTLINE style across the entire application */
-/* Lucide React icons are stroke-based by default - enforce consistency everywhere */
-svg {
-  color: inherit !important;
+[role="tablist"] [role="tab"]:first-child {
+  border-top-left-radius: 0.375rem !important;
+  border-bottom-left-radius: 0.375rem !important;
 }
 
-/* CRITICAL: Force outline style for ALL icon elements - no filled icons */
-/* Applies globally to ensure consistency in buttons, navigation, links, cards, etc. */
-/* Exception rules below will preserve filled SVGs for logos, badges, illustrations */
-svg *,
-svg path,
-svg circle,
-svg rect,
-svg line,
-svg polyline,
-svg polygon,
-svg ellipse {
-  fill: none !important; /* Remove fill - outline only */
-  stroke: currentColor !important; /* Use stroke with inherited color */
+[role="tablist"] [role="tab"]:last-child {
+  border-top-right-radius: 0.375rem !important;
+  border-bottom-right-radius: 0.375rem !important;
 }
 
-/* Specific exceptions for filled SVGs that should never be forced to outline */
-/* Covers both: SVG elements with these classes AND SVGs inside elements with these classes */
-svg.logo,
-svg.logo *,
-svg[class*="logo"],
-svg[class*="logo"] *,
-.logo svg,
-.logo svg *,
-[class*="logo"] svg,
-[class*="logo"] svg *,
-svg.badge,
-svg.badge *,
-svg[class*="badge"],
-svg[class*="badge"] *,
-.badge svg,
-.badge svg *,
-[class*="badge"] svg,
-[class*="badge"] svg *,
-svg.illustration,
-svg.illustration *,
-svg[class*="illustration"],
-svg[class*="illustration"] *,
-.illustration svg,
-.illustration svg *,
-[class*="illustration"] svg,
-[class*="illustration"] svg *,
-svg.image,
-svg.image *,
-svg[class*="image"],
-svg[class*="image"] *,
-.image svg,
-.image svg *,
-[class*="image"] svg,
-[class*="image"] svg *,
-svg.filled,
-svg.filled *,
-svg[class*="filled"],
-svg[class*="filled"] *,
-svg[data-icon-type="filled"],
-svg[data-icon-type="filled"] *,
-[data-icon-type="filled"] svg,
-[data-icon-type="filled"] svg * {
-  fill: currentColor !important;
-  stroke: none !important;
-}
-
-/* Border-only buttons (outline style) - ensure matching colors */
-button[class*="border"][class*="hover\:bg"],
-button[class*="border"][class*="hover\:bg"] *,
-button[class*="border"][class*="hover\:bg"] span,
-button[class*="border"][class*="hover\:bg"] svg {
-  color: rgb(226 232 240) !important; /* Light text and icons */
-}
-
-/* Exception: Keep input fields inside colored buttons with proper styling */
-.bg-absence input:not([type="checkbox"]):not([type="radio"]),
-.bg-admin input:not([type="checkbox"]):not([type="radio"]),
-.bg-rams input:not([type="checkbox"]):not([type="radio"]),
-.bg-report input:not([type="checkbox"]):not([type="radio"]),
-.bg-timesheet input:not([type="checkbox"]):not([type="radio"]),
-.bg-inspection input:not([type="checkbox"]):not([type="radio"]),
-.bg-workshop input:not([type="checkbox"]):not([type="radio"]),
-.bg-maintenance input:not([type="checkbox"]):not([type="radio"]),
-button.bg-absence input:not([type="checkbox"]):not([type="radio"]),
-button.bg-admin input:not([type="checkbox"]):not([type="radio"]),
-button.bg-rams input:not([type="checkbox"]):not([type="radio"]),
-button.bg-report input:not([type="checkbox"]):not([type="radio"]),
-button.bg-timesheet input:not([type="checkbox"]):not([type="radio"]),
-button.bg-inspection input:not([type="checkbox"]):not([type="radio"]),
-button.bg-workshop input:not([type="checkbox"]):not([type="radio"]),
-button.bg-maintenance input:not([type="checkbox"]):not([type="radio"]) {
-  color: rgb(226 232 240) !important; /* Light text */
-  background-color: rgb(30 41 59) !important; /* Dark background */
-}
-
-/* ============================================================================
- * HOVER STATES - Keep text and icons matching on hover
- * ============================================================================ */
-
-/* Yellow button hovers - Keep dark text and icons */
-button:hover.bg-avs-yellow,
-button:hover.bg-avs-yellow *,
-button:hover.bg-avs-yellow span,
-button:hover.bg-avs-yellow svg,
-button:hover.bg-primary,
-button:hover.bg-primary *,
-button:hover.bg-primary span,
-button:hover.bg-primary svg,
-button.bg-avs-yellow:hover,
-button.bg-avs-yellow:hover *,
-button.bg-avs-yellow:hover span,
-button.bg-avs-yellow:hover svg,
-button.bg-primary:hover,
-button.bg-primary:hover *,
-button.bg-primary:hover span,
-button.bg-primary:hover svg {
-  color: rgb(15 23 42) !important; /* Dark text on yellow */
-}
-
-/* Purple button hovers - Keep white text and icons */
-.hover\:bg-absence:hover,
-.hover\:bg-absence:hover *,
-.hover\:bg-absence:hover span,
-.hover\:bg-absence:hover svg,
-button.hover\:bg-absence:hover,
-button.hover\:bg-absence:hover *,
-button:hover.bg-absence,
-button:hover.bg-absence *,
-button:hover.bg-absence span,
-button:hover.bg-absence svg,
-.hover\:bg-admin:hover,
-.hover\:bg-admin:hover *,
-.hover\:bg-admin:hover span,
-.hover\:bg-admin:hover svg,
-button.hover\:bg-admin:hover,
-button.hover\:bg-admin:hover *,
-button:hover.bg-admin,
-button:hover.bg-admin *,
-button:hover.bg-admin span,
-button:hover.bg-admin svg,
-.hover\:bg-purple-600:hover,
-.hover\:bg-purple-600:hover *,
-.hover\:bg-purple-600:hover span,
-.hover\:bg-purple-600:hover svg,
-button:hover.bg-purple-600,
-button:hover.bg-purple-600 *,
-button:hover.bg-purple-600 span,
-button:hover.bg-purple-600 svg,
-.hover\:bg-purple-700:hover,
-.hover\:bg-purple-700:hover *,
-.hover\:bg-purple-700:hover span,
-.hover\:bg-purple-700:hover svg,
-button:hover.bg-purple-700,
-button:hover.bg-purple-700 *,
-button:hover.bg-purple-700 span,
-button:hover.bg-purple-700 svg {
-  color: rgb(255 255 255) !important;
-}
-
-/* Green button hovers - Keep white text and icons */
-.hover\:bg-rams:hover,
-.hover\:bg-rams:hover *,
-.hover\:bg-rams:hover span,
-.hover\:bg-rams:hover svg,
-button.hover\:bg-rams:hover,
-button.hover\:bg-rams:hover *,
-button:hover.bg-rams,
-button:hover.bg-rams *,
-button:hover.bg-rams span,
-button:hover.bg-rams svg,
-.hover\:bg-report:hover,
-.hover\:bg-report:hover *,
-.hover\:bg-report:hover span,
-.hover\:bg-report:hover svg,
-button.hover\:bg-report:hover,
-button.hover\:bg-report:hover *,
-button:hover.bg-report,
-button:hover.bg-report *,
-button:hover.bg-report span,
-button:hover.bg-report svg,
-.hover\:bg-green-600:hover,
-.hover\:bg-green-600:hover *,
-.hover\:bg-green-600:hover span,
-.hover\:bg-green-600:hover svg,
-button:hover.bg-green-600,
-button:hover.bg-green-600 *,
-button:hover.bg-green-600 span,
-button:hover.bg-green-600 svg,
-.hover\:bg-green-700:hover,
-.hover\:bg-green-700:hover *,
-.hover\:bg-green-700:hover span,
-.hover\:bg-green-700:hover svg,
-button:hover.bg-green-700,
-button:hover.bg-green-700 *,
-button:hover.bg-green-700 span,
-button:hover.bg-green-700 svg {
-  color: rgb(255 255 255) !important;
-}
-
-/* Blue button hovers - Keep white text and icons */
-.hover\:bg-timesheet:hover,
-.hover\:bg-timesheet:hover *,
-.hover\:bg-timesheet:hover span,
-.hover\:bg-timesheet:hover svg,
-button.hover\:bg-timesheet:hover,
-button.hover\:bg-timesheet:hover *,
-button:hover.bg-timesheet,
-button:hover.bg-timesheet *,
-button:hover.bg-timesheet span,
-button:hover.bg-timesheet svg,
-.hover\:bg-blue-600:hover,
-.hover\:bg-blue-600:hover *,
-.hover\:bg-blue-600:hover span,
-.hover\:bg-blue-600:hover svg,
-button:hover.bg-blue-600,
-button:hover.bg-blue-600 *,
-button:hover.bg-blue-600 span,
-button:hover.bg-blue-600 svg,
-.hover\:bg-blue-700:hover,
-.hover\:bg-blue-700:hover *,
-.hover\:bg-blue-700:hover span,
-.hover\:bg-blue-700:hover svg,
-button:hover.bg-blue-700,
-button:hover.bg-blue-700 *,
-button:hover.bg-blue-700 span,
-button:hover.bg-blue-700 svg {
-  color: rgb(255 255 255) !important;
-}
-
-/* Orange/Amber button hovers - Keep white text and icons */
-.hover\:bg-inspection:hover,
-.hover\:bg-inspection:hover *,
-.hover\:bg-inspection:hover span,
-.hover\:bg-inspection:hover svg,
-button.hover\:bg-inspection:hover,
-button.hover\:bg-inspection:hover *,
-button:hover.bg-inspection,
-button:hover.bg-inspection *,
-button:hover.bg-inspection span,
-button:hover.bg-inspection svg,
-.hover\:bg-workshop:hover,
-.hover\:bg-workshop:hover *,
-.hover\:bg-workshop:hover span,
-.hover\:bg-workshop:hover svg,
-button.hover\:bg-workshop:hover,
-button.hover\:bg-workshop:hover *,
-button:hover.bg-workshop,
-button:hover.bg-workshop *,
-button:hover.bg-workshop span,
-button:hover.bg-workshop svg,
-.hover\:bg-orange-600:hover,
-.hover\:bg-orange-600:hover *,
-.hover\:bg-orange-600:hover span,
-.hover\:bg-orange-600:hover svg,
-button:hover.bg-orange-600,
-button:hover.bg-orange-600 *,
-button:hover.bg-orange-600 span,
-button:hover.bg-orange-600 svg,
-.hover\:bg-amber-600:hover,
-.hover\:bg-amber-600:hover *,
-.hover\:bg-amber-600:hover span,
-.hover\:bg-amber-600:hover svg,
-button:hover.bg-amber-600,
-button:hover.bg-amber-600 *,
-button:hover.bg-amber-600 span,
-button:hover.bg-amber-600 svg {
-  color: rgb(255 255 255) !important;
-}
-
-/* Red button hovers - Keep white text and icons */
-.hover\:bg-maintenance:hover,
-.hover\:bg-maintenance:hover *,
-.hover\:bg-maintenance:hover span,
-.hover\:bg-maintenance:hover svg,
-button.hover\:bg-maintenance:hover,
-button.hover\:bg-maintenance:hover *,
-button:hover.bg-maintenance,
-button:hover.bg-maintenance *,
-button:hover.bg-maintenance span,
-button:hover.bg-maintenance svg,
-.hover\:bg-red-600:hover,
-.hover\:bg-red-600:hover *,
-.hover\:bg-red-600:hover span,
-.hover\:bg-red-600:hover svg,
-button:hover.bg-red-600,
-button:hover.bg-red-600 *,
-button:hover.bg-red-600 span,
-button:hover.bg-red-600 svg,
-.hover\:bg-red-700:hover,
-.hover\:bg-red-700:hover *,
-.hover\:bg-red-700:hover span,
-.hover\:bg-red-700:hover svg,
-button:hover.bg-red-700,
-button:hover.bg-red-700 *,
-button:hover.bg-red-700 span,
-button:hover.bg-red-700 svg,
-.hover\:bg-destructive:hover,
-.hover\:bg-destructive:hover *,
-.hover\:bg-destructive:hover span,
-.hover\:bg-destructive:hover svg,
-button:hover.bg-destructive,
-button:hover.bg-destructive *,
-button:hover.bg-destructive span,
-button:hover.bg-destructive svg {
-  color: rgb(255 255 255) !important;
-}
-
-/* Secondary/Dark button hovers - Keep light text and icons */
-button:hover.bg-secondary,
-button:hover.bg-secondary *,
-button:hover.bg-secondary span,
-button:hover.bg-secondary svg,
-button:hover.bg-slate-700,
-button:hover.bg-slate-700 *,
-button:hover.bg-slate-700 span,
-button:hover.bg-slate-700 svg,
-button:hover.bg-slate-800,
-button:hover.bg-slate-800 *,
-button:hover.bg-slate-800 span,
-button:hover.bg-slate-800 svg,
-.hover\:bg-secondary:hover,
-.hover\:bg-secondary:hover *,
-.hover\:bg-secondary:hover span,
-.hover\:bg-secondary:hover svg,
-.hover\:bg-slate-700:hover,
-.hover\:bg-slate-700:hover *,
-.hover\:bg-slate-700:hover span,
-.hover\:bg-slate-700:hover svg,
-.hover\:bg-slate-800:hover,
-.hover\:bg-slate-800:hover *,
-.hover\:bg-slate-800:hover span,
-.hover\:bg-slate-800:hover svg {
-  color: rgb(226 232 240) !important; /* Light text on dark backgrounds */
-}
-
-/* Ghost/Outline button hovers - Keep light text and icons */
-button[class*="variant-ghost"]:hover,
-button[class*="variant-ghost"]:hover *,
-button[class*="variant-ghost"]:hover span,
-button[class*="variant-ghost"]:hover svg,
-button[class*="variant-outline"]:hover,
-button[class*="variant-outline"]:hover *,
-button[class*="variant-outline"]:hover span,
-button[class*="variant-outline"]:hover svg,
-button[class*="variant-link"]:hover,
-button[class*="variant-link"]:hover *,
-button[class*="variant-link"]:hover span,
-button[class*="variant-link"]:hover svg {
-  color: rgb(226 232 240) !important; /* Light text and icons */
-}
-
-/* ============================================================================
- * Animation Utilities
- * ============================================================================ */
-
-/* Shake animation for indicating blocked actions or invalid interactions */
+/* Animations */
 @keyframes shake {
-  0%, 100% { 
-    transform: translateX(0); 
-  }
-  10%, 30%, 50%, 70%, 90% { 
-    transform: translateX(-10px); 
-  }
-  20%, 40%, 60%, 80% { 
-    transform: translateX(10px); 
-  }
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
+  20%, 40%, 60%, 80% { transform: translateX(10px); }
 }
 
 .animate-shake {
   animation: shake 0.5s ease-in-out;
 }
 
-/* Tile pop-in animation - scales from center */
 @keyframes tile-pop-in {
-  0% {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-  60% {
-    transform: scale(1.02);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
+  0% { opacity: 0; transform: scale(0.8); }
+  60% { transform: scale(1.02); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 .animate-tile-pop {
@@ -2005,16 +582,9 @@ button[class*="variant-link"]:hover svg {
   opacity: 0;
 }
 
-/* Card fade-in animation - subtle slide up */
 @keyframes card-fade-in {
-  0% {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 .animate-card-fade {

@@ -271,7 +271,7 @@ export default function TimesheetsPage() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-slate-400">Checking permissions...</p>
+          <p className="text-muted-foreground">Checking permissions...</p>
         </div>
       </div>
     );
@@ -288,11 +288,11 @@ export default function TimesheetsPage() {
       {!isOnline && <OfflineBanner />}
       
       {/* Header */}
-      <div className="bg-slate-900 rounded-lg p-6 border border-slate-700">
+      <div className="bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">Timesheets</h1>
-            <p className="text-slate-400">
+            <p className="text-muted-foreground">
               Manage your weekly timesheets
             </p>
           </div>
@@ -306,14 +306,14 @@ export default function TimesheetsPage() {
         
         {/* Manager: Employee Filter */}
         {isManager && employees.length > 0 && (
-          <div className="pt-4 border-t border-slate-700">
+          <div className="pt-4 border-t border-border">
             <div className="flex items-center gap-3 max-w-md">
               <Label htmlFor="employee-filter" className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
                 <User className="h-4 w-4" />
                 View timesheets for:
               </Label>
               <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                <SelectTrigger id="employee-filter" className="h-10 bg-slate-900 border-slate-600 text-white">
+                <SelectTrigger id="employee-filter" className="h-10 border-border text-white">
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
@@ -333,10 +333,10 @@ export default function TimesheetsPage() {
 
       {/* Status Filter - Only show for managers */}
       {isManager && (
-        <Card className="bg-slate-900 border-slate-700">
+        <Card className="border-border">
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-slate-400" />
+              <Filter className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
               <div className="flex gap-2 flex-wrap">
                 {(['all', 'draft', 'pending', 'approved', 'rejected', 'processed', 'adjusted'] as TimesheetStatusFilter[]).map((filter) => (
@@ -345,7 +345,7 @@ export default function TimesheetsPage() {
                     variant={statusFilter === filter ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setStatusFilter(filter)}
-                    className={statusFilter === filter ? '' : 'border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50'}
+                    className={statusFilter === filter ? '' : 'border-slate-600 text-slate-600 dark:text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-700/50'}
                   >
                     {filter === 'pending' && <Clock className="h-3 w-3 mr-1" />}
                     {filter === 'approved' && <CheckCircle2 className="h-3 w-3 mr-1" />}
@@ -385,7 +385,7 @@ export default function TimesheetsPage() {
           ))}
         </div>
       ) : timesheets.length === 0 ? (
-        <Card className="bg-slate-900 border-slate-700">
+        <Card className="border-border">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-16 w-16 text-slate-400 mb-4" />
             <h3 className="text-lg font-semibold text-white mb-2">No timesheets yet</h3>
@@ -406,7 +406,7 @@ export default function TimesheetsPage() {
             {timesheets.slice(0, displayCount).map((timesheet) => (
             <Card 
               key={timesheet.id} 
-              className="bg-slate-900 border-slate-700 hover:shadow-lg hover:border-timesheet/50 transition-all duration-200 cursor-pointer"
+              className="border-border hover:shadow-lg hover:border-timesheet/50 transition-all duration-200 cursor-pointer"
               onClick={() => {
                 // Redirect draft timesheets to /timesheets/new for editing with validation
                 if (timesheet.status === 'draft' || timesheet.status === 'rejected') {
@@ -424,7 +424,7 @@ export default function TimesheetsPage() {
                       <CardTitle className="text-lg text-white">
                         Week Ending {formatDate(timesheet.week_ending)}
                       </CardTitle>
-                      <CardDescription className="text-slate-400">
+                      <CardDescription className="text-muted-foreground">
                         {isManager && timesheet.profile?.full_name && (
                           <span className="font-medium text-white">
                             {timesheet.profile.full_name}
@@ -453,7 +453,7 @@ export default function TimesheetsPage() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between text-sm">
-                  <div className="text-slate-400">
+                  <div className="text-muted-foreground">
                     {timesheet.submitted_at
                       ? `Submitted ${formatDate(timesheet.submitted_at)}`
                       : 'Not yet submitted'}
@@ -488,7 +488,7 @@ export default function TimesheetsPage() {
               <Button
                 onClick={() => setDisplayCount(prev => prev + 12)}
                 variant="outline"
-                className="w-full max-w-xs bg-slate-900 border-slate-600 text-white hover:bg-slate-800"
+                className="w-full max-w-xs border-border text-white hover:bg-slate-800"
               >
                 Show More ({timesheets.length - displayCount} remaining)
               </Button>

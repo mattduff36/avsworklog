@@ -446,11 +446,11 @@ export default function UsersAdminPage() {
   return (
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
-      <div className="bg-slate-900 rounded-lg p-6 border border-slate-700">
+      <div className="bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">User Management</h1>
-            <p className="text-slate-400">
+            <p className="text-muted-foreground">
               Manage users, roles, and permissions
             </p>
           </div>
@@ -481,7 +481,7 @@ export default function UsersAdminPage() {
           {/* Stats Cards - Now Filter Buttons */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card 
-          className={`bg-slate-900 border-slate-700 cursor-pointer hover:shadow-lg transition-all ${
+          className={`border-border cursor-pointer hover:shadow-lg transition-all ${
             roleFilter === 'all' ? 'border-2 border-yellow-500' : ''
           }`}
           onClick={() => setRoleFilter('all')}
@@ -489,7 +489,7 @@ export default function UsersAdminPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400">All Users</p>
+                <p className="text-sm text-muted-foreground">All Users</p>
                 <p className="text-2xl font-bold text-white">{stats.total}</p>
               </div>
               <User className="h-8 w-8 text-blue-500" />
@@ -497,7 +497,7 @@ export default function UsersAdminPage() {
           </CardContent>
         </Card>
         <Card 
-          className={`bg-slate-900 border-slate-700 cursor-pointer hover:shadow-lg transition-all ${
+          className={`border-border cursor-pointer hover:shadow-lg transition-all ${
             roleFilter === 'admin' ? 'border-2 border-yellow-500' : ''
           }`}
           onClick={() => setRoleFilter('admin')}
@@ -505,7 +505,7 @@ export default function UsersAdminPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400">Admins</p>
+                <p className="text-sm text-muted-foreground">Admins</p>
                 <p className="text-2xl font-bold text-white">{stats.admins}</p>
               </div>
               <Shield className="h-8 w-8 text-red-500" />
@@ -513,7 +513,7 @@ export default function UsersAdminPage() {
           </CardContent>
         </Card>
         <Card 
-          className={`bg-slate-900 border-slate-700 cursor-pointer hover:shadow-lg transition-all ${
+          className={`border-border cursor-pointer hover:shadow-lg transition-all ${
             roleFilter === 'manager' ? 'border-2 border-yellow-500' : ''
           }`}
           onClick={() => setRoleFilter('manager')}
@@ -521,7 +521,7 @@ export default function UsersAdminPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400">Managers</p>
+                <p className="text-sm text-muted-foreground">Managers</p>
                 <p className="text-2xl font-bold text-white">{stats.managers}</p>
               </div>
               <Shield className="h-8 w-8 text-amber-500" />
@@ -529,7 +529,7 @@ export default function UsersAdminPage() {
           </CardContent>
         </Card>
         <Card 
-          className={`bg-slate-900 border-slate-700 cursor-pointer hover:shadow-lg transition-all ${
+          className={`border-border cursor-pointer hover:shadow-lg transition-all ${
             roleFilter === 'employee' ? 'border-2 border-yellow-500' : ''
           }`}
           onClick={() => setRoleFilter('employee')}
@@ -537,7 +537,7 @@ export default function UsersAdminPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400">Employees</p>
+                <p className="text-sm text-muted-foreground">Employees</p>
                 <p className="text-2xl font-bold text-white">{stats.employees}</p>
               </div>
               <User className="h-8 w-8 text-green-500" />
@@ -547,12 +547,12 @@ export default function UsersAdminPage() {
       </div>
 
       {/* User Management Interface */}
-      <Card className="bg-slate-900 border-slate-700">
+      <Card className="border-border">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-white">All Users</CardTitle>
-              <CardDescription className="text-slate-400">
+              <CardDescription className="text-muted-foreground">
                 View and manage user accounts, roles, and permissions
               </CardDescription>
             </div>
@@ -582,7 +582,7 @@ export default function UsersAdminPage() {
             {/* Search Bar */}
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by name, email, or employee ID..."
                   value={searchQuery}
@@ -598,7 +598,7 @@ export default function UsersAdminPage() {
                 <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
               </div>
             ) : filteredUsers.length === 0 ? (
-              <div className="text-center py-8 text-slate-400">
+              <div className="text-center py-8 text-muted-foreground">
                 {searchQuery ? 'No users found matching your search.' : 'No users yet.'}
               </div>
             ) : (
@@ -606,12 +606,12 @@ export default function UsersAdminPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-slate-700 hover:bg-slate-800/50">
-                      <TableHead className="text-slate-300">Name</TableHead>
-                      <TableHead className="text-slate-300">Email</TableHead>
-                      <TableHead className="text-slate-300">Employee ID</TableHead>
-                      <TableHead className="text-slate-300">Role</TableHead>
-                      <TableHead className="text-slate-300">Created</TableHead>
-                      <TableHead className="text-right text-slate-300">Actions</TableHead>
+                      <TableHead className="text-muted-foreground">Name</TableHead>
+                      <TableHead className="text-muted-foreground">Email</TableHead>
+                      <TableHead className="text-muted-foreground">Employee ID</TableHead>
+                      <TableHead className="text-muted-foreground">Role</TableHead>
+                      <TableHead className="text-muted-foreground">Created</TableHead>
+                      <TableHead className="text-right text-muted-foreground">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -620,18 +620,18 @@ export default function UsersAdminPage() {
                         <TableCell className="font-medium text-white">
                           <div className="flex items-center gap-2">
                             <div className="h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
-                              <User className="h-4 w-4 text-slate-600 dark:text-slate-300" />
+                              <User className="h-4 w-4 text-slate-600 dark:text-muted-foreground" />
                             </div>
                             {user.full_name || 'Unnamed User'}
                           </div>
                         </TableCell>
-                        <TableCell className="text-slate-300">
+                        <TableCell className="text-muted-foreground">
                           <div className="flex items-center gap-2 text-sm">
-                            <Mail className="h-3 w-3 text-slate-400" />
+                            <Mail className="h-3 w-3 text-muted-foreground" />
                             {user.email}
                           </div>
                         </TableCell>
-                        <TableCell className="text-slate-300">{user.employee_id || '-'}</TableCell>
+                        <TableCell className="text-muted-foreground">{user.employee_id || '-'}</TableCell>
                         <TableCell>
                           <Badge variant={
                             user.email === 'admin@mpdee.co.uk' ? 'destructive' :
@@ -641,9 +641,9 @@ export default function UsersAdminPage() {
                             {user.email === 'admin@mpdee.co.uk' ? 'SuperAdmin' : (user.role?.display_name || 'No Role')}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-slate-300">
+                        <TableCell className="text-muted-foreground">
                           <div className="flex items-center gap-2 text-sm">
-                            <Calendar className="h-3 w-3 text-slate-400" />
+                            <Calendar className="h-3 w-3 text-muted-foreground" />
                             {new Date(user.created_at || '').toLocaleDateString()}
                           </div>
                         </TableCell>
@@ -691,10 +691,10 @@ export default function UsersAdminPage() {
 
       {/* Add User Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+        <DialogContent className="border-border text-white">
           <DialogHeader>
             <DialogTitle>Add New User</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               Create a new user account with email and password
             </DialogDescription>
           </DialogHeader>
@@ -715,7 +715,7 @@ export default function UsersAdminPage() {
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 placeholder="user@example.com"
-                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+                className="bg-input border-border text-white placeholder:text-muted-foreground"
               />
             </div>
             <div className="space-y-2">
@@ -725,7 +725,7 @@ export default function UsersAdminPage() {
                 value={formData.full_name}
                 onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                 placeholder="John Smith"
-                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+                className="bg-input border-border text-white placeholder:text-muted-foreground"
               />
             </div>
             <div className="space-y-2">
@@ -736,7 +736,7 @@ export default function UsersAdminPage() {
                 value={formData.phone_number}
                 onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
                 placeholder="07123 456789"
-                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+                className="bg-input border-border text-white placeholder:text-muted-foreground"
               />
             </div>
             <div className="space-y-2">
@@ -746,13 +746,13 @@ export default function UsersAdminPage() {
                 value={formData.employee_id}
                 onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
                 placeholder="E001"
-                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+                className="bg-input border-border text-white placeholder:text-muted-foreground"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="add-role">Role *</Label>
               <Select value={formData.role_id} onValueChange={(value) => setFormData({ ...formData, role_id: value })}>
-                <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                <SelectTrigger className="bg-input border-border text-white">
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -788,10 +788,10 @@ export default function UsersAdminPage() {
 
       {/* Edit User Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+        <DialogContent className="border-border text-white">
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               Update user information and role
             </DialogDescription>
           </DialogHeader>
@@ -808,7 +808,7 @@ export default function UsersAdminPage() {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="bg-slate-800 border-slate-600 text-white"
+                className="bg-input border-border text-white"
               />
               <p className="text-xs text-amber-500">⚠️ Changing email will require the user to verify their new address</p>
             </div>
@@ -818,7 +818,7 @@ export default function UsersAdminPage() {
                 id="edit-name"
                 value={formData.full_name}
                 onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                className="bg-slate-800 border-slate-600 text-white"
+                className="bg-input border-border text-white"
               />
             </div>
             <div className="space-y-2">
@@ -828,7 +828,7 @@ export default function UsersAdminPage() {
                 type="tel"
                 value={formData.phone_number}
                 onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                className="bg-slate-800 border-slate-600 text-white"
+                className="bg-input border-border text-white"
               />
             </div>
             <div className="space-y-2">
@@ -837,13 +837,13 @@ export default function UsersAdminPage() {
                 id="edit-employee-id"
                 value={formData.employee_id}
                 onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-                className="bg-slate-800 border-slate-600 text-white"
+                className="bg-input border-border text-white"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-role">Role *</Label>
               <Select value={formData.role_id} onValueChange={(value) => setFormData({ ...formData, role_id: value })}>
-                <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                <SelectTrigger className="bg-input border-border text-white">
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -876,13 +876,13 @@ export default function UsersAdminPage() {
 
       {/* Delete Options Dialog */}
       <Dialog open={deleteOptionsDialogOpen} onOpenChange={setDeleteOptionsDialogOpen}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-2xl">
+        <DialogContent className="border-border text-white max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-red-500" />
               Delete User Account
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               Choose how to handle this user&apos;s company data (timesheets, inspections, etc.)
             </DialogDescription>
           </DialogHeader>
@@ -892,15 +892,15 @@ export default function UsersAdminPage() {
               {/* User Info */}
               <div className="bg-slate-800 rounded p-4 space-y-2">
                 <p className="text-sm">
-                  <span className="text-slate-400">Name:</span>{' '}
+                  <span className="text-muted-foreground">Name:</span>{' '}
                   <span className="text-white font-medium">{selectedUser.full_name}</span>
                 </p>
                 <p className="text-sm">
-                  <span className="text-slate-400">Email:</span>{' '}
+                  <span className="text-muted-foreground">Email:</span>{' '}
                   <span className="text-white">{selectedUser.email}</span>
                 </p>
                 <p className="text-sm">
-                  <span className="text-slate-400">Role:</span>{' '}
+                  <span className="text-muted-foreground">Role:</span>{' '}
                   <Badge variant={
                     selectedUser.email === 'admin@mpdee.co.uk' ? 'destructive' :
                     selectedUser.role?.name === 'admin' ? 'destructive' : 'default'
@@ -942,7 +942,7 @@ export default function UsersAdminPage() {
                         Preserve timesheets, inspections, and other submitted work for audits and reporting.
                         User will be marked as &quot;{selectedUser.full_name} (Deleted User)&quot; in all records.
                       </p>
-                      <div className="mt-2 text-xs text-slate-500">
+                      <div className="mt-2 text-xs text-muted-foreground">
                         ✓ Personal account deleted  • ✓ Company data preserved  • ✓ Audit trail maintained
                       </div>
                     </div>
@@ -1025,24 +1025,24 @@ export default function UsersAdminPage() {
 
       {/* Reset Password Confirmation Dialog */}
       <Dialog open={resetPasswordDialogOpen} onOpenChange={setResetPasswordDialogOpen}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+        <DialogContent className="border-border text-white">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <KeyRound className="h-5 w-5 text-amber-500" />
               Reset User Password
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               This will generate a new temporary password for the user. They will be required to change it on their next login.
             </DialogDescription>
           </DialogHeader>
           {selectedUser && (
             <div className="bg-slate-800 rounded p-4 space-y-2">
               <p className="text-sm">
-                <span className="text-slate-400">Name:</span>{' '}
+                <span className="text-muted-foreground">Name:</span>{' '}
                 <span className="text-white font-medium">{selectedUser.full_name}</span>
               </p>
               <p className="text-sm">
-                <span className="text-slate-400">Email:</span>{' '}
+                <span className="text-muted-foreground">Email:</span>{' '}
                 <span className="text-white">{selectedUser.email}</span>
               </p>
             </div>
@@ -1082,13 +1082,13 @@ export default function UsersAdminPage() {
 
       {/* Password Display Dialog */}
       <Dialog open={passwordDisplayDialogOpen} onOpenChange={setPasswordDisplayDialogOpen}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg">
+        <DialogContent className="border-border text-white max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5 text-green-500" />
               {isNewUser ? 'User Created Successfully' : 'Password Reset Successfully'}
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               {isNewUser 
                 ? 'The user account has been created with a temporary password.'
                 : 'The user\'s password has been reset to a new temporary password.'}

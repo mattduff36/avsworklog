@@ -173,8 +173,8 @@ export function PDFViewer({ url }: PDFViewerProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-        <span className="ml-2 text-sm text-slate-600 dark:text-slate-400">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-sm text-slate-600 dark:text-muted-foreground">
           Loading PDF...
         </span>
       </div>

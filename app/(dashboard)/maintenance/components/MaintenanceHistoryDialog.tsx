@@ -169,7 +169,7 @@ export function MaintenanceHistoryDialog({
               </span>
             </div>
             {showTimestamp && (
-              <div className="flex items-center gap-1 text-xs text-slate-400">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Clock className="h-3 w-3" />
                 {getRelativeTime(item.created_at)}
               </div>
@@ -212,13 +212,13 @@ export function MaintenanceHistoryDialog({
             <div className="bg-slate-900/50 rounded p-3 border border-slate-700 mt-2 space-y-2">
               {task.workshop_comments && (
                 <div>
-                  <p className="text-xs text-slate-500 font-medium mb-1">Task Details:</p>
+                  <p className="text-xs text-muted-foreground font-medium mb-1">Task Details:</p>
                   <p className="text-slate-200 text-sm">{task.workshop_comments}</p>
                 </div>
               )}
               {task.description && !task.workshop_comments && (
                 <div>
-                  <p className="text-xs text-slate-500 font-medium mb-1">Description:</p>
+                  <p className="text-xs text-muted-foreground font-medium mb-1">Description:</p>
                   <p className="text-slate-200 text-sm">{task.description}</p>
                 </div>
               )}
@@ -243,7 +243,7 @@ export function MaintenanceHistoryDialog({
       return (
         <div 
           key={entry.id}
-          className="bg-gradient-to-r from-slate-800/50 to-slate-800/30 border border-slate-700/50 rounded-lg p-4 hover:border-slate-600 transition-colors"
+          className="bg-gradient-to-r from-slate-800/50 to-slate-800/30 border border-border/50 rounded-lg p-4 hover:border-slate-600 transition-colors"
         >
           <div className="flex items-start justify-between mb-2">
             <div className="flex items-center gap-2">
@@ -253,7 +253,7 @@ export function MaintenanceHistoryDialog({
               </span>
             </div>
             {showTimestamp && (
-              <div className="flex items-center gap-1 text-xs text-slate-400">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Clock className="h-3 w-3" />
                 {getRelativeTime(item.created_at)}
               </div>
@@ -262,7 +262,7 @@ export function MaintenanceHistoryDialog({
           
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-300">Updated</span>
+              <span className="text-sm text-muted-foreground">Updated</span>
               <Badge variant="outline" className="text-xs">
                 {formatFieldName(entry.field_name)}
               </Badge>
@@ -270,10 +270,10 @@ export function MaintenanceHistoryDialog({
             
             {entry.field_name !== 'all_fields' && entry.field_name !== 'no_changes' && (
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-slate-500 line-through">
+                <span className="text-muted-foreground line-through">
                   {formatValue(entry.old_value, entry.value_type)}
                 </span>
-                <span className="text-slate-500">→</span>
+                <span className="text-muted-foreground">→</span>
                 <span className="text-green-400 font-semibold">
                   {formatValue(entry.new_value, entry.value_type)}
                 </span>
@@ -282,7 +282,7 @@ export function MaintenanceHistoryDialog({
           </div>
           
           <div className="bg-slate-900/50 rounded p-3 border border-slate-700 mt-2">
-            <p className="text-xs text-slate-500 mb-1">Comment:</p>
+            <p className="text-xs text-muted-foreground mb-1">Comment:</p>
             <p className="text-slate-200 text-sm">{entry.comment}</p>
           </div>
         </div>
@@ -317,7 +317,7 @@ export function MaintenanceHistoryDialog({
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-3xl max-h-[90vh] md:max-h-[90vh] h-full md:h-auto w-full md:max-w-3xl overflow-y-auto">
+      <DialogContent className="border-border text-white max-w-3xl max-h-[90vh] md:max-h-[90vh] h-full md:h-auto w-full md:max-w-3xl overflow-y-auto">
         <DialogHeader>
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-3 md:gap-4 md:pr-8">
             <div className="flex-1">
@@ -374,7 +374,7 @@ export function MaintenanceHistoryDialog({
                   {/* Make - prefer VES, fallback to MOT */}
                   {(vesData.ves_make || vesData.mot_make) && (
                     <div>
-                      <span className="text-slate-400">Make:</span>
+                      <span className="text-muted-foreground">Make:</span>
                       <span className="ml-2 text-white font-medium">{vesData.ves_make || vesData.mot_make}</span>
                     </div>
                   )}
@@ -382,7 +382,7 @@ export function MaintenanceHistoryDialog({
                   {/* Model - from MOT API only */}
                   {vesData.mot_model && (
                     <div>
-                      <span className="text-slate-400">Model:</span>
+                      <span className="text-muted-foreground">Model:</span>
                       <span className="ml-2 text-white font-medium">{vesData.mot_model}</span>
                     </div>
                   )}
@@ -390,7 +390,7 @@ export function MaintenanceHistoryDialog({
                   {/* Colour - prefer VES, fallback to MOT */}
                   {(vesData.ves_colour || vesData.mot_primary_colour) && (
                     <div>
-                      <span className="text-slate-400">Colour:</span>
+                      <span className="text-muted-foreground">Colour:</span>
                       <span className="ml-2 text-white font-medium">{vesData.ves_colour || vesData.mot_primary_colour}</span>
                     </div>
                   )}
@@ -398,7 +398,7 @@ export function MaintenanceHistoryDialog({
                   {/* Year - prefer VES, fallback to MOT */}
                   {(vesData.ves_year_of_manufacture || vesData.mot_year_of_manufacture) && (
                     <div>
-                      <span className="text-slate-400">Year:</span>
+                      <span className="text-muted-foreground">Year:</span>
                       <span className="ml-2 text-white font-medium">{vesData.ves_year_of_manufacture || vesData.mot_year_of_manufacture}</span>
                     </div>
                   )}
@@ -406,7 +406,7 @@ export function MaintenanceHistoryDialog({
                   {/* Fuel - prefer VES, fallback to MOT */}
                   {(vesData.ves_fuel_type || vesData.mot_fuel_type) && (
                     <div>
-                      <span className="text-slate-400">Fuel:</span>
+                      <span className="text-muted-foreground">Fuel:</span>
                       <span className="ml-2 text-white font-medium">{vesData.ves_fuel_type || vesData.mot_fuel_type}</span>
                     </div>
                   )}
@@ -414,7 +414,7 @@ export function MaintenanceHistoryDialog({
                   {/* First Registration - from MOT API */}
                   {vesData.mot_first_used_date && (
                     <div>
-                      <span className="text-slate-400">First Reg:</span>
+                      <span className="text-muted-foreground">First Reg:</span>
                       <span className="ml-2 text-white font-medium">{formatMaintenanceDate(vesData.mot_first_used_date)}</span>
                     </div>
                   )}
@@ -422,7 +422,7 @@ export function MaintenanceHistoryDialog({
                   {/* Engine - from VES only */}
                   {vesData.ves_engine_capacity && (
                     <div>
-                      <span className="text-slate-400">Engine:</span>
+                      <span className="text-muted-foreground">Engine:</span>
                       <span className="ml-2 text-white font-medium">{vesData.ves_engine_capacity}cc</span>
                     </div>
                   )}
@@ -430,7 +430,7 @@ export function MaintenanceHistoryDialog({
                   {/* Tax Status - from VES */}
                   {vesData.ves_tax_status && (
                     <div>
-                      <span className="text-slate-400">Tax Status:</span>
+                      <span className="text-muted-foreground">Tax Status:</span>
                       <span className="ml-2 text-white font-medium">{vesData.ves_tax_status}</span>
                     </div>
                   )}
@@ -438,7 +438,7 @@ export function MaintenanceHistoryDialog({
                   {/* Tax Due Date */}
                   {vesData.tax_due_date && (
                     <div>
-                      <span className="text-slate-400">Tax Due:</span>
+                      <span className="text-muted-foreground">Tax Due:</span>
                       <span className="ml-2 text-white font-medium">{formatMaintenanceDate(vesData.tax_due_date)}</span>
                     </div>
                   )}
@@ -446,7 +446,7 @@ export function MaintenanceHistoryDialog({
                   {/* MOT Status - from VES */}
                   {vesData.ves_mot_status && (
                     <div>
-                      <span className="text-slate-400">MOT Status:</span>
+                      <span className="text-muted-foreground">MOT Status:</span>
                       <span className="ml-2 text-white font-medium">{vesData.ves_mot_status}</span>
                     </div>
                   )}
@@ -454,7 +454,7 @@ export function MaintenanceHistoryDialog({
                   {/* MOT Due Date */}
                   {vesData.mot_due_date && (
                     <div>
-                      <span className="text-slate-400">MOT Due:</span>
+                      <span className="text-muted-foreground">MOT Due:</span>
                       <span className="ml-2 text-white font-medium">{formatMaintenanceDate(vesData.mot_due_date)}</span>
                     </div>
                   )}
@@ -462,7 +462,7 @@ export function MaintenanceHistoryDialog({
                   {/* CO2 Emissions - from VES */}
                   {vesData.ves_co2_emissions && (
                     <div>
-                      <span className="text-slate-400">CO2:</span>
+                      <span className="text-muted-foreground">CO2:</span>
                       <span className="ml-2 text-white font-medium">{vesData.ves_co2_emissions}g/km</span>
                     </div>
                   )}
@@ -470,7 +470,7 @@ export function MaintenanceHistoryDialog({
                   {/* Euro Status - from VES */}
                   {vesData.ves_euro_status && (
                     <div>
-                      <span className="text-slate-400">Euro Status:</span>
+                      <span className="text-muted-foreground">Euro Status:</span>
                       <span className="ml-2 text-white font-medium">{vesData.ves_euro_status}</span>
                     </div>
                   )}
@@ -478,7 +478,7 @@ export function MaintenanceHistoryDialog({
                   {/* Wheelplan - from VES */}
                   {vesData.ves_wheelplan && (
                     <div className="col-span-2">
-                      <span className="text-slate-400">Wheelplan:</span>
+                      <span className="text-muted-foreground">Wheelplan:</span>
                       <span className="ml-2 text-white font-medium">{vesData.ves_wheelplan}</span>
                     </div>
                   )}
@@ -488,7 +488,7 @@ export function MaintenanceHistoryDialog({
             
             {/* Show "No history" message if no history, but still show DVLA data above */}
             {combinedItems.length === 0 ? (
-              <div className="text-center py-12 text-slate-400">
+              <div className="text-center py-12 text-muted-foreground">
                 <HistoryIcon className="h-12 w-12 mx-auto mb-3 opacity-20" />
                 <p>No maintenance history yet</p>
                 <p className="text-sm mt-1">Changes will appear here when maintenance records or workshop tasks are recorded</p>
@@ -506,15 +506,15 @@ export function MaintenanceHistoryDialog({
               <div className="border-t border-slate-700 pt-4">
                 <button
                   onClick={() => setShowFullHistory(!showFullHistory)}
-                  className="w-full flex items-center justify-between p-3 bg-slate-800/30 hover:bg-slate-800/50 rounded-lg border border-slate-700/50 transition-colors"
+                  className="w-full flex items-center justify-between p-3 bg-slate-800/30 hover:bg-slate-800/50 rounded-lg border border-border/50 transition-colors"
                 >
                   <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">
                     {showFullHistory ? 'Hide Older Updates' : `Show More (${initialExpandCount} ${initialExpandCount === 1 ? 'item' : 'items'})`}
                   </h3>
                   {showFullHistory ? (
-                    <ChevronUp className="h-4 w-4 text-slate-400" />
+                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
                   ) : (
-                    <ChevronDown className="h-4 w-4 text-slate-400" />
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
                   )}
                 </button>
                 
@@ -530,7 +530,7 @@ export function MaintenanceHistoryDialog({
                       <Button
                         onClick={() => setVisibleHistoryCount(prev => prev + 10)}
                         variant="outline"
-                        className="w-full border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white"
+                        className="w-full border-border text-muted-foreground hover:bg-slate-800 hover:text-white"
                       >
                         <ChevronDown className="h-4 w-4 mr-2" />
                         Show More ({remainingCount} {remainingCount === 1 ? 'item' : 'items'} remaining)

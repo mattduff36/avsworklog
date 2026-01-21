@@ -236,7 +236,7 @@ export function AssignEmployeesModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <DialogContent className="sm:max-w-[600px] max-h-[80vh]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Assign RAMS Document</DialogTitle>
@@ -272,7 +272,7 @@ export function AssignEmployeesModal({
               >
                 {allSelected ? 'Deselect All' : 'Select All'}
               </Button>
-              <span className="text-sm text-slate-400">
+              <span className="text-sm text-muted-foreground">
                 {selectedIds.size} selected
               </span>
             </div>
@@ -305,7 +305,7 @@ export function AssignEmployeesModal({
                             <span className="text-sm font-medium text-slate-100">
                               {employee.full_name}
                             </span>
-                            <span className="text-xs text-slate-400">
+                            <span className="text-xs text-muted-foreground">
                               {employee.role?.display_name || 'No Role'}
                             </span>
                           </div>

@@ -5,6 +5,7 @@ import SignatureCanvas from 'react-signature-canvas';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { X, Check, RotateCcw } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface SignaturePadProps {
   onSave: (signature: string) => void;

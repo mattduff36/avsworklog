@@ -101,7 +101,7 @@ export function WorkshopTaskHistoryCard({
 
   return (
     <Card 
-      className="bg-slate-800/50 border-slate-700 border-l-4 border-l-orange-500 cursor-pointer hover:bg-slate-800/70 transition-colors"
+      className="bg-muted/50 border-border border-l-4 border-l-orange-500 cursor-pointer hover:bg-slate-800/70 transition-colors"
       onClick={handleToggle}
     >
       <CardHeader className="pb-3">
@@ -134,9 +134,9 @@ export function WorkshopTaskHistoryCard({
           <div className="flex items-center gap-2 flex-shrink-0">
             {getStatusBadge(task.status)}
             {isExpanded ? (
-              <ChevronUp className="h-5 w-5 text-slate-400" />
+              <ChevronUp className="h-5 w-5 text-muted-foreground" />
             ) : (
-              <ChevronDown className="h-5 w-5 text-slate-400" />
+              <ChevronDown className="h-5 w-5 text-muted-foreground" />
             )}
           </div>
         </div>
@@ -145,7 +145,7 @@ export function WorkshopTaskHistoryCard({
         <CardContent className="space-y-4 pt-0" onClick={(e) => e.stopPropagation()}>
           {/* Action buttons if provided */}
           {actionButtons && (
-            <div className="pb-4 border-b border-slate-700">
+            <div className="pb-4 border-b border-border">
               {actionButtons}
             </div>
           )}

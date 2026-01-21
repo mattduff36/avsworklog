@@ -98,7 +98,7 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <DialogContent className="sm:max-w-[600px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Upload RAMS Document</DialogTitle>
@@ -120,7 +120,7 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
                 onChange={(e) => setTitle(e.target.value)}
                 disabled={uploading}
                 required
-                className="placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                className=""
               />
             </div>
 
@@ -134,7 +134,7 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={uploading}
                 rows={3}
-                className="placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                className=""
               />
             </div>
 
@@ -162,7 +162,7 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
                     variant="outline"
                     onClick={() => document.getElementById('file-upload')?.click()}
                     disabled={uploading}
-                    className="w-full h-24 border-2 border-dashed border-rams/40 hover:border-rams hover:bg-rams/5 text-slate-600 dark:text-slate-300 hover:text-rams transition-all duration-200"
+                    className="w-full h-24 border-2 border-dashed border-rams/40 hover:border-rams hover:bg-rams/5 text-slate-600 dark:text-muted-foreground hover:text-rams transition-all duration-200"
                   >
                     <div className="flex flex-col items-center gap-2">
                       <Upload className="h-8 w-8" />

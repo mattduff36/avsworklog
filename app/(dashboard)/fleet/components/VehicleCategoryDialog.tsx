@@ -106,13 +106,13 @@ export function VehicleCategoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] bg-slate-900 border-slate-700 text-white">
+      <DialogContent className="sm:max-w-[500px] border-border text-white">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>
               {mode === 'create' ? 'Add Vehicle Category' : 'Edit Vehicle Category'}
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               {mode === 'create'
                 ? 'Create a new vehicle category for fleet organization'
                 : 'Update vehicle category details'}

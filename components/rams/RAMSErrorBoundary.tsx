@@ -84,19 +84,19 @@ export class RAMSErrorBoundary extends Component<Props, State> {
                 </div>
                 
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+                  <h2 className="text-2xl font-bold text-foreground mb-2">
                     Something went wrong
                   </h2>
-                  <p className="text-slate-600 dark:text-slate-400 mb-4">
+                  <p className="text-muted-foreground mb-4">
                     We encountered an error while loading this RAMS content.
                   </p>
                   
                   {this.state.error && (
-                    <details className="text-left bg-slate-50 dark:bg-slate-800 rounded-lg p-4 mb-4">
-                      <summary className="cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    <details className="text-left bg-muted rounded-lg p-4 mb-4">
+                      <summary className="cursor-pointer text-sm font-medium text-muted-foreground mb-2">
                         Technical Details
                       </summary>
-                      <div className="text-xs font-mono text-slate-600 dark:text-slate-400 space-y-2">
+                      <div className="text-xs font-mono text-muted-foreground space-y-2">
                         <div>
                           <strong>Error:</strong> {this.state.error.message}
                         </div>
@@ -124,7 +124,7 @@ export class RAMSErrorBoundary extends Component<Props, State> {
                   <Button
                     variant="outline"
                     onClick={() => window.history.back()}
-                    className="border-slate-600 text-slate-700 dark:text-slate-300"
+                    className="border-slate-600 text-muted-foreground"
                   >
                     Go Back
                   </Button>

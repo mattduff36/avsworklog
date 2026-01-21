@@ -508,7 +508,7 @@ export default function VehicleHistoryPage({
               {/* Make - prefer VES, fallback to MOT */}
               {(vehicleData.ves_make || vehicleData.mot_make) && (
                 <div>
-                  <span className="text-slate-400">Make:</span>
+                  <span className="text-muted-foreground">Make:</span>
                   <span className="ml-2 text-white font-medium">{vehicleData.ves_make || vehicleData.mot_make}</span>
                 </div>
               )}
@@ -516,7 +516,7 @@ export default function VehicleHistoryPage({
               {/* Model - from MOT API only */}
               {vehicleData.mot_model && (
                 <div>
-                  <span className="text-slate-400">Model:</span>
+                  <span className="text-muted-foreground">Model:</span>
                   <span className="ml-2 text-white font-medium">{vehicleData.mot_model}</span>
                 </div>
               )}
@@ -524,7 +524,7 @@ export default function VehicleHistoryPage({
               {/* Colour - prefer VES, fallback to MOT */}
               {(vehicleData.ves_colour || vehicleData.mot_primary_colour) && (
                 <div>
-                  <span className="text-slate-400">Colour:</span>
+                  <span className="text-muted-foreground">Colour:</span>
                   <span className="ml-2 text-white font-medium">{vehicleData.ves_colour || vehicleData.mot_primary_colour}</span>
                 </div>
               )}
@@ -532,7 +532,7 @@ export default function VehicleHistoryPage({
               {/* Year - prefer VES, fallback to MOT */}
               {(vehicleData.ves_year_of_manufacture || vehicleData.mot_year_of_manufacture) && (
                 <div>
-                  <span className="text-slate-400">Year:</span>
+                  <span className="text-muted-foreground">Year:</span>
                   <span className="ml-2 text-white font-medium">{vehicleData.ves_year_of_manufacture || vehicleData.mot_year_of_manufacture}</span>
                 </div>
               )}
@@ -540,7 +540,7 @@ export default function VehicleHistoryPage({
               {/* Fuel - prefer VES, fallback to MOT */}
               {(vehicleData.ves_fuel_type || vehicleData.mot_fuel_type) && (
                 <div>
-                  <span className="text-slate-400">Fuel:</span>
+                  <span className="text-muted-foreground">Fuel:</span>
                   <span className="ml-2 text-white font-medium">{vehicleData.ves_fuel_type || vehicleData.mot_fuel_type}</span>
                 </div>
               )}
@@ -548,7 +548,7 @@ export default function VehicleHistoryPage({
               {/* First Registration - from MOT API */}
               {vehicleData.mot_first_used_date && (
                 <div>
-                  <span className="text-slate-400">First Reg:</span>
+                  <span className="text-muted-foreground">First Reg:</span>
                   <span className="ml-2 text-white font-medium">
                     {new Date(vehicleData.mot_first_used_date).toLocaleDateString('en-GB', {
                       day: 'numeric',
@@ -562,7 +562,7 @@ export default function VehicleHistoryPage({
               {/* Engine - from VES only */}
               {vehicleData.ves_engine_capacity && (
                 <div>
-                  <span className="text-slate-400">Engine:</span>
+                  <span className="text-muted-foreground">Engine:</span>
                   <span className="ml-2 text-white font-medium">{vehicleData.ves_engine_capacity}cc</span>
                 </div>
               )}
@@ -570,7 +570,7 @@ export default function VehicleHistoryPage({
               {/* Tax Status - from VES */}
               {vehicleData.ves_tax_status && (
                 <div>
-                  <span className="text-slate-400">Tax Status:</span>
+                  <span className="text-muted-foreground">Tax Status:</span>
                   <span className="ml-2 text-white font-medium">{vehicleData.ves_tax_status}</span>
                 </div>
               )}
@@ -578,7 +578,7 @@ export default function VehicleHistoryPage({
               {/* MOT Status - from VES */}
               {vehicleData.ves_mot_status && (
                 <div>
-                  <span className="text-slate-400">MOT Status:</span>
+                  <span className="text-muted-foreground">MOT Status:</span>
                   <span className="ml-2 text-white font-medium">{vehicleData.ves_mot_status}</span>
                 </div>
               )}
@@ -586,7 +586,7 @@ export default function VehicleHistoryPage({
               {/* CO2 Emissions - from VES */}
               {vehicleData.ves_co2_emissions && (
                 <div>
-                  <span className="text-slate-400">CO2:</span>
+                  <span className="text-muted-foreground">CO2:</span>
                   <span className="ml-2 text-white font-medium">{vehicleData.ves_co2_emissions}g/km</span>
                 </div>
               )}
@@ -594,7 +594,7 @@ export default function VehicleHistoryPage({
               {/* Euro Status - from VES */}
               {vehicleData.ves_euro_status && (
                 <div>
-                  <span className="text-slate-400">Euro Status:</span>
+                  <span className="text-muted-foreground">Euro Status:</span>
                   <span className="ml-2 text-white font-medium">{vehicleData.ves_euro_status}</span>
                 </div>
               )}
@@ -602,7 +602,7 @@ export default function VehicleHistoryPage({
               {/* Wheelplan - from VES */}
               {vehicleData.ves_wheelplan && (
                 <div className="col-span-2">
-                  <span className="text-slate-400">Wheelplan:</span>
+                  <span className="text-muted-foreground">Wheelplan:</span>
                   <span className="ml-2 text-white font-medium">{vehicleData.ves_wheelplan}</span>
                 </div>
               )}
@@ -636,7 +636,7 @@ export default function VehicleHistoryPage({
         <TabsContent value="maintenance" className="space-y-6">
           {/* Vehicle Service Information Summary */}
           {maintenanceRecord && (
-            <Card className="bg-slate-800/50 border-slate-700">
+            <Card className="bg-slate-800/50 border-border">
               <CardHeader>
                 <CardTitle>Service Information</CardTitle>
                 <CardDescription>Current maintenance status and schedules</CardDescription>
@@ -719,7 +719,7 @@ export default function VehicleHistoryPage({
             </Card>
           )}
 
-          <Card className="bg-slate-800/50 border-slate-700">
+          <Card className="bg-slate-800/50 border-border">
             <CardHeader>
               <CardTitle>Maintenance & Workshop History</CardTitle>
               <CardDescription>
@@ -776,7 +776,7 @@ export default function VehicleHistoryPage({
                               <span className="text-slate-200">{entry.new_value || 'None'}</span>
                             </div>
                             {entry.comment && (
-                              <p className="text-sm text-slate-300 italic">&quot;{entry.comment}&quot;</p>
+                              <p className="text-sm text-muted-foreground italic">&quot;{entry.comment}&quot;</p>
                             )}
                             <p className="text-xs text-muted-foreground">
                               {formatRelativeTime(entry.created_at)}
@@ -801,7 +801,7 @@ export default function VehicleHistoryPage({
 
         {/* MOT Tab */}
         <TabsContent value="mot" className="space-y-6">
-          <Card className="bg-slate-800/50 border-slate-700">
+          <Card className="bg-slate-800/50 border-border">
             <CardHeader>
               <CardTitle>MOT History</CardTitle>
               <CardDescription>Complete MOT test history from GOV.UK database</CardDescription>
@@ -840,21 +840,21 @@ export default function VehicleHistoryPage({
                       <CardContent>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                           <div>
-                            <span className="text-slate-400">Expiry Date:</span>
+                            <span className="text-muted-foreground">Expiry Date:</span>
                             <p className="text-white font-semibold text-lg">{formatDate(motData.currentStatus.expiryDate)}</p>
                           </div>
                           <div>
-                            <span className="text-slate-400">Status:</span>
+                            <span className="text-muted-foreground">Status:</span>
                             <p className={`font-semibold text-lg ${motData.currentStatus.status === 'Valid' ? 'text-green-400' : 'text-red-400'}`}>
                               {motData.currentStatus.status}
                             </p>
                           </div>
                           <div>
-                            <span className="text-slate-400">Days Remaining:</span>
+                            <span className="text-muted-foreground">Days Remaining:</span>
                             <p className="text-white font-semibold text-lg">{motData.currentStatus.daysRemaining}</p>
                           </div>
                           <div>
-                            <span className="text-slate-400">Last Test:</span>
+                            <span className="text-muted-foreground">Last Test:</span>
                             <p className="text-white font-semibold text-lg">{formatDate(motData.currentStatus.lastTestDate)}</p>
                           </div>
                         </div>
@@ -899,7 +899,7 @@ export default function VehicleHistoryPage({
                                       </span>
                                     </h4>
                                     {test.expiryDate && (
-                                      <p className="text-sm text-slate-400">
+                                      <p className="text-sm text-muted-foreground">
                                         Expiry: <span className="text-white font-medium">{formatDate(test.expiryDate)}</span>
                                       </p>
                                     )}
@@ -921,23 +921,23 @@ export default function VehicleHistoryPage({
                               {/* Test Details */}
                               <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-6 text-sm mb-3">
                                 <div className="flex items-center gap-2">
-                                  <Gauge className="h-4 w-4 text-slate-400" />
-                                  <span className="text-slate-400">Mileage:</span>
+                                  <Gauge className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-muted-foreground">Mileage:</span>
                                   <span className="text-white font-medium">
                                     {test.odometerValue ? `${formatMileage(test.odometerValue)} ${test.odometerUnit || ''}`.trim() : 'Not Set'}
                                   </span>
                                 </div>
                                 {(test.testStationName || test.testStationPcode) && (
                                   <div className="flex items-center gap-2">
-                                    <MapPin className="h-4 w-4 text-slate-400" />
-                                    <span className="text-slate-400">Station:</span>
+                                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-muted-foreground">Station:</span>
                                     <span className="text-white font-medium">
                                       {[test.testStationName, test.testStationPcode].filter(Boolean).join(', ')}
                                     </span>
                                   </div>
                                 )}
                                 <div className="flex items-center gap-2">
-                                  <span className="text-slate-400">Test Number:</span>
+                                  <span className="text-muted-foreground">Test Number:</span>
                                   <span className="text-white font-medium text-xs">{test.motTestNumber}</span>
                                 </div>
                               </div>
@@ -979,7 +979,7 @@ export default function VehicleHistoryPage({
                                                   {defect.type}
                                                 </Badge>
                                                 {defect.locationLateral && (
-                                                  <span className="text-xs text-slate-400">
+                                                  <span className="text-xs text-muted-foreground">
                                                     {defect.locationLateral}
                                                   </span>
                                                 )}
@@ -1014,7 +1014,7 @@ export default function VehicleHistoryPage({
 
         {/* Documents Tab */}
         <TabsContent value="documents">
-          <Card className="bg-slate-800/50 border-slate-700">
+          <Card className="bg-slate-800/50 border-border">
             <CardHeader>
               <CardTitle>Vehicle Documents</CardTitle>
               <CardDescription>Upload and manage vehicle documents, invoices, and records</CardDescription>
@@ -1036,7 +1036,7 @@ export default function VehicleHistoryPage({
 
         {/* Notes Tab */}
         <TabsContent value="notes">
-          <Card className="bg-slate-800/50 border-slate-700">
+          <Card className="bg-slate-800/50 border-border">
             <CardHeader>
               <CardTitle>Vehicle Notes</CardTitle>
               <CardDescription>General notes and comments about this vehicle</CardDescription>

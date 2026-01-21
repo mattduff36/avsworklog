@@ -84,7 +84,7 @@ export function SignRAMSModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Confirm RAMS Acknowledgment</DialogTitle>
           <DialogDescription>
@@ -107,7 +107,7 @@ export function SignRAMSModal({
 
           {/* Comments (Optional) */}
           <div className="grid gap-2">
-            <Label htmlFor="comments" className="text-sm font-medium text-slate-900 dark:text-white">
+            <Label htmlFor="comments" className="text-sm font-medium text-foreground">
               Comments (Optional)
             </Label>
             <Textarea
@@ -117,13 +117,13 @@ export function SignRAMSModal({
               onChange={(e) => setComments(e.target.value)}
               disabled={loading}
               rows={3}
-              className="resize-none bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
+              className="resize-none bg-white dark:bg-slate-900 border-border text-foreground "
             />
           </div>
 
           {/* Signature Pad */}
           <div className="grid gap-2">
-            <label className="text-sm font-medium text-slate-900 dark:text-white">
+            <label className="text-sm font-medium text-foreground">
               Your Signature <span className="text-destructive">*</span>
             </label>
             <SignaturePad
@@ -133,7 +133,7 @@ export function SignRAMSModal({
           </div>
 
           {loading && (
-            <div className="flex items-center justify-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Signing document...
             </div>

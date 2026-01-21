@@ -87,7 +87,7 @@ export function RecordVisitorSignatureModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto border-border">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5" />
@@ -112,7 +112,7 @@ export function RecordVisitorSignatureModal({
                 placeholder="e.g., John Smith"
                 required
                 disabled={submitting}
-                className="text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                className="text-white "
               />
             </div>
 
@@ -124,7 +124,7 @@ export function RecordVisitorSignatureModal({
                 onChange={(e) => setVisitorCompany(e.target.value)}
                 placeholder="e.g., ABC Construction Ltd"
                 disabled={submitting}
-                className="text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                className="text-white "
               />
             </div>
 
@@ -136,7 +136,7 @@ export function RecordVisitorSignatureModal({
                 onChange={(e) => setVisitorRole(e.target.value)}
                 placeholder="e.g., Site Supervisor, Contractor"
                 disabled={submitting}
-                className="text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                className="text-white "
               />
             </div>
           </div>

@@ -663,31 +663,31 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
       {/* Debug Info Cards - Compact on mobile, full on desktop */}
       <div className="grid grid-cols-4 gap-2 md:gap-4">
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="">
           <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
-            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400 flex items-center gap-1 md:gap-2">
+            <CardDescription className="text-xs md:text-sm text-muted-foreground flex items-center gap-1 md:gap-2">
               <Database className="h-3 md:h-4 w-3 md:w-4 text-blue-500" />
               <span className="hidden md:inline">Environment</span>
               <span className="md:hidden">Env</span>
             </CardDescription>
-            <CardTitle className="text-base md:text-2xl font-bold text-slate-900 dark:text-white truncate">{debugInfo?.environment}</CardTitle>
+            <CardTitle className="text-base md:text-2xl font-bold text-foreground truncate">{debugInfo?.environment}</CardTitle>
           </CardHeader>
         </Card>
 
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="">
           <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
-            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400 flex items-center gap-1 md:gap-2">
+            <CardDescription className="text-xs md:text-sm text-muted-foreground flex items-center gap-1 md:gap-2">
               <Users className="h-3 md:h-4 w-3 md:w-4 text-green-500" />
               <span className="hidden md:inline">Logged In</span>
               <span className="md:hidden">User</span>
             </CardDescription>
-            <CardTitle className="text-xs md:text-lg font-bold text-slate-900 dark:text-white truncate">{profile?.full_name}</CardTitle>
+            <CardTitle className="text-xs md:text-lg font-bold text-foreground truncate">{profile?.full_name}</CardTitle>
           </CardHeader>
         </Card>
 
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="">
           <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
-            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400 flex items-center gap-1 md:gap-2">
+            <CardDescription className="text-xs md:text-sm text-muted-foreground flex items-center gap-1 md:gap-2">
               <ShieldAlert className="h-3 md:h-4 w-3 md:w-4 text-red-500" />
               <span className="hidden md:inline">Access</span>
               <span className="md:hidden">Role</span>
@@ -696,14 +696,14 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
           </CardHeader>
         </Card>
 
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="">
           <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
-            <CardDescription className="text-xs md:text-sm text-slate-600 dark:text-slate-400 flex items-center gap-1 md:gap-2">
+            <CardDescription className="text-xs md:text-sm text-muted-foreground flex items-center gap-1 md:gap-2">
               <Clock className="h-3 md:h-4 w-3 md:w-4 text-purple-500" />
               <span className="hidden md:inline">Next.js</span>
               <span className="md:hidden">Ver</span>
             </CardDescription>
-            <CardTitle className="text-base md:text-2xl font-bold text-slate-900 dark:text-white">{debugInfo?.nextVersion}</CardTitle>
+            <CardTitle className="text-base md:text-2xl font-bold text-foreground">{debugInfo?.nextVersion}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -745,7 +745,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
         {/* Error Log Tab */}
         <TabsContent value="errors">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -781,10 +781,10 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
             </CardHeader>
             <CardContent>
               {/* Error Log Filters */}
-              <div className="mb-4 p-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+              <div className="mb-4 p-3 border border-border rounded-lg bg-muted/50">
                 <div className="flex items-center gap-2 mb-3">
-                  <Filter className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-                  <h3 className="font-semibold text-sm text-slate-900 dark:text-white">Filters</h3>
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="font-semibold text-sm text-foreground">Filters</h3>
                   <Badge variant="secondary" className="ml-auto text-xs">
                     {getFilteredErrorLogs().length} / {errorLogs.length}
                   </Badge>
@@ -793,7 +793,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                 {/* Search Bar */}
                 <div className="mb-3">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       type="text"
                       placeholder="Search errors..."
@@ -889,9 +889,9 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
                 {/* Active Filters Summary */}
                 {(searchQuery || filterErrorType !== 'all' || filterDeviceType !== 'all' || filterComponent !== 'all' || filterLocalhost || filterAdminAccount) && (
-                  <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+                  <div className="mt-3 pt-3 border-t border-border">
                     <div className="flex items-center gap-1.5 flex-wrap text-xs">
-                      <span className="text-slate-600 dark:text-slate-400">Active:</span>
+                      <span className="text-muted-foreground">Active:</span>
                       {filterLocalhost && <Badge variant="secondary" className="text-xs h-5">No Localhost</Badge>}
                       {filterAdminAccount && <Badge variant="secondary" className="text-xs h-5">No Admin</Badge>}
                       {filterErrorType !== 'all' && <Badge variant="secondary" className="text-xs h-5">{filterErrorType}</Badge>}
@@ -1252,7 +1252,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
         {/* Audit Log Tab */}
         <TabsContent value="audit">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -1402,7 +1402,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
         {/* Timesheets Tab */}
         <TabsContent value="timesheets">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardHeader>
               <CardTitle>Timesheet Status Manager</CardTitle>
               <CardDescription>
@@ -1452,7 +1452,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
         {/* Inspections Tab */}
         <TabsContent value="inspections">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardHeader>
               <CardTitle>Inspection Status Manager</CardTitle>
               <CardDescription>
@@ -1502,7 +1502,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
         {/* Absences Tab */}
         <TabsContent value="absences">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardHeader>
               <CardTitle>Absence Status Manager</CardTitle>
               <CardDescription>

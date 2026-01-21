@@ -844,7 +844,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       {!isOnline && <OfflineBanner />}
       
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <Link href="/timesheets">
@@ -854,18 +854,18 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
               </Button>
             </Link>
             <div>
-              <h1 className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white">
+              <h1 className="text-xl md:text-3xl font-bold text-foreground">
                 {existingTimesheetId ? 'Edit Timesheet' : 'New Timesheet'}
               </h1>
-              <p className="text-sm text-slate-600 dark:text-slate-400 hidden md:block">
+              <p className="text-sm text-muted-foreground hidden md:block">
                 {profile?.full_name}
               </p>
             </div>
           </div>
           {/* Weekly Total Badge */}
           <div className="bg-timesheet/10 dark:bg-timesheet/20 border border-timesheet/30 rounded-lg px-3 py-2">
-            <div className="text-xs text-slate-600 dark:text-slate-400">Total</div>
-            <div className="text-lg font-bold text-slate-900 dark:text-white">{formatHours(weeklyTotal)}h</div>
+            <div className="text-xs text-muted-foreground">Total</div>
+            <div className="text-lg font-bold text-foreground">{formatHours(weeklyTotal)}h</div>
           </div>
         </div>
       </div>
@@ -886,18 +886,18 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       )}
 
       {/* Basic Info Card */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="">
         <CardHeader className="pb-4">
-          <CardTitle className="text-slate-900 dark:text-white">Timesheet Details</CardTitle>
-          <CardDescription className="text-slate-600 dark:text-slate-400">
+          <CardTitle className="text-foreground">Timesheet Details</CardTitle>
+          <CardDescription className="text-muted-foreground">
             Week ending {new Date(weekEnding).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Manager/Admin: Employee Selector */}
           {hasElevatedPermissions && (
-            <div className="space-y-2 pb-4 border-b border-slate-700">
-              <Label htmlFor="employee" className="text-slate-900 dark:text-white text-base flex items-center gap-2">
+            <div className="space-y-2 pb-4 border-b border-border">
+              <Label htmlFor="employee" className="text-foreground text-base flex items-center gap-2">
                 <User className="h-4 w-4" />
                 Creating timesheet for
               </Label>
@@ -915,7 +915,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 Select which employee this timesheet is for
               </p>
             </div>
@@ -923,7 +923,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
           
           {/* Vehicle Registration */}
           <div className="space-y-2 max-w-full">
-            <Label htmlFor="reg_number" className="text-slate-900 dark:text-white text-base">Vehicle Registration (Optional)</Label>
+            <Label htmlFor="reg_number" className="text-foreground text-base">Vehicle Registration (Optional)</Label>
             <div className="max-w-full overflow-hidden">
               <Input
                 id="reg_number"
@@ -934,15 +934,15 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
                 className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full uppercase"
               />
             </div>
-            <p className="text-xs text-slate-400">Enter the vehicle registration you used this week (if applicable)</p>
+            <p className="text-xs text-muted-foreground">Enter the vehicle registration you used this week (if applicable)</p>
           </div>
         </CardContent>
       </Card>
 
       {/* Daily Hours - Tabbed Interface (Mobile) / Table (Desktop) */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="">
         <CardHeader className="pb-3">
-          <CardTitle className="text-slate-900 dark:text-white">Daily Hours</CardTitle>
+          <CardTitle className="text-foreground">Daily Hours</CardTitle>
         </CardHeader>
         <CardContent className="p-0 md:p-6">
 
@@ -956,7 +956,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
                     <TabsTrigger 
                       key={index} 
                       value={String(index)}
-                      className={`text-xs py-3 data-[state=active]:bg-timesheet data-[state=active]:text-slate-900 text-slate-400 ${
+                      className={`text-xs py-3 data-[state=active]:bg-timesheet data-[state=active]:text-slate-900 text-muted-foreground ${
                         isComplete 
                           ? 'data-[state=active]:border-2 data-[state=active]:border-green-500 border-2 border-green-500/50' 
                           : 'data-[state=active]:border-2 data-[state=active]:border-white'
@@ -974,7 +974,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
               {entries.map((entry, index) => (
                 <TabsContent key={index} value={String(index)} className="space-y-4 px-4 pb-4 overflow-hidden">
                   <div className="text-center mb-4">
-                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{DAY_NAMES[index]}</h3>
+                    <h3 className="text-2xl font-bold text-foreground">{DAY_NAMES[index]}</h3>
                     <p className="text-lg font-semibold text-timesheet">
                       {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'}h
                     </p>
@@ -982,7 +982,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
 
                   <div className="space-y-4 max-w-full">
                     <div className="space-y-2 max-w-full">
-                      <Label className="text-slate-900 dark:text-white text-lg">Start Time</Label>
+                      <Label className="text-foreground text-lg">Start Time</Label>
                       <div className="max-w-full overflow-hidden">
                         <Input
                           type="time"
@@ -998,7 +998,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
                     </div>
 
                     <div className="space-y-2 max-w-full">
-                      <Label className="text-slate-900 dark:text-white text-lg">Finish Time</Label>
+                      <Label className="text-foreground text-lg">Finish Time</Label>
                       <div className="max-w-full overflow-hidden">
                         <Input
                           type="time"
@@ -1020,10 +1020,10 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-slate-900 dark:text-white text-lg flex items-center gap-2">
+                      <Label className="text-foreground text-lg flex items-center gap-2">
                         Job Number
                         {!entry.working_in_yard && <span className="text-red-400 text-base">*</span>}
-                        {entry.working_in_yard && <span className="text-slate-500 text-sm">(Not required - working in yard)</span>}
+                        {entry.working_in_yard && <span className="text-muted-foreground text-sm">(Not required - working in yard)</span>}
                       </Label>
                       <Input
                         value={entry.job_number}
@@ -1031,13 +1031,13 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
                         placeholder="1234-AB"
                         maxLength={7}
                         disabled={entry.did_not_work || entry.working_in_yard}
-                        className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 uppercase disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
                       />
                     </div>
 
                     {/* Status Buttons */}
                     <div className="space-y-3">
-                      <Label className="text-slate-900 dark:text-white text-lg">Day Status</Label>
+                      <Label className="text-foreground text-lg">Day Status</Label>
                       <div className="grid grid-cols-2 gap-3">
                         {/* Working in Yard Button */}
                         <button
@@ -1050,8 +1050,8 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
                               : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
                           } disabled:opacity-30 disabled:cursor-not-allowed`}
                         >
-                          <Home className={`h-8 w-8 mb-2 ${entry.working_in_yard ? 'text-blue-400' : 'text-slate-500'}`} />
-                          <span className={`text-sm font-medium ${entry.working_in_yard ? 'text-blue-400' : 'text-slate-400'}`}>
+                          <Home className={`h-8 w-8 mb-2 ${entry.working_in_yard ? 'text-blue-400' : 'text-muted-foreground'}`} />
+                          <span className={`text-sm font-medium ${entry.working_in_yard ? 'text-blue-400' : 'text-muted-foreground'}`}>
                             In Yard
                           </span>
                         </button>
@@ -1066,8 +1066,8 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
                               : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
                           }`}
                         >
-                          <XCircle className={`h-8 w-8 mb-2 ${entry.did_not_work ? 'text-amber-400' : 'text-slate-500'}`} />
-                          <span className={`text-sm font-medium ${entry.did_not_work ? 'text-amber-400' : 'text-slate-400'}`}>
+                          <XCircle className={`h-8 w-8 mb-2 ${entry.did_not_work ? 'text-amber-400' : 'text-muted-foreground'}`} />
+                          <span className={`text-sm font-medium ${entry.did_not_work ? 'text-amber-400' : 'text-muted-foreground'}`}>
                             Did Not Work
                           </span>
                         </button>
@@ -1078,12 +1078,12 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-slate-900 dark:text-white text-lg">Notes / Remarks</Label>
+                      <Label className="text-foreground text-lg">Notes / Remarks</Label>
                       <Input
                         value={entry.remarks}
                         onChange={(e) => updateEntry(index, 'remarks', e.target.value)}
                         placeholder="Add any notes for this day..."
-                        className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 w-full"
+                        className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground w-full"
                       />
                     </div>
 
@@ -1097,7 +1097,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="border-b border-slate-700">
+                <tr className="border-b border-border">
                   <th className="text-left p-3 font-medium text-white">Day</th>
                   <th className="text-left p-3 font-medium text-white">Time Started</th>
                   <th className="text-left p-3 font-medium text-white">Time Finished</th>
@@ -1109,7 +1109,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
               </thead>
               <tbody>
                 {entries.map((entry, index) => (
-                  <tr key={entry.day_of_week} className="border-b border-slate-700/50">
+                  <tr key={entry.day_of_week} className="border-b border-border/50">
                     <td className="p-3 font-medium text-white">{DAY_NAMES[index]}</td>
                     <td className="p-3">
                       <Input
@@ -1150,7 +1150,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
                         placeholder={entry.working_in_yard ? "N/A (Yard)" : "1234-AB"}
                         maxLength={7}
                         disabled={entry.did_not_work || entry.working_in_yard}
-                        className="w-28 bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 uppercase disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="w-28 bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
                       />
                     </td>
                     <td className="p-3">
@@ -1167,7 +1167,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
                           } disabled:opacity-30 disabled:cursor-not-allowed`}
                           title="Working in Yard"
                         >
-                          <Home className={`h-5 w-5 ${entry.working_in_yard ? 'text-blue-400' : 'text-slate-500'}`} />
+                          <Home className={`h-5 w-5 ${entry.working_in_yard ? 'text-blue-400' : 'text-muted-foreground'}`} />
                         </button>
 
                         {/* Did Not Work Button */}
@@ -1181,7 +1181,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
                           }`}
                           title="Did Not Work"
                         >
-                          <XCircle className={`h-5 w-5 ${entry.did_not_work ? 'text-amber-400' : 'text-slate-500'}`} />
+                          <XCircle className={`h-5 w-5 ${entry.did_not_work ? 'text-amber-400' : 'text-muted-foreground'}`} />
                         </button>
                       </div>
                     </td>
@@ -1193,7 +1193,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
                         value={entry.remarks}
                         onChange={(e) => updateEntry(index, 'remarks', e.target.value)}
                         placeholder="Notes"
-                        className="bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500"
+                        className="bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground"
                       />
                     </td>
                   </tr>
@@ -1215,8 +1215,8 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       </Card>
 
       {/* Confirmation Text - Desktop Only */}
-      <div className="hidden md:block p-4 bg-slate-800/40 border border-slate-700/50 rounded-lg backdrop-blur-xl">
-        <p className="text-sm text-slate-300 italic">
+      <div className="hidden md:block p-4 bg-slate-800/40 border border-border/50 rounded-lg backdrop-blur-xl">
+        <p className="text-sm text-muted-foreground italic">
           ✓ All time and other details are correct and should be used as a basis for wages etc.
         </p>
       </div>
@@ -1242,7 +1242,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       </div>
 
       {/* Mobile Sticky Footer */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-slate-700/50 p-4 z-20">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-border/50 p-4 z-20">
         <div className="flex gap-3">
           <Button
             variant="outline"
@@ -1314,10 +1314,10 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
 
       {/* Signature Dialog */}
       <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg">
+        <DialogContent className="border-border text-white max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Sign Timesheet</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               Please sign below to confirm your timesheet is accurate
             </DialogDescription>
           </DialogHeader>
@@ -1349,7 +1349,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
               </div>
               <DialogTitle className="text-white text-xl">Error</DialogTitle>
             </div>
-            <DialogDescription className="text-slate-300 text-base pt-2">
+            <DialogDescription className="text-muted-foreground text-base pt-2">
               {error}
             </DialogDescription>
           </DialogHeader>
@@ -1377,7 +1377,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
               </div>
               <DialogTitle className="text-white text-xl">Bank Holiday Warning</DialogTitle>
             </div>
-            <DialogDescription className="text-slate-300 text-base pt-2">
+            <DialogDescription className="text-muted-foreground text-base pt-2">
               <span className="font-semibold text-yellow-400">{bankHolidayDate}</span> is a bank holiday.
               <br />
               <br />

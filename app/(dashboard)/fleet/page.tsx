@@ -289,11 +289,11 @@ function FleetContent() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Fleet Management</h1>
-            <p className="text-slate-600 dark:text-slate-400">
+            <h1 className="text-3xl font-bold text-foreground mb-2">Fleet Management</h1>
+            <p className="text-muted-foreground">
               Manage vehicles, maintenance schedules, and fleet operations
             </p>
           </div>
@@ -382,14 +382,14 @@ function FleetContent() {
           <TabsContent value="settings" className="space-y-6">
             {/* Vehicle Categories Section - Admin Only */}
             {isAdmin && (
-              <Card className="bg-slate-900 border-slate-700">
+              <Card className="border-border">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle className="text-white">
                         Vehicle Categories
                       </CardTitle>
-                      <CardDescription className="text-slate-400">
+                      <CardDescription className="text-muted-foreground">
                         Manage vehicle categories and classifications
                       </CardDescription>
                     </div>
@@ -410,13 +410,13 @@ function FleetContent() {
                       <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                     </div>
                   ) : categories.length === 0 ? (
-                    <div className="text-center py-8 text-slate-400">
+                    <div className="text-center py-8 text-muted-foreground">
                       No vehicle categories found
                     </div>
                   ) : (
                     <div className="space-y-3">
                       {categories.map((category) => (
-                        <Card key={category.id} className="bg-slate-800/50 border-slate-700">
+                        <Card key={category.id} className="bg-slate-800/50 border-border">
                           <CardContent className="p-4">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-4 flex-1">
@@ -425,7 +425,7 @@ function FleetContent() {
                                 </div>
                                 <div className="flex-1">
                                   <h3 className="text-lg font-semibold text-white">{category.name}</h3>
-                                  <p className="text-sm text-slate-400 mt-1">
+                                  <p className="text-sm text-muted-foreground mt-1">
                                     {category.description || 'No description'}
                                   </p>
                                 </div>
@@ -492,13 +492,13 @@ function FleetContent() {
       
       {/* Delete Category Confirmation Dialog */}
       <AlertDialog open={deleteCategoryDialogOpen} onOpenChange={setDeleteCategoryDialogOpen}>
-        <AlertDialogContent className="bg-slate-900 border-slate-700 text-white">
+        <AlertDialogContent className="border-border text-white">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-red-500" />
               Delete Vehicle Category
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-400">
+            <AlertDialogDescription className="text-muted-foreground">
               Are you sure you want to delete this vehicle category? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -506,12 +506,12 @@ function FleetContent() {
           {selectedCategory && (
             <div className="bg-slate-800 rounded p-4 space-y-2">
               <p className="text-sm">
-                <span className="text-slate-400">Name:</span>{' '}
+                <span className="text-muted-foreground">Name:</span>{' '}
                 <span className="text-white font-medium">{selectedCategory.name}</span>
               </p>
               {selectedCategory.description && (
                 <p className="text-sm">
-                  <span className="text-slate-400">Description:</span>{' '}
+                  <span className="text-muted-foreground">Description:</span>{' '}
                   <span className="text-white">{selectedCategory.description}</span>
                 </p>
               )}

@@ -83,7 +83,7 @@ function NewTimesheetContent() {
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center space-y-3">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-timesheet mx-auto"></div>
-            <p className="text-slate-600 dark:text-slate-400">Loading timesheet...</p>
+            <p className="text-slate-600 dark:text-muted-foreground">Loading timesheet...</p>
           </div>
         </div>
       );

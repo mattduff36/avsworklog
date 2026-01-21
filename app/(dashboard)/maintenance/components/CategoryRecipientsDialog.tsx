@@ -162,13 +162,13 @@ export function CategoryRecipientsDialog({
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg">
+      <DialogContent className="border-border text-white max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-2">
             <Users className="h-5 w-5" />
             Reminder Recipients
           </DialogTitle>
-          <DialogDescription className="text-slate-400">
+          <DialogDescription className="text-muted-foreground">
             Select users who should receive reminders for <strong>{category.name}</strong>
           </DialogDescription>
         </DialogHeader>
@@ -181,12 +181,12 @@ export function CategoryRecipientsDialog({
           <div className="space-y-4">
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search users..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-slate-800 border-slate-600 text-white"
+                className="pl-10 bg-input border-border text-white"
               />
             </div>
             
@@ -267,7 +267,7 @@ export function CategoryRecipientsDialog({
             </ScrollArea>
             
             {/* Selected count */}
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-muted-foreground">
               {selectedUserIds.size} user{selectedUserIds.size !== 1 ? 's' : ''} selected
             </p>
           </div>

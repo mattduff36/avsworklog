@@ -212,14 +212,14 @@ export function MaintenanceTable({
         </AlertDescription>
       </Alert>
 
-      <Card className="bg-slate-900 border-slate-700">
+      <Card className="border-border">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-white">
                 All Vehicles
               </CardTitle>
-              <CardDescription className="text-slate-400">
+              <CardDescription className="text-muted-foreground">
                 {vehicles.length} vehicle{vehicles.length !== 1 ? 's' : ''} • Click column headers to sort
               </CardDescription>
             </div>
@@ -238,7 +238,7 @@ export function MaintenanceTable({
           
           {/* Internal Tabs for Active vs Retired Vehicles */}
           <Tabs defaultValue="active" className="w-full">
-            <TabsList className="bg-slate-800 border-slate-700">
+            <TabsList className="bg-slate-800 border-border">
               <TabsTrigger value="active" className="data-[state=active]:bg-slate-700">
                 Active Vehicles ({vehicles.length})
               </TabsTrigger>
@@ -253,7 +253,7 @@ export function MaintenanceTable({
               {/* Search Bar and Column Filter */}
               <div className="flex gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by registration number..."
                 value={searchQuery}
@@ -270,7 +270,7 @@ export function MaintenanceTable({
                   Show columns
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 bg-slate-900 border border-slate-700">
+              <DropdownMenuContent align="end" className="w-56 bg-slate-900 border border-border">
                 <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuCheckboxItem
@@ -321,16 +321,16 @@ export function MaintenanceTable({
 
           {/* Desktop Table View */}
           {vehicles.length === 0 ? (
-            <div className="text-center py-12 text-slate-400">
+            <div className="text-center py-12 text-muted-foreground">
               {searchQuery ? 'No vehicles found matching your search.' : 'No vehicles with maintenance records yet.'}
             </div>
           ) : (
             <div className="hidden md:block border border-slate-700 rounded-lg">
                 <Table className="min-w-full">
                   <TableHeader>
-                    <TableRow className="border-slate-700">
+                    <TableRow className="border-border">
                       <TableHead 
-                        className="sticky z-30 bg-slate-900 text-slate-300 cursor-pointer hover:bg-slate-800 border-b-2 border-slate-700"
+                        className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
                         style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                         onClick={() => handleSort('reg_number')}
                       >
@@ -341,7 +341,7 @@ export function MaintenanceTable({
                       </TableHead>
                       {columnVisibility.nickname && (
                         <TableHead 
-                          className="sticky z-30 bg-slate-900 text-slate-300 cursor-pointer hover:bg-slate-800 border-b-2 border-slate-700"
+                          className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
                           style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                           onClick={() => handleSort('nickname')}
                         >
@@ -353,7 +353,7 @@ export function MaintenanceTable({
                       )}
                       {columnVisibility.current_mileage && (
                       <TableHead 
-                          className="sticky z-30 bg-slate-900 text-slate-300 cursor-pointer hover:bg-slate-800 border-b-2 border-slate-700"
+                          className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
                           style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                           onClick={() => handleSort('current_mileage')}
                         >
@@ -365,7 +365,7 @@ export function MaintenanceTable({
                       )}
                       {columnVisibility.tax_due && (
                       <TableHead 
-                          className="sticky z-30 bg-slate-900 text-slate-300 cursor-pointer hover:bg-slate-800 border-b-2 border-slate-700"
+                          className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
                           style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                           onClick={() => handleSort('tax_due')}
                         >
@@ -377,7 +377,7 @@ export function MaintenanceTable({
                       )}
                       {columnVisibility.mot_due && (
                       <TableHead 
-                          className="sticky z-30 bg-slate-900 text-slate-300 cursor-pointer hover:bg-slate-800 border-b-2 border-slate-700"
+                          className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
                           style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                           onClick={() => handleSort('mot_due')}
                         >
@@ -389,7 +389,7 @@ export function MaintenanceTable({
                       )}
                       {columnVisibility.service_due && (
                       <TableHead 
-                          className="sticky z-30 bg-slate-900 text-slate-300 cursor-pointer hover:bg-slate-800 border-b-2 border-slate-700"
+                          className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
                           style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                           onClick={() => handleSort('service_due')}
                         >
@@ -401,7 +401,7 @@ export function MaintenanceTable({
                       )}
                       {columnVisibility.cambelt_due && (
                       <TableHead 
-                          className="sticky z-30 bg-slate-900 text-slate-300 cursor-pointer hover:bg-slate-800 border-b-2 border-slate-700"
+                          className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
                           style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                           onClick={() => handleSort('cambelt_due')}
                         >
@@ -413,7 +413,7 @@ export function MaintenanceTable({
                       )}
                       {columnVisibility.first_aid_expiry && (
                       <TableHead 
-                          className="sticky z-30 bg-slate-900 text-slate-300 cursor-pointer hover:bg-slate-800 border-b-2 border-slate-700"
+                          className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
                           style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                           onClick={() => handleSort('first_aid_expiry')}
                         >
@@ -444,7 +444,7 @@ export function MaintenanceTable({
                         
                         {/* Nickname */}
                         {columnVisibility.nickname && (
-                          <TableCell className="text-slate-300">
+                          <TableCell className="text-muted-foreground">
                             {vehicle.vehicle?.nickname || (
                               <span className="text-slate-400 italic">No nickname</span>
                             )}
@@ -453,7 +453,7 @@ export function MaintenanceTable({
                         
                         {/* Current Mileage */}
                         {columnVisibility.current_mileage && (
-                          <TableCell className="text-slate-300">
+                          <TableCell className="text-muted-foreground">
                             {formatMileage(vehicle.current_mileage)}
                           </TableCell>
                         )}
@@ -549,7 +549,7 @@ export function MaintenanceTable({
                           <div className="flex-1">
                             <h3 className="font-semibold text-white text-lg">{vehicle.vehicle?.reg_number}</h3>
                             {vehicle.vehicle?.nickname && (
-                              <p className="text-xs text-slate-400">{vehicle.vehicle.nickname}</p>
+                              <p className="text-xs text-muted-foreground">{vehicle.vehicle.nickname}</p>
                             )}
                           </div>
                           <div className="flex items-center gap-2">
@@ -568,9 +568,9 @@ export function MaintenanceTable({
                                 : 'OK'}
                             </Badge>
                             {isExpanded ? (
-                              <ChevronUp className="h-5 w-5 text-slate-400" />
+                              <ChevronUp className="h-5 w-5 text-muted-foreground" />
                             ) : (
-                              <ChevronDown className="h-5 w-5 text-slate-400" />
+                              <ChevronDown className="h-5 w-5 text-muted-foreground" />
                             )}
                           </div>
                         </div>
@@ -592,30 +592,30 @@ export function MaintenanceTable({
 
                       {/* Expanded View - All Fields */}
                       {isExpanded && (
-                        <div className="space-y-3 pt-3 border-t border-slate-700">
+                        <div className="space-y-3 pt-3 border-t border-border">
                           {/* All Status Fields */}
                           <div className="space-y-2">
                             {columnVisibility.current_mileage && vehicle.current_mileage && (
                               <div className="flex items-center justify-between">
-                                <span className="text-sm text-slate-400">Current Mileage:</span>
+                                <span className="text-sm text-muted-foreground">Current Mileage:</span>
                                 <span className="text-white font-medium">{formatMileage(vehicle.current_mileage)}</span>
                               </div>
                             )}
                             <div className="flex items-center justify-between">
-                              <span className="text-sm text-slate-400">Tax Due:</span>
+                              <span className="text-sm text-muted-foreground">Tax Due:</span>
                               <Badge className={`font-medium ${getStatusColorClass(vehicle.tax_status?.status || 'not_set')}`}>
                                 {formatMaintenanceDate(vehicle.tax_due_date)}
                               </Badge>
                             </div>
                             <div className="flex items-center justify-between">
-                              <span className="text-sm text-slate-400">MOT Due:</span>
+                              <span className="text-sm text-muted-foreground">MOT Due:</span>
                               <Badge className={`font-medium ${getStatusColorClass(vehicle.mot_status?.status || 'not_set')}`}>
                                 {formatMaintenanceDate(vehicle.mot_due_date)}
                               </Badge>
                             </div>
                             {columnVisibility.service_due && (
                               <div className="flex items-center justify-between">
-                                <span className="text-sm text-slate-400">Next Service:</span>
+                                <span className="text-sm text-muted-foreground">Next Service:</span>
                                 <Badge className={`font-medium ${getStatusColorClass(vehicle.next_service_status?.status || 'not_set')}`}>
                                   {formatMileage(vehicle.next_service_mileage)}
                                 </Badge>
@@ -623,7 +623,7 @@ export function MaintenanceTable({
                             )}
                             {columnVisibility.cambelt_due && vehicle.cambelt_due_mileage && (
                               <div className="flex items-center justify-between">
-                                <span className="text-sm text-slate-400">Cambelt Due:</span>
+                                <span className="text-sm text-muted-foreground">Cambelt Due:</span>
                                 <Badge className={`font-medium ${getStatusColorClass(vehicle.cambelt_status?.status || 'not_set')}`}>
                                   {formatMileage(vehicle.cambelt_due_mileage)}
                                 </Badge>
@@ -631,7 +631,7 @@ export function MaintenanceTable({
                             )}
                             {columnVisibility.first_aid_expiry && vehicle.first_aid_kit_expiry && (
                               <div className="flex items-center justify-between">
-                                <span className="text-sm text-slate-400">First Aid Expiry:</span>
+                                <span className="text-sm text-muted-foreground">First Aid Expiry:</span>
                                 <Badge className={`font-medium ${getStatusColorClass(vehicle.first_aid_status?.status || 'not_set')}`}>
                                   {formatMaintenanceDate(vehicle.first_aid_kit_expiry)}
                                 </Badge>
@@ -640,7 +640,7 @@ export function MaintenanceTable({
                           </div>
 
                           {/* Actions - All on One Line */}
-                          <div className="flex items-center gap-2 pt-2 border-t border-slate-700">
+                          <div className="flex items-center gap-2 pt-2 border-t border-border">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -694,7 +694,7 @@ export function MaintenanceTable({
             <TabsContent value="deleted" className="space-y-4 mt-4">
               {/* Search Bar for Retired Vehicles */}
               <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search retired vehicles by registration..."
                   value={retiredSearchQuery}
@@ -706,10 +706,10 @@ export function MaintenanceTable({
               {retiredLoading ? (
                 <div className="text-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-3" />
-                  <p className="text-slate-400">Loading retired vehicles...</p>
+                  <p className="text-muted-foreground">Loading retired vehicles...</p>
                 </div>
               ) : !retiredData || retiredData.vehicles.length === 0 ? (
-                <div className="text-center py-12 text-slate-400">
+                <div className="text-center py-12 text-muted-foreground">
                   <FolderClock className="h-12 w-12 mx-auto mb-3 text-slate-600" />
                   <p>No retired vehicles found.</p>
                 </div>
@@ -719,29 +719,29 @@ export function MaintenanceTable({
                   <div className="hidden md:block border border-slate-700 rounded-lg">
                     <Table className="min-w-full">
                       <TableHeader>
-                        <TableRow className="border-slate-700">
-                          <TableHead className="bg-slate-900 text-slate-300 border-b-2 border-slate-700">
+                        <TableRow className="border-border">
+                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
                             Registration
                           </TableHead>
-                          <TableHead className="bg-slate-900 text-slate-300 border-b-2 border-slate-700">
+                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
                             Nickname
                           </TableHead>
-                          <TableHead className="bg-slate-900 text-slate-300 border-b-2 border-slate-700">
+                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
                             Mileage
                           </TableHead>
-                          <TableHead className="bg-slate-900 text-slate-300 border-b-2 border-slate-700">
+                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
                             Tax Due
                           </TableHead>
-                          <TableHead className="bg-slate-900 text-slate-300 border-b-2 border-slate-700">
+                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
                             MOT Due
                           </TableHead>
-                          <TableHead className="bg-slate-900 text-slate-300 border-b-2 border-slate-700">
+                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
                             Retired Date
                           </TableHead>
-                          <TableHead className="bg-slate-900 text-slate-300 border-b-2 border-slate-700">
+                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
                             Reason
                           </TableHead>
-                          <TableHead className="bg-slate-900 text-right text-slate-300 border-b-2 border-slate-700">
+                          <TableHead className="bg-slate-900 text-right text-muted-foreground border-b-2 border-border">
                             Actions
                           </TableHead>
                         </TableRow>
@@ -762,33 +762,33 @@ export function MaintenanceTable({
                             </TableCell>
                             
                             {/* Nickname */}
-                            <TableCell className="text-slate-300">
+                            <TableCell className="text-muted-foreground">
                               {vehicle.nickname || (
                                 <span className="text-slate-400 italic">No nickname</span>
                               )}
                             </TableCell>
                             
                             {/* Mileage */}
-                            <TableCell className="text-slate-300">
+                            <TableCell className="text-muted-foreground">
                               {formatMileage(vehicle.current_mileage)}
                             </TableCell>
                             
                             {/* Tax Due */}
                             <TableCell>
-                              <span className="text-slate-300">
+                              <span className="text-muted-foreground">
                                 {formatMaintenanceDate(vehicle.tax_due_date)}
                               </span>
                             </TableCell>
                             
                             {/* MOT Due */}
                             <TableCell>
-                              <span className="text-slate-300">
+                              <span className="text-muted-foreground">
                                 {formatMaintenanceDate(vehicle.mot_due_date)}
                               </span>
                             </TableCell>
                             
                             {/* Deleted Date */}
-                            <TableCell className="text-slate-300">
+                            <TableCell className="text-muted-foreground">
                               {new Date(vehicle.archived_at).toLocaleDateString()}
                             </TableCell>
                             
@@ -801,7 +801,7 @@ export function MaintenanceTable({
                                     ? 'border-blue-500 text-blue-400' 
                                     : vehicle.archive_reason === 'Scrapped'
                                     ? 'border-red-500 text-red-400'
-                                    : 'border-slate-500 text-slate-400'
+                                    : 'border-slate-500 text-muted-foreground'
                                 }
                               >
                                 {vehicle.archive_reason}
@@ -858,7 +858,7 @@ export function MaintenanceTable({
                       .map((vehicle) => (
                       <Card 
                         key={vehicle.id}
-                        className="bg-slate-800 border-slate-700"
+                        className="bg-slate-800 border-border"
                       >
                         <CardContent className="p-4">
                           {/* Header */}
@@ -866,7 +866,7 @@ export function MaintenanceTable({
                             <div>
                               <h3 className="font-semibold text-white text-lg">{vehicle.reg_number}</h3>
                               {vehicle.nickname && (
-                                <p className="text-xs text-slate-400">{vehicle.nickname}</p>
+                                <p className="text-xs text-muted-foreground">{vehicle.nickname}</p>
                               )}
                             </div>
                             <Badge 
@@ -876,7 +876,7 @@ export function MaintenanceTable({
                                   ? 'border-blue-500 text-blue-400' 
                                   : vehicle.archive_reason === 'Scrapped'
                                   ? 'border-red-500 text-red-400'
-                                  : 'border-slate-500 text-slate-400'
+                                  : 'border-slate-500 text-muted-foreground'
                               }
                             >
                               {vehicle.archive_reason}
@@ -887,20 +887,20 @@ export function MaintenanceTable({
                           <div className="space-y-2 text-sm">
                             {vehicle.current_mileage && (
                               <div className="flex justify-between">
-                                <span className="text-slate-400">Mileage:</span>
+                                <span className="text-muted-foreground">Mileage:</span>
                                 <span className="text-white">{formatMileage(vehicle.current_mileage)}</span>
                               </div>
                             )}
                             <div className="flex justify-between">
-                              <span className="text-slate-400">Tax Due:</span>
+                              <span className="text-muted-foreground">Tax Due:</span>
                               <span className="text-white">{formatMaintenanceDate(vehicle.tax_due_date)}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-slate-400">MOT Due:</span>
+                              <span className="text-muted-foreground">MOT Due:</span>
                               <span className="text-white">{formatMaintenanceDate(vehicle.mot_due_date)}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-slate-400">Retired:</span>
+                              <span className="text-muted-foreground">Retired:</span>
                               <span className="text-white">{new Date(vehicle.archived_at).toLocaleDateString()}</span>
                             </div>
                           </div>

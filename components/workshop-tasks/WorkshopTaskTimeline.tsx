@@ -181,12 +181,12 @@ export function WorkshopTaskTimeline({
   });
 
   return (
-    <div className="space-y-3 border-l-2 border-slate-700 pl-4 ml-2">
+    <div className="space-y-3 border-l-2 border-border pl-4 ml-2">
       {timelineItems.map((item) => {
         if (item.type === 'created') {
           return (
             <div key={item.id} className="relative">
-              <div className="absolute -left-[1.3rem] top-1 h-3 w-3 rounded-full bg-slate-700 border-2 border-slate-900"></div>
+              <div className="absolute -left-[1.3rem] top-1 h-3 w-3 rounded-full bg-muted border-2 border-slate-900"></div>
               <div className="flex items-start gap-3">
                 <User className="h-4 w-4 text-muted-foreground mt-0.5" />
                 <div className="flex-1 space-y-1">
@@ -225,7 +225,7 @@ export function WorkshopTaskTimeline({
                     </span>
                   </div>
                   {item.body && (
-                    <p className="text-sm text-slate-300">{item.body}</p>
+                    <p className="text-sm text-muted-foreground">{item.body}</p>
                   )}
                   <p className="text-xs text-muted-foreground">
                     {formatRelativeTime(item.created_at)}
@@ -238,7 +238,7 @@ export function WorkshopTaskTimeline({
 
         return (
           <div key={item.id} className="relative">
-            <div className="absolute -left-[1.3rem] top-1 h-3 w-3 rounded-full bg-slate-700 border-2 border-slate-900"></div>
+            <div className="absolute -left-[1.3rem] top-1 h-3 w-3 rounded-full bg-muted border-2 border-slate-900"></div>
             <div className="flex items-start gap-3">
               <MessageSquare className="h-4 w-4 text-muted-foreground mt-0.5" />
               <div className="flex-1 space-y-1">
@@ -246,7 +246,7 @@ export function WorkshopTaskTimeline({
                   <span className="text-sm font-medium">{item.author || 'Unknown'}</span>
                   <span className="text-xs text-muted-foreground">added comment</span>
                 </div>
-                <p className="text-sm text-slate-300">{item.body}</p>
+                <p className="text-sm text-muted-foreground">{item.body}</p>
                 <p className="text-xs text-muted-foreground">
                   {formatRelativeTime(item.created_at)}
                   {item.updated_at && <span className="ml-1">(edited)</span>}

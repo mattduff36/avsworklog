@@ -124,8 +124,8 @@ export function MessageBlockingCheck() {
     return (
       <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
         <div className="bg-white dark:bg-slate-900 rounded-lg p-6 flex items-center gap-3">
-          <Loader2 className="h-5 w-5 animate-spin text-slate-600 dark:text-slate-400" />
-          <p className="text-sm text-slate-600 dark:text-slate-400">Checking for messages...</p>
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Checking for messages...</p>
         </div>
       </div>
     );

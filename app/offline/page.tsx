@@ -32,14 +32,14 @@ export default function OfflinePage() {
         </div>
 
         {/* Glass-morphism Card */}
-        <Card className="bg-slate-800/40 backdrop-blur-xl border-slate-700/50 shadow-2xl">
+        <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-2xl">
           <CardContent className="p-8">
             <div className="space-y-6 text-center">
               <div className="space-y-3">
                 <h2 className="text-xl font-semibold text-white">
                   No Internet Connection
                 </h2>
-                <p className="text-slate-300 text-sm leading-relaxed">
+                <p className="text-muted-foreground text-sm leading-relaxed">
                   The app needs an active internet connection to work. Please check your WiFi or mobile data and try again.
                 </p>
               </div>
@@ -56,7 +56,7 @@ export default function OfflinePage() {
           </CardContent>
         </Card>
 
-        <div className="mt-6 text-center text-sm text-slate-400">
+        <div className="mt-6 text-center text-sm text-muted-foreground">
           <p>This app requires an active internet connection</p>
         </div>
       </div>

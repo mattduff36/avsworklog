@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Save, Send, Edit2, CheckCircle2, XCircle, Download, Package, AlertTriangle } from 'lucide-react';
+import { Save, Send, Edit2, CheckCircle2, XCircle, Download, Package, AlertTriangle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { BackButton } from '@/components/ui/back-button';
 import { formatDate } from '@/lib/utils/date';
@@ -425,7 +425,7 @@ export default function ViewTimesheetPage() {
             Back to Timesheets
           </Button>
         </Link>
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="">
           <CardContent className="pt-6">
             <p className="text-red-600">{error}</p>
           </CardContent>
@@ -446,13 +446,13 @@ export default function ViewTimesheetPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center space-x-3 md:space-x-4">
             <BackButton />
             <div>
-              <h1 className="text-xl md:text-3xl font-bold text-slate-900 dark:text-white">Timesheet</h1>
-              <p className="text-sm md:text-base text-slate-600 dark:text-slate-400">
+              <h1 className="text-xl md:text-3xl font-bold text-foreground">Timesheet</h1>
+              <p className="text-sm md:text-base text-muted-foreground">
                 Week Ending {formatDate(timesheet.week_ending)}
               </p>
             </div>
@@ -504,7 +504,7 @@ export default function ViewTimesheetPage() {
         </Card>
       )}
 
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>

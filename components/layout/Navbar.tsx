@@ -26,6 +26,47 @@ import {
 
 type ViewAsRole = 'actual' | 'employee' | 'manager' | 'admin';
 
+/**
+ * Get the module-specific active color classes for a nav item
+ * Each module gets its own color when the link is active
+ */
+function getNavItemActiveColors(href: string): { bg: string; text: string } {
+  // Dashboard and Help use brand yellow (with dark text)
+  if (href === '/dashboard' || href === '/help') {
+    return { bg: 'bg-avs-yellow', text: 'text-slate-900' };
+  }
+  // Timesheets - Blue
+  if (href.startsWith('/timesheets')) {
+    return { bg: 'bg-timesheet', text: 'text-white' };
+  }
+  // Inspections - Orange
+  if (href.startsWith('/inspections')) {
+    return { bg: 'bg-inspection', text: 'text-white' };
+  }
+  // RAMS - Green
+  if (href.startsWith('/rams')) {
+    return { bg: 'bg-rams', text: 'text-white' };
+  }
+  // Absence - Purple
+  if (href.startsWith('/absence')) {
+    return { bg: 'bg-absence', text: 'text-white' };
+  }
+  // Fleet/Maintenance - Red
+  if (href.startsWith('/fleet') || href.startsWith('/maintenance')) {
+    return { bg: 'bg-maintenance', text: 'text-white' };
+  }
+  // Workshop - Brown/rust
+  if (href.startsWith('/workshop')) {
+    return { bg: 'bg-workshop', text: 'text-white' };
+  }
+  // Reports - Teal
+  if (href.startsWith('/reports')) {
+    return { bg: 'bg-report', text: 'text-white' };
+  }
+  // Default - Brand yellow
+  return { bg: 'bg-avs-yellow', text: 'text-slate-900' };
+}
+
 export function Navbar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -294,7 +335,7 @@ export function Navbar() {
       <SidebarNav open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
 
       <nav 
-        className="bg-slate-900/50 backdrop-blur-xl border-b border-slate-700/50 sticky top-0 z-50"
+        className="bg-slate-900/50 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50"
         style={{ '--top-nav-h': '68px' } as React.CSSProperties}
       >
         {/* AVS Yellow accent strip */}
@@ -302,24 +343,35 @@ export function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
+              {/* Mobile-only text logo */}
+              <Link 
+                href="/dashboard" 
+                className="md:hidden flex items-center mr-4 group"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <div className="text-xl font-bold text-white group-hover:text-avs-yellow transition-colors">
+                  SQUIRES
+                </div>
+              </Link>
+
               {/* Desktop Navigation - Same for all users */}
               <div className="hidden md:flex md:space-x-4">
                 {/* Dashboard */}
                 {dashboardNav.map((item) => {
                   const Icon = item.icon;
                   const isActive = isLinkActive(item.href);
+                  const activeColors = getNavItemActiveColors(item.href);
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
                       className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                         isActive
-                          ? 'bg-avs-yellow'
-                          : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                          ? `${activeColors.bg} ${activeColors.text}`
+                          : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                       }`}
-                      style={isActive ? { color: 'rgb(15 23 42)' } : {}}
                     >
-                      <Icon className="w-4 h-4 mr-2" style={isActive ? { color: 'rgb(15 23 42)' } : {}} />
+                      <Icon className="w-4 h-4 mr-2" />
                       {item.label}
                     </Link>
                   );
@@ -329,18 +381,18 @@ export function Navbar() {
                 {employeeNav.map((item) => {
                   const Icon = item.icon;
                   const isActive = isLinkActive(item.href);
+                  const activeColors = getNavItemActiveColors(item.href);
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
                       className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                         isActive
-                          ? 'bg-avs-yellow'
-                          : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                          ? `${activeColors.bg} ${activeColors.text}`
+                          : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                       }`}
-                      style={isActive ? { color: 'rgb(15 23 42)' } : {}}
                     >
-                      <Icon className="w-4 h-4 mr-2" style={isActive ? { color: 'rgb(15 23 42)' } : {}} />
+                      <Icon className="w-4 h-4 mr-2" />
                       {item.label}
                     </Link>
                   );
@@ -356,7 +408,7 @@ export function Navbar() {
                   variant="ghost"
                   size="sm"
                   onClick={() => setNotificationPanelOpen(!notificationPanelOpen)}
-                  className="text-slate-300 hover:text-white hover:bg-slate-800/50 relative"
+                  className="text-muted-foreground hover:text-white hover:bg-slate-800/50 relative"
                   title="Notifications"
                 >
                   <Bell className="w-4 h-4" />
@@ -374,7 +426,7 @@ export function Navbar() {
                   variant="ghost"
                   size="sm"
                   onClick={handleSignOut}
-                  className="text-slate-300 hover:text-white hover:bg-slate-800/50"
+                  className="text-muted-foreground hover:text-white hover:bg-slate-800/50"
                   title="Sign Out"
                 >
                   <LogOut className="w-4 h-4" />
@@ -384,7 +436,7 @@ export function Navbar() {
               {/* Mobile menu button */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 rounded-md text-slate-300 hover:bg-slate-800/50 hover:text-white"
+                className="md:hidden p-2 rounded-md text-muted-foreground hover:bg-slate-800/50 hover:text-white"
               >
                 {mobileMenuOpen ? (
                   <X className="w-6 h-6" />
@@ -398,12 +450,13 @@ export function Navbar() {
 
         {/* Mobile menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-700/50 bg-slate-900/95 backdrop-blur-xl">
+          <div className="md:hidden border-t border-border/50 bg-slate-900/95 backdrop-blur-xl">
             <div className="px-2 pt-2 pb-3 space-y-1">
               {/* Dashboard */}
               {dashboardNav.map((item) => {
                 const Icon = item.icon;
                 const isActive = isLinkActive(item.href);
+                const activeColors = getNavItemActiveColors(item.href);
                 return (
                   <Link
                     key={item.href}
@@ -411,12 +464,11 @@ export function Navbar() {
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                       isActive
-                        ? 'bg-avs-yellow'
-                        : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                        ? `${activeColors.bg} ${activeColors.text}`
+                        : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                     }`}
-                    style={isActive ? { color: 'rgb(15 23 42)' } : {}}
                   >
-                    <Icon className="w-5 h-5 mr-3" style={isActive ? { color: 'rgb(15 23 42)' } : {}} />
+                    <Icon className="w-5 h-5 mr-3" />
                     {item.label}
                   </Link>
                 );
@@ -426,6 +478,7 @@ export function Navbar() {
               {employeeNav.map((item) => {
                 const Icon = item.icon;
                 const isActive = isLinkActive(item.href);
+                const activeColors = getNavItemActiveColors(item.href);
                 return (
                   <Link
                     key={item.href}
@@ -433,12 +486,11 @@ export function Navbar() {
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                       isActive
-                        ? 'bg-avs-yellow'
-                        : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                        ? `${activeColors.bg} ${activeColors.text}`
+                        : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                     }`}
-                    style={isActive ? { color: 'rgb(15 23 42)' } : {}}
                   >
-                    <Icon className="w-5 h-5 mr-3" style={isActive ? { color: 'rgb(15 23 42)' } : {}} />
+                    <Icon className="w-5 h-5 mr-3" />
                     {item.label}
                   </Link>
                 );
@@ -447,7 +499,7 @@ export function Navbar() {
               {/* Manager/Admin Section (Mobile) */}
               {isManager && (
                 <>
-                  <div className="my-3 border-t border-slate-700/50"></div>
+                  <div className="my-3 border-t border-border/50"></div>
                   
                   {/* Management Section */}
                   <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -456,6 +508,7 @@ export function Navbar() {
                   {managerLinks.map((item) => {
                     const Icon = item.icon;
                     const isActive = isLinkActive(item.href);
+                    const activeColors = getNavItemActiveColors(item.href);
                     return (
                       <Link
                         key={item.href}
@@ -463,12 +516,11 @@ export function Navbar() {
                         onClick={() => setMobileMenuOpen(false)}
                         className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                           isActive
-                            ? 'bg-avs-yellow'
-                            : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                            ? `${activeColors.bg} ${activeColors.text}`
+                            : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                         }`}
-                        style={isActive ? { color: 'rgb(15 23 42)' } : {}}
                       >
-                        <Icon className="w-5 h-5 mr-3" style={isActive ? { color: 'rgb(15 23 42)' } : {}} />
+                        <Icon className="w-5 h-5 mr-3" />
                         {item.label}
                       </Link>
                     );
@@ -483,6 +535,7 @@ export function Navbar() {
                       {adminLinks.map((item) => {
                         const Icon = item.icon;
                         const isActive = isLinkActive(item.href);
+                        const activeColors = getNavItemActiveColors(item.href);
                         return (
                           <Link
                             key={item.href}
@@ -490,12 +543,11 @@ export function Navbar() {
                             onClick={() => setMobileMenuOpen(false)}
                             className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                               isActive
-                                ? 'bg-avs-yellow'
-                                : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                                ? `${activeColors.bg} ${activeColors.text}`
+                                : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                             }`}
-                            style={isActive ? { color: 'rgb(15 23 42)' } : {}}
                           >
-                            <Icon className="w-5 h-5 mr-3" style={isActive ? { color: 'rgb(15 23 42)' } : {}} />
+                            <Icon className="w-5 h-5 mr-3" />
                             {item.label}
                           </Link>
                         );
@@ -506,7 +558,7 @@ export function Navbar() {
                   {/* Developer Tools (Mobile) - SuperAdmin Only */}
                   {isSuperAdmin && viewAsRole === 'actual' && (
                     <>
-                      <div className="px-3 py-2 text-xs font-semibold text-orange-400 uppercase tracking-wider mt-4">
+                      <div className="px-3 py-2 text-xs font-semibold text-red-500 uppercase tracking-wider mt-4">
                         Developer
                       </div>
                       <Link
@@ -514,8 +566,8 @@ export function Navbar() {
                         onClick={() => setMobileMenuOpen(false)}
                         className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                           pathname === '/debug'
-                            ? 'bg-orange-500 text-white'
-                            : 'text-orange-300 hover:bg-slate-800/50 hover:text-orange-200'
+                            ? 'bg-red-600 text-white'
+                            : 'text-red-500 hover:bg-slate-800/50 hover:text-red-400'
                         }`}
                       >
                         <Bug className="w-5 h-5 mr-3" />
@@ -526,11 +578,11 @@ export function Navbar() {
                 </>
               )}
             </div>
-            <div className="pt-4 pb-3 border-t border-slate-700/50">
+            <div className="pt-4 pb-3 border-t border-border/50">
               <div className="px-2 space-y-2">
                 <Button
                   variant="ghost"
-                  className="w-full justify-start text-slate-300 hover:text-white hover:bg-slate-800/50"
+                  className="w-full justify-start text-muted-foreground hover:text-white hover:bg-slate-800/50"
                   onClick={handleSignOut}
                 >
                   <LogOut className="w-4 h-4 mr-2" />

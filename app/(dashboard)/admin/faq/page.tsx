@@ -344,16 +344,16 @@ export default function FAQEditorPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-blue-100 dark:bg-blue-950 rounded-lg">
             <HelpCircle className="h-6 w-6 text-blue-600" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+            <h1 className="text-3xl font-bold text-foreground mb-2">
               FAQ Editor
             </h1>
-            <p className="text-slate-600 dark:text-slate-400">
+            <p className="text-muted-foreground">
               Manage FAQ categories and articles
             </p>
           </div>
@@ -375,12 +375,12 @@ export default function FAQEditorPage() {
 
         {/* Categories Tab */}
         <TabsContent value="categories">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-slate-900 dark:text-white">Categories</CardTitle>
-                  <CardDescription className="text-slate-500">
+                  <CardTitle className="text-foreground">Categories</CardTitle>
+                  <CardDescription className="text-muted-foreground">
                     Organize FAQ articles into categories
                   </CardDescription>
                 </div>
@@ -396,8 +396,8 @@ export default function FAQEditorPage() {
                   <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
                 </div>
               ) : categories.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
-                  <FolderOpen className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                <div className="text-center py-8 text-muted-foreground">
+                  <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <p>No categories yet</p>
                 </div>
               ) : (
@@ -405,27 +405,27 @@ export default function FAQEditorPage() {
                   {categories.map((category) => (
                     <div
                       key={category.id}
-                      className="flex items-center justify-between p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
+                      className="flex items-center justify-between p-4 rounded-lg border border-border bg-slate-50 dark:bg-slate-800"
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <h3 className="font-medium text-slate-900 dark:text-white">
+                          <h3 className="font-medium text-foreground">
                             {category.name}
                           </h3>
                           <Badge variant="secondary" className="text-xs">
                             {category.article_count} articles
                           </Badge>
                           {!category.is_active && (
-                            <Badge variant="outline" className="text-xs text-slate-400">
+                            <Badge variant="outline" className="text-xs text-muted-foreground">
                               Inactive
                             </Badge>
                           )}
                         </div>
-                        <p className="text-sm text-slate-500">
+                        <p className="text-sm text-muted-foreground">
                           /{category.slug}
                         </p>
                         {category.description && (
-                          <p className="text-sm text-slate-400 mt-1">
+                          <p className="text-sm text-muted-foreground mt-1">
                             {category.description}
                           </p>
                         )}
@@ -459,12 +459,12 @@ export default function FAQEditorPage() {
 
         {/* Articles Tab */}
         <TabsContent value="articles">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-slate-900 dark:text-white">Articles</CardTitle>
-                  <CardDescription className="text-slate-500">
+                  <CardTitle className="text-foreground">Articles</CardTitle>
+                  <CardDescription className="text-muted-foreground">
                     Manage FAQ content
                   </CardDescription>
                 </div>
@@ -499,8 +499,8 @@ export default function FAQEditorPage() {
                   <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
                 </div>
               ) : articles.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
-                  <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <p>No articles yet</p>
                 </div>
               ) : (
@@ -508,27 +508,27 @@ export default function FAQEditorPage() {
                   {articles.map((article) => (
                     <div
                       key={article.id}
-                      className="flex items-center justify-between p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
+                      className="flex items-center justify-between p-4 rounded-lg border border-border bg-slate-50 dark:bg-slate-800"
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <h3 className="font-medium text-slate-900 dark:text-white truncate">
+                          <h3 className="font-medium text-foreground truncate">
                             {article.title}
                           </h3>
                           {article.is_published ? (
                             <Eye className="h-4 w-4 text-green-500" />
                           ) : (
-                            <EyeOff className="h-4 w-4 text-slate-400" />
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Badge variant="outline" className="text-xs">
                             {article.category?.name}
                           </Badge>
                           <span>/{article.slug}</span>
                         </div>
                         {article.summary && (
-                          <p className="text-sm text-slate-400 mt-1 truncate">
+                          <p className="text-sm text-muted-foreground mt-1 truncate">
                             {article.summary}
                           </p>
                         )}
@@ -562,19 +562,19 @@ export default function FAQEditorPage() {
 
       {/* Category Dialog */}
       <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <DialogContent className="">
           <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-white">
+            <DialogTitle className="text-foreground">
               {editingCategory ? 'Edit Category' : 'Add Category'}
             </DialogTitle>
-            <DialogDescription className="text-slate-500">
+            <DialogDescription className="text-muted-foreground">
               {editingCategory ? 'Update category details' : 'Create a new FAQ category'}
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-slate-700 dark:text-slate-300">Name</Label>
+              <Label className="text-slate-700 dark:text-muted-foreground">Name</Label>
               <Input
                 value={categoryForm.name}
                 onChange={(e) => {
@@ -590,7 +590,7 @@ export default function FAQEditorPage() {
             </div>
             
             <div className="space-y-2">
-              <Label className="text-slate-700 dark:text-slate-300">Slug</Label>
+              <Label className="text-slate-700 dark:text-muted-foreground">Slug</Label>
               <Input
                 value={categoryForm.slug}
                 onChange={(e) => setCategoryForm({ ...categoryForm, slug: e.target.value })}
@@ -600,7 +600,7 @@ export default function FAQEditorPage() {
             </div>
             
             <div className="space-y-2">
-              <Label className="text-slate-700 dark:text-slate-300">Description (optional)</Label>
+              <Label className="text-slate-700 dark:text-muted-foreground">Description (optional)</Label>
               <Textarea
                 value={categoryForm.description}
                 onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
@@ -611,7 +611,7 @@ export default function FAQEditorPage() {
             </div>
             
             <div className="space-y-2">
-              <Label className="text-slate-700 dark:text-slate-300">Sort Order</Label>
+              <Label className="text-slate-700 dark:text-muted-foreground">Sort Order</Label>
               <Input
                 type="number"
                 value={categoryForm.sort_order}
@@ -635,12 +635,12 @@ export default function FAQEditorPage() {
 
       {/* Article Dialog */}
       <Dialog open={articleDialogOpen} onOpenChange={setArticleDialogOpen}>
-        <DialogContent className="max-w-3xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl bg-white dark:bg-slate-900 border-border max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-white">
+            <DialogTitle className="text-foreground">
               {editingArticle ? 'Edit Article' : 'Add Article'}
             </DialogTitle>
-            <DialogDescription className="text-slate-500">
+            <DialogDescription className="text-muted-foreground">
               {editingArticle ? 'Update article content' : 'Create a new FAQ article'}
             </DialogDescription>
           </DialogHeader>
@@ -648,7 +648,7 @@ export default function FAQEditorPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-slate-700 dark:text-slate-300">Category</Label>
+                <Label className="text-slate-700 dark:text-muted-foreground">Category</Label>
                 <Select 
                   value={articleForm.category_id} 
                   onValueChange={(v) => setArticleForm({ ...articleForm, category_id: v })}
@@ -667,7 +667,7 @@ export default function FAQEditorPage() {
               </div>
               
               <div className="space-y-2">
-                <Label className="text-slate-700 dark:text-slate-300">Sort Order</Label>
+                <Label className="text-slate-700 dark:text-muted-foreground">Sort Order</Label>
                 <Input
                   type="number"
                   value={articleForm.sort_order}
@@ -678,7 +678,7 @@ export default function FAQEditorPage() {
             </div>
             
             <div className="space-y-2">
-              <Label className="text-slate-700 dark:text-slate-300">Title</Label>
+              <Label className="text-slate-700 dark:text-muted-foreground">Title</Label>
               <Input
                 value={articleForm.title}
                 onChange={(e) => {
@@ -694,7 +694,7 @@ export default function FAQEditorPage() {
             </div>
             
             <div className="space-y-2">
-              <Label className="text-slate-700 dark:text-slate-300">Slug</Label>
+              <Label className="text-slate-700 dark:text-muted-foreground">Slug</Label>
               <Input
                 value={articleForm.slug}
                 onChange={(e) => setArticleForm({ ...articleForm, slug: e.target.value })}
@@ -704,7 +704,7 @@ export default function FAQEditorPage() {
             </div>
             
             <div className="space-y-2">
-              <Label className="text-slate-700 dark:text-slate-300">Summary (optional)</Label>
+              <Label className="text-slate-700 dark:text-muted-foreground">Summary (optional)</Label>
               <Input
                 value={articleForm.summary}
                 onChange={(e) => setArticleForm({ ...articleForm, summary: e.target.value })}
@@ -714,7 +714,7 @@ export default function FAQEditorPage() {
             </div>
             
             <div className="space-y-2">
-              <Label className="text-slate-700 dark:text-slate-300">Content (Markdown)</Label>
+              <Label className="text-slate-700 dark:text-muted-foreground">Content (Markdown)</Label>
               <Textarea
                 value={articleForm.content_md}
                 onChange={(e) => setArticleForm({ ...articleForm, content_md: e.target.value })}
@@ -729,7 +729,7 @@ export default function FAQEditorPage() {
                 checked={articleForm.is_published}
                 onCheckedChange={(checked) => setArticleForm({ ...articleForm, is_published: checked })}
               />
-              <Label className="text-slate-700 dark:text-slate-300">Published</Label>
+              <Label className="text-slate-700 dark:text-muted-foreground">Published</Label>
             </div>
           </div>
 
@@ -747,7 +747,7 @@ export default function FAQEditorPage() {
 
       {/* Delete Category Dialog */}
       <AlertDialog open={!!deleteCategoryDialog} onOpenChange={() => setDeleteCategoryDialog(null)}>
-        <AlertDialogContent className="bg-white dark:bg-slate-900">
+        <AlertDialogContent className="bg-card">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Category</AlertDialogTitle>
             <AlertDialogDescription>
@@ -770,7 +770,7 @@ export default function FAQEditorPage() {
 
       {/* Delete Article Dialog */}
       <AlertDialog open={!!deleteArticleDialog} onOpenChange={() => setDeleteArticleDialog(null)}>
-        <AlertDialogContent className="bg-white dark:bg-slate-900">
+        <AlertDialogContent className="bg-card">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Article</AlertDialogTitle>
             <AlertDialogDescription>

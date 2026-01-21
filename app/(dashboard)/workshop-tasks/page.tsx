@@ -1215,7 +1215,7 @@ export default function WorkshopTasksPage() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-workshop mx-auto mb-4"></div>
-          <p className="text-slate-400">Checking permissions...</p>
+          <p className="text-muted-foreground">Checking permissions...</p>
         </div>
       </div>
     );
@@ -1229,11 +1229,11 @@ export default function WorkshopTasksPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Workshop Tasks</h1>
-            <p className="text-slate-600 dark:text-slate-400">
+            <h1 className="text-3xl font-bold text-foreground mb-2">Workshop Tasks</h1>
+            <p className="text-muted-foreground">
               Track vehicle repairs and workshop work
             </p>
           </div>
@@ -1273,13 +1273,13 @@ export default function WorkshopTasksPage() {
 
         <TabsContent value="vehicle" className="space-y-6">
           {/* Filters */}
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardContent className="pt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Status Filter</Label>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 dark:text-slate-100 text-slate-900">
+                    <SelectTrigger className="bg-white dark:bg-slate-900 border-border dark:text-slate-100 text-slate-900">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1294,7 +1294,7 @@ export default function WorkshopTasksPage() {
                 <div className="space-y-2">
                   <Label>Vehicle Filter</Label>
                   <Select value={vehicleFilter} onValueChange={setVehicleFilter}>
-                    <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 dark:text-slate-100 text-slate-900">
+                    <SelectTrigger className="bg-white dark:bg-slate-900 border-border dark:text-slate-100 text-slate-900">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1313,27 +1313,27 @@ export default function WorkshopTasksPage() {
 
           {/* Statistics */}
           <div className="grid grid-cols-4 gap-4">
-            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+            <Card className="">
               <CardHeader className="pb-3">
-                <CardDescription className="text-slate-600 dark:text-slate-400">Pending</CardDescription>
+                <CardDescription className="text-muted-foreground">Pending</CardDescription>
                 <CardTitle className="text-3xl text-amber-600 dark:text-amber-400">{pendingTasks.length}</CardTitle>
               </CardHeader>
             </Card>
-            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+            <Card className="">
               <CardHeader className="pb-3">
-                <CardDescription className="text-slate-600 dark:text-slate-400">In Progress</CardDescription>
+                <CardDescription className="text-muted-foreground">In Progress</CardDescription>
                 <CardTitle className="text-3xl text-blue-600 dark:text-blue-400">{inProgressTasks.length}</CardTitle>
               </CardHeader>
             </Card>
-            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+            <Card className="">
               <CardHeader className="pb-3">
-                <CardDescription className="text-slate-600 dark:text-slate-400">On Hold</CardDescription>
+                <CardDescription className="text-muted-foreground">On Hold</CardDescription>
                 <CardTitle className="text-3xl text-purple-600 dark:text-purple-400">{onHoldTasks.length}</CardTitle>
               </CardHeader>
             </Card>
-            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+            <Card className="">
               <CardHeader className="pb-3">
-                <CardDescription className="text-slate-600 dark:text-slate-400">Completed</CardDescription>
+                <CardDescription className="text-muted-foreground">Completed</CardDescription>
                 <CardTitle className="text-3xl text-green-600 dark:text-green-400">{completedTasks.length}</CardTitle>
               </CardHeader>
             </Card>
@@ -1342,14 +1342,14 @@ export default function WorkshopTasksPage() {
           {/* Tasks List */}
           {loading ? (
             <div className="flex items-center justify-center min-h-[400px]">
-              <p className="text-slate-600 dark:text-slate-400">Loading tasks...</p>
+              <p className="text-muted-foreground">Loading tasks...</p>
             </div>
           ) : tasks.length === 0 ? (
-            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+            <Card className="">
               <CardContent className="flex flex-col items-center justify-center py-12">
-                <Wrench className="h-16 w-16 text-slate-400 mb-4" />
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No workshop tasks yet</h3>
-                <p className="text-slate-600 dark:text-slate-400 mb-4">
+                <Wrench className="h-16 w-16 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">No workshop tasks yet</h3>
+                <p className="text-muted-foreground mb-4">
                   Create your first workshop task or wait for inspection defects
                 </p>
                 <Button
@@ -1370,7 +1370,7 @@ export default function WorkshopTasksPage() {
                     onClick={() => setShowPending(!showPending)}
                     className="w-full flex items-center justify-between p-4 bg-amber-500/10 hover:bg-amber-500/20 transition-colors border-b-2 border-amber-500/30"
                   >
-                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                    <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
                       <AlertTriangle className="h-5 w-5 text-amber-400" />
                       Pending Tasks ({pendingTasks.length})
                     </h2>
@@ -1387,7 +1387,7 @@ export default function WorkshopTasksPage() {
                       return (
                         <Card
                           key={task.id}
-                          className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-workshop/50 transition-all duration-200 cursor-pointer"
+                          className="bg-white dark:bg-slate-900 border-border hover:shadow-lg hover:border-workshop/50 transition-all duration-200 cursor-pointer"
                           onClick={() => handleOpenTaskModal(task)}
                         >
                           <CardContent className="pt-6">
@@ -1397,7 +1397,7 @@ export default function WorkshopTasksPage() {
                                 <div className="flex-1 w-full">
                                   <div className="flex items-center gap-2 mb-2">
                                     {getStatusIcon(task.status)}
-                                    <h3 className="font-semibold text-lg text-slate-900 dark:text-white">
+                                    <h3 className="font-semibold text-lg text-foreground">
                                       {getVehicleReg(task)}
                                     </h3>
                                     <Badge variant="outline" className="text-xs">
@@ -1417,10 +1417,10 @@ export default function WorkshopTasksPage() {
                                     )}
                                   </div>
                                   {task.action_type === 'inspection_defect' && task.description && (
-                                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{task.description}</p>
+                                    <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
                                   )}
                                   {task.workshop_comments && (
-                                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                                    <p className="text-sm text-muted-foreground mb-2">
                                       <strong>Notes:</strong> {task.workshop_comments}
                                     </p>
                                   )}
@@ -1434,7 +1434,7 @@ export default function WorkshopTasksPage() {
                                     disabled={isUpdating}
                                     size="sm"
                                     variant="outline"
-                                    className="h-9 px-3 text-xs border-slate-600 text-slate-400 hover:text-white hover:bg-slate-800"
+                                    className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800"
                                   >
                                     <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                                     Comments
@@ -1477,7 +1477,7 @@ export default function WorkshopTasksPage() {
                               
                               {/* Bottom row: Date on left, Edit/Delete on right */}
                               <div className="flex items-center justify-between w-full">
-                                <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
+                                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                                   <span>Created: {formatDate(task.created_at)}</span>
                                 </div>
                                 {task.action_type === 'workshop_vehicle_task' && (
@@ -1487,7 +1487,7 @@ export default function WorkshopTasksPage() {
                                       disabled={isUpdating}
                                       size="sm"
                                       variant="ghost"
-                                      className="h-7 w-7 p-0 text-slate-500 hover:text-slate-300 hover:bg-slate-800"
+                                      className="h-7 w-7 p-0 text-muted-foreground hover:text-muted-foreground hover:bg-slate-800"
                                       title="Edit task"
                                     >
                                       <Edit className="h-3.5 w-3.5" />
@@ -1522,7 +1522,7 @@ export default function WorkshopTasksPage() {
                     onClick={() => setShowInProgress(!showInProgress)}
                     className="w-full flex items-center justify-between p-4 bg-blue-500/10 hover:bg-blue-500/20 transition-colors border-b-2 border-blue-500/30"
                   >
-                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                    <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
                       <Clock className="h-5 w-5 text-blue-400" />
                       In Progress Tasks ({inProgressTasks.length})
                     </h2>
@@ -1549,7 +1549,7 @@ export default function WorkshopTasksPage() {
                                 <div className="flex-1 w-full">
                                   <div className="flex items-center gap-2 mb-2">
                                     {getStatusIcon(task.status)}
-                                    <h3 className="font-semibold text-lg text-slate-900 dark:text-white">
+                                    <h3 className="font-semibold text-lg text-foreground">
                                       {getVehicleReg(task)}
                                     </h3>
                                     <Badge variant="outline" className="text-xs">
@@ -1569,7 +1569,7 @@ export default function WorkshopTasksPage() {
                                     )}
                                   </div>
                                   {task.action_type === 'inspection_defect' && task.description && (
-                                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{task.description}</p>
+                                    <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
                                   )}
                                   {task.logged_comment && (
                                     <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-2">
@@ -1579,7 +1579,7 @@ export default function WorkshopTasksPage() {
                                     </div>
                                   )}
                                   {task.workshop_comments && (
-                                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                                    <p className="text-sm text-muted-foreground mb-2">
                                       <strong>Notes:</strong> {task.workshop_comments}
                                     </p>
                                   )}
@@ -1590,7 +1590,7 @@ export default function WorkshopTasksPage() {
                                     disabled={isUpdating}
                                     size="sm"
                                     variant="outline"
-                                    className="h-9 px-3 text-xs border-slate-600 text-slate-400 hover:text-white hover:bg-slate-800"
+                                    className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800"
                                   >
                                     <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                                     Comments
@@ -1600,7 +1600,7 @@ export default function WorkshopTasksPage() {
                                     variant="outline"
                                     disabled={isUpdating}
                                     size="sm"
-                                    className="h-9 px-3 text-xs border-slate-600 text-slate-400 hover:text-white hover:bg-slate-800"
+                                    className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800"
                                   >
                                     <Undo2 className="h-3.5 w-3.5 mr-1.5" />
                                     Undo
@@ -1650,7 +1650,7 @@ export default function WorkshopTasksPage() {
                               
                               {/* Bottom row: Dates on left, Edit on right */}
                               <div className="flex items-center justify-between w-full">
-                                <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
+                                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                                   <span>Created: {formatDate(task.created_at)}</span>
                                   {task.logged_at && (
                                     <span className="text-blue-400">
@@ -1665,7 +1665,7 @@ export default function WorkshopTasksPage() {
                                       disabled={isUpdating}
                                       size="sm"
                                       variant="ghost"
-                                      className="h-7 w-7 p-0 text-slate-500 hover:text-slate-300 hover:bg-slate-800"
+                                      className="h-7 w-7 p-0 text-muted-foreground hover:text-muted-foreground hover:bg-slate-800"
                                       title="Edit task"
                                     >
                                       <Edit className="h-3.5 w-3.5" />
@@ -1690,7 +1690,7 @@ export default function WorkshopTasksPage() {
                     onClick={() => setShowOnHold(!showOnHold)}
                     className="w-full flex items-center justify-between p-4 bg-purple-500/10 hover:bg-purple-500/20 transition-colors border-b-2 border-purple-500/30"
                   >
-                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                    <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
                       <Pause className="h-5 w-5 text-purple-400" />
                       On Hold Tasks ({onHoldTasks.length})
                     </h2>
@@ -1717,7 +1717,7 @@ export default function WorkshopTasksPage() {
                                 <div className="flex-1 w-full">
                                   <div className="flex items-center gap-2 mb-2">
                                     {getStatusIcon(task.status)}
-                                    <h3 className="font-semibold text-lg text-slate-900 dark:text-white">
+                                    <h3 className="font-semibold text-lg text-foreground">
                                       {getVehicleReg(task)}
                                     </h3>
                                     <Badge variant="outline" className="text-xs">
@@ -1737,7 +1737,7 @@ export default function WorkshopTasksPage() {
                                     )}
                                   </div>
                                   {task.action_type === 'inspection_defect' && task.description && (
-                                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{task.description}</p>
+                                    <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
                                   )}
                                   {task.logged_comment && (
                                     <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 mb-2">
@@ -1745,7 +1745,7 @@ export default function WorkshopTasksPage() {
                                     </div>
                                   )}
                                   {task.action_type === 'workshop_vehicle_task' && task.workshop_comments && (
-                                    <p className="text-sm text-slate-600 dark:text-slate-400">{task.workshop_comments}</p>
+                                    <p className="text-sm text-muted-foreground">{task.workshop_comments}</p>
                                   )}
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
@@ -1758,7 +1758,7 @@ export default function WorkshopTasksPage() {
                                     disabled={isUpdating}
                                     size="sm"
                                     variant="outline"
-                                    className="h-9 px-3 text-xs border-slate-600 text-slate-400 hover:text-white hover:bg-slate-800"
+                                    className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800"
                                   >
                                     <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                                     Comments
@@ -1789,7 +1789,7 @@ export default function WorkshopTasksPage() {
                               
                               {/* Bottom row: Dates on left, Edit/Delete on right */}
                               <div className="flex items-center justify-between w-full">
-                                <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
+                                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                                   <span>Created: {formatDate(task.created_at)}</span>
                                   {task.logged_at && (
                                     <span>Placed On Hold: {formatDate(task.logged_at)}</span>
@@ -1802,7 +1802,7 @@ export default function WorkshopTasksPage() {
                                       disabled={isUpdating}
                                       size="sm"
                                       variant="ghost"
-                                      className="h-7 w-7 p-0 text-slate-500 hover:text-slate-300 hover:bg-slate-800"
+                                      className="h-7 w-7 p-0 text-muted-foreground hover:text-muted-foreground hover:bg-slate-800"
                                       title="Edit task"
                                     >
                                       <Edit className="h-3.5 w-3.5" />
@@ -1837,7 +1837,7 @@ export default function WorkshopTasksPage() {
                     onClick={() => setShowCompleted(!showCompleted)}
                     className="w-full flex items-center justify-between p-4 bg-green-500/10 hover:bg-green-500/20 transition-colors border-b-2 border-green-500/30"
                   >
-                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                    <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
                       <CheckCircle2 className="h-5 w-5 text-green-400" />
                       Completed Tasks ({completedTasks.length})
                     </h2>
@@ -1852,7 +1852,7 @@ export default function WorkshopTasksPage() {
                     {completedTasks.map((task) => (
                       <Card
                         key={task.id}
-                        className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-90 transition-opacity cursor-pointer"
+                        className="bg-white dark:bg-slate-900 border-border opacity-70 hover:opacity-90 transition-opacity cursor-pointer"
                         onClick={() => handleOpenTaskModal(task)}
                       >
                         <CardContent className="pt-6">
@@ -1870,14 +1870,14 @@ export default function WorkshopTasksPage() {
                                     </Badge>
                                   </div>
                                   {task.workshop_task_categories && (
-                                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">
+                                    <p className="text-sm text-muted-foreground mb-1">
                                       <strong>Category:</strong> {task.workshop_task_categories.name}
                                     </p>
                                   )}
                                   {task.action_type === 'inspection_defect' && task.description && (
-                                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{task.description}</p>
+                                    <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
                                   )}
-                                  <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
+                                  <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                                     {task.actioned_at && (
                                       <span className="text-green-400">
                                         Completed: {formatDate(task.actioned_at)}
@@ -1890,7 +1890,7 @@ export default function WorkshopTasksPage() {
                                     onClick={(e) => { e.stopPropagation(); handleOpenComments(task); }}
                                     size="sm"
                                     variant="outline"
-                                    className="h-9 px-3 text-xs border-slate-600 text-slate-400 hover:text-white hover:bg-slate-800"
+                                    className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800"
                                   >
                                     <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                                     Comments
@@ -1899,7 +1899,7 @@ export default function WorkshopTasksPage() {
                                     onClick={(e) => { e.stopPropagation(); handleUndoComplete(task.id); }}
                                     size="sm"
                                     variant="outline"
-                                    className="h-9 px-3 text-xs border-slate-600 text-slate-400 hover:text-white hover:bg-slate-800"
+                                    className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800"
                                   >
                                     <Undo2 className="h-3.5 w-3.5 mr-1.5" />
                                     Undo
@@ -1920,11 +1920,11 @@ export default function WorkshopTasksPage() {
         </TabsContent>
 
         <TabsContent value="plant">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <Info className="h-16 w-16 text-slate-400 mb-4" />
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Coming Soon</h3>
-              <p className="text-slate-600 dark:text-slate-400">
+              <Info className="h-16 w-16 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">Coming Soon</h3>
+              <p className="text-muted-foreground">
                 Plant machinery tasks will be available in a future update
               </p>
             </CardContent>
@@ -1932,11 +1932,11 @@ export default function WorkshopTasksPage() {
         </TabsContent>
 
         <TabsContent value="tools">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <Info className="h-16 w-16 text-slate-400 mb-4" />
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Coming Soon</h3>
-              <p className="text-slate-600 dark:text-slate-400">
+              <Info className="h-16 w-16 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">Coming Soon</h3>
+              <p className="text-muted-foreground">
                 Tool repair tasks will be available in a future update
               </p>
             </CardContent>
@@ -1961,17 +1961,17 @@ export default function WorkshopTasksPage() {
 
       {/* Add Task Modal */}
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+        <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-white text-xl">Create Workshop Task</DialogTitle>
-            <DialogDescription className="text-slate-600 dark:text-slate-400">
+            <DialogTitle className="text-foreground text-xl">Create Workshop Task</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
               Add a new vehicle repair or maintenance task
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="vehicle" className="text-slate-900 dark:text-white">
+              <Label htmlFor="vehicle" className="text-foreground">
                 Vehicle <span className="text-red-500">*</span>
               </Label>
               <Select value={selectedVehicleId} onValueChange={(value) => {
@@ -1982,7 +1982,7 @@ export default function WorkshopTasksPage() {
                   setCurrentMileage(null);
                 }
               }}>
-                <SelectTrigger id="vehicle" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white">
+                <SelectTrigger id="vehicle" className="bg-white dark:bg-slate-800 border-border text-foreground">
                   <SelectValue placeholder="Select vehicle" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1996,11 +1996,11 @@ export default function WorkshopTasksPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="category" className="text-slate-900 dark:text-white">
+              <Label htmlFor="category" className="text-foreground">
                 Category <span className="text-red-500">*</span>
               </Label>
               <Select value={selectedCategoryId} onValueChange={handleCategoryChange}>
-                <SelectTrigger id="category" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white">
+                <SelectTrigger id="category" className="bg-white dark:bg-slate-800 border-border text-foreground">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2014,7 +2014,7 @@ export default function WorkshopTasksPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="subcategory" className="text-slate-900 dark:text-white">
+              <Label htmlFor="subcategory" className="text-foreground">
                 Subcategory <span className="text-red-500">*</span>
               </Label>
               <Select 
@@ -2022,7 +2022,7 @@ export default function WorkshopTasksPage() {
                 onValueChange={setSelectedSubcategoryId}
                 disabled={!selectedCategoryId}
               >
-                <SelectTrigger id="subcategory" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white">
+                <SelectTrigger id="subcategory" className="bg-white dark:bg-slate-800 border-border text-foreground">
                   <SelectValue placeholder={selectedCategoryId ? "Select subcategory" : "Select a category first"} />
                 </SelectTrigger>
                 <SelectContent>
@@ -2036,7 +2036,7 @@ export default function WorkshopTasksPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="mileage" className="text-slate-900 dark:text-white">
+              <Label htmlFor="mileage" className="text-foreground">
                 Current Mileage <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -2045,19 +2045,19 @@ export default function WorkshopTasksPage() {
                 value={newMileage}
                 onChange={(e) => setNewMileage(e.target.value)}
                 placeholder="Enter current mileage"
-                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white"
+                className="bg-white dark:bg-slate-800 border-border text-foreground"
                 min="0"
                 step="1"
               />
               {currentMileage !== null && (
-                <p className="text-xs text-slate-600 dark:text-slate-400">
+                <p className="text-xs text-muted-foreground">
                   Last recorded: {currentMileage.toLocaleString()} miles
                 </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="comments" className="text-slate-900 dark:text-white">
+              <Label htmlFor="comments" className="text-foreground">
                 Task Details <span className="text-red-500">*</span>
               </Label>
               <Textarea
@@ -2065,10 +2065,10 @@ export default function WorkshopTasksPage() {
                 value={workshopComments}
                 onChange={(e) => setWorkshopComments(e.target.value)}
                 placeholder="Describe the work needed (minimum 10 characters)"
-                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[100px]"
+                className="bg-white dark:bg-slate-800 border-border text-foreground min-h-[100px]"
                 maxLength={300}
               />
-              <p className="text-xs text-slate-600 dark:text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 {workshopComments.length}/300 characters (minimum 10)
               </p>
             </div>
@@ -2081,7 +2081,7 @@ export default function WorkshopTasksPage() {
                 setShowAddModal(false);
                 resetAddForm();
               }}
-              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               Cancel
             </Button>
@@ -2098,10 +2098,10 @@ export default function WorkshopTasksPage() {
 
       {/* Mark In Progress Modal */}
       <Dialog open={showStatusModal} onOpenChange={setShowStatusModal}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+        <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-white text-xl">Mark Task In Progress</DialogTitle>
-            <DialogDescription className="text-slate-600 dark:text-slate-400">
+            <DialogTitle className="text-foreground text-xl">Mark Task In Progress</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
               Add a short note about starting this work
             </DialogDescription>
           </DialogHeader>
@@ -2114,8 +2114,8 @@ export default function WorkshopTasksPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="logged-comment" className="text-slate-900 dark:text-white">
-                Progress Note <span className="text-slate-400">(max 300 chars)</span> <span className="text-red-500">*</span>
+              <Label htmlFor="logged-comment" className="text-foreground">
+                Progress Note <span className="text-muted-foreground">(max 300 chars)</span> <span className="text-red-500">*</span>
               </Label>
               <Textarea
                 id="logged-comment"
@@ -2126,11 +2126,11 @@ export default function WorkshopTasksPage() {
                   }
                 }}
                 placeholder="e.g., Started work on brakes"
-                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white"
+                className="bg-white dark:bg-slate-800 border-border text-foreground"
                 maxLength={300}
                 rows={3}
               />
-              <p className="text-xs text-slate-600 dark:text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 {loggedComment.length}/300 characters
               </p>
             </div>
@@ -2144,7 +2144,7 @@ export default function WorkshopTasksPage() {
                 setSelectedTask(null);
                 setLoggedComment('');
               }}
-              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               Cancel
             </Button>
@@ -2171,10 +2171,10 @@ export default function WorkshopTasksPage() {
 
       {/* Put Task On Hold Modal */}
       <Dialog open={showOnHoldModal} onOpenChange={setShowOnHoldModal}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+        <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-white text-xl">Put Task On Hold</DialogTitle>
-            <DialogDescription className="text-slate-600 dark:text-slate-400">
+            <DialogTitle className="text-foreground text-xl">Put Task On Hold</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
               Add a note about why this task is being paused
             </DialogDescription>
           </DialogHeader>
@@ -2187,8 +2187,8 @@ export default function WorkshopTasksPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="onhold-comment" className="text-slate-900 dark:text-white">
-                On Hold Reason <span className="text-slate-400">(max 300 chars)</span> <span className="text-red-500">*</span>
+              <Label htmlFor="onhold-comment" className="text-foreground">
+                On Hold Reason <span className="text-muted-foreground">(max 300 chars)</span> <span className="text-red-500">*</span>
               </Label>
               <Textarea
                 id="onhold-comment"
@@ -2199,11 +2199,11 @@ export default function WorkshopTasksPage() {
                   }
                 }}
                 placeholder="e.g., Awaiting parts delivery, Waiting for customer approval"
-                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[80px]"
+                className="bg-white dark:bg-slate-800 border-border text-foreground min-h-[80px]"
                 maxLength={300}
                 rows={3}
               />
-              <p className="text-xs text-slate-600 dark:text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 {onHoldComment.length}/300 characters
               </p>
             </div>
@@ -2218,7 +2218,7 @@ export default function WorkshopTasksPage() {
                 setOnHoldComment('');
               }}
               disabled={onHoldingTask ? updatingStatus.has(onHoldingTask.id) : false}
-              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               Cancel
             </Button>
@@ -2240,10 +2240,10 @@ export default function WorkshopTasksPage() {
 
       {/* Resume Task Modal */}
       <Dialog open={showResumeModal} onOpenChange={setShowResumeModal}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+        <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-white text-xl">Resume Task</DialogTitle>
-            <DialogDescription className="text-slate-600 dark:text-slate-400">
+            <DialogTitle className="text-foreground text-xl">Resume Task</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
               Add a note about resuming work on this task
             </DialogDescription>
           </DialogHeader>
@@ -2256,8 +2256,8 @@ export default function WorkshopTasksPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="resume-comment" className="text-slate-900 dark:text-white">
-                Resume Note <span className="text-slate-400">(max 300 chars)</span> <span className="text-red-500">*</span>
+              <Label htmlFor="resume-comment" className="text-foreground">
+                Resume Note <span className="text-muted-foreground">(max 300 chars)</span> <span className="text-red-500">*</span>
               </Label>
               <Textarea
                 id="resume-comment"
@@ -2268,11 +2268,11 @@ export default function WorkshopTasksPage() {
                   }
                 }}
                 placeholder="e.g., Parts arrived, ready to continue work"
-                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[80px]"
+                className="bg-white dark:bg-slate-800 border-border text-foreground min-h-[80px]"
                 maxLength={300}
                 rows={3}
               />
-              <p className="text-xs text-slate-600 dark:text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 {resumeComment.length}/300 characters
               </p>
             </div>
@@ -2287,7 +2287,7 @@ export default function WorkshopTasksPage() {
                 setResumeComment('');
               }}
               disabled={resumingTask ? updatingStatus.has(resumingTask.id) : false}
-              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               Cancel
             </Button>
@@ -2309,17 +2309,17 @@ export default function WorkshopTasksPage() {
 
       {/* Edit Task Modal */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+        <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-white text-xl">Edit Workshop Task</DialogTitle>
-            <DialogDescription className="text-slate-600 dark:text-slate-400">
+            <DialogTitle className="text-foreground text-xl">Edit Workshop Task</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
               Update the workshop task details
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-vehicle" className="text-slate-900 dark:text-white">
+              <Label htmlFor="edit-vehicle" className="text-foreground">
                 Vehicle <span className="text-red-500">*</span>
               </Label>
               <Select value={editVehicleId} onValueChange={(value) => {
@@ -2346,7 +2346,7 @@ export default function WorkshopTasksPage() {
                   setEditCurrentMileage(null);
                 }
               }}>
-                <SelectTrigger id="edit-vehicle" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white">
+                <SelectTrigger id="edit-vehicle" className="bg-white dark:bg-slate-800 border-border text-foreground">
                   <SelectValue placeholder="Select vehicle" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2356,7 +2356,7 @@ export default function WorkshopTasksPage() {
                       <>
                         {recentVehicles.length > 0 && (
                           <SelectGroup>
-                            <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">Recent</SelectLabel>
+                            <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">Recent</SelectLabel>
                             {recentVehicles.map((vehicle) => (
                               <SelectItem key={vehicle.id} value={vehicle.id}>
                                 {vehicle.reg_number}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
@@ -2370,7 +2370,7 @@ export default function WorkshopTasksPage() {
                         {otherVehicles.length > 0 && (
                           <SelectGroup>
                             {recentVehicles.length > 0 && (
-                              <SelectLabel className="text-slate-400 text-xs px-2 py-1.5">All Vehicles</SelectLabel>
+                              <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">All Vehicles</SelectLabel>
                             )}
                             {otherVehicles.map((vehicle) => (
                               <SelectItem key={vehicle.id} value={vehicle.id}>
@@ -2387,11 +2387,11 @@ export default function WorkshopTasksPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-category" className="text-slate-900 dark:text-white">
+              <Label htmlFor="edit-category" className="text-foreground">
                 Category <span className="text-red-500">*</span>
               </Label>
               <Select value={editCategoryId} onValueChange={setEditCategoryId}>
-                <SelectTrigger id="edit-category" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white">
+                <SelectTrigger id="edit-category" className="bg-white dark:bg-slate-800 border-border text-foreground">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2405,7 +2405,7 @@ export default function WorkshopTasksPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-mileage" className="text-slate-900 dark:text-white">
+              <Label htmlFor="edit-mileage" className="text-foreground">
                 Current Mileage <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -2414,19 +2414,19 @@ export default function WorkshopTasksPage() {
                 value={editMileage}
                 onChange={(e) => setEditMileage(e.target.value)}
                 placeholder="Enter current mileage"
-                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white"
+                className="bg-white dark:bg-slate-800 border-border text-foreground"
                 min="0"
                 step="1"
               />
               {editCurrentMileage !== null && (
-                <p className="text-xs text-slate-600 dark:text-slate-400">
+                <p className="text-xs text-muted-foreground">
                   Last recorded: {editCurrentMileage.toLocaleString()} miles
                 </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-comments" className="text-slate-900 dark:text-white">
+              <Label htmlFor="edit-comments" className="text-foreground">
                 Task Details <span className="text-red-500">*</span>
               </Label>
               <Textarea
@@ -2434,10 +2434,10 @@ export default function WorkshopTasksPage() {
                 value={editComments}
                 onChange={(e) => setEditComments(e.target.value)}
                 placeholder="Describe the work needed (minimum 10 characters)"
-                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white min-h-[100px]"
+                className="bg-white dark:bg-slate-800 border-border text-foreground min-h-[100px]"
                 maxLength={300}
               />
-              <p className="text-xs text-slate-600 dark:text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 {editComments.length}/300 characters (minimum 10)
               </p>
             </div>
@@ -2455,7 +2455,7 @@ export default function WorkshopTasksPage() {
                 setEditMileage('');
                 setEditCurrentMileage(null);
               }}
-              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               Cancel
             </Button>
@@ -2473,19 +2473,19 @@ export default function WorkshopTasksPage() {
       {/* Category Management Modal */}
       {showSettings && (
         <Dialog open={showCategoryModal} onOpenChange={setShowCategoryModal}>
-          <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-lg">
+          <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
             <DialogHeader>
-              <DialogTitle className="text-slate-900 dark:text-white text-xl">
+              <DialogTitle className="text-foreground text-xl">
                 {editingCategory ? 'Edit Category' : 'Add Category'}
               </DialogTitle>
-              <DialogDescription className="text-slate-600 dark:text-slate-400">
+              <DialogDescription className="text-muted-foreground">
                 {editingCategory ? 'Update the category details' : 'Create a new workshop task category'}
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="category-name" className="text-slate-900 dark:text-white">
+                <Label htmlFor="category-name" className="text-foreground">
                   Category Name <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -2493,10 +2493,10 @@ export default function WorkshopTasksPage() {
                   value={categoryName}
                   onChange={(e) => setCategoryName(e.target.value)}
                   placeholder="e.g., Brakes, Engine, Electrical"
-                  className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white"
+                  className="bg-white dark:bg-slate-800 border-border text-foreground"
                   maxLength={50}
                 />
-                <p className="text-xs text-slate-600 dark:text-slate-400">
+                <p className="text-xs text-muted-foreground">
                   Categories are automatically organized alphabetically
                 </p>
               </div>
@@ -2510,7 +2510,7 @@ export default function WorkshopTasksPage() {
                   setEditingCategory(null);
                   setCategoryName('');
                 }}
-                className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 Cancel
               </Button>
@@ -2528,21 +2528,21 @@ export default function WorkshopTasksPage() {
 
       {/* Delete Task Confirmation Dialog */}
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white max-w-md">
+        <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-white text-xl">Delete Workshop Task</DialogTitle>
-            <DialogDescription className="text-slate-600 dark:text-slate-400">
+            <DialogTitle className="text-foreground text-xl">Delete Workshop Task</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
               Are you sure you want to delete this task? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           
           {taskToDelete && (
             <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg space-y-2">
-              <p className="font-semibold text-slate-900 dark:text-white">
+              <p className="font-semibold text-foreground">
                 {getVehicleReg(taskToDelete)}
               </p>
               {taskToDelete.workshop_comments && (
-                <p className="text-sm text-slate-600 dark:text-slate-400">
+                <p className="text-sm text-muted-foreground">
                   {taskToDelete.workshop_comments}
                 </p>
               )}
@@ -2557,7 +2557,7 @@ export default function WorkshopTasksPage() {
                 setTaskToDelete(null);
               }}
               disabled={deleting}
-              className="border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               Cancel
             </Button>

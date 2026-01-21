@@ -94,7 +94,7 @@ export default function LoginPage() {
         </div>
 
         {/* Glass-morphism Card */}
-        <Card className="bg-slate-800/40 backdrop-blur-xl border-slate-700/50 shadow-2xl">
+        <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-2xl">
           <CardContent className="p-8">
             <form onSubmit={handleSubmit} className="space-y-5">
               {error && (
@@ -104,7 +104,7 @@ export default function LoginPage() {
               )}
               
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-slate-300 font-medium">Email Address</Label>
+                <Label htmlFor="email" className="text-muted-foreground font-medium">Email Address</Label>
                 <Input
                   id="email"
                   type="email"
@@ -114,12 +114,12 @@ export default function LoginPage() {
                   required
                   disabled={loading}
                   autoComplete="email"
-                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-avs-yellow focus:ring-avs-yellow/20 h-12"
+                  className="bg-input border-border text-white placeholder:text-muted-foreground focus:border-avs-yellow focus:ring-avs-yellow/20 h-12"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-slate-300 font-medium">Password</Label>
+                <Label htmlFor="password" className="text-muted-foreground font-medium">Password</Label>
                 <Input
                   id="password"
                   type="password"
@@ -129,7 +129,7 @@ export default function LoginPage() {
                   required
                   disabled={loading}
                   autoComplete="current-password"
-                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-avs-yellow focus:ring-avs-yellow/20 h-12"
+                  className="bg-input border-border text-white placeholder:text-muted-foreground focus:border-avs-yellow focus:ring-avs-yellow/20 h-12"
                 />
               </div>
 
@@ -144,7 +144,7 @@ export default function LoginPage() {
                 />
                 <Label 
                   htmlFor="remember" 
-                  className="text-sm font-normal cursor-pointer text-slate-300"
+                  className="text-sm font-normal cursor-pointer text-muted-foreground"
                 >
                   Keep me signed in
                 </Label>
@@ -161,7 +161,7 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        <div className="mt-6 text-center text-sm text-slate-400">
+        <div className="mt-6 text-center text-sm text-muted-foreground">
           <p>Contact your administrator for account access</p>
         </div>
       </div>

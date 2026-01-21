@@ -151,9 +151,9 @@ export default function AllowancesPage() {
   if (authLoading || loading) {
     return (
       <div className="space-y-6 max-w-6xl">
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="">
           <CardContent className="flex items-center justify-center py-12">
-            <p className="text-slate-400">Loading...</p>
+            <p className="text-muted-foreground">Loading...</p>
           </CardContent>
         </Card>
       </div>
@@ -165,14 +165,14 @@ export default function AllowancesPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center gap-4">
           <BackButton />
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+            <h1 className="text-3xl font-bold text-foreground mb-2">
               Employee Allowances
             </h1>
-            <p className="text-slate-600 dark:text-slate-400">
+            <p className="text-muted-foreground">
               Manage annual leave allowances for all employees ({financialYear.label})
             </p>
           </div>
@@ -180,37 +180,37 @@ export default function AllowancesPage() {
       </div>
       
       {/* Search */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="">
         <CardContent className="pt-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search by name or employee ID..."
-              className="pl-11 bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+              className="pl-11 bg-white dark:border-border dark:text-slate-100 text-slate-900"
             />
           </div>
         </CardContent>
       </Card>
       
       {/* Allowances Table */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-white">
+          <CardTitle className="flex items-center gap-2 text-foreground">
             <Users className="h-5 w-5" />
             Employees
           </CardTitle>
-          <CardDescription className="text-slate-400">
+          <CardDescription className="text-muted-foreground">
             {filteredProfiles.length} employees {searchTerm && `(filtered from ${profiles.length})`}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {filteredProfiles.length === 0 ? (
             <div className="text-center py-12">
-              <Users className="h-16 w-16 text-slate-400 mx-auto mb-4" />
+              <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-white mb-2">No employees found</h3>
-              <p className="text-slate-400">Try adjusting your search</p>
+              <p className="text-muted-foreground">Try adjusting your search</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -228,10 +228,10 @@ export default function AllowancesPage() {
       
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="bg-slate-900 border-slate-700">
+        <DialogContent className="border-border">
           <DialogHeader>
             <DialogTitle className="text-white">Edit Allowance</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               Update annual leave allowance for {editingProfile?.full_name}
             </DialogDescription>
           </DialogHeader>
@@ -247,9 +247,9 @@ export default function AllowancesPage() {
                 value={newAllowance}
                 onChange={(e) => setNewAllowance(e.target.value)}
                 placeholder="28"
-                className="bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+                className="border-border dark:text-slate-100 text-slate-900"
               />
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Standard UK allowance is 28 days (including bank holidays)
               </p>
             </div>
@@ -262,7 +262,7 @@ export default function AllowancesPage() {
                 setShowEditDialog(false);
                 setEditingProfile(null);
               }}
-              className="border-slate-600 text-slate-300"
+              className="border-border text-muted-foreground"
             >
               Cancel
             </Button>
@@ -285,7 +285,7 @@ function AllowanceRow({ profile, onEdit }: { profile: Profile; onEdit: () => voi
   const { data: summary, isLoading } = useAbsenceSummaryForEmployee(profile.id);
   
   return (
-    <div className="p-4 rounded-lg bg-slate-800/30 border border-slate-700/50 hover:border-slate-600 transition-colors">
+    <div className="p-4 rounded-lg bg-slate-800/30 border border-border/50 hover:border-slate-600 transition-colors">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-3">
@@ -293,30 +293,30 @@ function AllowanceRow({ profile, onEdit }: { profile: Profile; onEdit: () => voi
               {profile.full_name}
             </h3>
             {profile.employee_id && (
-              <Badge variant="outline" className="border-slate-600 text-slate-400">
+              <Badge variant="outline" className="border-slate-600 text-muted-foreground">
                 {profile.employee_id}
               </Badge>
             )}
           </div>
           
           {isLoading ? (
-            <p className="text-sm text-slate-400">Loading summary...</p>
+            <p className="text-sm text-muted-foreground">Loading summary...</p>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
-                <p className="text-slate-500 mb-1">Allowance</p>
+                <p className="text-muted-foreground mb-1">Allowance</p>
                 <p className="text-white font-semibold text-lg">{summary?.allowance || 28} days</p>
               </div>
               <div>
-                <p className="text-slate-500 mb-1">Approved Taken</p>
+                <p className="text-muted-foreground mb-1">Approved Taken</p>
                 <p className="text-white font-semibold text-lg">{summary?.approved_taken || 0} days</p>
               </div>
               <div>
-                <p className="text-slate-500 mb-1">Pending</p>
+                <p className="text-muted-foreground mb-1">Pending</p>
                 <p className="text-amber-400 font-semibold text-lg">{summary?.pending_total || 0} days</p>
               </div>
               <div>
-                <p className="text-slate-500 mb-1">Remaining</p>
+                <p className="text-muted-foreground mb-1">Remaining</p>
                 <p className={`font-semibold text-lg ${(summary?.remaining || 0) < 0 ? 'text-red-400' : 'text-green-400'}`}>
                   {summary?.remaining || 0} days
                 </p>
@@ -329,7 +329,7 @@ function AllowanceRow({ profile, onEdit }: { profile: Profile; onEdit: () => voi
           variant="outline"
           size="sm"
           onClick={onEdit}
-          className="border-slate-600 text-slate-300"
+          className="border-border text-muted-foreground"
         >
           <Edit className="h-4 w-4 mr-2" />
           Edit

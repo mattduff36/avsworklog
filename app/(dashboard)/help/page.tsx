@@ -237,14 +237,14 @@ export default function HelpPage() {
   const renderMarkdown = (content: string) => {
     // Simple markdown to HTML conversion
     return content
-      .replace(/^### (.*$)/gim, '<h3 class="text-lg font-semibold mt-4 mb-2 text-slate-900 dark:text-white">$1</h3>')
-      .replace(/^## (.*$)/gim, '<h2 class="text-xl font-semibold mt-6 mb-3 text-slate-900 dark:text-white">$1</h2>')
-      .replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold mt-6 mb-4 text-slate-900 dark:text-white">$1</h1>')
+      .replace(/^### (.*$)/gim, '<h3 class="text-lg font-semibold mt-4 mb-2 text-foreground">$1</h3>')
+      .replace(/^## (.*$)/gim, '<h2 class="text-xl font-semibold mt-6 mb-3 text-foreground">$1</h2>')
+      .replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold mt-6 mb-4 text-foreground">$1</h1>')
       .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
       .replace(/\*(.*)\*/gim, '<em>$1</em>')
       .replace(/^- (.*$)/gim, '<li class="ml-4">$1</li>')
       .replace(/^(\d+)\. (.*$)/gim, '<li class="ml-4">$2</li>')
-      .replace(/\n\n/g, '</p><p class="mb-3 text-slate-600 dark:text-slate-300">')
+      .replace(/\n\n/g, '</p><p class="mb-3 text-slate-600 dark:text-muted-foreground">')
       .replace(/\n/g, '<br/>');
   };
 
@@ -273,34 +273,27 @@ export default function HelpPage() {
   return (
     <div className="space-y-6 max-w-5xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-blue-100 dark:bg-blue-950 rounded-lg">
-            <HelpCircle className="h-6 w-6 text-blue-600" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-              Help & FAQ
-            </h1>
-            <p className="text-slate-600 dark:text-slate-400">
-              Find answers to common questions and submit suggestions
-            </p>
-          </div>
-        </div>
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
+        <h1 className="text-3xl font-bold text-foreground mb-2">
+          Help & FAQ
+        </h1>
+        <p className="text-muted-foreground">
+          Find answers to common questions and submit suggestions
+        </p>
       </div>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full max-w-lg grid-cols-3 bg-slate-100 dark:bg-slate-800 p-1">
-          <TabsTrigger value="faq" className="gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+          <TabsTrigger value="faq" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
             <BookOpen className="h-4 w-4" />
             FAQ
           </TabsTrigger>
-          <TabsTrigger value="suggest" className="gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+          <TabsTrigger value="suggest" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
             <Lightbulb className="h-4 w-4" />
             Suggest
           </TabsTrigger>
-          <TabsTrigger value="my-suggestions" className="gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+          <TabsTrigger value="my-suggestions" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
             <CheckCircle2 className="h-4 w-4" />
             My Suggestions
           </TabsTrigger>
@@ -309,15 +302,15 @@ export default function HelpPage() {
         {/* FAQ Tab */}
         <TabsContent value="faq" className="space-y-6">
           {/* Search Bar */}
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardContent className="pt-6">
               <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search FAQ articles..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-slate-100 text-slate-900"
+                  className="pl-10 bg-slate-50 dark:bg-slate-800 border-border dark:text-slate-100 text-slate-900"
                 />
               </div>
               
@@ -327,7 +320,7 @@ export default function HelpPage() {
                   variant={selectedCategory === null ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setSelectedCategory(null)}
-                  className={selectedCategory === null ? 'bg-blue-600 hover:bg-blue-700' : ''}
+                  className={selectedCategory === null ? 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900' : ''}
                 >
                   All Categories
                 </Button>
@@ -337,7 +330,7 @@ export default function HelpPage() {
                     variant={selectedCategory === category.slug ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setSelectedCategory(category.slug)}
-                    className={selectedCategory === category.slug ? 'bg-blue-600 hover:bg-blue-700' : ''}
+                    className={selectedCategory === category.slug ? 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900' : ''}
                   >
                     {category.name}
                   </Button>
@@ -349,13 +342,13 @@ export default function HelpPage() {
           {/* FAQ Content */}
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+              <Loader2 className="h-8 w-8 animate-spin text-avs-yellow" />
             </div>
           ) : filteredArticles.length === 0 ? (
-            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+            <Card className="">
               <CardContent className="py-12 text-center">
-                <HelpCircle className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                <p className="text-slate-500">
+                <HelpCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
                   {searchQuery ? 'No articles found matching your search.' : 'No FAQ articles available yet.'}
                 </p>
               </CardContent>
@@ -369,14 +362,14 @@ export default function HelpPage() {
                   if (catArticles.length === 0) return null;
                   
                   return (
-                    <Card key={category.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+                    <Card key={category.id} className="">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-lg text-slate-900 dark:text-white flex items-center gap-2">
-                          <ChevronRight className="h-5 w-5 text-blue-500" />
+                        <CardTitle className="text-lg text-foreground flex items-center gap-2">
+                          <ChevronRight className="h-5 w-5 text-avs-yellow" />
                           {category.name}
                         </CardTitle>
                         {category.description && (
-                          <CardDescription className="text-slate-500">
+                          <CardDescription className="text-muted-foreground">
                             {category.description}
                           </CardDescription>
                         )}
@@ -385,17 +378,17 @@ export default function HelpPage() {
                         <Accordion type="single" collapsible className="w-full">
                           {catArticles.map((article) => (
                             <AccordionItem key={article.id} value={article.id}>
-                              <AccordionTrigger className="text-left text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400">
+                              <AccordionTrigger className="text-left text-foreground hover:text-avs-yellow">
                                 {article.title}
                               </AccordionTrigger>
                               <AccordionContent>
                                 {article.summary && (
-                                  <p className="text-slate-500 dark:text-slate-400 mb-4 italic">
+                                  <p className="text-muted-foreground dark:text-muted-foreground mb-4 italic">
                                     {article.summary}
                                   </p>
                                 )}
                                 <div 
-                                  className="prose prose-sm dark:prose-invert max-w-none text-slate-600 dark:text-slate-300"
+                                  className="prose prose-sm dark:prose-invert max-w-none text-slate-600 dark:text-muted-foreground"
                                   dangerouslySetInnerHTML={{ __html: renderMarkdown(article.content_md) }}
                                 />
                               </AccordionContent>
@@ -407,22 +400,22 @@ export default function HelpPage() {
                   );
                 })
               ) : (
-                <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+                <Card className="">
                   <CardContent className="pt-6">
                     <Accordion type="single" collapsible className="w-full">
                       {filteredArticles.map((article) => (
                         <AccordionItem key={article.id} value={article.id}>
-                          <AccordionTrigger className="text-left text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400">
+                          <AccordionTrigger className="text-left text-foreground hover:text-avs-yellow">
                             {article.title}
                           </AccordionTrigger>
                           <AccordionContent>
                             {article.summary && (
-                              <p className="text-slate-500 dark:text-slate-400 mb-4 italic">
+                              <p className="text-muted-foreground dark:text-muted-foreground mb-4 italic">
                                 {article.summary}
                               </p>
                             )}
                             <div 
-                              className="prose prose-sm dark:prose-invert max-w-none text-slate-600 dark:text-slate-300"
+                              className="prose prose-sm dark:prose-invert max-w-none text-slate-600 dark:text-muted-foreground"
                               dangerouslySetInnerHTML={{ __html: renderMarkdown(article.content_md) }}
                             />
                           </AccordionContent>
@@ -438,19 +431,19 @@ export default function HelpPage() {
 
         {/* Submit Suggestion Tab */}
         <TabsContent value="suggest">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardHeader>
-              <CardTitle className="text-slate-900 dark:text-white flex items-center gap-2">
+              <CardTitle className="text-foreground flex items-center gap-2">
                 <Lightbulb className="h-5 w-5 text-yellow-500" />
                 Submit a Suggestion
               </CardTitle>
-              <CardDescription className="text-slate-500">
+              <CardDescription className="text-muted-foreground">
                 Have an idea to improve the app? We&apos;d love to hear it!
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="suggestion-title" className="text-slate-700 dark:text-slate-300">
+                <Label htmlFor="suggestion-title" className="text-slate-700 dark:text-muted-foreground">
                   Title <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -458,12 +451,12 @@ export default function HelpPage() {
                   placeholder="Brief title for your suggestion"
                   value={suggestionTitle}
                   onChange={(e) => setSuggestionTitle(e.target.value)}
-                  className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-slate-100 text-slate-900"
+                  className="bg-slate-50 dark:bg-slate-800 border-border dark:text-slate-100 text-slate-900"
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="suggestion-body" className="text-slate-700 dark:text-slate-300">
+                <Label htmlFor="suggestion-body" className="text-slate-700 dark:text-muted-foreground">
                   Description <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
@@ -472,12 +465,12 @@ export default function HelpPage() {
                   value={suggestionBody}
                   onChange={(e) => setSuggestionBody(e.target.value)}
                   rows={5}
-                  className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-slate-100 text-slate-900"
+                  className="bg-slate-50 dark:bg-slate-800 border-border dark:text-slate-100 text-slate-900"
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="suggestion-page" className="text-slate-700 dark:text-slate-300">
+                <Label htmlFor="suggestion-page" className="text-slate-700 dark:text-muted-foreground">
                   Related Page/Feature (optional)
                 </Label>
                 <Input
@@ -485,14 +478,14 @@ export default function HelpPage() {
                   placeholder="e.g., Timesheets, Inspections, Dashboard"
                   value={suggestionPageHint}
                   onChange={(e) => setSuggestionPageHint(e.target.value)}
-                  className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-slate-100 text-slate-900"
+                  className="bg-slate-50 dark:bg-slate-800 border-border dark:text-slate-100 text-slate-900"
                 />
               </div>
 
               <Button
                 onClick={handleSubmitSuggestion}
                 disabled={submittingSuggestion || !suggestionTitle.trim() || !suggestionBody.trim()}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
               >
                 {submittingSuggestion ? (
                   <>
@@ -512,23 +505,23 @@ export default function HelpPage() {
 
         {/* My Suggestions Tab */}
         <TabsContent value="my-suggestions">
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card className="">
             <CardHeader>
-              <CardTitle className="text-slate-900 dark:text-white">
+              <CardTitle className="text-foreground">
                 My Suggestions
               </CardTitle>
-              <CardDescription className="text-slate-500">
+              <CardDescription className="text-muted-foreground">
                 Track the status of your submitted suggestions
               </CardDescription>
             </CardHeader>
             <CardContent>
               {loadingSuggestions ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                  <Loader2 className="h-6 w-6 animate-spin text-avs-yellow" />
                 </div>
               ) : mySuggestions.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
-                  <Lightbulb className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                <div className="text-center py-8 text-muted-foreground">
+                  <Lightbulb className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <p>You haven&apos;t submitted any suggestions yet.</p>
                   <Button
                     variant="link"
@@ -543,18 +536,18 @@ export default function HelpPage() {
                   {mySuggestions.map((suggestion) => (
                     <div 
                       key={suggestion.id}
-                      className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
+                      className="p-4 rounded-lg border border-border bg-slate-50 dark:bg-slate-800"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
-                          <h3 className="font-medium text-slate-900 dark:text-white">
+                          <h3 className="font-medium text-foreground">
                             {suggestion.title}
                           </h3>
-                          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
+                          <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1 line-clamp-2">
                             {suggestion.body}
                           </p>
                           {suggestion.page_hint && (
-                            <p className="text-xs text-slate-400 mt-2">
+                            <p className="text-xs text-muted-foreground mt-2">
                               Related to: {suggestion.page_hint}
                             </p>
                           )}
@@ -563,7 +556,7 @@ export default function HelpPage() {
                           {getStatusLabel(suggestion.status)}
                         </Badge>
                       </div>
-                      <p className="text-xs text-slate-400 mt-3">
+                      <p className="text-xs text-muted-foreground mt-3">
                         Submitted {new Date(suggestion.created_at).toLocaleDateString()}
                       </p>
                     </div>

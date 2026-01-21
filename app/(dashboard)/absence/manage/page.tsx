@@ -180,9 +180,9 @@ export default function AdminAbsencePage() {
   if (authLoading || isLoading) {
     return (
       <div className="space-y-6 max-w-7xl">
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="">
           <CardContent className="flex items-center justify-center py-12">
-            <p className="text-slate-400">Loading...</p>
+            <p className="text-muted-foreground">Loading...</p>
           </CardContent>
         </Card>
       </div>
@@ -194,25 +194,25 @@ export default function AdminAbsencePage() {
   return (
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+            <h1 className="text-3xl font-bold text-foreground mb-2">
               Absence Management
             </h1>
-            <p className="text-slate-600 dark:text-slate-400">
+            <p className="text-muted-foreground">
               View and manage all employee absences
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
             <Link href="/absence/manage/reasons" className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full border-slate-600 text-slate-300">
+              <Button variant="outline" className="w-full border-border text-muted-foreground">
                 <Settings className="h-4 w-4 mr-2" />
                 Manage Reasons
               </Button>
             </Link>
             <Link href="/absence/manage/allowances" className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full border-slate-600 text-slate-300">
+              <Button variant="outline" className="w-full border-border text-muted-foreground">
                 <Users className="h-4 w-4 mr-2" />
                 Manage Allowances
               </Button>
@@ -229,9 +229,9 @@ export default function AdminAbsencePage() {
       </div>
       
       {/* Filters */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-white">
+          <CardTitle className="flex items-center gap-2 text-foreground">
             <Filter className="h-5 w-5" />
             Filters
           </CardTitle>
@@ -241,7 +241,7 @@ export default function AdminAbsencePage() {
             <div>
               <Label>Employee</Label>
               <Select value={profileId} onValueChange={setProfileId}>
-                <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900">
+                <SelectTrigger className="bg-white dark:border-border dark:text-slate-100 text-slate-900">
                   <SelectValue placeholder="All employees" />
                 </SelectTrigger>
                 <SelectContent>
@@ -261,7 +261,7 @@ export default function AdminAbsencePage() {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+                className="bg-white dark:border-border dark:text-slate-100 text-slate-900"
               />
             </div>
             
@@ -271,14 +271,14 @@ export default function AdminAbsencePage() {
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+                className="bg-white dark:border-border dark:text-slate-100 text-slate-900"
               />
             </div>
             
             <div>
               <Label>Reason</Label>
               <Select value={reasonId} onValueChange={setReasonId}>
-                <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900">
+                <SelectTrigger className="bg-white dark:border-border dark:text-slate-100 text-slate-900">
                   <SelectValue placeholder="All reasons" />
                 </SelectTrigger>
                 <SelectContent>
@@ -295,7 +295,7 @@ export default function AdminAbsencePage() {
             <div>
               <Label>Status</Label>
               <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900">
+                <SelectTrigger className="bg-white dark:border-border dark:text-slate-100 text-slate-900">
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -320,7 +320,7 @@ export default function AdminAbsencePage() {
                 setReasonId('');
                 setStatus('');
               }}
-              className="border-slate-600 text-slate-300"
+              className="border-border text-muted-foreground"
             >
               Clear Filters
             </Button>
@@ -329,28 +329,28 @@ export default function AdminAbsencePage() {
       </Card>
       
       {/* Absences Table */}
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+      <Card className="">
         <CardHeader>
-          <CardTitle className="text-slate-900 dark:text-white">
+          <CardTitle className="text-foreground">
             Absence Records
           </CardTitle>
-          <CardDescription className="text-slate-400">
+          <CardDescription className="text-muted-foreground">
             {absences?.length || 0} records found
           </CardDescription>
         </CardHeader>
         <CardContent>
           {!absences || absences.length === 0 ? (
             <div className="text-center py-12">
-              <Calendar className="h-16 w-16 text-slate-400 mx-auto mb-4" />
+              <Calendar className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-white mb-2">No absences found</h3>
-              <p className="text-slate-400">Try adjusting your filters</p>
+              <p className="text-muted-foreground">Try adjusting your filters</p>
             </div>
           ) : (
             <div className="space-y-3">
               {absences.map(absence => (
                 <div
                   key={absence.id}
-                  className="p-4 rounded-lg bg-slate-800/30 border border-slate-700/50 hover:border-slate-600 transition-colors"
+                  className="p-4 rounded-lg bg-slate-800/30 border border-border/50 hover:border-slate-600 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
@@ -359,7 +359,7 @@ export default function AdminAbsencePage() {
                           {absence.profiles.full_name}
                           {absence.profiles.employee_id && ` (${absence.profiles.employee_id})`}
                         </h3>
-                        <Badge variant="outline" className="border-slate-600 text-slate-300">
+                        <Badge variant="outline" className="border-border text-muted-foreground">
                           {absence.absence_reasons.name}
                         </Badge>
                         <Badge
@@ -371,7 +371,7 @@ export default function AdminAbsencePage() {
                             ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
                             : absence.status === 'rejected'
                             ? 'border-purple-500/30 text-purple-400 bg-purple-500/10'
-                            : 'border-slate-600 text-slate-400'
+                            : 'border-slate-600 text-muted-foreground'
                           }
                         >
                           {absence.status}
@@ -381,15 +381,15 @@ export default function AdminAbsencePage() {
                             Paid
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="border-slate-600 text-slate-400">
+                          <Badge variant="outline" className="border-slate-600 text-muted-foreground">
                             Unpaid
                           </Badge>
                         )}
                       </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-sm text-slate-400">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-sm text-muted-foreground">
                         <div>
-                          <span className="text-slate-500">Date:</span>{' '}
+                          <span className="text-muted-foreground">Date:</span>{' '}
                           {absence.end_date && absence.date !== absence.end_date
                             ? `${formatDate(absence.date)} - ${formatDate(absence.end_date)}`
                             : formatDate(absence.date)
@@ -397,21 +397,21 @@ export default function AdminAbsencePage() {
                           {absence.is_half_day && ` (${absence.half_day_session})`}
                         </div>
                         <div>
-                          <span className="text-slate-500">Duration:</span> {absence.duration_days} days
+                          <span className="text-muted-foreground">Duration:</span> {absence.duration_days} days
                         </div>
                         <div>
-                          <span className="text-slate-500">Created:</span> {formatDate(absence.created_at)}
+                          <span className="text-muted-foreground">Created:</span> {formatDate(absence.created_at)}
                         </div>
                         {absence.approved_at && (
                           <div>
-                            <span className="text-slate-500">Approved:</span> {formatDate(absence.approved_at)}
+                            <span className="text-muted-foreground">Approved:</span> {formatDate(absence.approved_at)}
                           </div>
                         )}
                       </div>
                       
                       {absence.notes && (
-                        <p className="text-sm text-slate-400 mt-2">
-                          <span className="text-slate-500">Notes:</span> {absence.notes}
+                        <p className="text-sm text-muted-foreground mt-2">
+                          <span className="text-muted-foreground">Notes:</span> {absence.notes}
                         </p>
                       )}
                     </div>
@@ -447,10 +447,10 @@ export default function AdminAbsencePage() {
       
       {/* Create Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="bg-slate-900 border-slate-700 max-w-2xl">
+        <DialogContent className="border-border max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-white">Create Absence Entry</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               Create an absence entry for any employee
             </DialogDescription>
           </DialogHeader>
@@ -459,7 +459,7 @@ export default function AdminAbsencePage() {
             <div>
               <Label>Employee *</Label>
               <Select value={selectedProfileId} onValueChange={setSelectedProfileId}>
-                <SelectTrigger className="bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900">
+                <SelectTrigger className="border-border dark:text-slate-100 text-slate-900">
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
@@ -475,7 +475,7 @@ export default function AdminAbsencePage() {
             <div>
               <Label>Reason *</Label>
               <Select value={selectedReasonId} onValueChange={setSelectedReasonId}>
-                <SelectTrigger className="bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900">
+                <SelectTrigger className="border-border dark:text-slate-100 text-slate-900">
                   <SelectValue placeholder="Select reason" />
                 </SelectTrigger>
                 <SelectContent>
@@ -500,7 +500,7 @@ export default function AdminAbsencePage() {
                       setEndDate('');
                     }
                   }}
-                  className="bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+                  className="border-border dark:text-slate-100 text-slate-900"
                 />
               </div>
               
@@ -512,7 +512,7 @@ export default function AdminAbsencePage() {
                   onChange={(e) => setEndDate(e.target.value)}
                   min={startDate}
                   disabled={!startDate || isHalfDay}
-                  className="bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+                  className="border-border dark:text-slate-100 text-slate-900"
                 />
               </div>
             </div>
@@ -526,9 +526,9 @@ export default function AdminAbsencePage() {
                     setIsHalfDay(e.target.checked);
                     if (e.target.checked) setEndDate('');
                   }}
-                  className="rounded border-slate-600"
+                  className="rounded border-border"
                 />
-                <span className="text-sm text-slate-300">Half Day</span>
+                <span className="text-sm text-muted-foreground">Half Day</span>
               </label>
               
               {isHalfDay && (
@@ -541,7 +541,7 @@ export default function AdminAbsencePage() {
                       checked={halfDaySession === 'AM'}
                       onChange={() => setHalfDaySession('AM')}
                     />
-                    <span className="text-sm text-slate-300">AM</span>
+                    <span className="text-sm text-muted-foreground">AM</span>
                   </label>
                   <label className="flex items-center gap-1 cursor-pointer">
                     <input
@@ -551,7 +551,7 @@ export default function AdminAbsencePage() {
                       checked={halfDaySession === 'PM'}
                       onChange={() => setHalfDaySession('PM')}
                     />
-                    <span className="text-sm text-slate-300">PM</span>
+                    <span className="text-sm text-muted-foreground">PM</span>
                   </label>
                 </div>
               )}
@@ -563,7 +563,7 @@ export default function AdminAbsencePage() {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Optional notes..."
-                className="bg-slate-900 border-slate-600 dark:text-slate-100 text-slate-900"
+                className="border-border dark:text-slate-100 text-slate-900"
               />
             </div>
             
@@ -573,16 +573,16 @@ export default function AdminAbsencePage() {
                 id="autoApprove"
                 checked={autoApprove}
                 onChange={(e) => setAutoApprove(e.target.checked)}
-                className="rounded border-slate-600"
+                className="rounded border-border"
               />
-              <label htmlFor="autoApprove" className="text-sm text-slate-300 cursor-pointer">
+              <label htmlFor="autoApprove" className="text-sm text-muted-foreground cursor-pointer">
                 Auto-approve (mark as approved immediately)
               </label>
             </div>
             
             {startDate && (
               <div className="bg-slate-800/30 p-3 rounded-lg">
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-muted-foreground">
                   Duration: <span className="text-white font-medium">{duration} days</span>
                 </p>
               </div>
@@ -593,7 +593,7 @@ export default function AdminAbsencePage() {
             <Button
               variant="outline"
               onClick={() => setShowCreateDialog(false)}
-              className="border-slate-600 text-slate-300"
+              className="border-border text-muted-foreground"
             >
               Cancel
             </Button>

@@ -140,7 +140,7 @@ export function MessagesReportView() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -150,12 +150,12 @@ export function MessagesReportView() {
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by subject or sender..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 dark:text-slate-100 text-slate-900"
+            className="pl-10 bg-white dark:bg-slate-900 border-border dark:text-slate-100 text-slate-900"
           />
         </div>
 
@@ -185,7 +185,7 @@ export function MessagesReportView() {
 
       {/* Messages List */}
       {filteredMessages.length === 0 ? (
-        <Card className="p-8 text-center text-slate-600 dark:text-slate-400">
+        <Card className="p-8 text-center text-muted-foreground">
           No messages found
         </Card>
       ) : showDetail && selectedMessage ? (
@@ -209,14 +209,14 @@ export function MessagesReportView() {
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                    <h3 className="text-xl font-bold text-foreground">
                       {selectedMessage.message.subject}
                     </h3>
                     <Badge variant={selectedMessage.message.type === 'TOOLBOX_TALK' ? 'destructive' : 'default'}>
                       {selectedMessage.message.type === 'TOOLBOX_TALK' ? 'Toolbox Talk' : 'Reminder'}
                     </Badge>
                   </div>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                  <p className="text-sm text-muted-foreground">
                     From: {selectedMessage.message.sender_name} • {formatDistanceToNow(new Date(selectedMessage.message.created_at), { addSuffix: true })}
                   </p>
                 </div>
@@ -252,34 +252,34 @@ export function MessagesReportView() {
               {selectedMessage.message.type === 'TOOLBOX_TALK' ? (
                 <div className="grid grid-cols-4 gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                   <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">Total Assigned</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{selectedMessage.total_assigned}</p>
+                    <p className="text-xs text-muted-foreground">Total Assigned</p>
+                    <p className="text-2xl font-bold text-foreground">{selectedMessage.total_assigned}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">Signed</p>
+                    <p className="text-xs text-muted-foreground">Signed</p>
                     <p className="text-2xl font-bold text-green-600">{selectedMessage.total_signed}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">Pending</p>
+                    <p className="text-xs text-muted-foreground">Pending</p>
                     <p className="text-2xl font-bold text-orange-600">{selectedMessage.total_pending}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">Compliance</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{selectedMessage.compliance_rate}%</p>
+                    <p className="text-xs text-muted-foreground">Compliance</p>
+                    <p className="text-2xl font-bold text-foreground">{selectedMessage.compliance_rate}%</p>
                   </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-3 gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                   <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">Total Assigned</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{selectedMessage.total_assigned}</p>
+                    <p className="text-xs text-muted-foreground">Total Assigned</p>
+                    <p className="text-2xl font-bold text-foreground">{selectedMessage.total_assigned}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">Dismissed</p>
+                    <p className="text-xs text-muted-foreground">Dismissed</p>
                     <p className="text-2xl font-bold text-green-600">{selectedMessage.total_signed}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">Not Viewed</p>
+                    <p className="text-xs text-muted-foreground">Not Viewed</p>
                     <p className="text-2xl font-bold text-orange-600">{selectedMessage.total_pending}</p>
                   </div>
                 </div>
@@ -287,15 +287,15 @@ export function MessagesReportView() {
 
               {/* Message Body */}
               <div>
-                <h4 className="font-semibold text-slate-900 dark:text-white mb-2">Message:</h4>
-                <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded whitespace-pre-wrap text-sm">
+                <h4 className="font-semibold text-foreground mb-2">Message:</h4>
+                <div className="p-4 bg-white dark:bg-slate-900 border border-border rounded whitespace-pre-wrap text-sm">
                   {selectedMessage.message.body}
                 </div>
               </div>
 
               {/* Recipients Table */}
               <div>
-                <h4 className="font-semibold text-slate-900 dark:text-white mb-2">Recipients ({selectedMessage.recipients.length}):</h4>
+                <h4 className="font-semibold text-foreground mb-2">Recipients ({selectedMessage.recipients.length}):</h4>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -313,7 +313,7 @@ export function MessagesReportView() {
                         <TableCell className="font-medium">
                           {recipient.user?.full_name || 'Deleted User'}
                           {recipient.user?.employee_id && (
-                            <span className="text-xs text-slate-500 ml-2">({recipient.user.employee_id})</span>
+                            <span className="text-xs text-muted-foreground ml-2">({recipient.user.employee_id})</span>
                           )}
                         </TableCell>
                         <TableCell className="capitalize">{recipient.user?.role || '-'}</TableCell>
@@ -358,16 +358,16 @@ export function MessagesReportView() {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <h4 className="font-semibold text-slate-900 dark:text-white">{msg.message.subject}</h4>
+                    <h4 className="font-semibold text-foreground">{msg.message.subject}</h4>
                     <Badge variant={msg.message.type === 'TOOLBOX_TALK' ? 'destructive' : 'default'}>
                       {msg.message.type === 'TOOLBOX_TALK' ? 'Toolbox Talk' : 'Reminder'}
                     </Badge>
                   </div>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                  <p className="text-sm text-muted-foreground mb-2">
                     From: {msg.message.sender_name} • {formatDistanceToNow(new Date(msg.message.created_at), { addSuffix: true })}
                   </p>
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="text-slate-600 dark:text-slate-400">
+                    <span className="text-muted-foreground">
                       <strong>{msg.total_assigned}</strong> assigned
                     </span>
                     {msg.message.type === 'TOOLBOX_TALK' ? (
@@ -382,7 +382,7 @@ export function MessagesReportView() {
                             <strong>{msg.total_pending}</strong> pending
                           </span>
                         )}
-                        <span className="text-slate-600 dark:text-slate-400">
+                        <span className="text-muted-foreground">
                           {msg.compliance_rate}% compliance
                         </span>
                       </>

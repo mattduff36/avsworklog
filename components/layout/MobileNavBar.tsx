@@ -58,7 +58,7 @@ export function MobileNavBar() {
   }
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/50 backdrop-blur-xl border-t border-slate-700/50 z-50 safe-area-inset-bottom">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/50 backdrop-blur-xl border-t border-border/50 z-50 safe-area-inset-bottom">
       <div className="flex items-center justify-around h-20 px-4">
         {/* Back Button */}
         <button

@@ -141,7 +141,7 @@ export function ExpandingVehicleCard({ vehicle, categories, onUpdate }: Expandin
                   <span className="text-sm text-slate-400 font-normal">({vehicle.nickname})</span>
                 )}
               </h3>
-              <div className="flex items-center gap-3 mt-1 text-sm text-slate-400">
+              <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
                 <span>{vehicle.vehicle_categories?.name || 'No Category'}</span>
                 <span>•</span>
                 <Badge 
@@ -165,9 +165,9 @@ export function ExpandingVehicleCard({ vehicle, categories, onUpdate }: Expandin
               </Button>
             </Link>
             {isExpanded ? (
-              <ChevronUp className="h-5 w-5 text-slate-400" />
+              <ChevronUp className="h-5 w-5 text-muted-foreground" />
             ) : (
-              <ChevronDown className="h-5 w-5 text-slate-400" />
+              <ChevronDown className="h-5 w-5 text-muted-foreground" />
             )}
           </div>
         </div>
@@ -176,7 +176,7 @@ export function ExpandingVehicleCard({ vehicle, categories, onUpdate }: Expandin
         {isExpanded && (
           <form onSubmit={handleSubmit(onSubmit)} className="mt-6 pt-6 border-t border-slate-700 space-y-6">
             <div className="flex items-center justify-between mb-4">
-              <h4 className="text-sm font-medium text-slate-300 uppercase tracking-wide">
+              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
                 Vehicle Details
               </h4>
               {!isEditing ? (
@@ -233,7 +233,7 @@ export function ExpandingVehicleCard({ vehicle, categories, onUpdate }: Expandin
                   id={`reg-${vehicle.id}`}
                   {...register('reg_number')}
                   disabled={!isEditing}
-                  className="bg-slate-800 border-slate-600 text-white disabled:opacity-70"
+                  className="bg-input border-border text-white disabled:opacity-70"
                 />
                 {errors.reg_number && (
                   <p className="text-sm text-red-400">{errors.reg_number.message}</p>
@@ -250,7 +250,7 @@ export function ExpandingVehicleCard({ vehicle, categories, onUpdate }: Expandin
                   {...register('nickname')}
                   disabled={!isEditing}
                   placeholder="e.g., Andy's Van, Main Truck"
-                  className="bg-slate-800 border-slate-600 text-white disabled:opacity-70"
+                  className="bg-input border-border text-white disabled:opacity-70"
                 />
                 {errors.nickname && (
                   <p className="text-sm text-red-400">{errors.nickname.message}</p>
@@ -269,11 +269,11 @@ export function ExpandingVehicleCard({ vehicle, categories, onUpdate }: Expandin
                 >
                   <SelectTrigger 
                     id={`category-${vehicle.id}`}
-                    className="bg-slate-800 border-slate-600 text-white disabled:opacity-70"
+                    className="bg-input border-border text-white disabled:opacity-70"
                   >
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-600 dark:text-slate-100 text-slate-900">
+                  <SelectContent className="bg-input border-border dark:text-slate-100 text-slate-900">
                     {categories.map((category) => (
                       <SelectItem key={category.id} value={category.id}>
                         {category.name}
@@ -298,11 +298,11 @@ export function ExpandingVehicleCard({ vehicle, categories, onUpdate }: Expandin
                 >
                   <SelectTrigger 
                     id={`status-${vehicle.id}`}
-                    className="bg-slate-800 border-slate-600 text-white disabled:opacity-70"
+                    className="bg-input border-border text-white disabled:opacity-70"
                   >
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-600 dark:text-slate-100 text-slate-900">
+                  <SelectContent className="bg-input border-border dark:text-slate-100 text-slate-900">
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="inactive">Inactive</SelectItem>
                     <SelectItem value="sold">Sold</SelectItem>

@@ -392,9 +392,9 @@ export default function ActionsPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Manager Actions</h1>
-        <p className="text-slate-600 dark:text-slate-400">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
+        <h1 className="text-3xl font-bold text-foreground mb-2">Manager Actions</h1>
+        <p className="text-muted-foreground">
           Track and manage action items and manager tasks
         </p>
       </div>
@@ -402,7 +402,7 @@ export default function ActionsPage() {
       {/* Action Categories */}
       <div className="space-y-6">
         {/* Workshop Tasks Category */}
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -410,8 +410,8 @@ export default function ActionsPage() {
                   <Wrench className="h-5 w-5 text-workshop" />
                 </div>
                 <div>
-                  <CardTitle className="text-slate-900 dark:text-white">Workshop Tasks</CardTitle>
-                  <CardDescription className="text-slate-600 dark:text-slate-400">
+                  <CardTitle className="text-foreground">Workshop Tasks</CardTitle>
+                  <CardDescription className="text-muted-foreground">
                     Vehicle repairs and inspection defects
                   </CardDescription>
                 </div>
@@ -431,7 +431,7 @@ export default function ActionsPage() {
               <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Pending</p>
+                    <p className="text-sm text-muted-foreground mb-1">Pending</p>
                     <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
                       {workshopActions.filter(a => a.status === 'pending').length}
                     </p>
@@ -442,7 +442,7 @@ export default function ActionsPage() {
               <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">In Progress</p>
+                    <p className="text-sm text-muted-foreground mb-1">In Progress</p>
                     <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                       {workshopActions.filter(a => a.status === 'logged').length}
                     </p>
@@ -453,7 +453,7 @@ export default function ActionsPage() {
               <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/30">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Completed</p>
+                    <p className="text-sm text-muted-foreground mb-1">Completed</p>
                     <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                       {workshopActions.filter(a => a.status === 'completed').length}
                     </p>
@@ -466,7 +466,7 @@ export default function ActionsPage() {
         </Card>
 
         {/* Maintenance & Service Category */}
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <Card className="">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -474,8 +474,8 @@ export default function ActionsPage() {
                   <Settings className="h-5 w-5 text-red-600 dark:text-red-400" />
                 </div>
                 <div>
-                  <CardTitle className="text-slate-900 dark:text-white">Maintenance & Service</CardTitle>
-                  <CardDescription className="text-slate-600 dark:text-slate-400">
+                  <CardTitle className="text-foreground">Maintenance & Service</CardTitle>
+                  <CardDescription className="text-muted-foreground">
                     Scheduled vehicle maintenance tracking
                   </CardDescription>
                 </div>
@@ -495,7 +495,7 @@ export default function ActionsPage() {
               <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Overdue Tasks</p>
+                    <p className="text-sm text-muted-foreground mb-1">Overdue Tasks</p>
                     <p className="text-2xl font-bold text-red-600 dark:text-red-400">
                       {maintenanceOverdue}
                     </p>
@@ -506,7 +506,7 @@ export default function ActionsPage() {
               <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Due Soon (30 days)</p>
+                    <p className="text-sm text-muted-foreground mb-1">Due Soon (30 days)</p>
                     <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
                       {maintenanceDueSoon}
                     </p>
@@ -519,21 +519,21 @@ export default function ActionsPage() {
         </Card>
 
         {/* Site Audit Inspections - Coming Soon */}
-        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 opacity-60">
+        <Card className="bg-white dark:bg-slate-900 border-border opacity-60">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-slate-500/20">
-                  <FileText className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                  <FileText className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <CardTitle className="text-slate-900 dark:text-white">Site Audit Inspections</CardTitle>
-                    <Badge variant="outline" className="bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30">
+                    <CardTitle className="text-foreground">Site Audit Inspections</CardTitle>
+                    <Badge variant="outline" className="bg-slate-500/10 text-muted-foreground border-slate-500/30">
                       Coming Soon
                     </Badge>
                   </div>
-                  <CardDescription className="text-slate-600 dark:text-slate-400">
+                  <CardDescription className="text-muted-foreground">
                     Site safety audits and compliance checks
                   </CardDescription>
                 </div>
@@ -549,8 +549,8 @@ export default function ActionsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-center py-8">
-              <Info className="h-12 w-12 mx-auto mb-3 opacity-20 text-slate-400" />
-              <p className="text-slate-600 dark:text-slate-400">
+              <Info className="h-12 w-12 mx-auto mb-3 opacity-20 text-muted-foreground" />
+              <p className="text-muted-foreground">
                 Site audit inspection tracking will be available in a future update
               </p>
             </div>
@@ -569,12 +569,12 @@ export default function ActionsPage() {
           {/* Pending Actions */}
           {pendingActions.length > 0 && (
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Pending Actions</h2>
+              <h2 className="text-xl font-semibold text-foreground">Pending Actions</h2>
           <div className="space-y-3">
             {pendingActions.map((action) => {
               const isCompleting = completingActions.has(action.id);
               return (
-                <Card key={action.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-red-500/50 transition-all duration-200">
+                <Card key={action.id} className="bg-white dark:bg-slate-900 border-border hover:shadow-lg hover:border-red-500/50 transition-all duration-200">
                   <CardContent className="pt-6">
                     <div className="flex flex-col items-start gap-4">
                       <div className="flex-1 space-y-2 w-full">
@@ -582,13 +582,13 @@ export default function ActionsPage() {
                           <div className="flex-1 w-full">
                             <div className="flex items-center gap-2 mb-2">
                               {getStatusIcon(action.status)}
-                              <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{action.title}</h3>
+                              <h3 className="font-semibold text-lg text-foreground">{action.title}</h3>
                               {getPriorityBadge(action.priority)}
                             </div>
                             {action.description && (
-                              <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{action.description}</p>
+                              <p className="text-sm text-muted-foreground mb-2">{action.description}</p>
                             )}
-                            <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
+                            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                               {action.vehicle_inspections && (
                                 <span>
                                   Vehicle: {action.vehicle_inspections.vehicles?.reg_number || 'N/A'}
@@ -657,7 +657,7 @@ export default function ActionsPage() {
       {/* Logged Actions */}
       {loggedActions.length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+          <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
             <FileText className="h-5 w-5 text-red-400" />
             Logged Actions
             <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
@@ -676,14 +676,14 @@ export default function ActionsPage() {
                           <div className="flex-1 w-full">
                             <div className="flex items-center gap-2 mb-2">
                               {getStatusIcon(action.status)}
-                              <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{action.title}</h3>
+                              <h3 className="font-semibold text-lg text-foreground">{action.title}</h3>
                               {getPriorityBadge(action.priority)}
                               <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
                                 LOGGED
                               </Badge>
                             </div>
                             {action.description && (
-                              <p className="text-sm text-slate-600 dark:text-slate-400 mb-2 whitespace-pre-line">{action.description}</p>
+                              <p className="text-sm text-muted-foreground mb-2 whitespace-pre-line">{action.description}</p>
                             )}
                             {action.logged_comment && (
                               <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-2">
@@ -692,7 +692,7 @@ export default function ActionsPage() {
                                 </p>
                               </div>
                             )}
-                            <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
+                            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                               {action.vehicle_inspections && (
                                 <span>
                                   Vehicle: {action.vehicle_inspections.vehicles?.reg_number || 'N/A'}
@@ -767,10 +767,10 @@ export default function ActionsPage() {
       {/* Completed Actions */}
       {completedActions.length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-slate-600 dark:text-slate-400">Completed Actions</h2>
+          <h2 className="text-xl font-semibold text-muted-foreground">Completed Actions</h2>
           <div className="space-y-3">
             {completedActions.map((action) => (
-              <Card key={action.id} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-90 transition-opacity">
+              <Card key={action.id} className="bg-white dark:bg-slate-900 border-border opacity-70 hover:opacity-90 transition-opacity">
                 <CardContent className="pt-6">
                   <div className="flex flex-col items-start gap-4">
                     <div className="flex-1 space-y-2 w-full">
@@ -782,9 +782,9 @@ export default function ActionsPage() {
                             {getPriorityBadge(action.priority)}
                           </div>
                           {action.description && (
-                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{action.description}</p>
+                            <p className="text-sm text-muted-foreground mb-2">{action.description}</p>
                           )}
-                          <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
+                          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                             {action.actioned_at && (
                               <span className="text-green-400">
                                 Actioned: {formatDate(action.actioned_at)}
@@ -821,11 +821,11 @@ export default function ActionsPage() {
       )}
 
           {actions.length === 0 && !loading && (
-            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+            <Card className="">
               <CardContent className="pt-6 text-center py-12">
-                <AlertTriangle className="h-12 w-12 mx-auto text-slate-400 mb-4" />
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No Actions Yet</h3>
-                <p className="text-slate-600 dark:text-slate-400 mb-4">
+                <AlertTriangle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">No Actions Yet</h3>
+                <p className="text-muted-foreground mb-4">
                   Actions will be automatically created when inspections have failed items
                 </p>
               </CardContent>
@@ -835,10 +835,10 @@ export default function ActionsPage() {
 
       {/* Logged Comment Dialog */}
       <Dialog open={showLoggedDialog} onOpenChange={setShowLoggedDialog}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg">
+        <DialogContent className="border-border text-white max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Mark Action as Logged</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               Add a short comment explaining why this defect is being logged but not fixed immediately
             </DialogDescription>
           </DialogHeader>
@@ -852,7 +852,7 @@ export default function ActionsPage() {
 
             <div className="space-y-2">
               <Label htmlFor="logged-comment" className="text-white">
-                Comment <span className="text-slate-400">(max 40 chars)</span> *
+                Comment <span className="text-muted-foreground">(max 40 chars)</span> *
               </Label>
               <Textarea
                 id="logged-comment"
@@ -863,11 +863,11 @@ export default function ActionsPage() {
                   }
                 }}
                 placeholder="e.g., Minor cosmetic damage, not urgent"
-                className="bg-slate-800 border-slate-600 text-white"
+                className="bg-input border-border text-white"
                 maxLength={40}
                 rows={2}
               />
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 {loggedComment.length}/40 characters
               </p>
             </div>
