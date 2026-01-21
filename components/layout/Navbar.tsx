@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
@@ -25,6 +26,47 @@ import {
 } from '@/lib/config/navigation';
 
 type ViewAsRole = 'actual' | 'employee' | 'manager' | 'admin';
+
+/**
+ * Get the module-specific active color classes for a nav item
+ * Each module gets its own color when the link is active
+ */
+function getNavItemActiveColors(href: string): { bg: string; text: string } {
+  // Dashboard and Help use brand yellow (with dark text)
+  if (href === '/dashboard' || href === '/help') {
+    return { bg: 'bg-avs-yellow', text: 'text-slate-900' };
+  }
+  // Timesheets - Blue
+  if (href.startsWith('/timesheets')) {
+    return { bg: 'bg-timesheet', text: 'text-white' };
+  }
+  // Inspections - Orange
+  if (href.startsWith('/inspections')) {
+    return { bg: 'bg-inspection', text: 'text-white' };
+  }
+  // RAMS - Green
+  if (href.startsWith('/rams')) {
+    return { bg: 'bg-rams', text: 'text-white' };
+  }
+  // Absence - Purple
+  if (href.startsWith('/absence')) {
+    return { bg: 'bg-absence', text: 'text-white' };
+  }
+  // Fleet/Maintenance - Red
+  if (href.startsWith('/fleet') || href.startsWith('/maintenance')) {
+    return { bg: 'bg-maintenance', text: 'text-white' };
+  }
+  // Workshop - Brown/rust
+  if (href.startsWith('/workshop')) {
+    return { bg: 'bg-workshop', text: 'text-white' };
+  }
+  // Reports - Teal
+  if (href.startsWith('/reports')) {
+    return { bg: 'bg-report', text: 'text-white' };
+  }
+  // Default - Brand yellow
+  return { bg: 'bg-avs-yellow', text: 'text-slate-900' };
+}
 
 export function Navbar() {
   const pathname = usePathname();
@@ -302,19 +344,37 @@ export function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
+              {/* Mobile-only logo (links to Dashboard) */}
+              <Link
+                href="/dashboard"
+                aria-label="Go to dashboard"
+                onClick={() => setMobileMenuOpen(false)}
+                className="md:hidden flex items-center mr-3"
+              >
+                <Image
+                  src="/images/logo.png"
+                  alt="Squires"
+                  width={32}
+                  height={32}
+                  className="h-8 w-8"
+                  priority
+                />
+              </Link>
+
               {/* Desktop Navigation - Same for all users */}
               <div className="hidden md:flex md:space-x-4">
                 {/* Dashboard */}
                 {dashboardNav.map((item) => {
                   const Icon = item.icon;
                   const isActive = isLinkActive(item.href);
+                  const activeColors = getNavItemActiveColors(item.href);
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
                       className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                         isActive
-                          ? 'bg-primary text-primary-foreground'
+                          ? `${activeColors.bg} ${activeColors.text}`
                           : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                       }`}
                     >
@@ -328,13 +388,14 @@ export function Navbar() {
                 {employeeNav.map((item) => {
                   const Icon = item.icon;
                   const isActive = isLinkActive(item.href);
+                  const activeColors = getNavItemActiveColors(item.href);
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
                       className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                         isActive
-                          ? 'bg-primary text-primary-foreground'
+                          ? `${activeColors.bg} ${activeColors.text}`
                           : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                       }`}
                     >
@@ -402,6 +463,7 @@ export function Navbar() {
               {dashboardNav.map((item) => {
                 const Icon = item.icon;
                 const isActive = isLinkActive(item.href);
+                const activeColors = getNavItemActiveColors(item.href);
                 return (
                   <Link
                     key={item.href}
@@ -409,7 +471,7 @@ export function Navbar() {
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                       isActive
-                        ? 'bg-primary text-primary-foreground'
+                        ? `${activeColors.bg} ${activeColors.text}`
                         : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                     }`}
                   >
@@ -423,6 +485,7 @@ export function Navbar() {
               {employeeNav.map((item) => {
                 const Icon = item.icon;
                 const isActive = isLinkActive(item.href);
+                const activeColors = getNavItemActiveColors(item.href);
                 return (
                   <Link
                     key={item.href}
@@ -430,7 +493,7 @@ export function Navbar() {
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                       isActive
-                        ? 'bg-primary text-primary-foreground'
+                        ? `${activeColors.bg} ${activeColors.text}`
                         : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                     }`}
                   >
@@ -452,6 +515,7 @@ export function Navbar() {
                   {managerLinks.map((item) => {
                     const Icon = item.icon;
                     const isActive = isLinkActive(item.href);
+                    const activeColors = getNavItemActiveColors(item.href);
                     return (
                       <Link
                         key={item.href}
@@ -459,7 +523,7 @@ export function Navbar() {
                         onClick={() => setMobileMenuOpen(false)}
                         className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                           isActive
-                            ? 'bg-primary text-primary-foreground'
+                            ? `${activeColors.bg} ${activeColors.text}`
                             : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                         }`}
                       >
@@ -478,6 +542,7 @@ export function Navbar() {
                       {adminLinks.map((item) => {
                         const Icon = item.icon;
                         const isActive = isLinkActive(item.href);
+                        const activeColors = getNavItemActiveColors(item.href);
                         return (
                           <Link
                             key={item.href}
@@ -485,7 +550,7 @@ export function Navbar() {
                             onClick={() => setMobileMenuOpen(false)}
                             className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                               isActive
-                                ? 'bg-primary text-primary-foreground'
+                                ? `${activeColors.bg} ${activeColors.text}`
                                 : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                             }`}
                           >
