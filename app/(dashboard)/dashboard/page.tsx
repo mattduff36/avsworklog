@@ -587,8 +587,8 @@ export default function DashboardPage() {
                     style={{ height: '100px', animationDelay: `${animationIndex * 75}ms` }}
                   >
                     <div className="flex flex-col items-start justify-between h-full">
-                      <Icon className={`h-6 w-6 ${item.label === 'Debug Console' ? 'text-red-500' : ''}`} />
-                      <span className={`font-semibold text-base leading-tight ${item.label === 'Debug Console' ? 'text-red-500' : ''}`}>
+                      <Icon className="h-6 w-6 text-red-500" />
+                      <span className="font-semibold text-base leading-tight text-red-500">
                         Debug
                       </span>
                     </div>
