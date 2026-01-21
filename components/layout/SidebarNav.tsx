@@ -130,7 +130,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                       open ? 'gap-3 px-3 py-2' : 'justify-center py-3'
                     } ${
                       isActive
-                        ? 'bg-avs-yellow text-slate-900 [&>svg]:text-slate-900'
+                        ? 'bg-primary text-primary-foreground'
                         : 'text-muted-foreground hover:bg-slate-800 hover:text-white'
                     }`}
                   >
@@ -276,7 +276,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                         }}
                         className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
                           isActive
-                            ? 'bg-avs-yellow text-slate-900'
+                            ? 'bg-primary text-primary-foreground'
                             : 'text-muted-foreground hover:bg-slate-800 hover:text-white'
                         }`}
                       >

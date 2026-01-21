@@ -109,6 +109,56 @@
     --warning: 38 92% 50%;
     --error: 0 84% 60%;
   }
+
+  /* Module-aware accent colors */
+  [data-accent="timesheets"] {
+    --primary: var(--timesheet-primary);
+    --primary-foreground: 210 40% 98%; /* light text for readability */
+    --ring: var(--timesheet-primary);
+  }
+
+  [data-accent="inspections"] {
+    --primary: var(--inspection-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--inspection-primary);
+  }
+
+  [data-accent="rams"] {
+    --primary: var(--rams-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--rams-primary);
+  }
+
+  [data-accent="absence"] {
+    --primary: var(--absence-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--absence-primary);
+  }
+
+  [data-accent="maintenance"] {
+    --primary: var(--maintenance-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--maintenance-primary);
+  }
+
+  [data-accent="workshop"] {
+    --primary: var(--workshop-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--workshop-primary);
+  }
+
+  [data-accent="reports"] {
+    --primary: var(--report-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--report-primary);
+  }
+
+  /* Brand (yellow) remains the default for non-module pages */
+  [data-accent="brand"] {
+    --primary: 48 87% 69%;
+    --primary-foreground: 222 47% 11%; /* dark text for yellow */
+    --ring: 48 87% 69%;
+  }
 }
 
 @layer base {
