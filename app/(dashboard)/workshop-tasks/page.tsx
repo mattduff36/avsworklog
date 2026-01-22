@@ -1222,7 +1222,8 @@ export default function WorkshopTasksPage() {
       await fetchSubcategories();
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete subcategory';
-      console.error('Error deleting subcategory:', error);
+      // Don't log validation errors - user already sees toast
+      // console.error('Error deleting subcategory:', error);
       toast.error(errorMessage);
     }
   };

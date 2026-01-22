@@ -51,7 +51,8 @@ export function ReminderModal({
       onClose();
 
     } catch (error) {
-      console.error('Error dismissing reminder:', error);
+      // Don't log network/validation errors - user already sees toast
+      // console.error('Error dismissing reminder:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to dismiss reminder');
     } finally {
       setDismissing(false);
