@@ -118,7 +118,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         attachment_id: attachmentId,
         question_id: resp.question_id,
         question_snapshot: questionSnapshot,
-        response_value: resp.response_value?.toString() || null,
+        response_value: resp.response_value?.toString() ?? null,
       });
     }
 

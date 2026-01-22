@@ -1995,7 +1995,15 @@ export default function WorkshopTasksPage() {
       </Tabs>
 
       {/* Add Task Modal */}
-      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+      <Dialog 
+        open={showAddModal} 
+        onOpenChange={(open) => {
+          setShowAddModal(open);
+          if (!open) {
+            resetAddForm();
+          }
+        }}
+      >
         <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-foreground text-xl">Create Workshop Task</DialogTitle>
