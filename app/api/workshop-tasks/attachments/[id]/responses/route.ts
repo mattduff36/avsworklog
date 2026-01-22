@@ -209,11 +209,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Fetch updated attachment
-    const { data: updatedAttachment } = await supabase
+    const { data: updatedAttachment, error: attachmentFetchError } = await supabase
       .from('workshop_task_attachments')
       .select('*')
       .eq('id', attachmentId)
       .single();
+
+    if (attachmentFetchError) {
+      throw attachmentFetchError;
+    }
 
     return NextResponse.json({
       success: true,

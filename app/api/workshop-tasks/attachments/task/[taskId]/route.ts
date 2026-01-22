@@ -156,12 +156,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Check if attachment already exists for this task+template
-    const { data: existingAttachment } = await supabase
+    const { data: existingAttachment, error: duplicateCheckError } = await supabase
       .from('workshop_task_attachments')
       .select('id')
       .eq('task_id', taskId)
       .eq('template_id', template_id)
       .single();
+
+    // Handle errors - PGRST116 means no rows found (expected), other errors should be thrown
+    if (duplicateCheckError && duplicateCheckError.code !== 'PGRST116') {
+      throw duplicateCheckError;
+    }
 
     if (existingAttachment) {
       return NextResponse.json(
