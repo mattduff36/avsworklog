@@ -22,8 +22,10 @@ import { TaskCommentsDrawer } from '@/components/workshop-tasks/TaskCommentsDraw
 import { WorkshopTaskModal } from '@/components/workshop-tasks/WorkshopTaskModal';
 import { SubcategoryDialog } from '@/components/workshop-tasks/SubcategoryDialog';
 import { CategoryManagementPanel } from '@/components/workshop-tasks/CategoryManagementPanel';
+import { AttachmentManagementPanel } from '@/components/workshop-tasks/AttachmentManagementPanel';
 import { MarkTaskCompleteDialog, type CompletionData } from '@/components/workshop-tasks/MarkTaskCompleteDialog';
 import { appendStatusHistory, buildStatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
+import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
 
 type Action = Database['public']['Tables']['actions']['Row'] & {
   vehicle_inspections?: {
@@ -86,6 +88,9 @@ export default function WorkshopTasksPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [vehicleFilter, setVehicleFilter] = useState<string>('all');
   
+  // Fetch attachment templates using hook
+  const { templates: attachmentTemplates } = useAttachmentTemplates();
+  
   // Add Task Modal
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
@@ -95,6 +100,7 @@ export default function WorkshopTasksPage() {
   const [newMileage, setNewMileage] = useState('');
   const [currentMileage, setCurrentMileage] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedAttachmentTemplateIds, setSelectedAttachmentTemplateIds] = useState<string[]>([]);
   
   // Status Update Modal (for "Mark In Progress" / logged)
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -366,7 +372,7 @@ export default function WorkshopTasksPage() {
       setSubmitting(true);
 
       // Create the workshop task
-      const { error } = await supabase
+      const { data: newTask, error } = await supabase
         .from('actions')
         .insert({
           action_type: 'workshop_vehicle_task',
@@ -378,9 +384,36 @@ export default function WorkshopTasksPage() {
           status: 'pending',
           priority: 'medium',
           created_by: user!.id,
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
+
+      // Create attachments for selected templates
+      if (newTask && selectedAttachmentTemplateIds.length > 0) {
+        const attachmentErrors: string[] = [];
+        
+        for (const templateId of selectedAttachmentTemplateIds) {
+          const { error: attachmentError } = await supabase
+            .from('workshop_task_attachments')
+            .insert({
+              task_id: newTask.id,
+              template_id: templateId,
+              status: 'pending',
+              created_by: user!.id,
+            });
+
+          if (attachmentError) {
+            console.error('Error creating attachment:', attachmentError);
+            attachmentErrors.push(templateId);
+          }
+        }
+
+        if (attachmentErrors.length > 0) {
+          toast.error(`Task created but ${attachmentErrors.length} attachment(s) failed to link`);
+        }
+      }
 
       // Update vehicle mileage in vehicle_maintenance table
       const { error: mileageError } = await supabase
@@ -420,6 +453,7 @@ export default function WorkshopTasksPage() {
     setWorkshopComments('');
     setNewMileage('');
     setCurrentMileage(null);
+    setSelectedAttachmentTemplateIds([]);
   };
 
   // Handle category change (reset subcategory when category changes)
@@ -1944,7 +1978,7 @@ export default function WorkshopTasksPage() {
         </TabsContent>
 
         {showSettings && (
-          <TabsContent value="settings">
+          <TabsContent value="settings" className="space-y-6">
             <CategoryManagementPanel
               categories={categories}
               subcategories={subcategories}
@@ -1955,12 +1989,21 @@ export default function WorkshopTasksPage() {
               onEditSubcategory={openEditSubcategoryModal}
               onDeleteSubcategory={handleDeleteSubcategory}
             />
+            <AttachmentManagementPanel />
           </TabsContent>
         )}
       </Tabs>
 
       {/* Add Task Modal */}
-      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+      <Dialog 
+        open={showAddModal} 
+        onOpenChange={(open) => {
+          setShowAddModal(open);
+          if (!open) {
+            resetAddForm();
+          }
+        }}
+      >
         <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-foreground text-xl">Create Workshop Task</DialogTitle>
@@ -2072,6 +2115,49 @@ export default function WorkshopTasksPage() {
                 {workshopComments.length}/300 characters (minimum 10)
               </p>
             </div>
+
+            {/* Attachment Templates Selection */}
+            {attachmentTemplates.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-foreground flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Attachments (Optional)
+                </Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Add service checklists or documentation to complete later
+                </p>
+                <div className="space-y-2 max-h-32 overflow-y-auto p-2 border border-border rounded-md bg-muted/30">
+                  {attachmentTemplates.map((template) => (
+                    <div key={template.id} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`template-inline-${template.id}`}
+                        checked={selectedAttachmentTemplateIds.includes(template.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedAttachmentTemplateIds(prev => [...prev, template.id]);
+                          } else {
+                            setSelectedAttachmentTemplateIds(prev => prev.filter(id => id !== template.id));
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-workshop focus:ring-workshop"
+                      />
+                      <label
+                        htmlFor={`template-inline-${template.id}`}
+                        className="text-sm font-normal cursor-pointer text-foreground"
+                      >
+                        {template.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                {selectedAttachmentTemplateIds.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {selectedAttachmentTemplateIds.length} attachment{selectedAttachmentTemplateIds.length > 1 ? 's' : ''} will be added to this task
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <DialogFooter>
