@@ -67,9 +67,19 @@ export function AttachmentFormModal({
     const requiredQuestions = questions.filter(q => q.is_required);
     for (const question of requiredQuestions) {
       const value = responses[question.id];
-      if (!value || value.trim() === '' || value === 'false') {
-        toast.error(`Please complete required field: ${question.question_text}`);
-        return false;
+      
+      // For checkboxes, 'false' means unchecked (invalid for required fields)
+      if (question.question_type === 'checkbox') {
+        if (value !== 'true') {
+          toast.error(`Please complete required field: ${question.question_text}`);
+          return false;
+        }
+      } else {
+        // For other types, check if value is empty
+        if (!value || value.trim() === '') {
+          toast.error(`Please complete required field: ${question.question_text}`);
+          return false;
+        }
       }
     }
     return true;

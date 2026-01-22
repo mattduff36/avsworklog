@@ -154,16 +154,31 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         );
       }
 
-      // Validate all required questions have been answered
+      // Validate all required questions have been answered with valid values
       const requiredQuestions = questions?.filter(q => q.is_required) || [];
-      const answeredQuestionIds = new Set(processedResponses.map(r => r.question_id));
-      const missingRequiredQuestions = requiredQuestions.filter(q => !answeredQuestionIds.has(q.id));
+      const responsesByQuestionId = new Map(processedResponses.map(r => [r.question_id, r.response_value]));
+      const invalidRequiredQuestions = requiredQuestions.filter(q => {
+        const responseValue = responsesByQuestionId.get(q.id);
+        
+        // No response at all
+        if (responseValue === undefined) {
+          return true;
+        }
+        
+        // For checkboxes, 'false' means unchecked (invalid for required fields)
+        if (q.question_type === 'checkbox') {
+          return responseValue !== 'true';
+        }
+        
+        // For other types, empty or whitespace-only values are invalid
+        return !responseValue || responseValue.trim() === '';
+      });
 
-      if (missingRequiredQuestions.length > 0) {
+      if (invalidRequiredQuestions.length > 0) {
         return NextResponse.json(
           { 
-            error: 'Cannot mark attachment as complete: required questions not answered',
-            missingQuestions: missingRequiredQuestions.map(q => q.question_text)
+            error: 'Cannot mark attachment as complete: required questions not properly answered',
+            missingQuestions: invalidRequiredQuestions.map(q => q.question_text)
           },
           { status: 400 }
         );
