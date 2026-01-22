@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS workshop_task_attachments (
   template_id UUID NOT NULL REFERENCES workshop_attachment_templates(id),
   status workshop_attachment_status NOT NULL DEFAULT 'pending',
   completed_at TIMESTAMPTZ,
-  completed_by UUID REFERENCES profiles(id),
+  completed_by UUID REFERENCES auth.users(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_by UUID REFERENCES auth.users(id)
 );
