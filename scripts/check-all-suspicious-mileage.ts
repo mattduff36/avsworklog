@@ -13,8 +13,8 @@ dotenv.config({ path: resolve(process.cwd(), '.env.local') });
 
 const FIX_MODE = process.env.FIX_MODE === 'true';
 
-// Test mileage values that indicate corruption
-const SUSPICIOUS_MILEAGE = [50000, 28000, 27000, 26000, 25000];
+// Test mileage values that indicate corruption - Obviously invalid values for easy detection
+const SUSPICIOUS_MILEAGE = [999999, 999998, 999997, 999996, 999995, 999994, 999993, 50000, 28000, 27000, 26000, 25000];
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

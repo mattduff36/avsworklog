@@ -21,6 +21,15 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Missing required environment variables for integration tests');
 }
 
+// SAFETY CHECK: Prevent running against production
+if (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('staging')) {
+  console.error('❌ SAFETY CHECK FAILED');
+  console.error('❌ This test suite should NOT run against production!');
+  console.error(`❌ Current URL: ${supabaseUrl}`);
+  console.error('❌ Tests will be skipped.');
+  process.exit(1);
+}
+
 describe('Vehicle History Page Workflows', () => {
   let supabase: ReturnType<typeof createClient>;
   let testUserId: string;
@@ -38,10 +47,11 @@ describe('Vehicle History Page Workflows', () => {
     if (authError) throw authError;
     testUserId = authData.user!.id;
 
-    // Get a test vehicle
+    // SAFETY: ONLY get TE57 test vehicles
     const { data: vehicles } = await supabase
       .from('vehicles')
       .select('id')
+      .ilike('reg_number', 'TE57%')
       .neq('status', 'deleted')
       .limit(1);
 
@@ -259,7 +269,7 @@ describe('Vehicle History Page Workflows', () => {
       }
 
       const updates = {
-        current_mileage: 55000,
+        current_mileage: 999993, // Obviously invalid test value for easy corruption detection
       };
 
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';

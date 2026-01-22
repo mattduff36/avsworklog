@@ -143,9 +143,9 @@ describe('Fleet Module Workflows', () => {
         return;
       }
 
-      // SAFETY: Using 28000 miles instead of 50000 to avoid Frank Barlow incident pattern
+      // SAFETY: Using obviously invalid mileage (999997) so corruption is immediately visible
       const updates = {
-        current_mileage: 28000,
+        current_mileage: 999997,
       };
 
       const { data: updated, error } = await supabase
@@ -157,7 +157,7 @@ describe('Fleet Module Workflows', () => {
 
       expect(error).toBeNull();
       expect(updated).toBeDefined();
-      expect(updated?.current_mileage).toBe(28000);
+      expect(updated?.current_mileage).toBe(999997);
     });
   });
 

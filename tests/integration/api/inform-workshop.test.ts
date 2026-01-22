@@ -15,6 +15,15 @@ import type { Database } from '@/types/database';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
+// SAFETY CHECK: Prevent running against production
+if (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('staging')) {
+  console.error('❌ SAFETY CHECK FAILED');
+  console.error('❌ This test suite creates database records and should NOT run against production!');
+  console.error(`❌ Current URL: ${supabaseUrl}`);
+  console.error('❌ Tests will be skipped.');
+  process.exit(1);
+}
+
 const supabase = createClient<Database>(supabaseUrl, supabaseKey);
 
 describe('Inform Workshop Endpoint', () => {
@@ -24,11 +33,11 @@ describe('Inform Workshop Endpoint', () => {
   let createdTaskIds: string[] = [];
 
   beforeAll(async () => {
-    // Create test vehicle
+    // Create test vehicle with TE57 prefix (test vehicles only)
     const { data: vehicle } = await supabase
       .from('vehicles')
       .insert({
-        reg_number: 'INFORM01',
+        reg_number: 'TE57INFORM',
         status: 'active',
       })
       .select()
@@ -52,7 +61,7 @@ describe('Inform Workshop Endpoint', () => {
         user_id: testUserId,
         inspection_date: '2026-01-20',
         inspection_end_date: '2026-01-26',
-        current_mileage: 45000,
+        current_mileage: 999995, // Obviously invalid test value for easy corruption detection
         status: 'draft',
       })
       .select()

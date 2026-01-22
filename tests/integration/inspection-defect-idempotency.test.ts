@@ -12,6 +12,15 @@ import type { Database } from '@/types/database';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
+// SAFETY CHECK: Prevent running against production
+if (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('staging')) {
+  console.error('❌ SAFETY CHECK FAILED');
+  console.error('❌ This test suite creates database records and should NOT run against production!');
+  console.error(`❌ Current URL: ${supabaseUrl}`);
+  console.error('❌ Tests will be skipped.');
+  process.exit(1);
+}
+
 const supabase = createClient<Database>(supabaseUrl, supabaseKey);
 
 describe('Inspection Defect Task Idempotency', () => {
@@ -21,11 +30,11 @@ describe('Inspection Defect Task Idempotency', () => {
   let testItemId: string;
 
   beforeAll(async () => {
-    // Create test vehicle
+    // Create test vehicle with TE57 prefix (test vehicles only)
     const { data: vehicle } = await supabase
       .from('vehicles')
       .insert({
-        reg_number: 'TEST IDEM',
+        reg_number: 'TE57IDEM',
         status: 'active',
       })
       .select()
@@ -49,7 +58,7 @@ describe('Inspection Defect Task Idempotency', () => {
         user_id: testUserId,
         inspection_date: '2026-01-13',
         inspection_end_date: '2026-01-19',
-        current_mileage: 30000,
+        current_mileage: 999994, // Obviously invalid test value for easy corruption detection
         status: 'draft',
       })
       .select()

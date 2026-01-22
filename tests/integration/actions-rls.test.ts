@@ -84,7 +84,7 @@ describe('Actions RLS Policy Fix', () => {
         user_id: testUserId,
         inspection_date: new Date().toISOString().split('T')[0],
         inspection_end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        current_mileage: 26000,
+        current_mileage: 999999, // Obviously invalid test value for easy corruption detection
         status: 'draft',
       })
       .select()

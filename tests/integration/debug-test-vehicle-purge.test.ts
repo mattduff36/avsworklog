@@ -51,8 +51,8 @@ describe('Test Vehicle Purge API', () => {
     testVehicleId = vehicle.id;
 
     // Create test inspection
-    // SAFETY: Using 25000 miles instead of 50000 to avoid Frank Barlow incident pattern
-    // (50000 is a known problematic test value that has corrupted production data)
+    // SAFETY: Using obviously invalid mileage (999998) so corruption is immediately visible
+    // If a real vehicle shows 999998 miles, we know it's test corruption!
     const { data: inspection, error: inspectionError } = await supabase
       .from('vehicle_inspections')
       .insert({
@@ -60,7 +60,7 @@ describe('Test Vehicle Purge API', () => {
         user_id: (await supabase.from('profiles').select('id').limit(1).single()).data?.id,
         inspection_date: '2026-01-22',
         status: 'submitted',
-        current_mileage: 25000,
+        current_mileage: 999998,
       })
       .select('id')
       .single();
