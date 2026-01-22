@@ -214,6 +214,64 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Count/delete workshop task attachments (if explicitly requested or if tasks are being deleted)
+    // Note: Attachments will cascade when tasks are deleted, but users can also explicitly purge them
+    if (actions?.attachments || actions?.workshop_tasks) {
+      // First, get task IDs for these vehicles to count/delete attachments
+      const { data: tasksForAttachments } = await adminSupabase
+        .from('actions')
+        .select('id')
+        .in('vehicle_id', vehicleIds)
+        .in('action_type', ['inspection_defect', 'workshop_vehicle_task']);
+
+      const taskIdsForAttachments = tasksForAttachments?.map(t => t.id) || [];
+
+      if (taskIdsForAttachments.length > 0) {
+        const { count: attachmentsCount } = await adminSupabase
+          .from('workshop_task_attachments')
+          .select('id', { count: 'exact', head: true })
+          .in('task_id', taskIdsForAttachments);
+
+        counts.workshop_attachments = attachmentsCount || 0;
+
+        // Only explicitly delete if attachments checkbox is selected
+        // (otherwise they'll cascade when tasks are deleted)
+        if (mode === 'execute' && actions?.attachments && counts.workshop_attachments > 0) {
+          // Get attachment IDs to delete responses first
+          const { data: attachmentsToDelete } = await adminSupabase
+            .from('workshop_task_attachments')
+            .select('id')
+            .in('task_id', taskIdsForAttachments);
+
+          const attachmentIds = attachmentsToDelete?.map(a => a.id) || [];
+
+          if (attachmentIds.length > 0) {
+            // Delete responses first (references attachments)
+            const { error: deleteResponsesError } = await adminSupabase
+              .from('workshop_attachment_responses')
+              .delete()
+              .in('attachment_id', attachmentIds);
+
+            if (deleteResponsesError) {
+              throw deleteResponsesError;
+            }
+
+            // Delete attachments
+            const { error: deleteAttachmentsError } = await adminSupabase
+              .from('workshop_task_attachments')
+              .delete()
+              .in('id', attachmentIds);
+
+            if (deleteAttachmentsError) {
+              throw deleteAttachmentsError;
+            }
+          }
+        }
+      } else {
+        counts.workshop_attachments = 0;
+      }
+    }
+
     // Count/delete maintenance records
     if (actions?.maintenance) {
       const { count: maintenanceCount } = await adminSupabase
