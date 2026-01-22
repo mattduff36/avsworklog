@@ -40,6 +40,8 @@ import {
   Search,
   Smartphone,
   Monitor,
+  Car,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DVLASyncDebugPanel } from './components/DVLASyncDebugPanel';
@@ -113,6 +115,21 @@ export default function DebugPage() {
   const [filterDeviceType, setFilterDeviceType] = useState<string>('all'); // 'all', 'mobile', 'desktop'
   const [filterComponent, setFilterComponent] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Test vehicle purge states
+  const [testVehiclePrefix, setTestVehiclePrefix] = useState('TE57');
+  const [testVehicles, setTestVehicles] = useState<Array<{ id: string; reg_number: string; nickname: string | null; status: string }>>([]);
+  const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
+  const [loadingTestVehicles, setLoadingTestVehicles] = useState(false);
+  const [purgePreview, setPurgePreview] = useState<Record<string, number> | null>(null);
+  const [purging, setPurging] = useState(false);
+  const [purgeActions, setPurgeActions] = useState({
+    inspections: true,
+    workshop_tasks: true,
+    maintenance: true,
+    attachments: true,
+    archives: true,
+  });
 
   // Check if user is superadmin and viewing as actual role
   useEffect(() => {
@@ -582,6 +599,208 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
     return String(value);
   };
 
+  // Test vehicle purge functions
+  const fetchTestVehicles = async () => {
+    setLoadingTestVehicles(true);
+    try {
+      const response = await fetch(`/api/debug/test-vehicles?prefix=${testVehiclePrefix}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setTestVehicles(data.vehicles || []);
+        setSelectedVehicleIds([]);
+        setPurgePreview(null);
+      } else {
+        toast.error(data.error || 'Failed to fetch test vehicles');
+      }
+    } catch (error) {
+      console.error('Error fetching test vehicles:', error);
+      toast.error('Failed to fetch test vehicles');
+    } finally {
+      setLoadingTestVehicles(false);
+    }
+  };
+
+  const previewPurge = async () => {
+    if (selectedVehicleIds.length === 0) {
+      toast.error('Please select at least one vehicle');
+      return;
+    }
+
+    setPurging(true);
+    try {
+      const response = await fetch('/api/debug/test-vehicles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'preview',
+          vehicle_ids: selectedVehicleIds,
+          prefix: testVehiclePrefix,
+          actions: purgeActions,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setPurgePreview(data.counts);
+        toast.success('Preview generated');
+      } else {
+        toast.error(data.error || 'Failed to preview purge');
+      }
+    } catch (error) {
+      console.error('Error previewing purge:', error);
+      toast.error('Failed to preview purge');
+    } finally {
+      setPurging(false);
+    }
+  };
+
+  const executePurge = async () => {
+    if (selectedVehicleIds.length === 0) {
+      toast.error('Please select at least one vehicle');
+      return;
+    }
+
+    const confirmed = await import('@/lib/services/notification.service').then(m => 
+      m.notify.confirm({
+        title: 'Confirm Purge',
+        description: `This will permanently delete selected records for ${selectedVehicleIds.length} vehicle(s). This cannot be undone.`,
+        confirmText: 'Purge Records',
+        destructive: true,
+      })
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setPurging(true);
+    try {
+      const response = await fetch('/api/debug/test-vehicles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'execute',
+          vehicle_ids: selectedVehicleIds,
+          prefix: testVehiclePrefix,
+          actions: purgeActions,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(`Purged records for ${data.affected_vehicles} vehicle(s)`);
+        setPurgePreview(null);
+        fetchTestVehicles(); // Refresh list
+      } else {
+        toast.error(data.error || 'Failed to execute purge');
+      }
+    } catch (error) {
+      console.error('Error executing purge:', error);
+      toast.error('Failed to execute purge');
+    } finally {
+      setPurging(false);
+    }
+  };
+
+  const archiveVehicles = async () => {
+    if (selectedVehicleIds.length === 0) {
+      toast.error('Please select at least one vehicle');
+      return;
+    }
+
+    const confirmed = await import('@/lib/services/notification.service').then(m => 
+      m.notify.confirm({
+        title: 'Archive Vehicles',
+        description: `This will archive ${selectedVehicleIds.length} vehicle(s) (soft delete). The vehicles will be marked as archived and moved to vehicle_archive.`,
+        confirmText: 'Archive',
+        destructive: false,
+      })
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setPurging(true);
+    try {
+      const response = await fetch('/api/debug/test-vehicles', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vehicle_ids: selectedVehicleIds,
+          prefix: testVehiclePrefix,
+          mode: 'archive',
+          archive_reason: 'Test Data Cleanup',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(`Archived ${data.archived_count} vehicle(s)`);
+        fetchTestVehicles(); // Refresh list
+      } else {
+        toast.error(data.error || 'Failed to archive vehicles');
+      }
+    } catch (error) {
+      console.error('Error archiving vehicles:', error);
+      toast.error('Failed to archive vehicles');
+    } finally {
+      setPurging(false);
+    }
+  };
+
+  const hardDeleteVehicles = async () => {
+    if (selectedVehicleIds.length === 0) {
+      toast.error('Please select at least one vehicle');
+      return;
+    }
+
+    const confirmed = await import('@/lib/services/notification.service').then(m => 
+      m.notify.confirm({
+        title: '⚠️ HARD DELETE VEHICLES',
+        description: `This will PERMANENTLY DELETE ${selectedVehicleIds.length} vehicle(s) and ALL associated records from the database. This is IRREVERSIBLE and DANGEROUS. Only use for test data cleanup.`,
+        confirmText: 'I understand - DELETE PERMANENTLY',
+        destructive: true,
+      })
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setPurging(true);
+    try {
+      const response = await fetch('/api/debug/test-vehicles', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vehicle_ids: selectedVehicleIds,
+          prefix: testVehiclePrefix,
+          mode: 'hard_delete',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(`Hard deleted ${data.affected_vehicles} vehicle(s) and ${Object.values(data.deleted_counts).reduce((a: number, b: any) => a + Number(b), 0)} total records`);
+        setPurgePreview(null);
+        fetchTestVehicles(); // Refresh list
+      } else {
+        toast.error(data.error || 'Failed to delete vehicles');
+      }
+    } catch (error) {
+      console.error('Error deleting vehicles:', error);
+      toast.error('Failed to delete vehicles');
+    } finally {
+      setPurging(false);
+    }
+  };
+
   // Filter error logs based on selected filters
   const getFilteredErrorLogs = () => {
     let filtered = [...errorLogs];
@@ -710,7 +929,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
       {/* Developer Tools Tabs */}
       <Tabs defaultValue="errors" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6 md:grid-cols-6 gap-1 md:gap-0 h-auto md:h-10 p-1 bg-slate-100 dark:bg-slate-800">
+        <TabsList className="grid w-full grid-cols-7 md:grid-cols-7 gap-1 md:gap-0 h-auto md:h-10 p-1 bg-slate-100 dark:bg-slate-800">
           <TabsTrigger value="errors" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
             <Bug className="h-4 w-4 flex-shrink-0" />
             <span className="hidden md:inline">Error Log</span>
@@ -740,6 +959,11 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
             <RefreshCw className="h-4 w-4 flex-shrink-0" />
             <span className="hidden md:inline">DVLA Sync</span>
             <span className="md:hidden data-[state=active]:inline hidden">DVLA</span>
+          </TabsTrigger>
+          <TabsTrigger value="test-vehicles" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+            <Car className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden md:inline">Test Vehicles</span>
+            <span className="md:hidden data-[state=active]:inline hidden">Test</span>
           </TabsTrigger>
         </TabsList>
 
@@ -799,7 +1023,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                       placeholder="Search errors..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-11 h-9 text-slate-900"
+                      className="pl-11 h-9"
                     />
                   </div>
                 </div>
@@ -830,7 +1054,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                   {/* Dropdown Filters */}
                   <div>
                     <Select value={filterErrorType} onValueChange={setFilterErrorType}>
-                      <SelectTrigger className="w-full h-9 text-slate-900">
+                      <SelectTrigger className="w-full h-9">
                         <SelectValue placeholder="Error Type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -846,7 +1070,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
                   <div>
                     <Select value={filterDeviceType} onValueChange={setFilterDeviceType}>
-                      <SelectTrigger className="w-full h-9 text-slate-900">
+                      <SelectTrigger className="w-full h-9">
                         <SelectValue placeholder="Device" />
                       </SelectTrigger>
                       <SelectContent>
@@ -871,7 +1095,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                   {uniqueComponents.length > 0 && (
                     <div className="lg:col-span-4">
                       <Select value={filterComponent} onValueChange={setFilterComponent}>
-                        <SelectTrigger className="w-full h-9 text-slate-900">
+                        <SelectTrigger className="w-full h-9">
                           <SelectValue placeholder="Component" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1430,7 +1654,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                         onValueChange={(value) => updateStatus(timesheet.id, 'timesheet', value)}
                         disabled={updating === timesheet.id}
                       >
-                        <SelectTrigger className="w-[140px] text-slate-900">
+                        <SelectTrigger className="w-[140px]">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1480,7 +1704,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                         onValueChange={(value) => updateStatus(inspection.id, 'inspection', value)}
                         disabled={updating === inspection.id}
                       >
-                        <SelectTrigger className="w-[140px] text-slate-900">
+                        <SelectTrigger className="w-[140px]">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1530,7 +1754,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                         onValueChange={(value) => updateStatus(absence.id, 'absence', value)}
                         disabled={updating === absence.id}
                       >
-                        <SelectTrigger className="w-[140px] text-slate-900">
+                        <SelectTrigger className="w-[140px]">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1553,6 +1777,292 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
         {/* DVLA Sync Tab */}
         <TabsContent value="dvla">
           <DVLASyncDebugPanel />
+        </TabsContent>
+
+        {/* Test Vehicles Tab */}
+        <TabsContent value="test-vehicles">
+          <Card className="">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Car className="h-5 w-5 text-red-500" />
+                    Test Vehicle Cleanup
+                  </CardTitle>
+                  <CardDescription>
+                    Manage and purge test vehicle data (TE57 prefix only)
+                  </CardDescription>
+                </div>
+                <Button
+                  onClick={fetchTestVehicles}
+                  variant="outline"
+                  size="sm"
+                  disabled={loadingTestVehicles}
+                >
+                  {loadingTestVehicles ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                  )}
+                  Refresh
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Prefix Configuration */}
+              <div className="space-y-2">
+                <Label htmlFor="vehicle-prefix" className="text-sm font-medium">
+                  Vehicle Registration Prefix
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="vehicle-prefix"
+                    value={testVehiclePrefix}
+                    onChange={(e) => setTestVehiclePrefix(e.target.value.toUpperCase())}
+                    placeholder="TE57"
+                    className="w-32 font-mono"
+                  />
+                  <Button
+                    onClick={fetchTestVehicles}
+                    disabled={loadingTestVehicles || !testVehiclePrefix.trim()}
+                  >
+                    Load Vehicles
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Only vehicles starting with this prefix can be managed here
+                </p>
+              </div>
+
+              {/* Vehicle Selection */}
+              {testVehicles.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">
+                      Select Vehicles ({selectedVehicleIds.length} of {testVehicles.length} selected)
+                    </Label>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedVehicleIds(testVehicles.map(v => v.id))}
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedVehicleIds([])}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
+                    {testVehicles.map((vehicle) => (
+                      <div
+                        key={vehicle.id}
+                        className="flex items-center gap-3 p-3 hover:bg-accent cursor-pointer"
+                        onClick={() => {
+                          setSelectedVehicleIds(prev =>
+                            prev.includes(vehicle.id)
+                              ? prev.filter(id => id !== vehicle.id)
+                              : [...prev, vehicle.id]
+                          );
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedVehicleIds.includes(vehicle.id)}
+                          onChange={() => {}}
+                          className="h-4 w-4"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-semibold">
+                              {vehicle.reg_number}
+                            </span>
+                            {vehicle.nickname && (
+                              <span className="text-sm text-muted-foreground">
+                                ({vehicle.nickname})
+                              </span>
+                            )}
+                            <Badge variant={vehicle.status === 'active' ? 'default' : 'secondary'} className="text-xs">
+                              {vehicle.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {testVehicles.length === 0 && !loadingTestVehicles && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Car className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No vehicles found matching prefix "{testVehiclePrefix}"</p>
+                  <p className="text-sm mt-1">Click "Load Vehicles" to search</p>
+                </div>
+              )}
+
+              {/* Action Selection */}
+              {selectedVehicleIds.length > 0 && (
+                <>
+                  <div className="space-y-2 p-4 border rounded-lg bg-muted/30">
+                    <Label className="text-sm font-medium">
+                      Records to Purge
+                    </Label>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="purge-inspections"
+                          checked={purgeActions.inspections}
+                          onChange={(e) => setPurgeActions(prev => ({ ...prev, inspections: e.target.checked }))}
+                          className="h-4 w-4"
+                        />
+                        <Label htmlFor="purge-inspections" className="text-sm font-normal cursor-pointer">
+                          Vehicle Inspections (and items, photos)
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="purge-tasks"
+                          checked={purgeActions.workshop_tasks}
+                          onChange={(e) => setPurgeActions(prev => ({ ...prev, workshop_tasks: e.target.checked }))}
+                          className="h-4 w-4"
+                        />
+                        <Label htmlFor="purge-tasks" className="text-sm font-normal cursor-pointer">
+                          Workshop Tasks (and comments, attachments)
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="purge-maintenance"
+                          checked={purgeActions.maintenance}
+                          onChange={(e) => setPurgeActions(prev => ({ ...prev, maintenance: e.target.checked }))}
+                          className="h-4 w-4"
+                        />
+                        <Label htmlFor="purge-maintenance" className="text-sm font-normal cursor-pointer">
+                          Maintenance Records (history, DVLA logs, MOT data)
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="purge-attachments"
+                          checked={purgeActions.attachments}
+                          onChange={(e) => setPurgeActions(prev => ({ ...prev, attachments: e.target.checked }))}
+                          className="h-4 w-4"
+                        />
+                        <Label htmlFor="purge-attachments" className="text-sm font-normal cursor-pointer">
+                          Workshop Attachments (usually cascades with tasks)
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="purge-archives"
+                          checked={purgeActions.archives}
+                          onChange={(e) => setPurgeActions(prev => ({ ...prev, archives: e.target.checked }))}
+                          className="h-4 w-4"
+                        />
+                        <Label htmlFor="purge-archives" className="text-sm font-normal cursor-pointer">
+                          Vehicle Archive Entries
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Preview Results */}
+                  {purgePreview && (
+                    <div className="p-4 border border-yellow-500 rounded-lg bg-yellow-50 dark:bg-yellow-950/20">
+                      <div className="flex items-start gap-2 mb-3">
+                        <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <h4 className="font-semibold text-yellow-900 dark:text-yellow-300">
+                            Preview: Records to be deleted
+                          </h4>
+                          <p className="text-sm text-yellow-800 dark:text-yellow-400 mt-1">
+                            {selectedVehicleIds.length} vehicle(s) selected
+                          </p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        {Object.entries(purgePreview).map(([key, value]) => (
+                          <div key={key} className="flex justify-between p-2 bg-white dark:bg-slate-900 rounded">
+                            <span className="text-muted-foreground capitalize">
+                              {key.replace(/_/g, ' ')}:
+                            </span>
+                            <span className="font-mono font-semibold text-yellow-900 dark:text-yellow-300">
+                              {value}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="space-y-3 pt-4 border-t">
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={previewPurge}
+                        variant="outline"
+                        disabled={purging || selectedVehicleIds.length === 0}
+                      >
+                        <Search className="h-4 w-4 mr-2" />
+                        Preview Counts
+                      </Button>
+                      <Button
+                        onClick={executePurge}
+                        variant="destructive"
+                        disabled={purging || selectedVehicleIds.length === 0}
+                      >
+                        {purging ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Trash className="h-4 w-4 mr-2" />
+                        )}
+                        Purge Selected Records
+                      </Button>
+                    </div>
+
+                    <div className="pt-3 border-t">
+                      <p className="text-sm font-medium text-muted-foreground mb-3">
+                        Vehicle Actions (records must be purged first):
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={archiveVehicles}
+                          variant="outline"
+                          disabled={purging || selectedVehicleIds.length === 0}
+                        >
+                          Archive Vehicles
+                        </Button>
+                        <Button
+                          onClick={hardDeleteVehicles}
+                          variant="destructive"
+                          disabled={purging || selectedVehicleIds.length === 0}
+                          className="bg-red-600 hover:bg-red-700"
+                        >
+                          <AlertTriangle className="h-4 w-4 mr-2" />
+                          Hard Delete Vehicles
+                        </Button>
+                      </div>
+                      <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+                        ⚠️ Hard Delete permanently removes vehicles from the database
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* System Tab */}

@@ -244,7 +244,7 @@ export default function HelpPage() {
       .replace(/\*(.*)\*/gim, '<em>$1</em>')
       .replace(/^- (.*$)/gim, '<li class="ml-4">$1</li>')
       .replace(/^(\d+)\. (.*$)/gim, '<li class="ml-4">$2</li>')
-      .replace(/\n\n/g, '</p><p class="mb-3 text-slate-600 dark:text-muted-foreground">')
+      .replace(/\n\n/g, '</p><p class="mb-3 text-foreground">')
       .replace(/\n/g, '<br/>');
   };
 
@@ -310,7 +310,7 @@ export default function HelpPage() {
                   placeholder="Search FAQ articles..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-slate-50 dark:bg-slate-800 border-border dark:text-slate-100 text-slate-900"
+                  className="pl-10"
                 />
               </div>
               
@@ -383,12 +383,12 @@ export default function HelpPage() {
                               </AccordionTrigger>
                               <AccordionContent>
                                 {article.summary && (
-                                  <p className="text-muted-foreground dark:text-muted-foreground mb-4 italic">
+                                  <p className="text-muted-foreground mb-4 italic">
                                     {article.summary}
                                   </p>
                                 )}
                                 <div 
-                                  className="prose prose-sm dark:prose-invert max-w-none text-slate-600 dark:text-muted-foreground"
+                                  className="prose prose-sm dark:prose-invert max-w-none"
                                   dangerouslySetInnerHTML={{ __html: renderMarkdown(article.content_md) }}
                                 />
                               </AccordionContent>
@@ -410,12 +410,12 @@ export default function HelpPage() {
                           </AccordionTrigger>
                           <AccordionContent>
                             {article.summary && (
-                              <p className="text-muted-foreground dark:text-muted-foreground mb-4 italic">
+                              <p className="text-muted-foreground mb-4 italic">
                                 {article.summary}
                               </p>
                             )}
                             <div 
-                              className="prose prose-sm dark:prose-invert max-w-none text-slate-600 dark:text-muted-foreground"
+                              className="prose prose-sm dark:prose-invert max-w-none"
                               dangerouslySetInnerHTML={{ __html: renderMarkdown(article.content_md) }}
                             />
                           </AccordionContent>
@@ -443,7 +443,7 @@ export default function HelpPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="suggestion-title" className="text-slate-700 dark:text-muted-foreground">
+                <Label htmlFor="suggestion-title">
                   Title <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -451,12 +451,11 @@ export default function HelpPage() {
                   placeholder="Brief title for your suggestion"
                   value={suggestionTitle}
                   onChange={(e) => setSuggestionTitle(e.target.value)}
-                  className="bg-slate-50 dark:bg-slate-800 border-border dark:text-slate-100 text-slate-900"
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="suggestion-body" className="text-slate-700 dark:text-muted-foreground">
+                <Label htmlFor="suggestion-body">
                   Description <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
@@ -465,12 +464,11 @@ export default function HelpPage() {
                   value={suggestionBody}
                   onChange={(e) => setSuggestionBody(e.target.value)}
                   rows={5}
-                  className="bg-slate-50 dark:bg-slate-800 border-border dark:text-slate-100 text-slate-900"
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="suggestion-page" className="text-slate-700 dark:text-muted-foreground">
+                <Label htmlFor="suggestion-page">
                   Related Page/Feature (optional)
                 </Label>
                 <Input
@@ -478,7 +476,6 @@ export default function HelpPage() {
                   placeholder="e.g., Timesheets, Inspections, Dashboard"
                   value={suggestionPageHint}
                   onChange={(e) => setSuggestionPageHint(e.target.value)}
-                  className="bg-slate-50 dark:bg-slate-800 border-border dark:text-slate-100 text-slate-900"
                 />
               </div>
 
@@ -543,7 +540,7 @@ export default function HelpPage() {
                           <h3 className="font-medium text-foreground">
                             {suggestion.title}
                           </h3>
-                          <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1 line-clamp-2">
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                             {suggestion.body}
                           </p>
                           {suggestion.page_hint && (
