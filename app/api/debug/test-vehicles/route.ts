@@ -498,81 +498,70 @@ export async function DELETE(request: NextRequest) {
       // Delete in proper order to avoid FK violations
       const deleteCounts: Record<string, number> = {};
 
+      // First, get all task IDs for these vehicles
+      const { data: tasksToDelete } = await adminSupabase
+        .from('actions')
+        .select('id')
+        .in('vehicle_id', vehicleIds)
+        .in('action_type', ['inspection_defect', 'workshop_vehicle_task']);
+
+      const taskIds = tasksToDelete?.map(t => t.id) || [];
+
       // 1. Delete workshop task comments (references actions)
-      const { count: commentsCount } = await adminSupabase
-        .from('workshop_task_comments')
-        .select('id', { count: 'exact', head: true })
-        .in('task_id', adminSupabase
-          .from('actions')
-          .select('id')
-          .in('vehicle_id', vehicleIds)
-          .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
-        );
+      if (taskIds.length > 0) {
+        const { count: commentsCount } = await adminSupabase
+          .from('workshop_task_comments')
+          .select('id', { count: 'exact', head: true })
+          .in('task_id', taskIds);
 
-      deleteCounts.workshop_task_comments = commentsCount || 0;
+        deleteCounts.workshop_task_comments = commentsCount || 0;
 
-      if (deleteCounts.workshop_task_comments > 0) {
-        // Get task IDs first
-        const { data: tasksToDelete } = await adminSupabase
-          .from('actions')
-          .select('id')
-          .in('vehicle_id', vehicleIds)
-          .in('action_type', ['inspection_defect', 'workshop_vehicle_task']);
-
-        if (tasksToDelete && tasksToDelete.length > 0) {
-          const taskIds = tasksToDelete.map(t => t.id);
-
+        if (deleteCounts.workshop_task_comments > 0) {
           await adminSupabase
             .from('workshop_task_comments')
             .delete()
             .in('task_id', taskIds);
         }
+      } else {
+        deleteCounts.workshop_task_comments = 0;
       }
 
       // 2. Delete workshop task attachments (and responses will cascade)
-      const { data: taskAttachments } = await adminSupabase
-        .from('workshop_task_attachments')
-        .select('id, task_id')
-        .in('task_id', adminSupabase
-          .from('actions')
-          .select('id')
-          .in('vehicle_id', vehicleIds)
-          .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
-        );
-
-      deleteCounts.workshop_attachments = taskAttachments?.length || 0;
-
-      if (taskAttachments && taskAttachments.length > 0) {
-        const attachmentIds = taskAttachments.map(a => a.id);
-
-        // Delete responses first (references attachments)
-        await adminSupabase
-          .from('workshop_attachment_responses')
-          .delete()
-          .in('attachment_id', attachmentIds);
-
-        // Delete attachments
-        await adminSupabase
+      if (taskIds.length > 0) {
+        const { data: taskAttachments } = await adminSupabase
           .from('workshop_task_attachments')
-          .delete()
-          .in('id', attachmentIds);
+          .select('id, task_id')
+          .in('task_id', taskIds);
+
+        deleteCounts.workshop_attachments = taskAttachments?.length || 0;
+
+        if (taskAttachments && taskAttachments.length > 0) {
+          const attachmentIds = taskAttachments.map(a => a.id);
+
+          // Delete responses first (references attachments)
+          await adminSupabase
+            .from('workshop_attachment_responses')
+            .delete()
+            .in('attachment_id', attachmentIds);
+
+          // Delete attachments
+          await adminSupabase
+            .from('workshop_task_attachments')
+            .delete()
+            .in('id', attachmentIds);
+        }
+      } else {
+        deleteCounts.workshop_attachments = 0;
       }
 
       // 3. Delete actions (workshop tasks)
-      const { count: actionsCount } = await adminSupabase
-        .from('actions')
-        .select('id', { count: 'exact', head: true })
-        .in('vehicle_id', vehicleIds)
-        .in('action_type', ['inspection_defect', 'workshop_vehicle_task']);
+      deleteCounts.workshop_tasks = taskIds.length;
 
-      deleteCounts.workshop_tasks = actionsCount || 0;
-
-      if (deleteCounts.workshop_tasks > 0) {
+      if (taskIds.length > 0) {
         await adminSupabase
           .from('actions')
           .delete()
-          .in('vehicle_id', vehicleIds)
-          .in('action_type', ['inspection_defect', 'workshop_vehicle_task']);
+          .in('id', taskIds);
       }
 
       // 4. Delete inspections (and dependent rows will cascade)
