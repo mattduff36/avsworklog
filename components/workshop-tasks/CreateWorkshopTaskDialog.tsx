@@ -240,6 +240,8 @@ export function CreateWorkshopTaskDialog({
 
       // Create attachments for selected templates
       if (newTask && selectedTemplateIds.length > 0) {
+        const attachmentErrors: string[] = [];
+        
         for (const templateId of selectedTemplateIds) {
           const { error: attachmentError } = await supabase
             .from('workshop_task_attachments')
@@ -252,7 +254,12 @@ export function CreateWorkshopTaskDialog({
 
           if (attachmentError) {
             console.error('Error creating attachment:', attachmentError);
+            attachmentErrors.push(templateId);
           }
+        }
+
+        if (attachmentErrors.length > 0) {
+          toast.error(`Task created but ${attachmentErrors.length} attachment(s) failed to link`);
         }
       }
 

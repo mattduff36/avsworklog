@@ -105,7 +105,8 @@ export function useTaskAttachments({
     } finally {
       setLoading(false);
     }
-  }, [taskId, enabled, supabase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskId, enabled]);
 
   const addAttachment = useCallback(async (templateId: string): Promise<TaskAttachmentWithDetails | null> => {
     if (!taskId) {

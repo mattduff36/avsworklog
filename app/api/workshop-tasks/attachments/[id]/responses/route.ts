@@ -125,10 +125,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Upsert responses (delete existing, insert new)
     if (processedResponses.length > 0) {
       // Delete existing responses for this attachment
-      await supabase
+      const { error: deleteError } = await supabase
         .from('workshop_attachment_responses')
         .delete()
         .eq('attachment_id', attachmentId);
+
+      if (deleteError) {
+        throw deleteError;
+      }
 
       // Insert new responses
       const { error: insertError } = await supabase
@@ -146,6 +150,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       if (processedResponses.length === 0) {
         return NextResponse.json(
           { error: 'Cannot mark attachment as complete without valid responses' },
+          { status: 400 }
+        );
+      }
+
+      // Validate all required questions have been answered
+      const requiredQuestions = questions?.filter(q => q.is_required) || [];
+      const answeredQuestionIds = new Set(processedResponses.map(r => r.question_id));
+      const missingRequiredQuestions = requiredQuestions.filter(q => !answeredQuestionIds.has(q.id));
+
+      if (missingRequiredQuestions.length > 0) {
+        return NextResponse.json(
+          { 
+            error: 'Cannot mark attachment as complete: required questions not answered',
+            missingQuestions: missingRequiredQuestions.map(q => q.question_text)
+          },
           { status: 400 }
         );
       }
