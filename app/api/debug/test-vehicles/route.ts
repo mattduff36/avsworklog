@@ -257,7 +257,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Count/delete DVLA sync logs
+    // Count/delete DVLA sync logs (always check when maintenance is selected)
+    // These are vehicle-related records that should be cleaned up with maintenance data
     if (actions?.maintenance) {
       const { count: dvlaCount } = await adminSupabase
         .from('dvla_sync_log')
@@ -278,7 +279,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Count/delete MOT history records
+    // Count/delete MOT history records (always check when maintenance is selected)
+    // These are vehicle-related records that should be cleaned up with maintenance data
     if (actions?.maintenance) {
       const { count: motCount } = await adminSupabase
         .from('mot_test_history')
@@ -444,6 +446,7 @@ export async function DELETE(request: NextRequest) {
     if (mode === 'archive') {
       // Use existing archive pattern (soft delete)
       let archivedCount = 0;
+      const failedVehicles: Array<{ reg_number: string; error: string }> = [];
 
       for (const vehicle of vehiclesToProcess) {
         // Get full vehicle data for archiving
@@ -470,6 +473,10 @@ export async function DELETE(request: NextRequest) {
 
           if (archiveError) {
             console.error('Failed to archive vehicle:', archiveError);
+            failedVehicles.push({
+              reg_number: vehicle.reg_number,
+              error: archiveError.message,
+            });
             continue; // Skip to next vehicle
           }
 
@@ -479,17 +486,28 @@ export async function DELETE(request: NextRequest) {
             .update({ status: 'archived' })
             .eq('id', vehicle.id);
 
-          if (!updateError) {
+          if (updateError) {
+            failedVehicles.push({
+              reg_number: vehicle.reg_number,
+              error: `Failed to update status: ${updateError.message}`,
+            });
+          } else {
             archivedCount++;
           }
+        } else {
+          failedVehicles.push({
+            reg_number: vehicle.reg_number,
+            error: 'Vehicle data not found',
+          });
         }
       }
 
       return NextResponse.json({
-        success: true,
+        success: failedVehicles.length === 0,
         mode: 'archive',
         archived_count: archivedCount,
         total_requested: vehiclesToProcess.length,
+        failed_vehicles: failedVehicles.length > 0 ? failedVehicles : undefined,
       });
     } else {
       // Hard delete mode
@@ -517,10 +535,14 @@ export async function DELETE(request: NextRequest) {
         deleteCounts.workshop_task_comments = commentsCount || 0;
 
         if (deleteCounts.workshop_task_comments > 0) {
-          await adminSupabase
+          const { error: deleteCommentsError } = await adminSupabase
             .from('workshop_task_comments')
             .delete()
             .in('task_id', taskIds);
+
+          if (deleteCommentsError) {
+            throw deleteCommentsError;
+          }
         }
       } else {
         deleteCounts.workshop_task_comments = 0;
@@ -539,16 +561,24 @@ export async function DELETE(request: NextRequest) {
           const attachmentIds = taskAttachments.map(a => a.id);
 
           // Delete responses first (references attachments)
-          await adminSupabase
+          const { error: deleteResponsesError } = await adminSupabase
             .from('workshop_attachment_responses')
             .delete()
             .in('attachment_id', attachmentIds);
 
+          if (deleteResponsesError) {
+            throw deleteResponsesError;
+          }
+
           // Delete attachments
-          await adminSupabase
+          const { error: deleteAttachmentsError } = await adminSupabase
             .from('workshop_task_attachments')
             .delete()
             .in('id', attachmentIds);
+
+          if (deleteAttachmentsError) {
+            throw deleteAttachmentsError;
+          }
         }
       } else {
         deleteCounts.workshop_attachments = 0;
@@ -558,10 +588,14 @@ export async function DELETE(request: NextRequest) {
       deleteCounts.workshop_tasks = taskIds.length;
 
       if (taskIds.length > 0) {
-        await adminSupabase
+        const { error: deleteActionsError } = await adminSupabase
           .from('actions')
           .delete()
           .in('id', taskIds);
+
+        if (deleteActionsError) {
+          throw deleteActionsError;
+        }
       }
 
       // 4. Delete inspections (and dependent rows will cascade)
@@ -573,10 +607,14 @@ export async function DELETE(request: NextRequest) {
       deleteCounts.inspections = inspectionsCount || 0;
 
       if (deleteCounts.inspections > 0) {
-        await adminSupabase
+        const { error: deleteInspectionsError } = await adminSupabase
           .from('vehicle_inspections')
           .delete()
           .in('vehicle_id', vehicleIds);
+
+        if (deleteInspectionsError) {
+          throw deleteInspectionsError;
+        }
       }
 
       // 5. Delete maintenance history
@@ -588,10 +626,14 @@ export async function DELETE(request: NextRequest) {
       deleteCounts.maintenance_history = historyCount || 0;
 
       if (deleteCounts.maintenance_history > 0) {
-        await adminSupabase
+        const { error: deleteHistoryError } = await adminSupabase
           .from('maintenance_history')
           .delete()
           .in('vehicle_id', vehicleIds);
+
+        if (deleteHistoryError) {
+          throw deleteHistoryError;
+        }
       }
 
       // 6. Delete DVLA sync logs
@@ -603,10 +645,14 @@ export async function DELETE(request: NextRequest) {
       deleteCounts.dvla_sync_logs = dvlaCount || 0;
 
       if (deleteCounts.dvla_sync_logs > 0) {
-        await adminSupabase
+        const { error: deleteDvlaError } = await adminSupabase
           .from('dvla_sync_log')
           .delete()
           .in('vehicle_id', vehicleIds);
+
+        if (deleteDvlaError) {
+          throw deleteDvlaError;
+        }
       }
 
       // 7. Delete MOT test history (defects/comments cascade)
@@ -618,10 +664,14 @@ export async function DELETE(request: NextRequest) {
       deleteCounts.mot_test_history = motCount || 0;
 
       if (deleteCounts.mot_test_history > 0) {
-        await adminSupabase
+        const { error: deleteMotError } = await adminSupabase
           .from('mot_test_history')
           .delete()
           .in('vehicle_id', vehicleIds);
+
+        if (deleteMotError) {
+          throw deleteMotError;
+        }
       }
 
       // 8. Delete vehicle maintenance
@@ -633,10 +683,14 @@ export async function DELETE(request: NextRequest) {
       deleteCounts.vehicle_maintenance = maintenanceRecordCount || 0;
 
       if (deleteCounts.vehicle_maintenance > 0) {
-        await adminSupabase
+        const { error: deleteMaintenanceError } = await adminSupabase
           .from('vehicle_maintenance')
           .delete()
           .in('vehicle_id', vehicleIds);
+
+        if (deleteMaintenanceError) {
+          throw deleteMaintenanceError;
+        }
       }
 
       // 9. Delete vehicle archives
@@ -649,10 +703,14 @@ export async function DELETE(request: NextRequest) {
       deleteCounts.vehicle_archives = archiveCount || 0;
 
       if (deleteCounts.vehicle_archives > 0) {
-        await adminSupabase
+        const { error: deleteArchivesError } = await adminSupabase
           .from('vehicle_archive')
           .delete()
           .in('reg_number', regNumbers);
+
+        if (deleteArchivesError) {
+          throw deleteArchivesError;
+        }
       }
 
       // 10. Finally, delete the vehicles themselves

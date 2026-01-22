@@ -662,14 +662,13 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
       return;
     }
 
-    const confirmed = await import('@/lib/services/notification.service').then(m => 
-      m.notify.confirm({
-        title: 'Confirm Purge',
-        description: `This will permanently delete selected records for ${selectedVehicleIds.length} vehicle(s). This cannot be undone.`,
-        confirmText: 'Purge Records',
-        destructive: true,
-      })
-    );
+    const notificationService = await import('@/lib/services/notification.service');
+    const confirmed = await notificationService.notify.confirm({
+      title: 'Confirm Purge',
+      description: `This will permanently delete selected records for ${selectedVehicleIds.length} vehicle(s). This cannot be undone.`,
+      confirmText: 'Purge Records',
+      destructive: true,
+    });
 
     if (!confirmed) {
       return;
@@ -711,14 +710,13 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
       return;
     }
 
-    const confirmed = await import('@/lib/services/notification.service').then(m => 
-      m.notify.confirm({
-        title: 'Archive Vehicles',
-        description: `This will archive ${selectedVehicleIds.length} vehicle(s) (soft delete). The vehicles will be marked as archived and moved to vehicle_archive.`,
-        confirmText: 'Archive',
-        destructive: false,
-      })
-    );
+    const notificationService = await import('@/lib/services/notification.service');
+    const confirmed = await notificationService.notify.confirm({
+      title: 'Archive Vehicles',
+      description: `This will archive ${selectedVehicleIds.length} vehicle(s) (soft delete). The vehicles will be marked as archived and moved to vehicle_archive.`,
+      confirmText: 'Archive',
+      destructive: false,
+    });
 
     if (!confirmed) {
       return;
@@ -743,7 +741,13 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
         toast.success(`Archived ${data.archived_count} vehicle(s)`);
         fetchTestVehicles(); // Refresh list
       } else {
-        toast.error(data.error || 'Failed to archive vehicles');
+        if (data.failed_vehicles && data.failed_vehicles.length > 0) {
+          const failedList = data.failed_vehicles.map((v: any) => v.reg_number).join(', ');
+          toast.error(`Archived ${data.archived_count} of ${data.total_requested}. Failed: ${failedList}`);
+        } else {
+          toast.error(data.error || 'Failed to archive vehicles');
+        }
+        fetchTestVehicles(); // Refresh list even on partial failure
       }
     } catch (error) {
       console.error('Error archiving vehicles:', error);
@@ -759,14 +763,13 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
       return;
     }
 
-    const confirmed = await import('@/lib/services/notification.service').then(m => 
-      m.notify.confirm({
-        title: '⚠️ HARD DELETE VEHICLES',
-        description: `This will PERMANENTLY DELETE ${selectedVehicleIds.length} vehicle(s) and ALL associated records from the database. This is IRREVERSIBLE and DANGEROUS. Only use for test data cleanup.`,
-        confirmText: 'I understand - DELETE PERMANENTLY',
-        destructive: true,
-      })
-    );
+    const notificationService = await import('@/lib/services/notification.service');
+    const confirmed = await notificationService.notify.confirm({
+      title: '⚠️ HARD DELETE VEHICLES',
+      description: `This will PERMANENTLY DELETE ${selectedVehicleIds.length} vehicle(s) and ALL associated records from the database. This is IRREVERSIBLE and DANGEROUS. Only use for test data cleanup.`,
+      confirmText: 'I understand - DELETE PERMANENTLY',
+      destructive: true,
+    });
 
     if (!confirmed) {
       return;
@@ -1875,7 +1878,14 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                         <input
                           type="checkbox"
                           checked={selectedVehicleIds.includes(vehicle.id)}
-                          onChange={() => {}}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            setSelectedVehicleIds(prev =>
+                              prev.includes(vehicle.id)
+                                ? prev.filter(id => id !== vehicle.id)
+                                : [...prev, vehicle.id]
+                            );
+                          }}
                           className="h-4 w-4"
                         />
                         <div className="flex-1">
