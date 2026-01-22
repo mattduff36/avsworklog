@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { WorkshopTaskTimeline } from '@/components/workshop-tasks/WorkshopTaskTimeline';
+import { TaskAttachmentsSection } from '@/components/workshop-tasks/TaskAttachmentsSection';
 import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
 
 type Task = {
@@ -276,6 +277,15 @@ export function WorkshopTaskModal({
             </div>
           </div>
         </DialogHeader>
+
+        {/* Attachments Section */}
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold text-white mb-4">Attachments</h3>
+          <TaskAttachmentsSection
+            taskId={task.id}
+            taskStatus={task.status}
+          />
+        </div>
 
         {/* Timeline Section */}
         <div className="mt-6">

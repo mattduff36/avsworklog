@@ -720,6 +720,128 @@ export interface Database {
           updated_at?: string | null
         }
       }
+      workshop_attachment_templates: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          is_active: boolean
+          created_at: string
+          created_by: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          is_active?: boolean
+          created_at?: string
+          created_by?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          is_active?: boolean
+          created_at?: string
+          created_by?: string | null
+          updated_at?: string | null
+        }
+      }
+      workshop_attachment_questions: {
+        Row: {
+          id: string
+          template_id: string
+          question_text: string
+          question_type: 'checkbox' | 'text' | 'long_text' | 'number' | 'date'
+          is_required: boolean
+          sort_order: number
+          created_at: string
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          template_id: string
+          question_text: string
+          question_type?: 'checkbox' | 'text' | 'long_text' | 'number' | 'date'
+          is_required?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          template_id?: string
+          question_text?: string
+          question_type?: 'checkbox' | 'text' | 'long_text' | 'number' | 'date'
+          is_required?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string | null
+        }
+      }
+      workshop_task_attachments: {
+        Row: {
+          id: string
+          task_id: string
+          template_id: string
+          status: 'pending' | 'completed'
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          task_id: string
+          template_id: string
+          status?: 'pending' | 'completed'
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          task_id?: string
+          template_id?: string
+          status?: 'pending' | 'completed'
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+        }
+      }
+      workshop_attachment_responses: {
+        Row: {
+          id: string
+          attachment_id: string
+          question_id: string
+          question_snapshot: Record<string, unknown>
+          response_value: string | null
+          created_at: string
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          attachment_id: string
+          question_id: string
+          question_snapshot: Record<string, unknown>
+          response_value?: string | null
+          created_at?: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          attachment_id?: string
+          question_id?: string
+          question_snapshot?: Record<string, unknown>
+          response_value?: string | null
+          created_at?: string
+          updated_at?: string | null
+        }
+      }
       rams_documents: {
         Row: {
           id: string

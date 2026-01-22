@@ -9,9 +9,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import { FileText } from 'lucide-react';
 import { getTaskContent } from '@/lib/utils/serviceTaskCreation';
 import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
+import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
 
 type Vehicle = {
   id: string;
@@ -68,6 +71,10 @@ export function CreateWorkshopTaskDialog({
   const [newMileage, setNewMileage] = useState('');
   const [currentMileage, setCurrentMileage] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
+  
+  // Fetch available attachment templates
+  const { templates: attachmentTemplates } = useAttachmentTemplates();
 
   // Load initial data and set prefilled values
   useEffect(() => {
@@ -213,7 +220,7 @@ export function CreateWorkshopTaskDialog({
         : `Workshop Task - ${regNumber}`;
 
       // Create the workshop task
-      const { error } = await supabase
+      const { data: newTask, error } = await supabase
         .from('actions')
         .insert({
           action_type: 'workshop_vehicle_task',
@@ -225,9 +232,29 @@ export function CreateWorkshopTaskDialog({
           status: 'pending',
           priority: 'medium',
           created_by: user.id,
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
+
+      // Create attachments for selected templates
+      if (newTask && selectedTemplateIds.length > 0) {
+        for (const templateId of selectedTemplateIds) {
+          const { error: attachmentError } = await supabase
+            .from('workshop_task_attachments')
+            .insert({
+              task_id: newTask.id,
+              template_id: templateId,
+              status: 'pending',
+              created_by: user.id,
+            });
+
+          if (attachmentError) {
+            console.error('Error creating attachment:', attachmentError);
+          }
+        }
+      }
 
       // Update vehicle mileage in vehicle_maintenance table
       const { error: mileageError } = await supabase
@@ -267,6 +294,7 @@ export function CreateWorkshopTaskDialog({
     setWorkshopComments('');
     setNewMileage('');
     setCurrentMileage(null);
+    setSelectedTemplateIds([]);
   };
 
   const handleClose = () => {
@@ -426,6 +454,47 @@ export function CreateWorkshopTaskDialog({
               {workshopComments.length}/300 characters (minimum 10)
             </p>
           </div>
+
+          {/* Attachment Templates Selection */}
+          {attachmentTemplates.length > 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Attachments (Optional)
+              </Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Add service checklists or documentation to complete later
+              </p>
+              <div className="space-y-2 max-h-32 overflow-y-auto p-2 border rounded-md bg-muted/30">
+                {attachmentTemplates.map((template) => (
+                  <div key={template.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`template-${template.id}`}
+                      checked={selectedTemplateIds.includes(template.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedTemplateIds(prev => [...prev, template.id]);
+                        } else {
+                          setSelectedTemplateIds(prev => prev.filter(id => id !== template.id));
+                        }
+                      }}
+                    />
+                    <Label
+                      htmlFor={`template-${template.id}`}
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      {template.name}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              {selectedTemplateIds.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {selectedTemplateIds.length} attachment{selectedTemplateIds.length > 1 ? 's' : ''} will be added to this task
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         <DialogFooter>

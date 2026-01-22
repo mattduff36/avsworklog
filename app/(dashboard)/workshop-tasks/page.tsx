@@ -22,6 +22,7 @@ import { TaskCommentsDrawer } from '@/components/workshop-tasks/TaskCommentsDraw
 import { WorkshopTaskModal } from '@/components/workshop-tasks/WorkshopTaskModal';
 import { SubcategoryDialog } from '@/components/workshop-tasks/SubcategoryDialog';
 import { CategoryManagementPanel } from '@/components/workshop-tasks/CategoryManagementPanel';
+import { AttachmentManagementPanel } from '@/components/workshop-tasks/AttachmentManagementPanel';
 import { MarkTaskCompleteDialog, type CompletionData } from '@/components/workshop-tasks/MarkTaskCompleteDialog';
 import { appendStatusHistory, buildStatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
 
@@ -1944,7 +1945,7 @@ export default function WorkshopTasksPage() {
         </TabsContent>
 
         {showSettings && (
-          <TabsContent value="settings">
+          <TabsContent value="settings" className="space-y-6">
             <CategoryManagementPanel
               categories={categories}
               subcategories={subcategories}
@@ -1955,6 +1956,7 @@ export default function WorkshopTasksPage() {
               onEditSubcategory={openEditSubcategoryModal}
               onDeleteSubcategory={handleDeleteSubcategory}
             />
+            <AttachmentManagementPanel />
           </TabsContent>
         )}
       </Tabs>
