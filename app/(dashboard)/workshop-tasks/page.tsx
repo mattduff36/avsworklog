@@ -96,6 +96,8 @@ export default function WorkshopTasksPage() {
   const [newMileage, setNewMileage] = useState('');
   const [currentMileage, setCurrentMileage] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedAttachmentTemplateIds, setSelectedAttachmentTemplateIds] = useState<string[]>([]);
+  const [attachmentTemplates, setAttachmentTemplates] = useState<{ id: string; name: string; description: string | null }[]>([]);
   
   // Status Update Modal (for "Mark In Progress" / logged)
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -175,6 +177,7 @@ export default function WorkshopTasksPage() {
       fetchVehicles();
       fetchCategories();
       fetchSubcategories();
+      fetchAttachmentTemplates();
       // Load recent vehicle IDs
       setRecentVehicleIds(getRecentVehicleIds(user.id));
     }
@@ -335,6 +338,21 @@ export default function WorkshopTasksPage() {
     }
   };
 
+  const fetchAttachmentTemplates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('workshop_attachment_templates')
+        .select('id, name, description')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setAttachmentTemplates(data || []);
+    } catch (err) {
+      console.error('Error fetching attachment templates:', err instanceof Error ? err.message : err);
+    }
+  };
+
   // Filter subcategories by selected category
   const filteredSubcategories = selectedCategoryId
     ? subcategories.filter(sub => sub.category_id === selectedCategoryId)
@@ -367,7 +385,7 @@ export default function WorkshopTasksPage() {
       setSubmitting(true);
 
       // Create the workshop task
-      const { error } = await supabase
+      const { data: newTask, error } = await supabase
         .from('actions')
         .insert({
           action_type: 'workshop_vehicle_task',
@@ -379,9 +397,29 @@ export default function WorkshopTasksPage() {
           status: 'pending',
           priority: 'medium',
           created_by: user!.id,
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
+
+      // Create attachments for selected templates
+      if (newTask && selectedAttachmentTemplateIds.length > 0) {
+        for (const templateId of selectedAttachmentTemplateIds) {
+          const { error: attachmentError } = await supabase
+            .from('workshop_task_attachments')
+            .insert({
+              task_id: newTask.id,
+              template_id: templateId,
+              status: 'pending',
+              created_by: user!.id,
+            });
+
+          if (attachmentError) {
+            console.error('Error creating attachment:', attachmentError);
+          }
+        }
+      }
 
       // Update vehicle mileage in vehicle_maintenance table
       const { error: mileageError } = await supabase
@@ -421,6 +459,7 @@ export default function WorkshopTasksPage() {
     setWorkshopComments('');
     setNewMileage('');
     setCurrentMileage(null);
+    setSelectedAttachmentTemplateIds([]);
   };
 
   // Handle category change (reset subcategory when category changes)
@@ -2074,6 +2113,49 @@ export default function WorkshopTasksPage() {
                 {workshopComments.length}/300 characters (minimum 10)
               </p>
             </div>
+
+            {/* Attachment Templates Selection */}
+            {attachmentTemplates.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-foreground flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Attachments (Optional)
+                </Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Add service checklists or documentation to complete later
+                </p>
+                <div className="space-y-2 max-h-32 overflow-y-auto p-2 border border-border rounded-md bg-muted/30">
+                  {attachmentTemplates.map((template) => (
+                    <div key={template.id} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`template-inline-${template.id}`}
+                        checked={selectedAttachmentTemplateIds.includes(template.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedAttachmentTemplateIds(prev => [...prev, template.id]);
+                          } else {
+                            setSelectedAttachmentTemplateIds(prev => prev.filter(id => id !== template.id));
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-workshop focus:ring-workshop"
+                      />
+                      <label
+                        htmlFor={`template-inline-${template.id}`}
+                        className="text-sm font-normal cursor-pointer text-foreground"
+                      >
+                        {template.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                {selectedAttachmentTemplateIds.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {selectedAttachmentTemplateIds.length} attachment{selectedAttachmentTemplateIds.length > 1 ? 's' : ''} will be added to this task
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <DialogFooter>
