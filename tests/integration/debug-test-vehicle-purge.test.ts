@@ -5,8 +5,18 @@ import { resolve } from 'path';
 
 dotenv.config({ path: resolve(process.cwd(), '.env.local') });
 
+// SAFETY CHECK: Prevent running against production
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+if (!SUPABASE_URL.includes('localhost') && !SUPABASE_URL.includes('127.0.0.1') && !SUPABASE_URL.includes('staging')) {
+  console.error('❌ SAFETY CHECK FAILED');
+  console.error('❌ This test suite creates real database records and should NOT run against production!');
+  console.error(`❌ Current URL: ${SUPABASE_URL}`);
+  console.error('❌ Tests will be skipped.');
+  process.exit(1);
+}
+
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
   {
     auth: {
@@ -41,6 +51,8 @@ describe('Test Vehicle Purge API', () => {
     testVehicleId = vehicle.id;
 
     // Create test inspection
+    // SAFETY: Using 25000 miles instead of 50000 to avoid Frank Barlow incident pattern
+    // (50000 is a known problematic test value that has corrupted production data)
     const { data: inspection, error: inspectionError } = await supabase
       .from('vehicle_inspections')
       .insert({
@@ -48,7 +60,7 @@ describe('Test Vehicle Purge API', () => {
         user_id: (await supabase.from('profiles').select('id').limit(1).single()).data?.id,
         inspection_date: '2026-01-22',
         status: 'submitted',
-        current_mileage: 50000,
+        current_mileage: 25000,
       })
       .select('id')
       .single();

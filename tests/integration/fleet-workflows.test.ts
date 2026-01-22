@@ -21,6 +21,15 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Missing required environment variables for integration tests');
 }
 
+// SAFETY CHECK: Prevent running against production
+if (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('staging')) {
+  console.error('❌ SAFETY CHECK FAILED');
+  console.error('❌ This test suite modifies database records and should NOT run against production!');
+  console.error(`❌ Current URL: ${supabaseUrl}`);
+  console.error('❌ Tests will be skipped.');
+  process.exit(1);
+}
+
 describe('Fleet Module Workflows', () => {
   let supabase: ReturnType<typeof createClient>;
   let testUserId: string;
@@ -70,15 +79,16 @@ describe('Fleet Module Workflows', () => {
     });
 
     it('should fetch vehicle with maintenance data', async () => {
-      // First get a vehicle ID from vehicles table
+      // SAFETY: ONLY get test vehicles starting with TE57
       const { data: vehicles } = await supabase
         .from('vehicles')
         .select('id')
+        .ilike('reg_number', 'TE57%')
         .neq('status', 'deleted')
         .limit(1);
 
       if (!vehicles || vehicles.length === 0) {
-        console.log('No vehicles found, skipping test');
+        console.log('No TE57 test vehicles found, skipping test');
         return;
       }
 
@@ -133,8 +143,9 @@ describe('Fleet Module Workflows', () => {
         return;
       }
 
+      // SAFETY: Using 28000 miles instead of 50000 to avoid Frank Barlow incident pattern
       const updates = {
-        current_mileage: 50000,
+        current_mileage: 28000,
       };
 
       const { data: updated, error } = await supabase
@@ -146,7 +157,7 @@ describe('Fleet Module Workflows', () => {
 
       expect(error).toBeNull();
       expect(updated).toBeDefined();
-      expect(updated?.current_mileage).toBe(50000);
+      expect(updated?.current_mileage).toBe(28000);
     });
   });
 

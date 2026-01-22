@@ -10,6 +10,15 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
+// SAFETY CHECK: Prevent running against production
+if (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('staging')) {
+  console.error('❌ SAFETY CHECK FAILED');
+  console.error('❌ This test suite creates database records and should NOT run against production!');
+  console.error(`❌ Current URL: ${supabaseUrl}`);
+  console.error('❌ Tests will be skipped.');
+  process.exit(1);
+}
+
 describe('Workshop Tasks RLS Policies', () => {
   let supabase: ReturnType<typeof createClient>;
   let testManagerId: string;
@@ -17,6 +26,7 @@ describe('Workshop Tasks RLS Policies', () => {
   let testVehicleId: string;
   let testCategoryId: string;
   let testWorkshopTaskId: string;
+  let createdTestVehicle = false;
 
   beforeAll(async () => {
     supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -43,16 +53,34 @@ describe('Workshop Tasks RLS Policies', () => {
     if (!employee) throw new Error('No test employee found');
     testEmployeeId = employee.id;
 
-    // Get a test vehicle
-    const { data: vehicle } = await supabase
+    // SAFETY: ONLY use test vehicles starting with TE57
+    let vehicle = await supabase
       .from('vehicles')
       .select('id')
+      .ilike('reg_number', 'TE57%')
       .eq('status', 'active')
       .limit(1)
       .single();
     
-    if (!vehicle) throw new Error('No test vehicle found');
-    testVehicleId = vehicle.id;
+    // If no TE57 test vehicle exists, create one
+    if (!vehicle.data) {
+      const categoryId = (await supabase.from('vehicle_categories').select('id').limit(1).single()).data?.id;
+      const newVehicle = await supabase
+        .from('vehicles')
+        .insert({
+          reg_number: 'TE57WSHP',
+          status: 'active',
+          category_id: categoryId,
+        })
+        .select('id')
+        .single();
+      
+      if (!newVehicle.data) throw new Error('Failed to create test vehicle');
+      testVehicleId = newVehicle.data.id;
+      createdTestVehicle = true;
+    } else {
+      testVehicleId = vehicle.data.id;
+    }
 
     // Get or create a test category
     const { data: category } = await supabase
@@ -82,6 +110,11 @@ describe('Workshop Tasks RLS Policies', () => {
   });
 
   afterAll(async () => {
+    // Cleanup test vehicle if we created it
+    if (createdTestVehicle) {
+      await supabase.from('vehicles').delete().eq('id', testVehicleId);
+    }
+    
     // Cleanup test data
     if (testWorkshopTaskId) {
       await supabase.from('actions').delete().eq('id', testWorkshopTaskId);
@@ -241,6 +274,7 @@ describe('Workshop Tasks RLS Policies', () => {
 
     it('should create inspection_defect actions with correct type', async () => {
       // Create a test inspection
+      // SAFETY: Using 27000 miles instead of 50000 to avoid Frank Barlow incident pattern
       const { data: inspection } = await supabase
         .from('vehicle_inspections')
         .insert({
@@ -248,7 +282,7 @@ describe('Workshop Tasks RLS Policies', () => {
           user_id: testManagerId,
           inspection_date: new Date().toISOString().split('T')[0],
           inspection_end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          current_mileage: 50000,
+          current_mileage: 27000,
           status: 'submitted',
         })
         .select()
