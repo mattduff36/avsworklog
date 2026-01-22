@@ -25,6 +25,7 @@ import { CategoryManagementPanel } from '@/components/workshop-tasks/CategoryMan
 import { AttachmentManagementPanel } from '@/components/workshop-tasks/AttachmentManagementPanel';
 import { MarkTaskCompleteDialog, type CompletionData } from '@/components/workshop-tasks/MarkTaskCompleteDialog';
 import { appendStatusHistory, buildStatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
+import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
 
 type Action = Database['public']['Tables']['actions']['Row'] & {
   vehicle_inspections?: {
@@ -87,6 +88,9 @@ export default function WorkshopTasksPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [vehicleFilter, setVehicleFilter] = useState<string>('all');
   
+  // Fetch attachment templates using hook
+  const { templates: attachmentTemplates } = useAttachmentTemplates();
+  
   // Add Task Modal
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
@@ -97,7 +101,6 @@ export default function WorkshopTasksPage() {
   const [currentMileage, setCurrentMileage] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [selectedAttachmentTemplateIds, setSelectedAttachmentTemplateIds] = useState<string[]>([]);
-  const [attachmentTemplates, setAttachmentTemplates] = useState<{ id: string; name: string; description: string | null }[]>([]);
   
   // Status Update Modal (for "Mark In Progress" / logged)
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -177,7 +180,6 @@ export default function WorkshopTasksPage() {
       fetchVehicles();
       fetchCategories();
       fetchSubcategories();
-      fetchAttachmentTemplates();
       // Load recent vehicle IDs
       setRecentVehicleIds(getRecentVehicleIds(user.id));
     }
@@ -335,21 +337,6 @@ export default function WorkshopTasksPage() {
     } catch (err) {
       console.error('Error fetching current mileage:', err instanceof Error ? err.message : err);
       setCurrentMileage(null);
-    }
-  };
-
-  const fetchAttachmentTemplates = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('workshop_attachment_templates')
-        .select('id, name, description')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      setAttachmentTemplates(data || []);
-    } catch (err) {
-      console.error('Error fetching attachment templates:', err instanceof Error ? err.message : err);
     }
   };
 

@@ -142,6 +142,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Update attachment status if requested
     if (mark_complete) {
+      // Prevent marking as complete if no valid responses were saved
+      if (processedResponses.length === 0) {
+        return NextResponse.json(
+          { error: 'Cannot mark attachment as complete without valid responses' },
+          { status: 400 }
+        );
+      }
+
       const { error: updateError } = await supabase
         .from('workshop_task_attachments')
         .update({
