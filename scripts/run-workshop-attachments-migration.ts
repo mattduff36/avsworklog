@@ -131,15 +131,22 @@ async function runMigration() {
     console.log('🌱 Seeding starter templates...\n');
 
     // Create Full Service template
-    const fullServiceResult = await client.query(`
-      INSERT INTO workshop_attachment_templates (name, description, is_active)
-      VALUES ($1, $2, true)
-      ON CONFLICT DO NOTHING
-      RETURNING id
-    `, ['Vehicle Van Full Service', 'Comprehensive vehicle service checklist covering all major systems and components']);
+    const existingFullService = await client.query(`
+      SELECT id FROM workshop_attachment_templates WHERE name = $1
+    `, ['Vehicle Van Full Service']);
 
-    if (fullServiceResult.rows.length > 0) {
-      const fullServiceId = fullServiceResult.rows[0].id;
+    let fullServiceId: string;
+    if (existingFullService.rows.length > 0) {
+      fullServiceId = existingFullService.rows[0].id;
+      console.log('   ⏭️  Full Service template already exists, skipping');
+    } else {
+      const fullServiceResult = await client.query(`
+        INSERT INTO workshop_attachment_templates (name, description, is_active)
+        VALUES ($1, $2, true)
+        RETURNING id
+      `, ['Vehicle Van Full Service', 'Comprehensive vehicle service checklist covering all major systems and components']);
+      
+      fullServiceId = fullServiceResult.rows[0].id;
       console.log('   ✅ Created "Vehicle Van Full Service" template');
 
       // Insert questions
@@ -147,24 +154,28 @@ async function runMigration() {
         await client.query(`
           INSERT INTO workshop_attachment_questions (template_id, question_text, question_type, is_required, sort_order)
           VALUES ($1, $2, 'checkbox', false, $3)
-          ON CONFLICT DO NOTHING
         `, [fullServiceId, fullServiceQuestions[i], i + 1]);
       }
       console.log(`   ✅ Added ${fullServiceQuestions.length} questions to Full Service template`);
-    } else {
-      console.log('   ⏭️  Full Service template already exists, skipping');
     }
 
     // Create Basic Service template
-    const basicServiceResult = await client.query(`
-      INSERT INTO workshop_attachment_templates (name, description, is_active)
-      VALUES ($1, $2, true)
-      ON CONFLICT DO NOTHING
-      RETURNING id
-    `, ['Vehicle Van Basic Service', 'Core safety and maintenance checklist for basic vehicle services']);
+    const existingBasicService = await client.query(`
+      SELECT id FROM workshop_attachment_templates WHERE name = $1
+    `, ['Vehicle Van Basic Service']);
 
-    if (basicServiceResult.rows.length > 0) {
-      const basicServiceId = basicServiceResult.rows[0].id;
+    let basicServiceId: string;
+    if (existingBasicService.rows.length > 0) {
+      basicServiceId = existingBasicService.rows[0].id;
+      console.log('   ⏭️  Basic Service template already exists, skipping');
+    } else {
+      const basicServiceResult = await client.query(`
+        INSERT INTO workshop_attachment_templates (name, description, is_active)
+        VALUES ($1, $2, true)
+        RETURNING id
+      `, ['Vehicle Van Basic Service', 'Core safety and maintenance checklist for basic vehicle services']);
+      
+      basicServiceId = basicServiceResult.rows[0].id;
       console.log('   ✅ Created "Vehicle Van Basic Service" template');
 
       // Insert questions
@@ -172,12 +183,9 @@ async function runMigration() {
         await client.query(`
           INSERT INTO workshop_attachment_questions (template_id, question_text, question_type, is_required, sort_order)
           VALUES ($1, $2, 'checkbox', false, $3)
-          ON CONFLICT DO NOTHING
         `, [basicServiceId, basicServiceQuestions[i], i + 1]);
       }
       console.log(`   ✅ Added ${basicServiceQuestions.length} questions to Basic Service template`);
-    } else {
-      console.log('   ⏭️  Basic Service template already exists, skipping');
     }
 
     console.log('\n🎉 Workshop Attachments feature is ready!\n');

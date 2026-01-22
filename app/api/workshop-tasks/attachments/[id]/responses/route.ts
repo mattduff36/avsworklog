@@ -160,8 +160,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       const invalidRequiredQuestions = requiredQuestions.filter(q => {
         const responseValue = responsesByQuestionId.get(q.id);
         
-        // No response at all
-        if (responseValue === undefined) {
+        // No response at all (undefined) or null value from database
+        if (responseValue === undefined || responseValue === null) {
           return true;
         }
         
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         }
         
         // For other types, empty or whitespace-only values are invalid
-        return !responseValue || responseValue.trim() === '';
+        return responseValue.trim() === '';
       });
 
       if (invalidRequiredQuestions.length > 0) {
