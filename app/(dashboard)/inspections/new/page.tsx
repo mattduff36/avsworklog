@@ -315,16 +315,11 @@ function NewInspectionContent() {
     setShowMileageWarningDialog(false);
   };
 
-  // Check if mileage is valid for showing checklist
-  const isMileageValidForChecklist = (): boolean => {
-    if (!currentMileage || currentMileage.trim() === '') return false;
-    const mileageValue = parseInt(currentMileage);
-    if (isNaN(mileageValue) || mileageValue < 0) return false;
-    
-    // If there's a warning, user must have confirmed
-    if (mileageWarning?.warning && !mileageConfirmed) return false;
-    
-    return true;
+  const getParsedMileage = (): number | null => {
+    if (!currentMileage || currentMileage.trim() === '') return null;
+    const mileageValue = parseInt(currentMileage, 10);
+    if (Number.isNaN(mileageValue) || mileageValue < 0) return null;
+    return mileageValue;
   };
 
   // Check for duplicate inspection (same vehicle + week ending)
@@ -699,7 +694,8 @@ function NewInspectionContent() {
       return;
     }
 
-    if (!currentMileage || parseInt(currentMileage) < 0) {
+    const mileageValue = getParsedMileage();
+    if (mileageValue === null) {
       setError('Please enter a valid current mileage');
       // Dialog will stay open due to onOpenChange handler checking error state
       return;
@@ -842,6 +838,12 @@ function NewInspectionContent() {
       setError('Please select a week ending date');
       return;
     }
+
+    const mileageValue = getParsedMileage();
+    if (status === 'submitted' && mileageValue === null) {
+      setError('Please enter a valid current mileage');
+      return;
+    }
     
     // Check for duplicate inspection before saving
     if (duplicateInspection) {
@@ -879,7 +881,7 @@ function NewInspectionContent() {
         user_id: selectedEmployeeId, // Use selected employee ID (can be manager's own ID or another employee's)
         inspection_date: formatDateISO(startDate),
         inspection_end_date: weekEnding,
-        current_mileage: parseInt(currentMileage),
+        current_mileage: mileageValue,
         status,
         submitted_at: status === 'submitted' ? new Date().toISOString() : null,
         signature_data: signatureData || null,
@@ -1039,7 +1041,7 @@ function NewInspectionContent() {
           user_id: selectedEmployeeId,
           inspection_date: formatDateISO(startDate),
           inspection_end_date: weekEnding,
-          current_mileage: parseInt(currentMileage),
+          current_mileage: mileageValue,
           status,
           submitted_at: status === 'submitted' ? new Date().toISOString() : null,
           signature_data: signatureData || null,
@@ -1583,8 +1585,8 @@ function NewInspectionContent() {
         </CardContent>
       </Card>
 
-      {/* Safety Check - Only shown when vehicle AND week ending AND mileage are valid AND no duplicate exists */}
-      {vehicleId && weekEnding && isMileageValidForChecklist() && !duplicateInspection && !duplicateCheckLoading && (
+      {/* Safety Check - Only shown when vehicle and week ending are valid and no duplicate exists */}
+      {vehicleId && weekEnding && !duplicateInspection && !duplicateCheckLoading && (
       <Card className="">
         <CardHeader className="pb-3">
           <CardTitle className="text-foreground">{currentChecklist.length}-Point Safety Check</CardTitle>
