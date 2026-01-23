@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Wrapper script for fixerrors
+cd "$(dirname "$0")/.." && npm run fixerrors
