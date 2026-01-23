@@ -26,6 +26,9 @@ import { AttachmentManagementPanel } from '@/components/workshop-tasks/Attachmen
 import { MarkTaskCompleteDialog, type CompletionData } from '@/components/workshop-tasks/MarkTaskCompleteDialog';
 import { appendStatusHistory, buildStatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
 import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
+import { ErrorDetailsModal } from '@/components/ui/error-details-modal';
+import { showErrorWithDetails, fetchErrorDetails } from '@/lib/utils/error-details';
+import { ErrorDetailsResponse } from '@/types/error-details';
 
 type Action = Database['public']['Tables']['actions']['Row'] & {
   vehicle_inspections?: {
@@ -119,6 +122,11 @@ export default function WorkshopTasksPage() {
 
   // Resume modal state
   const [showResumeModal, setShowResumeModal] = useState(false);
+
+  // Error details modal state
+  const [showErrorDetailsModal, setShowErrorDetailsModal] = useState(false);
+  const [errorDetails, setErrorDetails] = useState<ErrorDetailsResponse | null>(null);
+  const [errorDetailsLoading, setErrorDetailsLoading] = useState(false);
   const [resumingTask, setResumingTask] = useState<Action | null>(null);
   const [resumeComment, setResumeComment] = useState('');
   
@@ -1215,7 +1223,41 @@ export default function WorkshopTasksPage() {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Failed to delete subcategory');
+        const errorMessage = data.error || 'Failed to delete subcategory';
+        
+        // Check if this is a foreign key constraint error (tasks exist)
+        const isForeignKeyError = errorMessage.toLowerCase().includes('referenced') || 
+                                   errorMessage.toLowerCase().includes('constraint');
+        
+        if (isForeignKeyError) {
+          // Show error with "Show Details" button
+          showErrorWithDetails({
+            message: errorMessage,
+            detailsType: 'subcategory-tasks',
+            itemId: subcategoryId,
+            onShowDetails: async () => {
+              // Fetch and show the details
+              setShowErrorDetailsModal(true);
+              setErrorDetailsLoading(true);
+              
+              try {
+                const details = await fetchErrorDetails('subcategory-tasks', { id: subcategoryId });
+                setErrorDetails(details);
+              } catch (err) {
+                console.error('Failed to fetch error details:', err);
+                toast.error('Failed to load details');
+                setShowErrorDetailsModal(false);
+              } finally {
+                setErrorDetailsLoading(false);
+              }
+            },
+          });
+        } else {
+          // Regular error without details
+          toast.error(errorMessage);
+        }
+        
+        return;
       }
 
       toast.success('Subcategory deleted successfully');
@@ -2713,6 +2755,17 @@ export default function WorkshopTasksPage() {
           onSuccess={fetchSubcategories}
         />
       )}
+
+      {/* Error Details Modal */}
+      <ErrorDetailsModal
+        open={showErrorDetailsModal}
+        onClose={() => {
+          setShowErrorDetailsModal(false);
+          setErrorDetails(null);
+        }}
+        data={errorDetails}
+        loading={errorDetailsLoading}
+      />
     </div>
   );
 }
