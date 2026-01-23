@@ -45,7 +45,15 @@ export async function fetchErrorDetails(
   const response = await fetch(`/api/errors/details/${detailsType}?${queryString}`);
   
   if (!response.ok) {
-    throw new Error('Failed to fetch error details');
+    let errorMessage = `Failed to fetch error details (${response.status})`;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.error || errorMessage;
+    } catch {
+      // If response isn't JSON, use status text
+      errorMessage = response.statusText || errorMessage;
+    }
+    throw new Error(errorMessage);
   }
   
   return response.json();

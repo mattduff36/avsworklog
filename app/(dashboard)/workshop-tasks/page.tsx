@@ -1245,7 +1245,8 @@ export default function WorkshopTasksPage() {
                 setErrorDetails(details);
               } catch (err) {
                 console.error('Failed to fetch error details:', err);
-                toast.error('Failed to load details');
+                const errorMessage = err instanceof Error ? err.message : 'Failed to load details';
+                toast.error(errorMessage);
                 setShowErrorDetailsModal(false);
               } finally {
                 setErrorDetailsLoading(false);
