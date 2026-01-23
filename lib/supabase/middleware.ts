@@ -59,20 +59,45 @@ export async function updateSession(request: NextRequest) {
   ]
   
   const isPublicPath = publicPaths.some(path => request.nextUrl.pathname.startsWith(path))
+  const isApiRoute = request.nextUrl.pathname.startsWith('/api/')
 
-  // If not a public path and no user, redirect to login
+  // If not a public path and no user
   if (!isPublicPath && !user) {
+    // For API routes, return JSON 401 instead of HTML redirect
+    if (isApiRoute) {
+      const apiResponse = NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+      // CRITICAL: Copy cookies from supabaseResponse to avoid session termination
+      supabaseResponse.cookies.getAll().forEach(cookie => {
+        apiResponse.cookies.set(cookie.name, cookie.value, cookie)
+      })
+      return apiResponse
+    }
+    
+    // For page routes, redirect to login
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.searchParams.set('redirect', request.nextUrl.pathname)
-    return NextResponse.redirect(url)
+    const redirectResponse = NextResponse.redirect(url)
+    // CRITICAL: Copy cookies from supabaseResponse to avoid session termination
+    supabaseResponse.cookies.getAll().forEach(cookie => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, cookie)
+    })
+    return redirectResponse
   }
 
   // If user is logged in and trying to access login page, redirect to dashboard
   if (request.nextUrl.pathname === '/login' && user) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
-    return NextResponse.redirect(url)
+    const dashboardRedirect = NextResponse.redirect(url)
+    // CRITICAL: Copy cookies from supabaseResponse to avoid session termination
+    supabaseResponse.cookies.getAll().forEach(cookie => {
+      dashboardRedirect.cookies.set(cookie.name, cookie.value, cookie)
+    })
+    return dashboardRedirect
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is. If you're
@@ -80,7 +105,9 @@ export async function updateSession(request: NextRequest) {
   // 1. Pass the request in it, like so:
   //    const myNewResponse = NextResponse.next({ request })
   // 2. Copy over the cookies, like so:
-  //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
+  //    supabaseResponse.cookies.getAll().forEach(cookie => {
+  //      myNewResponse.cookies.set(cookie.name, cookie.value, cookie)
+  //    })
   // 3. Change the myNewResponse object to fit your needs, but avoid changing
   //    the cookies!
   // 4. Finally:
