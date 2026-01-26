@@ -1923,20 +1923,28 @@ function NotificationSettingsDebugPanel() {
   const updatePreference = async (
     userId: string,
     moduleKey: string,
-    field: 'enabled' | 'notify_in_app' | 'notify_email',
+    field: 'notify_in_app' | 'notify_email',
     value: boolean
   ) => {
     const saveKey = `${userId}-${moduleKey}-${field}`;
     setSaving(saveKey);
     try {
+      // Get current preference to ensure we send both fields
+      const user = users.find(u => u.user_id === userId);
+      const currentPref = user?.preferences.find(p => p.module_key === moduleKey);
+      
+      // Prepare data with both fields
+      const updateData = {
+        user_id: userId,
+        module_key: moduleKey,
+        notify_in_app: field === 'notify_in_app' ? value : (currentPref?.notify_in_app ?? true),
+        notify_email: field === 'notify_email' ? value : (currentPref?.notify_email ?? true),
+      };
+
       const response = await fetch('/api/notification-preferences/admin', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: userId,
-          module_key: moduleKey,
-          [field]: value,
-        }),
+        body: JSON.stringify(updateData),
       });
 
       const data = await response.json();
@@ -1952,9 +1960,8 @@ function NotificationSettingsDebugPanel() {
             if (!prefs.find(p => p.module_key === moduleKey)) {
               prefs.push({
                 module_key: moduleKey,
-                enabled: field === 'enabled' ? value : true,
-                notify_in_app: field === 'notify_in_app' ? value : true,
-                notify_email: field === 'notify_email' ? value : true,
+                notify_in_app: updateData.notify_in_app,
+                notify_email: updateData.notify_email,
               });
             }
             return { ...u, preferences: prefs };
@@ -1987,7 +1994,7 @@ function NotificationSettingsDebugPanel() {
   const uniqueRoles = Array.from(new Set(users.map(u => u.role_name))).sort();
 
   const batchUpdatePreference = async (
-    field: 'enabled' | 'notify_in_app' | 'notify_email',
+    field: 'notify_in_app' | 'notify_email',
     value: boolean,
     targetModule?: string
   ) => {
@@ -2010,17 +2017,25 @@ function NotificationSettingsDebugPanel() {
       );
 
       // Update all preferences and validate responses
-      const responses = await Promise.all(updates.map(({ userId, moduleKey }) => 
-        fetch('/api/notification-preferences/admin', {
+      const responses = await Promise.all(updates.map(({ userId, moduleKey }) => {
+        // Get current preference to ensure we send both fields
+        const user = users.find(u => u.user_id === userId);
+        const currentPref = user?.preferences.find(p => p.module_key === moduleKey);
+        
+        // Prepare data with both fields
+        const updateData = {
+          user_id: userId,
+          module_key: moduleKey,
+          notify_in_app: field === 'notify_in_app' ? value : (currentPref?.notify_in_app ?? true),
+          notify_email: field === 'notify_email' ? value : (currentPref?.notify_email ?? true),
+        };
+        
+        return fetch('/api/notification-preferences/admin', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: userId,
-            module_key: moduleKey,
-            [field]: value,
-          }),
-        })
-      ));
+          body: JSON.stringify(updateData),
+        });
+      }));
 
       // Check for any failed requests
       const failedCount = responses.filter(r => !r.ok).length;

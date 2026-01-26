@@ -70,7 +70,6 @@ export interface GetNotificationPreferencesResponse {
 
 export interface UpdateNotificationPreferenceRequest {
   module_key: NotificationModuleKey;
-  enabled?: boolean;
   notify_in_app?: boolean;
   notify_email?: boolean;
 }

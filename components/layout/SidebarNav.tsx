@@ -251,10 +251,10 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                 align="start"
                 sideOffset={12}
                 className="w-56 p-2 bg-slate-900 border border-slate-700 shadow-2xl"
-                style={{ zIndex: 999999 }}
+                style={{ zIndex: 999999, color: '#e2e8f0' }}
               >
                 <div className="space-y-1">
-                  <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: '#cbd5e1' }}>
                     View As
                   </div>
                   {[
@@ -276,13 +276,14 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                         }}
                         className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
                           isActive
-                            ? 'bg-primary text-primary-foreground'
-                            : 'text-muted-foreground hover:bg-slate-800 hover:text-white'
+                            ? 'bg-avs-yellow'
+                            : 'hover:bg-slate-800 hover:text-white'
                         }`}
+                        style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }}
                       >
-                        <Icon className="w-4 h-4" />
-                        <span className="flex-1 text-left">{role.label}</span>
-                        {isActive && <Check className="w-4 h-4" />}
+                        <Icon className="w-4 h-4" style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }} />
+                        <span className="flex-1 text-left" style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }}>{role.label}</span>
+                        {isActive && <Check className="w-4 h-4" style={{ color: '#0f172a' }} />}
                       </button>
                     );
                   })}

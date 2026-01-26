@@ -181,18 +181,25 @@ export default function NotificationsPage() {
 
   const updatePreference = async (
     moduleKey: NotificationModuleKey,
-    field: 'enabled' | 'notify_in_app' | 'notify_email',
+    field: 'notify_in_app' | 'notify_email',
     value: boolean
   ) => {
     setSavingPrefModule(moduleKey);
     try {
+      // Get current preference to ensure we send both fields
+      const currentPref = preferences.find(p => p.module_key === moduleKey);
+      
+      // Prepare data with both fields
+      const updateData = {
+        module_key: moduleKey,
+        notify_in_app: field === 'notify_in_app' ? value : (currentPref?.notify_in_app ?? true),
+        notify_email: field === 'notify_email' ? value : (currentPref?.notify_email ?? true),
+      };
+
       const response = await fetch('/api/notification-preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          module_key: moduleKey,
-          [field]: value,
-        }),
+        body: JSON.stringify(updateData),
       });
 
       const data = await response.json();
@@ -294,10 +301,9 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content (left side, 2 columns) */}
-        <div className="lg:col-span-2">
-          <Tabs defaultValue="all" className="w-full">
+      {/* Main Content */}
+      <div>
+        <Tabs defaultValue="all" className="w-full">
             <TabsList className="grid w-full max-w-2xl grid-cols-3 bg-slate-100 dark:bg-slate-800 p-1">
               <TabsTrigger value="all" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
                 <Bell className="h-4 w-4" />
@@ -577,76 +583,6 @@ export default function NotificationsPage() {
               </TabsContent>
             )}
           </Tabs>
-        </div>
-
-        {/* Right Column - Quick Settings */}
-        <div className="lg:col-span-1">
-          <Card className="sticky top-6">
-            <CardHeader>
-              <CardTitle className="text-foreground text-lg flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Quick Settings
-              </CardTitle>
-              <CardDescription className="text-muted-foreground text-sm">
-                Manage notification preferences
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loadingPrefs ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {availableModules.slice(0, 3).map((module) => {
-                    const pref = getPreference(module.key);
-                    const Icon = getModuleIcon(module.icon);
-                    const isSaving = savingPrefModule === module.key;
-
-                    return (
-                      <div key={module.key} className="pb-4 border-b border-border last:border-0 last:pb-0">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Icon className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium text-foreground">{module.label}</span>
-                        </div>
-                        <div className="space-y-2 ml-6">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">In-App</span>
-                            <Switch
-                              checked={pref.notify_in_app}
-                              onCheckedChange={(checked) => updatePreference(module.key, 'notify_in_app', checked)}
-                              disabled={isSaving}
-                              className="scale-75"
-                            />
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Email</span>
-                            <Switch
-                              checked={pref.notify_email}
-                              onCheckedChange={(checked) => updatePreference(module.key, 'notify_email', checked)}
-                              disabled={isSaving}
-                              className="scale-75"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => {
-                      const tab = document.querySelector('[data-state="active"][value="preferences"]');
-                      if (tab) (tab as HTMLElement).click();
-                    }}
-                  >
-                    View All Settings
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </div>
       </div>
 

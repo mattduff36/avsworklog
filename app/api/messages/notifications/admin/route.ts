@@ -6,8 +6,12 @@ import type { GetNotificationsResponse, NotificationItem } from '@/types/message
 
 /**
  * GET /api/messages/notifications/admin
- * Fetch notifications for a specific user (admin only)
+ * Fetch notifications for a specific user
+ * 
+ * Authorization: Super Admin OR Admin role ONLY (not regular managers)
  * Query param: user_id=<uuid>
+ * 
+ * Security: Verifies target user exists before fetching their data
  */
 export async function GET(request: NextRequest) {
   try {
@@ -19,9 +23,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin
+    // Check if user is admin (strict: super admin OR admin role only, NOT regular managers)
     const profile = await getProfileWithRole(user.id);
-    if (!profile?.role || !profile.role.is_manager_admin) {
+    const isStrictAdmin = profile?.role?.is_super_admin === true || profile?.role?.name === 'admin';
+    
+    if (!isStrictAdmin) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
@@ -31,6 +37,17 @@ export async function GET(request: NextRequest) {
 
     if (!targetUserId) {
       return NextResponse.json({ error: 'Missing user_id query parameter' }, { status: 400 });
+    }
+
+    // Verify target user exists (prevents admins from querying non-existent users)
+    const { data: targetProfile, error: targetError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', targetUserId)
+      .single();
+
+    if (targetError || !targetProfile) {
+      return NextResponse.json({ error: 'Invalid user_id: User not found' }, { status: 404 });
     }
 
     // Calculate 60 days ago

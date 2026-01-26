@@ -72,7 +72,7 @@ export async function PUT(request: NextRequest) {
 
     // Parse request body
     const body: UpdateNotificationPreferenceRequest = await request.json();
-    const { module_key, enabled, notify_in_app, notify_email } = body;
+    const { module_key, notify_in_app, notify_email } = body;
 
     const validModules: NotificationModuleKey[] = ['errors', 'maintenance', 'rams', 'approvals', 'inspections'];
     if (!module_key || !validModules.includes(module_key)) {
@@ -87,7 +87,6 @@ export async function PUT(request: NextRequest) {
       module_key,
     };
 
-    if (enabled !== undefined) upsertData.enabled = enabled;
     if (notify_in_app !== undefined) upsertData.notify_in_app = notify_in_app;
     if (notify_email !== undefined) upsertData.notify_email = notify_email;
 
