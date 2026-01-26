@@ -120,7 +120,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Fetch existing actions for this inspection
+    // CRITICAL: Fetch ALL active tasks for this VEHICLE (not just this inspection)
+    // This prevents duplicate task creation when a defect already has an active task from a previous inspection
+    const { data: activeVehicleTasks } = await supabaseAdmin
+      .from('actions')
+      .select(`
+        id,
+        status,
+        title,
+        description,
+        inspection_id,
+        inspection_item_id,
+        vehicle_id
+      `)
+      .eq('vehicle_id', vehicleId)
+      .eq('action_type', 'inspection_defect')
+      .in('status', ['pending', 'logged', 'on_hold', 'in_progress']);
+
+    // Fetch existing actions for this inspection (for updates)
     const { data: existingActions } = await supabaseAdmin
       .from('actions')
       .select(`
@@ -135,7 +152,28 @@ export async function POST(request: NextRequest) {
       .eq('inspection_id', inspectionId)
       .eq('action_type', 'inspection_defect');
 
-    // Build a map of existing tasks by stable signature
+    // Build a map of ACTIVE tasks across ALL inspections for this vehicle
+    // This is our primary check to prevent duplicates
+    const activeTasksMap = new Map<string, typeof activeVehicleTasks>();
+
+    if (activeVehicleTasks) {
+      for (const action of activeVehicleTasks) {
+        // Parse signature from description: "Item X - Description"
+        const match = action.description?.match(/Item (\d+) - ([^(]+)/);
+        if (match) {
+          const itemNum = match[1];
+          const itemDesc = match[2].trim();
+          const signature = `${itemNum}-${itemDesc}`;
+          
+          if (!activeTasksMap.has(signature)) {
+            activeTasksMap.set(signature, []);
+          }
+          activeTasksMap.get(signature)!.push(action);
+        }
+      }
+    }
+
+    // Build a map of existing tasks by stable signature (current inspection only)
     // Signature: item_number-item_description (normalized)
     const existingMap = new Map<string, typeof existingActions>();
 
@@ -186,7 +224,19 @@ export async function POST(request: NextRequest) {
       const title = `${vehicleReg} - ${item_description} (${dayRange})`;
       const description = `Vehicle inspection defect found:\nItem ${item_number} - ${item_description} (${dayRange})${commentText}`;
 
-      // Check for existing tasks with this signature
+      // CRITICAL CHECK: First check if there are ANY active tasks for this defect on this vehicle
+      // (across ALL inspections, not just the current one)
+      const activeTasksForDefect = activeTasksMap.get(signature);
+
+      if (activeTasksForDefect && activeTasksForDefect.length > 0) {
+        // An active task already exists for this defect (from any inspection)
+        // Skip creation entirely to prevent duplicates
+        console.log(`[sync-defect-tasks] Skipping creation for ${signature}: Active task(s) already exist (${activeTasksForDefect.map(t => `${t.id}:${t.status}`).join(', ')})`);
+        skipped++;
+        continue;
+      }
+
+      // Check for existing tasks with this signature in the CURRENT inspection
       const existing = existingMap.get(signature);
 
       if (existing && existing.length > 0) {
@@ -225,7 +275,9 @@ export async function POST(request: NextRequest) {
           skipped++;
         }
       } else {
-        // Create new task
+        // No active tasks exist anywhere for this vehicle + defect
+        // AND no tasks in current inspection
+        // Safe to create new task
         const newTask: ActionInsert = {
           action_type: 'inspection_defect',
           inspection_id: inspectionId,
