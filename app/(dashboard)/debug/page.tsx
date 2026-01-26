@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -98,6 +98,7 @@ export default function DebugPage() {
   const [viewedErrors, setViewedErrors] = useState<Set<string>>(new Set());
   const [lastCheckedErrorId, setLastCheckedErrorId] = useState<string | null>(null);
   const [notifyingNewErrors, setNotifyingNewErrors] = useState(false);
+  const notifyingNewErrorsRef = useRef(false);
   
   // Error log filter states
   const [filterLocalhost, setFilterLocalhost] = useState(true);
@@ -300,13 +301,16 @@ export default function DebugPage() {
           const newestErrorId = typedErrorData[0].id;
           
           // If this is a new error (and not the first load)
-          if (lastCheckedErrorId && newestErrorId !== lastCheckedErrorId && !notifyingNewErrors) {
+          if (lastCheckedErrorId && newestErrorId !== lastCheckedErrorId && !notifyingNewErrorsRef.current) {
             // Find all errors that are newer than the last checked ID
             const lastIndex = typedErrorData.findIndex(e => e.id === lastCheckedErrorId);
             const newErrors = lastIndex >= 0 ? typedErrorData.slice(0, lastIndex) : [];
             
             // Notify admins of new errors (only if not viewed yet and not notifying already)
+            // Use ref to prevent race conditions from concurrent fetchErrorLogs() calls
+            notifyingNewErrorsRef.current = true;
             setNotifyingNewErrors(true);
+            
             for (const newError of newErrors) {
               if (!viewedErrors.has(newError.id)) {
                 try {
@@ -321,6 +325,8 @@ export default function DebugPage() {
                 }
               }
             }
+            
+            notifyingNewErrorsRef.current = false;
             setNotifyingNewErrors(false);
           }
           

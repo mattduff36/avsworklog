@@ -234,9 +234,11 @@ export function getPageUrl(value: string): string {
     'admin-faq-categories': '/admin/faq/categories',
     
     // Other
-    'other-dashboard': '/dashboard',
-    'other-help': '/help',
-    'other-debug': '/debug',
+    'dashboard': '/dashboard',
+    'notifications': '/notifications',
+    'help': '/help',
+    'fleet-overview': '/fleet',
+    'something-else': '/help', // fallback to help page
   };
   
   return urlMap[value] || value;
