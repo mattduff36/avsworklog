@@ -143,41 +143,41 @@ function DocumentsTabContent({ vehicleId, workshopTasks }: { vehicleId: string; 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const fetchAttachments = async () => {
+      try {
+        setLoading(true);
+        const taskIds = workshopTasks.map(t => t.id);
+        
+        if (taskIds.length === 0) {
+          setAttachments([]);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('workshop_task_attachments')
+          .select(`
+            id,
+            task_id,
+            created_at,
+            workshop_attachment_templates (
+              name,
+              description
+            )
+          `)
+          .in('task_id', taskIds)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setAttachments(data || []);
+      } catch (error) {
+        console.error('Error fetching attachments:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchAttachments();
   }, [vehicleId, workshopTasks]);
-
-  const fetchAttachments = async () => {
-    try {
-      setLoading(true);
-      const taskIds = workshopTasks.map(t => t.id);
-      
-      if (taskIds.length === 0) {
-        setAttachments([]);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('workshop_task_attachments')
-        .select(`
-          id,
-          task_id,
-          created_at,
-          workshop_attachment_templates (
-            name,
-            description
-          )
-        `)
-        .in('task_id', taskIds)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setAttachments(data || []);
-    } catch (error) {
-      console.error('Error fetching attachments:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) {
     return (
