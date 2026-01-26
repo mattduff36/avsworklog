@@ -603,7 +603,7 @@ export default function NotificationsPage() {
               totalPending={1}
               currentIndex={0}
             />
-          ) : (
+          ) : selectedNotification.type === 'REMINDER' || selectedNotification.type === 'NOTIFICATION' ? (
             <ReminderModal
               open={showModal}
               onClose={handleModalClose}
@@ -617,7 +617,7 @@ export default function NotificationsPage() {
               }}
               onDismissed={handleModalClose}
             />
-          )}
+          ) : null}
         </>
       )}
     </div>

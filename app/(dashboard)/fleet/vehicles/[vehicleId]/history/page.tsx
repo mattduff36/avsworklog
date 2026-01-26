@@ -177,7 +177,7 @@ function DocumentsTabContent({ vehicleId, workshopTasks }: { vehicleId: string; 
     };
 
     fetchAttachments();
-  }, [vehicleId, workshopTasks]);
+  }, [workshopTasks, supabase]);
 
   if (loading) {
     return (
@@ -312,6 +312,8 @@ export default function VehicleHistoryPage({
   const [expandedTestId, setExpandedTestId] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [showWorkshopTasks, setShowWorkshopTasks] = useState(true);
+  const [showRecordUpdates, setShowRecordUpdates] = useState(true);
 
   // Fetch comments for all workshop tasks
   const { comments: taskComments } = useWorkshopTaskComments({
@@ -884,10 +886,42 @@ export default function VehicleHistoryPage({
 
           <Card className="bg-slate-800/50 border-border">
             <CardHeader>
-              <CardTitle>Maintenance & Workshop History</CardTitle>
-              <CardDescription>
-                Complete timeline of maintenance updates and workshop tasks
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Maintenance & Workshop History</CardTitle>
+                  <CardDescription>
+                    Complete timeline of maintenance updates and workshop tasks
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowWorkshopTasks(!showWorkshopTasks)}
+                    className={`h-8 w-8 p-0 transition-all ${
+                      showWorkshopTasks
+                        ? 'bg-workshop/20 hover:bg-workshop/30 border-workshop text-workshop'
+                        : 'bg-muted/50 hover:bg-muted border-border text-muted-foreground'
+                    }`}
+                    title="Toggle Workshop Tasks"
+                  >
+                    <Wrench className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowRecordUpdates(!showRecordUpdates)}
+                    className={`h-8 w-8 p-0 transition-all ${
+                      showRecordUpdates
+                        ? 'bg-blue-500/20 hover:bg-blue-500/30 border-blue-500 text-blue-400'
+                        : 'bg-muted/50 hover:bg-muted border-border text-muted-foreground'
+                    }`}
+                    title="Toggle Record Updates"
+                  >
+                    <Calendar className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               {loading ? (
@@ -899,7 +933,7 @@ export default function VehicleHistoryPage({
               ) : (
                 <div className="space-y-4">
                   {/* Workshop Tasks */}
-                  {workshopTasks.map((task) => (
+                  {showWorkshopTasks && workshopTasks.map((task) => (
                     <WorkshopTaskHistoryCard
                       key={task.id}
                       task={task}
@@ -920,7 +954,7 @@ export default function VehicleHistoryPage({
                   ))}
 
                   {/* Maintenance History Entries */}
-                  {maintenanceHistory.map((entry) => (
+                  {showRecordUpdates && maintenanceHistory.map((entry) => (
                     <Card key={entry.id} className="bg-slate-800/50 border-slate-700 border-l-4 border-l-blue-500">
                       <CardContent className="pt-6">
                         <div className="flex items-start gap-3">
@@ -950,10 +984,14 @@ export default function VehicleHistoryPage({
                     </Card>
                   ))}
 
-                  {workshopTasks.length === 0 && maintenanceHistory.length === 0 && (
+                  {(!showWorkshopTasks || workshopTasks.length === 0) && (!showRecordUpdates || maintenanceHistory.length === 0) && (
                     <div className="text-center py-12">
                       <Wrench className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-600">No maintenance history yet</p>
+                      <p className="text-gray-600">
+                        {!showWorkshopTasks && !showRecordUpdates 
+                          ? 'Enable filters to view history' 
+                          : 'No maintenance history yet'}
+                      </p>
                     </div>
                   )}
                 </div>
