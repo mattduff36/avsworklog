@@ -58,33 +58,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing title or description' }, { status: 400 });
     }
 
-    // 1. Find all admin users FIRST (before creating the report)
-    // NOTE: PostgREST's `.or(...)` does not support dotted paths like `role.name` reliably.
-    // We query role IDs first, then fetch profiles by role_id.
-    const { data: adminRoles, error: adminRolesError } = await supabase
-      .from('roles')
-      .select('id')
-      .or('name.eq.admin,is_super_admin.is.true,is_manager_admin.is.true');
-
-    if (adminRolesError) {
-      console.error('Error finding admin roles:', adminRolesError);
-      return NextResponse.json({ 
-        success: false,
-        error: 'Failed to find admin users',
-        details: adminRolesError.message
-      }, { status: 500 });
-    }
-
-    const adminRoleIds = (adminRoles ?? []).map(r => r.id);
-    if (adminRoleIds.length === 0) {
-      console.warn('No admin users found! This should not happen.');
-      return NextResponse.json({ 
-        success: false,
-        error: 'No admin users found to notify',
-      }, { status: 500 });
-    }
-
-    // 2. Persist error report to database (only after confirming admins exist)
+    // 1. Persist error report to database FIRST
+    // Error reports should always be saved regardless of notification availability
     const { data: errorReport, error: reportError } = await supabase
       .from('error_reports')
       .insert({
@@ -109,70 +84,82 @@ export async function POST(request: NextRequest) {
 
     console.log(`Error report created: ${errorReport.id}`);
 
-    // 3. Get admin user profiles
-    const { data: adminProfiles, error: adminProfilesError } = await supabase
-      .from('profiles')
-      .select('id, full_name, role_id')
-      .in('role_id', adminRoleIds);
-
-    if (adminProfilesError) {
-      console.error('Error finding admin profiles:', adminProfilesError);
-      return NextResponse.json({ 
-        success: false,
-        error: 'Failed to find admin users',
-        details: adminProfilesError.message
-      }, { status: 500 });
-    }
-
-    if (!adminProfiles || adminProfiles.length === 0) {
-      console.warn('No admin profiles found! This should not happen.');
-      return NextResponse.json({ 
-        success: false,
-        error: 'No admin users found to notify',
-      }, { status: 500 });
-    }
-
-    const adminUserIds = adminProfiles.map(p => p.id);
-    console.log(`Found ${adminUserIds.length} admin users for notification:`, adminUserIds);
-
-    // 2.5. Fetch admin notification preferences
-    const { data: allPrefs } = await supabase
-      .from('admin_error_notification_prefs')
-      .select('*')
-      .in('user_id', adminUserIds);
-    
-    // Build preference maps (default to true if no preference record exists)
-    const inAppPrefs = new Map<string, boolean>();
-    const emailPrefs = new Map<string, boolean>();
-    
-    adminUserIds.forEach(id => {
-      const pref = allPrefs?.find(p => p.user_id === id);
-      inAppPrefs.set(id, pref?.notify_in_app ?? true);
-      emailPrefs.set(id, pref?.notify_email ?? true);
-    });
-    
-    // Filter admins who want in-app notifications
-    const inAppAdminIds = adminUserIds.filter(id => inAppPrefs.get(id) === true);
-    console.log(`${inAppAdminIds.length} admins opted in for in-app notifications`);
-    
-    // Filter admins who want email notifications
-    const emailAdminIds = adminUserIds.filter(id => emailPrefs.get(id) === true);
-    console.log(`${emailAdminIds.length} admins opted in for email notifications`);
-
-    // 3. Create in-app notifications for opted-in admins
+    // 2. Try to notify admins (graceful failure - don't block report creation)
     let notificationSuccess = false;
-    let notificationMessageId: string | null = null;
+    let emailSuccess = false;
 
-    if (inAppAdminIds.length > 0) {
-      try {
-        // Create message
-        const { data: message, error: messageError } = await supabase
-          .from('messages')
-          .insert({
-            type: 'NOTIFICATION',
-            priority: 'HIGH',
-            subject: `🐛 Error Report: ${title.substring(0, 50)}${title.length > 50 ? '...' : ''}`,
-            body: `**User:** ${profile?.full_name || 'Unknown'} (${user.email})
+    try {
+      // Find all admin users for notification
+      // NOTE: PostgREST's `.or(...)` does not support dotted paths like `role.name` reliably.
+      // We query role IDs first, then fetch profiles by role_id.
+      const { data: adminRoles, error: adminRolesError } = await supabase
+        .from('roles')
+        .select('id')
+        .or('name.eq.admin,is_super_admin.is.true,is_manager_admin.is.true');
+
+      if (adminRolesError) {
+        console.error('Error finding admin roles for notification:', adminRolesError);
+        throw new Error(`Failed to find admin users: ${adminRolesError.message}`);
+      }
+
+      const adminRoleIds = (adminRoles ?? []).map(r => r.id);
+      if (adminRoleIds.length === 0) {
+        console.warn('No admin users found for notification - skipping email alerts');
+      } else {
+        const { data: adminProfiles, error: adminProfilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, role_id')
+          .in('role_id', adminRoleIds);
+
+        if (adminProfilesError) {
+          console.error('Error finding admin profiles for notification:', adminProfilesError);
+          throw new Error(`Failed to find admin profiles: ${adminProfilesError.message}`);
+        }
+
+        if (!adminProfiles || adminProfiles.length === 0) {
+          console.warn('No admin profiles found for notification - skipping email alerts');
+        } else {
+
+          const adminUserIds = adminProfiles.map(p => p.id);
+          console.log(`Found ${adminUserIds.length} admin users for notification:`, adminUserIds);
+
+          // Fetch admin notification preferences
+          const { data: allPrefs } = await supabase
+            .from('admin_error_notification_prefs')
+            .select('*')
+            .in('user_id', adminUserIds);
+          
+          // Build preference maps (default to true if no preference record exists)
+          const inAppPrefs = new Map<string, boolean>();
+          const emailPrefs = new Map<string, boolean>();
+          
+          adminUserIds.forEach(id => {
+            const pref = allPrefs?.find(p => p.user_id === id);
+            inAppPrefs.set(id, pref?.notify_in_app ?? true);
+            emailPrefs.set(id, pref?.notify_email ?? true);
+          });
+          
+          // Filter admins who want in-app notifications
+          const inAppAdminIds = adminUserIds.filter(id => inAppPrefs.get(id) === true);
+          console.log(`${inAppAdminIds.length} admins opted in for in-app notifications`);
+          
+          // Filter admins who want email notifications
+          const emailAdminIds = adminUserIds.filter(id => emailPrefs.get(id) === true);
+          console.log(`${emailAdminIds.length} admins opted in for email notifications`);
+
+          // Create in-app notifications for opted-in admins
+          let notificationMessageId: string | null = null;
+
+          if (inAppAdminIds.length > 0) {
+            try {
+              // Create message
+              const { data: message, error: messageError } = await supabase
+                .from('messages')
+                .insert({
+                  type: 'NOTIFICATION',
+                  priority: 'HIGH',
+                  subject: `🐛 Error Report: ${title.substring(0, 50)}${title.length > 50 ? '...' : ''}`,
+                  body: `**User:** ${profile?.full_name || 'Unknown'} (${user.email})
 
 **Title:** ${title}
 
@@ -187,90 +174,97 @@ ${additional_context ? `**Additional Context:**\n${JSON.stringify(additional_con
 
 ---
 *View and manage this error report in the Errors Management section.*`,
-            sender_id: user.id,
-          })
-          .select()
-          .single();
+                  sender_id: user.id,
+                })
+                .select()
+                .single();
 
-        if (messageError) {
-          console.error('Error creating message:', messageError);
-          throw messageError;
-        }
+              if (messageError) {
+                console.error('Error creating message:', messageError);
+                throw messageError;
+              }
 
-        notificationMessageId = message.id;
+              notificationMessageId = message.id;
 
-        // Create recipient entries for opted-in admins only
-        const recipientRecords = inAppAdminIds.map(adminId => ({
-          message_id: message.id,
-          user_id: adminId,
-          status: 'PENDING' as const
-        }));
+              // Create recipient entries for opted-in admins only
+              const recipientRecords = inAppAdminIds.map(adminId => ({
+                message_id: message.id,
+                user_id: adminId,
+                status: 'PENDING' as const
+              }));
 
-        const { error: recipientsError } = await supabase
-          .from('message_recipients')
-          .insert(recipientRecords);
+              const { error: recipientsError } = await supabase
+                .from('message_recipients')
+                .insert(recipientRecords);
 
-        if (recipientsError) {
-          console.error('Error creating recipients:', recipientsError);
-          throw recipientsError;
-        }
+              if (recipientsError) {
+                console.error('Error creating recipients:', recipientsError);
+                throw recipientsError;
+              }
 
-        // Update error report with notification message ID
-        await supabase
-          .from('error_reports')
-          .update({ notification_message_id: message.id })
-          .eq('id', errorReport.id);
+              // Update error report with notification message ID
+              await supabase
+                .from('error_reports')
+                .update({ notification_message_id: message.id })
+                .eq('id', errorReport.id);
 
-        notificationSuccess = true;
-        console.log(`In-app notifications created for ${inAppAdminIds.length} admins`);
-      } catch (notificationError) {
-        console.error('Failed to create in-app notifications:', notificationError);
-      }
-    }
+              notificationSuccess = true;
+              console.log(`In-app notifications created for ${inAppAdminIds.length} admins`);
+            } catch (notificationError) {
+              console.error('Failed to create in-app notifications:', notificationError);
+            }
+          }
 
-    // 4. Send email notifications to opted-in admins
-    let emailSuccess = false;
-    let emailSent = 0;
-    let emailFailed = 0;
+          // Send email notifications to opted-in admins
+          let emailSent = 0;
+          let emailFailed = 0;
 
-    if (emailAdminIds.length > 0) {
-      try {
-        // Fetch email addresses for opted-in admins only
-        const adminEmails: string[] = [];
-        for (const adminId of emailAdminIds) {
-          const { data: authUser } = await supabase.auth.admin.getUserById(adminId);
-          if (authUser?.user?.email) {
-            adminEmails.push(authUser.user.email);
+          if (emailAdminIds.length > 0) {
+            try {
+              // Fetch email addresses for opted-in admins only
+              const adminEmails: string[] = [];
+              for (const adminId of emailAdminIds) {
+                const { data: authUser } = await supabase.auth.admin.getUserById(adminId);
+                if (authUser?.user?.email) {
+                  adminEmails.push(authUser.user.email);
+                }
+              }
+
+              if (adminEmails.length > 0) {
+                const emailResult = await sendErrorReportEmailToAdmins({
+                  to: adminEmails,
+                  reportId: errorReport.id,
+                  title,
+                  description,
+                  errorCode: error_code,
+                  userName: profile?.full_name || 'Unknown',
+                  userEmail: user.email || 'Unknown',
+                  pageUrl: page_url,
+                  userAgent: user_agent,
+                  additionalContext: additional_context
+                });
+
+                emailSuccess = emailResult.success;
+                emailSent = emailResult.sent || 0;
+                emailFailed = emailResult.failed || 0;
+
+                console.log(`Emails sent: ${emailSent}, failed: ${emailFailed}`);
+              } else {
+                console.warn('No admin email addresses found');
+              }
+            } catch (emailError) {
+              console.error('Failed to send email notifications:', emailError);
+            }
           }
         }
-
-        if (adminEmails.length > 0) {
-          const emailResult = await sendErrorReportEmailToAdmins({
-            to: adminEmails,
-            reportId: errorReport.id,
-            title,
-            description,
-            errorCode: error_code,
-            userName: profile?.full_name || 'Unknown',
-            userEmail: user.email || 'Unknown',
-            pageUrl: page_url,
-            userAgent: user_agent,
-            additionalContext: additional_context
-          });
-
-          emailSuccess = emailResult.success;
-          emailSent = emailResult.sent || 0;
-          emailFailed = emailResult.failed || 0;
-
-          console.log(`Emails sent: ${emailSent}, failed: ${emailFailed}`);
-        } else {
-          console.warn('No admin email addresses found');
-        }
-      } catch (emailError) {
-        console.error('Failed to send email notifications:', emailError);
       }
+
+    } catch (notificationError) {
+      console.error('Failed to send admin notifications:', notificationError);
+      // Continue - don't fail the request due to notification issues
     }
 
+    // Return success since the report was created successfully
     const response: CreateErrorReportResponse = {
       success: true,
       report_id: errorReport.id,
