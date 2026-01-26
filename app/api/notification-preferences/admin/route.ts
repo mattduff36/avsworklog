@@ -99,8 +99,29 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is super admin (using email check for consistency with debug page)
-    if (user.email !== 'admin@mpdee.co.uk') {
+    // Check if user is super admin (using role-based check for consistency)
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select(`
+        id,
+        role:roles (
+          id,
+          name,
+          is_super_admin,
+          is_manager_admin
+        )
+      `)
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      console.error('Error fetching user profile:', profileError);
+      return NextResponse.json({ error: 'Forbidden: Unable to verify permissions' }, { status: 403 });
+    }
+
+    // Allow SuperAdmin role OR hardcoded email (for backwards compatibility)
+    const isSupeAdmin = profile.role?.is_super_admin === true || user.email === 'admin@mpdee.co.uk';
+    if (!isSupeAdmin) {
       return NextResponse.json({ error: 'Forbidden: SuperAdmin access required' }, { status: 403 });
     }
 

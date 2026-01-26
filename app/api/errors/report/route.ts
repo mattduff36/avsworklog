@@ -58,32 +58,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing title or description' }, { status: 400 });
     }
 
-    // 1. Persist error report to database
-    const { data: errorReport, error: reportError } = await supabase
-      .from('error_reports')
-      .insert({
-        created_by: user.id,
-        title: title.substring(0, 500), // Limit title length
-        description,
-        error_code,
-        page_url,
-        user_agent,
-        additional_context,
-        status: 'new'
-      })
-      .select()
-      .single();
-
-    if (reportError || !errorReport) {
-      console.error('Error creating error report:', reportError);
-      return NextResponse.json({ 
-        error: 'Failed to save error report' 
-      }, { status: 500 });
-    }
-
-    console.log(`Error report created: ${errorReport.id}`);
-
-    // 2. Find all admin users
+    // 1. Find all admin users FIRST (before creating the report)
     // NOTE: PostgREST's `.or(...)` does not support dotted paths like `role.name` reliably.
     // We query role IDs first, then fetch profiles by role_id.
     const { data: adminRoles, error: adminRolesError } = await supabase
@@ -109,6 +84,32 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
+    // 2. Persist error report to database (only after confirming admins exist)
+    const { data: errorReport, error: reportError } = await supabase
+      .from('error_reports')
+      .insert({
+        created_by: user.id,
+        title: title.substring(0, 500), // Limit title length
+        description,
+        error_code,
+        page_url,
+        user_agent,
+        additional_context,
+        status: 'new'
+      })
+      .select()
+      .single();
+
+    if (reportError || !errorReport) {
+      console.error('Error creating error report:', reportError);
+      return NextResponse.json({ 
+        error: 'Failed to save error report' 
+      }, { status: 500 });
+    }
+
+    console.log(`Error report created: ${errorReport.id}`);
+
+    // 3. Get admin user profiles
     const { data: adminProfiles, error: adminProfilesError } = await supabase
       .from('profiles')
       .select('id, full_name, role_id')

@@ -154,8 +154,31 @@ export default function DebugPage() {
       // Check if viewing as another role
       const viewAsRole = localStorage.getItem('viewAsRole') || 'actual';
       
-      // SECURITY: Redirect if not superadmin
-      if (authUser.email !== 'admin@mpdee.co.uk') {
+      // SECURITY: Check if user has super admin role
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          role:roles (
+            id,
+            name,
+            is_super_admin,
+            is_manager_admin
+          )
+        `)
+        .eq('id', authUser.id)
+        .single();
+
+      if (profileError || !profile) {
+        console.error('Error fetching user profile:', profileError);
+        toast.error('Access denied: Unable to verify permissions');
+        router.push('/dashboard');
+        return;
+      }
+
+      // SECURITY: Redirect if not superadmin (check role instead of hardcoded email)
+      const isSupeAdmin = profile.role?.is_super_admin === true || authUser.email === 'admin@mpdee.co.uk';
+      if (!isSupeAdmin) {
         toast.error('Access denied: SuperAdmin only');
         router.push('/dashboard');
         return;
