@@ -11,14 +11,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
+import { SelectableCard } from '@/components/ui/selectable-card';
 import {
   Bug,
   Database,
   Users,
   FileText,
-  Clipboard,
-  Calendar,
   ShieldAlert,
   RefreshCw,
   Loader2,
@@ -32,6 +30,7 @@ import {
   Plus,
   Send,
   Check,
+  CheckSquare,
   Ban,
   ChevronDown,
   ChevronRight,
@@ -53,14 +52,6 @@ type DebugInfo = {
   nextVersion: string;
 };
 
-type EntityStatus = {
-  id: string;
-  type: 'timesheet' | 'inspection' | 'absence';
-  identifier: string;
-  current_status: string;
-  user_name: string;
-  date: string;
-};
 
 type AuditLogEntry = {
   id: string;
@@ -97,16 +88,16 @@ export default function DebugPage() {
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   
   // Developer tab states
-  const [timesheets, setTimesheets] = useState<EntityStatus[]>([]);
-  const [inspections, setInspections] = useState<EntityStatus[]>([]);
-  const [absences, setAbsences] = useState<EntityStatus[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [auditLogsLimit, setAuditLogsLimit] = useState(100);
+  const [loadingMoreAudits, setLoadingMoreAudits] = useState(false);
   const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([]);
-  const [updating, setUpdating] = useState<string | null>(null);
   const [clearingErrors, setClearingErrors] = useState(false);
   const [expandedErrors, setExpandedErrors] = useState<string[]>([]);
   const [expandedAudits, setExpandedAudits] = useState<string[]>([]);
   const [viewedErrors, setViewedErrors] = useState<Set<string>>(new Set());
+  const [lastCheckedErrorId, setLastCheckedErrorId] = useState<string | null>(null);
+  const [notifyingNewErrors, setNotifyingNewErrors] = useState(false);
   
   // Error log filter states
   const [filterLocalhost, setFilterLocalhost] = useState(true);
@@ -130,6 +121,22 @@ export default function DebugPage() {
     attachments: true,
     archives: true,
   });
+
+  // Notification settings states
+  const [notificationUsers, setNotificationUsers] = useState<Array<{
+    user_id: string;
+    full_name: string;
+    role_name: string;
+    preferences: Array<{
+      module_key: string;
+      enabled: boolean;
+      notify_in_app: boolean;
+      notify_email: boolean;
+    }>;
+  }>>([]);
+  const [loadingNotificationUsers, setLoadingNotificationUsers] = useState(false);
+  const [notificationSearchQuery, setNotificationSearchQuery] = useState('');
+  const [savingNotificationPref, setSavingNotificationPref] = useState<string | null>(null);
 
   // Check if user is superadmin and viewing as actual role
   useEffect(() => {
@@ -183,7 +190,6 @@ export default function DebugPage() {
   useEffect(() => {
     if (userEmail === 'admin@mpdee.co.uk') {
       fetchDebugInfo();
-      fetchAllEntities();
       fetchAuditLogs();
       fetchErrorLogs();
     }
@@ -199,79 +205,17 @@ export default function DebugPage() {
     });
   };
 
-  const fetchAllEntities = async () => {
-    try {
-      // Fetch timesheets
-      const { data: timesheetData } = await supabase
-        .from('timesheets')
-        .select('id, status, week_ending, user_id, profiles!timesheets_user_id_fkey(full_name)')
-        .order('created_at', { ascending: false })
-        .limit(50);
 
-      if (timesheetData) {
-        setTimesheets(
-          timesheetData.map((t: { id: string; week_ending: string; status: string; profiles?: { full_name: string } }) => ({
-            id: t.id,
-            type: 'timesheet' as const,
-            identifier: `Week ending ${new Date(t.week_ending).toLocaleDateString()}`,
-            current_status: t.status,
-            user_name: t.profiles?.full_name || 'Unknown',
-            date: t.week_ending,
-          }))
-        );
-      }
-
-      // Fetch inspections
-      const { data: inspectionData } = await supabase
-        .from('vehicle_inspections')
-        .select('id, status, inspection_date, user_id, profiles!vehicle_inspections_user_id_fkey(full_name), vehicles(reg_number)')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (inspectionData) {
-        setInspections(
-          inspectionData.map((i: { id: string; inspection_date: string; status: string; vehicles?: { reg_number: string }; profiles?: { full_name: string } }) => ({
-            id: i.id,
-            type: 'inspection' as const,
-            identifier: `${i.vehicles?.reg_number || 'Unknown'} - ${new Date(i.inspection_date).toLocaleDateString()}`,
-            current_status: i.status,
-            user_name: i.profiles?.full_name || 'Unknown',
-            date: i.inspection_date,
-          }))
-        );
-      }
-
-      // Fetch absences
-      const { data: absenceData } = await supabase
-        .from('absences')
-        .select('id, status, date, profiles!absences_profile_id_fkey(full_name), absence_reasons(name)')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (absenceData) {
-        setAbsences(
-          absenceData.map((a: { id: string; status: string; date: string; absence_reasons?: { name: string } | null; profiles?: { full_name: string } | null }) => ({
-            id: a.id,
-            type: 'absence' as const,
-            identifier: `${a.absence_reasons?.name || 'Unknown'} - ${new Date(a.date).toLocaleDateString()}`,
-            current_status: a.status,
-            user_name: a.profiles?.full_name || 'Unknown',
-            date: a.date,
-          }))
-        );
-      }
-    } catch (error) {
-      console.error('Error fetching entities:', error);
-    }
-  };
-
-  const fetchAuditLogs = async () => {
+  const fetchAuditLogs = async (limit?: number) => {
+    // Use current state value if no limit provided
+    const effectiveLimit = limit ?? auditLogsLimit;
+    
     try {
       const { data: auditData, error } = await supabase
         .from('audit_log')
         .select('*, profiles!audit_log_user_id_fkey(full_name)')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(effectiveLimit);
 
       if (error) {
         console.error('Error fetching audit logs:', error);
@@ -297,6 +241,14 @@ export default function DebugPage() {
       console.error('Error fetching audit logs:', error);
       toast.error('Failed to fetch audit logs');
     }
+  };
+
+  const loadMoreAuditLogs = async () => {
+    setLoadingMoreAudits(true);
+    const newLimit = auditLogsLimit + 100;
+    setAuditLogsLimit(newLimit);
+    await fetchAuditLogs(newLimit);
+    setLoadingMoreAudits(false);
   };
 
   const fetchErrorLogs = async () => {
@@ -340,7 +292,41 @@ export default function DebugPage() {
           user_name: log.user_id ? userIdToName.get(log.user_id) || null : null,
         }));
 
-        setErrorLogs(enrichedErrorData as ErrorLogEntry[]);
+        const typedErrorData = enrichedErrorData as ErrorLogEntry[];
+        setErrorLogs(typedErrorData);
+        
+        // Check for new errors and notify admins
+        if (typedErrorData.length > 0) {
+          const newestErrorId = typedErrorData[0].id;
+          
+          // If this is a new error (and not the first load)
+          if (lastCheckedErrorId && newestErrorId !== lastCheckedErrorId && !notifyingNewErrors) {
+            // Find all errors that are newer than the last checked ID
+            const lastIndex = typedErrorData.findIndex(e => e.id === lastCheckedErrorId);
+            const newErrors = lastIndex > 0 ? typedErrorData.slice(0, lastIndex) : [typedErrorData[0]];
+            
+            // Notify admins of new errors (only if not viewed yet and not notifying already)
+            setNotifyingNewErrors(true);
+            for (const newError of newErrors) {
+              if (!viewedErrors.has(newError.id)) {
+                try {
+                  await fetch('/api/errors/notify-new', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ error_log_id: newError.id }),
+                  });
+                  console.log(`Notified admins of new error: ${newError.id}`);
+                } catch (notifyError) {
+                  console.error('Failed to notify admins of new error:', notifyError);
+                }
+              }
+            }
+            setNotifyingNewErrors(false);
+          }
+          
+          // Update last checked error ID
+          setLastCheckedErrorId(newestErrorId);
+        }
       }
     } catch (error) {
       // Silent fail - don't want to create error logging loops
@@ -474,72 +460,6 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
     }
   };
 
-  const updateStatus = async (id: string, type: string, newStatus: string) => {
-    setUpdating(id);
-    try {
-      let table = '';
-      switch (type) {
-        case 'timesheet':
-          table = 'timesheets';
-          break;
-        case 'inspection':
-          table = 'vehicle_inspections';
-          break;
-        case 'absence':
-          table = 'absences';
-          break;
-        default:
-          throw new Error('Invalid type');
-      }
-
-      const { error } = await supabase
-        .from(table)
-        .update({ status: newStatus })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      toast.success(`Status updated to ${newStatus}`);
-      fetchAllEntities();
-    } catch (error) {
-      console.error('Error updating status:', error);
-      toast.error('Failed to update status');
-    } finally {
-      setUpdating(null);
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'draft':
-        return <FileText className="h-4 w-4 text-gray-500" />;
-      case 'submitted':
-        return <Clock className="h-4 w-4 text-amber-500" />;
-      case 'approved':
-        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-      case 'rejected':
-        return <XCircle className="h-4 w-4 text-red-500" />;
-      case 'processed':
-        return <Package className="h-4 w-4 text-blue-500" />;
-      case 'adjusted':
-        return <Edit className="h-4 w-4 text-purple-500" />;
-      case 'pending':
-        return <Clock className="h-4 w-4 text-amber-500" />;
-      default:
-        return <FileText className="h-4 w-4 text-gray-500" />;
-    }
-  };
-
-  const getAvailableStatuses = (type: string) => {
-    if (type === 'timesheet') {
-      return ['draft', 'submitted', 'approved', 'rejected', 'processed', 'adjusted'];
-    } else if (type === 'inspection') {
-      return ['draft', 'submitted'];
-    } else if (type === 'absence') {
-      return ['pending', 'approved', 'rejected'];
-    }
-    return [];
-  };
 
   const getActionIcon = (action: string) => {
     switch (action.toLowerCase()) {
@@ -885,7 +805,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
       {/* Debug Info Cards - Compact on mobile, full on desktop */}
       <div className="grid grid-cols-4 gap-2 md:gap-4">
-        <Card className="">
+        <Card>
           <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
             <CardDescription className="text-xs md:text-sm text-muted-foreground flex items-center gap-1 md:gap-2">
               <Database className="h-3 md:h-4 w-3 md:w-4 text-blue-500" />
@@ -896,7 +816,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
           </CardHeader>
         </Card>
 
-        <Card className="">
+        <Card>
           <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
             <CardDescription className="text-xs md:text-sm text-muted-foreground flex items-center gap-1 md:gap-2">
               <Users className="h-3 md:h-4 w-3 md:w-4 text-green-500" />
@@ -907,7 +827,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
           </CardHeader>
         </Card>
 
-        <Card className="">
+        <Card>
           <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
             <CardDescription className="text-xs md:text-sm text-muted-foreground flex items-center gap-1 md:gap-2">
               <ShieldAlert className="h-3 md:h-4 w-3 md:w-4 text-red-500" />
@@ -918,7 +838,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
           </CardHeader>
         </Card>
 
-        <Card className="">
+        <Card>
           <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
             <CardDescription className="text-xs md:text-sm text-muted-foreground flex items-center gap-1 md:gap-2">
               <Clock className="h-3 md:h-4 w-3 md:w-4 text-purple-500" />
@@ -931,8 +851,8 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
       </div>
 
       {/* Developer Tools Tabs */}
-      <Tabs defaultValue="errors" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-7 md:grid-cols-7 gap-1 md:gap-0 h-auto md:h-10 p-1 bg-slate-100 dark:bg-slate-800">
+      <Tabs defaultValue="errors" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5 gap-1 md:gap-0 h-auto md:h-10 p-1">
           <TabsTrigger value="errors" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
             <Bug className="h-4 w-4 flex-shrink-0" />
             <span className="hidden md:inline">Error Log</span>
@@ -942,21 +862,6 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
             <History className="h-4 w-4 flex-shrink-0" />
             <span className="hidden md:inline">Audit Log</span>
             <span className="md:hidden data-[state=active]:inline hidden">Audit</span>
-          </TabsTrigger>
-          <TabsTrigger value="timesheets" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
-            <FileText className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden md:inline">Timesheets</span>
-            <span className="md:hidden data-[state=active]:inline hidden">Sheets</span>
-          </TabsTrigger>
-          <TabsTrigger value="inspections" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
-            <Clipboard className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden md:inline">Inspections</span>
-            <span className="md:hidden data-[state=active]:inline hidden">Inspect</span>
-          </TabsTrigger>
-          <TabsTrigger value="absences" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
-            <Calendar className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden md:inline">Absences</span>
-            <span className="md:hidden data-[state=active]:inline hidden">Absent</span>
           </TabsTrigger>
           <TabsTrigger value="dvla" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
             <RefreshCw className="h-4 w-4 flex-shrink-0" />
@@ -968,11 +873,16 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
             <span className="hidden md:inline">Test Vehicles</span>
             <span className="md:hidden data-[state=active]:inline hidden">Test</span>
           </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+            <Send className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden md:inline">Notification Settings</span>
+            <span className="md:hidden data-[state=active]:inline hidden">Notifs</span>
+          </TabsTrigger>
         </TabsList>
 
         {/* Error Log Tab */}
         <TabsContent value="errors">
-          <Card className="">
+          <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -1033,26 +943,23 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                   {/* Toggle Filters */}
-                  <div className="flex items-center justify-between gap-2">
-                    <Label htmlFor="filter-localhost" className="text-xs font-medium">
-                      Hide Localhost
-                    </Label>
-                    <Switch
-                      id="filter-localhost"
-                      checked={filterLocalhost}
-                      onCheckedChange={setFilterLocalhost}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <Label htmlFor="filter-admin" className="text-xs font-medium">
-                      Hide Admin
-                    </Label>
-                    <Switch
-                      id="filter-admin"
-                      checked={filterAdminAccount}
-                      onCheckedChange={setFilterAdminAccount}
-                    />
-                  </div>
+                  <SelectableCard
+                    selected={filterLocalhost}
+                    onSelect={() => setFilterLocalhost(!filterLocalhost)}
+                    variant="default"
+                    className="h-9"
+                  >
+                    <span className="text-xs font-medium">Hide Localhost</span>
+                  </SelectableCard>
+                  
+                  <SelectableCard
+                    selected={filterAdminAccount}
+                    onSelect={() => setFilterAdminAccount(!filterAdminAccount)}
+                    variant="default"
+                    className="h-9"
+                  >
+                    <span className="text-xs font-medium">Hide Admin</span>
+                  </SelectableCard>
 
                   {/* Dropdown Filters */}
                   <div>
@@ -1479,21 +1386,22 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
         {/* Audit Log Tab */}
         <TabsContent value="audit">
-          <Card className="">
+          <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Database Change Log</CardTitle>
                   <CardDescription>
-                    Track all database changes and modifications (Last 100 entries)
+                    Track all database changes and modifications (Showing {auditLogs.length} entries)
                   </CardDescription>
                 </div>
                 <Button
-                  onClick={fetchAuditLogs}
+                  onClick={() => fetchAuditLogs(auditLogsLimit)}
                   variant="outline"
                   size="sm"
+                  disabled={loadingMoreAudits}
                 >
-                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <RefreshCw className={`h-4 w-4 mr-2 ${loadingMoreAudits ? 'animate-spin' : ''}`} />
                   Refresh
                 </Button>
               </div>
@@ -1623,156 +1531,29 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                   })}
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Timesheets Tab */}
-        <TabsContent value="timesheets">
-          <Card className="">
-            <CardHeader>
-              <CardTitle>Timesheet Status Manager</CardTitle>
-              <CardDescription>
-                Manually change timesheet statuses (Last 50 entries)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {timesheets.map((timesheet) => (
-                  <div
-                    key={timesheet.id}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent"
+              
+              {/* Show More Button */}
+              {auditLogs.length > 0 && auditLogs.length >= auditLogsLimit && (
+                <div className="flex justify-center pt-4 border-t">
+                  <Button
+                    onClick={loadMoreAuditLogs}
+                    variant="outline"
+                    disabled={loadingMoreAudits}
                   >
-                    <div className="flex items-center gap-3 flex-1">
-                      {getStatusIcon(timesheet.current_status)}
-                      <div className="flex-1">
-                        <p className="font-medium">{timesheet.identifier}</p>
-                        <p className="text-sm text-muted-foreground">{timesheet.user_name}</p>
-                      </div>
-                      <Badge>{timesheet.current_status}</Badge>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Select
-                        value={timesheet.current_status}
-                        onValueChange={(value) => updateStatus(timesheet.id, 'timesheet', value)}
-                        disabled={updating === timesheet.id}
-                      >
-                        <SelectTrigger className="w-[140px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getAvailableStatuses('timesheet').map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {status}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {updating === timesheet.id && <Loader2 className="h-4 w-4 animate-spin" />}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Inspections Tab */}
-        <TabsContent value="inspections">
-          <Card className="">
-            <CardHeader>
-              <CardTitle>Inspection Status Manager</CardTitle>
-              <CardDescription>
-                Manually change inspection statuses (Last 50 entries)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {inspections.map((inspection) => (
-                  <div
-                    key={inspection.id}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent"
-                  >
-                    <div className="flex items-center gap-3 flex-1">
-                      {getStatusIcon(inspection.current_status)}
-                      <div className="flex-1">
-                        <p className="font-medium">{inspection.identifier}</p>
-                        <p className="text-sm text-muted-foreground">{inspection.user_name}</p>
-                      </div>
-                      <Badge>{inspection.current_status}</Badge>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Select
-                        value={inspection.current_status}
-                        onValueChange={(value) => updateStatus(inspection.id, 'inspection', value)}
-                        disabled={updating === inspection.id}
-                      >
-                        <SelectTrigger className="w-[140px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getAvailableStatuses('inspection').map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {status}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {updating === inspection.id && <Loader2 className="h-4 w-4 animate-spin" />}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Absences Tab */}
-        <TabsContent value="absences">
-          <Card className="">
-            <CardHeader>
-              <CardTitle>Absence Status Manager</CardTitle>
-              <CardDescription>
-                Manually change absence statuses (Last 50 entries)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {absences.map((absence) => (
-                  <div
-                    key={absence.id}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent"
-                  >
-                    <div className="flex items-center gap-3 flex-1">
-                      {getStatusIcon(absence.current_status)}
-                      <div className="flex-1">
-                        <p className="font-medium">{absence.identifier}</p>
-                        <p className="text-sm text-muted-foreground">{absence.user_name}</p>
-                      </div>
-                      <Badge>{absence.current_status}</Badge>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Select
-                        value={absence.current_status}
-                        onValueChange={(value) => updateStatus(absence.id, 'absence', value)}
-                        disabled={updating === absence.id}
-                      >
-                        <SelectTrigger className="w-[140px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getAvailableStatuses('absence').map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {status}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {updating === absence.id && <Loader2 className="h-4 w-4 animate-spin" />}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    {loadingMoreAudits ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-4 w-4 mr-2" />
+                        Show 100 More Entries
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1784,7 +1565,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
         {/* Test Vehicles Tab */}
         <TabsContent value="test-vehicles">
-          <Card className="">
+          <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -1886,7 +1667,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                                 : [...prev, vehicle.id]
                             );
                           }}
-                          className="h-4 w-4"
+                          className="h-4 w-4 rounded border-2 border-slate-400 dark:border-slate-600 text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 cursor-pointer bg-white dark:bg-slate-800"
                         />
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
@@ -1931,7 +1712,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                           id="purge-inspections"
                           checked={purgeActions.inspections}
                           onChange={(e) => setPurgeActions(prev => ({ ...prev, inspections: e.target.checked }))}
-                          className="h-4 w-4"
+                          className="h-4 w-4 rounded border-2 border-slate-400 dark:border-slate-600 text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 cursor-pointer bg-white dark:bg-slate-800"
                         />
                         <Label htmlFor="purge-inspections" className="text-sm font-normal cursor-pointer">
                           Vehicle Inspections (and items, photos)
@@ -1943,7 +1724,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                           id="purge-tasks"
                           checked={purgeActions.workshop_tasks}
                           onChange={(e) => setPurgeActions(prev => ({ ...prev, workshop_tasks: e.target.checked }))}
-                          className="h-4 w-4"
+                          className="h-4 w-4 rounded border-2 border-slate-400 dark:border-slate-600 text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 cursor-pointer bg-white dark:bg-slate-800"
                         />
                         <Label htmlFor="purge-tasks" className="text-sm font-normal cursor-pointer">
                           Workshop Tasks (and comments, attachments)
@@ -1955,7 +1736,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                           id="purge-maintenance"
                           checked={purgeActions.maintenance}
                           onChange={(e) => setPurgeActions(prev => ({ ...prev, maintenance: e.target.checked }))}
-                          className="h-4 w-4"
+                          className="h-4 w-4 rounded border-2 border-slate-400 dark:border-slate-600 text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 cursor-pointer bg-white dark:bg-slate-800"
                         />
                         <Label htmlFor="purge-maintenance" className="text-sm font-normal cursor-pointer">
                           Maintenance Records (history, DVLA logs, MOT data)
@@ -1967,7 +1748,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                           id="purge-attachments"
                           checked={purgeActions.attachments}
                           onChange={(e) => setPurgeActions(prev => ({ ...prev, attachments: e.target.checked }))}
-                          className="h-4 w-4"
+                          className="h-4 w-4 rounded border-2 border-slate-400 dark:border-slate-600 text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 cursor-pointer bg-white dark:bg-slate-800"
                         />
                         <Label htmlFor="purge-attachments" className="text-sm font-normal cursor-pointer">
                           Workshop Attachments (usually cascades with tasks)
@@ -1979,7 +1760,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                           id="purge-archives"
                           checked={purgeActions.archives}
                           onChange={(e) => setPurgeActions(prev => ({ ...prev, archives: e.target.checked }))}
-                          className="h-4 w-4"
+                          className="h-4 w-4 rounded border-2 border-slate-400 dark:border-slate-600 text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 cursor-pointer bg-white dark:bg-slate-800"
                         />
                         <Label htmlFor="purge-archives" className="text-sm font-normal cursor-pointer">
                           Vehicle Archive Entries
@@ -2075,9 +1856,519 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
           </Card>
         </TabsContent>
 
+        {/* Notification Settings Tab */}
+        <TabsContent value="notifications">
+          <NotificationSettingsDebugPanel />
+        </TabsContent>
+
         {/* System Tab */}
       </Tabs>
     </div>
+  );
+}
+
+// Notification Settings Debug Component
+function NotificationSettingsDebugPanel() {
+  const [users, setUsers] = useState<Array<{
+    user_id: string;
+    full_name: string;
+    role_name: string;
+    preferences: Array<{
+      id?: string;
+      module_key: string;
+      enabled: boolean;
+      notify_in_app: boolean;
+      notify_email: boolean;
+    }>;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [moduleFilter, setModuleFilter] = useState<string>('all');
+  const [saving, setSaving] = useState<string | null>(null);
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+
+  const MODULES = [
+    { key: 'errors', label: 'Error Reports' },
+    { key: 'maintenance', label: 'Maintenance' },
+    { key: 'rams', label: 'RAMS Signatures' },
+    { key: 'approvals', label: 'Approvals' },
+    { key: 'inspections', label: 'Inspections' },
+  ];
+
+  useEffect(() => {
+    fetchAllPreferences();
+  }, []);
+
+  const fetchAllPreferences = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/notification-preferences/admin');
+      const data = await response.json();
+
+      if (data.success) {
+        setUsers(data.users || []);
+      } else {
+        throw new Error(data.error || 'Failed to fetch preferences');
+      }
+    } catch (error) {
+      console.error('Error fetching notification preferences:', error);
+      toast.error('Failed to load notification preferences');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updatePreference = async (
+    userId: string,
+    moduleKey: string,
+    field: 'enabled' | 'notify_in_app' | 'notify_email',
+    value: boolean
+  ) => {
+    const saveKey = `${userId}-${moduleKey}-${field}`;
+    setSaving(saveKey);
+    try {
+      const response = await fetch('/api/notification-preferences/admin', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          module_key: moduleKey,
+          [field]: value,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Update local state
+        setUsers(prev => prev.map(u => {
+          if (u.user_id === userId) {
+            const prefs = u.preferences.map(p =>
+              p.module_key === moduleKey ? { ...p, [field]: value } : p
+            );
+            // If preference doesn't exist, add it
+            if (!prefs.find(p => p.module_key === moduleKey)) {
+              prefs.push({
+                module_key: moduleKey,
+                enabled: field === 'enabled' ? value : true,
+                notify_in_app: field === 'notify_in_app' ? value : true,
+                notify_email: field === 'notify_email' ? value : true,
+              });
+            }
+            return { ...u, preferences: prefs };
+          }
+          return u;
+        }));
+        toast.success('Preference updated');
+      } else {
+        throw new Error(data.error || 'Failed to update');
+      }
+    } catch (error) {
+      console.error('Error updating preference:', error);
+      toast.error('Failed to update preference');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const filteredUsers = users.filter(u => {
+    // Search filter
+    const matchesSearch = u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.role_name.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Role filter
+    const matchesRole = roleFilter === 'all' || u.role_name.toLowerCase() === roleFilter.toLowerCase();
+    
+    return matchesSearch && matchesRole;
+  });
+
+  const uniqueRoles = Array.from(new Set(users.map(u => u.role_name))).sort();
+
+  const batchUpdatePreference = async (
+    field: 'enabled' | 'notify_in_app' | 'notify_email',
+    value: boolean,
+    targetModule?: string
+  ) => {
+    if (selectedUsers.size === 0) {
+      toast.error('Please select users first');
+      return;
+    }
+
+    const modulesToUpdate = targetModule ? [targetModule] : MODULES.map(m => m.key);
+    
+    setSaving('batch');
+    try {
+      const updates = Array.from(selectedUsers).flatMap(userId => 
+        modulesToUpdate.map(moduleKey => ({
+          userId,
+          moduleKey,
+          field,
+          value
+        }))
+      );
+
+      // Update all preferences and validate responses
+      const responses = await Promise.all(updates.map(({ userId, moduleKey }) => 
+        fetch('/api/notification-preferences/admin', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: userId,
+            module_key: moduleKey,
+            [field]: value,
+          }),
+        })
+      ));
+
+      // Check for any failed requests
+      const failedCount = responses.filter(r => !r.ok).length;
+      
+      if (failedCount > 0) {
+        toast.error(`Failed to update ${failedCount} of ${responses.length} preferences`, {
+          description: 'Some updates may have failed. Please check and try again.'
+        });
+      } else {
+        toast.success(`Updated ${selectedUsers.size} user(s)`);
+        setSelectedUsers(new Set());
+        setBatchMode(false);
+      }
+
+      // Refresh data regardless
+      await fetchAllPreferences();
+    } catch (error) {
+      console.error('Error batch updating:', error);
+      toast.error('Failed to batch update');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const toggleUserSelection = (userId: string) => {
+    const newSelection = new Set(selectedUsers);
+    if (newSelection.has(userId)) {
+      newSelection.delete(userId);
+    } else {
+      newSelection.add(userId);
+    }
+    setSelectedUsers(newSelection);
+  };
+
+  const selectAll = () => {
+    setSelectedUsers(new Set(filteredUsers.map(u => u.user_id)));
+  };
+
+  const deselectAll = () => {
+    setSelectedUsers(new Set());
+  };
+
+  const getRoleBadgeVariant = (roleName: string, userEmail?: string) => {
+    if (userEmail === 'admin@mpdee.co.uk') return 'destructive';
+    const lowerRole = roleName.toLowerCase();
+    if (lowerRole === 'admin') return 'destructive';
+    if (lowerRole === 'manager') return 'warning';
+    return 'secondary';
+  };
+
+  const getRoleDisplayName = (roleName: string, userEmail?: string) => {
+    if (userEmail === 'admin@mpdee.co.uk') return 'SuperAdmin';
+    return roleName;
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Send className="h-5 w-5" />
+          User Notification Settings
+        </CardTitle>
+        <CardDescription>
+          View and override notification preferences for all users
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Filters and Batch Actions */}
+        <div className="flex flex-col md:flex-row gap-4">
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search users..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-white dark:bg-slate-900"
+            />
+          </div>
+
+          {/* Role Filter */}
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger className="w-full md:w-[200px] bg-white dark:bg-slate-900">
+              <SelectValue placeholder="All Roles" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Roles</SelectItem>
+              {uniqueRoles.map(role => (
+                <SelectItem key={role} value={role}>{role}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Module Filter */}
+          <Select value={moduleFilter} onValueChange={setModuleFilter}>
+            <SelectTrigger className="w-full md:w-[200px] bg-white dark:bg-slate-900">
+              <SelectValue placeholder="All Modules" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Modules</SelectItem>
+              {MODULES.map(m => (
+                <SelectItem key={m.key} value={m.key}>{m.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Batch Mode Toggle */}
+          <Button
+            variant={batchMode ? "default" : "outline"}
+            onClick={() => {
+              setBatchMode(!batchMode);
+              if (batchMode) {
+                setSelectedUsers(new Set());
+              }
+            }}
+            className="whitespace-nowrap"
+          >
+            <CheckSquare className="h-4 w-4 mr-2" />
+            Batch Mode
+          </Button>
+        </div>
+
+        {/* Batch Actions */}
+        {batchMode && (
+          <div className="flex flex-wrap gap-2 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground w-full mb-2">
+              {selectedUsers.size} user(s) selected
+              <Button size="sm" variant="ghost" onClick={selectAll}>Select All</Button>
+              <Button size="sm" variant="ghost" onClick={deselectAll}>Clear</Button>
+            </div>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => batchUpdatePreference('notify_in_app', true, moduleFilter !== 'all' ? moduleFilter : undefined)}
+              disabled={saving === 'batch'}
+            >
+              Enable In-App
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => batchUpdatePreference('notify_in_app', false, moduleFilter !== 'all' ? moduleFilter : undefined)}
+              disabled={saving === 'batch'}
+            >
+              Disable In-App
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => batchUpdatePreference('notify_email', true, moduleFilter !== 'all' ? moduleFilter : undefined)}
+              disabled={saving === 'batch'}
+            >
+              Enable Email
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => batchUpdatePreference('notify_email', false, moduleFilter !== 'all' ? moduleFilter : undefined)}
+              disabled={saving === 'batch'}
+            >
+              Disable Email
+            </Button>
+            {saving === 'batch' && <Loader2 className="h-4 w-4 animate-spin" />}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : filteredUsers.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>No users match your filters</p>
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-border bg-slate-50 dark:bg-slate-800/50">
+                    {batchMode && (
+                      <th className="p-3 text-left">
+                        <input
+                          type="checkbox"
+                          checked={selectedUsers.size === filteredUsers.length}
+                          onChange={() => selectedUsers.size === filteredUsers.length ? deselectAll() : selectAll()}
+                          className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-primary cursor-pointer"
+                        />
+                      </th>
+                    )}
+                    <th className="p-3 text-left text-sm font-medium text-foreground">User</th>
+                    <th className="p-3 text-left text-sm font-medium text-foreground">Role</th>
+                    {MODULES.filter(m => moduleFilter === 'all' || m.key === moduleFilter).map(module => (
+                      <th key={module.key} className="p-3 text-center text-sm font-medium text-foreground">
+                        <div className="flex flex-col gap-1">
+                          <span>{module.label}</span>
+                          <div className="flex gap-2 text-xs text-muted-foreground justify-center">
+                            <span>App</span>
+                            <span>Email</span>
+                          </div>
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map(user => {
+                    const getPref = (moduleKey: string) => {
+                      return user.preferences.find(p => p.module_key === moduleKey) || {
+                        notify_in_app: true,
+                        notify_email: true,
+                      };
+                    };
+
+                    return (
+                      <tr key={user.user_id} className="border-b border-border hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                        {batchMode && (
+                          <td className="p-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedUsers.has(user.user_id)}
+                              onChange={() => toggleUserSelection(user.user_id)}
+                              className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-primary cursor-pointer"
+                            />
+                          </td>
+                        )}
+                        <td className="p-3 text-sm font-medium text-foreground">{user.full_name}</td>
+                        <td className="p-3">
+                          <Badge variant={getRoleBadgeVariant(user.role_name)}>
+                            {getRoleDisplayName(user.role_name)}
+                          </Badge>
+                        </td>
+                        {MODULES.filter(m => moduleFilter === 'all' || m.key === moduleFilter).map(module => {
+                          const pref = getPref(module.key);
+                          const saveKey = `${user.user_id}-${module.key}`;
+                          const isSaving = saving?.startsWith(saveKey) || false;
+
+                          return (
+                            <td key={module.key} className="p-3">
+                              <div className="flex gap-4 justify-center items-center">
+                                <input
+                                  type="checkbox"
+                                  checked={pref.notify_in_app}
+                                  onChange={(e) => updatePreference(user.user_id, module.key, 'notify_in_app', e.target.checked)}
+                                  disabled={isSaving}
+                                  className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary focus:ring-offset-0 bg-white dark:bg-slate-700 cursor-pointer disabled:opacity-50"
+                                />
+                                <input
+                                  type="checkbox"
+                                  checked={pref.notify_email}
+                                  onChange={(e) => updatePreference(user.user_id, module.key, 'notify_email', e.target.checked)}
+                                  disabled={isSaving}
+                                  className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary focus:ring-offset-0 bg-white dark:bg-slate-700 cursor-pointer disabled:opacity-50"
+                                />
+                                {isSaving && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4">
+              {filteredUsers.map(user => {
+                const getPref = (moduleKey: string) => {
+                  return user.preferences.find(p => p.module_key === moduleKey) || {
+                    notify_in_app: true,
+                    notify_email: true,
+                  };
+                };
+
+                return (
+                  <Card key={user.user_id} className="border-2">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg">{user.full_name}</CardTitle>
+                          <div className="mt-1">
+                            <Badge variant={getRoleBadgeVariant(user.role_name)}>
+                              {getRoleDisplayName(user.role_name)}
+                            </Badge>
+                          </div>
+                        </div>
+                        {batchMode && (
+                          <input
+                            type="checkbox"
+                            checked={selectedUsers.has(user.user_id)}
+                            onChange={() => toggleUserSelection(user.user_id)}
+                            className="h-5 w-5 rounded border-slate-300 dark:border-slate-600 text-primary cursor-pointer"
+                          />
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {MODULES.filter(m => moduleFilter === 'all' || m.key === moduleFilter).map(module => {
+                          const pref = getPref(module.key);
+                          const saveKey = `${user.user_id}-${module.key}`;
+                          const isSaving = saving?.startsWith(saveKey) || false;
+
+                          return (
+                            <div key={module.key} className="flex items-center justify-between p-2 rounded border border-border bg-white dark:bg-slate-800/50">
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-foreground dark:text-slate-200">{module.label}</p>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300">App</span>
+                                  <input
+                                    type="checkbox"
+                                    checked={pref.notify_in_app}
+                                    onChange={(e) => updatePreference(user.user_id, module.key, 'notify_in_app', e.target.checked)}
+                                    disabled={isSaving}
+                                    className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary focus:ring-offset-0 bg-white dark:bg-slate-700 cursor-pointer disabled:opacity-50"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Email</span>
+                                  <input
+                                    type="checkbox"
+                                    checked={pref.notify_email}
+                                    onChange={(e) => updatePreference(user.user_id, module.key, 'notify_email', e.target.checked)}
+                                    disabled={isSaving}
+                                    className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary focus:ring-offset-0 bg-white dark:bg-slate-700 cursor-pointer disabled:opacity-50"
+                                  />
+                                </div>
+                                {isSaving && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

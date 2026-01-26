@@ -156,6 +156,11 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
             <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
               You&apos;re all caught up!
             </p>
+            <Link href="/notifications" onClick={onClose}>
+              <Button variant="outline" size="sm" className="mt-4 text-xs">
+                Notification Settings
+              </Button>
+            </Link>
           </div>
         ) : (
           <>

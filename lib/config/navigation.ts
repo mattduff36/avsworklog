@@ -26,6 +26,7 @@ import {
   Truck,
   HelpCircle,
   Lightbulb,
+  AlertTriangle,
   LucideIcon
 } from 'lucide-react';
 import { ModuleName } from '@/types/roles';
@@ -160,6 +161,12 @@ export const adminNavItems: NavItem[] = [
     href: '/admin/faq', 
     label: 'FAQ Editor', 
     icon: HelpCircle,
+    category: 'admin'
+  },
+  { 
+    href: '/admin/errors/manage', 
+    label: 'Error Reports', 
+    icon: AlertTriangle,
     category: 'admin'
   },
 ];

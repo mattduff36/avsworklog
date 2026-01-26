@@ -66,6 +66,12 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
         body: formData,
       });
 
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error(`Server error (${response.status}). Please try again or contact support if the issue persists.`);
+      }
+
       const data = await response.json();
 
       if (!response.ok) {

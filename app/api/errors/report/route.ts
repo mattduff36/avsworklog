@@ -31,7 +31,13 @@ export async function POST(request: NextRequest) {
     // Use service role client for database operations to bypass RLS
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
     );
 
     // Get user's profile
@@ -78,37 +84,91 @@ export async function POST(request: NextRequest) {
     console.log(`Error report created: ${errorReport.id}`);
 
     // 2. Find all admin users
-    const { data: adminProfiles, error: adminError } = await supabase
-      .from('profiles')
-      .select(`
-        id,
-        full_name,
-        roles!inner(
-          id,
-          name,
-          is_super_admin
-        )
-      `)
-      .or('roles.name.eq.admin,roles.is_super_admin.eq.true');
+    // NOTE: PostgREST's `.or(...)` does not support dotted paths like `role.name` reliably.
+    // We query role IDs first, then fetch profiles by role_id.
+    const { data: adminRoles, error: adminRolesError } = await supabase
+      .from('roles')
+      .select('id')
+      .or('name.eq.admin,is_super_admin.is.true,is_manager_admin.is.true');
 
-    if (adminError) {
-      console.error('Error finding admin users:', adminError);
+    if (adminRolesError) {
+      console.error('Error finding admin roles:', adminRolesError);
+      return NextResponse.json({ 
+        success: false,
+        error: 'Failed to find admin users',
+        details: adminRolesError.message
+      }, { status: 500 });
     }
 
-    const adminUserIds = adminProfiles?.map(p => p.id) || [];
-    console.log(`Found ${adminUserIds.length} admin users`);
+    const adminRoleIds = (adminRoles ?? []).map(r => r.id);
+    if (adminRoleIds.length === 0) {
+      console.warn('No admin users found! This should not happen.');
+      return NextResponse.json({ 
+        success: false,
+        error: 'No admin users found to notify',
+      }, { status: 500 });
+    }
 
-    // 3. Create in-app notifications for all admins
+    const { data: adminProfiles, error: adminProfilesError } = await supabase
+      .from('profiles')
+      .select('id, full_name, role_id')
+      .in('role_id', adminRoleIds);
+
+    if (adminProfilesError) {
+      console.error('Error finding admin profiles:', adminProfilesError);
+      return NextResponse.json({ 
+        success: false,
+        error: 'Failed to find admin users',
+        details: adminProfilesError.message
+      }, { status: 500 });
+    }
+
+    if (!adminProfiles || adminProfiles.length === 0) {
+      console.warn('No admin profiles found! This should not happen.');
+      return NextResponse.json({ 
+        success: false,
+        error: 'No admin users found to notify',
+      }, { status: 500 });
+    }
+
+    const adminUserIds = adminProfiles.map(p => p.id);
+    console.log(`Found ${adminUserIds.length} admin users for notification:`, adminUserIds);
+
+    // 2.5. Fetch admin notification preferences
+    const { data: allPrefs } = await supabase
+      .from('admin_error_notification_prefs')
+      .select('*')
+      .in('user_id', adminUserIds);
+    
+    // Build preference maps (default to true if no preference record exists)
+    const inAppPrefs = new Map<string, boolean>();
+    const emailPrefs = new Map<string, boolean>();
+    
+    adminUserIds.forEach(id => {
+      const pref = allPrefs?.find(p => p.user_id === id);
+      inAppPrefs.set(id, pref?.notify_in_app ?? true);
+      emailPrefs.set(id, pref?.notify_email ?? true);
+    });
+    
+    // Filter admins who want in-app notifications
+    const inAppAdminIds = adminUserIds.filter(id => inAppPrefs.get(id) === true);
+    console.log(`${inAppAdminIds.length} admins opted in for in-app notifications`);
+    
+    // Filter admins who want email notifications
+    const emailAdminIds = adminUserIds.filter(id => emailPrefs.get(id) === true);
+    console.log(`${emailAdminIds.length} admins opted in for email notifications`);
+
+    // 3. Create in-app notifications for opted-in admins
     let notificationSuccess = false;
     let notificationMessageId: string | null = null;
 
-    if (adminUserIds.length > 0) {
+    if (inAppAdminIds.length > 0) {
       try {
         // Create message
         const { data: message, error: messageError } = await supabase
           .from('messages')
           .insert({
-            type: 'REMINDER',
+            type: 'NOTIFICATION',
             priority: 'HIGH',
             subject: `🐛 Error Report: ${title.substring(0, 50)}${title.length > 50 ? '...' : ''}`,
             body: `**User:** ${profile?.full_name || 'Unknown'} (${user.email})
@@ -138,8 +198,8 @@ ${additional_context ? `**Additional Context:**\n${JSON.stringify(additional_con
 
         notificationMessageId = message.id;
 
-        // Create recipient entries for all admins
-        const recipientRecords = adminUserIds.map(adminId => ({
+        // Create recipient entries for opted-in admins only
+        const recipientRecords = inAppAdminIds.map(adminId => ({
           message_id: message.id,
           user_id: adminId,
           status: 'PENDING' as const
@@ -161,22 +221,22 @@ ${additional_context ? `**Additional Context:**\n${JSON.stringify(additional_con
           .eq('id', errorReport.id);
 
         notificationSuccess = true;
-        console.log(`In-app notifications created for ${adminUserIds.length} admins`);
+        console.log(`In-app notifications created for ${inAppAdminIds.length} admins`);
       } catch (notificationError) {
         console.error('Failed to create in-app notifications:', notificationError);
       }
     }
 
-    // 4. Send email notifications to all admins
+    // 4. Send email notifications to opted-in admins
     let emailSuccess = false;
     let emailSent = 0;
     let emailFailed = 0;
 
-    if (adminUserIds.length > 0) {
+    if (emailAdminIds.length > 0) {
       try {
-        // Fetch admin email addresses
+        // Fetch email addresses for opted-in admins only
         const adminEmails: string[] = [];
-        for (const adminId of adminUserIds) {
+        for (const adminId of emailAdminIds) {
           const { data: authUser } = await supabase.auth.admin.getUserById(adminId);
           if (authUser?.user?.email) {
             adminEmails.push(authUser.user.email);

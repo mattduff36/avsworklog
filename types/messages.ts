@@ -3,7 +3,7 @@
  * Supports Toolbox Talks (high priority, blocking) and Reminders (low priority, non-blocking)
  */
 
-export type MessageType = 'TOOLBOX_TALK' | 'REMINDER';
+export type MessageType = 'TOOLBOX_TALK' | 'REMINDER' | 'NOTIFICATION';
 export type MessagePriority = 'HIGH' | 'LOW';
 export type MessageRecipientStatus = 'PENDING' | 'SHOWN' | 'SIGNED' | 'DISMISSED';
 

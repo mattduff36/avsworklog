@@ -1012,9 +1012,9 @@ export async function sendErrorReportEmailToAdmins(params: SendErrorReportEmailT
               <p style="margin: 5px 0 0 0; color: #92400e;">Please log in to SquiresApp to review and manage this error report. You can update the status and add notes for tracking.</p>
             </div>
             
-            <div style="text-align: center; margin: 20px 0;">
-              <a href="https://www.squiresapp.com/errors/manage" style="display: inline-block; background-color: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Manage Error Reports</a>
-            </div>
+    <div style="text-align: center; margin: 20px 0;">
+      <a href="https://www.squiresapp.com/admin/errors/manage" style="display: inline-block; background-color: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Manage Error Reports</a>
+    </div>
             
             <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
               <strong>Report ID:</strong> ${reportId}

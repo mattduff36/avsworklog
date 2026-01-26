@@ -28,6 +28,8 @@ import type { FAQArticleWithCategory, FAQCategory, Suggestion } from '@/types/fa
 import type { ErrorReport } from '@/types/error-reports';
 import type { ModuleName } from '@/types/roles';
 import Link from 'next/link';
+import { MODULE_PAGES, getPageLabel } from '@/lib/config/module-pages';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function HelpPage() {
   const { profile, isManager, isAdmin } = useAuth(); // Get user info
@@ -51,7 +53,7 @@ export default function HelpPage() {
   // Error report state
   const [errorTitle, setErrorTitle] = useState('');
   const [errorDescription, setErrorDescription] = useState('');
-  const [errorPageHint, setErrorPageHint] = useState('');
+  const [errorPageSelection, setErrorPageSelection] = useState('');
   const [submittingError, setSubmittingError] = useState(false);
   const [myErrors, setMyErrors] = useState<ErrorReport[]>([]);
   const [loadingErrors, setLoadingErrors] = useState(false);
@@ -275,6 +277,11 @@ export default function HelpPage() {
       return;
     }
 
+    if (!errorPageSelection) {
+      toast.error('Please select which page/feature this error relates to');
+      return;
+    }
+
     try {
       setSubmittingError(true);
       const response = await fetch('/api/errors/report', {
@@ -283,26 +290,39 @@ export default function HelpPage() {
         body: JSON.stringify({
           title: errorTitle.trim(),
           description: errorDescription.trim(),
-          page_url: errorPageHint.trim() || (typeof window !== 'undefined' ? window.location.href : undefined),
+          page_url: getPageLabel(errorPageSelection),
           user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+          additional_context: {
+            current_url: typeof window !== 'undefined' ? window.location.href : undefined,
+            selected_page: errorPageSelection,
+          },
         }),
       });
 
-      const data = await response.json();
+      // Check response status first
+      if (!response.ok) {
+        // Try to parse error response
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || `Server error (${response.status})`);
+      }
 
-      if (data.success) {
+      const data = await response.json().catch(() => {
+        throw new Error('Failed to parse response from server');
+      });
+
+      if (data && data.success) {
         toast.success('Error reported successfully!', {
           description: 'Admins have been notified and will investigate.'
         });
         setErrorTitle('');
         setErrorDescription('');
-        setErrorPageHint('');
+        setErrorPageSelection('');
         // Refresh error reports list if on that tab
         if (activeTab === 'my-errors') {
           fetchMyErrors();
         }
       } else {
-        throw new Error(data.error || 'Failed to submit error report');
+        throw new Error(data?.error || 'Failed to submit error report');
       }
     } catch (error) {
       console.error('Error submitting error report:', error);
@@ -571,14 +591,25 @@ export default function HelpPage() {
               
               <div className="space-y-2">
                 <Label htmlFor="error-page">
-                  Page/Feature (optional)
+                  Page/Feature <span className="text-red-500">*</span>
                 </Label>
-                <Input
-                  id="error-page"
-                  placeholder="e.g., Timesheets, Inspections, Dashboard"
-                  value={errorPageHint}
-                  onChange={(e) => setErrorPageHint(e.target.value)}
-                />
+                <Select value={errorPageSelection} onValueChange={setErrorPageSelection}>
+                  <SelectTrigger id="error-page" className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900">
+                    <SelectValue placeholder="Select which page/feature this error relates to" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    {MODULE_PAGES.map((moduleGroup) => (
+                      <SelectGroup key={moduleGroup.module}>
+                        <SelectLabel>{moduleGroup.displayName}</SelectLabel>
+                        {moduleGroup.subPages.map((page) => (
+                          <SelectItem key={page.value} value={page.value}>
+                            {page.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-3">
@@ -589,7 +620,7 @@ export default function HelpPage() {
 
               <Button
                 onClick={handleSubmitError}
-                disabled={submittingError || !errorTitle.trim() || !errorDescription.trim()}
+                disabled={submittingError || !errorTitle.trim() || !errorDescription.trim() || !errorPageSelection}
                 className="bg-red-600 hover:bg-red-700 text-white"
               >
                 {submittingError ? (
@@ -620,7 +651,7 @@ export default function HelpPage() {
                   </CardDescription>
                 </div>
                 {isAdmin && (
-                  <Link href="/errors/manage">
+                  <Link href="/admin/errors/manage">
                     <Button variant="outline" size="sm" className="gap-2">
                       <Settings className="h-4 w-4" />
                       Manage All Errors
