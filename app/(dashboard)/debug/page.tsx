@@ -324,22 +324,28 @@ export default function DebugPage() {
           
           // If this is a new error (and not the first load)
           if (lastCheckedErrorId && newestErrorId !== lastCheckedErrorId && !notifyingNewErrorsRef.current) {
+            // Set the ref immediately to prevent race conditions
+            notifyingNewErrorsRef.current = true;
+            
             // Find all errors that are newer than the last checked ID
             const lastIndex = typedErrorData.findIndex(e => e.id === lastCheckedErrorId);
             const newErrors = lastIndex >= 0 ? typedErrorData.slice(0, lastIndex) : [];
             
-            // Notify admins of new errors (only if not viewed yet and not notifying already)
-            // Use ref to prevent race conditions from concurrent fetchErrorLogs() calls
-            notifyingNewErrorsRef.current = true;
+            // Notify admins of new errors (only if not viewed yet)
             
             for (const newError of newErrors) {
               if (!viewedErrors.has(newError.id)) {
                 try {
-                  await fetch('/api/errors/notify-new', {
+                  const response = await fetch('/api/errors/notify-new', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ error_log_id: newError.id }),
                   });
+                  
+                  if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                  }
+                  
                   console.log(`Notified admins of new error: ${newError.id}`);
                 } catch (notifyError) {
                   console.error('Failed to notify admins of new error:', notifyError);

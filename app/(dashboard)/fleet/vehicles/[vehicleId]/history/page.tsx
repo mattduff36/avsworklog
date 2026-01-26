@@ -137,7 +137,7 @@ type TaskAttachment = {
   } | null;
 };
 
-function DocumentsTabContent({ workshopTasks }: { vehicleId: string; workshopTasks: WorkshopTask[] }) {
+function DocumentsTabContent({ vehicleId, workshopTasks }: { vehicleId: string; workshopTasks: WorkshopTask[] }) {
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [loading, setLoading] = useState(true);
 
