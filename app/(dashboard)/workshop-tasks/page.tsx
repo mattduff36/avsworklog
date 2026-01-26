@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, FileText, Wrench, Undo2, Info, Edit, Trash2, ChevronDown, ChevronUp, MessageSquare, Pause } from 'lucide-react';
+import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, FileText, Wrench, Undo2, Info, Edit, Trash2, ChevronDown, ChevronUp, MessageSquare, Pause, Paperclip } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import { Database } from '@/types/database';
@@ -90,6 +90,7 @@ export default function WorkshopTasksPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [vehicleFilter, setVehicleFilter] = useState<string>('all');
+  const [taskAttachmentCounts, setTaskAttachmentCounts] = useState<Map<string, number>>(new Map());
   
   // Fetch attachment templates using hook
   const { templates: attachmentTemplates } = useAttachmentTemplates();
@@ -271,6 +272,21 @@ export default function WorkshopTasksPage() {
       }));
 
       setTasks(tasksWithProfiles);
+
+      // Fetch attachment counts for all tasks
+      if (tasksWithProfiles.length > 0) {
+        const taskIds = tasksWithProfiles.map(t => t.id);
+        const { data: attachmentData } = await supabase
+          .from('workshop_task_attachments')
+          .select('task_id')
+          .in('task_id', taskIds);
+
+        const counts = new Map<string, number>();
+        (attachmentData || []).forEach(att => {
+          counts.set(att.task_id, (counts.get(att.task_id) || 0) + 1);
+        });
+        setTaskAttachmentCounts(counts);
+      }
     } catch (err) {
       console.error('Error fetching tasks:', err instanceof Error ? err.message : err);
       toast.error('Failed to load workshop tasks');
@@ -1481,6 +1497,12 @@ export default function WorkshopTasksPage() {
                                     <Badge variant="outline" className="text-xs">
                                       {getSourceLabel(task)}
                                     </Badge>
+                                    {taskAttachmentCounts.get(task.id) && taskAttachmentCounts.get(task.id)! > 0 && (
+                                      <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30 text-xs">
+                                        <Paperclip className="h-3 w-3 mr-1" />
+                                        {taskAttachmentCounts.get(task.id)}
+                                      </Badge>
+                                    )}
                                   </div>
                                   <div className="flex flex-wrap gap-2 mb-2">
                                     {task.workshop_task_subcategories?.workshop_task_categories && (
@@ -1558,8 +1580,8 @@ export default function WorkshopTasksPage() {
                                 <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                                   <span>Created: {formatDate(task.created_at)}</span>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                  {task.action_type === 'workshop_vehicle_task' && (
+                                {task.action_type === 'workshop_vehicle_task' && (
+                                  <div className="flex items-center gap-1">
                                     <Button
                                       onClick={(e) => { e.stopPropagation(); handleEditTask(task); }}
                                       disabled={isUpdating}
@@ -1570,18 +1592,18 @@ export default function WorkshopTasksPage() {
                                     >
                                       <Edit className="h-3.5 w-3.5" />
                                     </Button>
-                                  )}
-                                  <Button
-                                    onClick={(e) => { e.stopPropagation(); handleDeleteTask(task); }}
-                                    disabled={isUpdating}
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-7 w-7 p-0 text-red-500 hover:text-red-400 hover:bg-red-950/50"
-                                    title="Delete task"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </div>
+                                    <Button
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteTask(task); }}
+                                      disabled={isUpdating}
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0 text-red-500 hover:text-red-400 hover:bg-red-950/50"
+                                      title="Delete task"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </CardContent>
@@ -1633,6 +1655,12 @@ export default function WorkshopTasksPage() {
                                     <Badge variant="outline" className="text-xs">
                                       {getSourceLabel(task)}
                                     </Badge>
+                                    {taskAttachmentCounts.get(task.id) && taskAttachmentCounts.get(task.id)! > 0 && (
+                                      <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30 text-xs">
+                                        <Paperclip className="h-3 w-3 mr-1" />
+                                        {taskAttachmentCounts.get(task.id)}
+                                      </Badge>
+                                    )}
                                   </div>
                                   <div className="flex flex-wrap gap-2 mb-2">
                                     {task.workshop_task_subcategories?.workshop_task_categories && (
@@ -1801,6 +1829,12 @@ export default function WorkshopTasksPage() {
                                     <Badge variant="outline" className="text-xs">
                                       {getSourceLabel(task)}
                                     </Badge>
+                                    {taskAttachmentCounts.get(task.id) && taskAttachmentCounts.get(task.id)! > 0 && (
+                                      <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30 text-xs">
+                                        <Paperclip className="h-3 w-3 mr-1" />
+                                        {taskAttachmentCounts.get(task.id)}
+                                      </Badge>
+                                    )}
                                   </div>
                                   <div className="flex flex-wrap gap-2 mb-2">
                                     {task.workshop_task_subcategories?.workshop_task_categories && (
@@ -1946,6 +1980,12 @@ export default function WorkshopTasksPage() {
                                     <Badge variant="outline" className="text-xs">
                                       {getSourceLabel(task)}
                                     </Badge>
+                                    {taskAttachmentCounts.get(task.id) && taskAttachmentCounts.get(task.id)! > 0 && (
+                                      <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30 text-xs">
+                                        <Paperclip className="h-3 w-3 mr-1" />
+                                        {taskAttachmentCounts.get(task.id)}
+                                      </Badge>
+                                    )}
                                   </div>
                                   {task.workshop_task_categories && (
                                     <p className="text-sm text-muted-foreground mb-1">

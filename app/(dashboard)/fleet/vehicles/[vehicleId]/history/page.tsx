@@ -33,6 +33,7 @@ import { formatMileage, formatMaintenanceDate } from '@/lib/utils/maintenanceCal
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { WorkshopTaskHistoryCard } from '@/components/workshop-tasks/WorkshopTaskHistoryCard';
 import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
+import { Paperclip } from 'lucide-react';
 
 type Vehicle = {
   id: string;
@@ -125,6 +126,168 @@ type WorkshopTask = {
     full_name: string;
   } | null;
 };
+
+type TaskAttachment = {
+  id: string;
+  task_id: string;
+  created_at: string;
+  workshop_attachment_templates: {
+    name: string;
+    description: string | null;
+  } | null;
+};
+
+function DocumentsTabContent({ vehicleId, workshopTasks }: { vehicleId: string; workshopTasks: WorkshopTask[] }) {
+  const supabase = createClient();
+  const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAttachments();
+  }, [vehicleId, workshopTasks]);
+
+  const fetchAttachments = async () => {
+    try {
+      setLoading(true);
+      const taskIds = workshopTasks.map(t => t.id);
+      
+      if (taskIds.length === 0) {
+        setAttachments([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('workshop_task_attachments')
+        .select(`
+          id,
+          task_id,
+          created_at,
+          workshop_attachment_templates (
+            name,
+            description
+          )
+        `)
+        .in('task_id', taskIds)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setAttachments(data || []);
+    } catch (error) {
+      console.error('Error fetching attachments:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map(i => (
+          <Skeleton key={i} className="h-20 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  if (attachments.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <FileText className="h-16 w-16 text-slate-400 mx-auto mb-4 opacity-50" />
+        <h3 className="text-lg font-semibold text-white mb-2">No Documents Yet</h3>
+        <p className="text-slate-400 mb-4">
+          No workshop task attachments found for this vehicle
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Attachments will appear here when added to workshop tasks
+        </p>
+      </div>
+    );
+  }
+
+  // Group attachments by task
+  const attachmentsByTask = attachments.reduce((acc, att) => {
+    if (!acc[att.task_id]) {
+      acc[att.task_id] = [];
+    }
+    acc[att.task_id].push(att);
+    return acc;
+  }, {} as Record<string, TaskAttachment[]>);
+
+  return (
+    <div className="space-y-4">
+      {Object.entries(attachmentsByTask).map(([taskId, taskAttachments]) => {
+        const task = workshopTasks.find(t => t.id === taskId);
+        if (!task) return null;
+
+        return (
+          <Card key={taskId} className="bg-slate-800/30 border-slate-700">
+            <CardContent className="pt-6">
+              <div className="space-y-3">
+                {/* Task Header */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Wrench className="h-4 w-4 text-workshop" />
+                      <h4 className="font-medium text-white">
+                        {task.workshop_task_categories?.name || 'Workshop Task'}
+                      </h4>
+                      <Badge 
+                        variant="outline" 
+                        className={
+                          task.status === 'completed' 
+                            ? 'bg-green-500/10 text-green-300 border-green-500/30'
+                            : 'bg-blue-500/10 text-blue-300 border-blue-500/30'
+                        }
+                      >
+                        {task.status === 'completed' ? 'Completed' : 'In Progress'}
+                      </Badge>
+                    </div>
+                    {task.workshop_comments && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {task.workshop_comments}
+                      </p>
+                    )}
+                  </div>
+                  <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30">
+                    <Paperclip className="h-3 w-3 mr-1" />
+                    {taskAttachments.length}
+                  </Badge>
+                </div>
+
+                {/* Attachments List */}
+                <div className="space-y-2 pl-6 border-l-2 border-slate-700">
+                  {taskAttachments.map(attachment => (
+                    <div 
+                      key={attachment.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-5 w-5 text-blue-400" />
+                        <div>
+                          <p className="text-sm font-medium text-white">
+                            {attachment.workshop_attachment_templates?.name || 'Attachment'}
+                          </p>
+                          {attachment.workshop_attachment_templates?.description && (
+                            <p className="text-xs text-muted-foreground">
+                              {attachment.workshop_attachment_templates.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(attachment.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function VehicleHistoryPage({
   params,
@@ -1016,20 +1179,27 @@ export default function VehicleHistoryPage({
         <TabsContent value="documents">
           <Card className="bg-slate-800/50 border-border">
             <CardHeader>
-              <CardTitle>Vehicle Documents</CardTitle>
-              <CardDescription>Upload and manage vehicle documents, invoices, and records</CardDescription>
+              <CardTitle>Workshop Task Attachments</CardTitle>
+              <CardDescription>Documents and forms attached to workshop tasks for this vehicle</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-12">
-                <FileText className="h-16 w-16 text-slate-400 mx-auto mb-4 opacity-50" />
-                <h3 className="text-lg font-semibold text-white mb-2">Coming Soon</h3>
-                <p className="text-slate-400 mb-4">
-                  Document management feature will be implemented in a future update
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  This will allow you to upload and view PDFs, images, and other documents related to this vehicle
-                </p>
-              </div>
+              {loading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map(i => (
+                    <Skeleton key={i} className="h-20 w-full" />
+                  ))}
+                </div>
+              ) : workshopTasks.length === 0 ? (
+                <div className="text-center py-12">
+                  <FileText className="h-16 w-16 text-slate-400 mx-auto mb-4 opacity-50" />
+                  <h3 className="text-lg font-semibold text-white mb-2">No Documents Yet</h3>
+                  <p className="text-slate-400 mb-4">
+                    No workshop tasks with attachments found for this vehicle
+                  </p>
+                </div>
+              ) : (
+                <DocumentsTabContent vehicleId={resolvedParams.vehicleId} workshopTasks={workshopTasks} />
+              )}
             </CardContent>
           </Card>
         </TabsContent>

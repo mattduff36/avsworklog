@@ -28,7 +28,7 @@ import type { FAQArticleWithCategory, FAQCategory, Suggestion } from '@/types/fa
 import type { ErrorReport } from '@/types/error-reports';
 import type { ModuleName } from '@/types/roles';
 import Link from 'next/link';
-import { MODULE_PAGES, getPageLabel } from '@/lib/config/module-pages';
+import { MODULE_PAGES, getPageLabel, getPageUrl } from '@/lib/config/module-pages';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function HelpPage() {
@@ -290,11 +290,12 @@ export default function HelpPage() {
         body: JSON.stringify({
           title: errorTitle.trim(),
           description: errorDescription.trim(),
-          page_url: getPageLabel(errorPageSelection),
+          page_url: getPageUrl(errorPageSelection),
           user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
           additional_context: {
             current_url: typeof window !== 'undefined' ? window.location.href : undefined,
             selected_page: errorPageSelection,
+            selected_page_label: getPageLabel(errorPageSelection),
           },
         }),
       });

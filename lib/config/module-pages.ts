@@ -165,3 +165,79 @@ export function getPageLabel(value: string): string {
   }
   return value;
 }
+
+/**
+ * Get actual page URL by value
+ */
+export function getPageUrl(value: string): string {
+  // Map page values to their actual URLs
+  const urlMap: Record<string, string> = {
+    // Timesheets
+    'timesheets-list': '/timesheets',
+    'timesheets-new': '/timesheets/new',
+    'timesheets-view': '/timesheets/[id]',
+    
+    // Inspections
+    'inspections-list': '/inspections',
+    'inspections-new': '/inspections/new',
+    'inspections-view': '/inspections/[id]',
+    
+    // RAMS
+    'rams-list': '/rams',
+    'rams-manage': '/rams/manage',
+    'rams-view': '/rams/[id]',
+    'rams-read': '/rams/read/[id]',
+    
+    // Absence
+    'absence-list': '/absence',
+    'absence-manage': '/absence/manage',
+    'absence-allowances': '/absence/allowances',
+    'absence-reasons': '/absence/reasons',
+    
+    // Maintenance
+    'maintenance-overview': '/fleet/maintenance',
+    'maintenance-schedule': '/fleet/maintenance/schedule',
+    
+    // Workshop Tasks
+    'workshop-tasks-list': '/workshop-tasks',
+    'workshop-tasks-new': '/workshop-tasks/new',
+    'workshop-tasks-view': '/workshop-tasks/[id]',
+    
+    // Approvals
+    'approvals-list': '/approvals',
+    'approvals-timesheets': '/approvals/timesheets',
+    'approvals-absence': '/approvals/absence',
+    
+    // Actions
+    'actions-list': '/actions',
+    'actions-my': '/actions/my',
+    
+    // Reports
+    'reports-list': '/reports',
+    'reports-timesheets': '/reports/timesheets',
+    'reports-absence': '/reports/absence',
+    
+    // Toolbox Talks
+    'toolbox-talks-list': '/toolbox-talks',
+    'toolbox-talks-new': '/toolbox-talks/new',
+    
+    // Admin - Users
+    'admin-users-list': '/admin/users',
+    'admin-users-roles': '/admin/roles',
+    
+    // Admin - Vehicles
+    'admin-vehicles-list': '/admin/vehicles',
+    'admin-vehicles-new': '/admin/vehicles/new',
+    
+    // Admin - FAQ
+    'admin-faq-list': '/admin/faq',
+    'admin-faq-categories': '/admin/faq/categories',
+    
+    // Other
+    'other-dashboard': '/dashboard',
+    'other-help': '/help',
+    'other-debug': '/debug',
+  };
+  
+  return urlMap[value] || value;
+}
