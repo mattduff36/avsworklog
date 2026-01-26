@@ -175,6 +175,19 @@
     position: relative;
   }
 
+  /* Placeholder text styling - ensure grey/muted appearance for empty fields */
+  input::placeholder,
+  textarea::placeholder,
+  input::-webkit-input-placeholder,
+  textarea::-webkit-input-placeholder,
+  input::-moz-placeholder,
+  textarea::-moz-placeholder,
+  input:-ms-input-placeholder,
+  textarea:-ms-input-placeholder {
+    color: hsl(var(--muted-foreground)) !important;
+    opacity: 1 !important;
+  }
+
   /* Grid pattern removed - keeping plain gradient background */
 }
 

@@ -300,16 +300,18 @@ export default function HelpPage() {
         }),
       });
 
-      // Check response status first
-      if (!response.ok) {
-        // Try to parse error response
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || `Server error (${response.status})`);
+      // Parse response body once, regardless of status
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        throw new Error('Failed to parse response from server');
       }
 
-      const data = await response.json().catch(() => {
-        throw new Error('Failed to parse response from server');
-      });
+      // Check response status and handle errors
+      if (!response.ok) {
+        throw new Error(data?.error || `Server error (${response.status})`);
+      }
 
       if (data && data.success) {
         toast.success('Error reported successfully!', {

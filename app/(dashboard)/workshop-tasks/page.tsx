@@ -1301,7 +1301,14 @@ export default function WorkshopTasksPage() {
   const pendingTasks = tasks.filter(t => t.status === 'pending');
   const inProgressTasks = tasks.filter(t => t.status === 'logged');
   const onHoldTasks = tasks.filter(t => t.status === 'on_hold');
-  const completedTasks = tasks.filter(t => t.status === 'completed');
+  const completedTasks = tasks
+    .filter(t => t.status === 'completed')
+    .sort((a, b) => {
+      // Sort by actioned_at (completion date), most recent first
+      const dateA = a.actioned_at ? new Date(a.actioned_at).getTime() : 0;
+      const dateB = b.actioned_at ? new Date(b.actioned_at).getTime() : 0;
+      return dateB - dateA; // Descending order (newest first)
+    });
 
   // Show loading state while checking permissions
   if (permissionLoading) {

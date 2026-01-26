@@ -98,6 +98,7 @@ export default function DebugPage() {
   const [viewedErrors, setViewedErrors] = useState<Set<string>>(new Set());
   const [lastCheckedErrorId, setLastCheckedErrorId] = useState<string | null>(null);
   const notifyingNewErrorsRef = useRef(false);
+  const lastNotifiedErrorIdRef = useRef<string | null>(null); // Track last notified ID synchronously
   
   // Error log filter states
   const [filterLocalhost, setFilterLocalhost] = useState(true);
@@ -322,8 +323,9 @@ export default function DebugPage() {
         if (typedErrorData.length > 0) {
           const newestErrorId = typedErrorData[0].id;
           
-          // If this is a new error (and not the first load)
-          if (lastCheckedErrorId && newestErrorId !== lastCheckedErrorId && !notifyingNewErrorsRef.current) {
+          // Check against the synchronous ref (not the async state) to prevent duplicates
+          // lastNotifiedErrorIdRef tracks what we've already notified about
+          if (lastCheckedErrorId && newestErrorId !== lastNotifiedErrorIdRef.current && !notifyingNewErrorsRef.current) {
             // Set the ref immediately to prevent race conditions
             notifyingNewErrorsRef.current = true;
             
@@ -353,10 +355,15 @@ export default function DebugPage() {
               }
             }
             
+            // Update ref synchronously to prevent duplicate notifications
+            lastNotifiedErrorIdRef.current = newestErrorId;
+            
+            // Reset lock ref immediately - safe because lastNotifiedErrorIdRef prevents re-entry
             notifyingNewErrorsRef.current = false;
           }
           
-          // Update last checked error ID
+          // Always update lastCheckedErrorId (even on first load when it's null)
+          // This bootstraps the notification system and maintains UI consistency
           setLastCheckedErrorId(newestErrorId);
         }
       }

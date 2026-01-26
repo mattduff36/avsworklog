@@ -121,15 +121,18 @@ export function AttachmentFormModal({
               checked={isChecked}
               onCheckedChange={(checked) => handleCheckboxChange(question.id, !!checked)}
               disabled={readOnly}
+              className="h-5 w-5 border-2 data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600 pointer-events-none"
             />
             <Label
               htmlFor={question.id}
-              className={`text-sm font-normal cursor-pointer ${isChecked ? 'text-green-600 dark:text-green-400' : 'text-foreground'}`}
+              className={`flex-1 text-sm font-medium cursor-pointer select-none ${
+                isChecked ? 'text-green-600 dark:text-green-400' : 'text-foreground'
+              }`}
             >
               {question.question_text}
               {question.is_required && <span className="text-red-500 ml-1">*</span>}
             </Label>
-            {isChecked && <Check className="h-4 w-4 text-green-600 dark:text-green-400" />}
+            {isChecked && <Check className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />}
           </div>
         );
 
@@ -252,13 +255,24 @@ export function AttachmentFormModal({
             {questions.map((question) => (
               <div
                 key={question.id}
-                className={`p-3 rounded-lg border ${
+                className={`p-4 rounded-lg border transition-all ${
                   question.question_type === 'checkbox'
                     ? responses[question.id] === 'true'
-                      ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800'
-                      : 'bg-muted/30 border-border'
+                      ? 'bg-green-50 dark:bg-green-950/30 border-green-300 dark:border-green-700 shadow-sm'
+                      : 'bg-muted/30 border-border hover:border-muted-foreground/30 hover:shadow-sm'
                     : 'bg-muted/30 border-border'
+                } ${
+                  question.question_type === 'checkbox' && !readOnly
+                    ? 'cursor-pointer'
+                    : ''
                 }`}
+                onClick={(e) => {
+                  if (question.question_type === 'checkbox' && !readOnly) {
+                    e.preventDefault();
+                    const currentValue = responses[question.id] === 'true';
+                    handleCheckboxChange(question.id, !currentValue);
+                  }
+                }}
               >
                 {renderQuestionInput(question)}
               </div>
