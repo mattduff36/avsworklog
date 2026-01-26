@@ -303,7 +303,7 @@ export default function DebugPage() {
           if (lastCheckedErrorId && newestErrorId !== lastCheckedErrorId && !notifyingNewErrors) {
             // Find all errors that are newer than the last checked ID
             const lastIndex = typedErrorData.findIndex(e => e.id === lastCheckedErrorId);
-            const newErrors = lastIndex > 0 ? typedErrorData.slice(0, lastIndex) : [typedErrorData[0]];
+            const newErrors = lastIndex > 0 ? typedErrorData.slice(0, lastIndex) : [];
             
             // Notify admins of new errors (only if not viewed yet and not notifying already)
             setNotifyingNewErrors(true);

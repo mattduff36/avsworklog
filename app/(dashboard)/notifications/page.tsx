@@ -584,10 +584,9 @@ export default function NotificationsPage() {
             )}
           </Tabs>
         </div>
-      </div>
 
-      {/* Modals */}
-      {showModal && selectedNotification && (
+        {/* Modals */}
+        {showModal && selectedNotification && (
         <>
           {selectedNotification.type === 'TOOLBOX_TALK' ? (
             <BlockingMessageModal
@@ -602,7 +601,7 @@ export default function NotificationsPage() {
               }}
               onSigned={handleModalClose}
               totalPending={1}
-              currentIndex={1}
+              currentIndex={0}
             />
           ) : (
             <ReminderModal
