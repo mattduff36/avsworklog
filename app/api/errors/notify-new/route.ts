@@ -91,6 +91,16 @@ export async function POST(request: NextRequest) {
     }
 
     const adminRoleIds = (adminRoles ?? []).map(r => r.id);
+    
+    // Check for empty admin roles before querying profiles
+    if (adminRoleIds.length === 0) {
+      console.warn('No admin roles found - cannot notify admins');
+      return NextResponse.json({ 
+        success: false,
+        error: 'No admin users found to notify',
+      }, { status: 500 });
+    }
+
     const { data: adminProfiles, error: adminProfilesError } = await supabase
       .from('profiles')
       .select('id, full_name, role_id')
