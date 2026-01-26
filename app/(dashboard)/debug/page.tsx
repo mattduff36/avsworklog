@@ -97,7 +97,6 @@ export default function DebugPage() {
   const [expandedAudits, setExpandedAudits] = useState<string[]>([]);
   const [viewedErrors, setViewedErrors] = useState<Set<string>>(new Set());
   const [lastCheckedErrorId, setLastCheckedErrorId] = useState<string | null>(null);
-  const [notifyingNewErrors, setNotifyingNewErrors] = useState(false);
   const notifyingNewErrorsRef = useRef(false);
   
   // Error log filter states
@@ -309,7 +308,6 @@ export default function DebugPage() {
             // Notify admins of new errors (only if not viewed yet and not notifying already)
             // Use ref to prevent race conditions from concurrent fetchErrorLogs() calls
             notifyingNewErrorsRef.current = true;
-            setNotifyingNewErrors(true);
             
             for (const newError of newErrors) {
               if (!viewedErrors.has(newError.id)) {
@@ -327,7 +325,6 @@ export default function DebugPage() {
             }
             
             notifyingNewErrorsRef.current = false;
-            setNotifyingNewErrors(false);
           }
           
           // Update last checked error ID
