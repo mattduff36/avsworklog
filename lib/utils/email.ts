@@ -922,10 +922,13 @@ export async function sendTimesheetAdjustmentEmail(params: SendTimesheetAdjustme
 }
 
 /**
- * Send error report email to admin
+ * Send error report email to admins
  */
-interface SendErrorReportEmailParams {
-  errorMessage: string;
+interface SendErrorReportEmailToAdminsParams {
+  to: string[]; // Multiple admin emails
+  reportId: string;
+  title: string;
+  description: string;
   errorCode?: string;
   userName: string;
   userEmail: string;
@@ -934,11 +937,13 @@ interface SendErrorReportEmailParams {
   additionalContext?: Record<string, unknown>;
 }
 
-export async function sendErrorReportEmail(params: SendErrorReportEmailParams): Promise<{
+export async function sendErrorReportEmailToAdmins(params: SendErrorReportEmailToAdminsParams): Promise<{
   success: boolean;
+  sent?: number;
+  failed?: number;
   error?: string;
 }> {
-  const { errorMessage, errorCode, userName, userEmail, pageUrl, userAgent, additionalContext } = params;
+  const { to, reportId, title, description, errorCode, userName, userEmail, pageUrl, userAgent, additionalContext } = params;
   
   try {
     // Check if Resend API key is configured
@@ -951,8 +956,14 @@ export async function sendErrorReportEmail(params: SendErrorReportEmailParams): 
       };
     }
     
-    const adminEmail = 'admin@mpdee.co.uk';
-    const subject = `🐛 Error Report: ${errorMessage.substring(0, 50)}${errorMessage.length > 50 ? '...' : ''}`;
+    if (to.length === 0) {
+      return {
+        success: false,
+        error: 'No recipient email addresses provided'
+      };
+    }
+    
+    const subject = `🐛 Error Report: ${title.substring(0, 50)}${title.length > 50 ? '...' : ''}`;
     
     const htmlContent = `
       <!DOCTYPE html>
@@ -969,16 +980,19 @@ export async function sendErrorReportEmail(params: SendErrorReportEmailParams): 
           <div style="background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
             <h2 style="color: #dc2626; margin-top: 0;">User-Reported Error</h2>
             
-            <p>A user has reported an error in the application.</p>
+            <p>A user has reported an error in the application that requires your attention.</p>
             
             <div style="background-color: #fff; border: 2px solid #dc2626; border-radius: 8px; padding: 20px; margin: 20px 0;">
               <h3 style="margin: 0 0 15px 0; color: #252525;">Error Details</h3>
               
-              <p style="margin: 10px 0;"><strong>User:</strong> ${userName} (${userEmail})</p>
+              <p style="margin: 10px 0;"><strong>Reported By:</strong> ${userName} (${userEmail})</p>
               
-              <p style="margin: 10px 0;"><strong>Error Message:</strong></p>
+              <p style="margin: 10px 0;"><strong>Title:</strong></p>
+              <p style="margin: 5px 0 10px 0; color: #252525; font-weight: bold;">${title}</p>
+              
+              <p style="margin: 10px 0;"><strong>Description:</strong></p>
               <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin: 10px 0;">
-                <p style="margin: 0; color: #991b1b; white-space: pre-wrap;">${errorMessage}</p>
+                <p style="margin: 0; color: #991b1b; white-space: pre-wrap;">${description}</p>
               </div>
               
               ${errorCode ? `<p style="margin: 10px 0;"><strong>Error Code:</strong> <code style="background-color: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${errorCode}</code></p>` : ''}
@@ -995,11 +1009,15 @@ export async function sendErrorReportEmail(params: SendErrorReportEmailParams): 
             
             <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
               <p style="margin: 0; font-weight: bold; color: #92400e;">⚠️ Action Required</p>
-              <p style="margin: 5px 0 0 0; color: #92400e;">Please investigate this error and take appropriate action. This error was reported directly by the user from the application.</p>
+              <p style="margin: 5px 0 0 0; color: #92400e;">Please log in to SquiresApp to review and manage this error report. You can update the status and add notes for tracking.</p>
+            </div>
+            
+            <div style="text-align: center; margin: 20px 0;">
+              <a href="https://www.squiresapp.com/errors/manage" style="display: inline-block; background-color: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Manage Error Reports</a>
             </div>
             
             <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
-              <strong>Note:</strong> This email was sent as a fallback because the in-app notification system was unavailable.
+              <strong>Report ID:</strong> ${reportId}
             </p>
           </div>
           
@@ -1010,42 +1028,66 @@ export async function sendErrorReportEmail(params: SendErrorReportEmailParams): 
       </html>
     `;
     
-    // Send email using Resend API
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL || 'AVS Worklog <onboarding@resend.dev>',
-        to: [adminEmail],
-        subject,
-        html: htmlContent
-      })
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      console.error('Resend API error:', error);
-      return {
-        success: false,
-        error: `Failed to send email: ${error.message || 'Unknown error'}`
-      };
+    // Send emails (batch if needed)
+    const BATCH_SIZE = 10;
+    let sent = 0;
+    let failed = 0;
+
+    for (let i = 0; i < to.length; i += BATCH_SIZE) {
+      const batch = to.slice(i, i + BATCH_SIZE);
+      
+      try {
+        const promises = batch.map(email =>
+          fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              from: process.env.RESEND_FROM_EMAIL || 'AVS Worklog <onboarding@resend.dev>',
+              to: [email],
+              subject,
+              html: htmlContent
+            })
+          })
+        );
+
+        const results = await Promise.allSettled(promises);
+        
+        results.forEach((result, index) => {
+          if (result.status === 'fulfilled' && result.value.ok) {
+            sent++;
+          } else {
+            failed++;
+            console.error(`Failed to send to ${batch[index]}:`,
+              result.status === 'rejected' ? result.reason : 'API error');
+          }
+        });
+
+        // Wait before next batch (unless this is the last batch)
+        if (i + BATCH_SIZE < to.length) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      } catch (batchError) {
+        console.error('Batch sending error:', batchError);
+        failed += batch.length;
+      }
     }
-    
-    const data = await response.json();
-    console.log('Error report email sent successfully:', data);
-    
+
+    console.log(`Error report emails: ${sent} sent, ${failed} failed`);
+
     return {
-      success: true
+      success: sent > 0,
+      sent,
+      failed
     };
     
   } catch (error: any) {
-    console.error('Error sending error report email:', error);
+    console.error('Error sending error report emails:', error);
     return {
       success: false,
-      error: error.message || 'Failed to send email'
+      error: error.message || 'Failed to send emails'
     };
   }
 }

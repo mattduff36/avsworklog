@@ -18,12 +18,16 @@ import {
   Loader2,
   Send,
   CheckCircle2,
-  ChevronRight
+  ChevronRight,
+  AlertTriangle,
+  Settings
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import type { FAQArticleWithCategory, FAQCategory, Suggestion } from '@/types/faq';
+import type { ErrorReport } from '@/types/error-reports';
 import type { ModuleName } from '@/types/roles';
+import Link from 'next/link';
 
 export default function HelpPage() {
   const { profile, isManager, isAdmin } = useAuth(); // Get user info
@@ -43,6 +47,14 @@ export default function HelpPage() {
   const [submittingSuggestion, setSubmittingSuggestion] = useState(false);
   const [mySuggestions, setMySuggestions] = useState<Suggestion[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  
+  // Error report state
+  const [errorTitle, setErrorTitle] = useState('');
+  const [errorDescription, setErrorDescription] = useState('');
+  const [errorPageHint, setErrorPageHint] = useState('');
+  const [submittingError, setSubmittingError] = useState(false);
+  const [myErrors, setMyErrors] = useState<ErrorReport[]>([]);
+  const [loadingErrors, setLoadingErrors] = useState(false);
   
   // Active tab
   const [activeTab, setActiveTab] = useState('faq');
@@ -85,6 +97,22 @@ export default function HelpPage() {
       console.error('Error fetching suggestions:', error);
     } finally {
       setLoadingSuggestions(false);
+    }
+  }, []);
+
+  const fetchMyErrors = useCallback(async () => {
+    try {
+      setLoadingErrors(true);
+      const response = await fetch('/api/error-reports');
+      const data = await response.json();
+      
+      if (data.success) {
+        setMyErrors(data.reports);
+      }
+    } catch (error) {
+      console.error('Error fetching error reports:', error);
+    } finally {
+      setLoadingErrors(false);
     }
   }, []);
 
@@ -145,6 +173,13 @@ export default function HelpPage() {
       fetchMySuggestions();
     }
   }, [activeTab, fetchMySuggestions]);
+
+  // Fetch user's error reports when tab changes
+  useEffect(() => {
+    if (activeTab === 'my-errors') {
+      fetchMyErrors();
+    }
+  }, [activeTab, fetchMyErrors]);
 
   // Debounced search
   useEffect(() => {
@@ -233,6 +268,50 @@ export default function HelpPage() {
     }
   };
 
+  // Handle error report submission
+  const handleSubmitError = async () => {
+    if (!errorTitle.trim() || !errorDescription.trim()) {
+      toast.error('Please fill in both title and description');
+      return;
+    }
+
+    try {
+      setSubmittingError(true);
+      const response = await fetch('/api/errors/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: errorTitle.trim(),
+          description: errorDescription.trim(),
+          page_url: errorPageHint.trim() || (typeof window !== 'undefined' ? window.location.href : undefined),
+          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Error reported successfully!', {
+          description: 'Admins have been notified and will investigate.'
+        });
+        setErrorTitle('');
+        setErrorDescription('');
+        setErrorPageHint('');
+        // Refresh error reports list if on that tab
+        if (activeTab === 'my-errors') {
+          fetchMyErrors();
+        }
+      } else {
+        throw new Error(data.error || 'Failed to submit error report');
+      }
+    } catch (error) {
+      console.error('Error submitting error report:', error);
+      toast.error('Failed to submit error report');
+    } finally {
+      setSubmittingError(false);
+    }
+  };
+
   // Render markdown content (simple version)
   const renderMarkdown = (content: string) => {
     // Simple markdown to HTML conversion
@@ -270,6 +349,24 @@ export default function HelpPage() {
     }
   };
 
+  const getErrorStatusColor = (status: string) => {
+    switch (status) {
+      case 'new': return 'bg-red-500';
+      case 'investigating': return 'bg-yellow-500';
+      case 'resolved': return 'bg-green-500';
+      default: return 'bg-slate-500';
+    }
+  };
+
+  const getErrorStatusLabel = (status: string) => {
+    switch (status) {
+      case 'new': return 'New';
+      case 'investigating': return 'Investigating';
+      case 'resolved': return 'Resolved';
+      default: return status;
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-5xl">
       {/* Header */}
@@ -284,10 +381,14 @@ export default function HelpPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-lg grid-cols-3 bg-slate-100 dark:bg-slate-800 p-1">
+        <TabsList className="grid w-full max-w-3xl grid-cols-4 bg-slate-100 dark:bg-slate-800 p-1">
           <TabsTrigger value="faq" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
             <BookOpen className="h-4 w-4" />
             FAQ
+          </TabsTrigger>
+          <TabsTrigger value="errors" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
+            <AlertTriangle className="h-4 w-4" />
+            Errors
           </TabsTrigger>
           <TabsTrigger value="suggest" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
             <Lightbulb className="h-4 w-4" />
@@ -427,6 +528,151 @@ export default function HelpPage() {
               )}
             </div>
           )}
+        </TabsContent>
+
+        {/* Errors Tab */}
+        <TabsContent value="errors" className="space-y-6">
+          {/* Report Error Form */}
+          <Card className="">
+            <CardHeader>
+              <CardTitle className="text-foreground flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+                Report an Error
+              </CardTitle>
+              <CardDescription className="text-muted-foreground">
+                Found a bug or issue? Let us know and we&apos;ll investigate.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="error-title">
+                  Error Title <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="error-title"
+                  placeholder="Brief description of the error"
+                  value={errorTitle}
+                  onChange={(e) => setErrorTitle(e.target.value)}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="error-description">
+                  Description <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="error-description"
+                  placeholder="What happened? What did you expect to happen? Steps to reproduce..."
+                  value={errorDescription}
+                  onChange={(e) => setErrorDescription(e.target.value)}
+                  rows={5}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="error-page">
+                  Page/Feature (optional)
+                </Label>
+                <Input
+                  id="error-page"
+                  placeholder="e.g., Timesheets, Inspections, Dashboard"
+                  value={errorPageHint}
+                  onChange={(e) => setErrorPageHint(e.target.value)}
+                />
+              </div>
+
+              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-3">
+                <p className="text-sm text-blue-900 dark:text-blue-300">
+                  <strong>Tip:</strong> Include any error messages, codes, or screenshots you saw. The more detail you provide, the faster we can fix it!
+                </p>
+              </div>
+
+              <Button
+                onClick={handleSubmitError}
+                disabled={submittingError || !errorTitle.trim() || !errorDescription.trim()}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {submittingError ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Submit Error Report
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* My Errors */}
+          <Card className="">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-foreground">
+                    My Error Reports
+                  </CardTitle>
+                  <CardDescription className="text-muted-foreground">
+                    Track the status of your reported errors
+                  </CardDescription>
+                </div>
+                {isAdmin && (
+                  <Link href="/errors/manage">
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <Settings className="h-4 w-4" />
+                      Manage All Errors
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingErrors ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-red-500" />
+                </div>
+              ) : myErrors.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p>You haven&apos;t reported any errors yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {myErrors.map((error) => (
+                    <div 
+                      key={error.id}
+                      className="p-4 rounded-lg border border-border bg-slate-50 dark:bg-slate-800"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-foreground">
+                            {error.title}
+                          </h3>
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                            {error.description}
+                          </p>
+                          {error.page_url && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Page: {error.page_url}
+                            </p>
+                          )}
+                        </div>
+                        <Badge className={`${getErrorStatusColor(error.status)} text-white`}>
+                          {getErrorStatusLabel(error.status)}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-3">
+                        Reported {new Date(error.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Submit Suggestion Tab */}

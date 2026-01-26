@@ -1,24 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
-import { sendErrorReportEmail } from '@/lib/utils/email';
+import { sendErrorReportEmailToAdmins } from '@/lib/utils/email';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import type { CreateErrorReportResponse } from '@/types/error-reports';
 
 /**
  * POST /api/errors/report
- * Report an error from a user - creates a notification for admin@mpdee.co.uk ONLY
- * 
- * SECURITY: Error reports are ONLY sent to admin@mpdee.co.uk. No other user
- * will ever receive error report notifications.
+ * Report an error from a user - persists to database and notifies all admins
  * 
  * Flow:
- * 1. Finds admin@mpdee.co.uk user account by email
- * 2. If found: Creates in-app notification for that account only
- * 3. If not found or notification fails: Sends email to admin@mpdee.co.uk
+ * 1. Persists error report to error_reports table
+ * 2. Finds all admin users (roles.name = 'admin' OR roles.is_super_admin = true)
+ * 3. Creates in-app notification for all admins
+ * 4. Sends email notification to all admin email addresses
  * 
- * NOTE: This endpoint uses the service role key to bypass RLS policies
- * since error reporting is an administrative function that all authenticated
- * users should be able to use, regardless of their role.
+ * Accepts both:
+ * - Legacy format: { error_message, error_code, page_url, user_agent, additional_context }
+ * - New format: { title, description, error_code, page_url, user_agent, additional_context }
  */
 export async function POST(request: NextRequest) {
   try {
@@ -43,45 +42,67 @@ export async function POST(request: NextRequest) {
       .single();
 
     const body = await request.json();
-    const { error_message, error_code, page_url, user_agent, additional_context } = body;
-
-    if (!error_message) {
-      return NextResponse.json({ error: 'Missing error_message' }, { status: 400 });
-    }
-
-    // Find admin user ID - ONLY admin@mpdee.co.uk should receive error reports
-    // We find the user by email to ensure it's specifically your account
-    let adminUserId: string | null = null;
-    const adminEmail = 'admin@mpdee.co.uk';
-
-    try {
-      // Use admin API to find user by email (requires service role)
-      const { data: authUsers, error: listError } = await supabase.auth.admin.listUsers();
-      
-      if (!listError && authUsers?.users) {
-        const adminUser = authUsers.users.find(u => u.email === adminEmail);
-        if (adminUser?.id) {
-          adminUserId = adminUser.id;
-          console.log(`Found admin user: ${adminEmail} (ID: ${adminUserId})`);
-        } else {
-          console.warn(`Admin user not found: ${adminEmail}`);
-        }
-      } else {
-        console.error('Error listing users:', listError);
-      }
-    } catch (error) {
-      console.error('Error finding admin user:', error);
-    }
     
-    if (!adminUserId) {
-      console.warn(`Admin user ${adminEmail} not found, will use email fallback only`);
+    // Support both legacy and new formats
+    const title = body.title || body.error_message;
+    const description = body.description || body.error_message;
+    const { error_code, page_url, user_agent, additional_context } = body;
+
+    if (!title || !description) {
+      return NextResponse.json({ error: 'Missing title or description' }, { status: 400 });
     }
 
-    // Try to create in-app notification first (ONLY for admin@mpdee.co.uk)
-    // If admin@mpdee.co.uk account is found, create notification
-    // Otherwise, skip notification and go straight to email
+    // 1. Persist error report to database
+    const { data: errorReport, error: reportError } = await supabase
+      .from('error_reports')
+      .insert({
+        created_by: user.id,
+        title: title.substring(0, 500), // Limit title length
+        description,
+        error_code,
+        page_url,
+        user_agent,
+        additional_context,
+        status: 'new'
+      })
+      .select()
+      .single();
+
+    if (reportError || !errorReport) {
+      console.error('Error creating error report:', reportError);
+      return NextResponse.json({ 
+        error: 'Failed to save error report' 
+      }, { status: 500 });
+    }
+
+    console.log(`Error report created: ${errorReport.id}`);
+
+    // 2. Find all admin users
+    const { data: adminProfiles, error: adminError } = await supabase
+      .from('profiles')
+      .select(`
+        id,
+        full_name,
+        roles!inner(
+          id,
+          name,
+          is_super_admin
+        )
+      `)
+      .or('roles.name.eq.admin,roles.is_super_admin.eq.true');
+
+    if (adminError) {
+      console.error('Error finding admin users:', adminError);
+    }
+
+    const adminUserIds = adminProfiles?.map(p => p.id) || [];
+    console.log(`Found ${adminUserIds.length} admin users`);
+
+    // 3. Create in-app notifications for all admins
     let notificationSuccess = false;
-    if (adminUserId) {
+    let notificationMessageId: string | null = null;
+
+    if (adminUserIds.length > 0) {
       try {
         // Create message
         const { data: message, error: messageError } = await supabase
@@ -89,10 +110,12 @@ export async function POST(request: NextRequest) {
           .insert({
             type: 'REMINDER',
             priority: 'HIGH',
-            subject: `🐛 Error Report: ${error_message.substring(0, 50)}${error_message.length > 50 ? '...' : ''}`,
+            subject: `🐛 Error Report: ${title.substring(0, 50)}${title.length > 50 ? '...' : ''}`,
             body: `**User:** ${profile?.full_name || 'Unknown'} (${user.email})
 
-**Error:** ${error_message}
+**Title:** ${title}
+
+**Description:** ${description}
 
 ${error_code ? `**Error Code:** ${error_code}\n` : ''}
 **Page:** ${page_url || 'Unknown'}
@@ -102,7 +125,7 @@ ${error_code ? `**Error Code:** ${error_code}\n` : ''}
 ${additional_context ? `**Additional Context:**\n${JSON.stringify(additional_context, null, 2)}` : ''}
 
 ---
-*This error was reported by the user from the application.*`,
+*View and manage this error report in the Errors Management section.*`,
             sender_id: user.id,
           })
           .select()
@@ -113,64 +136,88 @@ ${additional_context ? `**Additional Context:**\n${JSON.stringify(additional_con
           throw messageError;
         }
 
-        // Create recipient entry for admin
-        const { error: recipientError } = await supabase
-          .from('message_recipients')
-          .insert({
-            message_id: message.id,
-            user_id: adminUserId,
-            status: 'PENDING',
-          });
+        notificationMessageId = message.id;
 
-        if (recipientError) {
-          console.error('Error creating recipient:', recipientError);
-          throw recipientError;
+        // Create recipient entries for all admins
+        const recipientRecords = adminUserIds.map(adminId => ({
+          message_id: message.id,
+          user_id: adminId,
+          status: 'PENDING' as const
+        }));
+
+        const { error: recipientsError } = await supabase
+          .from('message_recipients')
+          .insert(recipientRecords);
+
+        if (recipientsError) {
+          console.error('Error creating recipients:', recipientsError);
+          throw recipientsError;
         }
 
+        // Update error report with notification message ID
+        await supabase
+          .from('error_reports')
+          .update({ notification_message_id: message.id })
+          .eq('id', errorReport.id);
+
         notificationSuccess = true;
-        console.log('Error report notification created successfully');
+        console.log(`In-app notifications created for ${adminUserIds.length} admins`);
       } catch (notificationError) {
-        console.error('Failed to create in-app notification, falling back to email:', notificationError);
-        // Fall through to email fallback
+        console.error('Failed to create in-app notifications:', notificationError);
       }
-    } else {
-      console.log('No admin user found, skipping notification and using email fallback');
     }
 
-    // If notification failed, send email as fallback
-    if (!notificationSuccess) {
-      console.log('Sending error report via email fallback to admin@mpdee.co.uk');
-      const emailResult = await sendErrorReportEmail({
-        errorMessage: error_message,
-        errorCode: error_code,
-        userName: profile?.full_name || 'Unknown',
-        userEmail: user.email || 'Unknown',
-        pageUrl: page_url,
-        userAgent: user_agent,
-        additionalContext: additional_context,
-      });
+    // 4. Send email notifications to all admins
+    let emailSuccess = false;
+    let emailSent = 0;
+    let emailFailed = 0;
 
-      if (!emailResult.success) {
-        console.error('Email fallback also failed:', emailResult.error);
-        return NextResponse.json({ 
-          error: 'Failed to deliver error report via notification or email',
-          details: emailResult.error
-        }, { status: 500 });
+    if (adminUserIds.length > 0) {
+      try {
+        // Fetch admin email addresses
+        const adminEmails: string[] = [];
+        for (const adminId of adminUserIds) {
+          const { data: authUser } = await supabase.auth.admin.getUserById(adminId);
+          if (authUser?.user?.email) {
+            adminEmails.push(authUser.user.email);
+          }
+        }
+
+        if (adminEmails.length > 0) {
+          const emailResult = await sendErrorReportEmailToAdmins({
+            to: adminEmails,
+            reportId: errorReport.id,
+            title,
+            description,
+            errorCode: error_code,
+            userName: profile?.full_name || 'Unknown',
+            userEmail: user.email || 'Unknown',
+            pageUrl: page_url,
+            userAgent: user_agent,
+            additionalContext: additional_context
+          });
+
+          emailSuccess = emailResult.success;
+          emailSent = emailResult.sent || 0;
+          emailFailed = emailResult.failed || 0;
+
+          console.log(`Emails sent: ${emailSent}, failed: ${emailFailed}`);
+        } else {
+          console.warn('No admin email addresses found');
+        }
+      } catch (emailError) {
+        console.error('Failed to send email notifications:', emailError);
       }
-
-      console.log('Error report sent via email fallback successfully');
-      return NextResponse.json({ 
-        success: true,
-        message: 'Error reported successfully (sent via email)',
-        method: 'email'
-      });
     }
 
-    return NextResponse.json({ 
+    const response: CreateErrorReportResponse = {
       success: true,
-      message: 'Error reported successfully',
-      method: 'notification'
-    });
+      report_id: errorReport.id,
+      notification_sent: notificationSuccess,
+      email_sent: emailSuccess
+    };
+
+    return NextResponse.json(response);
 
   } catch (error) {
     console.error('Error in POST /api/errors/report:', error);
