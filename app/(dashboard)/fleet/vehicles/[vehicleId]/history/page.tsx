@@ -138,7 +138,6 @@ type TaskAttachment = {
 };
 
 function DocumentsTabContent({ vehicleId, workshopTasks }: { vehicleId: string; workshopTasks: WorkshopTask[] }) {
-  const supabase = createClient();
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -153,6 +152,7 @@ function DocumentsTabContent({ vehicleId, workshopTasks }: { vehicleId: string; 
           return;
         }
 
+        const supabase = createClient();
         const { data, error } = await supabase
           .from('workshop_task_attachments')
           .select(`
@@ -177,7 +177,7 @@ function DocumentsTabContent({ vehicleId, workshopTasks }: { vehicleId: string; 
     };
 
     fetchAttachments();
-  }, [workshopTasks, supabase]);
+  }, [workshopTasks]);
 
   if (loading) {
     return (
