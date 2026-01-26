@@ -1558,8 +1558,8 @@ export default function WorkshopTasksPage() {
                                 <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                                   <span>Created: {formatDate(task.created_at)}</span>
                                 </div>
-                                {task.action_type === 'workshop_vehicle_task' && (
-                                  <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-1">
+                                  {task.action_type === 'workshop_vehicle_task' && (
                                     <Button
                                       onClick={(e) => { e.stopPropagation(); handleEditTask(task); }}
                                       disabled={isUpdating}
@@ -1570,18 +1570,18 @@ export default function WorkshopTasksPage() {
                                     >
                                       <Edit className="h-3.5 w-3.5" />
                                     </Button>
-                                    <Button
-                                      onClick={(e) => { e.stopPropagation(); handleDeleteTask(task); }}
-                                      disabled={isUpdating}
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-7 w-7 p-0 text-red-500 hover:text-red-400 hover:bg-red-950/50"
-                                      title="Delete task"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </div>
-                                )}
+                                  )}
+                                  <Button
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteTask(task); }}
+                                    disabled={isUpdating}
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 w-7 p-0 text-red-500 hover:text-red-400 hover:bg-red-950/50"
+                                    title="Delete task"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           </CardContent>
