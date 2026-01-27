@@ -142,7 +142,9 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
 
   // Fetch last used vehicle when selectedEmployeeId changes (for new timesheets only)
   useEffect(() => {
-    if (selectedEmployeeId && !existingTimesheetId && !regNumber) {
+    if (selectedEmployeeId && !existingTimesheetId) {
+      // Clear previous employee's vehicle when switching employees
+      setRegNumber('');
       setVehiclePromptDismissed(false); // Reset dismissal state for new employee
       fetchLastUsedVehicle(selectedEmployeeId);
     }
@@ -438,6 +440,16 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       const fullWeek = Array.from({ length: 7 }, (_, i) => {
         const existingEntry = entriesData?.find(e => e.day_of_week === i + 1);
         if (existingEntry) {
+          // Infer didNotWorkReason from remarks for better UX
+          let inferredReason: 'Holiday' | 'Sickness' | 'Off Shift' | 'Other' | null = null;
+          if (existingEntry.did_not_work && existingEntry.remarks) {
+            const remarks = existingEntry.remarks.trim();
+            if (remarks === 'Annual Leave') inferredReason = 'Holiday';
+            else if (remarks === 'Sickness Leave') inferredReason = 'Sickness';
+            else if (remarks === 'Not on Shift') inferredReason = 'Off Shift';
+            else if (remarks.length > 0) inferredReason = 'Other';
+          }
+          
           return {
             day_of_week: i + 1,
             time_started: existingEntry.time_started || '',
@@ -445,9 +457,9 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
             job_number: existingEntry.job_number || '',
             working_in_yard: existingEntry.working_in_yard || false,
             did_not_work: existingEntry.did_not_work || false,
-            didNotWorkReason: null as 'Holiday' | 'Sickness' | 'Off Shift' | 'Other' | null,
-            night_shift: false,
-            bank_holiday: false,
+            didNotWorkReason: inferredReason,
+            night_shift: existingEntry.night_shift || false,
+            bank_holiday: existingEntry.bank_holiday || false,
             daily_total: existingEntry.daily_total,
             remarks: existingEntry.remarks || '',
             bankHolidayWarningShown: false,
@@ -618,24 +630,24 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
   };
 
   // Handle "Did Not Work" reason selection
-  // Handle "Did Not Work" reason selection
   const handleDidNotWorkReason = (dayIndex: number, reason: 'Holiday' | 'Sickness' | 'Off Shift' | 'Other') => {
     const newEntries = [...entries];
     
-    // Set the reason
-    newEntries[dayIndex].didNotWorkReason = reason;
+    // Determine the new remarks value based on reason
+    const newRemarks = reason === 'Other' 
+      ? '' 
+      : reason === 'Holiday' 
+        ? 'Annual Leave' 
+        : reason === 'Sickness' 
+          ? 'Sickness Leave'
+          : 'Not on Shift';
     
-    // Overwrite remarks with standard text based on reason
-    if (reason === 'Other') {
-      // Clear remarks to empty and require user to type
-      newEntries[dayIndex].remarks = '';
-    } else {
-      // Replace with standard text (overwrite any existing content)
-      const standardText = reason === 'Holiday' ? 'Annual Leave' 
-                         : reason === 'Sickness' ? 'Sickness Leave'
-                         : 'Not on Shift';
-      newEntries[dayIndex].remarks = standardText;
-    }
+    // Create new object with updated values (immutable update)
+    newEntries[dayIndex] = {
+      ...newEntries[dayIndex],
+      didNotWorkReason: reason,
+      remarks: newRemarks,
+    };
     
     setEntries(newEntries);
   };
@@ -685,10 +697,12 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
     
     if (invalidDidNotWorkDays.length > 0) {
       const dayIndex = entries.findIndex(e => e.day_of_week === invalidDidNotWorkDays[0].day_of_week);
-      const dayName = DAY_NAMES[dayIndex];
-      setError(`${dayName}: When "Other" is selected for "Did Not Work", you must add a comment in the Notes / Remarks field`);
-      setShowErrorDialog(true);
-      setActiveDay(String(dayIndex));
+      if (dayIndex !== -1) {
+        const dayName = DAY_NAMES[dayIndex];
+        setError(`${dayName}: When "Other" is selected for "Did Not Work", you must add a comment in the Notes / Remarks field`);
+        setShowErrorDialog(true);
+        setActiveDay(String(dayIndex));
+      }
       return;
     }
 
