@@ -130,7 +130,7 @@ export function WeekSelector({ userId, onWeekSelected, initialWeek }: WeekSelect
         <CardContent className="space-y-6">
           {/* Date Picker */}
           <div className="space-y-2">
-            <Label htmlFor="week-ending" className="text-foreground text-base">
+            <Label htmlFor="week-ending" className="text-foreground text-lg">
               Week Ending Date (Must be Sunday)
             </Label>
             <Input
@@ -138,9 +138,9 @@ export function WeekSelector({ userId, onWeekSelected, initialWeek }: WeekSelect
               type="date"
               value={selectedDate}
               onChange={(e) => handleDateChange(e.target.value)}
-              className="h-14 text-lg bg-white dark:bg-slate-900 border-border text-foreground"
+              className="h-16 text-3xl text-center bg-white dark:bg-slate-900 border-border text-foreground"
             />
-            <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+            <p className="text-base text-muted-foreground dark:text-muted-foreground">
               Timesheets must end on Sunday. The selected date should be the last day of your work week.
             </p>
           </div>
