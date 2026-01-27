@@ -81,7 +81,12 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
   // Track time validation errors per day
   const [timeErrors, setTimeErrors] = useState<Record<number, string>>({});
 
-  // Initialize entries for all 7 days
+  // Vehicle suggestion states
+  const [suggestedRegNumber, setSuggestedRegNumber] = useState<string | null>(null);
+  const [showSuggestedVehiclePrompt, setShowSuggestedVehiclePrompt] = useState(false);
+  const [vehiclePromptDismissed, setVehiclePromptDismissed] = useState(false);
+
+  // Initialize entries for all 7 days (with didNotWorkReason tracking)
   const [entries, setEntries] = useState(
     Array.from({ length: 7 }, (_, i) => ({
       day_of_week: i + 1,
@@ -90,6 +95,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       job_number: '',
       working_in_yard: false,
       did_not_work: false,
+      didNotWorkReason: null as 'Holiday' | 'Sickness' | 'Off Shift' | 'Other' | null,
       night_shift: false,
       bank_holiday: false,
       daily_total: null as number | null,
@@ -133,6 +139,17 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialExistingId, user, profile]);
+
+  // Fetch last used vehicle when selectedEmployeeId changes (for new timesheets only)
+  useEffect(() => {
+    if (selectedEmployeeId && !existingTimesheetId) {
+      // Clear previous employee's vehicle when switching employees
+      setRegNumber('');
+      setVehiclePromptDismissed(false); // Reset dismissal state for new employee
+      fetchLastUsedVehicle(selectedEmployeeId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmployeeId]);
 
   // Removed: Fetch existing timesheets effect - no longer needed
   // Duplicate checking now happens in WeekSelector
@@ -275,6 +292,72 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
     }
   };
 
+  // Fetch last used vehicle for the selected user
+  const fetchLastUsedVehicle = async (userId: string) => {
+    try {
+      // Query last timesheet with reg_number
+      const { data: lastTimesheet } = await supabase
+        .from('timesheets')
+        .select('reg_number, week_ending')
+        .eq('user_id', userId)
+        .not('reg_number', 'is', null)
+        .neq('reg_number', '')
+        .order('week_ending', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Query last inspection with vehicle reg
+      const { data: lastInspection } = await supabase
+        .from('vehicle_inspections')
+        .select('inspection_date, vehicles(reg_number)')
+        .eq('user_id', userId)
+        .order('inspection_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Determine which is most recent
+      let mostRecentReg: string | null = null;
+      let mostRecentDate: Date | null = null;
+
+      if (lastTimesheet?.reg_number && lastTimesheet?.week_ending) {
+        mostRecentReg = lastTimesheet.reg_number;
+        mostRecentDate = new Date(lastTimesheet.week_ending);
+      }
+
+      if (lastInspection?.vehicles && 'reg_number' in lastInspection.vehicles && lastInspection.inspection_date) {
+        const inspectionDate = new Date(lastInspection.inspection_date);
+        const vehicleReg = (lastInspection.vehicles as { reg_number: string }).reg_number;
+        
+        if (!mostRecentDate || inspectionDate > mostRecentDate) {
+          mostRecentReg = vehicleReg;
+          mostRecentDate = inspectionDate;
+        }
+      }
+
+      if (mostRecentReg) {
+        setSuggestedRegNumber(mostRecentReg);
+        setShowSuggestedVehiclePrompt(true);
+      }
+    } catch (err) {
+      console.error('Error fetching last used vehicle:', err);
+      // Silently fail - not critical
+    }
+  };
+
+  // Handle vehicle suggestion "Yes"
+  const handleVehicleSuggestionYes = () => {
+    if (suggestedRegNumber) {
+      setRegNumber(suggestedRegNumber.toUpperCase());
+    }
+    setShowSuggestedVehiclePrompt(false);
+  };
+
+  // Handle vehicle suggestion "No"
+  const handleVehicleSuggestionNo = () => {
+    setShowSuggestedVehiclePrompt(false);
+    setVehiclePromptDismissed(true);
+  };
+
   // Removed: fetchExistingTimesheets logic - no longer needed
   // Duplicate checking now happens in WeekSelector before reaching this component
 
@@ -357,6 +440,16 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       const fullWeek = Array.from({ length: 7 }, (_, i) => {
         const existingEntry = entriesData?.find(e => e.day_of_week === i + 1);
         if (existingEntry) {
+          // Infer didNotWorkReason from remarks for better UX
+          let inferredReason: 'Holiday' | 'Sickness' | 'Off Shift' | 'Other' | null = null;
+          if (existingEntry.did_not_work && existingEntry.remarks) {
+            const remarks = existingEntry.remarks.trim();
+            if (remarks === 'Annual Leave') inferredReason = 'Holiday';
+            else if (remarks === 'Sickness Leave') inferredReason = 'Sickness';
+            else if (remarks === 'Not on Shift') inferredReason = 'Off Shift';
+            else if (remarks.length > 0) inferredReason = 'Other';
+          }
+          
           return {
             day_of_week: i + 1,
             time_started: existingEntry.time_started || '',
@@ -364,6 +457,9 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
             job_number: existingEntry.job_number || '',
             working_in_yard: existingEntry.working_in_yard || false,
             did_not_work: existingEntry.did_not_work || false,
+            didNotWorkReason: inferredReason,
+            night_shift: existingEntry.night_shift || false,
+            bank_holiday: existingEntry.bank_holiday || false,
             daily_total: existingEntry.daily_total,
             remarks: existingEntry.remarks || '',
             bankHolidayWarningShown: false,
@@ -376,6 +472,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
             job_number: '',
             working_in_yard: false,
             did_not_work: false,
+            didNotWorkReason: null as 'Holiday' | 'Sickness' | 'Off Shift' | 'Other' | null,
             night_shift: false,
             bank_holiday: false,
             daily_total: null,
@@ -425,6 +522,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
         newEntries[dayIndex] = {
           ...newEntries[dayIndex],
           did_not_work: true,
+          didNotWorkReason: null, // Clear any previous reason
           time_started: '',
           time_finished: '',
           working_in_yard: false,
@@ -435,6 +533,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
         newEntries[dayIndex] = {
           ...newEntries[dayIndex],
           did_not_work: false,
+          didNotWorkReason: null, // Clear reason when re-enabling work
         };
         // Recalculate daily_total if times are present, otherwise set to null
         const entry = newEntries[dayIndex];
@@ -530,6 +629,29 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
     setEntries(newEntries);
   };
 
+  // Handle "Did Not Work" reason selection
+  const handleDidNotWorkReason = (dayIndex: number, reason: 'Holiday' | 'Sickness' | 'Off Shift' | 'Other') => {
+    const newEntries = [...entries];
+    
+    // Determine the new remarks value based on reason
+    const newRemarks = reason === 'Other' 
+      ? '' 
+      : reason === 'Holiday' 
+        ? 'Annual Leave' 
+        : reason === 'Sickness' 
+          ? 'Sickness Leave'
+          : 'Not on Shift';
+    
+    // Create new object with updated values (immutable update)
+    newEntries[dayIndex] = {
+      ...newEntries[dayIndex],
+      didNotWorkReason: reason,
+      remarks: newRemarks,
+    };
+    
+    setEntries(newEntries);
+  };
+
   // Calculate weekly total
   const weeklyTotal = entries.reduce((sum, entry) => {
     return sum + (entry.daily_total || 0);
@@ -563,6 +685,24 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
     if (!allDaysComplete) {
       setError('Please enter hours OR mark "Did Not Work" for ALL 7 days of the week');
       setShowErrorDialog(true);
+      return;
+    }
+
+    // Validate that days marked "Did Not Work" with reason "Other" have remarks
+    const invalidDidNotWorkDays = entries.filter(entry => 
+      entry.did_not_work && 
+      entry.didNotWorkReason === 'Other' && 
+      (!entry.remarks || entry.remarks.trim().length === 0)
+    );
+    
+    if (invalidDidNotWorkDays.length > 0) {
+      const dayIndex = entries.findIndex(e => e.day_of_week === invalidDidNotWorkDays[0].day_of_week);
+      if (dayIndex !== -1) {
+        const dayName = DAY_NAMES[dayIndex];
+        setError(`${dayName}: When "Other" is selected for "Did Not Work", you must add a comment in the Notes / Remarks field`);
+        setShowErrorDialog(true);
+        setActiveDay(String(dayIndex));
+      }
       return;
     }
 
@@ -923,18 +1063,46 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
           
           {/* Vehicle Registration */}
           <div className="space-y-2 max-w-full">
-            <Label htmlFor="reg_number" className="text-foreground text-base">Vehicle Registration (Optional)</Label>
-            <div className="max-w-full overflow-hidden">
-              <Input
-                id="reg_number"
-                type="text"
-                value={regNumber}
-                onChange={(e) => setRegNumber(e.target.value.toUpperCase())}
-                placeholder="e.g., AB12 CDE"
-                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full uppercase"
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">Enter the vehicle registration you used this week (if applicable)</p>
+            <Label htmlFor="reg_number" className="text-foreground text-lg">Vehicle Registration (Optional)</Label>
+            
+            {/* Show suggestion prompt if available and not dismissed */}
+            {showSuggestedVehiclePrompt && !vehiclePromptDismissed && suggestedRegNumber && !regNumber ? (
+              <div className="space-y-3">
+                <p className="text-lg text-muted-foreground">
+                  Still using this vehicle: <span className="font-semibold text-white">{suggestedRegNumber}</span>?
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={handleVehicleSuggestionYes}
+                    className="flex items-center justify-center h-24 rounded-lg border-2 bg-slate-800/30 border-slate-700 hover:bg-slate-800/50 transition-all"
+                  >
+                    <span className="text-xl font-medium text-foreground">Yes</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleVehicleSuggestionNo}
+                    className="flex items-center justify-center h-24 rounded-lg border-2 bg-slate-800/30 border-slate-700 hover:bg-slate-800/50 transition-all"
+                  >
+                    <span className="text-xl font-medium text-foreground">No</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="max-w-full overflow-hidden">
+                  <Input
+                    id="reg_number"
+                    type="text"
+                    value={regNumber}
+                    onChange={(e) => setRegNumber(e.target.value.toUpperCase())}
+                    placeholder="e.g., AB12 CDE"
+                    className="h-12 text-lg bg-slate-900/50 border-slate-600 text-white w-full uppercase"
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground">Enter the vehicle registration you used this week (if applicable)</p>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -949,22 +1117,22 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
           {/* Mobile Tabbed View */}
           <div className="md:hidden">
             <Tabs value={activeDay} onValueChange={setActiveDay} className="w-full">
-              <TabsList className="grid w-full grid-cols-7 bg-slate-900/50 p-1 rounded-lg mb-4">
+              <TabsList className="grid w-full grid-cols-7 bg-slate-900/50 p-1 rounded-lg mb-4 h-auto">
                 {DAY_NAMES.map((day, index) => {
                   const isComplete = entries[index].did_not_work || (entries[index].daily_total && entries[index].daily_total! > 0);
                   return (
                     <TabsTrigger 
                       key={index} 
                       value={String(index)}
-                      className={`text-xs py-3 data-[state=active]:bg-timesheet data-[state=active]:text-slate-900 text-muted-foreground ${
+                      className={`text-sm py-3 data-[state=active]:bg-timesheet data-[state=active]:text-slate-900 text-muted-foreground ${
                         isComplete 
-                          ? 'data-[state=active]:border-2 data-[state=active]:border-green-500 border-2 border-green-500/50' 
-                          : 'data-[state=active]:border-2 data-[state=active]:border-white'
+                          ? 'data-[state=active]:outline data-[state=active]:outline-2 data-[state=active]:outline-green-500 data-[state=active]:-outline-offset-2 outline outline-2 outline-green-500/50 -outline-offset-2' 
+                          : 'data-[state=active]:outline data-[state=active]:outline-2 data-[state=active]:outline-white data-[state=active]:-outline-offset-2'
                       }`}
                     >
                       {day.substring(0, 3)}
                       {isComplete && (
-                        <Check className="h-3 w-3 ml-1" />
+                        <Check className="h-4 w-4 ml-1" />
                       )}
                     </TabsTrigger>
                   );
@@ -974,56 +1142,55 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
               {entries.map((entry, index) => (
                 <TabsContent key={index} value={String(index)} className="space-y-4 px-4 pb-4 overflow-hidden">
                   <div className="text-center mb-4">
-                    <h3 className="text-2xl font-bold text-foreground">{DAY_NAMES[index]}</h3>
-                    <p className="text-lg font-semibold text-timesheet">
+                    <h3 className="text-3xl font-bold text-foreground">{DAY_NAMES[index]}</h3>
+                    <p className="text-xl font-semibold text-timesheet">
                       {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'}h
                     </p>
                   </div>
 
                   <div className="space-y-4 max-w-full">
-                    <div className="space-y-2 max-w-full">
-                      <Label className="text-foreground text-lg">Start Time</Label>
-                      <div className="max-w-full overflow-hidden">
+                    {/* Start and Finish Time - Side by Side on Mobile */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-foreground text-xl">Start Time</Label>
                         <Input
                           type="time"
                           step="900"
                           value={entry.time_started}
                           onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
                           disabled={entry.did_not_work}
-                          className={`h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed ${
+                          className={`h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed ${
                             timeErrors[index] ? 'border-red-500' : ''
                           }`}
                         />
                       </div>
-                    </div>
 
-                    <div className="space-y-2 max-w-full">
-                      <Label className="text-foreground text-lg">Finish Time</Label>
-                      <div className="max-w-full overflow-hidden">
+                      <div className="space-y-2">
+                        <Label className="text-foreground text-xl">Finish Time</Label>
                         <Input
                           type="time"
                           step="900"
                           value={entry.time_finished}
                           onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
                           disabled={entry.did_not_work}
-                          className={`h-14 text-lg bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed ${
+                          className={`h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed ${
                             timeErrors[index] ? 'border-red-500' : ''
                           }`}
                         />
                       </div>
-                      {timeErrors[index] && (
-                        <p className="text-sm text-red-400 flex items-center gap-1">
-                          <AlertCircle className="h-4 w-4" />
-                          {timeErrors[index]}
-                        </p>
-                      )}
                     </div>
+                    {timeErrors[index] && (
+                      <p className="text-base text-red-400 flex items-center gap-1 -mt-2">
+                        <AlertCircle className="h-4 w-4" />
+                        {timeErrors[index]}
+                      </p>
+                    )}
 
                     <div className="space-y-2">
-                      <Label className="text-foreground text-lg flex items-center gap-2">
+                      <Label className="text-foreground text-xl flex items-center gap-2">
                         Job Number
-                        {!entry.working_in_yard && <span className="text-red-400 text-base">*</span>}
-                        {entry.working_in_yard && <span className="text-muted-foreground text-sm">(Not required - working in yard)</span>}
+                        {!entry.working_in_yard && <span className="text-red-400 text-lg">*</span>}
+                        {entry.working_in_yard && <span className="text-muted-foreground text-base">(Not required - working in yard)</span>}
                       </Label>
                       <Input
                         value={entry.job_number}
@@ -1031,27 +1198,27 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
                         placeholder="1234-AB"
                         maxLength={7}
                         disabled={entry.did_not_work || entry.working_in_yard}
-                        className="h-14 text-lg bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
                       />
                     </div>
 
                     {/* Status Buttons */}
                     <div className="space-y-3">
-                      <Label className="text-foreground text-lg">Day Status</Label>
+                      <Label className="text-foreground text-xl">Day Status</Label>
                       <div className="grid grid-cols-2 gap-3">
                         {/* Working in Yard Button */}
                         <button
                           type="button"
                           onClick={() => updateEntry(index, 'working_in_yard', !entry.working_in_yard)}
                           disabled={entry.did_not_work}
-                          className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                          className={`flex flex-col items-center justify-center h-24 rounded-lg border-2 transition-all ${
                             entry.working_in_yard
                               ? 'bg-blue-500/20 border-blue-500 shadow-lg shadow-blue-500/20'
                               : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
                           } disabled:opacity-30 disabled:cursor-not-allowed`}
                         >
                           <Home className={`h-8 w-8 mb-2 ${entry.working_in_yard ? 'text-blue-400' : 'text-muted-foreground'}`} />
-                          <span className={`text-sm font-medium ${entry.working_in_yard ? 'text-blue-400' : 'text-muted-foreground'}`}>
+                          <span className={`text-lg font-medium ${entry.working_in_yard ? 'text-blue-400' : 'text-muted-foreground'}`}>
                             In Yard
                           </span>
                         </button>
@@ -1060,30 +1227,88 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
                         <button
                           type="button"
                           onClick={() => updateEntry(index, 'did_not_work', !entry.did_not_work)}
-                          className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                          className={`flex flex-col items-center justify-center h-24 rounded-lg border-2 transition-all ${
                             entry.did_not_work
                               ? 'bg-amber-500/20 border-amber-500 shadow-lg shadow-amber-500/20'
                               : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
                           }`}
                         >
                           <XCircle className={`h-8 w-8 mb-2 ${entry.did_not_work ? 'text-amber-400' : 'text-muted-foreground'}`} />
-                          <span className={`text-sm font-medium ${entry.did_not_work ? 'text-amber-400' : 'text-muted-foreground'}`}>
+                          <span className={`text-lg font-medium ${entry.did_not_work ? 'text-amber-400' : 'text-muted-foreground'}`}>
                             Did Not Work
                           </span>
                         </button>
                       </div>
+                      
+                      {/* Did Not Work Reasons */}
                       {entry.did_not_work && (
-                        <p className="text-xs text-amber-400 text-center">Time entries disabled for this day</p>
+                        <>
+                          <p className="text-sm text-amber-400 text-center">Time entries disabled for this day</p>
+                          <div className="space-y-2">
+                            <Label className="text-foreground text-base">Reason (Optional)</Label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleDidNotWorkReason(index, 'Holiday')}
+                                className={`flex items-center justify-center h-24 rounded-lg border-2 transition-all text-lg font-medium ${
+                                  entry.didNotWorkReason === 'Holiday'
+                                    ? 'bg-purple-500/20 border-purple-500 text-purple-400'
+                                    : 'bg-slate-800/30 border-slate-700 text-muted-foreground hover:bg-slate-800/50'
+                                }`}
+                              >
+                                Holiday
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDidNotWorkReason(index, 'Sickness')}
+                                className={`flex items-center justify-center h-24 rounded-lg border-2 transition-all text-lg font-medium ${
+                                  entry.didNotWorkReason === 'Sickness'
+                                    ? 'bg-purple-500/20 border-purple-500 text-purple-400'
+                                    : 'bg-slate-800/30 border-slate-700 text-muted-foreground hover:bg-slate-800/50'
+                                }`}
+                              >
+                                Sickness
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDidNotWorkReason(index, 'Off Shift')}
+                                className={`flex items-center justify-center h-24 rounded-lg border-2 transition-all text-lg font-medium ${
+                                  entry.didNotWorkReason === 'Off Shift'
+                                    ? 'bg-purple-500/20 border-purple-500 text-purple-400'
+                                    : 'bg-slate-800/30 border-slate-700 text-muted-foreground hover:bg-slate-800/50'
+                                }`}
+                              >
+                                Off Shift
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDidNotWorkReason(index, 'Other')}
+                                className={`flex items-center justify-center h-24 rounded-lg border-2 transition-all text-lg font-medium ${
+                                  entry.didNotWorkReason === 'Other'
+                                    ? 'bg-purple-500/20 border-purple-500 text-purple-400'
+                                    : 'bg-slate-800/30 border-slate-700 text-muted-foreground hover:bg-slate-800/50'
+                                }`}
+                              >
+                                Other
+                              </button>
+                            </div>
+                            {entry.didNotWorkReason === 'Other' && (
+                              <p className="text-sm text-purple-400 text-center mt-1">
+                                Please add a comment in Notes / Remarks below
+                              </p>
+                            )}
+                          </div>
+                        </>
                       )}
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-foreground text-lg">Notes / Remarks</Label>
+                      <Label className="text-foreground text-xl">Notes / Remarks</Label>
                       <Input
                         value={entry.remarks}
                         onChange={(e) => updateEntry(index, 'remarks', e.target.value)}
                         placeholder="Add any notes for this day..."
-                        className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground w-full"
+                        className="h-16 text-2xl bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground w-full"
                       />
                     </div>
 
@@ -1154,35 +1379,91 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
                       />
                     </td>
                     <td className="p-3">
-                      <div className="flex items-center justify-center gap-2">
-                        {/* In Yard Button */}
-                        <button
-                          type="button"
-                          onClick={() => updateEntry(index, 'working_in_yard', !entry.working_in_yard)}
-                          disabled={entry.did_not_work}
-                          className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
-                            entry.working_in_yard
-                              ? 'bg-blue-500/20 border-blue-500 shadow-lg shadow-blue-500/20'
-                              : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
-                          } disabled:opacity-30 disabled:cursor-not-allowed`}
-                          title="Working in Yard"
-                        >
-                          <Home className={`h-5 w-5 ${entry.working_in_yard ? 'text-blue-400' : 'text-muted-foreground'}`} />
-                        </button>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-center gap-2">
+                          {/* In Yard Button */}
+                          <button
+                            type="button"
+                            onClick={() => updateEntry(index, 'working_in_yard', !entry.working_in_yard)}
+                            disabled={entry.did_not_work}
+                            className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
+                              entry.working_in_yard
+                                ? 'bg-blue-500/20 border-blue-500 shadow-lg shadow-blue-500/20'
+                                : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
+                            } disabled:opacity-30 disabled:cursor-not-allowed`}
+                            title="Working in Yard"
+                          >
+                            <Home className={`h-5 w-5 ${entry.working_in_yard ? 'text-blue-400' : 'text-muted-foreground'}`} />
+                          </button>
 
-                        {/* Did Not Work Button */}
-                        <button
-                          type="button"
-                          onClick={() => updateEntry(index, 'did_not_work', !entry.did_not_work)}
-                          className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
-                            entry.did_not_work
-                              ? 'bg-amber-500/20 border-amber-500 shadow-lg shadow-amber-500/20'
-                              : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
-                          }`}
-                          title="Did Not Work"
-                        >
-                          <XCircle className={`h-5 w-5 ${entry.did_not_work ? 'text-amber-400' : 'text-muted-foreground'}`} />
-                        </button>
+                          {/* Did Not Work Button */}
+                          <button
+                            type="button"
+                            onClick={() => updateEntry(index, 'did_not_work', !entry.did_not_work)}
+                            className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
+                              entry.did_not_work
+                                ? 'bg-amber-500/20 border-amber-500 shadow-lg shadow-amber-500/20'
+                                : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
+                            }`}
+                            title="Did Not Work"
+                          >
+                            <XCircle className={`h-5 w-5 ${entry.did_not_work ? 'text-amber-400' : 'text-muted-foreground'}`} />
+                          </button>
+                        </div>
+                        
+                        {/* Did Not Work Reasons - Desktop */}
+                        {entry.did_not_work && (
+                          <div className="flex flex-wrap gap-1 justify-center">
+                            <button
+                              type="button"
+                              onClick={() => handleDidNotWorkReason(index, 'Holiday')}
+                              className={`px-2 py-1 rounded text-[10px] font-medium border transition-all ${
+                                entry.didNotWorkReason === 'Holiday'
+                                  ? 'bg-purple-500/20 border-purple-500 text-purple-400'
+                                  : 'bg-slate-800/30 border-slate-700 text-muted-foreground hover:bg-slate-800/50'
+                              }`}
+                              title="Holiday"
+                            >
+                              Holiday
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDidNotWorkReason(index, 'Sickness')}
+                              className={`px-2 py-1 rounded text-[10px] font-medium border transition-all ${
+                                entry.didNotWorkReason === 'Sickness'
+                                  ? 'bg-purple-500/20 border-purple-500 text-purple-400'
+                                  : 'bg-slate-800/30 border-slate-700 text-muted-foreground hover:bg-slate-800/50'
+                              }`}
+                              title="Sickness"
+                            >
+                              Sick
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDidNotWorkReason(index, 'Off Shift')}
+                              className={`px-2 py-1 rounded text-[10px] font-medium border transition-all ${
+                                entry.didNotWorkReason === 'Off Shift'
+                                  ? 'bg-purple-500/20 border-purple-500 text-purple-400'
+                                  : 'bg-slate-800/30 border-slate-700 text-muted-foreground hover:bg-slate-800/50'
+                              }`}
+                              title="Off Shift"
+                            >
+                              Off
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDidNotWorkReason(index, 'Other')}
+                              className={`px-2 py-1 rounded text-[10px] font-medium border transition-all ${
+                                entry.didNotWorkReason === 'Other'
+                                  ? 'bg-purple-500/20 border-purple-500 text-purple-400'
+                                  : 'bg-slate-800/30 border-slate-700 text-muted-foreground hover:bg-slate-800/50'
+                              }`}
+                              title="Other (requires remarks)"
+                            >
+                              Other
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="p-3 text-right font-semibold text-timesheet">
