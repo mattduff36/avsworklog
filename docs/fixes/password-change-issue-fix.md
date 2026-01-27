@@ -23,40 +23,69 @@ CREATE POLICY "Users can update own profile"
   );
 ```
 
-## The Fix
-Updated the policy to allow users to update their own profiles AND admins/managers to update any profile:
+## The Fix (v3 - Correct Version)
+
+### Challenge: Infinite Recursion
+The initial fix attempt caused infinite recursion because querying the `profiles` table within a `profiles` RLS policy creates a loop:
+- User tries to update profiles table
+- Policy checks profiles table
+- That check triggers the same policy
+- Loop continues infinitely
+
+### Solution: Security Definer Function
+Created a `SECURITY DEFINER` function that bypasses RLS to safely check permissions:
 
 ```sql
+-- Function runs with elevated privileges, bypassing RLS
+CREATE OR REPLACE FUNCTION public.is_user_manager_or_admin(user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+STABLE
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  is_manager BOOLEAN;
+BEGIN
+  SELECT COALESCE(r.is_manager_admin, FALSE) INTO is_manager
+  FROM profiles p
+  INNER JOIN roles r ON p.role_id = r.id
+  WHERE p.id = user_id;
+  
+  RETURN COALESCE(is_manager, FALSE);
+END;
+$$;
+
+-- Policy uses the function (no recursion!)
 CREATE POLICY "Users can update own profile"
   ON public.profiles
   FOR UPDATE
   TO authenticated
   USING (
-    -- Users can update their own profile OR admins/managers can update any
     (select auth.uid()) = id
-    OR EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = (select auth.uid())
-        AND profiles.role = ANY (ARRAY['admin', 'manager'])
-    )
+    OR is_user_manager_or_admin((select auth.uid()))
   )
   WITH CHECK (
-    -- Users can only save to their own profile OR admins/managers to any
     (select auth.uid()) = id
-    OR EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = (select auth.uid())
-        AND profiles.role = ANY (ARRAY['admin', 'manager'])
-    )
+    OR is_user_manager_or_admin((select auth.uid()))
   );
 ```
 
 ## Files Changed
-1. `supabase/migrations/20260127_fix_profiles_update_policy.sql` - Migration SQL
-2. `scripts/run-profiles-update-fix-migration.ts` - Migration runner script
+1. `supabase/migrations/20260127_fix_profiles_update_policy.sql` - Initial fix (caused recursion)
+2. `supabase/migrations/20260127_fix_profiles_update_policy_v2.sql` - Second attempt (still had recursion)
+3. `supabase/migrations/20260127_fix_profiles_update_policy_v3.sql` - Final working fix
+4. `scripts/run-profiles-update-fix-migration.ts` - Migration runner script
 
-## Migration Applied
-✅ Successfully applied to production database on 2026-01-27
+## Migrations Applied
+✅ v1 applied - caused infinite recursion
+✅ v3 applied - working correctly (2026-01-27)
+
+## Technical Details
+- `SECURITY DEFINER`: Function runs with creator's privileges, bypassing RLS
+- `STABLE`: Function result doesn't change during transaction (optimization)
+- `SET search_path`: Security hardening to prevent search_path hijacking
+- `GRANT EXECUTE TO authenticated`: Only authenticated users can call function
 
 ## Impact
 - ✅ New users can now change their temporary password on first login
@@ -64,15 +93,18 @@ CREATE POLICY "Users can update own profile"
 - ✅ All users can update their own profiles
 - ✅ Admins and managers can still update any profile
 - ✅ Security maintained: users cannot update other users' profiles
+- ✅ No infinite recursion errors
 
 ## Testing
 New users should now be able to:
 1. Log in with temporary password
 2. Be redirected to /change-password
-3. Successfully change their password
+3. Successfully change their password (no recursion error)
 4. Be redirected to dashboard
 
-## Commit
-- Commit: `be7d328`
+## Commits
+- `be7d328` - Initial fix (broken - recursion)
+- `5a1e4dc` - Documentation
+- `c3acd27` - Correct fix using security definer function ✅
 - Branch: `main`
 - Pushed to GitHub: Yes ✅
