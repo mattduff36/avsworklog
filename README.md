@@ -97,6 +97,22 @@ Open [http://localhost:3000](http://localhost:3000) and sign in with your admin 
 
 ## Recent Enhancements
 
+### Performance Optimizations (January 2026)
+- **Bundle Size Reductions**: Implemented dynamic imports for heavy components, reducing bundle sizes by up to 67 kB on key pages
+- **Lazy Loading**: Modal dialogs and heavy components now load on-demand only when needed
+- **Code Quality**: Fixed critical bugs and improved ESLint configuration with SonarJS rules
+- **Dependency Cleanup**: Removed unused packages and added missing dev dependencies
+- **Build Optimization**: Integrated bundle analyzer for ongoing performance monitoring
+
+**Page-specific improvements:**
+- `/fleet/vehicles/[id]/history` - **25.9% smaller** (192 kB, was 259 kB)
+- `/admin/users` - **14.2% smaller** (211 kB, was 246 kB)
+- `/fleet` - **8.7% smaller** (284 kB, was 311 kB)
+- `/workshop-tasks` - **8.2% smaller** (236 kB, was 257 kB)
+- `/notifications` - **4.8% smaller** (220 kB, was 231 kB)
+- `/inspections/new` - **2.8% smaller** (241 kB, was 248 kB)
+
+### Previous Updates
 - **RAMS documents**: Simplified read flow with explicit **Download**, **Open**, and **Email** actions, and action tracking for how each document was accessed in RAMS PDF exports.
 - **Timesheet PDFs**: Driver name now comes from the employee profile and displays correctly in both the top **Driver** field and the footer signature row.
 
