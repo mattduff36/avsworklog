@@ -156,7 +156,7 @@ export function ExpandingVehicleCard({ vehicle, categories, onUpdate }: Expandin
           
           <div className="flex items-center gap-2">
             <Link 
-              href={`/fleet/vehicles/${vehicle.id}/history`}
+              href={`/fleet/vehicles/${vehicle.id}/history?fromTab=maintenance`}
               onClick={(e) => e.stopPropagation()}
             >
               <Button variant="ghost" size="sm" className="gap-2">

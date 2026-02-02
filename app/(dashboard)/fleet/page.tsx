@@ -251,7 +251,8 @@ function FleetContent() {
   // Handler for navigating to vehicle history
   const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
     const vehicleId = vehicle.vehicle_id || vehicle.id;
-    router.push(`/fleet/vehicles/${vehicleId}/history`);
+    // Pass the current active tab as fromTab
+    router.push(`/fleet/vehicles/${vehicleId}/history?fromTab=${activeTab}`);
   };
   
   // Vehicle Category Dialog Handlers

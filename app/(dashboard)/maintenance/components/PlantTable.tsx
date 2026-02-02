@@ -109,7 +109,7 @@ export function PlantTable({
   };
 
   const handleViewHistory = (vehicleId: string) => {
-    router.push(`/fleet/vehicles/${vehicleId}/history`);
+    router.push(`/fleet/vehicles/${vehicleId}/history?fromTab=plant`);
   };
 
   const getMaintenanceStatusBadge = (vehicle: VehicleMaintenanceWithStatus) => {

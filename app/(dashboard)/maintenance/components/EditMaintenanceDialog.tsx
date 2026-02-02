@@ -267,144 +267,150 @@ export function EditMaintenanceDialog({
             )}
           </div>
 
-          {/* Current Mileage (Editable for manual corrections) */}
-          <div className={`rounded-lg p-4 transition-colors ${
-            isMileageFocused 
-              ? 'bg-amber-900/20 border border-amber-800/50' 
-              : 'bg-slate-800/50 border border-border'
-          }`}>
-            <Label htmlFor="current_mileage" className="text-white">
-              Current Mileage {isMileageFocused && <span className="text-amber-400">(Manual Override)</span>}
-            </Label>
-            <Input
-              id="current_mileage"
-              type="number"
-              {...register('current_mileage')}
-              onFocus={() => setIsMileageFocused(true)}
-              onBlur={() => setIsMileageFocused(false)}
-              placeholder="e.g., 75000"
-              className="bg-input border-border text-white mt-2"
-            />
-            {isMileageFocused && (
-              <p className="text-xs text-amber-400 mt-2">
-                ⚠️ Normally auto-updated from inspections. Only edit if the current mileage is incorrect (e.g., typo in inspection).
-              </p>
-            )}
-            {!isMileageFocused && vehicle.last_mileage_update && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Last updated: {new Date(vehicle.last_mileage_update).toLocaleString()}
-              </p>
-            )}
-            {errors.current_mileage && (
-              <p className="text-sm text-red-400 mt-2">{errors.current_mileage.message}</p>
-            )}
-          </div>
+          {/* Current Mileage (Editable for manual corrections) - Vehicle only */}
+          {vehicle.vehicle?.asset_type !== 'plant' && (
+            <div className={`rounded-lg p-4 transition-colors ${
+              isMileageFocused 
+                ? 'bg-amber-900/20 border border-amber-800/50' 
+                : 'bg-slate-800/50 border border-border'
+            }`}>
+              <Label htmlFor="current_mileage" className="text-white">
+                Current Mileage {isMileageFocused && <span className="text-amber-400">(Manual Override)</span>}
+              </Label>
+              <Input
+                id="current_mileage"
+                type="number"
+                {...register('current_mileage')}
+                onFocus={() => setIsMileageFocused(true)}
+                onBlur={() => setIsMileageFocused(false)}
+                placeholder="e.g., 75000"
+                className="bg-input border-border text-white mt-2"
+              />
+              {isMileageFocused && (
+                <p className="text-xs text-amber-400 mt-2">
+                  ⚠️ Normally auto-updated from inspections. Only edit if the current mileage is incorrect (e.g., typo in inspection).
+                </p>
+              )}
+              {!isMileageFocused && vehicle.last_mileage_update && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Last updated: {new Date(vehicle.last_mileage_update).toLocaleString()}
+                </p>
+              )}
+              {errors.current_mileage && (
+                <p className="text-sm text-red-400 mt-2">{errors.current_mileage.message}</p>
+              )}
+            </div>
+          )}
 
-          {/* Date-based Maintenance */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-lg border-b border-slate-700 pb-2">
-              Date-Based Maintenance
-            </h3>
-            
-            <div className="grid md:grid-cols-3 gap-4">
-              {/* Tax Due Date */}
-              <div className="space-y-2">
-                <Label htmlFor="tax_due_date">Tax Due Date</Label>
-                <Input
-                  id="tax_due_date"
-                  type="date"
-                  {...register('tax_due_date')}
-                  className="bg-input border-border text-white"
-                />
-                {errors.tax_due_date && (
-                  <p className="text-sm text-red-400">{errors.tax_due_date.message}</p>
-                )}
-              </div>
+          {/* Date-based Maintenance - Show for vehicles, or plant with reg_number */}
+          {(vehicle.vehicle?.asset_type !== 'plant' || vehicle.vehicle?.reg_number) && (
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg border-b border-slate-700 pb-2">
+                Date-Based Maintenance
+              </h3>
+              
+              <div className="grid md:grid-cols-3 gap-4">
+                {/* Tax Due Date */}
+                <div className="space-y-2">
+                  <Label htmlFor="tax_due_date">Tax Due Date</Label>
+                  <Input
+                    id="tax_due_date"
+                    type="date"
+                    {...register('tax_due_date')}
+                    className="bg-input border-border text-white"
+                  />
+                  {errors.tax_due_date && (
+                    <p className="text-sm text-red-400">{errors.tax_due_date.message}</p>
+                  )}
+                </div>
 
-              {/* MOT Due Date */}
-              <div className="space-y-2">
-                <Label htmlFor="mot_due_date">MOT Due Date</Label>
-                <Input
-                  id="mot_due_date"
-                  type="date"
-                  {...register('mot_due_date')}
-                  className="bg-input border-border text-white"
-                />
-                {errors.mot_due_date && (
-                  <p className="text-sm text-red-400">{errors.mot_due_date.message}</p>
-                )}
-              </div>
+                {/* MOT Due Date */}
+                <div className="space-y-2">
+                  <Label htmlFor="mot_due_date">MOT Due Date</Label>
+                  <Input
+                    id="mot_due_date"
+                    type="date"
+                    {...register('mot_due_date')}
+                    className="bg-input border-border text-white"
+                  />
+                  {errors.mot_due_date && (
+                    <p className="text-sm text-red-400">{errors.mot_due_date.message}</p>
+                  )}
+                </div>
 
-              {/* First Aid Expiry */}
-              <div className="space-y-2">
-                <Label htmlFor="first_aid_kit_expiry">First Aid Kit Expiry</Label>
-                <Input
-                  id="first_aid_kit_expiry"
-                  type="date"
-                  {...register('first_aid_kit_expiry')}
-                  className="bg-input border-border text-white"
-                />
-                {errors.first_aid_kit_expiry && (
-                  <p className="text-sm text-red-400">{errors.first_aid_kit_expiry.message}</p>
-                )}
+                {/* First Aid Expiry */}
+                <div className="space-y-2">
+                  <Label htmlFor="first_aid_kit_expiry">First Aid Kit Expiry</Label>
+                  <Input
+                    id="first_aid_kit_expiry"
+                    type="date"
+                    {...register('first_aid_kit_expiry')}
+                    className="bg-input border-border text-white"
+                  />
+                  {errors.first_aid_kit_expiry && (
+                    <p className="text-sm text-red-400">{errors.first_aid_kit_expiry.message}</p>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Mileage-based Maintenance */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-lg border-b border-slate-700 pb-2">
-              Mileage-Based Maintenance
-            </h3>
-            
-            <div className="grid md:grid-cols-3 gap-4">
-              {/* Service Due */}
-              <div className="space-y-2">
-                <Label htmlFor="next_service_mileage">Next Service (Miles)</Label>
-                <Input
-                  id="next_service_mileage"
-                  type="number"
-                  {...register('next_service_mileage')}
-                  placeholder="e.g., 50000"
-                  className="bg-input border-border text-white"
-                />
-                {errors.next_service_mileage && (
-                  <p className="text-sm text-red-400">{errors.next_service_mileage.message}</p>
-                )}
+          {/* Mileage-based Maintenance - Vehicle only */}
+          {vehicle.vehicle?.asset_type !== 'plant' && (
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg border-b border-slate-700 pb-2">
+                Mileage-Based Maintenance
+              </h3>
+              
+              <div className="grid md:grid-cols-3 gap-4">
+                {/* Service Due */}
+                <div className="space-y-2">
+                  <Label htmlFor="next_service_mileage">Next Service (Miles)</Label>
+                  <Input
+                    id="next_service_mileage"
+                    type="number"
+                    {...register('next_service_mileage')}
+                    placeholder="e.g., 50000"
+                    className="bg-input border-border text-white"
+                  />
+                  {errors.next_service_mileage && (
+                    <p className="text-sm text-red-400">{errors.next_service_mileage.message}</p>
+                  )}
+                </div>
+
+                {/* Last Service */}
+                <div className="space-y-2">
+                  <Label htmlFor="last_service_mileage">Last Service (Miles)</Label>
+                  <Input
+                    id="last_service_mileage"
+                    type="number"
+                    {...register('last_service_mileage')}
+                    placeholder="e.g., 40000"
+                    className="bg-input border-border text-white"
+                  />
+                  {errors.last_service_mileage && (
+                    <p className="text-sm text-red-400">{errors.last_service_mileage.message}</p>
+                  )}
+                </div>
+
+                {/* Cambelt Due */}
+                <div className="space-y-2">
+                  <Label htmlFor="cambelt_due_mileage">Cambelt Due (Miles)</Label>
+                  <Input
+                    id="cambelt_due_mileage"
+                    type="number"
+                    {...register('cambelt_due_mileage')}
+                    placeholder="e.g., 100000"
+                    className="bg-input border-border text-white"
+                  />
+                  {errors.cambelt_due_mileage && (
+                    <p className="text-sm text-red-400">{errors.cambelt_due_mileage.message}</p>
+                  )}
+                </div>
               </div>
 
-              {/* Last Service */}
-              <div className="space-y-2">
-                <Label htmlFor="last_service_mileage">Last Service (Miles)</Label>
-                <Input
-                  id="last_service_mileage"
-                  type="number"
-                  {...register('last_service_mileage')}
-                  placeholder="e.g., 40000"
-                  className="bg-input border-border text-white"
-                />
-                {errors.last_service_mileage && (
-                  <p className="text-sm text-red-400">{errors.last_service_mileage.message}</p>
-                )}
-              </div>
-
-              {/* Cambelt Due */}
-              <div className="space-y-2">
-                <Label htmlFor="cambelt_due_mileage">Cambelt Due (Miles)</Label>
-                <Input
-                  id="cambelt_due_mileage"
-                  type="number"
-                  {...register('cambelt_due_mileage')}
-                  placeholder="e.g., 100000"
-                  className="bg-input border-border text-white"
-                />
-                {errors.cambelt_due_mileage && (
-                  <p className="text-sm text-red-400">{errors.cambelt_due_mileage.message}</p>
-                )}
-              </div>
             </div>
-
-          </div>
+          )}
 
           {/* Hours-based Maintenance (Plant Machinery) */}
           {vehicle.vehicle?.asset_type === 'plant' && (
