@@ -36,6 +36,19 @@ const PlantOverview = dynamic(
   }
 );
 
+// Dynamic import for PlantTable
+const PlantTable = dynamic(
+  () => import('@/app/(dashboard)/maintenance/components/PlantTable').then(mod => ({ default: mod.PlantTable })),
+  { 
+    loading: () => (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    ),
+    ssr: false
+  }
+);
+
 // Import existing components
 import { MaintenanceTable } from '@/app/(dashboard)/maintenance/components/MaintenanceTable';
 import { MaintenanceSettings } from '@/app/(dashboard)/maintenance/components/MaintenanceSettings';
@@ -443,8 +456,8 @@ function FleetContent() {
               </CardContent>
             </Card>
           ) : canManageVehicles ? (
-            <MaintenanceTable 
-              vehicles={(maintenanceData?.vehicles || []).filter(v => v.vehicle?.asset_type === 'plant')}
+            <PlantTable 
+              vehicles={maintenanceData?.vehicles || []}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
               onVehicleAdded={() => {}}
