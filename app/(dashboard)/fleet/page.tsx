@@ -7,12 +7,25 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Loader2, Wrench, Truck, Settings, Tag, Plus, Edit, Trash2, AlertTriangle } from 'lucide-react';
+import { Loader2, Wrench, Truck, Settings, Tag, Plus, Edit, Trash2, AlertTriangle, HardHat } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
 
 // Dynamic import for heavy component - loaded only when Maintenance tab is active
 const MaintenanceOverview = dynamic(
   () => import('@/app/(dashboard)/maintenance/components/MaintenanceOverview').then(mod => ({ default: mod.MaintenanceOverview })),
+  { 
+    loading: () => (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    ),
+    ssr: false
+  }
+);
+
+// Dynamic import for PlantOverview
+const PlantOverview = dynamic(
+  () => import('@/app/(dashboard)/maintenance/components/PlantOverview').then(mod => ({ default: mod.PlantOverview })),
   { 
     loading: () => (
       <div className="flex items-center justify-center p-12">
@@ -314,10 +327,14 @@ function FleetContent() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
           <TabsTrigger value="maintenance" className="gap-2">
             <Wrench className="h-4 w-4" />
             Maintenance
+          </TabsTrigger>
+          <TabsTrigger value="plant" className="gap-2">
+            <HardHat className="h-4 w-4" />
+            Plant
           </TabsTrigger>
           {canManageVehicles && (
             <>
@@ -351,12 +368,36 @@ function FleetContent() {
             </Card>
           ) : (
             <MaintenanceOverview 
-              vehicles={maintenanceData?.vehicles || []}
+              vehicles={(maintenanceData?.vehicles || []).filter(v => v.vehicle?.asset_type !== 'plant')}
               summary={maintenanceData?.summary || {
                 total: 0,
                 overdue: 0,
                 due_soon: 0,
               }}
+              onVehicleClick={handleVehicleClick}
+            />
+          )}
+        </TabsContent>
+
+        {/* Plant Tab */}
+        <TabsContent value="plant" className="space-y-6">
+          {maintenanceLoading ? (
+            <div className="flex items-center justify-center min-h-[400px]">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+            </div>
+          ) : maintenanceError ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <HardHat className="h-16 w-16 text-red-400 mb-4" />
+                <h2 className="text-2xl font-semibold mb-2">Error Loading Plant Data</h2>
+                <p className="text-gray-600 text-center max-w-md">
+                  {maintenanceError?.message || 'Failed to load plant machinery records'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <PlantOverview 
+              vehicles={maintenanceData?.vehicles || []}
               onVehicleClick={handleVehicleClick}
             />
           )}
