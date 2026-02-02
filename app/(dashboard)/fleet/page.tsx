@@ -370,34 +370,42 @@ function FleetContent() {
           ) : (
             <>
               {/* Filter Buttons */}
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  variant={maintenanceFilter === 'both' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setMaintenanceFilter('both')}
-                  className="gap-2"
-                >
-                  <Wrench className="h-4 w-4" />
-                  All Assets
-                </Button>
-                <Button
-                  variant={maintenanceFilter === 'vehicle' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setMaintenanceFilter('vehicle')}
-                  className="gap-2"
-                >
-                  <Truck className="h-4 w-4" />
-                  Vehicles Only
-                </Button>
-                <Button
-                  variant={maintenanceFilter === 'plant' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setMaintenanceFilter('plant')}
-                  className="gap-2"
-                >
-                  <HardHat className="h-4 w-4" />
-                  Plant Only
-                </Button>
+              <div className="flex items-center justify-end">
+                <div className="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground">
+                  <button
+                    onClick={() => setMaintenanceFilter('both')}
+                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 gap-2 ${
+                      maintenanceFilter === 'both'
+                        ? 'bg-background text-foreground shadow'
+                        : 'hover:bg-background/50'
+                    }`}
+                  >
+                    <Wrench className="h-3.5 w-3.5" />
+                    All Assets
+                  </button>
+                  <button
+                    onClick={() => setMaintenanceFilter('vehicle')}
+                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 gap-2 ${
+                      maintenanceFilter === 'vehicle'
+                        ? 'bg-background text-foreground shadow'
+                        : 'hover:bg-background/50'
+                    }`}
+                  >
+                    <Truck className="h-3.5 w-3.5" />
+                    Vehicles
+                  </button>
+                  <button
+                    onClick={() => setMaintenanceFilter('plant')}
+                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 gap-2 ${
+                      maintenanceFilter === 'plant'
+                        ? 'bg-background text-foreground shadow'
+                        : 'hover:bg-background/50'
+                    }`}
+                  >
+                    <HardHat className="h-3.5 w-3.5" />
+                    Plant
+                  </button>
+                </div>
               </div>
 
               <MaintenanceOverview 
