@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,7 +42,12 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import type { Database } from '@/types/database';
-import { RoleManagement } from '@/components/admin/RoleManagement';
+
+// Dynamic import for role management - loaded only when Roles tab is active
+const RoleManagement = dynamic(() => import('@/components/admin/RoleManagement').then(m => ({ default: m.RoleManagement })), { 
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
+});
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 type ProfileWithEmail = Profile & { email?: string };

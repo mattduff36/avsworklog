@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { createClient } from '@/lib/supabase/client';
@@ -18,17 +19,21 @@ import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, FileText, Wrench, U
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import { Database } from '@/types/database';
-import { TaskCommentsDrawer } from '@/components/workshop-tasks/TaskCommentsDrawer';
-import { WorkshopTaskModal } from '@/components/workshop-tasks/WorkshopTaskModal';
-import { SubcategoryDialog } from '@/components/workshop-tasks/SubcategoryDialog';
-import { CategoryManagementPanel } from '@/components/workshop-tasks/CategoryManagementPanel';
-import { AttachmentManagementPanel } from '@/components/workshop-tasks/AttachmentManagementPanel';
-import { MarkTaskCompleteDialog, type CompletionData } from '@/components/workshop-tasks/MarkTaskCompleteDialog';
+
+// Dynamic imports for heavy components - loaded only when needed
+const TaskCommentsDrawer = dynamic(() => import('@/components/workshop-tasks/TaskCommentsDrawer').then(m => ({ default: m.TaskCommentsDrawer })), { ssr: false });
+const WorkshopTaskModal = dynamic(() => import('@/components/workshop-tasks/WorkshopTaskModal').then(m => ({ default: m.WorkshopTaskModal })), { ssr: false });
+const SubcategoryDialog = dynamic(() => import('@/components/workshop-tasks/SubcategoryDialog').then(m => ({ default: m.SubcategoryDialog })), { ssr: false });
+const CategoryManagementPanel = dynamic(() => import('@/components/workshop-tasks/CategoryManagementPanel').then(m => ({ default: m.CategoryManagementPanel })), { ssr: false });
+const AttachmentManagementPanel = dynamic(() => import('@/components/workshop-tasks/AttachmentManagementPanel').then(m => ({ default: m.AttachmentManagementPanel })), { ssr: false });
+const MarkTaskCompleteDialog = dynamic(() => import('@/components/workshop-tasks/MarkTaskCompleteDialog').then(m => ({ default: m.MarkTaskCompleteDialog })), { ssr: false });
+const ErrorDetailsModal = dynamic(() => import('@/components/ui/error-details-modal').then(m => ({ default: m.ErrorDetailsModal })), { ssr: false });
+
 import { appendStatusHistory, buildStatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
 import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
-import { ErrorDetailsModal } from '@/components/ui/error-details-modal';
 import { showErrorWithDetails, fetchErrorDetails } from '@/lib/utils/error-details';
 import { ErrorDetailsResponse } from '@/types/error-details';
+import type { CompletionData } from '@/components/workshop-tasks/MarkTaskCompleteDialog';
 
 type Action = Database['public']['Tables']['actions']['Row'] & {
   vehicle_inspections?: {
@@ -2286,7 +2291,7 @@ export default function WorkshopTasksPage() {
           <div className="space-y-4">
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
               <p className="text-sm text-blue-300">
-                This task will be marked as "In Progress" and visible in the workshop queue.
+                This task will be marked as &quot;In Progress&quot; and visible in the workshop queue.
               </p>
             </div>
 
@@ -2359,7 +2364,7 @@ export default function WorkshopTasksPage() {
           <div className="space-y-4">
             <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
               <p className="text-sm text-purple-300">
-                This task will be marked as "On Hold" and can be resumed later. On hold tasks will still appear in driver inspections.
+                This task will be marked as &quot;On Hold&quot; and can be resumed later. On hold tasks will still appear in driver inspections.
               </p>
             </div>
 
@@ -2428,7 +2433,7 @@ export default function WorkshopTasksPage() {
           <div className="space-y-4">
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
               <p className="text-sm text-blue-300">
-                This task will be moved back to "In Progress" and work can continue.
+                This task will be moved back to &quot;In Progress&quot; and work can continue.
               </p>
             </div>
 

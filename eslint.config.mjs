@@ -29,6 +29,9 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      "public/sw.js",
+      "public/sw-custom.js",
+      "public/workbox-*.js",
     ],
   },
 ];

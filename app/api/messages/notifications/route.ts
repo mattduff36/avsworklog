@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { GetNotificationsResponse, NotificationItem } from '@/types/messages';
@@ -90,7 +90,6 @@ export async function GET() {
 
     await logServerError({
       error: error as Error,
-      request,
       componentName: '/api/messages/notifications',
       additionalData: {
         endpoint: '/api/messages/notifications',

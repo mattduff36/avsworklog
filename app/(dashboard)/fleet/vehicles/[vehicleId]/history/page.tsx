@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,12 +28,14 @@ import {
 import { BackButton } from '@/components/ui/back-button';
 import { formatRelativeTime } from '@/lib/utils/date';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { EditMaintenanceDialog } from '@/app/(dashboard)/maintenance/components/EditMaintenanceDialog';
-import { DeleteVehicleDialog } from '@/app/(dashboard)/maintenance/components/DeleteVehicleDialog';
 import { formatMileage, formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
-import { WorkshopTaskHistoryCard } from '@/components/workshop-tasks/WorkshopTaskHistoryCard';
 import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
+
+// Dynamic imports for dialog components
+const EditMaintenanceDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/EditMaintenanceDialog').then(m => ({ default: m.EditMaintenanceDialog })), { ssr: false });
+const DeleteVehicleDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/DeleteVehicleDialog').then(m => ({ default: m.DeleteVehicleDialog })), { ssr: false });
+const WorkshopTaskHistoryCard = dynamic(() => import('@/components/workshop-tasks/WorkshopTaskHistoryCard').then(m => ({ default: m.WorkshopTaskHistoryCard })), { ssr: false });
 import { Paperclip } from 'lucide-react';
 
 type Vehicle = {

@@ -358,7 +358,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                 {existingMotDueDate && !vehicleNotFound && (
                   <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4 max-w-md mx-auto">
                     <p className="text-sm text-blue-300">
-                      This vehicle is likely less than 3 years old and hasn't required an MOT yet.
+                      This vehicle is likely less than 3 years old and hasn&apos;t required an MOT yet.
                     </p>
                     <p className="text-sm text-white font-medium mt-2">
                       First MOT due: <span className="text-blue-400">{new Date(existingMotDueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>

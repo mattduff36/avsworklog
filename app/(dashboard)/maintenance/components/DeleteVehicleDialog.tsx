@@ -101,7 +101,7 @@ export function DeleteVehicleDialog({
             Retire Vehicle
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            This will move the vehicle to the "Retired Vehicles" tab. All inspection history and maintenance records will be preserved.
+            This will move the vehicle to the &quot;Retired Vehicles&quot; tab. All inspection history and maintenance records will be preserved.
           </DialogDescription>
         </DialogHeader>
 

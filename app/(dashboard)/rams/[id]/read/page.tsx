@@ -352,7 +352,7 @@ export default function ReadRAMSPage() {
             <FileText className="h-12 w-12 text-red-600 dark:text-red-400" />
           </div>
           <h2 className="text-2xl font-bold text-foreground mb-2">Document not found</h2>
-          <p className="text-muted-foreground mb-6">The document you're looking for doesn't exist or has been removed.</p>
+          <p className="text-muted-foreground mb-6">The document you&apos;re looking for doesn&apos;t exist or has been removed.</p>
           <BackButton />
         </Card>
       </div>

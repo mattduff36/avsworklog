@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
+import dynamic from 'next/dynamic';
 import { useSearchParams, useRouter as useNextRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,8 +10,20 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Wrench, Truck, Settings, Tag, Plus, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
 
+// Dynamic import for heavy component - loaded only when Maintenance tab is active
+const MaintenanceOverview = dynamic(
+  () => import('@/app/(dashboard)/maintenance/components/MaintenanceOverview').then(mod => ({ default: mod.MaintenanceOverview })),
+  { 
+    loading: () => (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    ),
+    ssr: false
+  }
+);
+
 // Import existing components
-import { MaintenanceOverview } from '@/app/(dashboard)/maintenance/components/MaintenanceOverview';
 import { MaintenanceTable } from '@/app/(dashboard)/maintenance/components/MaintenanceTable';
 import { MaintenanceSettings } from '@/app/(dashboard)/maintenance/components/MaintenanceSettings';
 import { VehicleCategoryDialog } from './components/VehicleCategoryDialog';

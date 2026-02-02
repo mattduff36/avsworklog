@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -29,8 +30,10 @@ import { toast } from 'sonner';
 import type { NotificationItem } from '@/types/messages';
 import type { NotificationPreference, NotificationModuleKey } from '@/types/notifications';
 import { NOTIFICATION_MODULES } from '@/types/notifications';
-import { BlockingMessageModal } from '@/components/messages/BlockingMessageModal';
-import { ReminderModal } from '@/components/messages/ReminderModal';
+
+// Dynamic imports for modal components
+const BlockingMessageModal = dynamic(() => import('@/components/messages/BlockingMessageModal').then(m => ({ default: m.BlockingMessageModal })), { ssr: false });
+const ReminderModal = dynamic(() => import('@/components/messages/ReminderModal').then(m => ({ default: m.ReminderModal })), { ssr: false });
 
 const MODULE_ICONS: Record<string, any> = {
   'AlertTriangle': AlertTriangle,

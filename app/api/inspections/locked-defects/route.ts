@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
     // Get inspection_items to extract item_number and item_description
     const itemIds = tasks.map(t => t.inspection_item_id).filter(Boolean);
     
-    let lockedItems: Array<{
+    const lockedItems: Array<{
       item_number: number;
       item_description: string;
       status: string;

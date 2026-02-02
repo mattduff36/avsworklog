@@ -1732,8 +1732,8 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
               {testVehicles.length === 0 && !loadingTestVehicles && (
                 <div className="text-center py-8 text-muted-foreground">
                   <Car className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>No vehicles found matching prefix "{testVehiclePrefix}"</p>
-                  <p className="text-sm mt-1">Click "Load Vehicles" to search</p>
+                  <p>No vehicles found matching prefix &quot;{testVehiclePrefix}&quot;</p>
+                  <p className="text-sm mt-1">Click &quot;Load Vehicles&quot; to search</p>
                 </div>
               )}
 

@@ -32,14 +32,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch or create preferences
-    let { data: prefs, error } = await supabase
+    let prefs;
+    const { data, error: fetchError } = await supabase
       .from('admin_error_notification_prefs')
       .select('*')
       .eq('user_id', user.id)
       .single();
 
     // If no preferences exist, create default ones
-    if (error && error.code === 'PGRST116') {
+    if (fetchError && fetchError.code === 'PGRST116') {
       const { data: newPrefs, error: insertError } = await supabase
         .from('admin_error_notification_prefs')
         .insert({
@@ -54,8 +55,10 @@ export async function GET(request: NextRequest) {
         throw insertError;
       }
       prefs = newPrefs;
-    } else if (error) {
-      throw error;
+    } else if (fetchError) {
+      throw fetchError;
+    } else {
+      prefs = data;
     }
 
     return NextResponse.json({

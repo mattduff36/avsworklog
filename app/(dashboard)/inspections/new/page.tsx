@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
@@ -24,12 +25,14 @@ import { BackButton } from '@/components/ui/back-button';
 import { formatDateISO, formatDate, getWeekEnding } from '@/lib/utils/date';
 import { INSPECTION_ITEMS, InspectionStatus, getChecklistForCategory } from '@/types/inspection';
 import { checkMileageSanity, formatMileage, type MileageSanityResult } from '@/lib/utils/mileageSanity';
-import PhotoUpload from '@/components/forms/PhotoUpload';
 import { Database } from '@/types/database';
-import { SignaturePad } from '@/components/forms/SignaturePad';
 import { Employee } from '@/types/common';
 import { toast } from 'sonner';
 import { showErrorWithReport } from '@/lib/utils/error-reporting';
+
+// Dynamic imports for heavy components - loaded only when needed
+const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
+const SignaturePad = dynamic(() => import('@/components/forms/SignaturePad').then(m => ({ default: m.SignaturePad })), { ssr: false });
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -2177,10 +2180,10 @@ function NewInspectionContent() {
             </div>
             <div className="space-y-2 text-sm text-muted-foreground">
               <p>
-                Vehicle inspections should be submitted <strong className="text-white">weekly</strong> when you're done using the vehicle.
+                Vehicle inspections should be submitted <strong className="text-white">weekly</strong> when you&apos;re done using the vehicle.
               </p>
               <p className="text-amber-400">
-                Still using this vehicle this week? Select 'Save Draft' instead.
+                Still using this vehicle this week? Select &apos;Save Draft&apos; instead.
               </p>
             </div>
           </div>
@@ -2264,7 +2267,7 @@ function NewInspectionContent() {
             </div>
             
             <p className="text-xs text-muted-foreground">
-              Please double-check the odometer reading. If the value is correct, click "Confirm" to continue.
+              Please double-check the odometer reading. If the value is correct, click &quot;Confirm&quot; to continue.
             </p>
           </div>
 

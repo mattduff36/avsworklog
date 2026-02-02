@@ -220,7 +220,7 @@ export default function TestErrorLoggingPage() {
           <ol className="list-decimal list-inside space-y-2">
             <li>Run the tests above</li>
             <li>Navigate to <code className="bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">/debug</code> page</li>
-            <li>Click the "Error Log" tab</li>
+            <li>Click the &quot;Error Log&quot; tab</li>
             <li>Verify that all test errors appear with full details</li>
             <li>Check that each error has clear descriptions and context</li>
           </ol>
