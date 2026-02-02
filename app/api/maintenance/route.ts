@@ -80,9 +80,15 @@ export async function GET(request: NextRequest) {
       .select(`
         id,
         reg_number,
+        plant_id,
+        asset_type,
+        serial_number,
+        year,
+        weight_class,
         category_id,
         status,
         nickname,
+        vehicle_type,
         maintenance:vehicle_maintenance(*)
       `)
       .eq('status', 'active');
