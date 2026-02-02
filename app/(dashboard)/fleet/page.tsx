@@ -78,6 +78,7 @@ function FleetContent() {
   
   const [activeTab, setActiveTab] = useState('maintenance'); // Default to maintenance, validate after auth loads
   const [hasModulePermission, setHasModulePermission] = useState<boolean | null>(null);
+  const [maintenanceFilter, setMaintenanceFilter] = useState<'both' | 'vehicle' | 'plant'>('both'); // Filter for maintenance overview
   
   // Vehicle Category Dialog States
   const [addCategoryDialogOpen, setAddCategoryDialogOpen] = useState(false);
@@ -367,15 +368,53 @@ function FleetContent() {
               </CardContent>
             </Card>
           ) : (
-            <MaintenanceOverview 
-              vehicles={(maintenanceData?.vehicles || []).filter(v => v.vehicle?.asset_type !== 'plant')}
-              summary={maintenanceData?.summary || {
-                total: 0,
-                overdue: 0,
-                due_soon: 0,
-              }}
-              onVehicleClick={handleVehicleClick}
-            />
+            <>
+              {/* Filter Buttons */}
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  variant={maintenanceFilter === 'both' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setMaintenanceFilter('both')}
+                  className="gap-2"
+                >
+                  <Wrench className="h-4 w-4" />
+                  All Assets
+                </Button>
+                <Button
+                  variant={maintenanceFilter === 'vehicle' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setMaintenanceFilter('vehicle')}
+                  className="gap-2"
+                >
+                  <Truck className="h-4 w-4" />
+                  Vehicles Only
+                </Button>
+                <Button
+                  variant={maintenanceFilter === 'plant' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setMaintenanceFilter('plant')}
+                  className="gap-2"
+                >
+                  <HardHat className="h-4 w-4" />
+                  Plant Only
+                </Button>
+              </div>
+
+              <MaintenanceOverview 
+                vehicles={(maintenanceData?.vehicles || []).filter(v => {
+                  if (maintenanceFilter === 'both') return true;
+                  if (maintenanceFilter === 'vehicle') return v.vehicle?.asset_type !== 'plant';
+                  if (maintenanceFilter === 'plant') return v.vehicle?.asset_type === 'plant';
+                  return true;
+                })}
+                summary={maintenanceData?.summary || {
+                  total: 0,
+                  overdue: 0,
+                  due_soon: 0,
+                }}
+                onVehicleClick={handleVehicleClick}
+              />
+            </>
           )}
         </TabsContent>
 
@@ -395,6 +434,13 @@ function FleetContent() {
                 </p>
               </CardContent>
             </Card>
+          ) : canManageVehicles ? (
+            <MaintenanceTable 
+              vehicles={(maintenanceData?.vehicles || []).filter(v => v.vehicle?.asset_type === 'plant')}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onVehicleAdded={() => {}}
+            />
           ) : (
             <PlantOverview 
               vehicles={maintenanceData?.vehicles || []}
@@ -422,7 +468,7 @@ function FleetContent() {
               </Card>
             ) : (
               <MaintenanceTable 
-                vehicles={maintenanceData?.vehicles || []}
+                vehicles={(maintenanceData?.vehicles || []).filter(v => v.vehicle?.asset_type !== 'plant')}
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
                 onVehicleAdded={() => {}}
