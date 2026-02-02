@@ -10,10 +10,15 @@ INSERT INTO vehicle_categories (name, description) VALUES
 ON CONFLICT (name) DO NOTHING;
 
 -- Add hours-based maintenance category
+-- Note: The check_threshold constraint requires at least ONE of (alert_threshold_days, alert_threshold_miles, alert_threshold_hours) to be NOT NULL
 INSERT INTO maintenance_categories (
-  name, description, type, alert_threshold_hours,
+  name, description, type,  
+  alert_threshold_days, alert_threshold_miles, alert_threshold_hours,
   is_active, responsibility, show_on_overview, applies_to
 ) VALUES
-  ('Service Due (Hours)', 'Regular service based on engine hours', 'hours', 50,
+  ('Service Due (Hours)', 'Regular service based on engine hours', 'hours',
+   NULL, NULL, 50,
    true, 'workshop', true, ARRAY['plant'])
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT (name) DO UPDATE SET
+  alert_threshold_hours = EXCLUDED.alert_threshold_hours,
+  applies_to = EXCLUDED.applies_to;
