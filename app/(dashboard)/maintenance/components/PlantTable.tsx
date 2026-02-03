@@ -6,6 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { 
   Search, 
   History,
@@ -13,11 +19,13 @@ import {
   Loader2,
   ArrowUpDown,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Settings2
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { AddVehicleDialog } from './AddVehicleDialog';
-import { formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
+import { formatMaintenanceDate, getStatusColorClass } from '@/lib/utils/maintenanceCalculations';
+import { Badge } from '@/components/ui/badge';
 
 type PlantAsset = {
   id: string;
@@ -46,6 +54,15 @@ interface PlantTableProps {
 type SortField = 'plant_id' | 'nickname' | 'category' | 'current_hours' | 'next_service_hours' | 'loler_due';
 type SortDirection = 'asc' | 'desc';
 
+type ColumnVisibility = {
+  plant_id: boolean;
+  nickname: boolean;
+  category: boolean;
+  current_hours: boolean;
+  service_due: boolean;
+  loler_due: boolean;
+};
+
 export function PlantTable({ 
   searchQuery, 
   onSearchChange,
@@ -59,17 +76,26 @@ export function PlantTable({
   const [plantAssets, setPlantAssets] = useState<PlantMaintenanceWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+  const [activeStatus, setActiveStatus] = useState<'active' | 'retired'>('active');
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
+    plant_id: true,
+    nickname: true,
+    category: true,
+    current_hours: true,
+    service_due: true,
+    loler_due: true,
+  });
 
   // Fetch plant assets from the plant table
   useEffect(() => {
     fetchPlantAssets();
-  }, []);
+  }, [activeStatus]); // Re-fetch when status changes
 
   const fetchPlantAssets = async () => {
     try {
       setLoading(true);
       
-      // Fetch plant assets with maintenance data
+      // Fetch plant assets with maintenance data based on active status
       const { data: plantData, error: plantError } = await supabase
         .from('plant')
         .select(`
@@ -79,7 +105,7 @@ export function PlantTable({
             name
           )
         `)
-        .eq('status', 'active')
+        .eq('status', activeStatus === 'active' ? 'active' : 'retired')
         .order('plant_id');
 
       if (plantError) throw plantError;
@@ -183,23 +209,108 @@ export function PlantTable({
     <>
       <Card className="border-border">
         <CardHeader>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <CardTitle className="text-white flex items-center gap-2">
-                <HardHat className="h-5 w-5" />
-                Plant Machinery Management
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                {sortedPlant.length} plant asset{sortedPlant.length !== 1 ? 's' : ''}
-              </p>
+          <div className="flex flex-col gap-4">
+            {/* Title and Add Button Row */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-white flex items-center gap-2">
+                  All Plant
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {sortedPlant.length} plant asset{sortedPlant.length !== 1 ? 's' : ''} • Click column headers to sort
+                </p>
+              </div>
+              <Button
+                onClick={() => setAddVehicleDialogOpen(true)}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <HardHat className="h-4 w-4 mr-2" />
+                Add Vehicle
+              </Button>
             </div>
-            <Button
-              onClick={() => setAddVehicleDialogOpen(true)}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <HardHat className="h-4 w-4 mr-2" />
-              Add Plant
-            </Button>
+
+            {/* Status Tabs and Show Columns Row */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              {/* Status Tabs */}
+              <div className="flex gap-2">
+                <Button
+                  variant={activeStatus === 'active' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveStatus('active')}
+                  className={activeStatus === 'active' ? 'bg-orange-600 hover:bg-orange-700' : ''}
+                >
+                  Active Plant ({plantAssets.filter(p => p.plant?.status === 'active').length})
+                </Button>
+                <Button
+                  variant={activeStatus === 'retired' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveStatus('retired')}
+                  className={activeStatus === 'retired' ? 'bg-slate-600 hover:bg-slate-700' : ''}
+                >
+                  Retired Plant ({plantAssets.filter(p => p.plant?.status === 'retired').length})
+                </Button>
+              </div>
+
+              {/* Show Columns Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Settings2 className="h-4 w-4 mr-2" />
+                    Show columns
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.plant_id}
+                    onCheckedChange={(checked) =>
+                      setColumnVisibility({ ...columnVisibility, plant_id: checked })
+                    }
+                  >
+                    Plant ID
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.nickname}
+                    onCheckedChange={(checked) =>
+                      setColumnVisibility({ ...columnVisibility, nickname: checked })
+                    }
+                  >
+                    Nickname
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.category}
+                    onCheckedChange={(checked) =>
+                      setColumnVisibility({ ...columnVisibility, category: checked })
+                    }
+                  >
+                    Category
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.current_hours}
+                    onCheckedChange={(checked) =>
+                      setColumnVisibility({ ...columnVisibility, current_hours: checked })
+                    }
+                  >
+                    Hours
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.service_due}
+                    onCheckedChange={(checked) =>
+                      setColumnVisibility({ ...columnVisibility, service_due: checked })
+                    }
+                  >
+                    Service Due
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.loler_due}
+                    onCheckedChange={(checked) =>
+                      setColumnVisibility({ ...columnVisibility, loler_due: checked })
+                    }
+                  >
+                    LOLER Due
+                  </DropdownMenuCheckboxItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </CardHeader>
 
@@ -208,7 +319,7 @@ export function PlantTable({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by Plant ID, registration, or description..."
+              placeholder="Search by registration number..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               className="pl-10 bg-input border-border text-white"
@@ -227,67 +338,79 @@ export function PlantTable({
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent border-border">
-                      <TableHead 
-                        className="text-white cursor-pointer hover:text-blue-400"
-                        onClick={() => handleSort('plant_id')}
-                      >
-                        <div className="flex items-center gap-2">
-                          Plant ID
-                          <ArrowUpDown className="h-3 w-3" />
-                        </div>
-                      </TableHead>
-                      <TableHead 
-                        className="text-white cursor-pointer hover:text-blue-400"
-                        onClick={() => handleSort('nickname')}
-                      >
-                        <div className="flex items-center gap-2">
-                          Nickname
-                          <ArrowUpDown className="h-3 w-3" />
-                        </div>
-                      </TableHead>
-                      <TableHead 
-                        className="text-white cursor-pointer hover:text-blue-400"
-                        onClick={() => handleSort('category')}
-                      >
-                        <div className="flex items-center gap-2">
-                          Category
-                          <ArrowUpDown className="h-3 w-3" />
-                        </div>
-                      </TableHead>
-                      <TableHead 
-                        className="text-white cursor-pointer hover:text-blue-400"
-                        onClick={() => handleSort('current_hours')}
-                      >
-                        <div className="flex items-center gap-2">
-                          Hours
-                          <ArrowUpDown className="h-3 w-3" />
-                        </div>
-                      </TableHead>
-                      <TableHead 
-                        className="text-white cursor-pointer hover:text-blue-400"
-                        onClick={() => handleSort('next_service_hours')}
-                      >
-                        <div className="flex items-center gap-2">
-                          Service Due
-                          <ArrowUpDown className="h-3 w-3" />
-                        </div>
-                      </TableHead>
-                      <TableHead 
-                        className="text-white cursor-pointer hover:text-blue-400"
-                        onClick={() => handleSort('loler_due')}
-                      >
-                        <div className="flex items-center gap-2">
-                          LOLER Due
-                          <ArrowUpDown className="h-3 w-3" />
-                        </div>
-                      </TableHead>
+                      {columnVisibility.plant_id && (
+                        <TableHead 
+                          className="text-white cursor-pointer hover:text-blue-400"
+                          onClick={() => handleSort('plant_id')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Plant ID
+                            <ArrowUpDown className="h-3 w-3" />
+                          </div>
+                        </TableHead>
+                      )}
+                      {columnVisibility.nickname && (
+                        <TableHead 
+                          className="text-white cursor-pointer hover:text-blue-400"
+                          onClick={() => handleSort('nickname')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Nickname
+                            <ArrowUpDown className="h-3 w-3" />
+                          </div>
+                        </TableHead>
+                      )}
+                      {columnVisibility.category && (
+                        <TableHead 
+                          className="text-white cursor-pointer hover:text-blue-400"
+                          onClick={() => handleSort('category')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Category
+                            <ArrowUpDown className="h-3 w-3" />
+                          </div>
+                        </TableHead>
+                      )}
+                      {columnVisibility.current_hours && (
+                        <TableHead 
+                          className="text-white cursor-pointer hover:text-blue-400"
+                          onClick={() => handleSort('current_hours')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Hours
+                            <ArrowUpDown className="h-3 w-3" />
+                          </div>
+                        </TableHead>
+                      )}
+                      {columnVisibility.service_due && (
+                        <TableHead 
+                          className="text-white cursor-pointer hover:text-blue-400"
+                          onClick={() => handleSort('next_service_hours')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Service Due
+                            <ArrowUpDown className="h-3 w-3" />
+                          </div>
+                        </TableHead>
+                      )}
+                      {columnVisibility.loler_due && (
+                        <TableHead 
+                          className="text-white cursor-pointer hover:text-blue-400"
+                          onClick={() => handleSort('loler_due')}
+                        >
+                          <div className="flex items-center gap-2">
+                            LOLER Due
+                            <ArrowUpDown className="h-3 w-3" />
+                          </div>
+                        </TableHead>
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sortedPlant.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                          {searchQuery ? 'No plant machinery found matching your search' : 'No plant machinery added yet'}
+                          {searchQuery ? 'No plant machinery found matching your search' : `No ${activeStatus} plant machinery`}
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -297,34 +420,56 @@ export function PlantTable({
                           className="border-border hover:bg-slate-800/50 cursor-pointer"
                           onClick={() => handleViewHistory(asset.plant_id)}
                         >
-                          <TableCell className="font-mono font-medium text-blue-400">
-                            {asset.plant?.plant_id}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {asset.plant?.nickname || (
-                              <span className="text-slate-400 italic">No nickname</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {asset.plant?.vehicle_categories?.name || 'All plant'}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {asset.current_hours ? (
-                              <span className="font-mono">{asset.current_hours.toLocaleString()}h</span>
-                            ) : (
-                              <span className="text-slate-400 italic">Not set</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {asset.next_service_hours ? (
-                              <span className="font-mono">{asset.next_service_hours.toLocaleString()}h</span>
-                            ) : (
-                              <span className="text-slate-400 italic">Not set</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {formatMaintenanceDate(asset.plant?.loler_due_date || null)}
-                          </TableCell>
+                          {columnVisibility.plant_id && (
+                            <TableCell className="font-mono font-medium text-blue-400">
+                              {asset.plant?.plant_id}
+                            </TableCell>
+                          )}
+                          {columnVisibility.nickname && (
+                            <TableCell className="text-muted-foreground">
+                              {asset.plant?.nickname || (
+                                <span className="text-slate-400 italic">No nickname</span>
+                              )}
+                            </TableCell>
+                          )}
+                          {columnVisibility.category && (
+                            <TableCell className="text-muted-foreground">
+                              {asset.plant?.vehicle_categories?.name || 'All plant'}
+                            </TableCell>
+                          )}
+                          {columnVisibility.current_hours && (
+                            <TableCell className="text-muted-foreground">
+                              {asset.current_hours ? (
+                                <Badge className={`font-medium ${getStatusColorClass('not_set')}`}>
+                                  {asset.current_hours.toLocaleString()}h
+                                </Badge>
+                              ) : (
+                                <Badge className={`font-medium ${getStatusColorClass('not_set')}`}>
+                                  Not set
+                                </Badge>
+                              )}
+                            </TableCell>
+                          )}
+                          {columnVisibility.service_due && (
+                            <TableCell className="text-muted-foreground">
+                              {asset.next_service_hours ? (
+                                <Badge className={`font-medium ${getStatusColorClass('ok')}`}>
+                                  {asset.next_service_hours.toLocaleString()}h
+                                </Badge>
+                              ) : (
+                                <Badge className={`font-medium ${getStatusColorClass('not_set')}`}>
+                                  Not set
+                                </Badge>
+                              )}
+                            </TableCell>
+                          )}
+                          {columnVisibility.loler_due && (
+                            <TableCell className="text-muted-foreground">
+                              <Badge className={`font-medium ${getStatusColorClass(asset.plant?.loler_due_date ? 'ok' : 'not_set')}`}>
+                                {formatMaintenanceDate(asset.plant?.loler_due_date || null)}
+                              </Badge>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))
                     )}
@@ -418,19 +563,33 @@ export function PlantTable({
                                 </div>
                                 <div className="flex items-center justify-between">
                                   <span className="text-sm text-muted-foreground">Current Hours:</span>
-                                  <span className="text-white font-medium">
-                                    {asset.current_hours ? `${asset.current_hours.toLocaleString()}h` : 'Not set'}
-                                  </span>
+                                  {asset.current_hours ? (
+                                    <Badge className={`font-medium ${getStatusColorClass('not_set')}`}>
+                                      {asset.current_hours.toLocaleString()}h
+                                    </Badge>
+                                  ) : (
+                                    <Badge className={`font-medium ${getStatusColorClass('not_set')}`}>
+                                      Not set
+                                    </Badge>
+                                  )}
                                 </div>
                                 <div className="flex items-center justify-between">
                                   <span className="text-sm text-muted-foreground">Service Due:</span>
-                                  <span className="text-white">
-                                    {asset.next_service_hours ? `${asset.next_service_hours.toLocaleString()}h` : 'Not set'}
-                                  </span>
+                                  {asset.next_service_hours ? (
+                                    <Badge className={`font-medium ${getStatusColorClass('ok')}`}>
+                                      {asset.next_service_hours.toLocaleString()}h
+                                    </Badge>
+                                  ) : (
+                                    <Badge className={`font-medium ${getStatusColorClass('not_set')}`}>
+                                      Not set
+                                    </Badge>
+                                  )}
                                 </div>
                                 <div className="flex items-center justify-between">
                                   <span className="text-sm text-muted-foreground">LOLER Due:</span>
-                                  <span className="text-white">{formatMaintenanceDate(asset.plant?.loler_due_date || null)}</span>
+                                  <Badge className={`font-medium ${getStatusColorClass(asset.plant?.loler_due_date ? 'ok' : 'not_set')}`}>
+                                    {formatMaintenanceDate(asset.plant?.loler_due_date || null)}
+                                  </Badge>
                                 </div>
                               </div>
 
