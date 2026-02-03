@@ -476,7 +476,7 @@ export default function WorkshopTasksPage() {
       const { data, error } = await supabase
         .from('vehicle_maintenance')
         .select(isPlant ? 'current_hours' : 'current_mileage')
-        .eq('vehicle_id', vehicleId)
+        .eq(isPlant ? 'plant_id' : 'vehicle_id', vehicleId)
         .single();
 
       if (error) {
@@ -531,21 +531,31 @@ export default function WorkshopTasksPage() {
 
       // Create the workshop task
       const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
+      const isPlant = selectedVehicle?.asset_type === 'plant';
       const taskTitle = `Workshop Task - ${getAssetIdLabel(selectedVehicle)}`;
+      
+      // Build task data with correct asset reference
+      const taskData: any = {
+        action_type: 'workshop_vehicle_task',
+        workshop_subcategory_id: selectedSubcategoryId,
+        workshop_comments: workshopComments,
+        title: taskTitle,
+        description: workshopComments.substring(0, 200),
+        status: 'pending',
+        priority: 'medium',
+        created_by: user!.id,
+      };
+
+      // Set either vehicle_id or plant_id, not both
+      if (isPlant) {
+        taskData.plant_id = selectedVehicleId;
+      } else {
+        taskData.vehicle_id = selectedVehicleId;
+      }
       
       const { data: newTask, error } = await supabase
         .from('actions')
-        .insert({
-          action_type: 'workshop_vehicle_task',
-          vehicle_id: selectedVehicleId,
-          workshop_subcategory_id: selectedSubcategoryId,
-          workshop_comments: workshopComments,
-          title: taskTitle,
-          description: workshopComments.substring(0, 200),
-          status: 'pending',
-          priority: 'medium',
-          created_by: user!.id,
-        })
+        .insert(taskData)
         .select('id')
         .single();
 
@@ -576,27 +586,26 @@ export default function WorkshopTasksPage() {
         }
       }
 
-      // Update vehicle meter reading in vehicle_maintenance table
-      const updateData = meterReadingType === 'hours' 
-        ? {
-            vehicle_id: selectedVehicleId,
-            current_hours: readingValue,
-            last_hours_update: new Date().toISOString(),
-            last_updated_at: new Date().toISOString(),
-            last_updated_by: user!.id,
-          }
-        : {
-            vehicle_id: selectedVehicleId,
-            current_mileage: readingValue,
-            last_mileage_update: new Date().toISOString(),
-            last_updated_at: new Date().toISOString(),
-            last_updated_by: user!.id,
-          };
+      // Update meter reading in vehicle_maintenance table
+      const updateData: any = {
+        last_updated_at: new Date().toISOString(),
+        last_updated_by: user!.id,
+      };
+
+      if (isPlant) {
+        updateData.plant_id = selectedVehicleId;
+        updateData.current_hours = readingValue;
+        updateData.last_hours_update = new Date().toISOString();
+      } else {
+        updateData.vehicle_id = selectedVehicleId;
+        updateData.current_mileage = readingValue;
+        updateData.last_mileage_update = new Date().toISOString();
+      }
 
       const { error: meterReadingError } = await supabase
         .from('vehicle_maintenance')
         .upsert(updateData, {
-          onConflict: 'vehicle_id',
+          onConflict: isPlant ? 'plant_id' : 'vehicle_id',
         });
 
       if (meterReadingError) {
@@ -1163,37 +1172,60 @@ export default function WorkshopTasksPage() {
     try {
       setSubmitting(true);
 
-      // Update the workshop task
+      // Determine if this is a plant or vehicle
+      const selectedVehicle = vehicles.find(v => v.id === editVehicleId);
+      const isPlant = selectedVehicle?.asset_type === 'plant';
+
+      // Update the workshop task with correct asset reference
+      const updateData: any = {
+        workshop_category_id: editCategoryId,
+        workshop_subcategory_id: editSubcategoryId || null,
+        workshop_comments: editComments,
+        title: `Workshop Task - ${getAssetIdLabel(selectedVehicle)}`,
+        description: editComments.substring(0, 200),
+      };
+
+      // Update the correct asset reference
+      if (isPlant) {
+        updateData.plant_id = editVehicleId;
+        updateData.vehicle_id = null;
+      } else {
+        updateData.vehicle_id = editVehicleId;
+        updateData.plant_id = null;
+      }
+
       const { error } = await supabase
         .from('actions')
-        .update({
-          vehicle_id: editVehicleId,
-          workshop_category_id: editCategoryId,
-          workshop_subcategory_id: editSubcategoryId || null,
-          workshop_comments: editComments,
-          title: `Workshop Task - ${vehicles.find(v => v.id === editVehicleId)?.reg_number}`,
-          description: editComments.substring(0, 200),
-        })
+        .update(updateData)
         .eq('id', editingTask.id);
 
       if (error) throw error;
 
-      // Update vehicle mileage
+      // Update meter reading
+      const meterUpdateData: any = {
+        last_updated_at: new Date().toISOString(),
+        last_updated_by: user.id,
+      };
+
+      if (isPlant) {
+        meterUpdateData.plant_id = editVehicleId;
+        meterUpdateData.current_hours = mileageValue;
+        meterUpdateData.last_hours_update = new Date().toISOString();
+      } else {
+        meterUpdateData.vehicle_id = editVehicleId;
+        meterUpdateData.current_mileage = mileageValue;
+        meterUpdateData.last_mileage_update = new Date().toISOString();
+      }
+
       const { error: mileageError } = await supabase
         .from('vehicle_maintenance')
-        .upsert({
-          vehicle_id: editVehicleId,
-          current_mileage: mileageValue,
-          last_mileage_update: new Date().toISOString(),
-          last_updated_at: new Date().toISOString(),
-          last_updated_by: user.id,
-        }, {
-          onConflict: 'vehicle_id',
+        .upsert(meterUpdateData, {
+          onConflict: isPlant ? 'plant_id' : 'vehicle_id',
         });
 
       if (mileageError) {
-        console.error('Error updating mileage:', mileageError);
-        toast.error('Task updated but failed to update mileage');
+        console.error('Error updating meter reading:', mileageError);
+        toast.error('Task updated but failed to update meter reading');
       } else {
         toast.success('Workshop task updated successfully');
       }
@@ -3381,7 +3413,7 @@ export default function WorkshopTasksPage() {
                   supabase
                     .from('vehicle_maintenance')
                     .select(fieldToSelect)
-                    .eq('vehicle_id', value)
+                    .eq(isPlant ? 'plant_id' : 'vehicle_id', value)
                     .single()
                     .then(({ data, error }) => {
                       if (error && error.code !== 'PGRST116') {
