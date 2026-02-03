@@ -400,7 +400,7 @@ console.log(stats.timesheets.weekHours); // e.g., 156.5
 
 ```typescript
 // Generate Excel file
-generateExcelFile(worksheets: ExcelWorksheetData[]): Buffer
+generateExcelFile(worksheets: ExcelWorksheetData[]): Promise<Buffer>
 
 // Format helpers
 formatExcelDate(date: Date | string): string

@@ -9,6 +9,40 @@ import {
   formatExcelStatus
 } from '@/lib/utils/excel';
 
+type AbsenceReasonRow = {
+  is_paid?: boolean | null;
+  name?: string | null;
+};
+
+type AbsenceRow = {
+  profile_id: string;
+  duration_days?: number | null;
+  absence_reasons?: AbsenceReasonRow | null;
+};
+
+type TimesheetEntryRow = {
+  day_of_week: number;
+  did_not_work?: boolean | null;
+  working_in_yard?: boolean | null;
+  daily_total?: number | null;
+  job_number?: string | null;
+};
+
+type EmployeeRow = {
+  full_name?: string | null;
+  employee_id?: string | null;
+};
+
+type TimesheetRow = {
+  user_id: string;
+  week_ending: string;
+  status: string;
+  submitted_at?: string | null;
+  reviewed_at?: string | null;
+  employee?: EmployeeRow | null;
+  timesheet_entries?: TimesheetEntryRow[] | null;
+};
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -123,11 +157,10 @@ export async function GET(request: NextRequest) {
     }
     
     // Group absences by employee for easier lookup
-    const HOURS_PER_DAY = 9;
     const absencesByEmployee = new Map<string, { paidDays: number; unpaidDays: number; reasons: string[] }>();
     
     if (absences && absences.length > 0) {
-      absences.forEach((absence: any) => {
+      (absences as AbsenceRow[]).forEach((absence) => {
         const employeeId = absence.profile_id;
         const isPaid = absence.absence_reasons?.is_paid || false;
         const days = absence.duration_days || 0;
@@ -152,22 +185,22 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform data for Excel
-    const excelData: any[] = [];
+    const excelData: Array<Record<string, string>> = [];
 
-    timesheets.forEach((timesheet: any) => {
+    (timesheets as TimesheetRow[]).forEach((timesheet) => {
       const employee = timesheet.employee;
       const entries = timesheet.timesheet_entries || [];
 
       // Sort entries by day of week (1=Monday, 7=Sunday)
-      const sortedEntries = entries.sort((a: any, b: any) => a.day_of_week - b.day_of_week);
+      const sortedEntries = [...entries].sort((a, b) => a.day_of_week - b.day_of_week);
 
       // Calculate total hours from entries
-      const totalHours = entries.reduce((sum: number, entry: any) => {
-        return sum + (entry.did_not_work ? 0 : (entry.daily_total || 0));
+      const totalHours = entries.reduce((sum, entry) => {
+        return sum + (entry.did_not_work ? 0 : (entry.daily_total ?? 0));
       }, 0);
 
       // Create row for each timesheet
-      const row: any = {
+      const row: Record<string, string> = {
         'Employee Name': employee?.full_name || 'Unknown',
         'Employee ID': employee?.employee_id || '-',
         'Week Ending': formatExcelDate(timesheet.week_ending),
@@ -179,7 +212,7 @@ export async function GET(request: NextRequest) {
       const dayNames = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       const jobNumbers: string[] = [];
       
-      sortedEntries.forEach((entry: any) => {
+      sortedEntries.forEach((entry) => {
         const dayName = dayNames[entry.day_of_week] || '';
         const day = dayName.substring(0, 3); // Mon, Tue, etc.
         if (entry.did_not_work) {
@@ -187,7 +220,7 @@ export async function GET(request: NextRequest) {
         } else if (entry.working_in_yard) {
           row[`${day} Hours`] = `${formatExcelHours(entry.daily_total)} (Yard)`;
         } else {
-          row[`${day} Hours`] = formatExcelHours(entry.daily_total);
+          row[`${day} Hours`] = formatExcelHours(entry.daily_total ?? null);
         }
         
         // Collect job numbers
@@ -201,8 +234,6 @@ export async function GET(request: NextRequest) {
       
       // Get absence data for this employee
       const employeeAbsences = absencesByEmployee.get(timesheet.user_id) || { paidDays: 0, unpaidDays: 0, reasons: [] };
-      const paidAbsenceHours = employeeAbsences.paidDays * HOURS_PER_DAY;
-      const unpaidAbsenceHours = employeeAbsences.unpaidDays * HOURS_PER_DAY;
       
       row['Paid Absence (Days)'] = employeeAbsences.paidDays > 0 ? employeeAbsences.paidDays.toFixed(1) : '-';
       row['Unpaid Absence (Days)'] = employeeAbsences.unpaidDays > 0 ? employeeAbsences.unpaidDays.toFixed(1) : '-';
@@ -266,7 +297,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Generate Excel file
-    const buffer = generateExcelFile([
+    const buffer = await generateExcelFile([
       {
         sheetName: 'Timesheet Summary',
         columns: [

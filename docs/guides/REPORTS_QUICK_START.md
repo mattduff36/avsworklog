@@ -227,7 +227,7 @@ package.json                                          ← Added test script
 **Full details:** See `REPORTS_IMPLEMENTATION_SUMMARY.md`
 
 **Key functions:**
-- `generateExcelFile()` - Create Excel from data
+- `generateExcelFile()` - Create Excel from data (async, returns `Promise<Buffer>`)
 - `formatExcelDate()` - Format dates for Excel
 - `formatExcelHours()` - Format hours display
 - `addTotalsRow()` - Add summary rows

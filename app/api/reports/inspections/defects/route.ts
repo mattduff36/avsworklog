@@ -9,6 +9,29 @@ import {
   formatExcelStatus
 } from '@/lib/utils/excel';
 
+type VehicleRow = {
+  reg_number?: string | null;
+};
+
+type InspectorRow = {
+  full_name?: string | null;
+};
+
+type InspectionItemRow = {
+  status?: string | null;
+  item_number?: string | number | null;
+  item_description?: string | null;
+  comments?: string | null;
+};
+
+type InspectionRow = {
+  vehicle?: VehicleRow | null;
+  inspector?: InspectorRow | null;
+  inspection_date: string;
+  status: string;
+  inspection_items?: InspectionItemRow[] | null;
+};
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -84,12 +107,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform data for Excel - one row per defect
-    const excelData: any[] = [];
+    const excelData: Array<Record<string, string>> = [];
 
-    inspections.forEach((inspection: any) => {
-      const defectItems = (inspection.inspection_items || []).filter((item: any) => item.status === 'attention');
+    (inspections as InspectionRow[]).forEach((inspection) => {
+      const defectItems = (inspection.inspection_items || []).filter(
+        (item) => item.status === 'attention'
+      );
       
-      defectItems.forEach((item: any) => {
+      defectItems.forEach((item) => {
         excelData.push({
           'Vehicle Reg': inspection.vehicle?.reg_number || '-',
           'Vehicle Type': getVehicleCategoryName(inspection.vehicle),
@@ -105,7 +130,7 @@ export async function GET(request: NextRequest) {
 
     // Add summary
     const totalDefects = excelData.length;
-    const uniqueVehicles = new Set(excelData.map((row: any) => row['Vehicle Reg'])).size;
+    const uniqueVehicles = new Set(excelData.map((row) => row['Vehicle Reg'])).size;
 
     excelData.push({
       'Vehicle Reg': '',
@@ -130,7 +155,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Generate Excel file
-    const buffer = generateExcelFile([
+    const buffer = await generateExcelFile([
       {
         sheetName: 'Defects Report',
         columns: [

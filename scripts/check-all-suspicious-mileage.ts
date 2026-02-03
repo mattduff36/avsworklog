@@ -16,6 +16,25 @@ const FIX_MODE = process.env.FIX_MODE === 'true';
 // Test mileage values that indicate corruption - Obviously invalid values for easy detection
 const SUSPICIOUS_MILEAGE = [999999, 999998, 999997, 999996, 999995, 999994, 999993, 50000, 28000, 27000, 26000, 25000];
 
+type VehicleMaintenanceRow = {
+  id: string;
+  current_mileage: number;
+  updated_at: string;
+};
+
+type VehicleRow = {
+  id: string;
+  reg_number: string;
+  nickname: string | null;
+  vehicle_maintenance?: VehicleMaintenanceRow[];
+};
+
+type InspectionRow = {
+  current_mileage: number | null;
+  inspection_date: string;
+  status: string;
+};
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -30,7 +49,7 @@ const supabase = createClient(
 async function checkAllVehicles() {
   console.log('🔍 CHECKING ALL VEHICLES FOR SUSPICIOUS MILEAGE PATTERNS');
   console.log('========================================================\n');
-  console.log(`Mode: ${FIX_MODE ? '⚠️  FIX MODE (WILL MODIFY DATA)' : '📊 READ-ONLY (NO CHANGES)'}\n');
+  console.log(`Mode: ${FIX_MODE ? '⚠️  FIX MODE (WILL MODIFY DATA)' : '📊 READ-ONLY (NO CHANGES)'}\n`);
 
   // Get all non-TE57 vehicles with maintenance data
   const { data: vehicles, error } = await supabase
@@ -57,8 +76,10 @@ async function checkAllVehicles() {
     maintenanceId: string;
   }> = [];
 
-  for (const vehicle of vehicles || []) {
-    const maintenance = (vehicle as any).vehicle_maintenance?.[0];
+  const vehicleRows = (vehicles ?? []) as VehicleRow[];
+
+  for (const vehicle of vehicleRows) {
+    const maintenance = vehicle.vehicle_maintenance?.[0];
     
     if (!maintenance) continue;
 
@@ -68,15 +89,17 @@ async function checkAllVehicles() {
       const { data: inspections } = await supabase
         .from('vehicle_inspections')
         .select('current_mileage, inspection_date, status')
-        .eq('vehicle_id', (vehicle as any).id)
+        .eq('vehicle_id', vehicle.id)
         .not('current_mileage', 'is', null)
         .eq('status', 'submitted')
         .order('inspection_date', { ascending: false })
         .limit(5);
 
       // Find most recent non-suspicious inspection
-      const realInspections = (inspections || []).filter(
-        (i: any) => !SUSPICIOUS_MILEAGE.includes(i.current_mileage)
+      const realInspections = ((inspections ?? []) as InspectionRow[]).filter(
+        (inspection) =>
+          inspection.current_mileage !== null &&
+          !SUSPICIOUS_MILEAGE.includes(inspection.current_mileage)
       );
 
       const daysSinceUpdate = Math.floor(
@@ -84,8 +107,8 @@ async function checkAllVehicles() {
       );
 
       suspiciousVehicles.push({
-        reg_number: (vehicle as any).reg_number,
-        nickname: (vehicle as any).nickname,
+        reg_number: vehicle.reg_number,
+        nickname: vehicle.nickname,
         currentMileage: maintenance.current_mileage,
         correctMileage: realInspections[0]?.current_mileage || null,
         lastUpdate: maintenance.updated_at,

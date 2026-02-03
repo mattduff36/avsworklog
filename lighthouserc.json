@@ -1,7 +1,10 @@
 {
   "ci": {
     "collect": {
-      "url": ["http://localhost:3000"],
+      "startServerCommand": "cross-env PORT=3001 npm run start",
+      "startServerReadyPattern": "started server on",
+      "startServerReadyTimeout": 60000,
+      "url": ["http://localhost:3001"],
       "numberOfRuns": 1,
       "settings": {
         "preset": "desktop",

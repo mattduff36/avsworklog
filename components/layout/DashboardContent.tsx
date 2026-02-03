@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 interface DashboardContentProps {
   children: React.ReactNode;
@@ -9,14 +9,19 @@ interface DashboardContentProps {
 
 export function DashboardContent({ children }: DashboardContentProps) {
   const { isManager } = useAuth();
-  const [isPWA, setIsPWA] = useState(false);
+  const [isPWA] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
 
-  useEffect(() => {
     // Check if running as PWA (standalone mode)
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    const isIOSStandalone = (window.navigator as any).standalone === true;
-    setIsPWA(isStandalone || isIOSStandalone);
-  }, []);
+    const isIOSStandalone =
+      'standalone' in window.navigator &&
+      (window.navigator as { standalone?: boolean }).standalone === true;
+
+    return isStandalone || isIOSStandalone;
+  });
 
   return (
     <div className={`transition-all duration-300 ${isManager ? 'md:pl-16' : ''}`}>

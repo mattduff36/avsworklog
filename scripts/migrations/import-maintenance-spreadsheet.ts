@@ -1,7 +1,6 @@
 import { config } from 'dotenv';
 import { resolve } from 'path';
-import { readFileSync } from 'fs';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import pg from 'pg';
 
 const { Client } = pg;
@@ -54,14 +53,18 @@ interface ImportResult {
  * Parse Excel date format (mmm-yy) to PostgreSQL date
  * Example: "Jan-26" → "2026-01-01"
  */
-function parseExcelDate(dateStr: string | number): string | null {
+function parseExcelDate(dateStr: string | number | Date | null): string | null {
   if (!dateStr || dateStr === '-' || dateStr === 'N/A') return null;
   
-  // Handle both string and Excel serial number formats
+  if (dateStr instanceof Date) {
+    return dateStr.toISOString().slice(0, 10);
+  }
+
+  // Handle Excel serial number formats
   if (typeof dateStr === 'number') {
-    // Excel serial date
-    const date = XLSX.SSF.parse_date_code(dateStr);
-    return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+    const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+    const date = new Date(excelEpoch.getTime() + dateStr * 24 * 60 * 60 * 1000);
+    return date.toISOString().slice(0, 10);
   }
   
   // String format: "mmm-yy" or "Jan-26"
@@ -90,7 +93,7 @@ function parseExcelDate(dateStr: string | number): string | null {
 /**
  * Clean and validate mileage value
  */
-function parseMileage(value: any): number | null {
+function parseMileage(value: unknown): number | null {
   if (!value || value === '-' || value === 'N/A') return null;
   const num = parseInt(String(value).replace(/,/g, ''));
   return isNaN(num) || num < 0 ? null : num;
@@ -99,8 +102,38 @@ function parseMileage(value: any): number | null {
 /**
  * Parse boolean from Yes/No string
  */
-function parseBoolean(value: any): boolean {
-  return String(value).toLowerCase().trim() === 'yes';
+function normalizeCellValue(value: ExcelJS.CellValue): string | number | Date | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (typeof value === 'object') {
+    if ('text' in value && typeof value.text === 'string') {
+      return value.text;
+    }
+
+    if ('richText' in value && Array.isArray(value.richText)) {
+      return value.richText.map((part) => part.text).join('');
+    }
+
+    if ('result' in value) {
+      return value.result as string | number | Date | null;
+    }
+  }
+
+  return value as string | number;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
 }
 
 // ============================================================================
@@ -135,10 +168,33 @@ async function importMaintenanceData() {
     // ========================================================================
     console.log('📂 Reading Excel file...');
     const filePath = resolve(process.cwd(), excelFilePath);
-    const workbook = XLSX.readFile(filePath);
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const data: ExcelRow[] = XLSX.utils.sheet_to_json(worksheet);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+
+    const worksheet = workbook.worksheets[0];
+    if (!worksheet) {
+      throw new Error('No worksheets found in the Excel file');
+    }
+
+    const headerRow = worksheet.getRow(1);
+    const headers = (headerRow.values as Array<ExcelJS.CellValue | undefined>)
+      .slice(1)
+      .map((header) => String(header ?? '').trim());
+
+    const data: ExcelRow[] = [];
+
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+
+      const rowData = {} as ExcelRow;
+      headers.forEach((header, index) => {
+        if (!header) return;
+        const cellValue = normalizeCellValue(row.getCell(index + 1).value);
+        (rowData as Record<string, string | number | Date | null>)[header] = cellValue;
+      });
+
+      data.push(rowData);
+    });
     
     console.log(`✅ Found ${data.length} vehicles in spreadsheet\n`);
 
@@ -279,14 +335,15 @@ async function importMaintenanceData() {
         });
         console.log(`  ✅ ${matchedReg}: Imported successfully`);
 
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage = getErrorMessage(error);
         result.failed++;
         result.details.push({
           reg,
           status: 'failed',
-          reason: error.message
+          reason: errorMessage
         });
-        console.error(`  ❌ ${reg}: ${error.message}`);
+        console.error(`  ❌ ${reg}: ${errorMessage}`);
       }
     }
 
@@ -350,12 +407,13 @@ async function importMaintenanceData() {
       console.log('   3. Test the system\n');
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = getErrorMessage(error);
     console.error('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.error('❌ IMPORT FAILED');
     console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    console.error('Error:', error.message);
-    if (error.stack) {
+    console.error('Error:', errorMessage);
+    if (error instanceof Error && error.stack) {
       console.error('\nStack trace:');
       console.error(error.stack);
     }

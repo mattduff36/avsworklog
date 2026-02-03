@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash2, ChevronDown, ChevronUp, Settings } from 'lucide-react';
 
 type Category = {
@@ -47,24 +46,19 @@ export function CategoryManagementPanel({
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [expandedSubcategories, setExpandedSubcategories] = useState<Set<string>>(new Set());
 
-  // Auto-select first category on load or when categories change
-  useEffect(() => {
-    if (categories.length > 0 && !selectedCategoryId) {
-      setSelectedCategoryId(categories[0].id);
-    } else if (categories.length > 0 && selectedCategoryId) {
-      // Check if selected category still exists
-      const categoryExists = categories.some(c => c.id === selectedCategoryId);
-      if (!categoryExists) {
-        setSelectedCategoryId(categories[0].id);
-      }
-    } else if (categories.length === 0) {
-      setSelectedCategoryId(null);
+  const effectiveSelectedCategoryId = useMemo(() => {
+    if (selectedCategoryId && categories.some((category) => category.id === selectedCategoryId)) {
+      return selectedCategoryId;
     }
+
+    return categories[0]?.id ?? null;
   }, [categories, selectedCategoryId]);
 
-  const selectedCategory = categories.find(c => c.id === selectedCategoryId);
-  const categorySubcategories = selectedCategoryId
-    ? subcategories.filter(s => s.category_id === selectedCategoryId).sort((a, b) => a.name.localeCompare(b.name))
+  const selectedCategory = categories.find(c => c.id === effectiveSelectedCategoryId);
+  const categorySubcategories = effectiveSelectedCategoryId
+    ? subcategories
+        .filter(s => s.category_id === effectiveSelectedCategoryId)
+        .sort((a, b) => a.name.localeCompare(b.name))
     : [];
 
   const toggleSubcategoryExpansion = (subcategoryId: string) => {
@@ -124,7 +118,7 @@ export function CategoryManagementPanel({
               .sort((a, b) => a.name.localeCompare(b.name))
               .map((category) => {
                 const subcategoryCount = subcategories.filter(s => s.category_id === category.id).length;
-                const isSelected = selectedCategoryId === category.id;
+                const isSelected = effectiveSelectedCategoryId === category.id;
 
                 return (
                   <button

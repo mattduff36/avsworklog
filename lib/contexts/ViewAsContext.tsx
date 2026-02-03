@@ -20,17 +20,16 @@ export function ViewAsProvider({
   children: React.ReactNode;
   userEmail: string | null;
 }) {
-  const [viewAsRole, setViewAsRole] = useState<ViewAsRole>('actual');
   const isSuperAdmin = userEmail === 'admin@mpdee.co.uk';
-  const isViewingAs = viewAsRole !== 'actual';
-
-  // Persist view-as mode in localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem('viewAsRole');
-    if (stored && isSuperAdmin) {
-      setViewAsRole(stored as ViewAsRole);
+  const [viewAsRole, setViewAsRole] = useState<ViewAsRole>(() => {
+    if (typeof window === 'undefined' || !isSuperAdmin) {
+      return 'actual';
     }
-  }, [isSuperAdmin]);
+
+    const stored = window.localStorage.getItem('viewAsRole') as ViewAsRole | null;
+    return stored ?? 'actual';
+  });
+  const isViewingAs = viewAsRole !== 'actual';
 
   useEffect(() => {
     if (isSuperAdmin) {
