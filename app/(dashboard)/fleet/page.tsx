@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Loader2, Wrench, Truck, Settings, Tag, Plus, Edit, Trash2, AlertTriangle, HardHat } from 'lucide-react';
+import { Loader2, Wrench, Truck, Settings, Tag, Plus, Edit, Trash2, AlertTriangle, HardHat, ChevronDown } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
 
 // Dynamic import for heavy component - loaded only when Maintenance tab is active
@@ -134,6 +134,10 @@ function FleetContent() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
+  
+  // State for collapsible category sections
+  const [plantCategoriesExpanded, setPlantCategoriesExpanded] = useState(false);
+  const [vehicleCategoriesExpanded, setVehicleCategoriesExpanded] = useState(false);
   
   // State for maintenance search
   const [searchQuery, setSearchQuery] = useState('');
@@ -498,21 +502,45 @@ function FleetContent() {
               <>
                 {/* Plant Machinery Categories */}
                 <Card className="border-border">
-                  <CardHeader>
+                  <CardHeader 
+                    className="cursor-pointer hover:bg-slate-800/30 transition-colors"
+                    onClick={() => setPlantCategoriesExpanded(!plantCategoriesExpanded)}
+                  >
                     <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-white flex items-center gap-2">
-                          <HardHat className="h-5 w-5" />
-                          Plant Machinery Categories
-                        </CardTitle>
-                        <CardDescription className="text-muted-foreground">
-                          Manage plant machinery categories and classifications
-                        </CardDescription>
+                      <div className="flex items-center gap-3 flex-1">
+                        <ChevronDown 
+                          className={`h-5 w-5 text-muted-foreground transition-transform ${
+                            plantCategoriesExpanded ? 'rotate-180' : ''
+                          }`}
+                        />
+                        <div>
+                          <CardTitle className="text-white flex items-center gap-2">
+                            <HardHat className="h-5 w-5" />
+                            Plant Machinery Categories
+                          </CardTitle>
+                          <CardDescription className="text-muted-foreground">
+                            {(() => {
+                              const plantCategoryNames = [
+                                'Excavation & Earthmoving',
+                                'Loading & Material Handling',
+                                'Compaction, Crushing & Processing',
+                                'Transport & Utility Vehicles',
+                                'Access & Site Support',
+                                'Unclassified'
+                              ];
+                              const plantCategories = categories.filter(c => plantCategoryNames.includes(c.name));
+                              return `${plantCategories.length} ${plantCategories.length === 1 ? 'category' : 'categories'}`;
+                            })()}
+                          </CardDescription>
+                        </div>
                       </div>
                       <Button
                         size="sm"
                         className="bg-blue-600 hover:bg-blue-700"
-                        onClick={() => setAddCategoryDialogOpen(true)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAddCategoryDialogOpen(true);
+                        }}
                       >
                         <Plus className="h-4 w-4 mr-2" />
                         Add Category
@@ -520,99 +548,125 @@ function FleetContent() {
                     </div>
                   </CardHeader>
                   
-                  <CardContent>
-                    {categoriesLoading ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                      </div>
-                    ) : (() => {
-                      // Plant category names from migration
-                      const plantCategoryNames = [
-                        'Excavation & Earthmoving',
-                        'Loading & Material Handling',
-                        'Compaction, Crushing & Processing',
-                        'Transport & Utility Vehicles',
-                        'Access & Site Support',
-                        'Unclassified'
-                      ];
-                      const plantCategories = categories.filter(c => plantCategoryNames.includes(c.name));
-                      
-                      return plantCategories.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          No plant machinery categories found
+                  {plantCategoriesExpanded && (
+                    <CardContent>
+                      {categoriesLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                         </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {plantCategories.map((category) => (
-                            <Card key={category.id} className="bg-slate-800/50 border-border">
-                              <CardContent className="p-4">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-4 flex-1">
-                                    <div className="bg-orange-500/10 p-3 rounded-lg">
-                                      <HardHat className="h-5 w-5 text-orange-400" />
-                                    </div>
-                                    <div className="flex-1">
-                                      <h3 className="text-lg font-semibold text-white">{category.name}</h3>
-                                      <p className="text-sm text-muted-foreground mt-1">
-                                        {category.description || 'No description'}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-4">
-                                    <div className="text-right">
-                                      <div className="text-2xl font-bold text-orange-400">
-                                        {vehicles.filter(v => v.vehicle_categories?.name === category.name).length}
+                      ) : (() => {
+                        // Plant category names from migration
+                        const plantCategoryNames = [
+                          'Excavation & Earthmoving',
+                          'Loading & Material Handling',
+                          'Compaction, Crushing & Processing',
+                          'Transport & Utility Vehicles',
+                          'Access & Site Support',
+                          'Unclassified'
+                        ];
+                        const plantCategories = categories.filter(c => plantCategoryNames.includes(c.name));
+                        
+                        return plantCategories.length === 0 ? (
+                          <div className="text-center py-8 text-muted-foreground">
+                            No plant machinery categories found
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {plantCategories.map((category) => (
+                              <Card key={category.id} className="bg-slate-800/50 border-border">
+                                <CardContent className="p-4">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-4 flex-1">
+                                      <div className="bg-orange-500/10 p-3 rounded-lg">
+                                        <HardHat className="h-5 w-5 text-orange-400" />
                                       </div>
-                                      <p className="text-xs text-muted-foreground">plant assets</p>
+                                      <div className="flex-1">
+                                        <h3 className="text-lg font-semibold text-white">{category.name}</h3>
+                                        <p className="text-sm text-muted-foreground mt-1">
+                                          {category.description || 'No description'}
+                                        </p>
+                                      </div>
                                     </div>
-                                    <div className="flex gap-1">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => openEditCategoryDialog(category)}
-                                        className="text-blue-400 hover:text-blue-300 hover:bg-slate-800"
-                                        title="Edit Category"
-                                      >
-                                        <Edit className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => openDeleteCategoryDialog(category)}
-                                        className="text-red-400 hover:text-red-300 hover:bg-slate-800"
-                                        title="Delete Category"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
+                                    <div className="flex items-center gap-4">
+                                      <div className="text-right">
+                                        <div className="text-2xl font-bold text-orange-400">
+                                          {vehicles.filter(v => v.vehicle_categories?.name === category.name).length}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">plant assets</p>
+                                      </div>
+                                      <div className="flex gap-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => openEditCategoryDialog(category)}
+                                          className="text-blue-400 hover:text-blue-300 hover:bg-slate-800"
+                                          title="Edit Category"
+                                        >
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => openDeleteCategoryDialog(category)}
+                                          className="text-red-400 hover:text-red-300 hover:bg-slate-800"
+                                          title="Delete Category"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                  </CardContent>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </CardContent>
+                  )}
                 </Card>
 
                 {/* Vehicle Categories */}
                 <Card className="border-border">
-                  <CardHeader>
+                  <CardHeader 
+                    className="cursor-pointer hover:bg-slate-800/30 transition-colors"
+                    onClick={() => setVehicleCategoriesExpanded(!vehicleCategoriesExpanded)}
+                  >
                     <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-white flex items-center gap-2">
-                          <Truck className="h-5 w-5" />
-                          Vehicle Categories
-                        </CardTitle>
-                        <CardDescription className="text-muted-foreground">
-                          Manage vehicle categories and classifications
-                        </CardDescription>
+                      <div className="flex items-center gap-3 flex-1">
+                        <ChevronDown 
+                          className={`h-5 w-5 text-muted-foreground transition-transform ${
+                            vehicleCategoriesExpanded ? 'rotate-180' : ''
+                          }`}
+                        />
+                        <div>
+                          <CardTitle className="text-white flex items-center gap-2">
+                            <Truck className="h-5 w-5" />
+                            Vehicle Categories
+                          </CardTitle>
+                          <CardDescription className="text-muted-foreground">
+                            {(() => {
+                              const plantCategoryNames = [
+                                'Excavation & Earthmoving',
+                                'Loading & Material Handling',
+                                'Compaction, Crushing & Processing',
+                                'Transport & Utility Vehicles',
+                                'Access & Site Support',
+                                'Unclassified'
+                              ];
+                              const vehicleCategories = categories.filter(c => !plantCategoryNames.includes(c.name));
+                              return `${vehicleCategories.length} ${vehicleCategories.length === 1 ? 'category' : 'categories'}`;
+                            })()}
+                          </CardDescription>
+                        </div>
                       </div>
                       <Button
                         size="sm"
                         className="bg-blue-600 hover:bg-blue-700"
-                        onClick={() => setAddCategoryDialogOpen(true)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAddCategoryDialogOpen(true);
+                        }}
                       >
                         <Plus className="h-4 w-4 mr-2" />
                         Add Category
@@ -620,7 +674,8 @@ function FleetContent() {
                     </div>
                   </CardHeader>
                   
-                  <CardContent>
+                  {vehicleCategoriesExpanded && (
+                    <CardContent>
                     {categoriesLoading ? (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -693,7 +748,8 @@ function FleetContent() {
                         </div>
                       );
                     })()}
-                  </CardContent>
+                    </CardContent>
+                  )}
                 </Card>
               </>
             )}
