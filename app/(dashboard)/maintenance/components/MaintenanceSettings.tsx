@@ -154,7 +154,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                                 P
                               </Badge>
                             )}
-                            {!category.applies_to || category.applies_to.length === 0 && (
+                            {(!category.applies_to || category.applies_to.length === 0) && (
                               <Badge variant="outline" className="text-gray-400 border-gray-400/50">
                                 All
                               </Badge>

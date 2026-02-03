@@ -42,6 +42,7 @@ export interface VehicleMaintenance {
   tax_due_date: string | null;
   mot_due_date: string | null;
   first_aid_kit_expiry: string | null;
+  loler_due_date?: string | null; // LOLER inspection due (plant machinery only)
   
   // Mileage-based maintenance (vehicles)
   current_mileage: number | null;
@@ -188,6 +189,7 @@ export interface VehicleMaintenanceWithStatus extends VehicleMaintenance {
   service_status?: MaintenanceItemStatus;
   cambelt_status?: MaintenanceItemStatus;
   first_aid_status?: MaintenanceItemStatus;
+  loler_status?: MaintenanceItemStatus; // For plant machinery
   
   // Overall counts
   overdue_count: number;

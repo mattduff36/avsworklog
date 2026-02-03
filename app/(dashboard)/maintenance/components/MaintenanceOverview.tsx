@@ -31,6 +31,7 @@ const ALERT_TO_CATEGORY_NAME: Record<string, string> = {
   'Service': 'service due',
   'Cambelt': 'cambelt replacement',
   'First Aid Kit': 'first aid kit expiry',
+  'LOLER': 'loler due',
 };
 
 interface MaintenanceOverviewProps {
@@ -105,7 +106,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
   const [createTaskVehicleId, setCreateTaskVehicleId] = useState<string | undefined>();
   const [createTaskCategoryId, setCreateTaskCategoryId] = useState<string | undefined>();
-  const [createTaskAlertType, setCreateTaskAlertType] = useState<'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | undefined>();
+  const [createTaskAlertType, setCreateTaskAlertType] = useState<'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER' | undefined>();
   const [maintenanceCategoryId, setMaintenanceCategoryId] = useState<string | undefined>();
   
   // Task Action Modals state
@@ -133,7 +134,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     vehicleId: string;
     vehicleReg: string;
     vehicleNickname?: string | null;
-    alertType: 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit';
+    alertType: 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER';
     dueInfo: string;
     currentDueDate?: string | null;
   } | null>(null);
@@ -236,7 +237,8 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         v.mot_status?.status === 'overdue' || v.mot_status?.status === 'due_soon' ||
         v.service_status?.status === 'overdue' || v.service_status?.status === 'due_soon' ||
         v.cambelt_status?.status === 'overdue' || v.cambelt_status?.status === 'due_soon' ||
-        v.first_aid_status?.status === 'overdue' || v.first_aid_status?.status === 'due_soon';
+        v.first_aid_status?.status === 'overdue' || v.first_aid_status?.status === 'due_soon' ||
+        v.loler_status?.status === 'overdue' || v.loler_status?.status === 'due_soon';
     });
     
     vehiclesWithAlerts.forEach(vehicle => {
@@ -340,6 +342,23 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       });
     }
     
+    // Check LOLER (for plant machinery)
+    if (vehicle.loler_status?.status === 'overdue') {
+      alerts.push({
+        type: 'LOLER',
+        detail: formatDaysUntil(vehicle.loler_status.days_until),
+        severity: 'overdue',
+        sortValue: vehicle.loler_status.days_until ?? 0
+      });
+    } else if (vehicle.loler_status?.status === 'due_soon') {
+      alerts.push({
+        type: 'LOLER',
+        detail: formatDaysUntil(vehicle.loler_status.days_until),
+        severity: 'due_soon',
+        sortValue: vehicle.loler_status.days_until ?? 0
+      });
+    }
+    
     return {
       ...vehicle,
       alerts
@@ -366,7 +385,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     // Prefill with Service category if available
     setCreateTaskCategoryId(maintenanceCategoryId);
     // Set the alert type from the first alert (prioritize overdue)
-    const alertType = vehicle.alerts?.[0]?.type as 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | undefined;
+    const alertType = vehicle.alerts?.[0]?.type as 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER' | undefined;
     setCreateTaskAlertType(alertType);
     
     setShowCreateTaskDialog(true);
@@ -376,7 +395,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     const alert = vehicle.alerts?.[0];
     if (!alert) return;
     
-    const alertType = alert.type as 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit';
+    const alertType = alert.type as 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER';
     
     // Get the current due date based on alert type
     let currentDueDate: string | null = null;
@@ -386,11 +405,13 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       currentDueDate = vehicle.mot_due_date || null;
     } else if (alertType === 'First Aid Kit') {
       currentDueDate = vehicle.first_aid_kit_expiry || null;
+    } else if (alertType === 'LOLER') {
+      currentDueDate = vehicle.loler_due_date || null;
     }
     
     setOfficeActionVehicle({
       vehicleId,
-      vehicleReg: vehicle.vehicle?.reg_number || 'Unknown',
+      vehicleReg: vehicle.vehicle?.reg_number || vehicle.vehicle?.plant_id || 'Unknown',
       vehicleNickname: vehicle.vehicle?.nickname,
       alertType,
       dueInfo: alert.detail,

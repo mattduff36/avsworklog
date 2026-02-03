@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { MaintenanceOverview } from './MaintenanceOverview';
 import { getDateBasedStatus, calculateAlertCounts } from '@/lib/utils/maintenanceCalculations';
+import type { MaintenanceItemStatus } from '@/types/maintenance';
 
 interface PlantOverviewProps {
   onVehicleClick?: (vehicle: any) => void;
@@ -27,6 +28,8 @@ type PlantMaintenanceWithStatus = {
   vehicle?: PlantAsset;
   current_hours: number | null;
   next_service_hours: number | null;
+  loler_due_date?: string | null; // LOLER due date for office actions
+  loler_status?: MaintenanceItemStatus; // LOLER status for plant machinery
   overdue_count: number;
   due_soon_count: number;
 };
@@ -86,6 +89,8 @@ export function PlantOverview({ onVehicleClick }: PlantOverviewProps) {
           } as PlantAsset,
           current_hours: maintenance?.current_hours || plant.current_hours || null,
           next_service_hours: maintenance?.next_service_hours || null,
+          loler_due_date: plant.loler_due_date, // Add LOLER due date for office actions
+          loler_status, // Add LOLER status so MaintenanceOverview can detect it
           overdue_count: alertCounts.overdue,
           due_soon_count: alertCounts.due_soon,
         };

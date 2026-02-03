@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/client';
 
-export type AlertType = 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit';
+export type AlertType = 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER';
 export type AlertSeverity = 'overdue' | 'due_soon';
 
 interface Alert {
@@ -94,6 +94,7 @@ export function getTaskContent(alertType: AlertType, regNumber: string, detail: 
     'Service': `Service Due - ${regNumber}`,
     'Cambelt': `Cambelt Replacement Due - ${regNumber}`,
     'First Aid Kit': `First Aid Kit Expiry - ${regNumber}`,
+    'LOLER': `LOLER Inspection Due - ${regNumber}`,
   };
 
   const comments: Record<AlertType, string> = {
@@ -102,6 +103,7 @@ export function getTaskContent(alertType: AlertType, regNumber: string, detail: 
     'Service': `Vehicle service is required. ${detail}`,
     'Cambelt': `Cambelt replacement is required. ${detail}`,
     'First Aid Kit': `First aid kit requires replacement. ${detail}`,
+    'LOLER': `LOLER (Lifting Operations and Lifting Equipment Regulations) inspection is required for this plant machinery. ${detail}`,
   };
 
   return {

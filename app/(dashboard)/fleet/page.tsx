@@ -548,8 +548,9 @@ function FleetContent() {
                           </CardTitle>
                           <CardDescription className="text-muted-foreground">
                             {(() => {
-                              const plantCategoryNames = ['All plant'];
-                              const plantCategories = categories.filter(c => plantCategoryNames.includes(c.name));
+                              // Dynamically get categories used by plant assets
+                              const plantCategoryIds = new Set(plantAssets.map(p => p.category_id).filter(Boolean));
+                              const plantCategories = categories.filter(c => plantCategoryIds.has(c.id));
                               return `${plantCategories.length} ${plantCategories.length === 1 ? 'category' : 'categories'}`;
                             })()}
                           </CardDescription>
@@ -576,9 +577,9 @@ function FleetContent() {
                           <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                         </div>
                       ) : (() => {
-                        // Plant category - single "All plant" category after migration
-                        const plantCategoryNames = ['All plant'];
-                        const plantCategories = categories.filter(c => plantCategoryNames.includes(c.name));
+                        // Dynamically get categories used by plant assets
+                        const plantCategoryIds = new Set(plantAssets.map(p => p.category_id).filter(Boolean));
+                        const plantCategories = categories.filter(c => plantCategoryIds.has(c.id));
                         
                         return plantCategories.length === 0 ? (
                           <div className="text-center py-8 text-muted-foreground">
@@ -695,9 +696,9 @@ function FleetContent() {
                         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                       </div>
                     ) : (() => {
-                      // Plant category names to exclude (updated after migration to use 'All plant')
-                      const plantCategoryNames = ['All plant'];
-                      const vehicleCategories = categories.filter(c => !plantCategoryNames.includes(c.name));
+                      // Dynamically exclude categories used by plant assets
+                      const plantCategoryIds = new Set(plantAssets.map(p => p.category_id).filter(Boolean));
+                      const vehicleCategories = categories.filter(c => !plantCategoryIds.has(c.id));
                       
                       return vehicleCategories.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">
