@@ -84,6 +84,7 @@ export interface Database {
         Row: {
           id: string
           plant_id: string
+          reg_number: string | null
           nickname: string | null
           make: string | null
           model: string | null
@@ -105,6 +106,7 @@ export interface Database {
         Insert: {
           id?: string
           plant_id: string
+          reg_number?: string | null
           nickname?: string | null
           make?: string | null
           model?: string | null
@@ -126,6 +128,7 @@ export interface Database {
         Update: {
           id?: string
           plant_id?: string
+          reg_number?: string | null
           nickname?: string | null
           make?: string | null
           model?: string | null

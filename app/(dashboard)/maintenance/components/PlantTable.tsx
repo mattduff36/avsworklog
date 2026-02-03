@@ -4,32 +4,27 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { 
   Search, 
-  Edit, 
   History,
   HardHat,
-  Clock,
-  AlertTriangle,
-  CheckCircle2,
-  Loader2
+  Loader2,
+  ArrowUpDown,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { AddVehicleDialog } from './AddVehicleDialog';
-import { EditMaintenanceDialog } from './EditMaintenanceDialog';
+import { formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 
 type PlantAsset = {
   id: string;
   plant_id: string;
+  reg_number: string | null;
   nickname: string | null;
-  make: string | null;
-  model: string | null;
-  serial_number: string | null;
-  year: number | null;
-  weight_class: string | null;
+  loler_due_date: string | null;
   current_hours: number | null;
   status: string;
   vehicle_categories?: { name: string; id: string } | null;
@@ -40,8 +35,6 @@ type PlantMaintenanceWithStatus = {
   plant: PlantAsset;
   current_hours: number | null;
   next_service_hours: number | null;
-  overdue_count: number;
-  due_soon_count: number;
 };
 
 interface PlantTableProps {
@@ -50,7 +43,7 @@ interface PlantTableProps {
   onVehicleAdded?: () => void;
 }
 
-type SortField = 'plant_id' | 'nickname' | 'current_hours' | 'next_service_hours';
+type SortField = 'plant_id' | 'nickname' | 'category' | 'current_hours' | 'next_service_hours' | 'loler_due';
 type SortDirection = 'asc' | 'desc';
 
 export function PlantTable({ 
@@ -62,11 +55,10 @@ export function PlantTable({
   const supabase = createClient();
   const [sortField, setSortField] = useState<SortField>('plant_id');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addVehicleDialogOpen, setAddVehicleDialogOpen] = useState(false);
-  const [selectedVehicle, setSelectedVehicle] = useState<any | null>(null);
   const [plantAssets, setPlantAssets] = useState<PlantMaintenanceWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
 
   // Fetch plant assets from the plant table
   useEffect(() => {
@@ -109,8 +101,6 @@ export function PlantTable({
           plant: plant as PlantAsset,
           current_hours: maintenance?.current_hours || plant.current_hours || null,
           next_service_hours: maintenance?.next_service_hours || null,
-          overdue_count: 0, // TODO: Calculate based on maintenance items
-          due_soon_count: 0, // TODO: Calculate based on maintenance items
         };
       });
 
@@ -128,14 +118,12 @@ export function PlantTable({
     
     const searchLower = searchQuery.toLowerCase();
     const plantId = asset.plant?.plant_id?.toLowerCase() || '';
+    const regNumber = asset.plant?.reg_number?.toLowerCase() || '';
     const nickname = asset.plant?.nickname?.toLowerCase() || '';
-    const make = asset.plant?.make?.toLowerCase() || '';
-    const model = asset.plant?.model?.toLowerCase() || '';
     
     return plantId.includes(searchLower) || 
-           nickname.includes(searchLower) ||
-           make.includes(searchLower) ||
-           model.includes(searchLower);
+           regNumber.includes(searchLower) ||
+           nickname.includes(searchLower);
   });
 
   // Sort
@@ -152,6 +140,10 @@ export function PlantTable({
         aValue = a.plant?.nickname || '';
         bValue = b.plant?.nickname || '';
         break;
+      case 'category':
+        aValue = a.plant?.vehicle_categories?.name || '';
+        bValue = b.plant?.vehicle_categories?.name || '';
+        break;
       case 'current_hours':
         aValue = a.current_hours || 0;
         bValue = b.current_hours || 0;
@@ -160,6 +152,11 @@ export function PlantTable({
         aValue = a.next_service_hours || 0;
         bValue = b.next_service_hours || 0;
         break;
+      case 'loler_due':
+        if (!a.plant?.loler_due_date && !b.plant?.loler_due_date) return 0;
+        if (!a.plant?.loler_due_date) return 1;
+        if (!b.plant?.loler_due_date) return -1;
+        return new Date(a.plant.loler_due_date).getTime() - new Date(b.plant.loler_due_date).getTime();
       default:
         return 0;
     }
@@ -178,38 +175,8 @@ export function PlantTable({
     }
   };
 
-  const handleEdit = (vehicle: PlantMaintenanceWithStatus) => {
-    setSelectedVehicle(vehicle);
-    setEditDialogOpen(true);
-  };
-
   const handleViewHistory = (plantId: string) => {
     router.push(`/fleet/plant/${plantId}/history`);
-  };
-
-  const getMaintenanceStatusBadge = (asset: PlantMaintenanceWithStatus) => {
-    if (asset.overdue_count > 0) {
-      return (
-        <Badge variant="destructive" className="gap-1">
-          <AlertTriangle className="h-3 w-3" />
-          {asset.overdue_count} Overdue
-        </Badge>
-      );
-    }
-    if (asset.due_soon_count > 0) {
-      return (
-        <Badge variant="secondary" className="gap-1 bg-amber-500/20 text-amber-400 border-amber-500/30">
-          <Clock className="h-3 w-3" />
-          {asset.due_soon_count} Due Soon
-        </Badge>
-      );
-    }
-    return (
-      <Badge variant="secondary" className="gap-1 bg-green-500/20 text-green-400 border-green-500/30">
-        <CheckCircle2 className="h-3 w-3" />
-        Up to Date
-      </Badge>
-    );
   };
 
   return (
@@ -241,7 +208,7 @@ export function PlantTable({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by Plant ID, description, make, or model..."
+              placeholder="Search by Plant ID, registration, or description..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               className="pl-10 bg-input border-border text-white"
@@ -254,124 +221,242 @@ export function PlantTable({
               <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
             </div>
           ) : (
-            /* Table */
-            <div className="rounded-md border border-border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent border-border">
-                    <TableHead 
-                      className="text-white cursor-pointer hover:text-blue-400"
-                      onClick={() => handleSort('plant_id')}
-                    >
-                      Plant ID
-                    </TableHead>
-                    <TableHead 
-                      className="text-white cursor-pointer hover:text-blue-400"
-                      onClick={() => handleSort('nickname')}
-                    >
-                      Description
-                    </TableHead>
-                    <TableHead className="text-white">
-                      Make / Model
-                    </TableHead>
-                    <TableHead 
-                      className="text-white cursor-pointer hover:text-blue-400"
-                      onClick={() => handleSort('current_hours')}
-                    >
-                      Current Hours
-                    </TableHead>
-                    <TableHead 
-                      className="text-white cursor-pointer hover:text-blue-400"
-                      onClick={() => handleSort('next_service_hours')}
-                    >
-                      Next Service
-                    </TableHead>
-                    <TableHead className="text-white">
-                      Status
-                    </TableHead>
-                    <TableHead className="text-white text-right">
-                      Actions
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedPlant.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                        {searchQuery ? 'No plant machinery found matching your search' : 'No plant machinery added yet'}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    sortedPlant.map((asset) => (
-                      <TableRow
-                        key={asset.plant_id}
-                        className="border-border hover:bg-slate-800/50 cursor-pointer"
-                        onClick={() => handleViewHistory(asset.plant_id)}
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block rounded-md border border-border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent border-border">
+                      <TableHead 
+                        className="text-white cursor-pointer hover:text-blue-400"
+                        onClick={() => handleSort('plant_id')}
                       >
-                        <TableCell className="font-mono font-medium text-blue-400">
-                          {asset.plant?.plant_id}
-                        </TableCell>
-                        <TableCell className="text-white">
-                          {asset.plant?.nickname || <span className="text-muted-foreground italic">No description</span>}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {asset.plant?.make && asset.plant?.model ? (
-                            `${asset.plant.make} ${asset.plant.model}`
-                          ) : asset.plant?.make || asset.plant?.model ? (
-                            asset.plant.make || asset.plant.model
-                          ) : (
-                            <span className="italic">Not specified</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-white">
-                          {asset.current_hours ? (
-                            <span className="font-mono">{asset.current_hours.toLocaleString()}h</span>
-                          ) : (
-                            <span className="text-muted-foreground italic">Not set</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-white">
-                          {asset.next_service_hours ? (
-                            <span className="font-mono">{asset.next_service_hours.toLocaleString()}h</span>
-                          ) : (
-                            <span className="text-muted-foreground italic">Not set</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {getMaintenanceStatusBadge(asset)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEdit(asset);
-                              }}
-                              className="hover:bg-blue-500/20 hover:text-blue-400"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewHistory(asset.plant_id);
-                              }}
-                              className="hover:bg-green-500/20 hover:text-green-400"
-                            >
-                              <History className="h-4 w-4" />
-                            </Button>
-                          </div>
+                        <div className="flex items-center gap-2">
+                          Plant ID
+                          <ArrowUpDown className="h-3 w-3" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="text-white cursor-pointer hover:text-blue-400"
+                        onClick={() => handleSort('nickname')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Nickname
+                          <ArrowUpDown className="h-3 w-3" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="text-white cursor-pointer hover:text-blue-400"
+                        onClick={() => handleSort('category')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Category
+                          <ArrowUpDown className="h-3 w-3" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="text-white cursor-pointer hover:text-blue-400"
+                        onClick={() => handleSort('current_hours')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Hours
+                          <ArrowUpDown className="h-3 w-3" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="text-white cursor-pointer hover:text-blue-400"
+                        onClick={() => handleSort('next_service_hours')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Service Due
+                          <ArrowUpDown className="h-3 w-3" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="text-white cursor-pointer hover:text-blue-400"
+                        onClick={() => handleSort('loler_due')}
+                      >
+                        <div className="flex items-center gap-2">
+                          LOLER Due
+                          <ArrowUpDown className="h-3 w-3" />
+                        </div>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedPlant.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          {searchQuery ? 'No plant machinery found matching your search' : 'No plant machinery added yet'}
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                    ) : (
+                      sortedPlant.map((asset) => (
+                        <TableRow
+                          key={asset.plant_id}
+                          className="border-border hover:bg-slate-800/50 cursor-pointer"
+                          onClick={() => handleViewHistory(asset.plant_id)}
+                        >
+                          <TableCell className="font-mono font-medium text-blue-400">
+                            {asset.plant?.plant_id}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {asset.plant?.nickname || (
+                              <span className="text-slate-400 italic">No nickname</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {asset.plant?.vehicle_categories?.name || 'All plant'}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {asset.current_hours ? (
+                              <span className="font-mono">{asset.current_hours.toLocaleString()}h</span>
+                            ) : (
+                              <span className="text-slate-400 italic">Not set</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {asset.next_service_hours ? (
+                              <span className="font-mono">{asset.next_service_hours.toLocaleString()}h</span>
+                            ) : (
+                              <span className="text-slate-400 italic">Not set</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatMaintenanceDate(asset.plant?.loler_due_date || null)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile Card View */}
+              {sortedPlant.length > 0 && (
+                <div className="md:hidden space-y-3">
+                  {sortedPlant.map((asset) => {
+                    const isExpanded = expandedCardId === asset.plant_id;
+                    
+                    return (
+                      <Card 
+                        key={asset.plant_id} 
+                        id={`plant-card-${asset.plant_id}`}
+                        className="bg-slate-800 border-slate-700 transition-all duration-200"
+                      >
+                        <CardContent className="p-4">
+                          {/* Collapsed View - Click to Expand */}
+                          <div 
+                            onClick={() => {
+                              if (!isExpanded) {
+                                setExpandedCardId(asset.plant_id);
+                                // Scroll to top of card after expansion
+                                setTimeout(() => {
+                                  const card = document.getElementById(`plant-card-${asset.plant_id}`);
+                                  if (card) {
+                                    const navbarHeight = 68;
+                                    const padding = 16;
+                                    const yOffset = -(navbarHeight + padding);
+                                    const y = card.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                                    window.scrollTo({ top: y, behavior: 'smooth' });
+                                  }
+                                }, 100);
+                              } else {
+                                setExpandedCardId(null);
+                              }
+                            }}
+                            className="cursor-pointer"
+                          >
+                            {/* Header */}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex-1">
+                                <h3 className="font-semibold text-white text-lg">{asset.plant?.plant_id}</h3>
+                                {asset.plant?.nickname && (
+                                  <p className="text-xs text-muted-foreground">{asset.plant.nickname}</p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {isExpanded ? (
+                                  <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                                ) : (
+                                  <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Collapsed View - Essential Info Only */}
+                            {!isExpanded && (
+                              <div className="text-xs text-slate-400 space-y-0.5">
+                                <div className="flex justify-between">
+                                  <span>Hours:</span>
+                                  <span className="text-white">
+                                    {asset.current_hours ? `${asset.current_hours.toLocaleString()}h` : 'Not set'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>LOLER Due:</span>
+                                  <span className="text-white">{formatMaintenanceDate(asset.plant?.loler_due_date || null)}</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Expanded View - All Fields */}
+                          {isExpanded && (
+                            <div className="space-y-3 pt-3 border-t border-border">
+                              {/* All Status Fields */}
+                              <div className="space-y-2">
+                                {asset.plant?.reg_number && (
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm text-muted-foreground">Registration:</span>
+                                    <span className="text-white font-medium">{asset.plant.reg_number}</span>
+                                  </div>
+                                )}
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-muted-foreground">Category:</span>
+                                  <span className="text-white">{asset.plant?.vehicle_categories?.name || 'All plant'}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-muted-foreground">Current Hours:</span>
+                                  <span className="text-white font-medium">
+                                    {asset.current_hours ? `${asset.current_hours.toLocaleString()}h` : 'Not set'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-muted-foreground">Service Due:</span>
+                                  <span className="text-white">
+                                    {asset.next_service_hours ? `${asset.next_service_hours.toLocaleString()}h` : 'Not set'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-muted-foreground">LOLER Due:</span>
+                                  <span className="text-white">{formatMaintenanceDate(asset.plant?.loler_due_date || null)}</span>
+                                </div>
+                              </div>
+
+                              {/* Actions - Single History Button */}
+                              <div className="flex items-center gap-2 pt-2 border-t border-border">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewHistory(asset.plant_id);
+                                  }}
+                                  className="h-10 w-10 p-0"
+                                >
+                                  <History className="h-5 w-5" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -380,17 +465,6 @@ export function PlantTable({
         open={addVehicleDialogOpen}
         onOpenChange={setAddVehicleDialogOpen}
         onSuccess={() => {
-          fetchPlantAssets();
-          onVehicleAdded?.();
-        }}
-      />
-
-      <EditMaintenanceDialog
-        open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        vehicle={selectedVehicle}
-        onSuccess={() => {
-          setEditDialogOpen(false);
           fetchPlantAssets();
           onVehicleAdded?.();
         }}
