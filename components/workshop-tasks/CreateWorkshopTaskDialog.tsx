@@ -30,6 +30,7 @@ type Category = {
   slug: string | null;
   is_active: boolean;
   sort_order: number;
+  applies_to: 'vehicle' | 'plant';
 };
 
 type Subcategory = {
@@ -39,6 +40,9 @@ type Subcategory = {
   slug: string;
   is_active: boolean;
   sort_order: number;
+  workshop_task_categories?: {
+    applies_to: 'vehicle' | 'plant';
+  };
 };
 
 interface CreateWorkshopTaskDialogProps {
@@ -119,10 +123,10 @@ export function CreateWorkshopTaskDialog({
 
   const fetchCategories = async () => {
     try {
+      // Fetch both vehicle and plant categories
       const { data, error } = await supabase
         .from('workshop_task_categories')
-        .select('id, name, slug, is_active, sort_order')
-        .eq('applies_to', 'vehicle')
+        .select('id, name, slug, is_active, sort_order, applies_to')
         .eq('is_active', true)
         .order('name');
 
@@ -136,9 +140,18 @@ export function CreateWorkshopTaskDialog({
 
   const fetchSubcategories = async () => {
     try {
+      // Fetch all subcategories with their parent category's applies_to
       const { data, error } = await supabase
         .from('workshop_task_subcategories')
-        .select('id, category_id, name, slug, is_active, sort_order')
+        .select(`
+          id,
+          category_id,
+          name,
+          slug,
+          is_active,
+          sort_order,
+          workshop_task_categories!inner(applies_to)
+        `)
         .eq('is_active', true)
         .order('name');
 
@@ -185,9 +198,23 @@ export function CreateWorkshopTaskDialog({
     }
   };
 
-  // Filter subcategories by selected category
+  // Get selected vehicle's asset type
+  const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
+  const selectedAssetType = selectedVehicle?.asset_type || 'vehicle';
+
+  // Filter categories by selected vehicle's asset type
+  const filteredCategories = categories.filter(cat => cat.applies_to === selectedAssetType);
+
+  // Filter subcategories by selected category and asset type
   const filteredSubcategories = selectedCategoryId
-    ? subcategories.filter(sub => sub.category_id === selectedCategoryId)
+    ? subcategories.filter(sub => {
+        if (sub.category_id !== selectedCategoryId) return false;
+        // Also check that the subcategory's parent category applies to the selected asset type
+        if (sub.workshop_task_categories) {
+          return sub.workshop_task_categories.applies_to === selectedAssetType;
+        }
+        return true;
+      })
     : [];
 
   const handleCategoryChange = (categoryId: string) => {
@@ -370,6 +397,10 @@ export function CreateWorkshopTaskDialog({
               }
               if (value) {
                 fetchCurrentMeterReading(value);
+                // Reset category and subcategory when vehicle changes
+                // (different asset types have different categories)
+                setSelectedCategoryId('');
+                setSelectedSubcategoryId('');
               } else {
                 setCurrentMeterReading(null);
               }
@@ -423,7 +454,7 @@ export function CreateWorkshopTaskDialog({
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((category) => (
+                {filteredCategories.map((category) => (
                   <SelectItem key={category.id} value={category.id}>
                     {category.name}
                   </SelectItem>
