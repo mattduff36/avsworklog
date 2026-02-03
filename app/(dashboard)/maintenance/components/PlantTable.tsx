@@ -223,7 +223,7 @@ export function PlantTable({
                 ) : (
                   sortedPlant.map((vehicle) => (
                     <TableRow
-                      key={vehicle.id}
+                      key={vehicle.vehicle_id || vehicle.vehicle?.id}
                       className="border-border hover:bg-slate-800/50 cursor-pointer"
                       onClick={() => handleViewHistory(vehicle.vehicle_id)}
                     >
