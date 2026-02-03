@@ -237,16 +237,20 @@ export default function WorkshopTasksPage() {
             inspection_date,
             vehicles (
               reg_number,
-              nickname,
+              nickname
+            ),
+            plant (
               plant_id,
-              asset_type
+              nickname
             )
           ),
           vehicles (
             reg_number,
-            nickname,
+            nickname
+          ),
+          plant (
             plant_id,
-            asset_type
+            nickname
           ),
           workshop_task_categories (
             id,
@@ -278,7 +282,8 @@ export default function WorkshopTasksPage() {
       }
       
       if (vehicleFilter !== 'all') {
-        query = query.eq('vehicle_id', vehicleFilter);
+        // Filter by either vehicle_id OR plant_id depending on the filter value
+        query = query.or(`vehicle_id.eq.${vehicleFilter},plant_id.eq.${vehicleFilter}`);
       }
 
       const { data, error } = await query;
@@ -332,14 +337,43 @@ export default function WorkshopTasksPage() {
 
   const fetchVehicles = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch vehicles
+      const { data: vehicleData, error: vehicleError } = await supabase
         .from('vehicles')
-        .select('id, reg_number, plant_id, nickname, asset_type')
+        .select('id, reg_number, nickname')
         .eq('status', 'active')
         .order('reg_number');
 
-      if (error) throw error;
-      setVehicles(data || []);
+      if (vehicleError) throw vehicleError;
+
+      // Fetch plant
+      const { data: plantData, error: plantError } = await supabase
+        .from('plant')
+        .select('id, plant_id, nickname')
+        .eq('status', 'active')
+        .order('plant_id');
+
+      if (plantError) throw plantError;
+
+      // Combine both into a unified list with asset type indicators
+      const combinedVehicles = [
+        ...(vehicleData || []).map(v => ({
+          id: v.id,
+          reg_number: v.reg_number,
+          plant_id: null,
+          nickname: v.nickname,
+          asset_type: 'vehicle' as const
+        })),
+        ...(plantData || []).map(p => ({
+          id: p.id,
+          reg_number: null,
+          plant_id: p.plant_id,
+          nickname: p.nickname,
+          asset_type: 'plant' as const
+        }))
+      ];
+
+      setVehicles(combinedVehicles);
     } catch (err) {
       console.error('Error fetching vehicles:', err instanceof Error ? err.message : err);
     }
@@ -1216,28 +1250,40 @@ export default function WorkshopTasksPage() {
     }
   };
 
-  const getAssetIdLabel = (vehicle?: { reg_number: string | null; plant_id?: string | null; asset_type?: 'vehicle' | 'plant' | 'tool' }) => {
-    if (!vehicle) return 'Unknown';
-    if (vehicle.asset_type === 'plant') {
-      return vehicle.plant_id ?? 'Unknown Plant';
+  const getAssetIdLabel = (asset?: { reg_number?: string | null; plant_id?: string | null }) => {
+    if (!asset) return 'Unknown';
+    if (asset.plant_id) {
+      return asset.plant_id;
     }
-    return vehicle.reg_number ?? 'Unknown Vehicle';
+    if (asset.reg_number) {
+      return asset.reg_number;
+    }
+    return 'Unknown';
   };
 
-  const getAssetDisplay = (vehicle?: { reg_number: string | null; plant_id?: string | null; nickname: string | null; asset_type?: 'vehicle' | 'plant' | 'tool' }) => {
-    if (!vehicle) return 'Unknown';
-    const idLabel = getAssetIdLabel(vehicle);
-    if (vehicle.nickname) {
-      return `${idLabel} (${vehicle.nickname})`;
+  const getAssetDisplay = (asset?: { reg_number?: string | null; plant_id?: string | null; nickname?: string | null }) => {
+    if (!asset) return 'Unknown';
+    const idLabel = getAssetIdLabel(asset);
+    if (asset.nickname) {
+      return `${idLabel} (${asset.nickname})`;
     }
     return idLabel;
   };
 
   const getVehicleReg = (task: Action) => {
+    // Check direct vehicle or plant reference
     if (task.vehicles) {
       return getAssetDisplay(task.vehicles);
-    } else if (task.vehicle_inspections?.vehicles) {
-      return getAssetDisplay(task.vehicle_inspections.vehicles);
+    } else if (task.plant) {
+      return getAssetDisplay(task.plant);
+    } 
+    // Check via inspection
+    else if (task.vehicle_inspections) {
+      if (task.vehicle_inspections.vehicles) {
+        return getAssetDisplay(task.vehicle_inspections.vehicles);
+      } else if (task.vehicle_inspections.plant) {
+        return getAssetDisplay(task.vehicle_inspections.plant);
+      }
     }
     return 'Unknown';
   };
@@ -1427,16 +1473,11 @@ export default function WorkshopTasksPage() {
   // Filter tasks by asset type based on current tab
   const getTabFilteredTasks = () => {
     if (assetTab === 'plant') {
-      return tasks.filter(t => t.vehicles?.asset_type === 'plant');
+      // Plant tab: show tasks with plant_id set
+      return tasks.filter(t => t.plant_id !== null);
     } else if (assetTab === 'vehicle') {
-      return tasks.filter(t => {
-        // For inspection defects, check the asset type of the inspected vehicle
-        if (t.action_type === 'inspection_defect') {
-          return t.vehicle_inspections?.vehicles?.asset_type !== 'plant';
-        }
-        // For other tasks, exclude plant assets
-        return t.vehicles?.asset_type !== 'plant';
-      });
+      // Vehicle tab: show tasks with vehicle_id set
+      return tasks.filter(t => t.vehicle_id !== null);
     }
     return tasks;
   };

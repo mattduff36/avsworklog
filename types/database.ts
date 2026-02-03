@@ -80,6 +80,71 @@ export interface Database {
           created_at?: string
         }
       }
+      plant: {
+        Row: {
+          id: string
+          plant_id: string
+          nickname: string | null
+          make: string | null
+          model: string | null
+          serial_number: string | null
+          year: number | null
+          weight_class: string | null
+          category_id: string
+          loler_due_date: string | null
+          loler_last_inspection_date: string | null
+          loler_certificate_number: string | null
+          loler_inspection_interval_months: number
+          current_hours: number | null
+          status: 'active' | 'inactive' | 'maintenance' | 'retired'
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          plant_id: string
+          nickname?: string | null
+          make?: string | null
+          model?: string | null
+          serial_number?: string | null
+          year?: number | null
+          weight_class?: string | null
+          category_id: string
+          loler_due_date?: string | null
+          loler_last_inspection_date?: string | null
+          loler_certificate_number?: string | null
+          loler_inspection_interval_months?: number
+          current_hours?: number | null
+          status?: 'active' | 'inactive' | 'maintenance' | 'retired'
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          plant_id?: string
+          nickname?: string | null
+          make?: string | null
+          model?: string | null
+          serial_number?: string | null
+          year?: number | null
+          weight_class?: string | null
+          category_id?: string
+          loler_due_date?: string | null
+          loler_last_inspection_date?: string | null
+          loler_certificate_number?: string | null
+          loler_inspection_interval_months?: number
+          current_hours?: number | null
+          status?: 'active' | 'inactive' | 'maintenance' | 'retired'
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+      }
       vehicle_categories: {
         Row: {
           id: string
@@ -144,7 +209,8 @@ export interface Database {
       vehicle_maintenance: {
         Row: {
           id: string
-          vehicle_id: string
+          vehicle_id: string | null
+          plant_id: string | null
           tax_due_date: string | null
           mot_due_date: string | null
           first_aid_kit_expiry: string | null
@@ -154,6 +220,10 @@ export interface Database {
           cambelt_due_mileage: number | null
           cambelt_done: boolean
           last_mileage_update: string | null
+          current_hours: number | null
+          last_service_hours: number | null
+          next_service_hours: number | null
+          last_hours_update: string | null
           last_updated_at: string
           last_updated_by: string | null
           notes: string | null
@@ -162,7 +232,8 @@ export interface Database {
         }
         Insert: {
           id?: string
-          vehicle_id: string
+          vehicle_id?: string | null
+          plant_id?: string | null
           tax_due_date?: string | null
           mot_due_date?: string | null
           first_aid_kit_expiry?: string | null
@@ -172,6 +243,10 @@ export interface Database {
           cambelt_due_mileage?: number | null
           cambelt_done?: boolean
           last_mileage_update?: string | null
+          current_hours?: number | null
+          last_service_hours?: number | null
+          next_service_hours?: number | null
+          last_hours_update?: string | null
           last_updated_at?: string
           last_updated_by?: string | null
           notes?: string | null
@@ -180,7 +255,8 @@ export interface Database {
         }
         Update: {
           id?: string
-          vehicle_id?: string
+          vehicle_id?: string | null
+          plant_id?: string | null
           tax_due_date?: string | null
           mot_due_date?: string | null
           first_aid_kit_expiry?: string | null
@@ -190,6 +266,10 @@ export interface Database {
           cambelt_due_mileage?: number | null
           cambelt_done?: boolean
           last_mileage_update?: string | null
+          current_hours?: number | null
+          last_service_hours?: number | null
+          next_service_hours?: number | null
+          last_hours_update?: string | null
           last_updated_at?: string
           last_updated_by?: string | null
           notes?: string | null
@@ -388,7 +468,8 @@ export interface Database {
       vehicle_inspections: {
         Row: {
           id: string
-          vehicle_id: string
+          vehicle_id: string | null
+          plant_id: string | null
           user_id: string
           inspection_date: string
           inspection_end_date: string | null
@@ -398,6 +479,7 @@ export interface Database {
           reviewed_by: string | null
           reviewed_at: string | null
           manager_comments: string | null
+          inspector_comments: string | null
           signature_data: string | null
           signed_at: string | null
           created_at: string
@@ -405,7 +487,8 @@ export interface Database {
         }
         Insert: {
           id?: string
-          vehicle_id: string
+          vehicle_id?: string | null
+          plant_id?: string | null
           user_id: string
           inspection_date: string
           inspection_end_date?: string | null
@@ -415,6 +498,7 @@ export interface Database {
           reviewed_by?: string | null
           reviewed_at?: string | null
           manager_comments?: string | null
+          inspector_comments?: string | null
           signature_data?: string | null
           signed_at?: string | null
           created_at?: string
@@ -422,7 +506,8 @@ export interface Database {
         }
         Update: {
           id?: string
-          vehicle_id?: string
+          vehicle_id?: string | null
+          plant_id?: string | null
           user_id?: string
           inspection_date?: string
           inspection_end_date?: string | null
@@ -432,6 +517,7 @@ export interface Database {
           reviewed_by?: string | null
           reviewed_at?: string | null
           manager_comments?: string | null
+          inspector_comments?: string | null
           signature_data?: string | null
           signed_at?: string | null
           created_at?: string
@@ -535,6 +621,7 @@ export interface Database {
           inspection_id: string | null
           inspection_item_id: string | null
           vehicle_id: string | null
+          plant_id: string | null
           workshop_category_id: string | null
           workshop_subcategory_id: string | null
           workshop_comments: string | null
@@ -560,6 +647,7 @@ export interface Database {
           inspection_id?: string | null
           inspection_item_id?: string | null
           vehicle_id?: string | null
+          plant_id?: string | null
           workshop_category_id?: string | null
           workshop_comments?: string | null
           title: string
@@ -584,6 +672,7 @@ export interface Database {
           inspection_id?: string | null
           inspection_item_id?: string | null
           vehicle_id?: string | null
+          plant_id?: string | null
           workshop_category_id?: string | null
           workshop_comments?: string | null
           title?: string

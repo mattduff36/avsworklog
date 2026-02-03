@@ -108,14 +108,43 @@ export function CreateWorkshopTaskDialog({
 
   const fetchVehicles = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch vehicles
+      const { data: vehicleData, error: vehicleError } = await supabase
         .from('vehicles')
-        .select('id, reg_number, plant_id, nickname, asset_type')
+        .select('id, reg_number, nickname')
         .eq('status', 'active')
         .order('reg_number');
 
-      if (error) throw error;
-      setVehicles(data || []);
+      if (vehicleError) throw vehicleError;
+
+      // Fetch plant
+      const { data: plantData, error: plantError } = await supabase
+        .from('plant')
+        .select('id, plant_id, nickname')
+        .eq('status', 'active')
+        .order('plant_id');
+
+      if (plantError) throw plantError;
+
+      // Combine both into a unified list with asset type indicators
+      const combinedVehicles = [
+        ...(vehicleData || []).map(v => ({
+          id: v.id,
+          reg_number: v.reg_number,
+          plant_id: null,
+          nickname: v.nickname,
+          asset_type: 'vehicle' as const
+        })),
+        ...(plantData || []).map(p => ({
+          id: p.id,
+          reg_number: null,
+          plant_id: p.plant_id,
+          nickname: p.nickname,
+          asset_type: 'plant' as const
+        }))
+      ];
+
+      setVehicles(combinedVehicles);
     } catch (err) {
       console.error('Error fetching vehicles:', err);
     }
@@ -162,24 +191,23 @@ export function CreateWorkshopTaskDialog({
     }
   };
 
-  const fetchCurrentMeterReading = async (vehicleId: string) => {
+  const fetchCurrentMeterReading = async (assetId: string) => {
     try {
-      // First get the vehicle to check asset_type
-      const { data: vehicleData, error: vehicleError } = await supabase
-        .from('vehicles')
-        .select('asset_type')
-        .eq('id', vehicleId)
-        .single();
+      // Find the asset in our local vehicles list to determine type
+      const asset = vehicles.find(v => v.id === assetId);
+      if (!asset) {
+        setCurrentMeterReading(null);
+        return;
+      }
 
-      if (vehicleError) throw vehicleError;
-
-      const isPlant = vehicleData?.asset_type === 'plant';
+      const isPlant = asset.asset_type === 'plant';
       setMeterReadingType(isPlant ? 'hours' : 'mileage');
 
+      // Query vehicle_maintenance table with appropriate filter
       const { data, error } = await supabase
         .from('vehicle_maintenance')
         .select(isPlant ? 'current_hours' : 'current_mileage')
-        .eq('vehicle_id', vehicleId)
+        .eq(isPlant ? 'plant_id' : 'vehicle_id', assetId)
         .single();
 
       if (error) {
@@ -258,27 +286,36 @@ export function CreateWorkshopTaskDialog({
 
       // Generate title based on alert type if provided, otherwise use generic title
       const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
-      const assetIdLabel = selectedVehicle?.asset_type === 'plant' 
+      const isPlant = selectedVehicle?.asset_type === 'plant';
+      const assetIdLabel = isPlant
         ? (selectedVehicle?.plant_id ?? 'Unknown Plant')
         : (selectedVehicle?.reg_number ?? 'Unknown Vehicle');
       const taskTitle = alertType 
         ? getTaskContent(alertType, assetIdLabel, '').title
         : `Workshop Task - ${assetIdLabel}`;
 
-      // Create the workshop task
+      // Create the workshop task with correct asset reference
+      const taskData: any = {
+        action_type: 'workshop_vehicle_task',
+        workshop_subcategory_id: selectedSubcategoryId,
+        workshop_comments: workshopComments,
+        title: taskTitle,
+        description: workshopComments.substring(0, 200),
+        status: 'pending',
+        priority: 'medium',
+        created_by: user.id,
+      };
+
+      // Set either vehicle_id or plant_id, not both
+      if (isPlant) {
+        taskData.plant_id = selectedVehicleId;
+      } else {
+        taskData.vehicle_id = selectedVehicleId;
+      }
+
       const { data: newTask, error } = await supabase
         .from('actions')
-        .insert({
-          action_type: 'workshop_vehicle_task',
-          vehicle_id: selectedVehicleId,
-          workshop_subcategory_id: selectedSubcategoryId,
-          workshop_comments: workshopComments,
-          title: taskTitle,
-          description: workshopComments.substring(0, 200),
-          status: 'pending',
-          priority: 'medium',
-          created_by: user.id,
-        })
+        .insert(taskData)
         .select('id')
         .single();
 
@@ -309,27 +346,26 @@ export function CreateWorkshopTaskDialog({
         }
       }
 
-      // Update vehicle meter reading in vehicle_maintenance table
-      const updateData = meterReadingType === 'hours' 
-        ? {
-            vehicle_id: selectedVehicleId,
-            current_hours: readingValue,
-            last_hours_update: new Date().toISOString(),
-            last_updated_at: new Date().toISOString(),
-            last_updated_by: user.id,
-          }
-        : {
-            vehicle_id: selectedVehicleId,
-            current_mileage: readingValue,
-            last_mileage_update: new Date().toISOString(),
-            last_updated_at: new Date().toISOString(),
-            last_updated_by: user.id,
-          };
+      // Update meter reading in vehicle_maintenance table
+      const updateData: any = {
+        last_updated_at: new Date().toISOString(),
+        last_updated_by: user.id,
+      };
+
+      if (isPlant) {
+        updateData.plant_id = selectedVehicleId;
+        updateData.current_hours = readingValue;
+        updateData.last_hours_update = new Date().toISOString();
+      } else {
+        updateData.vehicle_id = selectedVehicleId;
+        updateData.current_mileage = readingValue;
+        updateData.last_mileage_update = new Date().toISOString();
+      }
 
       const { error: meterReadingError } = await supabase
         .from('vehicle_maintenance')
         .upsert(updateData, {
-          onConflict: 'vehicle_id',
+          onConflict: isPlant ? 'plant_id' : 'vehicle_id',
         });
 
       if (meterReadingError) {
