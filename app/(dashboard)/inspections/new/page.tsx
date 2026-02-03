@@ -32,7 +32,7 @@ import { showErrorWithReport } from '@/lib/utils/error-reporting';
 
 // Dynamic imports for heavy components - loaded only when needed
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
-const SignaturePad = dynamic(() => import('@/components/forms/SignaturePad').then(m => ({ default: m.SignaturePad })), { ssr: false });
+const SignaturePad = dynamic(() => import('@/components/forms/SignaturePad'), { ssr: false });
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
