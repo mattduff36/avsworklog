@@ -461,16 +461,34 @@ export default function WorkshopTasksPage() {
 
   const fetchCurrentMeterReading = async (vehicleId: string) => {
     try {
-      // First get the vehicle to check asset_type
-      const { data: vehicleData, error: vehicleError } = await supabase
+      // Check both vehicles and plant tables to determine asset type
+      let isPlant = false;
+
+      // Check if it's a vehicle
+      const { data: vehicleData } = await supabase
         .from('vehicles')
-        .select('asset_type')
+        .select('id')
         .eq('id', vehicleId)
-        .single();
+        .maybeSingle();
 
-      if (vehicleError) throw vehicleError;
+      // If not found in vehicles, check plant table
+      if (!vehicleData) {
+        const { data: plantData } = await supabase
+          .from('plant')
+          .select('id')
+          .eq('id', vehicleId)
+          .maybeSingle();
 
-      const isPlant = vehicleData?.asset_type === 'plant';
+        if (plantData) {
+          isPlant = true;
+        } else {
+          // Asset not found in either table
+          setCurrentMeterReading(null);
+          setMeterReadingType('mileage');
+          return;
+        }
+      }
+
       setMeterReadingType(isPlant ? 'hours' : 'mileage');
 
       const { data, error } = await supabase
