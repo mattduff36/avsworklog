@@ -22,7 +22,8 @@ import {
   ChevronUp,
   Gauge,
   HardHat,
-  Loader2
+  Loader2,
+  Edit
 } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
 import { formatRelativeTime } from '@/lib/utils/date';
@@ -30,6 +31,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 
 // Dynamic imports
 const WorkshopTaskHistoryCard = dynamic(() => import('@/components/workshop-tasks/WorkshopTaskHistoryCard').then(m => ({ default: m.WorkshopTaskHistoryCard })), { ssr: false });
+const EditMaintenanceDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/EditMaintenanceDialog').then(m => ({ default: m.EditMaintenanceDialog })), { ssr: false });
 
 type Plant = {
   id: string;
@@ -94,7 +96,9 @@ export default function PlantHistoryPage({
   const [plant, setPlant] = useState<Plant | null>(null);
   const [workshopTasks, setWorkshopTasks] = useState<WorkshopTask[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('maintenance');
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [maintenanceRecord, setMaintenanceRecord] = useState<any>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -105,7 +109,34 @@ export default function PlantHistoryPage({
 
     fetchPlantData();
     fetchWorkshopTasks();
+    fetchMaintenanceRecord();
   }, [unwrappedParams.plantId, profile, authLoading]);
+
+  const fetchMaintenanceRecord = async () => {
+    try {
+      // Fetch maintenance record via API to get computed status fields
+      const response = await fetch('/api/maintenance');
+      
+      if (!response.ok) {
+        console.error('Maintenance API error:', response.status, response.statusText);
+        return;
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        const plantMaintenance = result.vehicles.find(
+          (v: any) => v.plant_id === unwrappedParams.plantId
+        );
+        
+        if (plantMaintenance) {
+          setMaintenanceRecord(plantMaintenance);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching maintenance record:', error);
+    }
+  };
 
   const fetchPlantData = async () => {
     try {
@@ -196,24 +227,30 @@ export default function PlantHistoryPage({
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <BackButton />
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <HardHat className="h-8 w-8" />
-              {getAssetDisplay()}
+            <h1 className="text-3xl font-bold tracking-tight">
+              {plant.plant_id}
+              {plant.nickname && <span className="text-muted-foreground ml-2">({plant.nickname})</span>}
             </h1>
-            <p className="text-muted-foreground">
-              Plant Machinery History &amp; Maintenance Records
+            <p className="text-muted-foreground mt-1">
+              Plant Machinery History & Records
             </p>
           </div>
         </div>
-        <Badge variant={plant.status === 'active' ? 'default' : 'secondary'}>
-          {plant.status}
-        </Badge>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setEditDialogOpen(true)}
+          className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white"
+        >
+          <Edit className="h-4 w-4 mr-2" />
+          Edit Plant Record
+        </Button>
       </div>
 
       {/* Quick Info Cards */}
@@ -266,70 +303,84 @@ export default function PlantHistoryPage({
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="workshop">Workshop Tasks</TabsTrigger>
-          <TabsTrigger value="loler">LOLER Compliance</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className={`grid w-full ${plant.reg_number ? 'grid-cols-5' : 'grid-cols-4'} lg:w-auto lg:inline-grid`}>
+          <TabsTrigger value="maintenance" className="gap-2">
+            <Wrench className="h-4 w-4" />
+            History
+          </TabsTrigger>
+          {/* Only show MOT tab if plant has reg_number */}
+          {plant.reg_number && (
+            <TabsTrigger value="mot" className="gap-2">
+              <ClipboardCheck className="h-4 w-4" />
+              MOT
+            </TabsTrigger>
+          )}
+          <TabsTrigger value="documents" className="gap-2">
+            <FileText className="h-4 w-4" />
+            Documents
+          </TabsTrigger>
+          <TabsTrigger value="loler" className="gap-2">
+            <Calendar className="h-4 w-4" />
+            LOLER
+          </TabsTrigger>
+          <TabsTrigger value="notes" className="gap-2">
+            <MessageSquare className="h-4 w-4" />
+            Notes
+          </TabsTrigger>
         </TabsList>
 
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Plant Details</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Plant ID</p>
-                <p className="font-medium">{plant.plant_id}</p>
-              </div>
-              {plant.nickname && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Nickname</p>
-                  <p className="font-medium">{plant.nickname}</p>
-                </div>
-              )}
-              {plant.make && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Make</p>
-                  <p className="font-medium">{plant.make}</p>
-                </div>
-              )}
-              {plant.model && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Model</p>
-                  <p className="font-medium">{plant.model}</p>
-                </div>
-              )}
-              {plant.serial_number && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Serial Number</p>
-                  <p className="font-medium">{plant.serial_number}</p>
-                </div>
-              )}
-              {plant.year && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Year</p>
-                  <p className="font-medium">{plant.year}</p>
-                </div>
-              )}
-              {plant.weight_class && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Weight Class</p>
-                  <p className="font-medium">{plant.weight_class}</p>
-                </div>
-              )}
-              <div>
-                <p className="text-sm text-muted-foreground">Current Hours</p>
-                <p className="font-medium">{plant.current_hours?.toLocaleString() ?? 'Not recorded'}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {/* History Tab - Service Information */}
+        <TabsContent value="maintenance" className="space-y-4">
+          {/* Service Info Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Current Hours */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Gauge className="h-4 w-4" />
+                  Current Hours
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">
+                  {maintenanceRecord?.current_hours?.toLocaleString() || plant.current_hours?.toLocaleString() || 'N/A'}
+                </p>
+              </CardContent>
+            </Card>
 
-        {/* Workshop Tasks Tab */}
-        <TabsContent value="workshop" className="space-y-4">
+            {/* Next Service */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Wrench className="h-4 w-4" />
+                  Next Service
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">
+                  {maintenanceRecord?.next_service_hours?.toLocaleString() || 'Not Set'}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Last Service */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Last Service
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">
+                  {maintenanceRecord?.last_service_hours?.toLocaleString() || 'N/A'}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Workshop Tasks - Reuse existing workshop tasks card */}
           <Card>
             <CardHeader>
               <CardTitle>Workshop Task History</CardTitle>
@@ -350,6 +401,51 @@ export default function PlantHistoryPage({
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* MOT Tab - Only shown if plant has reg_number */}
+        {plant.reg_number && (
+          <TabsContent value="mot" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>MOT Information</CardTitle>
+                <CardDescription>
+                  MOT history and details for road-legal plant machinery
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8 text-muted-foreground">
+                  <ClipboardCheck className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>MOT details for {plant.reg_number}</p>
+                  <p className="text-sm mt-2">MOT integration coming soon</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {/* Documents Tab */}
+        <TabsContent value="documents" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Documents & Attachments</CardTitle>
+              <CardDescription>
+                Workshop task attachments and related documents
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12">
+                <FileText className="h-16 w-16 text-slate-400 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-semibold text-white mb-2">No Documents Yet</h3>
+                <p className="text-slate-400 mb-4">
+                  No workshop task attachments found for this plant machinery
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Attachments will appear here when added to workshop tasks
+                </p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -411,7 +507,88 @@ export default function PlantHistoryPage({
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Notes Tab */}
+        <TabsContent value="notes" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Plant Notes</CardTitle>
+              <CardDescription>
+                Additional notes and information for this plant machinery
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Plant Details */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Plant Details</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Plant ID</p>
+                      <p className="font-medium">{plant.plant_id}</p>
+                    </div>
+                    {plant.nickname && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Nickname</p>
+                        <p className="font-medium">{plant.nickname}</p>
+                      </div>
+                    )}
+                    {plant.make && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Make</p>
+                        <p className="font-medium">{plant.make}</p>
+                      </div>
+                    )}
+                    {plant.model && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Model</p>
+                        <p className="font-medium">{plant.model}</p>
+                      </div>
+                    )}
+                    {plant.serial_number && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Serial Number</p>
+                        <p className="font-medium">{plant.serial_number}</p>
+                      </div>
+                    )}
+                    {plant.year && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Year</p>
+                        <p className="font-medium">{plant.year}</p>
+                      </div>
+                    )}
+                    {plant.weight_class && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Weight Class</p>
+                        <p className="font-medium">{plant.weight_class}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm text-muted-foreground">Status</p>
+                      <Badge variant={plant.status === 'active' ? 'default' : 'secondary'}>
+                        {plant.status}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* Edit Maintenance Dialog */}
+      {maintenanceRecord && (
+        <EditMaintenanceDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          maintenanceRecord={maintenanceRecord}
+          onSuccess={() => {
+            fetchMaintenanceRecord();
+            fetchPlantData();
+          }}
+        />
+      )}
     </div>
   );
 }

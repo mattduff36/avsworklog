@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { MaintenanceOverview } from './MaintenanceOverview';
+import { getDateBasedStatus, calculateAlertCounts } from '@/lib/utils/maintenanceCalculations';
 
 interface PlantOverviewProps {
   onVehicleClick?: (vehicle: any) => void;
@@ -16,6 +17,7 @@ type PlantAsset = {
   make: string | null;
   model: string | null;
   current_hours: number | null;
+  loler_due_date: string | null;
   status: string;
 };
 
@@ -65,9 +67,15 @@ export function PlantOverview({ onVehicleClick }: PlantOverviewProps) {
 
       if (maintenanceError) throw maintenanceError;
 
-      // Combine plant data with maintenance data
+      // Combine plant data with maintenance data and calculate status
       const combined: PlantMaintenanceWithStatus[] = (plantData || []).map((plant) => {
         const maintenance = maintenanceData?.find((m) => m.plant_id === plant.id);
+        
+        // Calculate LOLER status (30 day threshold)
+        const loler_status = getDateBasedStatus(plant.loler_due_date, 30);
+        
+        // Calculate alert counts based on LOLER status
+        const alertCounts = calculateAlertCounts([loler_status]);
         
         return {
           vehicle_id: plant.id,
@@ -78,8 +86,8 @@ export function PlantOverview({ onVehicleClick }: PlantOverviewProps) {
           } as PlantAsset,
           current_hours: maintenance?.current_hours || plant.current_hours || null,
           next_service_hours: maintenance?.next_service_hours || null,
-          overdue_count: 0, // TODO: Calculate based on maintenance items
-          due_soon_count: 0, // TODO: Calculate based on maintenance items
+          overdue_count: alertCounts.overdue,
+          due_soon_count: alertCounts.due_soon,
         };
       });
 
