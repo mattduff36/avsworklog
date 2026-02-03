@@ -193,14 +193,34 @@ export function CreateWorkshopTaskDialog({
 
   const fetchCurrentMeterReading = async (assetId: string) => {
     try {
-      // Find the asset in our local vehicles list to determine type
-      const asset = vehicles.find(v => v.id === assetId);
-      if (!asset) {
-        setCurrentMeterReading(null);
-        return;
+      // First, determine asset type by checking both vehicles and plant tables
+      // This is necessary because this function may be called before the vehicles state is populated
+      let isPlant = false;
+      
+      // Check if it's a vehicle
+      const { data: vehicleData } = await supabase
+        .from('vehicles')
+        .select('id')
+        .eq('id', assetId)
+        .maybeSingle();
+      
+      // If not found in vehicles, check plant table
+      if (!vehicleData) {
+        const { data: plantData } = await supabase
+          .from('plant')
+          .select('id')
+          .eq('id', assetId)
+          .maybeSingle();
+        
+        if (plantData) {
+          isPlant = true;
+        } else {
+          // Asset not found in either table
+          setCurrentMeterReading(null);
+          return;
+        }
       }
 
-      const isPlant = asset.asset_type === 'plant';
       setMeterReadingType(isPlant ? 'hours' : 'mileage');
 
       // Query vehicle_maintenance table with appropriate filter
