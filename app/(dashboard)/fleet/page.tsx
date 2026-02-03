@@ -453,14 +453,12 @@ function FleetContent() {
             </Card>
           ) : canManageVehicles ? (
             <PlantTable 
-              vehicles={maintenanceData?.vehicles || []}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
               onVehicleAdded={() => {}}
             />
           ) : (
             <PlantOverview 
-              vehicles={maintenanceData?.vehicles || []}
               onVehicleClick={handleVehicleClick}
             />
           )}

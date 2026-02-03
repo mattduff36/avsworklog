@@ -1,27 +1,113 @@
 'use client';
 
-import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { Loader2 } from 'lucide-react';
 import { MaintenanceOverview } from './MaintenanceOverview';
 
 interface PlantOverviewProps {
-  vehicles: VehicleMaintenanceWithStatus[];
-  onVehicleClick?: (vehicle: VehicleMaintenanceWithStatus) => void;
+  onVehicleClick?: (vehicle: any) => void;
 }
 
-export function PlantOverview({ vehicles, onVehicleClick }: PlantOverviewProps) {
-  const plantVehicles = vehicles.filter(
-    vehicle => vehicle.vehicle?.asset_type === 'plant'
-  );
+type PlantAsset = {
+  id: string;
+  plant_id: string;
+  nickname: string | null;
+  make: string | null;
+  model: string | null;
+  current_hours: number | null;
+  status: string;
+};
+
+type PlantMaintenanceWithStatus = {
+  vehicle_id: string;
+  plant_id: string;
+  vehicle?: PlantAsset;
+  current_hours: number | null;
+  next_service_hours: number | null;
+  overdue_count: number;
+  due_soon_count: number;
+};
+
+export function PlantOverview({ onVehicleClick }: PlantOverviewProps) {
+  const supabase = createClient();
+  const [plantAssets, setPlantAssets] = useState<PlantMaintenanceWithStatus[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchPlantAssets();
+  }, []);
+
+  const fetchPlantAssets = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch plant assets with maintenance data
+      const { data: plantData, error: plantError } = await supabase
+        .from('plant')
+        .select(`
+          *,
+          vehicle_categories (
+            id,
+            name
+          )
+        `)
+        .eq('status', 'active')
+        .order('plant_id');
+
+      if (plantError) throw plantError;
+
+      // Fetch maintenance records for plant
+      const { data: maintenanceData, error: maintenanceError } = await supabase
+        .from('vehicle_maintenance')
+        .select('*')
+        .not('plant_id', 'is', null);
+
+      if (maintenanceError) throw maintenanceError;
+
+      // Combine plant data with maintenance data
+      const combined: PlantMaintenanceWithStatus[] = (plantData || []).map((plant) => {
+        const maintenance = maintenanceData?.find((m) => m.plant_id === plant.id);
+        
+        return {
+          vehicle_id: plant.id,
+          plant_id: plant.id,
+          vehicle: {
+            ...plant,
+            id: plant.id
+          } as PlantAsset,
+          current_hours: maintenance?.current_hours || plant.current_hours || null,
+          next_service_hours: maintenance?.next_service_hours || null,
+          overdue_count: 0, // TODO: Calculate based on maintenance items
+          due_soon_count: 0, // TODO: Calculate based on maintenance items
+        };
+      });
+
+      setPlantAssets(combined);
+    } catch (error) {
+      console.error('Error fetching plant assets:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </div>
+    );
+  }
 
   const summary = {
-    total: plantVehicles.length,
-    overdue: plantVehicles.filter(v => v.overdue_count > 0).length,
-    due_soon: plantVehicles.filter(v => v.due_soon_count > 0 && v.overdue_count === 0).length,
+    total: plantAssets.length,
+    overdue: plantAssets.filter(v => v.overdue_count > 0).length,
+    due_soon: plantAssets.filter(v => v.due_soon_count > 0 && v.overdue_count === 0).length,
   };
 
   return (
     <MaintenanceOverview
-      vehicles={plantVehicles}
+      vehicles={plantAssets}
       summary={summary}
       onVehicleClick={onVehicleClick}
     />
