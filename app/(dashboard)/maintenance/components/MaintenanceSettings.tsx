@@ -146,12 +146,12 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                           <div className="flex gap-1">
                             {category.applies_to?.includes('vehicle') && (
                               <Badge variant="outline" className="text-blue-400 border-blue-400/50 font-mono" title="Applies to vehicles">
-                                (V)
+                                V
                               </Badge>
                             )}
                             {category.applies_to?.includes('plant') && (
                               <Badge variant="outline" className="text-purple-400 border-purple-400/50 font-mono" title="Applies to plant machinery">
-                                (P)
+                                P
                               </Badge>
                             )}
                             {!category.applies_to || category.applies_to.length === 0 && (
@@ -284,11 +284,11 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
               <div className="mt-2 flex items-center gap-4 text-xs">
                 <span className="font-semibold">Key:</span>
                 <span className="flex items-center gap-1">
-                  <span className="font-mono px-1.5 py-0.5 rounded border border-blue-400/50 text-blue-400">(V)</span>
+                  <span className="font-mono px-1.5 py-0.5 rounded border border-blue-400/50 text-blue-400">V</span>
                   = Vehicle
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="font-mono px-1.5 py-0.5 rounded border border-purple-400/50 text-purple-400">(P)</span>
+                  <span className="font-mono px-1.5 py-0.5 rounded border border-purple-400/50 text-purple-400">P</span>
                   = Plant
                 </span>
               </div>
