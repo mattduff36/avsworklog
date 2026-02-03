@@ -39,11 +39,15 @@ type Task = {
     vehicles?: {
       reg_number: string;
       nickname: string | null;
+      asset_type?: 'vehicle' | 'plant' | 'tool';
+      plant_id?: string | null;
     };
   };
   vehicles?: {
     reg_number: string;
     nickname: string | null;
+    asset_type?: 'vehicle' | 'plant' | 'tool';
+    plant_id?: string | null;
   };
 };
 
@@ -80,15 +84,28 @@ export function WorkshopTaskModal({
   if (!task) return null;
 
   const getVehicleDisplay = () => {
+    const getAssetIdLabel = (vehicle?: { reg_number: string | null; plant_id?: string | null; asset_type?: 'vehicle' | 'plant' | 'tool' }) => {
+      if (!vehicle) return 'Unknown';
+      if (vehicle.asset_type === 'plant') {
+        return vehicle.plant_id ?? 'Unknown Plant';
+      }
+      return vehicle.reg_number ?? 'Unknown Vehicle';
+    };
+
+    const getAssetDisplay = (vehicle?: { reg_number: string | null; plant_id?: string | null; nickname: string | null; asset_type?: 'vehicle' | 'plant' | 'tool' }) => {
+      if (!vehicle) return 'Unknown';
+      const idLabel = getAssetIdLabel(vehicle);
+      if (vehicle.nickname) {
+        return `${idLabel} (${vehicle.nickname})`;
+      }
+      return idLabel;
+    };
+
     if (task.vehicles) {
-      return task.vehicles.nickname 
-        ? `${task.vehicles.reg_number} (${task.vehicles.nickname})`
-        : task.vehicles.reg_number;
+      return getAssetDisplay(task.vehicles);
     }
     if (task.vehicle_inspections?.vehicles) {
-      return task.vehicle_inspections.vehicles.nickname
-        ? `${task.vehicle_inspections.vehicles.reg_number} (${task.vehicle_inspections.vehicles.nickname})`
-        : task.vehicle_inspections.vehicles.reg_number;
+      return getAssetDisplay(task.vehicle_inspections.vehicles);
     }
     return 'Unknown Vehicle';
   };
