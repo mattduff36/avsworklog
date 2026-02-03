@@ -1428,10 +1428,14 @@ export default function WorkshopTasksPage() {
     if (assetTab === 'plant') {
       return tasks.filter(t => t.vehicles?.asset_type === 'plant');
     } else if (assetTab === 'vehicle') {
-      return tasks.filter(t => 
-        t.action_type === 'inspection_defect' || 
-        t.vehicles?.asset_type !== 'plant'
-      );
+      return tasks.filter(t => {
+        // For inspection defects, check the asset type of the inspected vehicle
+        if (t.action_type === 'inspection_defect') {
+          return t.vehicle_inspections?.vehicles?.asset_type !== 'plant';
+        }
+        // For other tasks, exclude plant assets
+        return t.vehicles?.asset_type !== 'plant';
+      });
     }
     return tasks;
   };
@@ -3501,17 +3505,21 @@ export default function WorkshopTasksPage() {
                   setRecentVehicleIds(updatedRecent);
                 }
                 if (value) {
-                  // Fetch current mileage for the new vehicle
+                  // Fetch current meter reading for the selected vehicle
+                  const selectedVehicle = vehicles.find(v => v.id === value);
+                  const isPlant = selectedVehicle?.asset_type === 'plant';
+                  const fieldToSelect = isPlant ? 'current_hours' : 'current_mileage';
+                  
                   supabase
                     .from('vehicle_maintenance')
-                    .select('current_mileage')
+                    .select(fieldToSelect)
                     .eq('vehicle_id', value)
                     .single()
                     .then(({ data, error }) => {
                       if (error && error.code !== 'PGRST116') {
-                        console.error('Error fetching mileage:', error);
+                        console.error('Error fetching meter reading:', error);
                       }
-                      setEditCurrentMileage(data?.current_mileage || null);
+                      setEditCurrentMileage(data?.[fieldToSelect] || null);
                     });
                 } else {
                   setEditCurrentMileage(null);
@@ -3530,7 +3538,7 @@ export default function WorkshopTasksPage() {
                             <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">Recent</SelectLabel>
                             {recentVehicles.map((vehicle) => (
                               <SelectItem key={vehicle.id} value={vehicle.id}>
-                                {vehicle.reg_number}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
+                                {getAssetDisplay(vehicle)}
                               </SelectItem>
                             ))}
                           </SelectGroup>
@@ -3545,7 +3553,7 @@ export default function WorkshopTasksPage() {
                             )}
                             {otherVehicles.map((vehicle) => (
                               <SelectItem key={vehicle.id} value={vehicle.id}>
-                                {vehicle.reg_number}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
+                                {getAssetDisplay(vehicle)}
                               </SelectItem>
                             ))}
                           </SelectGroup>
