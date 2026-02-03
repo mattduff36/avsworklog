@@ -33,7 +33,7 @@ const createCategorySchema = z.object({
     .max(500, 'Description must be less than 500 characters')
     .optional()
     .nullable(),
-  type: z.enum(['date', 'mileage'], {
+  type: z.enum(['date', 'mileage', 'hours'], {
     required_error: 'Type is required'
   }),
   alert_threshold_days: z.coerce.number()
@@ -46,6 +46,12 @@ const createCategorySchema = z.object({
     .positive('Must be positive')
     .optional()
     .nullable(),
+  alert_threshold_hours: z.coerce.number()
+    .int()
+    .positive('Must be positive')
+    .optional()
+    .nullable(),
+  applies_to: z.array(z.enum(['vehicle', 'plant'])).default(['vehicle']),
   sort_order: z.coerce.number().int().optional(),
   is_active: z.boolean().optional(),
   // New fields for duty/responsibility
@@ -61,16 +67,19 @@ const createCategorySchema = z.object({
     if (data.type === 'mileage') {
       return data.alert_threshold_miles != null && data.alert_threshold_miles > 0;
     }
+    if (data.type === 'hours') {
+      return data.alert_threshold_hours != null && data.alert_threshold_hours > 0;
+    }
     return true;
   },
   {
-    message: 'Date-based categories need days threshold, mileage-based need miles threshold',
+    message: 'Date-based categories need days threshold, mileage-based need miles threshold, hours-based need hours threshold',
     path: ['alert_threshold_days']
   }
 );
 
 const editCategorySchema = createCategorySchema.partial().extend({
-  type: z.enum(['date', 'mileage']).optional(), // Type cannot be changed in edit
+  type: z.enum(['date', 'mileage', 'hours']).optional(), // Type cannot be changed in edit
 });
 
 type CategoryFormData = z.infer<typeof createCategorySchema>;
@@ -119,6 +128,7 @@ export function CategoryDialog({
   const showOnOverview = watch('show_on_overview');
   const reminderInApp = watch('reminder_in_app_enabled');
   const reminderEmail = watch('reminder_email_enabled');
+  const appliesTo = watch('applies_to');
 
   // Reset form when dialog opens/closes or category changes
   useEffect(() => {
@@ -129,6 +139,8 @@ export function CategoryDialog({
         type: category.type,
         alert_threshold_days: category.alert_threshold_days || undefined,
         alert_threshold_miles: category.alert_threshold_miles || undefined,
+        alert_threshold_hours: category.alert_threshold_hours || undefined,
+        applies_to: category.applies_to || ['vehicle'],
         sort_order: category.sort_order,
         is_active: category.is_active,
         responsibility: category.responsibility || 'workshop',
@@ -143,6 +155,8 @@ export function CategoryDialog({
         type: 'date',
         alert_threshold_days: 30,
         alert_threshold_miles: undefined,
+        alert_threshold_hours: undefined,
+        applies_to: ['vehicle'],
         sort_order: 999,
         is_active: true,
         responsibility: 'workshop',
@@ -157,14 +171,24 @@ export function CategoryDialog({
   useEffect(() => {
     if (selectedType === 'date') {
       setValue('alert_threshold_miles', null);
+      setValue('alert_threshold_hours', null);
       if (!watch('alert_threshold_days')) {
         setValue('alert_threshold_days', 30);
       }
     } else if (selectedType === 'mileage') {
       setValue('alert_threshold_days', null);
+      setValue('alert_threshold_hours', null);
       if (!watch('alert_threshold_miles')) {
         setValue('alert_threshold_miles', 1000);
       }
+    } else if (selectedType === 'hours') {
+      setValue('alert_threshold_days', null);
+      setValue('alert_threshold_miles', null);
+      if (!watch('alert_threshold_hours')) {
+        setValue('alert_threshold_hours', 50);
+      }
+      // Hours-based categories are for plant machinery
+      setValue('applies_to', ['plant']);
     }
   }, [selectedType, setValue, watch]);
 
@@ -176,6 +200,8 @@ export function CategoryDialog({
         type: data.type,
         alert_threshold_days: data.type === 'date' ? data.alert_threshold_days : undefined,
         alert_threshold_miles: data.type === 'mileage' ? data.alert_threshold_miles : undefined,
+        alert_threshold_hours: data.type === 'hours' ? data.alert_threshold_hours : undefined,
+        applies_to: data.applies_to,
         sort_order: data.sort_order,
         responsibility: data.responsibility,
         show_on_overview: data.show_on_overview,
@@ -190,6 +216,8 @@ export function CategoryDialog({
         description: data.description || undefined,
         alert_threshold_days: data.type === 'date' ? data.alert_threshold_days : undefined,
         alert_threshold_miles: data.type === 'mileage' ? data.alert_threshold_miles : undefined,
+        alert_threshold_hours: data.type === 'hours' ? data.alert_threshold_hours : undefined,
+        applies_to: data.applies_to,
         is_active: data.is_active,
         sort_order: data.sort_order,
         responsibility: data.responsibility,
@@ -254,7 +282,7 @@ export function CategoryDialog({
             <Label>
               Type <span className="text-red-400">*</span>
             </Label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <button
                 type="button"
                 disabled={mode === 'edit'}
@@ -279,9 +307,9 @@ export function CategoryDialog({
                   </div>
                   <div>
                     <p className={`font-medium ${selectedType === 'date' ? 'text-blue-400' : 'text-white'}`}>
-                      Date-based
+                      Date
                     </p>
-                    <p className="text-xs text-muted-foreground">Tax, MOT, First Aid</p>
+                    <p className="text-xs text-muted-foreground">Tax, MOT</p>
                   </div>
                 </div>
               </button>
@@ -310,9 +338,40 @@ export function CategoryDialog({
                   </div>
                   <div>
                     <p className={`font-medium ${selectedType === 'mileage' ? 'text-blue-400' : 'text-white'}`}>
-                      Mileage-based
+                      Mileage
                     </p>
-                    <p className="text-xs text-muted-foreground">Service, Cambelt</p>
+                    <p className="text-xs text-muted-foreground">Service</p>
+                  </div>
+                </div>
+              </button>
+              
+              <button
+                type="button"
+                disabled={mode === 'edit'}
+                onClick={() => mode !== 'edit' && setValue('type', 'hours')}
+                className={`p-4 rounded-lg border-2 transition-all text-left ${
+                  mode === 'edit' 
+                    ? 'opacity-50 cursor-not-allowed border-slate-700 bg-slate-800/50' 
+                    : selectedType === 'hours'
+                      ? 'border-blue-500 bg-blue-500/20 ring-2 ring-blue-500/30'
+                      : 'border-slate-600 bg-slate-800 hover:border-slate-500'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    selectedType === 'hours' 
+                      ? 'border-blue-500 bg-blue-500' 
+                      : 'border-slate-500'
+                  }`}>
+                    {selectedType === 'hours' && (
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                  <div>
+                    <p className={`font-medium ${selectedType === 'hours' ? 'text-blue-400' : 'text-white'}`}>
+                      Hours
+                    </p>
+                    <p className="text-xs text-muted-foreground">Plant</p>
                   </div>
                 </div>
               </button>
@@ -343,7 +402,7 @@ export function CategoryDialog({
                   <p className="text-sm text-red-400">{errors.alert_threshold_days.message}</p>
                 )}
               </>
-            ) : (
+            ) : selectedType === 'mileage' ? (
               <>
                 <Label htmlFor="alert_threshold_miles">
                   Alert Threshold (Miles) <span className="text-red-400">*</span>
@@ -360,6 +419,25 @@ export function CategoryDialog({
                 </p>
                 {errors.alert_threshold_miles && (
                   <p className="text-sm text-red-400">{errors.alert_threshold_miles.message}</p>
+                )}
+              </>
+            ) : (
+              <>
+                <Label htmlFor="alert_threshold_hours">
+                  Alert Threshold (Hours) <span className="text-red-400">*</span>
+                </Label>
+                <Input
+                  id="alert_threshold_hours"
+                  type="number"
+                  {...register('alert_threshold_hours')}
+                  placeholder="e.g., 50"
+                  className="bg-input border-border text-white"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Show &quot;Due Soon&quot; alert when this many engine hours before the service is due
+                </p>
+                {errors.alert_threshold_hours && (
+                  <p className="text-sm text-red-400">{errors.alert_threshold_hours.message}</p>
                 )}
               </>
             )}

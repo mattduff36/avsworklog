@@ -36,9 +36,18 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
   const [recipientsDialogOpen, setRecipientsDialogOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<MaintenanceCategory | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isPlantExpanded, setIsPlantExpanded] = useState(false);
   
-  const categories = categoriesData?.categories || [];
+  const allCategories = categoriesData?.categories || [];
   const canModifySettings = isAdmin || isManager;
+  
+  // Split categories by applies_to field
+  const vehicleCategories = allCategories.filter(cat => 
+    cat.applies_to?.includes('vehicle') || !cat.applies_to // backward compatibility
+  );
+  const plantCategories = allCategories.filter(cat => 
+    cat.applies_to?.includes('plant')
+  );
   
   // Open dialogs
   const openEditDialog = (category: MaintenanceCategory) => {
@@ -65,7 +74,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
   
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Vehicle Categories Header */}
       <Card className="border-border">
         <CardHeader 
           className="cursor-pointer hover:bg-slate-800/30 transition-colors"
@@ -81,10 +90,10 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
               <div>
                 <CardTitle className="text-white flex items-center gap-2">
                   <Wrench className="h-5 w-5" />
-                  Maintenance Categories
+                  Vehicle Maintenance Categories
                 </CardTitle>
                 <CardDescription className="text-muted-foreground">
-                  {categories.length} {categories.length === 1 ? 'category' : 'categories'}
+                  {vehicleCategories.length} {vehicleCategories.length === 1 ? 'category' : 'categories'}
                 </CardDescription>
               </div>
             </div>
@@ -105,9 +114,9 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
         
         {isExpanded && (
           <CardContent className="pt-6">
-          {categories.length === 0 ? (
+          {vehicleCategories.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No categories configured yet.
+              No vehicle categories configured yet.
             </div>
           ) : (
             <div className="border border-slate-700 rounded-lg overflow-hidden overflow-x-auto">
@@ -124,7 +133,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {categories
+                  {vehicleCategories
                     .sort((a, b) => a.sort_order - b.sort_order)
                     .map((category) => (
                       <TableRow
@@ -143,6 +152,182 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                         
                         <TableCell className="text-muted-foreground">
                           {category.type === 'date' 
+                            ? `${category.alert_threshold_days} days`
+                            : category.type === 'hours'
+                            ? `${category.alert_threshold_hours} hours`
+                            : `${category.alert_threshold_miles?.toLocaleString()} miles`
+                          }
+                        </TableCell>
+                        
+                        <TableCell>
+                          <Badge 
+                            variant="outline" 
+                            className={category.responsibility === 'office' 
+                              ? 'text-avs-yellow border-avs-yellow/50' 
+                              : 'text-orange-400 border-orange-400/50'
+                            }
+                          >
+                            {category.responsibility === 'office' ? (
+                              <><Briefcase className="h-3 w-3 mr-1" />Office</>
+                            ) : (
+                              <><Wrench className="h-3 w-3 mr-1" />Workshop</>
+                            )}
+                          </Badge>
+                        </TableCell>
+                        
+                        <TableCell>
+                          <div className="flex gap-1">
+                            {category.reminder_in_app_enabled && (
+                              <Badge variant="outline" className="text-blue-400 border-blue-400/50" title="In-app notifications enabled">
+                                <Bell className="h-3 w-3" />
+                              </Badge>
+                            )}
+                            {category.reminder_email_enabled && (
+                              <Badge variant="outline" className="text-green-400 border-green-400/50" title="Email notifications enabled">
+                                <Mail className="h-3 w-3" />
+                              </Badge>
+                            )}
+                            {!category.reminder_in_app_enabled && !category.reminder_email_enabled && (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        
+                        <TableCell>
+                          <Badge 
+                            variant={category.is_active ? 'default' : 'secondary'}
+                            className={category.is_active ? 'bg-green-600' : ''}
+                          >
+                            {category.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </TableCell>
+                        
+                        <TableCell className="text-right">
+                          <div className="flex gap-1 justify-end">
+                            {(category.reminder_in_app_enabled || category.reminder_email_enabled) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openRecipientsDialog(category)}
+                                disabled={!canModifySettings}
+                                className="text-purple-400 hover:text-purple-300 hover:bg-slate-800 disabled:opacity-30"
+                                title="Manage Recipients"
+                              >
+                                <Users className="h-3 w-3" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditDialog(category)}
+                              disabled={!canModifySettings}
+                              className="text-blue-400 hover:text-blue-300 hover:bg-slate-800 disabled:opacity-30"
+                              title="Edit Category"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openDeleteDialog(category)}
+                              disabled={!canModifySettings}
+                              className="text-red-400 hover:text-red-300 hover:bg-slate-800 disabled:opacity-30"
+                              title="Delete Category"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+        )}
+      </Card>
+      
+      {/* Plant Categories Header */}
+      <Card className="border-border">
+        <CardHeader 
+          className="cursor-pointer hover:bg-slate-800/30 transition-colors"
+          onClick={() => setIsPlantExpanded(!isPlantExpanded)}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 flex-1">
+              <ChevronDown 
+                className={`h-5 w-5 text-muted-foreground transition-transform ${
+                  isPlantExpanded ? 'rotate-180' : ''
+                }`}
+              />
+              <div>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Wrench className="h-5 w-5" />
+                  Plant Maintenance Categories
+                </CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  {plantCategories.length} {plantCategories.length === 1 ? 'category' : 'categories'} (Hours-based)
+                </CardDescription>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setAddDialogOpen(true);
+              }}
+              className="bg-blue-600 hover:bg-blue-700"
+              disabled={!canModifySettings}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Category
+            </Button>
+          </div>
+        </CardHeader>
+        
+        {isPlantExpanded && (
+          <CardContent className="pt-6">
+          {plantCategories.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No plant categories configured yet.
+            </div>
+          ) : (
+            <div className="border border-slate-700 rounded-lg overflow-hidden overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-slate-700 hover:bg-slate-800/50">
+                    <TableHead className="text-muted-foreground">Name</TableHead>
+                    <TableHead className="text-muted-foreground">Type</TableHead>
+                    <TableHead className="text-muted-foreground">Alert Threshold</TableHead>
+                    <TableHead className="text-muted-foreground">Responsibility</TableHead>
+                    <TableHead className="text-muted-foreground">Reminders</TableHead>
+                    <TableHead className="text-muted-foreground">Status</TableHead>
+                    <TableHead className="text-right text-muted-foreground">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {plantCategories
+                    .sort((a, b) => a.sort_order - b.sort_order)
+                    .map((category) => (
+                      <TableRow
+                        key={category.id}
+                        className="border-slate-700 hover:bg-slate-800/50"
+                      >
+                        <TableCell className="font-medium text-white">
+                          {category.name}
+                        </TableCell>
+                        
+                        <TableCell>
+                          <Badge variant="outline" className="capitalize">
+                            {category.type}
+                          </Badge>
+                        </TableCell>
+                        
+                        <TableCell className="text-muted-foreground">
+                          {category.type === 'hours'
+                            ? `${category.alert_threshold_hours} hours`
+                            : category.type === 'date' 
                             ? `${category.alert_threshold_days} days`
                             : `${category.alert_threshold_miles?.toLocaleString()} miles`
                           }
@@ -243,10 +428,15 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-blue-800 dark:text-blue-200">
-              <p className="font-semibold mb-1">About Categories & Settings</p>
+              <p className="font-semibold mb-1">About Maintenance Categories</p>
               <p>
-                Categories define what types of maintenance to track. Each category has an alert threshold that determines when to show &quot;Due Soon&quot; warnings. 
-                Date-based categories (Tax, MOT, First Aid) use days, while mileage-based categories (Service, Cambelt) use miles.
+                Categories define what types of maintenance to track for vehicles and plant machinery. Each category has an alert threshold that determines when to show &quot;Due Soon&quot; warnings.
+              </p>
+              <p className="mt-2">
+                <strong>Vehicle Categories:</strong> Use date-based (Tax, MOT, First Aid) or mileage-based (Service, Cambelt) thresholds.
+              </p>
+              <p className="mt-2">
+                <strong>Plant Categories:</strong> Use hours-based thresholds (Service Due, LOLER inspections) since plant machinery tracks engine hours instead of mileage.
               </p>
               <p className="mt-2">
                 <strong>Responsibility:</strong> Categories can be assigned to either Workshop (shows &quot;Create Task&quot; button) or Office (shows &quot;Office Action&quot; button with reminder and update options).
@@ -255,7 +445,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                 <strong>Reminders:</strong> Office categories can have in-app and/or email notifications enabled. Click the <Users className="h-3 w-3 inline mx-1" /> button to manage who receives reminders.
               </p>
               <p className="mt-2">
-                <strong>Note:</strong> You cannot change a category&apos;s type (date ↔ mileage) after creation. 
+                <strong>Note:</strong> You cannot change a category&apos;s type (date ↔ mileage ↔ hours) after creation. 
                 Changes to settings apply immediately.
               </p>
             </div>

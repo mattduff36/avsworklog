@@ -92,9 +92,9 @@ export async function POST(request: NextRequest) {
     }
     
     // Validate type
-    if (!['date', 'mileage'].includes(body.type)) {
+    if (!['date', 'mileage', 'hours'].includes(body.type)) {
       return NextResponse.json(
-        { error: 'Type must be either "date" or "mileage"' },
+        { error: 'Type must be either "date", "mileage", or "hours"' },
         { status: 400 }
       );
     }
@@ -114,6 +114,13 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    if (body.type === 'hours' && !body.alert_threshold_hours) {
+      return NextResponse.json(
+        { error: 'alert_threshold_hours is required for hours-based categories' },
+        { status: 400 }
+      );
+    }
+    
     // Create category
     const { data, error } = await supabase
       .from('maintenance_categories')
@@ -123,6 +130,8 @@ export async function POST(request: NextRequest) {
         type: body.type,
         alert_threshold_days: body.type === 'date' ? body.alert_threshold_days : null,
         alert_threshold_miles: body.type === 'mileage' ? body.alert_threshold_miles : null,
+        alert_threshold_hours: body.type === 'hours' ? body.alert_threshold_hours : null,
+        applies_to: body.applies_to || ['vehicle'],
         sort_order: body.sort_order || 999,
         is_active: true,
         responsibility: body.responsibility || 'workshop',

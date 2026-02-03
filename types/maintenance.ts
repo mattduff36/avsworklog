@@ -6,9 +6,11 @@ export interface MaintenanceCategory {
   id: string;
   name: string;
   description: string | null;
-  type: 'date' | 'mileage';
+  type: 'date' | 'mileage' | 'hours';
   alert_threshold_days: number | null;
   alert_threshold_miles: number | null;
+  alert_threshold_hours: number | null;
+  applies_to: ('vehicle' | 'plant')[];
   is_active: boolean;
   sort_order: number;
   created_at: string;
@@ -155,8 +157,10 @@ export interface MaintenanceItemStatus {
   status: MaintenanceStatus;
   days_until?: number;
   miles_until?: number;
+  hours_until?: number;
   due_date?: string;
   due_mileage?: number;
+  due_hours?: number;
 }
 
 export interface VehicleMaintenanceWithStatus extends VehicleMaintenance {
@@ -213,9 +217,11 @@ export interface UpdateMaintenanceRequest {
 export interface CreateCategoryRequest {
   name: string;
   description?: string;
-  type: 'date' | 'mileage';
+  type: 'date' | 'mileage' | 'hours';
   alert_threshold_days?: number;
   alert_threshold_miles?: number;
+  alert_threshold_hours?: number;
+  applies_to?: ('vehicle' | 'plant')[];
   sort_order?: number;
   responsibility?: CategoryResponsibility;
   show_on_overview?: boolean;
@@ -228,6 +234,8 @@ export interface UpdateCategoryRequest {
   description?: string;
   alert_threshold_days?: number;
   alert_threshold_miles?: number;
+  alert_threshold_hours?: number;
+  applies_to?: ('vehicle' | 'plant')[];
   is_active?: boolean;
   sort_order?: number;
   responsibility?: CategoryResponsibility;
@@ -344,5 +352,10 @@ export interface DateThreshold {
 
 export interface MileageThreshold {
   miles_until: number; // Negative if overdue
+  status: MaintenanceStatus;
+}
+
+export interface HoursThreshold {
+  hours_until: number; // Negative if overdue
   status: MaintenanceStatus;
 }
