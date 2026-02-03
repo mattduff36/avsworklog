@@ -104,7 +104,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
         </CardHeader>
         
         {isExpanded && (
-          <CardContent>
+          <CardContent className="pt-6">
           {categories.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No categories configured yet.

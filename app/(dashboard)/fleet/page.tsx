@@ -548,8 +548,8 @@ function FleetContent() {
                     </div>
                   </CardHeader>
                   
-                  {plantCategoriesExpanded && (
-                    <CardContent>
+                {plantCategoriesExpanded && (
+                  <CardContent className="pt-6">
                       {categoriesLoading ? (
                         <div className="flex items-center justify-center py-8">
                           <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -674,8 +674,8 @@ function FleetContent() {
                     </div>
                   </CardHeader>
                   
-                  {vehicleCategoriesExpanded && (
-                    <CardContent>
+                {vehicleCategoriesExpanded && (
+                  <CardContent className="pt-6">
                     {categoriesLoading ? (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
