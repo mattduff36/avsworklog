@@ -6,10 +6,15 @@
 /**
  * Get the parent route for a given pathname
  * @param pathname - The current pathname
+ * @param searchParams - Optional search params (for context like fromTab)
  * @param userRole - Optional user role context (for role-specific navigation)
  * @returns The parent route path
  */
-export function getParentHref(pathname: string, userRole?: { isManager?: boolean; isAdmin?: boolean }): string {
+export function getParentHref(
+  pathname: string, 
+  searchParams?: URLSearchParams | null,
+  userRole?: { isManager?: boolean; isAdmin?: boolean }
+): string {
   // Normalize pathname (remove trailing slashes)
   const normalizedPath = pathname.replace(/\/$/, '');
   
@@ -25,8 +30,15 @@ export function getParentHref(pathname: string, userRole?: { isManager?: boolean
     return '/rams';
   }
   
-  // Fleet routes
+  // Fleet routes - support fromTab query param
   if (normalizedPath.match(/^\/fleet\/vehicles\/[^/]+\/history$/)) {
+    const fromTab = searchParams?.get('fromTab');
+    // Validate fromTab to prevent injection
+    const validTabs = ['maintenance', 'plant', 'vehicles', 'settings'];
+    if (fromTab && validTabs.includes(fromTab)) {
+      return `/fleet?tab=${fromTab}`;
+    }
+    // Default fallback to vehicles tab
     return '/fleet?tab=vehicles';
   }
   

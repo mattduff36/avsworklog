@@ -14,7 +14,7 @@ module.exports = {
     node: true,
     es2021: true
   },
-  plugins: ["@typescript-eslint", "react", "react-hooks"],
+  plugins: ["@typescript-eslint", "react", "react-hooks", "sonarjs"],
   extends: [
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended",
@@ -30,6 +30,9 @@ module.exports = {
   rules: {
     "@typescript-eslint/explicit-module-boundary-types": "off",
     "@typescript-eslint/consistent-type-definitions": ["error", "interface"],
-    "react/react-in-jsx-scope": "off"
+    "react/react-in-jsx-scope": "off",
+    "sonarjs/cognitive-complexity": ["warn", 15],
+    "sonarjs/no-duplicate-string": "warn",
+    "sonarjs/no-identical-functions": "warn"
   }
 };

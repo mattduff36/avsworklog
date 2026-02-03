@@ -432,7 +432,7 @@ export function MaintenanceTable({
                         onClick={() => {
                           const vehicleId = vehicle.vehicle_id || vehicle.id;
                           if (vehicleId) {
-                            router.push(`/fleet/vehicles/${vehicleId}/history`);
+                            router.push(`/fleet/vehicles/${vehicleId}/history?fromTab=vehicles`);
                           }
                         }}
                         className="border-slate-700 hover:bg-slate-800/50 cursor-pointer"
@@ -648,7 +648,7 @@ export function MaintenanceTable({
                                 e.stopPropagation();
                                 const vehicleId = vehicle.vehicle_id || vehicle.id;
                                 if (vehicleId) {
-                                  router.push(`/fleet/vehicles/${vehicleId}/history`);
+                                  router.push(`/fleet/vehicles/${vehicleId}/history?fromTab=vehicles`);
                                 }
                               }}
                               className="h-10 w-10 p-0"

@@ -20,7 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, Truck, HardHat } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { logger } from '@/lib/utils/logger';
 
@@ -35,6 +36,8 @@ interface Category {
   name: string;
 }
 
+type AssetType = 'vehicle' | 'plant';
+
 export function AddVehicleDialog({
   open,
   onOpenChange,
@@ -43,11 +46,16 @@ export function AddVehicleDialog({
   const queryClient = useQueryClient();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
+  const [assetType, setAssetType] = useState<AssetType>('vehicle');
   const [formData, setFormData] = useState({
     reg_number: '',
+    plant_id: '',
     category_id: '',
     status: 'active',
     nickname: '',
+    serial_number: '',
+    year: '',
+    weight_class: '',
   });
   const [error, setError] = useState('');
 
@@ -61,11 +69,16 @@ export function AddVehicleDialog({
   // Reset form when dialog closes
   useEffect(() => {
     if (!open) {
+      setAssetType('vehicle');
       setFormData({
         reg_number: '',
+        plant_id: '',
         category_id: '',
         status: 'active',
         nickname: '',
+        serial_number: '',
+        year: '',
+        weight_class: '',
       });
       setError('');
     }
@@ -120,9 +133,14 @@ export function AddVehicleDialog({
     e.preventDefault();
     setError('');
     
-    // Validate
-    if (!formData.reg_number.trim()) {
-      setError('Registration number is required');
+    // Validate based on asset type
+    if (assetType === 'vehicle' && !formData.reg_number.trim()) {
+      setError('Registration number is required for vehicles');
+      return;
+    }
+    
+    if (assetType === 'plant' && !formData.plant_id.trim()) {
+      setError('Plant ID is required for plant machinery');
       return;
     }
     
@@ -134,53 +152,62 @@ export function AddVehicleDialog({
     try {
       setLoading(true);
       
-      // Format registration number
-      const formattedReg = formatRegistration(formData.reg_number);
+      // Prepare payload based on asset type
+      const payload: any = {
+        asset_type: assetType,
+        category_id: formData.category_id,
+        status: formData.status,
+        nickname: formData.nickname.trim() || null,
+      };
+
+      if (assetType === 'vehicle') {
+        payload.reg_number = formatRegistration(formData.reg_number);
+      } else {
+        payload.plant_id = formData.plant_id.trim();
+        payload.reg_number = formData.reg_number.trim() || null;
+        payload.serial_number = formData.serial_number.trim() || null;
+        payload.year = formData.year ? parseInt(formData.year) : null;
+        payload.weight_class = formData.weight_class.trim() || null;
+      }
       
       const response = await fetch('/api/admin/vehicles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          reg_number: formattedReg,
-          nickname: formData.nickname.trim() || null, // Send null if empty
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // Check sync result for appropriate messaging
+        const identifier = assetType === 'vehicle' ? payload.reg_number : formData.plant_id;
         const syncResult = data.syncResult;
         
-        if (syncResult?.success) {
-          toast.success('Vehicle added successfully', {
-            description: `${formattedReg} has been added with TAX and MOT data synced.`,
+        if (assetType === 'plant' || syncResult?.skipped) {
+          toast.success(`${assetType === 'vehicle' ? 'Vehicle' : 'Plant machinery'} added successfully`, {
+            description: `${identifier} has been added to the system.`,
           });
-        } else if (syncResult?.skipped) {
+        } else if (syncResult?.success) {
           toast.success('Vehicle added successfully', {
-            description: `${formattedReg} has been added (test vehicle, sync skipped).`,
+            description: `${identifier} has been added with TAX and MOT data synced.`,
           });
         } else {
-          toast.success('Vehicle added', {
-            description: data.message || `${formattedReg} has been added. ${syncResult?.warning || 'API sync will retry automatically.'}`,
+          toast.success(`${assetType === 'vehicle' ? 'Vehicle' : 'Plant'} added`, {
+            description: data.message || `${identifier} has been added. ${syncResult?.warning || ''}`,
             duration: 5000,
           });
         }
         
-        // Invalidate queries to refresh data
         queryClient.invalidateQueries({ queryKey: ['maintenance'] });
-        
         onSuccess?.();
         onOpenChange(false);
       } else {
-        setError(data.error || 'Failed to add vehicle');
-        toast.error('Failed to add vehicle', {
+        setError(data.error || `Failed to add ${assetType}`);
+        toast.error(`Failed to add ${assetType}`, {
           description: data.error || 'Please try again.',
         });
       }
     } catch (error: any) {
-      logger.error('Error adding vehicle', error, 'AddVehicleDialog');
+      logger.error(`Error adding ${assetType}`, error, 'AddVehicleDialog');
       setError('An unexpected error occurred');
       toast.error('An unexpected error occurred', {
         description: 'Please try again.',
@@ -192,11 +219,11 @@ export function AddVehicleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border text-white max-w-md">
+      <DialogContent className="border-border text-white max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Add New Vehicle</DialogTitle>
+          <DialogTitle className="text-2xl">Add New Asset</DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Add a new vehicle to the fleet management system.
+            Add a new vehicle or plant machinery to the fleet management system.
           </DialogDescription>
         </DialogHeader>
 
@@ -207,30 +234,147 @@ export function AddVehicleDialog({
             </div>
           )}
 
-          {/* Registration Number */}
+          {/* Asset Type Selector */}
           <div className="space-y-2">
-            <Label htmlFor="reg_number" className="text-white">
-              Registration Number <span className="text-red-400">*</span>
-            </Label>
-            <Input
-              id="reg_number"
-              value={formData.reg_number}
-              onChange={(e) => handleRegistrationChange(e.target.value)}
-              placeholder="e.g., AB12 CDE or A10 ABC"
-              className="bg-input border-border text-white placeholder:text-muted-foreground uppercase"
-              disabled={loading}
-              required
-              maxLength={9}
-            />
-            <p className="text-xs text-muted-foreground">
-              Auto-formatted: UPPERCASE with space after 4th character
-            </p>
+            <Label className="text-white">Asset Type <span className="text-red-400">*</span></Label>
+            <Tabs value={assetType} onValueChange={(v) => setAssetType(v as AssetType)}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="vehicle" className="flex items-center gap-2">
+                  <Truck className="h-4 w-4" />
+                  Vehicle
+                </TabsTrigger>
+                <TabsTrigger value="plant" className="flex items-center gap-2">
+                  <HardHat className="h-4 w-4" />
+                  Plant
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
 
-          {/* Nickname */}
+          {/* Vehicle Registration Number */}
+          {assetType === 'vehicle' && (
+            <div className="space-y-2">
+              <Label htmlFor="reg_number" className="text-white">
+                Registration Number <span className="text-red-400">*</span>
+              </Label>
+              <Input
+                id="reg_number"
+                value={formData.reg_number}
+                onChange={(e) => handleRegistrationChange(e.target.value)}
+                placeholder="e.g., AB12 CDE or A10 ABC"
+                className="bg-input border-border text-white placeholder:text-muted-foreground uppercase"
+                disabled={loading}
+                required={assetType === 'vehicle'}
+                maxLength={9}
+              />
+              <p className="text-xs text-muted-foreground">
+                Auto-formatted: UPPERCASE with space after 4th character
+              </p>
+            </div>
+          )}
+
+          {/* Plant ID */}
+          {assetType === 'plant' && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="plant_id" className="text-white">
+                  Plant ID <span className="text-red-400">*</span>
+                </Label>
+                <Input
+                  id="plant_id"
+                  value={formData.plant_id}
+                  onChange={(e) =>
+                    setFormData({ ...formData, plant_id: e.target.value })
+                  }
+                  placeholder="e.g., 203, DIGGER-01"
+                  className="bg-input border-border text-white placeholder:text-muted-foreground"
+                  disabled={loading}
+                  required={assetType === 'plant'}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Unique identifier for this plant machinery
+                </p>
+              </div>
+
+              {/* Optional Registration for Plant */}
+              <div className="space-y-2">
+                <Label htmlFor="plant_reg" className="text-white">
+                  Registration Number <span className="text-slate-400 text-xs">(Optional - if road-registered)</span>
+                </Label>
+                <Input
+                  id="plant_reg"
+                  value={formData.reg_number}
+                  onChange={(e) => {
+                    const formatted = e.target.value.toUpperCase().replace(/[^A-Z0-9\s]/g, '');
+                    setFormData({ ...formData, reg_number: formatted });
+                  }}
+                  placeholder="e.g., AB12 CDE"
+                  className="bg-input border-border text-white placeholder:text-muted-foreground uppercase"
+                  disabled={loading}
+                  maxLength={9}
+                />
+              </div>
+
+              {/* Serial Number */}
+              <div className="space-y-2">
+                <Label htmlFor="serial_number" className="text-white">
+                  Serial Number <span className="text-slate-400 text-xs">(Optional)</span>
+                </Label>
+                <Input
+                  id="serial_number"
+                  value={formData.serial_number}
+                  onChange={(e) =>
+                    setFormData({ ...formData, serial_number: e.target.value })
+                  }
+                  placeholder="e.g., SN12345678"
+                  className="bg-input border-border text-white placeholder:text-muted-foreground"
+                  disabled={loading}
+                />
+              </div>
+
+              {/* Year */}
+              <div className="space-y-2">
+                <Label htmlFor="year" className="text-white">
+                  Year <span className="text-slate-400 text-xs">(Optional)</span>
+                </Label>
+                <Input
+                  id="year"
+                  type="number"
+                  value={formData.year}
+                  onChange={(e) =>
+                    setFormData({ ...formData, year: e.target.value })
+                  }
+                  placeholder="e.g., 2023"
+                  className="bg-input border-border text-white placeholder:text-muted-foreground"
+                  disabled={loading}
+                  min="1900"
+                  max="2100"
+                />
+              </div>
+
+              {/* Weight Class */}
+              <div className="space-y-2">
+                <Label htmlFor="weight_class" className="text-white">
+                  Weight Class <span className="text-slate-400 text-xs">(Optional)</span>
+                </Label>
+                <Input
+                  id="weight_class"
+                  value={formData.weight_class}
+                  onChange={(e) =>
+                    setFormData({ ...formData, weight_class: e.target.value })
+                  }
+                  placeholder="e.g., 8-9t, 1.5-2t"
+                  className="bg-input border-border text-white placeholder:text-muted-foreground"
+                  disabled={loading}
+                />
+              </div>
+            </>
+          )}
+
+          {/* Nickname/Description */}
           <div className="space-y-2">
             <Label htmlFor="nickname" className="text-white">
-              Nickname <span className="text-slate-400 text-xs">(Optional)</span>
+              {assetType === 'plant' ? 'Description' : 'Nickname'} <span className="text-slate-400 text-xs">(Optional)</span>
             </Label>
             <Input
               id="nickname"
@@ -238,12 +382,12 @@ export function AddVehicleDialog({
               onChange={(e) =>
                 setFormData({ ...formData, nickname: e.target.value })
               }
-              placeholder="e.g., Andy's Van, Red Pickup, Main Truck"
+              placeholder={assetType === 'plant' ? 'e.g., Mini Excavator, Forklift' : "e.g., Andy's Van, Red Pickup"}
               className="bg-input border-border text-white placeholder:text-muted-foreground"
               disabled={loading}
             />
             <p className="text-xs text-muted-foreground">
-              A friendly name to help identify this vehicle quickly
+              A friendly name to help identify this {assetType} quickly
             </p>
           </div>
 
@@ -321,12 +465,12 @@ export function AddVehicleDialog({
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding & Syncing...
+                  {assetType === 'vehicle' ? 'Adding & Syncing...' : 'Adding...'}
                 </>
               ) : (
                 <>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Vehicle
+                  Add {assetType === 'vehicle' ? 'Vehicle' : 'Plant'}
                 </>
               )}
             </Button>

@@ -20,7 +20,17 @@ export interface ServerErrorLog {
 /**
  * Extract useful context from the request
  */
-function extractRequestContext(request: Request): Record<string, unknown> {
+function extractRequestContext(request?: Request | null): Record<string, unknown> {
+  if (!request) {
+    return {
+      method: 'UNKNOWN',
+      pathname: 'N/A',
+      searchParams: {},
+      referer: null,
+      origin: null,
+    };
+  }
+  
   const url = new URL(request.url);
   
   return {
@@ -73,14 +83,14 @@ function generateErrorDescription(
  */
 export async function logServerError({
   error,
-  request,
+  request = null,
   componentName = null,
   additionalData = null,
   userId = null,
   userEmail = null,
 }: {
   error: Error | string;
-  request: Request;
+  request?: Request | null;
   componentName?: string | null;
   additionalData?: Record<string, unknown> | null;
   userId?: string | null;
@@ -123,8 +133,8 @@ export async function logServerError({
       error_type: errorObj.name || 'Error',
       user_id: finalUserId,
       user_email: finalUserEmail,
-      page_url: request.url || 'N/A',
-      user_agent: request.headers.get('user-agent') || 'N/A',
+      page_url: request?.url || 'N/A',
+      user_agent: request?.headers.get('user-agent') || 'N/A',
       component_name: componentName,
       additional_data: enrichedData,
     };

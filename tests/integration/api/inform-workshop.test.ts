@@ -30,7 +30,7 @@ describe('Inform Workshop Endpoint', () => {
   let testVehicleId: string;
   let testUserId: string;
   let testInspectionId: string;
-  let createdTaskIds: string[] = [];
+  const createdTaskIds: string[] = [];
 
   beforeAll(async () => {
     // Create test vehicle with TE57 prefix (test vehicles only)

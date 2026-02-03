@@ -337,7 +337,7 @@ export function CategoryDialog({
                   className="bg-input border-border text-white"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Show "Due Soon" alert when this many days before the due date
+                  Show &quot;Due Soon&quot; alert when this many days before the due date
                 </p>
                 {errors.alert_threshold_days && (
                   <p className="text-sm text-red-400">{errors.alert_threshold_days.message}</p>
@@ -356,7 +356,7 @@ export function CategoryDialog({
                   className="bg-input border-border text-white"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Show "Due Soon" alert when this many miles before the due mileage
+                  Show &quot;Due Soon&quot; alert when this many miles before the due mileage
                 </p>
                 {errors.alert_threshold_miles && (
                   <p className="text-sm text-red-400">{errors.alert_threshold_miles.message}</p>

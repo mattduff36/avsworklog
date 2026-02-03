@@ -39,7 +39,7 @@ describe('Actions RLS Policy Fix', () => {
     testUserId = users.id;
 
     // SAFETY: ONLY use test vehicles starting with TE57
-    let vehicle = await supabase
+    const vehicle = await supabase
       .from('vehicles')
       .select('id')
       .ilike('reg_number', 'TE57%')

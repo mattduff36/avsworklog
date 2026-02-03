@@ -41,11 +41,17 @@ export interface VehicleMaintenance {
   mot_due_date: string | null;
   first_aid_kit_expiry: string | null;
   
-  // Mileage-based maintenance
+  // Mileage-based maintenance (vehicles)
   current_mileage: number | null;
   last_service_mileage: number | null;
   next_service_mileage: number | null;
   cambelt_due_mileage: number | null;
+  
+  // Hours-based maintenance (plant machinery)
+  current_hours?: number | null;
+  last_service_hours?: number | null;
+  next_service_hours?: number | null;
+  last_hours_update?: string | null;
   
   // Tracker
   tracker_id: string | null;
@@ -155,10 +161,16 @@ export interface MaintenanceItemStatus {
 export interface VehicleMaintenanceWithStatus extends VehicleMaintenance {
   vehicle?: {
     id: string;
-    reg_number: string;
+    reg_number: string | null;
     category_id: string | null;
     status: string;
     nickname?: string | null;
+    asset_type?: 'vehicle' | 'plant' | 'tool';
+    plant_id?: string | null;
+    serial_number?: string | null;
+    year?: number | null;
+    weight_class?: string | null;
+    vehicle_type?: string | null;
   };
   
   // Last inspection info

@@ -42,9 +42,10 @@ interface ExpandingVehicleCardProps {
   vehicle: Vehicle;
   categories: Category[];
   onUpdate: () => void;
+  fromTab?: 'maintenance' | 'plant' | 'vehicles'; // Tab to return to on back navigation
 }
 
-export function ExpandingVehicleCard({ vehicle, categories, onUpdate }: ExpandingVehicleCardProps) {
+export function ExpandingVehicleCard({ vehicle, categories, onUpdate, fromTab = 'maintenance' }: ExpandingVehicleCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   
@@ -156,7 +157,7 @@ export function ExpandingVehicleCard({ vehicle, categories, onUpdate }: Expandin
           
           <div className="flex items-center gap-2">
             <Link 
-              href={`/fleet/vehicles/${vehicle.id}/history`}
+              href={`/fleet/vehicles/${vehicle.id}/history?fromTab=${fromTab}`}
               onClick={(e) => e.stopPropagation()}
             >
               <Button variant="ghost" size="sm" className="gap-2">

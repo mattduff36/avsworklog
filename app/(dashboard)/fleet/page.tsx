@@ -1,16 +1,55 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
+import dynamic from 'next/dynamic';
 import { useSearchParams, useRouter as useNextRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Loader2, Wrench, Truck, Settings, Tag, Plus, Edit, Trash2, AlertTriangle } from 'lucide-react';
+import { Loader2, Wrench, Truck, Settings, Tag, Plus, Edit, Trash2, AlertTriangle, HardHat } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
 
+// Dynamic import for heavy component - loaded only when Maintenance tab is active
+const MaintenanceOverview = dynamic(
+  () => import('@/app/(dashboard)/maintenance/components/MaintenanceOverview').then(mod => ({ default: mod.MaintenanceOverview })),
+  { 
+    loading: () => (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    ),
+    ssr: false
+  }
+);
+
+// Dynamic import for PlantOverview
+const PlantOverview = dynamic(
+  () => import('@/app/(dashboard)/maintenance/components/PlantOverview').then(mod => ({ default: mod.PlantOverview })),
+  { 
+    loading: () => (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    ),
+    ssr: false
+  }
+);
+
+// Dynamic import for PlantTable
+const PlantTable = dynamic(
+  () => import('@/app/(dashboard)/maintenance/components/PlantTable').then(mod => ({ default: mod.PlantTable })),
+  { 
+    loading: () => (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    ),
+    ssr: false
+  }
+);
+
 // Import existing components
-import { MaintenanceOverview } from '@/app/(dashboard)/maintenance/components/MaintenanceOverview';
 import { MaintenanceTable } from '@/app/(dashboard)/maintenance/components/MaintenanceTable';
 import { MaintenanceSettings } from '@/app/(dashboard)/maintenance/components/MaintenanceSettings';
 import { VehicleCategoryDialog } from './components/VehicleCategoryDialog';
@@ -52,6 +91,7 @@ function FleetContent() {
   
   const [activeTab, setActiveTab] = useState('maintenance'); // Default to maintenance, validate after auth loads
   const [hasModulePermission, setHasModulePermission] = useState<boolean | null>(null);
+  const [maintenanceFilter, setMaintenanceFilter] = useState<'both' | 'vehicle' | 'plant'>('both'); // Filter for maintenance overview
   
   // Vehicle Category Dialog States
   const [addCategoryDialogOpen, setAddCategoryDialogOpen] = useState(false);
@@ -211,7 +251,8 @@ function FleetContent() {
   // Handler for navigating to vehicle history
   const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
     const vehicleId = vehicle.vehicle_id || vehicle.id;
-    router.push(`/fleet/vehicles/${vehicleId}/history`);
+    // Pass the current active tab as fromTab
+    router.push(`/fleet/vehicles/${vehicleId}/history?fromTab=${activeTab}`);
   };
   
   // Vehicle Category Dialog Handlers
@@ -301,10 +342,14 @@ function FleetContent() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
           <TabsTrigger value="maintenance" className="gap-2">
             <Wrench className="h-4 w-4" />
             Maintenance
+          </TabsTrigger>
+          <TabsTrigger value="plant" className="gap-2">
+            <HardHat className="h-4 w-4" />
+            Plant
           </TabsTrigger>
           {canManageVehicles && (
             <>
@@ -337,13 +382,81 @@ function FleetContent() {
               </CardContent>
             </Card>
           ) : (
-            <MaintenanceOverview 
+            <>
+              {/* Filter Buttons - Using Tabs component for consistent styling */}
+              <div className="flex items-center justify-end">
+                <Tabs value={maintenanceFilter} onValueChange={(v) => setMaintenanceFilter(v as 'both' | 'vehicle' | 'plant')}>
+                  <TabsList>
+                    <TabsTrigger value="both" className="gap-2">
+                      <Wrench className="h-4 w-4" />
+                      All Assets
+                    </TabsTrigger>
+                    <TabsTrigger value="vehicle" className="gap-2">
+                      <Truck className="h-4 w-4" />
+                      Vehicles
+                    </TabsTrigger>
+                    <TabsTrigger value="plant" className="gap-2">
+                      <HardHat className="h-4 w-4" />
+                      Plant
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+
+              {(() => {
+                // Filter vehicles based on maintenance filter selection
+                const filteredVehicles = (maintenanceData?.vehicles || []).filter(v => {
+                  if (maintenanceFilter === 'both') return true;
+                  if (maintenanceFilter === 'vehicle') return v.vehicle?.asset_type !== 'plant';
+                  if (maintenanceFilter === 'plant') return v.vehicle?.asset_type === 'plant';
+                  return true;
+                });
+                
+                // Calculate summary based on filtered vehicles
+                const filteredSummary = {
+                  total: filteredVehicles.length,
+                  overdue: filteredVehicles.filter(v => v.overdue_count > 0).length,
+                  due_soon: filteredVehicles.filter(v => v.due_soon_count > 0 && v.overdue_count === 0).length,
+                };
+
+                return (
+                  <MaintenanceOverview 
+                    vehicles={filteredVehicles}
+                    summary={filteredSummary}
+                    onVehicleClick={handleVehicleClick}
+                  />
+                );
+              })()}
+            </>
+          )}
+        </TabsContent>
+
+        {/* Plant Tab */}
+        <TabsContent value="plant" className="space-y-6">
+          {maintenanceLoading ? (
+            <div className="flex items-center justify-center min-h-[400px]">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+            </div>
+          ) : maintenanceError ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <HardHat className="h-16 w-16 text-red-400 mb-4" />
+                <h2 className="text-2xl font-semibold mb-2">Error Loading Plant Data</h2>
+                <p className="text-gray-600 text-center max-w-md">
+                  {maintenanceError?.message || 'Failed to load plant machinery records'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : canManageVehicles ? (
+            <PlantTable 
               vehicles={maintenanceData?.vehicles || []}
-              summary={maintenanceData?.summary || {
-                total: 0,
-                overdue: 0,
-                due_soon: 0,
-              }}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onVehicleAdded={() => {}}
+            />
+          ) : (
+            <PlantOverview 
+              vehicles={maintenanceData?.vehicles || []}
               onVehicleClick={handleVehicleClick}
             />
           )}
@@ -368,7 +481,7 @@ function FleetContent() {
               </Card>
             ) : (
               <MaintenanceTable 
-                vehicles={maintenanceData?.vehicles || []}
+                vehicles={(maintenanceData?.vehicles || []).filter(v => v.vehicle?.asset_type !== 'plant')}
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
                 onVehicleAdded={() => {}}

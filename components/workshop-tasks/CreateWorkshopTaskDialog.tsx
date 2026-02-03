@@ -18,8 +18,10 @@ import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
 
 type Vehicle = {
   id: string;
-  reg_number: string;
+  reg_number: string | null;
+  plant_id: string | null;
   nickname: string | null;
+  asset_type: 'vehicle' | 'plant' | 'tool';
 };
 
 type Category = {
@@ -103,7 +105,7 @@ export function CreateWorkshopTaskDialog({
     try {
       const { data, error } = await supabase
         .from('vehicles')
-        .select('id, reg_number, nickname')
+        .select('id, reg_number, plant_id, nickname, asset_type')
         .eq('status', 'active')
         .order('reg_number');
 
@@ -358,7 +360,7 @@ export function CreateWorkshopTaskDialog({
                           <SelectLabel>Recent</SelectLabel>
                           {recentVehicles.map((vehicle) => (
                             <SelectItem key={vehicle.id} value={vehicle.id}>
-                              {vehicle.reg_number}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
+                              {vehicle.reg_number || vehicle.plant_id}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
                             </SelectItem>
                           ))}
                         </SelectGroup>
@@ -373,7 +375,7 @@ export function CreateWorkshopTaskDialog({
                           )}
                           {otherVehicles.map((vehicle) => (
                             <SelectItem key={vehicle.id} value={vehicle.id}>
-                              {vehicle.reg_number}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
+                              {vehicle.reg_number || vehicle.plant_id}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
                             </SelectItem>
                           ))}
                         </SelectGroup>

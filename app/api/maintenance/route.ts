@@ -80,9 +80,15 @@ export async function GET(request: NextRequest) {
       .select(`
         id,
         reg_number,
+        plant_id,
+        asset_type,
+        serial_number,
+        year,
+        weight_class,
         category_id,
         status,
         nickname,
+        vehicle_type,
         maintenance:vehicle_maintenance(*)
       `)
       .eq('status', 'active');
@@ -134,9 +140,15 @@ export async function GET(request: NextRequest) {
           vehicle: {
             id: v.id,
             reg_number: v.reg_number,
+            plant_id: v.plant_id,
+            asset_type: v.asset_type,
+            serial_number: v.serial_number,
+            year: v.year,
+            weight_class: v.weight_class,
             category_id: v.category_id,
             status: v.status,
-            nickname: v.nickname || null
+            nickname: v.nickname || null,
+            vehicle_type: v.vehicle_type
           },
           last_inspector: v.last_inspector,
           last_inspection_date: v.last_inspection_date,
@@ -196,9 +208,15 @@ export async function GET(request: NextRequest) {
         vehicle: {
           id: v.id,
           reg_number: v.reg_number,
+          plant_id: v.plant_id,
+          asset_type: v.asset_type,
+          serial_number: v.serial_number,
+          year: v.year,
+          weight_class: v.weight_class,
           category_id: v.category_id,
           status: v.status,
-          nickname: v.nickname || null
+          nickname: v.nickname || null,
+          vehicle_type: v.vehicle_type
         },
         last_inspector: v.last_inspector,
         last_inspection_date: v.last_inspection_date,

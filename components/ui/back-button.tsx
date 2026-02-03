@@ -30,11 +30,11 @@ export function BackButton({ className, userRole, fallbackHref }: BackButtonProp
   const searchParams = useSearchParams()
   
   const handleBack = () => {
-    // Get the 'from' query parameter
-    const from = searchParams.get('from')
+    // Get the 'from' or 'fromTab' query parameter
+    const from = searchParams.get('from') || searchParams.get('fromTab')
     
-    // Determine fallback parent
-    const computedFallback = fallbackHref || getParentHref(pathname, userRole)
+    // Determine fallback parent (pass searchParams for context-aware navigation)
+    const computedFallback = fallbackHref || getParentHref(pathname, searchParams, userRole)
     
     // Get safe back href (validates 'from' param)
     const backHref = getBackHref(from, computedFallback)
