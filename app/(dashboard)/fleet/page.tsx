@@ -403,20 +403,30 @@ function FleetContent() {
                 </Tabs>
               </div>
 
-              <MaintenanceOverview 
-                vehicles={(maintenanceData?.vehicles || []).filter(v => {
+              {(() => {
+                // Filter vehicles based on maintenance filter selection
+                const filteredVehicles = (maintenanceData?.vehicles || []).filter(v => {
                   if (maintenanceFilter === 'both') return true;
                   if (maintenanceFilter === 'vehicle') return v.vehicle?.asset_type !== 'plant';
                   if (maintenanceFilter === 'plant') return v.vehicle?.asset_type === 'plant';
                   return true;
-                })}
-                summary={maintenanceData?.summary || {
-                  total: 0,
-                  overdue: 0,
-                  due_soon: 0,
-                }}
-                onVehicleClick={handleVehicleClick}
-              />
+                });
+                
+                // Calculate summary based on filtered vehicles
+                const filteredSummary = {
+                  total: filteredVehicles.length,
+                  overdue: filteredVehicles.filter(v => v.overdue_count > 0).length,
+                  due_soon: filteredVehicles.filter(v => v.due_soon_count > 0 && v.overdue_count === 0).length,
+                };
+
+                return (
+                  <MaintenanceOverview 
+                    vehicles={filteredVehicles}
+                    summary={filteredSummary}
+                    onVehicleClick={handleVehicleClick}
+                  />
+                );
+              })()}
             </>
           )}
         </TabsContent>
