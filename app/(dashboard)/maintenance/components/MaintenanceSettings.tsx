@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, AlertTriangle, Briefcase, Wrench, Bell, Mail, Users } from 'lucide-react';
+import { Plus, Edit, Trash2, AlertTriangle, Briefcase, Wrench, Bell, Mail, Users, ChevronDown } from 'lucide-react';
 import { useMaintenanceCategories, useDeleteCategory } from '@/lib/hooks/useMaintenance';
 import {
   AlertDialog,
@@ -35,6 +35,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recipientsDialogOpen, setRecipientsDialogOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<MaintenanceCategory | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
   
   const categories = categoriesData?.categories || [];
   const canModifySettings = isAdmin || isManager;
@@ -66,19 +67,33 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
     <div className="space-y-6">
       {/* Header */}
       <Card className="border-border">
-        <CardHeader>
+        <CardHeader 
+          className="cursor-pointer hover:bg-slate-800/30 transition-colors"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-white">
-                Maintenance Categories
-              </CardTitle>
-              <CardDescription className="text-muted-foreground">
-                Configure maintenance types and alert thresholds
-              </CardDescription>
+            <div className="flex items-center gap-3 flex-1">
+              <ChevronDown 
+                className={`h-5 w-5 text-muted-foreground transition-transform ${
+                  isExpanded ? 'rotate-180' : ''
+                }`}
+              />
+              <div>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Wrench className="h-5 w-5" />
+                  Maintenance Categories
+                </CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  {categories.length} {categories.length === 1 ? 'category' : 'categories'}
+                </CardDescription>
+              </div>
             </div>
             <Button
               size="sm"
-              onClick={() => setAddDialogOpen(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setAddDialogOpen(true);
+              }}
               className="bg-blue-600 hover:bg-blue-700"
               disabled={!canModifySettings}
             >
@@ -88,7 +103,8 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
           </div>
         </CardHeader>
         
-        <CardContent>
+        {isExpanded && (
+          <CardContent>
           {categories.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No categories configured yet.
@@ -218,6 +234,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
             </div>
           )}
         </CardContent>
+        )}
       </Card>
       
       {/* Info Card */}
