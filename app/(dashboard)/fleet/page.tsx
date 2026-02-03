@@ -273,11 +273,13 @@ function FleetContent() {
   // Handler for navigating to vehicle or plant history
   const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
     const vehicleId = vehicle.vehicle_id || vehicle.id;
-    const assetId = vehicle.plant_id || vehicleId;
     
     // Determine if this is a plant asset or vehicle
-    // Plant assets have plant_id set, or vehicle.asset_type === 'plant'
-    const isPlant = vehicle.plant_id || vehicle.vehicle?.asset_type === 'plant';
+    // Plant assets have plant_id set in the nested vehicle object, or vehicle.asset_type === 'plant'
+    const isPlant = vehicle.vehicle?.plant_id || vehicle.vehicle?.asset_type === 'plant';
+    
+    // Get the correct asset ID - use plant_id if it's a plant asset, otherwise use vehicle_id
+    const assetId = vehicle.vehicle?.plant_id || vehicleId;
     
     // Navigate to appropriate history page
     if (isPlant) {
@@ -693,15 +695,8 @@ function FleetContent() {
                         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                       </div>
                     ) : (() => {
-                      // Plant category names to exclude
-                      const plantCategoryNames = [
-                        'Excavation & Earthmoving',
-                        'Loading & Material Handling',
-                        'Compaction, Crushing & Processing',
-                        'Transport & Utility Vehicles',
-                        'Access & Site Support',
-                        'Unclassified'
-                      ];
+                      // Plant category names to exclude (updated after migration to use 'All plant')
+                      const plantCategoryNames = ['All plant'];
                       const vehicleCategories = categories.filter(c => !plantCategoryNames.includes(c.name));
                       
                       return vehicleCategories.length === 0 ? (
