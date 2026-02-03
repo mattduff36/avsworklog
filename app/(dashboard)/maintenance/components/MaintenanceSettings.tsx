@@ -145,13 +145,13 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                         <TableCell>
                           <div className="flex gap-1">
                             {category.applies_to?.includes('vehicle') && (
-                              <Badge variant="outline" className="text-blue-400 border-blue-400/50" title="Applies to vehicles">
-                                Vehicle
+                              <Badge variant="outline" className="text-blue-400 border-blue-400/50 font-mono" title="Applies to vehicles">
+                                (V)
                               </Badge>
                             )}
                             {category.applies_to?.includes('plant') && (
-                              <Badge variant="outline" className="text-purple-400 border-purple-400/50" title="Applies to plant machinery">
-                                Plant
+                              <Badge variant="outline" className="text-purple-400 border-purple-400/50 font-mono" title="Applies to plant machinery">
+                                (P)
                               </Badge>
                             )}
                             {!category.applies_to || category.applies_to.length === 0 && (
@@ -281,6 +281,17 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
               <p className="mt-2">
                 <strong>Applies To:</strong> Categories can apply to vehicles only, plant only, or both. Hours-based categories typically apply to plant machinery since they track engine operating hours.
               </p>
+              <div className="mt-2 flex items-center gap-4 text-xs">
+                <span className="font-semibold">Key:</span>
+                <span className="flex items-center gap-1">
+                  <span className="font-mono px-1.5 py-0.5 rounded border border-blue-400/50 text-blue-400">(V)</span>
+                  = Vehicle
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="font-mono px-1.5 py-0.5 rounded border border-purple-400/50 text-purple-400">(P)</span>
+                  = Plant
+                </span>
+              </div>
               <p className="mt-2">
                 <strong>Responsibility:</strong> Workshop categories show &quot;Create Task&quot; button; Office categories show &quot;Office Action&quot; with reminders.
               </p>
