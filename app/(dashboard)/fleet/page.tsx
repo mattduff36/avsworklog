@@ -132,6 +132,7 @@ function FleetContent() {
   
   // State for vehicles and categories
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [plantAssets, setPlantAssets] = useState<any[]>([]); // Separate state for plant assets
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   
@@ -152,6 +153,21 @@ function FleetContent() {
       }
     } catch (error) {
       logger.error('Failed to fetch vehicles', error, 'FleetPage');
+    }
+  };
+
+  // Fetch plant assets
+  const fetchPlantAssets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('plant')
+        .select('id, plant_id, nickname, status, category_id, vehicle_categories(name, id)')
+        .eq('status', 'active');
+      
+      if (error) throw error;
+      setPlantAssets(data || []);
+    } catch (error) {
+      logger.error('Failed to fetch plant assets', error, 'FleetPage');
     }
   };
 
@@ -225,6 +241,7 @@ function FleetContent() {
     } else if (activeTab === 'settings') {
       if (categories.length === 0) fetchCategories();
       if (vehicles.length === 0) fetchVehicles(); // Need vehicles for category counts
+      if (plantAssets.length === 0) fetchPlantAssets(); // Need plant assets for category counts
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
@@ -249,6 +266,7 @@ function FleetContent() {
     } else if (value === 'settings') {
       if (categories.length === 0) fetchCategories();
       if (vehicles.length === 0) fetchVehicles(); // Need vehicles for category counts
+      if (plantAssets.length === 0) fetchPlantAssets(); // Need plant assets for category counts
     }
   };
   
@@ -518,14 +536,7 @@ function FleetContent() {
                           </CardTitle>
                           <CardDescription className="text-muted-foreground">
                             {(() => {
-                              const plantCategoryNames = [
-                                'Excavation & Earthmoving',
-                                'Loading & Material Handling',
-                                'Compaction, Crushing & Processing',
-                                'Transport & Utility Vehicles',
-                                'Access & Site Support',
-                                'Unclassified'
-                              ];
+                              const plantCategoryNames = ['All plant'];
                               const plantCategories = categories.filter(c => plantCategoryNames.includes(c.name));
                               return `${plantCategories.length} ${plantCategories.length === 1 ? 'category' : 'categories'}`;
                             })()}
@@ -553,15 +564,8 @@ function FleetContent() {
                           <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                         </div>
                       ) : (() => {
-                        // Plant category names from migration
-                        const plantCategoryNames = [
-                          'Excavation & Earthmoving',
-                          'Loading & Material Handling',
-                          'Compaction, Crushing & Processing',
-                          'Transport & Utility Vehicles',
-                          'Access & Site Support',
-                          'Unclassified'
-                        ];
+                        // Plant category - single "All plant" category after migration
+                        const plantCategoryNames = ['All plant'];
                         const plantCategories = categories.filter(c => plantCategoryNames.includes(c.name));
                         
                         return plantCategories.length === 0 ? (
@@ -588,7 +592,7 @@ function FleetContent() {
                                     <div className="flex items-center gap-4">
                                       <div className="text-right">
                                         <div className="text-2xl font-bold text-orange-400">
-                                          {vehicles.filter(v => v.vehicle_categories?.name === category.name).length}
+                                          {plantAssets.filter(p => p.vehicle_categories?.name === category.name).length}
                                         </div>
                                         <p className="text-xs text-muted-foreground">plant assets</p>
                                       </div>
