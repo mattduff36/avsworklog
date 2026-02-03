@@ -117,7 +117,8 @@ export interface VehicleMaintenance {
 
 export interface MaintenanceHistory {
   id: string;
-  vehicle_id: string;
+  vehicle_id: string | null;
+  plant_id: string | null;
   maintenance_category_id: string | null;
   field_name: string;
   old_value: string | null;
@@ -201,6 +202,9 @@ export interface UpdateMaintenanceRequest {
   next_service_mileage?: number | null;
   last_service_mileage?: number | null;
   cambelt_due_mileage?: number | null;
+  current_hours?: number | null; // For plant machinery
+  last_service_hours?: number | null; // For plant machinery
+  next_service_hours?: number | null; // For plant machinery
   tracker_id?: string | null;
   notes?: string | null;
   comment: string; // Mandatory for audit trail (min 10 chars)

@@ -86,6 +86,30 @@ export function useMaintenanceHistory(vehicleId: string | null) {
 }
 
 // ============================================================================
+// Query: Get maintenance history for a plant
+// ============================================================================
+
+export function usePlantMaintenanceHistory(plantId: string | null) {
+  return useQuery({
+    queryKey: ['maintenance', 'history', 'plant', plantId],
+    queryFn: async () => {
+      if (!plantId) throw new Error('Plant ID is required');
+      
+      const response = await fetch(`/api/maintenance/history/plant/${plantId}`);
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch plant history');
+      }
+      
+      return response.json();
+    },
+    enabled: !!plantId, // Only run if plantId exists
+    staleTime: 1 * 60 * 1000, // 1 minute
+  });
+}
+
+// ============================================================================
 // Mutation: Create maintenance record
 // ============================================================================
 

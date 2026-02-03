@@ -205,8 +205,13 @@ export default function WorkshopTasksPage() {
   const handleTabChange = (newTab: string) => {
     const previousTab = assetTab;
     setAssetTab(newTab as 'vehicle' | 'plant' | 'tools' | 'settings');
-    // Reset filters when switching between vehicle/plant tabs
-    if ((newTab === 'vehicle' || newTab === 'plant') && (previousTab === 'vehicle' || previousTab === 'plant')) {
+    
+    // Reset filters when switching to a different asset type tab (vehicle or plant)
+    // This ensures filters are cleared when:
+    // 1. Switching directly between vehicle/plant tabs
+    // 2. Switching from vehicle/plant to settings/tools and back to the OTHER asset type
+    // 3. Any tab change that results in a different asset type being displayed
+    if ((newTab === 'vehicle' || newTab === 'plant') && previousTab !== newTab) {
       setVehicleFilter('all');
       setStatusFilter('all');
     }
@@ -3013,7 +3018,7 @@ export default function WorkshopTasksPage() {
           <DialogHeader>
             <DialogTitle className="text-foreground text-xl">Create Workshop Task</DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Add a new vehicle repair or maintenance task
+              Add a new {assetTab === 'plant' ? 'plant' : 'vehicle'} repair or maintenance task
             </DialogDescription>
           </DialogHeader>
 

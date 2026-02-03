@@ -270,11 +270,21 @@ function FleetContent() {
     }
   };
   
-  // Handler for navigating to vehicle history
+  // Handler for navigating to vehicle or plant history
   const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
     const vehicleId = vehicle.vehicle_id || vehicle.id;
-    // Pass the current active tab as fromTab
-    router.push(`/fleet/vehicles/${vehicleId}/history?fromTab=${activeTab}`);
+    const assetId = vehicle.plant_id || vehicleId;
+    
+    // Determine if this is a plant asset or vehicle
+    // Plant assets have plant_id set, or vehicle.asset_type === 'plant'
+    const isPlant = vehicle.plant_id || vehicle.vehicle?.asset_type === 'plant';
+    
+    // Navigate to appropriate history page
+    if (isPlant) {
+      router.push(`/fleet/plant/${assetId}/history?fromTab=${activeTab}`);
+    } else {
+      router.push(`/fleet/vehicles/${assetId}/history?fromTab=${activeTab}`);
+    }
   };
   
   // Vehicle Category Dialog Handlers

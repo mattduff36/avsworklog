@@ -283,7 +283,8 @@ export interface Database {
       maintenance_history: {
         Row: {
           id: string
-          vehicle_id: string
+          vehicle_id: string | null
+          plant_id: string | null
           maintenance_category_id: string | null
           field_name: string
           old_value: string | null
@@ -296,7 +297,8 @@ export interface Database {
         }
         Insert: {
           id?: string
-          vehicle_id: string
+          vehicle_id?: string | null
+          plant_id?: string | null
           maintenance_category_id?: string | null
           field_name: string
           old_value?: string | null
@@ -309,7 +311,8 @@ export interface Database {
         }
         Update: {
           id?: string
-          vehicle_id?: string
+          vehicle_id?: string | null
+          plant_id?: string | null
           maintenance_category_id?: string | null
           field_name?: string
           old_value?: string | null

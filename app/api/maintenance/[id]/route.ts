@@ -163,6 +163,44 @@ export async function PUT(
       }
     }
     
+    // Hours-based fields for plant machinery
+    if (body.current_hours !== undefined) {
+      updates.current_hours = body.current_hours;
+      updates.last_hours_update = new Date().toISOString();
+      if (currentRecord.current_hours !== body.current_hours) {
+        changedFields.push({
+          field_name: 'current_hours',
+          old_value: currentRecord.current_hours?.toString() || null,
+          new_value: body.current_hours?.toString() || null,
+          value_type: 'text'
+        });
+      }
+    }
+    
+    if (body.last_service_hours !== undefined) {
+      updates.last_service_hours = body.last_service_hours;
+      if (currentRecord.last_service_hours !== body.last_service_hours) {
+        changedFields.push({
+          field_name: 'last_service_hours',
+          old_value: currentRecord.last_service_hours?.toString() || null,
+          new_value: body.last_service_hours?.toString() || null,
+          value_type: 'text'
+        });
+      }
+    }
+    
+    if (body.next_service_hours !== undefined) {
+      updates.next_service_hours = body.next_service_hours;
+      if (currentRecord.next_service_hours !== body.next_service_hours) {
+        changedFields.push({
+          field_name: 'next_service_hours',
+          old_value: currentRecord.next_service_hours?.toString() || null,
+          new_value: body.next_service_hours?.toString() || null,
+          value_type: 'text'
+        });
+      }
+    }
+    
     if (body.tracker_id !== undefined) {
       updates.tracker_id = body.tracker_id;
       if (currentRecord.tracker_id !== body.tracker_id) {
@@ -194,6 +232,7 @@ export async function PUT(
         .from('maintenance_history')
         .insert({
           vehicle_id: currentRecord.vehicle_id,
+          plant_id: currentRecord.plant_id,
           field_name: 'no_changes',
           old_value: null,
           new_value: null,
@@ -226,6 +265,7 @@ export async function PUT(
     // Create history entries for all changed fields
     const historyEntries = changedFields.map(change => ({
       vehicle_id: currentRecord.vehicle_id,
+      plant_id: currentRecord.plant_id,
       field_name: change.field_name,
       old_value: change.old_value,
       new_value: change.new_value,

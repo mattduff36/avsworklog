@@ -11,27 +11,26 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Wrench, 
-  ClipboardCheck, 
   FileText, 
   MessageSquare,
   Calendar,
   AlertTriangle,
-  CheckCircle,
-  XCircle,
-  ChevronDown,
-  ChevronUp,
-  Gauge,
   HardHat,
   Loader2,
-  Edit
+  Edit,
+  Paperclip
 } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
 import { formatRelativeTime } from '@/lib/utils/date';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
+import { usePlantMaintenanceHistory } from '@/lib/hooks/useMaintenance';
+import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
 
-// Dynamic imports
+// Dynamic imports for dialog components
+const EditPlantRecordDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/EditPlantRecordDialog').then(m => ({ default: m.EditPlantRecordDialog })), { ssr: false });
+const DeletePlantDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/DeletePlantDialog').then(m => ({ default: m.DeletePlantDialog })), { ssr: false });
 const WorkshopTaskHistoryCard = dynamic(() => import('@/components/workshop-tasks/WorkshopTaskHistoryCard').then(m => ({ default: m.WorkshopTaskHistoryCard })), { ssr: false });
-const EditMaintenanceDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/EditMaintenanceDialog').then(m => ({ default: m.EditMaintenanceDialog })), { ssr: false });
 
 type Plant = {
   id: string;
@@ -42,12 +41,36 @@ type Plant = {
   serial_number: string | null;
   year: number | null;
   weight_class: string | null;
-  status: string;
-  current_hours: number | null;
+  category_id: string;
   loler_due_date: string | null;
   loler_last_inspection_date: string | null;
   loler_certificate_number: string | null;
   loler_inspection_interval_months: number;
+  current_hours: number | null;
+  status: 'active' | 'inactive' | 'maintenance' | 'retired';
+  reg_number: string | null;
+  vehicle_categories?: { name: string } | null;
+};
+
+type MaintenanceRecord = {
+  id: string | null;
+  plant_id: string;
+  current_hours: number | null;
+  last_service_hours: number | null;
+  next_service_hours: number | null;
+  tracker_id: string | null;
+  last_hours_update: string | null;
+};
+
+type MaintenanceHistoryEntry = {
+  id: string;
+  created_at: string;
+  updated_by: string | null;
+  updated_by_name: string | null;
+  field_name: string;
+  old_value: string | null;
+  new_value: string | null;
+  comment: string;
 };
 
 type WorkshopTask = {
@@ -64,6 +87,13 @@ type WorkshopTask = {
   actioned_at: string | null;
   actioned_by: string | null;
   actioned_comment: string | null;
+  status_history?: Array<{
+    status: string;
+    timestamp: string;
+    userId: string;
+    userName: string;
+    comment?: string;
+  }> | null;
   created_at: string;
   created_by: string;
   workshop_task_categories: {
@@ -72,16 +102,172 @@ type WorkshopTask = {
     slug: string | null;
     ui_color: string | null;
   } | null;
-  workshop_task_subcategories: {
-    id: string;
-    name: string;
-    slug: string;
-    ui_color: string | null;
-  } | null;
   profiles_created: {
     full_name: string;
   } | null;
 };
+
+type TaskAttachment = {
+  id: string;
+  task_id: string;
+  created_at: string;
+  workshop_attachment_templates: {
+    name: string;
+    description: string | null;
+  } | null;
+};
+
+function DocumentsTabContent({ plantId, workshopTasks }: { plantId: string; workshopTasks: WorkshopTask[] }) {
+  const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAttachments = async () => {
+      try {
+        setLoading(true);
+        const taskIds = workshopTasks.map(t => t.id);
+        
+        if (taskIds.length === 0) {
+          setAttachments([]);
+          return;
+        }
+
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from('workshop_task_attachments')
+          .select(`
+            id,
+            task_id,
+            created_at,
+            workshop_attachment_templates (
+              name,
+              description
+            )
+          `)
+          .in('task_id', taskIds)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setAttachments(data || []);
+      } catch (error) {
+        console.error('Error fetching attachments:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAttachments();
+  }, [workshopTasks]);
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map(i => (
+          <Skeleton key={i} className="h-20 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  if (attachments.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <FileText className="h-16 w-16 text-slate-400 mx-auto mb-4 opacity-50" />
+        <h3 className="text-lg font-semibold text-white mb-2">No Documents Yet</h3>
+        <p className="text-slate-400 mb-4">
+          No workshop task attachments found for this plant machinery
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Attachments will appear here when added to workshop tasks
+        </p>
+      </div>
+    );
+  }
+
+  // Group attachments by task
+  const attachmentsByTask = attachments.reduce((acc, att) => {
+    if (!acc[att.task_id]) {
+      acc[att.task_id] = [];
+    }
+    acc[att.task_id].push(att);
+    return acc;
+  }, {} as Record<string, TaskAttachment[]>);
+
+  return (
+    <div className="space-y-4">
+      {Object.entries(attachmentsByTask).map(([taskId, taskAttachments]) => {
+        const task = workshopTasks.find(t => t.id === taskId);
+        if (!task) return null;
+
+        return (
+          <Card key={taskId} className="bg-slate-800/30 border-slate-700">
+            <CardContent className="pt-6">
+              <div className="space-y-3">
+                {/* Task Header */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Wrench className="h-4 w-4 text-workshop" />
+                      <h4 className="font-medium text-white">
+                        {task.workshop_task_categories?.name || 'Workshop Task'}
+                      </h4>
+                      <Badge 
+                        variant="outline" 
+                        className={
+                          task.status === 'completed' 
+                            ? 'bg-green-500/10 text-green-300 border-green-500/30'
+                            : 'bg-blue-500/10 text-blue-300 border-blue-500/30'
+                        }
+                      >
+                        {task.status === 'completed' ? 'Completed' : 'In Progress'}
+                      </Badge>
+                    </div>
+                    {task.workshop_comments && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {task.workshop_comments}
+                      </p>
+                    )}
+                  </div>
+                  <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30">
+                    <Paperclip className="h-3 w-3 mr-1" />
+                    {taskAttachments.length}
+                  </Badge>
+                </div>
+
+                {/* Attachments List */}
+                <div className="space-y-2 pl-6 border-l-2 border-slate-700">
+                  {taskAttachments.map(attachment => (
+                    <div 
+                      key={attachment.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-5 w-5 text-blue-400" />
+                        <div>
+                          <p className="text-sm font-medium text-white">
+                            {attachment.workshop_attachment_templates?.name || 'Attachment'}
+                          </p>
+                          {attachment.workshop_attachment_templates?.description && (
+                            <p className="text-xs text-muted-foreground">
+                              {attachment.workshop_attachment_templates.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(attachment.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function PlantHistoryPage({
   params,
@@ -90,59 +276,49 @@ export default function PlantHistoryPage({
 }) {
   const unwrappedParams = use(params);
   const router = useRouter();
+  const { user } = useAuth();
   const supabase = createClient();
-  const { profile, loading: authLoading } = useAuth();
   
   const [plant, setPlant] = useState<Plant | null>(null);
-  const [workshopTasks, setWorkshopTasks] = useState<WorkshopTask[]>([]);
+  const [maintenanceRecord, setMaintenanceRecord] = useState<MaintenanceRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('maintenance');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [maintenanceRecord, setMaintenanceRecord] = useState<any>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [showWorkshopTasks, setShowWorkshopTasks] = useState(true);
+  const [showRecordUpdates, setShowRecordUpdates] = useState(true);
+
+  // Use the plant history hook
+  const { data: historyData, refetch: refetchHistory } = usePlantMaintenanceHistory(unwrappedParams.plantId);
+
+  const workshopTasks = historyData?.workshopTasks || [];
+  const maintenanceHistory = historyData?.history || [];
+
+  // Fetch comments for all workshop tasks
+  const { comments: taskComments } = useWorkshopTaskComments({
+    taskIds: workshopTasks.map(t => t.id),
+    enabled: workshopTasks.length > 0
+  });
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!profile) {
-      router.push('/login');
-      return;
+    if (user && unwrappedParams.plantId) {
+      fetchPlantData();
+      fetchMaintenanceRecord();
     }
-
-    fetchPlantData();
-    fetchWorkshopTasks();
-    fetchMaintenanceRecord();
-  }, [unwrappedParams.plantId, profile, authLoading]);
-
-  const fetchMaintenanceRecord = async () => {
-    try {
-      // Fetch maintenance record via API to get computed status fields
-      const response = await fetch('/api/maintenance');
-      
-      if (!response.ok) {
-        console.error('Maintenance API error:', response.status, response.statusText);
-        return;
-      }
-
-      const result = await response.json();
-      
-      if (result.success) {
-        const plantMaintenance = result.vehicles.find(
-          (v: any) => v.plant_id === unwrappedParams.plantId
-        );
-        
-        if (plantMaintenance) {
-          setMaintenanceRecord(plantMaintenance);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching maintenance record:', error);
-    }
-  };
+  }, [user, unwrappedParams.plantId]);
 
   const fetchPlantData = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('plant')
-        .select('*')
+        .select(`
+          *,
+          vehicle_categories (
+            name
+          )
+        `)
         .eq('id', unwrappedParams.plantId)
         .single();
 
@@ -155,76 +331,54 @@ export default function PlantHistoryPage({
     }
   };
 
-  const fetchWorkshopTasks = async () => {
+  const fetchMaintenanceRecord = async () => {
     try {
       const { data, error } = await supabase
-        .from('actions')
-        .select(`
-          id,
-          action_type,
-          title,
-          description,
-          status,
-          priority,
-          workshop_comments,
-          logged_at,
-          logged_by,
-          logged_comment,
-          actioned_at,
-          actioned_by,
-          actioned_comment,
-          created_at,
-          created_by,
-          workshop_task_categories (
-            id,
-            name,
-            slug,
-            ui_color
-          ),
-          workshop_task_subcategories (
-            id,
-            name,
-            slug,
-            ui_color
-          ),
-          profiles_created:profiles!created_by (
-            full_name
-          )
-        `)
+        .from('vehicle_maintenance')
+        .select('*')
         .eq('plant_id', unwrappedParams.plantId)
-        .order('created_at', { ascending: false });
+        .maybeSingle();
 
-      if (error) throw error;
-      setWorkshopTasks(data as any || []);
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      setMaintenanceRecord(data);
     } catch (err) {
-      console.error('Error fetching workshop tasks:', err);
+      console.error('Error fetching maintenance record:', err);
     }
   };
 
-  if (loading || authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
-  if (!plant) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
-        <HardHat className="h-16 w-16 text-muted-foreground" />
-        <p className="text-xl">Plant machinery not found</p>
-        <BackButton />
-      </div>
-    );
-  }
-
-  const getAssetDisplay = () => {
-    if (plant.nickname) {
-      return `${plant.plant_id} (${plant.nickname})`;
-    }
-    return plant.plant_id;
+  const getFieldLabel = (fieldName: string): string => {
+    const labels: Record<string, string> = {
+      current_hours: 'Current Hours',
+      last_service_hours: 'Last Service Hours',
+      next_service_hours: 'Next Service Hours',
+      loler_due_date: 'LOLER Due Date',
+      loler_last_inspection_date: 'LOLER Last Inspection',
+      loler_certificate_number: 'LOLER Certificate',
+      loler_inspection_interval_months: 'LOLER Interval',
+      tracker_id: 'GPS Tracker',
+    };
+    return labels[fieldName] || fieldName.replace(/_/g, ' ');
   };
+
+  if (!plant && !loading) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertTriangle className="h-16 w-16 text-red-400 mb-4" />
+            <h2 className="text-2xl font-semibold mb-2">Plant Not Found</h2>
+            <p className="text-gray-600 text-center max-w-md mb-4">
+              The requested plant machinery could not be found.
+            </p>
+            <BackButton />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -234,95 +388,102 @@ export default function PlantHistoryPage({
           <BackButton />
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              {plant.plant_id}
-              {plant.nickname && <span className="text-muted-foreground ml-2">({plant.nickname})</span>}
+              {plant?.plant_id || <Skeleton className="h-8 w-32" />}
+              {plant?.nickname && <span className="text-muted-foreground ml-2">({plant.nickname})</span>}
             </h1>
             <p className="text-muted-foreground mt-1">
               Plant Machinery History & Records
             </p>
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setEditDialogOpen(true)}
-          className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white"
-        >
-          <Edit className="h-4 w-4 mr-2" />
-          Edit Plant Record
-        </Button>
+        {plant && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEditDialogOpen(true)}
+            className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white"
+          >
+            <Edit className="h-4 w-4 mr-2" />
+            Edit Plant Record
+          </Button>
+        )}
       </div>
 
-      {/* Quick Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Gauge className="h-4 w-4" />
-              Current Hours
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">
-              {plant.current_hours?.toLocaleString() ?? 'N/A'}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              LOLER Due Date
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">
-              {plant.loler_due_date 
-                ? new Date(plant.loler_due_date).toLocaleDateString()
-                : 'Not Set'}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Details
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1 text-sm">
-              {plant.make && <p>Make: {plant.make}</p>}
-              {plant.model && <p>Model: {plant.model}</p>}
-              {plant.serial_number && <p>Serial: {plant.serial_number}</p>}
+      {/* Plant Details Section - matching vehicle history layout */}
+      {plant && (
+        <Card className="bg-gradient-to-r from-amber-900/20 to-amber-800/10 border-amber-700/30">
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
+              {/* Registration (if exists) */}
+              {plant.reg_number && (
+                <div>
+                  <span className="text-muted-foreground">Registration:</span>
+                  <span className="ml-2 text-white font-medium">{plant.reg_number}</span>
+                </div>
+              )}
+              
+              {/* Serial Number */}
+              {plant.serial_number && (
+                <div>
+                  <span className="text-muted-foreground">Serial Number:</span>
+                  <span className="ml-2 text-white font-medium">{plant.serial_number}</span>
+                </div>
+              )}
+              
+              {/* Year */}
+              {plant.year && (
+                <div>
+                  <span className="text-muted-foreground">Year:</span>
+                  <span className="ml-2 text-white font-medium">{plant.year}</span>
+                </div>
+              )}
+              
+              {/* Weight Class */}
+              {plant.weight_class && (
+                <div>
+                  <span className="text-muted-foreground">Weight Class:</span>
+                  <span className="ml-2 text-white font-medium">{plant.weight_class}</span>
+                </div>
+              )}
+              
+              {/* Category */}
+              {plant.vehicle_categories?.name && (
+                <div>
+                  <span className="text-muted-foreground">Category:</span>
+                  <span className="ml-2 text-white font-medium">{plant.vehicle_categories.name}</span>
+                </div>
+              )}
+              
+              {/* Make */}
+              {plant.make && (
+                <div>
+                  <span className="text-muted-foreground">Make:</span>
+                  <span className="ml-2 text-white font-medium">{plant.make}</span>
+                </div>
+              )}
+              
+              {/* Model */}
+              {plant.model && (
+                <div>
+                  <span className="text-muted-foreground">Model:</span>
+                  <span className="ml-2 text-white font-medium">{plant.model}</span>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
-      </div>
+      )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className={`grid w-full ${plant.reg_number ? 'grid-cols-5' : 'grid-cols-4'} lg:w-auto lg:inline-grid`}>
+        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
           <TabsTrigger value="maintenance" className="gap-2">
             <Wrench className="h-4 w-4" />
             History
           </TabsTrigger>
-          {/* Only show MOT tab if plant has reg_number */}
-          {plant.reg_number && (
-            <TabsTrigger value="mot" className="gap-2">
-              <ClipboardCheck className="h-4 w-4" />
-              MOT
-            </TabsTrigger>
-          )}
           <TabsTrigger value="documents" className="gap-2">
             <FileText className="h-4 w-4" />
             Documents
-          </TabsTrigger>
-          <TabsTrigger value="loler" className="gap-2">
-            <Calendar className="h-4 w-4" />
-            LOLER
           </TabsTrigger>
           <TabsTrigger value="notes" className="gap-2">
             <MessageSquare className="h-4 w-4" />
@@ -330,177 +491,176 @@ export default function PlantHistoryPage({
           </TabsTrigger>
         </TabsList>
 
-        {/* History Tab - Service Information */}
-        <TabsContent value="maintenance" className="space-y-4">
-          {/* Service Info Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Current Hours */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Gauge className="h-4 w-4" />
-                  Current Hours
-                </CardTitle>
+        {/* Maintenance Tab */}
+        <TabsContent value="maintenance" className="space-y-6">
+          {/* Service Information Summary - matching vehicle history */}
+          {(maintenanceRecord || plant) && (
+            <Card className="bg-slate-800/50 border-border">
+              <CardHeader>
+                <CardTitle>Service Information</CardTitle>
+                <CardDescription>Current maintenance status and schedules</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">
-                  {maintenanceRecord?.current_hours?.toLocaleString() || plant.current_hours?.toLocaleString() || 'N/A'}
-                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {/* Current Hours */}
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">Current Hours</span>
+                    <p className="text-lg font-semibold text-white">
+                      {maintenanceRecord?.current_hours || plant?.current_hours ? `${maintenanceRecord?.current_hours || plant?.current_hours}h` : 'Not Set'}
+                    </p>
+                  </div>
+
+                  {/* Next Service Hours */}
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">Next Service</span>
+                    <p className="text-lg font-semibold text-white">
+                      {maintenanceRecord?.next_service_hours 
+                        ? `${maintenanceRecord.next_service_hours}h` 
+                        : 'Not Set'}
+                    </p>
+                  </div>
+
+                  {/* Last Service Hours */}
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">Last Service</span>
+                    <p className="text-lg font-semibold text-white">
+                      {maintenanceRecord?.last_service_hours 
+                        ? `${maintenanceRecord.last_service_hours}h` 
+                        : 'Not Set'}
+                    </p>
+                  </div>
+
+                  {/* LOLER Due Date */}
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">LOLER Due</span>
+                    <p className="text-lg font-semibold text-white">
+                      {formatMaintenanceDate(plant?.loler_due_date)}
+                    </p>
+                  </div>
+
+                  {/* Tracker ID */}
+                  {maintenanceRecord?.tracker_id && (
+                    <div className="space-y-1">
+                      <span className="text-xs text-slate-400 uppercase tracking-wide">GPS Tracker</span>
+                      <p className="text-lg font-semibold text-white">
+                        {maintenanceRecord.tracker_id}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
+          )}
 
-            {/* Next Service */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Wrench className="h-4 w-4" />
-                  Next Service
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">
-                  {maintenanceRecord?.next_service_hours?.toLocaleString() || 'Not Set'}
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Last Service */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Last Service
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">
-                  {maintenanceRecord?.last_service_hours?.toLocaleString() || 'N/A'}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Workshop Tasks - Reuse existing workshop tasks card */}
-          <Card>
+          <Card className="bg-slate-800/50 border-border">
             <CardHeader>
-              <CardTitle>Workshop Task History</CardTitle>
-              <CardDescription>
-                All workshop tasks and maintenance for this plant machinery
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Maintenance & Workshop History</CardTitle>
+                  <CardDescription>
+                    Complete timeline of maintenance updates and workshop tasks
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowWorkshopTasks(!showWorkshopTasks)}
+                    className={`h-8 w-8 p-0 transition-all ${
+                      showWorkshopTasks
+                        ? 'bg-workshop/20 hover:bg-workshop/30 border-workshop text-workshop'
+                        : 'bg-muted/50 hover:bg-muted border-border text-muted-foreground'
+                    }`}
+                    title="Toggle Workshop Tasks"
+                  >
+                    <Wrench className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowRecordUpdates(!showRecordUpdates)}
+                    className={`h-8 w-8 p-0 transition-all ${
+                      showRecordUpdates
+                        ? 'bg-blue-500/20 hover:bg-blue-500/30 border-blue-500 text-blue-400'
+                        : 'bg-muted/50 hover:bg-muted border-border text-muted-foreground'
+                    }`}
+                    title="Toggle Record Updates"
+                  >
+                    <Calendar className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              {workshopTasks.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Wrench className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No workshop tasks recorded</p>
+              {loading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map(i => (
+                    <Skeleton key={i} className="h-32 w-full" />
+                  ))}
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {workshopTasks.map((task) => (
-                    <WorkshopTaskHistoryCard key={task.id} task={task} />
+                  {/* Workshop Tasks */}
+                  {showWorkshopTasks && workshopTasks.map((task) => (
+                    <WorkshopTaskHistoryCard
+                      key={task.id}
+                      task={task}
+                      comments={taskComments[task.id] || []}
+                      defaultExpanded={expandedTasks.has(task.id)}
+                      onToggle={(taskId, isExpanded) => {
+                        setExpandedTasks(prev => {
+                          const newSet = new Set(prev);
+                          if (isExpanded) {
+                            newSet.add(taskId);
+                          } else {
+                            newSet.delete(taskId);
+                          }
+                          return newSet;
+                        });
+                      }}
+                    />
                   ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        {/* MOT Tab - Only shown if plant has reg_number */}
-        {plant.reg_number && (
-          <TabsContent value="mot" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>MOT Information</CardTitle>
-                <CardDescription>
-                  MOT history and details for road-legal plant machinery
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <ClipboardCheck className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>MOT details for {plant.reg_number}</p>
-                  <p className="text-sm mt-2">MOT integration coming soon</p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
+                  {/* Maintenance History Entries */}
+                  {showRecordUpdates && maintenanceHistory.map((entry) => (
+                    <Card key={entry.id} className="bg-slate-800/50 border-slate-700 border-l-4 border-l-blue-500">
+                      <CardContent className="pt-6">
+                        <div className="flex items-start gap-3">
+                          <Calendar className="h-5 w-5 text-blue-400 mt-0.5" />
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-medium">{entry.updated_by_name || 'System'}</span>
+                              <span className="text-xs text-muted-foreground">updated</span>
+                              <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30">
+                                {getFieldLabel(entry.field_name)}
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              <span className="line-through">{entry.old_value || 'None'}</span>
+                              {' → '}
+                              <span className="text-slate-200">{entry.new_value || 'None'}</span>
+                            </div>
+                            {entry.comment && (
+                              <p className="text-sm text-muted-foreground italic">&quot;{entry.comment}&quot;</p>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              {formatRelativeTime(entry.created_at)}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
 
-        {/* Documents Tab */}
-        <TabsContent value="documents" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Documents & Attachments</CardTitle>
-              <CardDescription>
-                Workshop task attachments and related documents
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12">
-                <FileText className="h-16 w-16 text-slate-400 mx-auto mb-4 opacity-50" />
-                <h3 className="text-lg font-semibold text-white mb-2">No Documents Yet</h3>
-                <p className="text-slate-400 mb-4">
-                  No workshop task attachments found for this plant machinery
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Attachments will appear here when added to workshop tasks
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* LOLER Tab */}
-        <TabsContent value="loler" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>LOLER Compliance</CardTitle>
-              <CardDescription>
-                Lifting Operations and Lifting Equipment Regulations 1998
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Last Inspection Date</p>
-                <p className="font-medium text-lg">
-                  {plant.loler_last_inspection_date 
-                    ? new Date(plant.loler_last_inspection_date).toLocaleDateString()
-                    : 'Not recorded'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Next Inspection Due</p>
-                <p className="font-medium text-lg">
-                  {plant.loler_due_date 
-                    ? new Date(plant.loler_due_date).toLocaleDateString()
-                    : 'Not set'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Inspection Interval</p>
-                <p className="font-medium text-lg">
-                  {plant.loler_inspection_interval_months} months
-                </p>
-              </div>
-              {plant.loler_certificate_number && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Certificate Number</p>
-                  <p className="font-medium text-lg">{plant.loler_certificate_number}</p>
-                </div>
-              )}
-              
-              {plant.loler_due_date && (
-                <div className="pt-4 border-t">
-                  {new Date(plant.loler_due_date) < new Date() ? (
-                    <Badge variant="destructive" className="text-base px-4 py-2">
-                      <AlertTriangle className="h-4 w-4 mr-2" />
-                      LOLER Inspection Overdue
-                    </Badge>
-                  ) : (
-                    <Badge variant="default" className="text-base px-4 py-2">
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      LOLER Compliant
-                    </Badge>
+                  {(!showWorkshopTasks || workshopTasks.length === 0) && (!showRecordUpdates || maintenanceHistory.length === 0) && (
+                    <div className="text-center py-12">
+                      <Wrench className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600">
+                        {!showWorkshopTasks && !showRecordUpdates 
+                          ? 'Enable filters to view history' 
+                          : 'No maintenance history yet'}
+                      </p>
+                    </div>
                   )}
                 </div>
               )}
@@ -508,84 +668,90 @@ export default function PlantHistoryPage({
           </Card>
         </TabsContent>
 
-        {/* Notes Tab */}
-        <TabsContent value="notes" className="space-y-4">
-          <Card>
+        {/* Documents Tab */}
+        <TabsContent value="documents" className="space-y-4">
+          <Card className="bg-slate-800/50 border-border">
             <CardHeader>
-              <CardTitle>Plant Notes</CardTitle>
-              <CardDescription>
-                Additional notes and information for this plant machinery
-              </CardDescription>
+              <CardTitle>Workshop Task Attachments</CardTitle>
+              <CardDescription>Documents and forms attached to workshop tasks for this plant machinery</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {/* Plant Details */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-3">Plant Details</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Plant ID</p>
-                      <p className="font-medium">{plant.plant_id}</p>
-                    </div>
-                    {plant.nickname && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Nickname</p>
-                        <p className="font-medium">{plant.nickname}</p>
-                      </div>
-                    )}
-                    {plant.make && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Make</p>
-                        <p className="font-medium">{plant.make}</p>
-                      </div>
-                    )}
-                    {plant.model && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Model</p>
-                        <p className="font-medium">{plant.model}</p>
-                      </div>
-                    )}
-                    {plant.serial_number && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Serial Number</p>
-                        <p className="font-medium">{plant.serial_number}</p>
-                      </div>
-                    )}
-                    {plant.year && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Year</p>
-                        <p className="font-medium">{plant.year}</p>
-                      </div>
-                    )}
-                    {plant.weight_class && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Weight Class</p>
-                        <p className="font-medium">{plant.weight_class}</p>
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-sm text-muted-foreground">Status</p>
-                      <Badge variant={plant.status === 'active' ? 'default' : 'secondary'}>
-                        {plant.status}
-                      </Badge>
-                    </div>
-                  </div>
+              {loading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map(i => (
+                    <Skeleton key={i} className="h-20 w-full" />
+                  ))}
                 </div>
+              ) : workshopTasks.length === 0 ? (
+                <div className="text-center py-12">
+                  <FileText className="h-16 w-16 text-slate-400 mx-auto mb-4 opacity-50" />
+                  <h3 className="text-lg font-semibold text-white mb-2">No Documents Yet</h3>
+                  <p className="text-slate-400 mb-4">
+                    No workshop tasks with attachments found for this plant machinery
+                  </p>
+                </div>
+              ) : (
+                <DocumentsTabContent plantId={unwrappedParams.plantId} workshopTasks={workshopTasks} />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Notes Tab */}
+        <TabsContent value="notes">
+          <Card className="bg-slate-800/50 border-border">
+            <CardHeader>
+              <CardTitle>Plant Notes</CardTitle>
+              <CardDescription>General notes and comments about this plant machinery</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12">
+                <MessageSquare className="h-16 w-16 text-slate-400 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-semibold text-white mb-2">Coming Soon</h3>
+                <p className="text-slate-400 mb-4">
+                  Plant notes feature will be implemented in a future update
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  This will allow you to add and view general notes about this plant machinery
+                </p>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      {/* Edit Maintenance Dialog */}
-      {maintenanceRecord && (
-        <EditMaintenanceDialog
+      {/* Edit Plant Record Dialog */}
+      {plant && (
+        <EditPlantRecordDialog
           open={editDialogOpen}
           onOpenChange={setEditDialogOpen}
+          plant={plant}
           maintenanceRecord={maintenanceRecord}
           onSuccess={() => {
-            fetchMaintenanceRecord();
+            setEditDialogOpen(false);
             fetchPlantData();
+            fetchMaintenanceRecord();
+            refetchHistory();
+          }}
+          onRetire={() => {
+            setDeleteDialogOpen(true);
+          }}
+        />
+      )}
+
+      {/* Delete Plant Dialog */}
+      {plant && (
+        <DeletePlantDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          plant={{
+            id: plant.id,
+            plant_id: plant.plant_id,
+            nickname: plant.nickname,
+            vehicle_categories: plant.vehicle_categories
+          }}
+          onSuccess={() => {
+            router.push('/fleet?tab=plant');
           }}
         />
       )}
