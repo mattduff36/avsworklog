@@ -70,8 +70,9 @@ export function CreateWorkshopTaskDialog({
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState('');
   const [workshopComments, setWorkshopComments] = useState('');
-  const [newMileage, setNewMileage] = useState('');
-  const [currentMileage, setCurrentMileage] = useState<number | null>(null);
+  const [newMeterReading, setNewMeterReading] = useState('');
+  const [currentMeterReading, setCurrentMeterReading] = useState<number | null>(null);
+  const [meterReadingType, setMeterReadingType] = useState<'mileage' | 'hours'>('mileage');
   const [submitting, setSubmitting] = useState(false);
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
   
@@ -93,7 +94,7 @@ export function CreateWorkshopTaskDialog({
       // Set initial values if provided
       if (initialVehicleId) {
         setSelectedVehicleId(initialVehicleId);
-        fetchCurrentMileage(initialVehicleId);
+        fetchCurrentMeterReading(initialVehicleId);
       }
       if (initialCategoryId) {
         setSelectedCategoryId(initialCategoryId);
@@ -148,27 +149,39 @@ export function CreateWorkshopTaskDialog({
     }
   };
 
-  const fetchCurrentMileage = async (vehicleId: string) => {
+  const fetchCurrentMeterReading = async (vehicleId: string) => {
     try {
+      // First get the vehicle to check asset_type
+      const { data: vehicleData, error: vehicleError } = await supabase
+        .from('vehicles')
+        .select('asset_type')
+        .eq('id', vehicleId)
+        .single();
+
+      if (vehicleError) throw vehicleError;
+
+      const isPlant = vehicleData?.asset_type === 'plant';
+      setMeterReadingType(isPlant ? 'hours' : 'mileage');
+
       const { data, error } = await supabase
         .from('vehicle_maintenance')
-        .select('current_mileage')
+        .select(isPlant ? 'current_hours' : 'current_mileage')
         .eq('vehicle_id', vehicleId)
         .single();
 
       if (error) {
         // If no maintenance record exists, set to null
         if (error.code === 'PGRST116') {
-          setCurrentMileage(null);
+          setCurrentMeterReading(null);
           return;
         }
         throw error;
       }
 
-      setCurrentMileage(data?.current_mileage || null);
+      setCurrentMeterReading(isPlant ? (data?.current_hours || null) : (data?.current_mileage || null));
     } catch (err) {
-      console.error('Error fetching current mileage:', err);
-      setCurrentMileage(null);
+      console.error('Error fetching current meter reading:', err);
+      setCurrentMeterReading(null);
     }
   };
 
@@ -190,7 +203,7 @@ export function CreateWorkshopTaskDialog({
       return;
     }
 
-    if (!selectedVehicleId || !selectedSubcategoryId || !workshopComments.trim() || !newMileage.trim()) {
+    if (!selectedVehicleId || !selectedSubcategoryId || !workshopComments.trim() || !newMeterReading.trim()) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -200,15 +213,16 @@ export function CreateWorkshopTaskDialog({
       return;
     }
 
-    const mileageValue = parseInt(newMileage);
-    if (isNaN(mileageValue) || mileageValue < 0) {
-      toast.error('Please enter a valid mileage');
+    const readingValue = parseInt(newMeterReading);
+    if (isNaN(readingValue) || readingValue < 0) {
+      toast.error(`Please enter a valid ${meterReadingType === 'hours' ? 'hours' : 'mileage'}`);
       return;
     }
 
-    // Validate mileage is >= current mileage
-    if (currentMileage !== null && mileageValue < currentMileage) {
-      toast.error(`Mileage must be equal to or greater than current mileage (${currentMileage.toLocaleString()} miles)`);
+    // Validate reading is >= current reading
+    if (currentMeterReading !== null && readingValue < currentMeterReading) {
+      const unit = meterReadingType === 'hours' ? 'hours' : 'miles';
+      toast.error(`${meterReadingType === 'hours' ? 'Hours' : 'Mileage'} must be equal to or greater than current reading (${currentMeterReading.toLocaleString()} ${unit})`);
       return;
     }
 
@@ -216,10 +230,13 @@ export function CreateWorkshopTaskDialog({
       setSubmitting(true);
 
       // Generate title based on alert type if provided, otherwise use generic title
-      const regNumber = vehicles.find(v => v.id === selectedVehicleId)?.reg_number || 'Unknown';
+      const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
+      const assetIdLabel = selectedVehicle?.asset_type === 'plant' 
+        ? (selectedVehicle?.plant_id ?? 'Unknown Plant')
+        : (selectedVehicle?.reg_number ?? 'Unknown Vehicle');
       const taskTitle = alertType 
-        ? getTaskContent(alertType, regNumber, '').title
-        : `Workshop Task - ${regNumber}`;
+        ? getTaskContent(alertType, assetIdLabel, '').title
+        : `Workshop Task - ${assetIdLabel}`;
 
       // Create the workshop task
       const { data: newTask, error } = await supabase
@@ -265,22 +282,32 @@ export function CreateWorkshopTaskDialog({
         }
       }
 
-      // Update vehicle mileage in vehicle_maintenance table
-      const { error: mileageError } = await supabase
+      // Update vehicle meter reading in vehicle_maintenance table
+      const updateData = meterReadingType === 'hours' 
+        ? {
+            vehicle_id: selectedVehicleId,
+            current_hours: readingValue,
+            last_hours_update: new Date().toISOString(),
+            last_updated_at: new Date().toISOString(),
+            last_updated_by: user.id,
+          }
+        : {
+            vehicle_id: selectedVehicleId,
+            current_mileage: readingValue,
+            last_mileage_update: new Date().toISOString(),
+            last_updated_at: new Date().toISOString(),
+            last_updated_by: user.id,
+          };
+
+      const { error: meterReadingError } = await supabase
         .from('vehicle_maintenance')
-        .upsert({
-          vehicle_id: selectedVehicleId,
-          current_mileage: mileageValue,
-          last_mileage_update: new Date().toISOString(),
-          last_updated_at: new Date().toISOString(),
-          last_updated_by: user.id,
-        }, {
+        .upsert(updateData, {
           onConflict: 'vehicle_id',
         });
 
-      if (mileageError) {
-        console.error('Error updating mileage:', mileageError);
-        toast.error('Task created but failed to update mileage');
+      if (meterReadingError) {
+        console.error('Error updating meter reading:', meterReadingError);
+        toast.error(`Task created but failed to update ${meterReadingType}`);
       } else {
         toast.success('Workshop task created successfully');
       }
@@ -342,9 +369,9 @@ export function CreateWorkshopTaskDialog({
                 setRecentVehicleIds(updatedRecent);
               }
               if (value) {
-                fetchCurrentMileage(value);
+                fetchCurrentMeterReading(value);
               } else {
-                setCurrentMileage(null);
+                setCurrentMeterReading(null);
               }
             }}>
               <SelectTrigger id="vehicle">
@@ -429,20 +456,20 @@ export function CreateWorkshopTaskDialog({
 
           <div className="space-y-2">
             <Label htmlFor="mileage">
-              Current Mileage <span className="text-red-500">*</span>
+              {meterReadingType === 'hours' ? 'Current Hours' : 'Current Mileage'} <span className="text-red-500">*</span>
             </Label>
             <Input
               id="mileage"
               type="number"
-              value={newMileage}
-              onChange={(e) => setNewMileage(e.target.value)}
-              placeholder="Enter current mileage"
+              value={newMeterReading}
+              onChange={(e) => setNewMeterReading(e.target.value)}
+              placeholder={`Enter current ${meterReadingType === 'hours' ? 'hours' : 'mileage'}`}
               min="0"
               step="1"
             />
-            {currentMileage !== null && (
+            {currentMeterReading !== null && (
               <p className="text-xs text-muted-foreground">
-                Last recorded: {currentMileage.toLocaleString()} miles
+                Last recorded: {currentMeterReading.toLocaleString()} {meterReadingType === 'hours' ? 'hours' : 'miles'}
               </p>
             )}
           </div>
@@ -515,7 +542,7 @@ export function CreateWorkshopTaskDialog({
           </Button>
           <Button
             onClick={handleAddTask}
-            disabled={submitting || !selectedVehicleId || !selectedSubcategoryId || workshopComments.length < 10 || !newMileage.trim()}
+            disabled={submitting || !selectedVehicleId || !selectedSubcategoryId || workshopComments.length < 10 || !newMeterReading.trim()}
             className="bg-workshop hover:bg-workshop-dark text-white"
           >
             {submitting ? 'Creating...' : 'Create Task'}

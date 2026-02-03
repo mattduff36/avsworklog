@@ -98,6 +98,9 @@ export default function WorkshopTasksPage() {
   const [recentVehicleIds, setRecentVehicleIds] = useState<string[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const [plantCategories, setPlantCategories] = useState<Category[]>([]);
+  const [plantSubcategories, setPlantSubcategories] = useState<Subcategory[]>([]);
+  const [categoryTaxonomyMode, setCategoryTaxonomyMode] = useState<'vehicle' | 'plant'>('vehicle');
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [vehicleFilter, setVehicleFilter] = useState<string>('all');
@@ -213,7 +216,9 @@ export default function WorkshopTasksPage() {
       fetchTasks();
       fetchVehicles();
       fetchCategories();
+      fetchPlantCategories();
       fetchSubcategories();
+      fetchPlantSubcategories();
       // Load recent vehicle IDs
       setRecentVehicleIds(getRecentVehicleIds(user.id));
     }
@@ -355,18 +360,67 @@ export default function WorkshopTasksPage() {
     }
   };
 
+  const fetchPlantCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('workshop_task_categories')
+        .select('id, name, slug, is_active, sort_order')
+        .eq('applies_to', 'plant')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setPlantCategories(data || []);
+    } catch (err) {
+      console.error('Error fetching plant categories:', err instanceof Error ? err.message : err);
+    }
+  };
+
   const fetchSubcategories = async () => {
     try {
       const { data, error } = await supabase
         .from('workshop_task_subcategories')
-        .select('id, category_id, name, slug, is_active, sort_order')
+        .select(`
+          id,
+          category_id,
+          name,
+          slug,
+          is_active,
+          sort_order,
+          workshop_task_categories!inner (applies_to)
+        `)
         .eq('is_active', true)
+        .eq('workshop_task_categories.applies_to', 'vehicle')
         .order('name');
 
       if (error) throw error;
       setSubcategories(data || []);
     } catch (err) {
       console.error('Error fetching subcategories:', err instanceof Error ? err.message : err);
+    }
+  };
+
+  const fetchPlantSubcategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('workshop_task_subcategories')
+        .select(`
+          id,
+          category_id,
+          name,
+          slug,
+          is_active,
+          sort_order,
+          workshop_task_categories!inner (applies_to)
+        `)
+        .eq('is_active', true)
+        .eq('workshop_task_categories.applies_to', 'plant')
+        .order('name');
+
+      if (error) throw error;
+      setPlantSubcategories(data || []);
+    } catch (err) {
+      console.error('Error fetching plant subcategories:', err instanceof Error ? err.message : err);
     }
   };
 
@@ -407,8 +461,11 @@ export default function WorkshopTasksPage() {
 
   // Filter subcategories by selected category
   const filteredSubcategories = selectedCategoryId
-    ? subcategories.filter(sub => sub.category_id === selectedCategoryId)
+    ? (assetTab === 'plant' ? plantSubcategories : subcategories).filter(sub => sub.category_id === selectedCategoryId)
     : [];
+
+  // Get the correct categories based on current tab
+  const activeCategories = assetTab === 'plant' ? plantCategories : categories;
 
   const handleAddTask = async () => {
     if (!selectedVehicleId || !selectedSubcategoryId || !workshopComments.trim() || !newMeterReading.trim()) {
@@ -1227,7 +1284,7 @@ export default function WorkshopTasksPage() {
           .from('workshop_task_categories')
           .insert({
             name: categoryName.trim(),
-            applies_to: 'vehicle',
+            applies_to: categoryTaxonomyMode,
             is_active: true,
             sort_order: 0,
             created_by: user?.id,
@@ -1238,7 +1295,11 @@ export default function WorkshopTasksPage() {
       }
 
       setShowCategoryModal(false);
-      fetchCategories();
+      if (categoryTaxonomyMode === 'plant') {
+        fetchPlantCategories();
+      } else {
+        fetchCategories();
+      }
     } catch (err) {
       console.error('Error saving category:', err instanceof Error ? err.message : err);
       toast.error('Failed to save category');
@@ -2255,9 +2316,27 @@ export default function WorkshopTasksPage() {
 
         {showSettings && (
           <TabsContent value="settings" className="space-y-6">
+            {/* Taxonomy Mode Switcher */}
+            <Card className="border-border">
+              <CardHeader>
+                <CardTitle className="text-white">Category Taxonomy</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  Manage categories for vehicles or plant machinery
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Tabs value={categoryTaxonomyMode} onValueChange={(v) => setCategoryTaxonomyMode(v as 'vehicle' | 'plant')}>
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="vehicle">Vehicle Categories</TabsTrigger>
+                    <TabsTrigger value="plant">Plant Categories</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </CardContent>
+            </Card>
+
             <CategoryManagementPanel
-              categories={categories}
-              subcategories={subcategories}
+              categories={categoryTaxonomyMode === 'plant' ? plantCategories : categories}
+              subcategories={categoryTaxonomyMode === 'plant' ? plantSubcategories : subcategories}
               onAddCategory={openAddCategoryModal}
               onEditCategory={openEditCategoryModal}
               onDeleteCategory={handleDeleteCategory}
@@ -2325,7 +2404,7 @@ export default function WorkshopTasksPage() {
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((category) => (
+                  {activeCategories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
                     </SelectItem>
