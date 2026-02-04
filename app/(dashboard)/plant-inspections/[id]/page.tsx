@@ -203,11 +203,16 @@ export default function ViewPlantInspectionPage() {
         if (insertError) throw insertError;
       }
 
-      // Update daily hours
-      await supabase
+      // Update daily hours - delete existing entries first
+      const { error: deleteHoursError } = await supabase
         .from('inspection_daily_hours')
         .delete()
         .eq('inspection_id', inspection.id);
+
+      if (deleteHoursError) {
+        console.error('Failed to delete existing daily hours:', deleteHoursError);
+        throw deleteHoursError;
+      }
 
       const dailyHoursToInsert = Object.entries(editableDailyHours)
         .filter(([_, hours]) => hours !== null)

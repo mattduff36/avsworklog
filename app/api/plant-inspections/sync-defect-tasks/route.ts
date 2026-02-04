@@ -124,7 +124,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ created, updated: 0, skipped });
+    // Generate summary message
+    const message = `Created ${created} task${created !== 1 ? 's' : ''}, skipped ${skipped} existing task${skipped !== 1 ? 's' : ''}`;
+
+    return NextResponse.json({ created, updated: 0, skipped, message });
   } catch (error) {
     console.error('Error in plant sync-defect-tasks:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

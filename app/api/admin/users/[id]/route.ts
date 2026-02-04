@@ -236,33 +236,34 @@ export async function DELETE(
 
     if (mode === 'keep-data') {
       // MODE 1: Keep company data, only delete user account
-      // Update user's name to mark as deleted
+      // Update user's name to mark as deleted (use admin client to bypass RLS)
       const deletedName = userProfile.full_name.includes('(Deleted User)') 
         ? userProfile.full_name 
         : `${userProfile.full_name} (Deleted User)`;
 
-      await supabase
+      await supabaseAdmin
         .from('profiles')
         .update({ full_name: deletedName })
         .eq('id', userId);
 
       // Nullify reviewer/assigner references (keeps audit trail of who created data)
-      await supabase
+      // Use admin client to bypass RLS policies
+      await supabaseAdmin
         .from('timesheets')
         .update({ reviewed_by: null })
         .eq('reviewed_by', userId);
 
-      await supabase
+      await supabaseAdmin
         .from('vehicle_inspections')
         .update({ reviewed_by: null })
         .eq('reviewed_by', userId);
 
-      await supabase
+      await supabaseAdmin
         .from('timesheets')
         .update({ adjusted_by: null })
         .eq('adjusted_by', userId);
 
-      await supabase
+      await supabaseAdmin
         .from('actions')
         .update({ actioned_by: null })
         .eq('actioned_by', userId);
@@ -294,28 +295,28 @@ export async function DELETE(
       });
     } else {
       // MODE 2: Delete all user data
-      // Step 1: Handle foreign key references before deletion
+      // Step 1: Handle foreign key references before deletion (use admin client to bypass RLS)
       // Set reviewed_by to NULL in timesheets where this user was the reviewer
-      await supabase
+      await supabaseAdmin
         .from('timesheets')
         .update({ reviewed_by: null })
         .eq('reviewed_by', userId);
 
       // Set reviewed_by to NULL in vehicle_inspections where this user was the reviewer
-      await supabase
+      await supabaseAdmin
         .from('vehicle_inspections')
         .update({ reviewed_by: null })
         .eq('reviewed_by', userId);
 
       // Set adjusted_by to NULL in timesheets if it exists
-      await supabase
+      await supabaseAdmin
         .from('timesheets')
         .update({ adjusted_by: null })
         .eq('adjusted_by', userId);
 
-    // Step 2: Delete user's own records
+    // Step 2: Delete user's own records (use admin client)
     // First get all timesheet IDs for this user
-    const { data: userTimesheets } = await supabase
+    const { data: userTimesheets } = await supabaseAdmin
       .from('timesheets')
       .select('id')
       .eq('user_id', userId);
@@ -323,20 +324,20 @@ export async function DELETE(
     // Delete timesheet entries (must delete before timesheets due to FK)
     if (userTimesheets && userTimesheets.length > 0) {
       const timesheetIds = userTimesheets.map(t => t.id);
-      await supabase
+      await supabaseAdmin
         .from('timesheet_entries')
         .delete()
         .in('timesheet_id', timesheetIds);
     }
 
     // Delete timesheets created by this user
-    await supabase
+    await supabaseAdmin
       .from('timesheets')
       .delete()
       .eq('user_id', userId);
 
     // First get all inspection IDs for this user
-    const { data: userInspections } = await supabase
+    const { data: userInspections } = await supabaseAdmin
       .from('vehicle_inspections')
       .select('id')
       .eq('user_id', userId);
@@ -344,61 +345,61 @@ export async function DELETE(
     // Delete inspection items (must delete before inspections due to FK)
     if (userInspections && userInspections.length > 0) {
       const inspectionIds = userInspections.map(i => i.id);
-      await supabase
+      await supabaseAdmin
         .from('inspection_items')
         .delete()
         .in('inspection_id', inspectionIds);
     }
 
     // Delete vehicle inspections created by this user
-    await supabase
+    await supabaseAdmin
       .from('vehicle_inspections')
       .delete()
       .eq('user_id', userId);
 
     // Delete or nullify actions
-    await supabase
+    await supabaseAdmin
       .from('actions')
       .delete()
       .eq('created_by', userId);
 
-    await supabase
+    await supabaseAdmin
       .from('actions')
       .update({ actioned_by: null })
       .eq('actioned_by', userId);
 
     // Delete absences
-    await supabase
+    await supabaseAdmin
       .from('absences')
       .delete()
       .eq('profile_id', userId);
 
     // Delete RAMS assignments
-    await supabase
+    await supabaseAdmin
       .from('rams_assignments')
       .delete()
       .eq('employee_id', userId);
 
     // Nullify audit log references
-    await supabase
+    await supabaseAdmin
       .from('audit_log')
       .update({ user_id: null })
       .eq('user_id', userId);
 
     // Nullify message references
-    await supabase
+    await supabaseAdmin
       .from('messages')
       .update({ sender_id: null })
       .eq('sender_id', userId);
 
     // Delete message recipients
-    await supabase
+    await supabaseAdmin
       .from('message_recipients')
       .delete()
       .eq('user_id', userId);
 
     // Step 3: Delete the profile
-    const { error: profileError } = await supabase
+    const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .delete()
       .eq('id', userId);
