@@ -72,10 +72,12 @@ export function AddVehicleDialog({
       
       if (error) throw error;
       
-      // Filter categories based on asset type
-      const filtered = (data || []).filter(cat => 
-        cat.applies_to?.includes(assetType) ?? true
-      );
+      // ✅ Filter categories based on asset type
+      // Consistent with SELECT dropdown: undefined applies_to defaults to ['vehicle']
+      const filtered = (data || []).filter(cat => {
+        const appliesTo = cat.applies_to || ['vehicle']; // ✅ Default to ['vehicle']
+        return appliesTo.includes(assetType);
+      });
       
       setCategories(filtered);
     } catch (err) {
@@ -86,10 +88,19 @@ export function AddVehicleDialog({
   // Fetch categories when dialog opens
   useEffect(() => {
     if (open) {
-      fetchCategories(); // ✅ Now included in dependencies
-      setAssetType(initialAssetType); // Sync state with prop when dialog opens
+      // ✅ Set asset type FIRST, then fetch categories
+      // This ensures fetchCategories uses the correct assetType
+      setAssetType(initialAssetType);
+      // fetchCategories will run automatically via its dependency on assetType
     }
-  }, [open, initialAssetType, fetchCategories]); // ✅ Added fetchCategories
+  }, [open, initialAssetType]);
+
+  // ✅ Fetch categories when assetType changes
+  useEffect(() => {
+    if (open) {
+      fetchCategories();
+    }
+  }, [open, fetchCategories]);
 
   // Reset form when dialog closes
   useEffect(() => {
@@ -423,8 +434,9 @@ export function AddVehicleDialog({
               <SelectContent className="bg-slate-800 border-slate-700 dark:text-slate-100 text-slate-900">
                 {categories
                   .filter(category => {
-                    // Filter categories based on asset type
-                    const appliesTo = (category as any).applies_to || ['vehicle'];
+                    // ✅ Filter categories based on asset type
+                    // Note: fetchCategories already filters, but double-check here for safety
+                    const appliesTo = category.applies_to || ['vehicle'];
                     return appliesTo.includes(assetType);
                   })
                   .map((category) => (
