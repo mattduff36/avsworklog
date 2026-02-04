@@ -81,6 +81,7 @@ type Category = {
   id: string;
   name: string;
   description: string | null;
+  applies_to?: string[];
 };
 
 function FleetContent() {
@@ -548,9 +549,10 @@ function FleetContent() {
                           </CardTitle>
                           <CardDescription className="text-muted-foreground">
                             {(() => {
-                              // Dynamically get categories used by plant assets
-                              const plantCategoryIds = new Set(plantAssets.map(p => p.category_id).filter(Boolean));
-                              const plantCategories = categories.filter(c => plantCategoryIds.has(c.id));
+                              // Filter categories that apply to plant
+                              const plantCategories = categories.filter(c => 
+                                (c.applies_to || ['vehicle']).includes('plant')
+                              );
                               return `${plantCategories.length} ${plantCategories.length === 1 ? 'category' : 'categories'}`;
                             })()}
                           </CardDescription>
@@ -577,9 +579,10 @@ function FleetContent() {
                           <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                         </div>
                       ) : (() => {
-                        // Dynamically get categories used by plant assets
-                        const plantCategoryIds = new Set(plantAssets.map(p => p.category_id).filter(Boolean));
-                        const plantCategories = categories.filter(c => plantCategoryIds.has(c.id));
+                        // Filter categories that apply to plant
+                        const plantCategories = categories.filter(c => 
+                          (c.applies_to || ['vehicle']).includes('plant')
+                        );
                         
                         return plantCategories.length === 0 ? (
                           <div className="text-center py-8 text-muted-foreground">
@@ -587,7 +590,9 @@ function FleetContent() {
                           </div>
                         ) : (
                           <div className="space-y-3">
-                            {plantCategories.map((category) => (
+                            {plantCategories.map((category) => {
+                              const plantCount = plantAssets.filter(p => p.category_id === category.id).length;
+                              return (
                               <Card key={category.id} className="bg-slate-800/50 border-border">
                                 <CardContent className="p-4">
                                   <div className="flex items-center justify-between">
@@ -605,7 +610,7 @@ function FleetContent() {
                                     <div className="flex items-center gap-4">
                                       <div className="text-right">
                                         <div className="text-2xl font-bold text-orange-400">
-                                          {plantAssets.filter(p => p.category_id === category.id).length}
+                                          {plantCount}
                                         </div>
                                         <p className="text-xs text-muted-foreground">plant assets</p>
                                       </div>
@@ -633,7 +638,7 @@ function FleetContent() {
                                   </div>
                                 </CardContent>
                               </Card>
-                            ))}
+                            )})}
                           </div>
                         );
                       })()}
@@ -661,15 +666,10 @@ function FleetContent() {
                           </CardTitle>
                           <CardDescription className="text-muted-foreground">
                             {(() => {
-                              const plantCategoryNames = [
-                                'Excavation & Earthmoving',
-                                'Loading & Material Handling',
-                                'Compaction, Crushing & Processing',
-                                'Transport & Utility Vehicles',
-                                'Access & Site Support',
-                                'Unclassified'
-                              ];
-                              const vehicleCategories = categories.filter(c => !plantCategoryNames.includes(c.name));
+                              // Filter categories that apply to vehicles
+                              const vehicleCategories = categories.filter(c => 
+                                (c.applies_to || ['vehicle']).includes('vehicle')
+                              );
                               return `${vehicleCategories.length} ${vehicleCategories.length === 1 ? 'category' : 'categories'}`;
                             })()}
                           </CardDescription>
@@ -696,9 +696,11 @@ function FleetContent() {
                         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                       </div>
                     ) : (() => {
-                      // Dynamically exclude categories used by plant assets
-                      const plantCategoryIds = new Set(plantAssets.map(p => p.category_id).filter(Boolean));
-                      const vehicleCategories = categories.filter(c => !plantCategoryIds.has(c.id));
+                      // Filter categories that apply to vehicles (not plant-only categories)
+                      const vehicleCategories = categories.filter(c => {
+                        const appliesTo = (c as any).applies_to || ['vehicle'];
+                        return appliesTo.includes('vehicle');
+                      });
                       
                       return vehicleCategories.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">

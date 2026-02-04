@@ -410,7 +410,7 @@ export function PlantTable({
                     {sortedPlant.map((asset) => (
                       <TableRow 
                         key={asset.plant_id}
-                        onClick={() => handleViewHistory(asset.plant_id)}
+                        onClick={() => handleViewHistory(asset.plant?.id || '')}
                         className="border-slate-700 hover:bg-slate-800/50 cursor-pointer"
                       >
                         {/* Plant ID */}
@@ -602,7 +602,7 @@ export function PlantTable({
                               size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleViewHistory(asset.plant_id);
+                                handleViewHistory(asset.plant?.id || '');
                               }}
                               className="h-10 w-10 p-0"
                             >
@@ -636,6 +636,7 @@ export function PlantTable({
       <AddVehicleDialog
         open={addVehicleDialogOpen}
         onOpenChange={setAddVehicleDialogOpen}
+        assetType="plant"
         onSuccess={() => {
           fetchPlantData();
           onVehicleAdded?.();

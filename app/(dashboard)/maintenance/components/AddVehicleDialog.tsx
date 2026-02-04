@@ -29,6 +29,7 @@ interface AddVehicleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  assetType?: AssetType; // Default to 'vehicle' if not provided
 }
 
 interface Category {
@@ -41,12 +42,13 @@ type AssetType = 'vehicle' | 'plant';
 export function AddVehicleDialog({
   open,
   onOpenChange,
-  onSuccess
+  onSuccess,
+  assetType: initialAssetType = 'vehicle', // Default to 'vehicle'
 }: AddVehicleDialogProps) {
   const queryClient = useQueryClient();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
-  const [assetType, setAssetType] = useState<AssetType>('vehicle');
+  const [assetType, setAssetType] = useState<AssetType>(initialAssetType);
   const [formData, setFormData] = useState({
     reg_number: '',
     plant_id: '',
@@ -408,7 +410,13 @@ export function AddVehicleDialog({
                 <SelectValue placeholder="Select category..." />
               </SelectTrigger>
               <SelectContent className="bg-slate-800 border-slate-700 dark:text-slate-100 text-slate-900">
-                {categories.map((category) => (
+                {categories
+                  .filter(category => {
+                    // Filter categories based on asset type
+                    const appliesTo = (category as any).applies_to || ['vehicle'];
+                    return appliesTo.includes(assetType);
+                  })
+                  .map((category) => (
                   <SelectItem
                     key={category.id}
                     value={category.id}
