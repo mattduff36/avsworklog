@@ -90,15 +90,8 @@ function FleetContent() {
   const { profile, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const supabase = createClient();
   
-  // Initialize activeTab from URL to prevent hydration mismatch
-  const [activeTab, setActiveTab] = useState(() => {
-    // Read tab from URL on initial render to match server/client
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      return params.get('tab') || 'maintenance';
-    }
-    return 'maintenance';
-  });
+  // Initialize to default - useEffect will sync with URL to prevent hydration mismatch
+  const [activeTab, setActiveTab] = useState('maintenance');
   const [hasModulePermission, setHasModulePermission] = useState<boolean | null>(null);
   const [maintenanceFilter, setMaintenanceFilter] = useState<'both' | 'vehicle' | 'plant'>('both'); // Filter for maintenance overview
   

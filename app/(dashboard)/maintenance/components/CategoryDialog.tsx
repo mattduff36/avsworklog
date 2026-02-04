@@ -487,7 +487,7 @@ export function CategoryDialog({
                       setValue('applies_to', current.filter(a => a !== 'vehicle'));
                     }
                   }}
-                  disabled={loading || selectedType === 'hours'}
+                  disabled={isSubmitting || selectedType === 'hours'}
                   className="border-slate-600"
                 />
                 <Label htmlFor="applies-vehicle" className="text-white cursor-pointer flex items-center gap-2">
@@ -507,7 +507,7 @@ export function CategoryDialog({
                       setValue('applies_to', current.filter(a => a !== 'plant'));
                     }
                   }}
-                  disabled={loading || selectedType === 'mileage'}
+                  disabled={isSubmitting || selectedType === 'mileage'}
                   className="border-slate-600"
                 />
                 <Label htmlFor="applies-plant" className="text-white cursor-pointer flex items-center gap-2">
