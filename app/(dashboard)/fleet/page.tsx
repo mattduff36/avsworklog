@@ -274,8 +274,8 @@ function FleetContent() {
   // Handler for navigating to vehicle or plant history
   const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
     // Determine if this is a plant asset or vehicle
-    // Plant assets have plant_id set in the nested vehicle object, or vehicle.asset_type === 'plant'
-    const isPlant = vehicle.vehicle?.plant_id || vehicle.vehicle?.asset_type === 'plant';
+    // Check the is_plant flag set by PlantOverview
+    const isPlant = vehicle.is_plant === true;
     
     // Get the correct asset ID (UUID) - use the vehicle.id (which is the UUID for both vehicles and plant)
     // For plant: vehicle.vehicle?.id is the plant table UUID
