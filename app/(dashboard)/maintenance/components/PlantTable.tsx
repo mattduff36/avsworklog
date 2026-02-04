@@ -637,9 +637,9 @@ export function PlantTable({
         open={addVehicleDialogOpen}
         onOpenChange={setAddVehicleDialogOpen}
         assetType="plant"
-        onSuccess={() => {
-          fetchPlantData();
-          onVehicleAdded?.();
+        onSuccess={async () => {
+          await fetchPlantData(); // ✅ Wait for fetch to complete
+          onVehicleAdded?.(); // ✅ Then trigger callback with fresh data
         }}
       />
     </>
