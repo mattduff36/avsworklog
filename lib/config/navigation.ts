@@ -220,6 +220,19 @@ export function getFilteredEmployeeNav(
       return true;
     }
     
+    // For items with dropdown children, check if user has access to ANY child
+    if (item.dropdownItems && item.dropdownItems.length > 0) {
+      const hasAccessToAnyChild = item.dropdownItems.some(child => {
+        // If child has no module requirement, it's accessible
+        if (!child.module) return true;
+        // Otherwise check if user has the module permission
+        return userPermissions.has(child.module);
+      });
+      
+      // If user has access to at least one child, show the parent
+      return hasAccessToAnyChild;
+    }
+    
     // Check basic permission for employees
     if (item.module && !userPermissions.has(item.module)) {
       return false;

@@ -412,17 +412,21 @@ export function Navbar() {
                   
                   // If dropdown should be shown, render dropdown menu
                   if (shouldShowDropdown) {
-                    // Check if any dropdown item is active
-                    const isAnyDropdownActive = accessibleDropdownItems.some(dropdownItem => 
+                    // Find which dropdown item is active to determine trigger colors
+                    const activeDropdownItem = accessibleDropdownItems.find(dropdownItem => 
                       isLinkActive(dropdownItem.href)
                     );
+                    const isAnyDropdownActive = !!activeDropdownItem;
+                    const triggerColors = activeDropdownItem 
+                      ? getNavItemActiveColors(activeDropdownItem.href)
+                      : { bg: '', text: '' };
                     
                     return (
                       <DropdownMenu key={item.href}>
                         <DropdownMenuTrigger
                           className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                             isAnyDropdownActive
-                              ? `${getNavItemActiveColors(pathname || '').bg} ${getNavItemActiveColors(pathname || '').text}`
+                              ? `${triggerColors.bg} ${triggerColors.text}`
                               : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                           }`}
                         >
@@ -461,7 +465,8 @@ export function Navbar() {
                   // Otherwise, render as regular link (either no dropdown or only one accessible item)
                   // CRITICAL: Use item.href consistently until after mount to prevent hydration mismatch
                   // The finalHref calculation must be identical on server and client
-                  const finalHref = isMounted && accessibleDropdownItems.length === 1 
+                  // SAFETY: Validate array is non-empty before accessing by index
+                  const finalHref = isMounted && accessibleDropdownItems.length === 1 && accessibleDropdownItems[0]
                     ? accessibleDropdownItems[0].href 
                     : item.href;
                   
@@ -609,7 +614,8 @@ export function Navbar() {
                 // Otherwise, render as regular link
                 // CRITICAL: Use item.href consistently until after mount to prevent hydration mismatch
                 // The finalHref calculation must be identical on server and client
-                const finalHref = isMounted && accessibleDropdownItems.length === 1 
+                // SAFETY: Validate array is non-empty before accessing by index
+                const finalHref = isMounted && accessibleDropdownItems.length === 1 && accessibleDropdownItems[0]
                   ? accessibleDropdownItems[0].href 
                   : item.href;
                 

@@ -278,7 +278,7 @@ export default function ViewPlantInspectionPage() {
             primaryInspectionItemId: group.item_ids[0]
           }));
 
-          await fetch('/api/plant-inspections/sync-defect-tasks', {
+          const syncResponse = await fetch('/api/plant-inspections/sync-defect-tasks', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -288,6 +288,11 @@ export default function ViewPlantInspectionPage() {
               defects
             })
           });
+
+          if (!syncResponse.ok) {
+            const errorData = await syncResponse.json();
+            throw new Error(errorData.error || 'Failed to sync defect tasks');
+          }
         }
       }
 

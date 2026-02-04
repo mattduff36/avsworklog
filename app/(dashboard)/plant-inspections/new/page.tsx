@@ -276,10 +276,20 @@ function NewPlantInspectionContent() {
 
         setLoggedDefects(loggedMap);
 
-        // Auto-mark logged items as defective for all days
-        const newCheckboxStates = { ...checkboxStates };
-        const newComments = { ...comments };
+        // Reset all checkbox states and comments, then mark only locked items
+        const newCheckboxStates: Record<string, CheckboxState> = {};
+        const newComments: Record<string, string> = {};
 
+        // Initialize all cells to default 'ok' state
+        for (let day = 1; day <= 7; day++) {
+          for (let itemNum = 1; itemNum <= PLANT_CHECKLIST_ITEMS.length; itemNum++) {
+            const stateKey = `${day}-${itemNum}`;
+            newCheckboxStates[stateKey] = 'ok';
+            newComments[stateKey] = '';
+          }
+        }
+
+        // Mark only locked defect items
         loggedMap.forEach((loggedInfo, key) => {
           const [itemNumStr] = key.split('-');
           const itemNum = parseInt(itemNumStr);
