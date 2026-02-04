@@ -760,9 +760,14 @@ function NewPlantInspectionContent() {
             if (syncResponse.ok) {
               const syncResult = await syncResponse.json();
               console.log(`✅ Sync complete: ${syncResult.message}`);
+            } else {
+              const errorData = await syncResponse.json();
+              throw new Error(errorData.error || 'Failed to sync defect tasks');
             }
           } catch (error) {
             console.error('Error syncing defect tasks:', error);
+            const errorMsg = error instanceof Error ? error.message : 'Failed to sync defect tasks';
+            toast.error(`Warning: Inspection saved, but ${errorMsg}`);
           }
         }
       }
