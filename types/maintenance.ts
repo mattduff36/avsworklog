@@ -165,6 +165,9 @@ export interface MaintenanceItemStatus {
 }
 
 export interface VehicleMaintenanceWithStatus extends VehicleMaintenance {
+  // Asset type flag (set by PlantOverview for plant assets)
+  is_plant?: boolean;
+  
   vehicle?: {
     id: string;
     reg_number: string | null;
