@@ -167,6 +167,27 @@ export function EditPlantRecordDialog({
     try {
       setIsSubmitting(true);
 
+      // ----------------------------------------------------------------------
+      // Auth is REQUIRED for audit trail integrity.
+      // Fail fast before any updates to avoid partial success (updates without history).
+      // ----------------------------------------------------------------------
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+
+      if (userError) {
+        throw new Error(`Authentication failed: ${userError.message}`);
+      }
+
+      const user = userData.user;
+      if (!user) {
+        throw new Error('Your session has expired. Please sign in again to update plant records.');
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single();
+
       // Track changed fields for history
       const changedFields: string[] = [];
 
@@ -251,29 +272,23 @@ export function EditPlantRecordDialog({
         }
       }
 
-      // Create maintenance history entry
-      // Note: This writes with plant_id after the migration
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', user?.id)
-        .single();
+      // Create maintenance history entry (ALWAYS).
+      // Note: This writes with plant_id after the migration.
+      const historyFieldName = changedFields.length > 0 ? changedFields.join(', ') : 'no_changes';
+      const { error: historyError } = await supabase.from('maintenance_history').insert({
+        plant_id: plant.id,
+        vehicle_id: null,
+        field_name: historyFieldName,
+        old_value: null,
+        new_value: null,
+        value_type: 'text',
+        comment: data.comment.trim(),
+        updated_by: user.id,
+        updated_by_name: profile?.full_name || 'Unknown User',
+      });
 
-      if (changedFields.length > 0 && user) {
-        await supabase
-          .from('maintenance_history')
-          .insert({
-            plant_id: plant.id,
-            vehicle_id: null,
-            field_name: changedFields.join(', '),
-            old_value: null,
-            new_value: null,
-            value_type: 'text',
-            comment: data.comment.trim(),
-            updated_by: user.id,
-            updated_by_name: profile?.full_name || 'Unknown User',
-          });
+      if (historyError) {
+        throw new Error(`Failed to write maintenance history: ${historyError.message}`);
       }
 
       toast.success('Plant record updated successfully', {
