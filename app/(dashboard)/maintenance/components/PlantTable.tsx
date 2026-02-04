@@ -217,7 +217,7 @@ export function PlantTable({
   };
 
   const handleViewHistory = (plantId: string) => {
-    router.push(`/fleet/plant/${plantId}/history`);
+    router.push(`/fleet/plant/${plantId}/history?fromTab=plant`);
   };
 
   return (
