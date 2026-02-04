@@ -62,24 +62,34 @@ const createCategorySchema = z.object({
   show_on_overview: z.boolean().default(true),
   reminder_in_app_enabled: z.boolean().default(false),
   reminder_email_enabled: z.boolean().default(false),
-}).refine(
-  (data) => {
-    if (data.type === 'date') {
-      return data.alert_threshold_days != null && data.alert_threshold_days > 0;
+}).superRefine((data, ctx) => {
+  // ✅ Use superRefine for dynamic error paths based on category type
+  if (data.type === 'date') {
+    if (data.alert_threshold_days == null || data.alert_threshold_days <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Date-based categories need days threshold',
+        path: ['alert_threshold_days']
+      });
     }
-    if (data.type === 'mileage') {
-      return data.alert_threshold_miles != null && data.alert_threshold_miles > 0;
+  } else if (data.type === 'mileage') {
+    if (data.alert_threshold_miles == null || data.alert_threshold_miles <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Mileage-based categories need miles threshold',
+        path: ['alert_threshold_miles']
+      });
     }
-    if (data.type === 'hours') {
-      return data.alert_threshold_hours != null && data.alert_threshold_hours > 0;
+  } else if (data.type === 'hours') {
+    if (data.alert_threshold_hours == null || data.alert_threshold_hours <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Hours-based categories need hours threshold',
+        path: ['alert_threshold_hours']
+      });
     }
-    return true;
-  },
-  {
-    message: 'Date-based categories need days threshold, mileage-based need miles threshold, hours-based need hours threshold',
-    path: ['alert_threshold_days']
   }
-);
+});
 
 const editCategorySchema = createCategorySchema.partial().extend({
   type: z.enum(['date', 'mileage', 'hours']).optional(), // Type cannot be changed in edit

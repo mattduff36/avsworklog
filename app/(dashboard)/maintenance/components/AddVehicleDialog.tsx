@@ -28,7 +28,7 @@ import { logger } from '@/lib/utils/logger';
 interface AddVehicleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: () => void;
+  onSuccess?: () => void | Promise<void>; // ✅ Support both sync and async callbacks
   assetType?: AssetType; // Default to 'vehicle' if not provided
 }
 
@@ -201,7 +201,7 @@ export function AddVehicleDialog({
         }
         
         queryClient.invalidateQueries({ queryKey: ['maintenance'] });
-        onSuccess?.();
+        await onSuccess?.(); // ✅ Await async callback before closing dialog
         onOpenChange(false);
       } else {
         setError(data.error || `Failed to add ${assetType}`);
