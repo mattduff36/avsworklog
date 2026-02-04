@@ -875,15 +875,18 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   };
 
   const toggleVehicle = useCallback(async (vehicleId: string, vehicle?: VehicleMaintenanceWithStatus) => {
-    const newExpanded = new Set(expandedVehicles);
-    if (newExpanded.has(vehicleId)) {
-      newExpanded.delete(vehicleId);
-    } else {
-      newExpanded.add(vehicleId);
-      fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId));
-    }
-    setExpandedVehicles(newExpanded);
-  }, [expandedVehicles, fetchVehicleHistory, isPlantAsset]);
+    setExpandedVehicles(prev => {
+      const newExpanded = new Set(prev);
+      if (newExpanded.has(vehicleId)) {
+        newExpanded.delete(vehicleId);
+      } else {
+        newExpanded.add(vehicleId);
+        // Fetch history when expanding (not when collapsing)
+        fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId));
+      }
+      return newExpanded;
+    });
+  }, [fetchVehicleHistory, isPlantAsset]);
 
   const handleCardClick = (vehicleId: string, vehicle: VehicleWithAlerts) => {
     // If onVehicleClick is provided, use it for navigation
