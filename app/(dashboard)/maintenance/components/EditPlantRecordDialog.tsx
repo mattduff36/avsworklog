@@ -52,6 +52,8 @@ type MaintenanceRecord = {
 // ============================================================================
 
 const editPlantRecordSchema = z.object({
+  // Nickname
+  nickname: z.string().max(100, 'Nickname must be less than 100 characters').optional().nullable(),
   // Hours-based fields
   current_hours: z.preprocess(
     (val) => val === '' || val === null || val === undefined ? null : Number(val),
@@ -129,6 +131,7 @@ export function EditPlantRecordDialog({
   useEffect(() => {
     if (plant) {
       reset({
+        nickname: plant.nickname || '',
         current_hours: maintenanceRecord?.current_hours || plant.current_hours || undefined,
         last_service_hours: maintenanceRecord?.last_service_hours || undefined,
         next_service_hours: maintenanceRecord?.next_service_hours || undefined,
@@ -190,6 +193,25 @@ export function EditPlantRecordDialog({
 
       // Track changed fields for history
       const changedFields: string[] = [];
+
+      // Update plant nickname if changed
+      const nicknameChanged = data.nickname?.trim() !== plant.nickname;
+      if (nicknameChanged) {
+        const { error: nicknameError } = await supabase
+          .from('plant')
+          .update({ 
+            nickname: data.nickname?.trim() || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', plant.id);
+
+        if (nicknameError) {
+          console.error('Error updating plant nickname:', nicknameError);
+          // Continue with other updates even if nickname update fails
+        } else {
+          changedFields.push('nickname');
+        }
+      }
 
       // Update plant table fields (LOLER)
       const plantUpdates: Record<string, any> = {};
@@ -343,6 +365,25 @@ export function EditPlantRecordDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Plant Nickname */}
+          <div className="space-y-2">
+            <Label htmlFor="nickname" className="text-white">
+              Plant Nickname <span className="text-slate-400 text-xs">(Optional)</span>
+            </Label>
+            <Input
+              id="nickname"
+              {...register('nickname')}
+              placeholder="e.g., VOLVO ECR88D, Big Digger, Main Excavator"
+              className="bg-input border-border text-white"
+            />
+            <p className="text-xs text-muted-foreground">
+              A friendly name to help identify this plant machine quickly
+            </p>
+            {errors.nickname && (
+              <p className="text-sm text-red-400">{errors.nickname.message}</p>
+            )}
+          </div>
+
           {/* Hours-based Maintenance (Plant Machinery) */}
           <div className="space-y-4">
             <h3 className="font-semibold text-lg border-b border-slate-700 pb-2">
