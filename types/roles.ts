@@ -35,6 +35,7 @@ export interface RoleWithUserCount extends Role {
 export type ModuleName =
   | 'timesheets'
   | 'inspections'
+  | 'plant-inspections'
   | 'rams'
   | 'absence'
   | 'maintenance'
@@ -49,6 +50,7 @@ export type ModuleName =
 export const ALL_MODULES: ModuleName[] = [
   'timesheets',
   'inspections',
+  'plant-inspections',
   'rams',
   'absence',
   'maintenance',
@@ -64,6 +66,7 @@ export const ALL_MODULES: ModuleName[] = [
 export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
   'timesheets': 'Timesheets',
   'inspections': 'Vehicle Inspections',
+  'plant-inspections': 'Plant Inspections',
   'rams': 'RAMS Documents',
   'absence': 'Absence & Leave',
   'maintenance': 'Maintenance & Service',
@@ -79,6 +82,7 @@ export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
 export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
   'timesheets': 'Create and submit timesheets',
   'inspections': 'Perform vehicle inspections',
+  'plant-inspections': 'Perform plant machinery inspections',
   'rams': 'Access and sign RAMS documents',
   'absence': 'Request and manage absence',
   'maintenance': 'Track and manage vehicle maintenance schedules',

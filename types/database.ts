@@ -474,6 +474,32 @@ export interface Database {
           updated_at?: string
         }
       }
+      inspection_daily_hours: {
+        Row: {
+          id: string
+          inspection_id: string
+          day_of_week: number
+          hours: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          inspection_id: string
+          day_of_week: number
+          hours?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          inspection_id?: string
+          day_of_week?: number
+          hours?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       vehicle_inspections: {
         Row: {
           id: string

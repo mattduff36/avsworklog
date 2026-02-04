@@ -37,6 +37,7 @@ export interface NavItem {
   icon: LucideIcon;
   module?: ModuleName; // For permission checking
   category?: 'employee' | 'manager' | 'admin'; // Which nav area it belongs to
+  dropdownItems?: NavItem[]; // For dropdown menus
 }
 
 /**
@@ -58,7 +59,23 @@ export const employeeNavItems: NavItem[] = [
     label: 'Inspections', 
     icon: ClipboardCheck, 
     module: 'inspections',
-    category: 'employee'
+    category: 'employee',
+    dropdownItems: [
+      {
+        href: '/inspections',
+        label: 'Vehicle Inspections',
+        icon: ClipboardCheck,
+        module: 'inspections',
+        category: 'employee'
+      },
+      {
+        href: '/plant-inspections',
+        label: 'Plant Inspections',
+        icon: ClipboardCheck,
+        module: 'plant-inspections',
+        category: 'employee'
+      }
+    ]
   },
   { 
     href: '/rams', 

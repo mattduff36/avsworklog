@@ -5,12 +5,19 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { 
   Menu, 
   X, 
   LogOut,
   Bell,
   Bug,
+  ChevronDown,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { NotificationPanel } from '@/components/messages/NotificationPanel';
@@ -38,6 +45,10 @@ function getNavItemActiveColors(href: string): { bg: string; text: string } {
   // Timesheets - Blue
   if (href.startsWith('/timesheets')) {
     return { bg: 'bg-timesheet', text: 'text-white' };
+  }
+  // Plant Inspections - Darker Orange
+  if (href.startsWith('/plant-inspections')) {
+    return { bg: 'bg-plant-inspection', text: 'text-white' };
   }
   // Inspections - Orange
   if (href.startsWith('/inspections')) {
@@ -126,7 +137,7 @@ export function Navbar() {
       // When viewing as different roles, simulate their permissions
       if (isSuperAdmin && viewAsRole !== 'actual') {
         if (viewAsRole === 'admin' || viewAsRole === 'manager') {
-          setUserPermissions(new Set(['timesheets', 'inspections', 'absence', 'rams', 'maintenance', 'workshop-tasks', 'approvals', 'actions', 'reports'] as ModuleName[]));
+          setUserPermissions(new Set(['timesheets', 'inspections', 'plant-inspections', 'absence', 'rams', 'maintenance', 'workshop-tasks', 'approvals', 'actions', 'reports'] as ModuleName[]));
         } else if (viewAsRole === 'employee') {
           // Simulate basic employee permissions
           setUserPermissions(new Set(['timesheets', 'inspections'] as ModuleName[]));
@@ -137,7 +148,7 @@ export function Navbar() {
 
       // Managers and admins have all permissions
       if (isManager || isAdmin) {
-        setUserPermissions(new Set(['timesheets', 'inspections', 'absence', 'rams', 'maintenance', 'workshop-tasks', 'approvals', 'actions', 'reports'] as ModuleName[]));
+        setUserPermissions(new Set(['timesheets', 'inspections', 'plant-inspections', 'absence', 'rams', 'maintenance', 'workshop-tasks', 'approvals', 'actions', 'reports'] as ModuleName[]));
         setPermissionsLoading(false);
         return;
       }
@@ -382,10 +393,74 @@ export function Navbar() {
                   const Icon = item.icon;
                   const isActive = isLinkActive(item.href);
                   const activeColors = getNavItemActiveColors(item.href);
+                  
+                  // Check if this item has a dropdown and user has access to multiple items
+                  const hasDropdown = item.dropdownItems && item.dropdownItems.length > 0;
+                  const accessibleDropdownItems = hasDropdown
+                    ? item.dropdownItems!.filter(dropdownItem => {
+                        if (!dropdownItem.module) return true;
+                        return userPermissions.has(dropdownItem.module);
+                      })
+                    : [];
+                  const shouldShowDropdown = accessibleDropdownItems.length > 1;
+                  
+                  // If dropdown should be shown, render dropdown menu
+                  if (shouldShowDropdown) {
+                    // Check if any dropdown item is active
+                    const isAnyDropdownActive = accessibleDropdownItems.some(dropdownItem => 
+                      isLinkActive(dropdownItem.href)
+                    );
+                    
+                    return (
+                      <DropdownMenu key={item.href}>
+                        <DropdownMenuTrigger
+                          className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                            isAnyDropdownActive
+                              ? `${getNavItemActiveColors(pathname || '').bg} ${getNavItemActiveColors(pathname || '').text}`
+                              : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4 mr-2" />
+                          {item.label}
+                          <ChevronDown className="w-3 h-3 ml-1" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="bg-slate-800 border-slate-700">
+                          {accessibleDropdownItems.map((dropdownItem) => {
+                            const DropdownIcon = dropdownItem.icon;
+                            const dropdownIsActive = isLinkActive(dropdownItem.href);
+                            const dropdownActiveColors = getNavItemActiveColors(dropdownItem.href);
+                            
+                            return (
+                              <DropdownMenuItem
+                                key={dropdownItem.href}
+                                className={`cursor-pointer ${
+                                  dropdownIsActive
+                                    ? `${dropdownActiveColors.bg} ${dropdownActiveColors.text}`
+                                    : 'text-muted-foreground hover:bg-slate-700 hover:text-white'
+                                }`}
+                                asChild
+                              >
+                                <Link href={dropdownItem.href} className="flex items-center">
+                                  <DropdownIcon className="w-4 h-4 mr-2" />
+                                  {dropdownItem.label}
+                                </Link>
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    );
+                  }
+                  
+                  // Otherwise, render as regular link (either no dropdown or only one accessible item)
+                  const finalHref = accessibleDropdownItems.length === 1 
+                    ? accessibleDropdownItems[0].href 
+                    : item.href;
+                  
                   return (
                     <Link
                       key={item.href}
-                      href={item.href}
+                      href={finalHref}
                       className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                         isActive
                           ? `${activeColors.bg} ${activeColors.text}`
@@ -479,10 +554,55 @@ export function Navbar() {
                 const Icon = item.icon;
                 const isActive = isLinkActive(item.href);
                 const activeColors = getNavItemActiveColors(item.href);
+                
+                // Check if this item has a dropdown and user has access to multiple items
+                const hasDropdown = item.dropdownItems && item.dropdownItems.length > 0;
+                const accessibleDropdownItems = hasDropdown
+                  ? item.dropdownItems!.filter(dropdownItem => {
+                      if (!dropdownItem.module) return true;
+                      return userPermissions.has(dropdownItem.module);
+                    })
+                  : [];
+                const shouldShowDropdown = accessibleDropdownItems.length > 1;
+                
+                // If dropdown should be shown in mobile, render each dropdown item
+                if (shouldShowDropdown) {
+                  return (
+                    <div key={item.href}>
+                      {accessibleDropdownItems.map((dropdownItem) => {
+                        const DropdownIcon = dropdownItem.icon;
+                        const dropdownIsActive = isLinkActive(dropdownItem.href);
+                        const dropdownActiveColors = getNavItemActiveColors(dropdownItem.href);
+                        
+                        return (
+                          <Link
+                            key={dropdownItem.href}
+                            href={dropdownItem.href}
+                            onClick={() => setMobileMenuOpen(false)}
+                            className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
+                              dropdownIsActive
+                                ? `${dropdownActiveColors.bg} ${dropdownActiveColors.text}`
+                                : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
+                            }`}
+                          >
+                            <DropdownIcon className="w-5 h-5 mr-3" />
+                            {dropdownItem.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  );
+                }
+                
+                // Otherwise, render as regular link
+                const finalHref = accessibleDropdownItems.length === 1 
+                  ? accessibleDropdownItems[0].href 
+                  : item.href;
+                
                 return (
                   <Link
                     key={item.href}
-                    href={item.href}
+                    href={finalHref}
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                       isActive

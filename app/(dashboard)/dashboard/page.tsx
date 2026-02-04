@@ -117,7 +117,7 @@ export default function DashboardPage() {
       // When viewing as different roles, simulate their permissions
       if (isSuperAdmin && viewAsRole !== 'actual') {
         if (viewAsRole === 'admin' || viewAsRole === 'manager') {
-          setUserPermissions(new Set(['timesheets', 'inspections', 'absence', 'rams', 'maintenance', 'workshop-tasks', 'approvals', 'actions', 'reports'] as ModuleName[]));
+          setUserPermissions(new Set(['timesheets', 'inspections', 'plant-inspections', 'absence', 'rams', 'maintenance', 'workshop-tasks', 'approvals', 'actions', 'reports'] as ModuleName[]));
         } else if (viewAsRole === 'employee') {
           // Simulate basic employee permissions (timesheets and inspections only)
           setUserPermissions(new Set(['timesheets', 'inspections'] as ModuleName[]));
@@ -126,10 +126,10 @@ export default function DashboardPage() {
         return;
       }
       
-      // Managers and admins have all permissions
+        // Managers and admins have all permissions
       if (isManager || isAdmin) {
         setUserPermissions(new Set([
-          'timesheets', 'inspections', 'rams', 'absence', 'maintenance', 'toolbox-talks', 'workshop-tasks',
+          'timesheets', 'inspections', 'plant-inspections', 'rams', 'absence', 'maintenance', 'toolbox-talks', 'workshop-tasks',
           'approvals', 'actions', 'reports', 'admin-users', 'admin-vehicles'
         ] as ModuleName[]));
         setPermissionsLoading(false);
@@ -477,6 +477,7 @@ export default function DashboardPage() {
                 const moduleMap: Record<string, ModuleName> = {
                   'timesheet': 'timesheets',
                   'inspection': 'inspections',
+                  'plant-inspection': 'plant-inspections',
                   'rams': 'rams',
                   'absence': 'absence',
                   'maintenance': 'maintenance',
