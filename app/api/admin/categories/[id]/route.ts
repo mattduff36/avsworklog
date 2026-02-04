@@ -30,7 +30,7 @@ export async function PUT(
 
     const categoryId = (await params).id;
     const body = await request.json();
-    const { name, description } = body;
+    const { name, description, applies_to } = body;
 
     // Validate required fields
     if (!name) {
@@ -40,13 +40,28 @@ export async function PUT(
       );
     }
 
+    // Validate applies_to if provided
+    if (applies_to !== undefined && (!Array.isArray(applies_to) || applies_to.length === 0)) {
+      return NextResponse.json(
+        { error: 'applies_to must be a non-empty array' },
+        { status: 400 }
+      );
+    }
+
+    // Build updates object
+    const updates: Record<string, any> = {
+      name: name.trim(),
+      description: description?.trim() || null,
+    };
+
+    if (applies_to !== undefined) {
+      updates.applies_to = applies_to;
+    }
+
     // Update category
     const { data, error } = await supabase
       .from('vehicle_categories')
-      .update({
-        name: name.trim(),
-        description: description?.trim() || null,
-      })
+      .update(updates)
       .eq('id', categoryId)
       .select()
       .single();
@@ -107,17 +122,23 @@ export async function DELETE(
 
     const categoryId = (await params).id;
 
-    // Check if category is in use by any vehicles
+    // Check if category is in use by any vehicles or plant
     const { data: vehicles } = await supabase
       .from('vehicles')
       .select('id')
       .eq('category_id', categoryId)
       .limit(1);
 
-    if (vehicles && vehicles.length > 0) {
+    const { data: plant } = await supabase
+      .from('plant')
+      .select('id')
+      .eq('category_id', categoryId)
+      .limit(1);
+
+    if ((vehicles && vehicles.length > 0) || (plant && plant.length > 0)) {
       return NextResponse.json(
         {
-          error: 'Cannot delete category that is assigned to vehicles',
+          error: 'Cannot delete category that is assigned to vehicles or plant',
         },
         { status: 400 }
       );

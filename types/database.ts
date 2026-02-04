@@ -153,6 +153,7 @@ export interface Database {
           id: string
           name: string
           description: string | null
+          applies_to: string[]
           created_at: string
           updated_at: string
         }
@@ -160,6 +161,7 @@ export interface Database {
           id?: string
           name: string
           description?: string | null
+          applies_to?: string[]
           created_at?: string
           updated_at?: string
         }
@@ -167,6 +169,7 @@ export interface Database {
           id?: string
           name?: string
           description?: string | null
+          applies_to?: string[]
           created_at?: string
           updated_at?: string
         }
@@ -820,6 +823,7 @@ export interface Database {
           id: string
           name: string
           description: string | null
+          applies_to: string[]
           is_active: boolean
           created_at: string
           created_by: string | null
@@ -829,6 +833,7 @@ export interface Database {
           id?: string
           name: string
           description?: string | null
+          applies_to?: string[]
           is_active?: boolean
           created_at?: string
           created_by?: string | null
@@ -838,6 +843,7 @@ export interface Database {
           id?: string
           name?: string
           description?: string | null
+          applies_to?: string[]
           is_active?: boolean
           created_at?: string
           created_by?: string | null

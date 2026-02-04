@@ -2999,7 +2999,7 @@ export default function WorkshopTasksPage() {
               onEditSubcategory={openEditSubcategoryModal}
               onDeleteSubcategory={handleDeleteSubcategory}
             />
-            <AttachmentManagementPanel />
+            <AttachmentManagementPanel taxonomyMode={categoryTaxonomyMode} />
           </TabsContent>
         )}
       </Tabs>

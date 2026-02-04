@@ -14,13 +14,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2, Truck, HardHat } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface VehicleCategory {
   id: string;
   name: string;
   description: string | null;
+  applies_to?: string[];
 }
 
 interface VehicleCategoryDialogProps {
@@ -42,6 +44,8 @@ export function VehicleCategoryDialog({
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [appliesToVehicle, setAppliesToVehicle] = useState(true);
+  const [appliesToPlant, setAppliesToPlant] = useState(false);
 
   // Reset form when dialog opens/closes or category changes
   useEffect(() => {
@@ -49,9 +53,14 @@ export function VehicleCategoryDialog({
       if (mode === 'edit' && category) {
         setName(category.name);
         setDescription(category.description || '');
+        const appliesTo = category.applies_to || ['vehicle'];
+        setAppliesToVehicle(appliesTo.includes('vehicle'));
+        setAppliesToPlant(appliesTo.includes('plant'));
       } else {
         setName('');
         setDescription('');
+        setAppliesToVehicle(true);
+        setAppliesToPlant(false);
       }
     }
   }, [open, mode, category]);
@@ -64,6 +73,11 @@ export function VehicleCategoryDialog({
       return;
     }
 
+    if (!appliesToVehicle && !appliesToPlant) {
+      toast.error('Category must apply to at least one asset type');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -73,12 +87,17 @@ export function VehicleCategoryDialog({
       
       const method = mode === 'create' ? 'POST' : 'PUT';
 
+      const appliesTo: string[] = [];
+      if (appliesToVehicle) appliesTo.push('vehicle');
+      if (appliesToPlant) appliesTo.push('plant');
+
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim() || null,
+          applies_to: appliesTo,
         }),
       });
 
@@ -143,6 +162,42 @@ export function VehicleCategoryDialog({
                 className="bg-slate-800 border-slate-700 min-h-[80px] dark:text-slate-100 text-slate-900"
                 disabled={loading}
               />
+            </div>
+
+            {/* Applies To Checkboxes */}
+            <div className="space-y-3">
+              <Label>Applies To *</Label>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="applies-vehicle"
+                    checked={appliesToVehicle}
+                    onCheckedChange={(checked) => setAppliesToVehicle(checked as boolean)}
+                    disabled={loading}
+                    className="border-slate-600"
+                  />
+                  <Label htmlFor="applies-vehicle" className="text-white cursor-pointer flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-blue-400" />
+                    Vehicles
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="applies-plant"
+                    checked={appliesToPlant}
+                    onCheckedChange={(checked) => setAppliesToPlant(checked as boolean)}
+                    disabled={loading}
+                    className="border-slate-600"
+                  />
+                  <Label htmlFor="applies-plant" className="text-white cursor-pointer flex items-center gap-2">
+                    <HardHat className="h-4 w-4 text-orange-400" />
+                    Plant Machinery
+                  </Label>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Select which asset types this category applies to
+              </p>
             </div>
           </div>
 

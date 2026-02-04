@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Create new vehicle
+// POST - Create new vehicle or plant asset
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerClient();
@@ -115,24 +115,19 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { reg_number, category_id, nickname } = body;
+    const { 
+      asset_type = 'vehicle', 
+      reg_number, 
+      plant_id,
+      category_id, 
+      nickname,
+      serial_number,
+      year,
+      weight_class,
+      status = 'active'
+    } = body;
 
-    // Validate required fields
-    if (!reg_number) {
-      return NextResponse.json(
-        { error: 'Registration number is required' },
-        { status: 400 }
-      );
-    }
-
-    // Validate and format registration number
-    const validationError = validateRegistrationNumber(reg_number);
-    if (validationError) {
-      return NextResponse.json({ error: validationError }, { status: 400 });
-    }
-    
-    const cleanReg = formatRegistrationForStorage(reg_number);
-
+    // Validate category (required for both)
     if (!category_id) {
       return NextResponse.json(
         { error: 'Category is required' },
@@ -140,42 +135,120 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insert vehicle (vehicle_type will auto-sync from category via trigger)
-    const { data, error } = await supabase
-      .from('vehicles')
-      .insert({
-        reg_number: cleanReg,
-        category_id: category_id,
-        status: 'active',
-        nickname: nickname?.trim() || null,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      if (error.code === '23505') {
+    // Branch based on asset type
+    if (asset_type === 'plant') {
+      // === PLANT ASSET PATH ===
+      
+      // Validate required fields for plant
+      if (!plant_id) {
         return NextResponse.json(
-          { error: 'Vehicle with this registration already exists' },
+          { error: 'Plant ID is required for plant assets' },
           { status: 400 }
         );
       }
-      throw error;
+
+      // Validate registration number if provided (optional for plant)
+      let cleanReg = null;
+      if (reg_number && reg_number.trim()) {
+        const validationError = validateRegistrationNumber(reg_number);
+        if (validationError) {
+          return NextResponse.json({ error: validationError }, { status: 400 });
+        }
+        cleanReg = formatRegistrationForStorage(reg_number);
+      }
+
+      // Insert plant
+      const { data, error } = await supabase
+        .from('plant')
+        .insert({
+          plant_id: plant_id.trim(),
+          reg_number: cleanReg,
+          category_id: category_id,
+          status: status,
+          nickname: nickname?.trim() || null,
+          serial_number: serial_number?.trim() || null,
+          year: year ? parseInt(year) : null,
+          weight_class: weight_class?.trim() || null,
+          created_by: user.id,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === '23505') {
+          return NextResponse.json(
+            { error: 'Plant asset with this ID already exists' },
+            { status: 400 }
+          );
+        }
+        throw error;
+      }
+
+      console.log(`[INFO] Plant asset created: ${data.plant_id} (ID: ${data.id})`);
+
+      // Return plant data in compatible format
+      return NextResponse.json({ 
+        vehicle: data,
+        syncResult: { success: true, skipped: true, reason: 'plant asset' },
+        message: 'Plant asset created successfully'
+      });
+
+    } else {
+      // === VEHICLE PATH (existing logic) ===
+      
+      // Validate required fields for vehicle
+      if (!reg_number) {
+        return NextResponse.json(
+          { error: 'Registration number is required' },
+          { status: 400 }
+        );
+      }
+
+      // Validate and format registration number
+      const validationError = validateRegistrationNumber(reg_number);
+      if (validationError) {
+        return NextResponse.json({ error: validationError }, { status: 400 });
+      }
+      
+      const cleanReg = formatRegistrationForStorage(reg_number);
+
+      // Insert vehicle (vehicle_type will auto-sync from category via trigger)
+      const { data, error } = await supabase
+        .from('vehicles')
+        .insert({
+          reg_number: cleanReg,
+          category_id: category_id,
+          status: 'active',
+          nickname: nickname?.trim() || null,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === '23505') {
+          return NextResponse.json(
+            { error: 'Vehicle with this registration already exists' },
+            { status: 400 }
+          );
+        }
+        throw error;
+      }
+
+      console.log(`[INFO] Vehicle created: ${data.reg_number} (ID: ${data.id})`);
+
+      // Automatically sync TAX and MOT data from APIs (non-blocking)
+      const syncResult = await syncVehicleData(data.id, data.reg_number, user.id, supabase);
+
+      return NextResponse.json({ 
+        vehicle: data,
+        syncResult: syncResult,
+        message: syncResult.success 
+          ? 'Vehicle created and data synced successfully'
+          : 'Vehicle created. Note: ' + (syncResult.warning || 'API sync will retry automatically')
+      });
     }
-
-    console.log(`[INFO] Vehicle created: ${data.reg_number} (ID: ${data.id})`);
-
-    // Automatically sync TAX and MOT data from APIs (non-blocking)
-    const syncResult = await syncVehicleData(data.id, data.reg_number, user.id, supabase);
-
-    return NextResponse.json({ 
-      vehicle: data,
-      syncResult: syncResult,
-      message: syncResult.success 
-        ? 'Vehicle created and data synced successfully'
-        : 'Vehicle created. Note: ' + (syncResult.warning || 'API sync will retry automatically')
-    });
   } catch (error) {
-    console.error('Error creating vehicle:', error);
+    console.error('Error creating vehicle/plant:', error);
 
     await logServerError({
       error: error as Error,

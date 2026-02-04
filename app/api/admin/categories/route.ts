@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, description } = body;
+    const { name, description, applies_to } = body;
 
     // Validate required fields
     if (!name) {
@@ -75,12 +75,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate applies_to if provided
+    if (applies_to && (!Array.isArray(applies_to) || applies_to.length === 0)) {
+      return NextResponse.json(
+        { error: 'applies_to must be a non-empty array' },
+        { status: 400 }
+      );
+    }
+
+    const validAppliesTo = applies_to && applies_to.length > 0 ? applies_to : ['vehicle'];
+
     // Insert category
     const { data, error } = await supabase
       .from('vehicle_categories')
       .insert({
         name: name.trim(),
         description: description?.trim() || null,
+        applies_to: validAppliesTo,
       })
       .select()
       .single();

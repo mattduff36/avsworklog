@@ -9,9 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Plus, Edit, Trash2, ChevronDown, ChevronUp, FileText, GripVertical, Check, X } from 'lucide-react';
+import { Plus, Edit, Trash2, ChevronDown, ChevronUp, FileText, Truck, HardHat } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { Database } from '@/types/database';
@@ -27,13 +28,18 @@ const QUESTION_TYPES = [
   { value: 'date', label: 'Date' },
 ] as const;
 
-export function AttachmentManagementPanel() {
+interface AttachmentManagementPanelProps {
+  taxonomyMode?: 'vehicle' | 'plant';
+}
+
+export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagementPanelProps) {
   const supabase = createClient();
   
   const [templates, setTemplates] = useState<Template[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
   
   // Template dialog state
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
@@ -41,6 +47,8 @@ export function AttachmentManagementPanel() {
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
   const [templateActive, setTemplateActive] = useState(true);
+  const [templateAppliesToVehicle, setTemplateAppliesToVehicle] = useState(true);
+  const [templateAppliesToPlant, setTemplateAppliesToPlant] = useState(true);
   const [savingTemplate, setSavingTemplate] = useState(false);
   
   // Question dialog state
@@ -62,19 +70,24 @@ export function AttachmentManagementPanel() {
     fetchQuestions();
   }, []);
 
-  // Auto-select first template
+  // Filter templates by taxonomy mode if provided
+  const filteredTemplates = taxonomyMode 
+    ? templates.filter(t => (t.applies_to || ['vehicle', 'plant']).includes(taxonomyMode))
+    : templates;
+
+  // Auto-select first template (from filtered templates)
   useEffect(() => {
-    if (templates.length > 0 && !selectedTemplateId) {
-      setSelectedTemplateId(templates[0].id);
-    } else if (templates.length > 0 && selectedTemplateId) {
-      const templateExists = templates.some(t => t.id === selectedTemplateId);
+    if (filteredTemplates.length > 0 && !selectedTemplateId) {
+      setSelectedTemplateId(filteredTemplates[0].id);
+    } else if (filteredTemplates.length > 0 && selectedTemplateId) {
+      const templateExists = filteredTemplates.some(t => t.id === selectedTemplateId);
       if (!templateExists) {
-        setSelectedTemplateId(templates[0].id);
+        setSelectedTemplateId(filteredTemplates[0].id);
       }
-    } else if (templates.length === 0) {
+    } else if (filteredTemplates.length === 0) {
       setSelectedTemplateId(null);
     }
-  }, [templates, selectedTemplateId]);
+  }, [filteredTemplates, selectedTemplateId]);
 
   const fetchTemplates = async () => {
     try {
@@ -108,6 +121,7 @@ export function AttachmentManagementPanel() {
   };
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
+  
   const templateQuestions = selectedTemplateId
     ? questions.filter(q => q.template_id === selectedTemplateId).sort((a, b) => a.sort_order - b.sort_order)
     : [];
@@ -118,6 +132,8 @@ export function AttachmentManagementPanel() {
     setTemplateName('');
     setTemplateDescription('');
     setTemplateActive(true);
+    setTemplateAppliesToVehicle(true);
+    setTemplateAppliesToPlant(true);
     setShowTemplateDialog(true);
   };
 
@@ -126,6 +142,9 @@ export function AttachmentManagementPanel() {
     setTemplateName(template.name);
     setTemplateDescription(template.description || '');
     setTemplateActive(template.is_active);
+    const appliesTo = template.applies_to || ['vehicle', 'plant'];
+    setTemplateAppliesToVehicle(appliesTo.includes('vehicle'));
+    setTemplateAppliesToPlant(appliesTo.includes('plant'));
     setShowTemplateDialog(true);
   };
 
@@ -135,8 +154,17 @@ export function AttachmentManagementPanel() {
       return;
     }
 
+    if (!templateAppliesToVehicle && !templateAppliesToPlant) {
+      toast.error('Template must apply to at least one asset type');
+      return;
+    }
+
     setSavingTemplate(true);
     try {
+      const appliesTo: string[] = [];
+      if (templateAppliesToVehicle) appliesTo.push('vehicle');
+      if (templateAppliesToPlant) appliesTo.push('plant');
+
       if (editingTemplate) {
         const { error } = await supabase
           .from('workshop_attachment_templates')
@@ -144,6 +172,7 @@ export function AttachmentManagementPanel() {
             name: templateName.trim(),
             description: templateDescription.trim() || null,
             is_active: templateActive,
+            applies_to: appliesTo,
           })
           .eq('id', editingTemplate.id);
 
@@ -156,6 +185,7 @@ export function AttachmentManagementPanel() {
             name: templateName.trim(),
             description: templateDescription.trim() || null,
             is_active: templateActive,
+            applies_to: appliesTo,
           });
 
         if (error) throw error;
@@ -166,7 +196,8 @@ export function AttachmentManagementPanel() {
       fetchTemplates();
     } catch (err) {
       console.error('Error saving template:', err);
-      toast.error('Failed to save template');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save template';
+      toast.error(errorMessage);
     } finally {
       setSavingTemplate(false);
     }
@@ -320,59 +351,128 @@ export function AttachmentManagementPanel() {
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <div className="animate-pulse text-muted-foreground">Loading attachment templates...</div>
-        </CardContent>
+      <Card className="border-border">
+        <CardHeader
+          className="cursor-pointer hover:bg-slate-800/30 transition-colors"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 flex-1">
+              <ChevronDown 
+                className={`h-5 w-5 text-muted-foreground transition-transform ${
+                  isExpanded ? 'rotate-180' : ''
+                }`}
+              />
+              <div>
+                <CardTitle className="text-white">Attachment Templates</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  Loading...
+                </CardDescription>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        {isExpanded && (
+          <CardContent className="flex items-center justify-center py-12">
+            <div className="animate-pulse text-muted-foreground">Loading attachment templates...</div>
+          </CardContent>
+        )}
       </Card>
     );
   }
 
   if (templates.length === 0) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <FileText className="h-16 w-16 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">
-            No Attachment Templates Yet
-          </h3>
-          <p className="text-muted-foreground mb-6 text-center max-w-md">
-            Create attachment templates to add service checklists and documentation forms to workshop tasks
-          </p>
-          <Button onClick={openAddTemplateDialog} className="bg-workshop hover:bg-workshop-dark text-white">
-            <Plus className="h-4 w-4 mr-2" />
-            Create First Template
-          </Button>
-        </CardContent>
+      <Card className="border-border">
+        <CardHeader
+          className="cursor-pointer hover:bg-slate-800/30 transition-colors"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 flex-1">
+              <ChevronDown 
+                className={`h-5 w-5 text-muted-foreground transition-transform ${
+                  isExpanded ? 'rotate-180' : ''
+                }`}
+              />
+              <div>
+                <CardTitle className="text-white">Attachment Templates</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  0 templates
+                </CardDescription>
+              </div>
+            </div>
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                openAddTemplateDialog();
+              }}
+              className="bg-workshop hover:bg-workshop-dark text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Template
+            </Button>
+          </div>
+        </CardHeader>
+        {isExpanded && (
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              No Attachment Templates Yet
+            </h3>
+            <p className="text-muted-foreground text-center max-w-md">
+              Create attachment templates to add service checklists and documentation forms to workshop tasks
+            </p>
+          </CardContent>
+        )}
       </Card>
     );
   }
 
   return (
     <>
-      <Card>
-        <CardHeader>
+      <Card className="border-border">
+        <CardHeader
+          className="cursor-pointer hover:bg-slate-800/30 transition-colors"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Attachment Templates</CardTitle>
-              <CardDescription>
-                Create and manage service checklists and documentation forms
-              </CardDescription>
+            <div className="flex items-center gap-3 flex-1">
+              <ChevronDown 
+                className={`h-5 w-5 text-muted-foreground transition-transform ${
+                  isExpanded ? 'rotate-180' : ''
+                }`}
+              />
+              <div>
+                <CardTitle className="text-white">Attachment Templates</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  {filteredTemplates.length} {filteredTemplates.length === 1 ? 'template' : 'templates'} • Service checklists and documentation forms
+                </CardDescription>
+              </div>
             </div>
-            <Button onClick={openAddTemplateDialog} className="bg-workshop hover:bg-workshop-dark text-white">
+            <Button
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                openAddTemplateDialog();
+              }}
+              className="bg-workshop hover:bg-workshop-dark text-white"
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Template
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
+        
+        {isExpanded && (
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
             {/* Left Column: Template List */}
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wide">
-                Templates ({templates.length})
+                Templates ({filteredTemplates.length})
               </p>
-              {templates.map((template) => {
+              {filteredTemplates.map((template) => {
                 const questionCount = questions.filter(q => q.template_id === template.id).length;
                 const isSelected = selectedTemplateId === template.id;
 
@@ -569,6 +669,7 @@ export function AttachmentManagementPanel() {
             </div>
           </div>
         </CardContent>
+        )}
       </Card>
 
       {/* Template Dialog */}
@@ -621,6 +722,40 @@ export function AttachmentManagementPanel() {
                 checked={templateActive}
                 onCheckedChange={setTemplateActive}
               />
+            </div>
+
+            {/* Applies To Checkboxes */}
+            <div className="space-y-3">
+              <Label>Applies To <span className="text-red-500">*</span></Label>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="template-applies-vehicle"
+                    checked={templateAppliesToVehicle}
+                    onCheckedChange={(checked) => setTemplateAppliesToVehicle(checked as boolean)}
+                    className="border-slate-600"
+                  />
+                  <Label htmlFor="template-applies-vehicle" className="cursor-pointer flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-blue-400" />
+                    Vehicle Tasks
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="template-applies-plant"
+                    checked={templateAppliesToPlant}
+                    onCheckedChange={(checked) => setTemplateAppliesToPlant(checked as boolean)}
+                    className="border-slate-600"
+                  />
+                  <Label htmlFor="template-applies-plant" className="cursor-pointer flex items-center gap-2">
+                    <HardHat className="h-4 w-4 text-orange-400" />
+                    Plant Machinery Tasks
+                  </Label>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Select which types of workshop tasks this template can be used for
+              </p>
             </div>
           </div>
 
