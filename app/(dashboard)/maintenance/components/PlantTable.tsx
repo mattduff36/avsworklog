@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -99,12 +99,7 @@ export function PlantTable({
     }));
   };
 
-  // Fetch plant assets from the plant table
-  useEffect(() => {
-    fetchPlantData();
-  }, []);
-
-  const fetchPlantData = async () => {
+  const fetchPlantData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -159,7 +154,12 @@ export function PlantTable({
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
+
+  // Fetch plant assets from the plant table
+  useEffect(() => {
+    fetchPlantData();
+  }, [fetchPlantData]);
 
   // Filter based on search
   const filteredPlant = activePlantAssets.filter(asset => {

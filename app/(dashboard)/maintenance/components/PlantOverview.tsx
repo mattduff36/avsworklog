@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { MaintenanceOverview } from './MaintenanceOverview';
@@ -40,11 +40,7 @@ export function PlantOverview({ onVehicleClick }: PlantOverviewProps) {
   const [plantAssets, setPlantAssets] = useState<PlantMaintenanceWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchPlantAssets();
-  }, []);
-
-  const fetchPlantAssets = async () => {
+  const fetchPlantAssets = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -104,7 +100,11 @@ export function PlantOverview({ onVehicleClick }: PlantOverviewProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchPlantAssets();
+  }, [fetchPlantAssets]);
 
   if (loading) {
     return (

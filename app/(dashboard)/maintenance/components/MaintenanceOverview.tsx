@@ -236,7 +236,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   
   // Helper to determine if a vehicle ID corresponds to a plant asset
   const isPlantAsset = useCallback((vehicleId: string) => {
-    const vehicle = vehicles.find(v => (v.vehicle_id || v.id) === vehicleId);
+    const vehicle = vehicles.find(v => v.vehicle_id === vehicleId || v.id === vehicleId);
     return vehicle && 'is_plant' in vehicle && vehicle.is_plant === true;
   }, [vehicles]);
   
@@ -846,7 +846,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     setShowCommentsDrawer(true);
   };
 
-  const toggleVehicle = async (vehicleId: string, vehicle?: VehicleMaintenanceWithStatus) => {
+  const toggleVehicle = useCallback(async (vehicleId: string, vehicle?: VehicleMaintenanceWithStatus) => {
     const newExpanded = new Set(expandedVehicles);
     if (newExpanded.has(vehicleId)) {
       newExpanded.delete(vehicleId);
@@ -855,7 +855,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId));
     }
     setExpandedVehicles(newExpanded);
-  };
+  }, [expandedVehicles, fetchVehicleHistory, isPlantAsset]);
 
   const handleCardClick = (vehicleId: string, vehicle: VehicleWithAlerts) => {
     // If onVehicleClick is provided, use it for navigation
