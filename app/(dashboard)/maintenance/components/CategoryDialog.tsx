@@ -470,7 +470,7 @@ export function CategoryDialog({
                   id="applies-vehicle"
                   checked={appliesTo?.includes('vehicle') || false}
                   onCheckedChange={(checked) => {
-                    const current = appliesTo || ['vehicle'];
+                    const current = appliesTo || []; // ✅ Default to empty, not ['vehicle']
                     if (checked) {
                       setValue('applies_to', [...current.filter(a => a !== 'vehicle'), 'vehicle']);
                     } else {
@@ -490,7 +490,7 @@ export function CategoryDialog({
                   id="applies-plant"
                   checked={appliesTo?.includes('plant') || false}
                   onCheckedChange={(checked) => {
-                    const current = appliesTo || ['vehicle'];
+                    const current = appliesTo || []; // ✅ Default to empty, not ['vehicle']
                     if (checked) {
                       setValue('applies_to', [...current.filter(a => a !== 'plant'), 'plant']);
                     } else {
