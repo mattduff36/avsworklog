@@ -65,13 +65,14 @@ export function AddVehicleDialog({
   useEffect(() => {
     if (open) {
       fetchCategories();
+      setAssetType(initialAssetType); // Sync state with prop when dialog opens
     }
-  }, [open]);
+  }, [open, initialAssetType]);
 
   // Reset form when dialog closes
   useEffect(() => {
     if (!open) {
-      setAssetType('vehicle');
+      setAssetType(initialAssetType); // Reset to prop value, not hardcoded 'vehicle'
       setFormData({
         reg_number: '',
         plant_id: '',
@@ -84,7 +85,7 @@ export function AddVehicleDialog({
       });
       setError('');
     }
-  }, [open]);
+  }, [open, initialAssetType]);
 
   async function fetchCategories() {
     try {
