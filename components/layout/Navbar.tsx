@@ -399,14 +399,15 @@ export function Navbar() {
                   const Icon = item.icon;
                   
                   // Check if this item has a dropdown and user has access to multiple items
-                  // Only filter by permissions after client hydration to prevent hydration mismatch
+                  // CRITICAL: Only populate accessibleDropdownItems after mount to prevent hydration mismatch
+                  // When !isMounted, keep empty to ensure server/client render identical link structure
                   const hasDropdown = item.dropdownItems && item.dropdownItems.length > 0;
                   const accessibleDropdownItems = hasDropdown && isMounted
                     ? item.dropdownItems!.filter(dropdownItem => {
                         if (!dropdownItem.module) return true;
                         return userPermissions.has(dropdownItem.module);
                       })
-                    : hasDropdown ? item.dropdownItems! : [];
+                    : []; // Always empty before mount to prevent hydration mismatch
                   const shouldShowDropdown = isMounted && accessibleDropdownItems.length > 1;
                   
                   // If dropdown should be shown, render dropdown menu
@@ -458,7 +459,9 @@ export function Navbar() {
                   }
                   
                   // Otherwise, render as regular link (either no dropdown or only one accessible item)
-                  const finalHref = accessibleDropdownItems.length === 1 
+                  // CRITICAL: Use item.href consistently until after mount to prevent hydration mismatch
+                  // The finalHref calculation must be identical on server and client
+                  const finalHref = isMounted && accessibleDropdownItems.length === 1 
                     ? accessibleDropdownItems[0].href 
                     : item.href;
                   
@@ -563,14 +566,16 @@ export function Navbar() {
                 const Icon = item.icon;
                 
                 // Check if this item has a dropdown and user has access to multiple items
+                // CRITICAL: Only populate accessibleDropdownItems after mount to prevent hydration mismatch
+                // When !isMounted, keep empty to ensure server/client render identical link structure
                 const hasDropdown = item.dropdownItems && item.dropdownItems.length > 0;
-                const accessibleDropdownItems = hasDropdown
+                const accessibleDropdownItems = hasDropdown && isMounted
                   ? item.dropdownItems!.filter(dropdownItem => {
                       if (!dropdownItem.module) return true;
                       return userPermissions.has(dropdownItem.module);
                     })
-                  : [];
-                const shouldShowDropdown = accessibleDropdownItems.length > 1;
+                  : []; // Always empty before mount to prevent hydration mismatch
+                const shouldShowDropdown = isMounted && accessibleDropdownItems.length > 1;
                 
                 // If dropdown should be shown in mobile, render each dropdown item
                 if (shouldShowDropdown) {
@@ -602,7 +607,9 @@ export function Navbar() {
                 }
                 
                 // Otherwise, render as regular link
-                const finalHref = accessibleDropdownItems.length === 1 
+                // CRITICAL: Use item.href consistently until after mount to prevent hydration mismatch
+                // The finalHref calculation must be identical on server and client
+                const finalHref = isMounted && accessibleDropdownItems.length === 1 
                   ? accessibleDropdownItems[0].href 
                   : item.href;
                 
