@@ -605,7 +605,7 @@ function FleetContent() {
                                     <div className="flex items-center gap-4">
                                       <div className="text-right">
                                         <div className="text-2xl font-bold text-orange-400">
-                                          {plantAssets.filter(p => p.vehicle_categories?.name === category.name).length}
+                                          {plantAssets.filter(p => p.category_id === category.id).length}
                                         </div>
                                         <p className="text-xs text-muted-foreground">plant assets</p>
                                       </div>
@@ -724,7 +724,7 @@ function FleetContent() {
                                   <div className="flex items-center gap-4">
                                     <div className="text-right">
                                       <div className="text-2xl font-bold text-blue-400">
-                                        {vehicles.filter(v => v.vehicle_categories?.name === category.name).length}
+                                        {vehicles.filter(v => v.category_id === category.id).length}
                                       </div>
                                       <p className="text-xs text-muted-foreground">vehicles</p>
                                     </div>
