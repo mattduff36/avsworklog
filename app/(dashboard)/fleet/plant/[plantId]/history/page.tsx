@@ -351,6 +351,7 @@ export default function PlantHistoryPage({
 
   const getFieldLabel = (fieldName: string): string => {
     const labels: Record<string, string> = {
+      nickname: 'Nickname',
       current_hours: 'Current Hours',
       last_service_hours: 'Last Service Hours',
       next_service_hours: 'Next Service Hours',
@@ -359,8 +360,9 @@ export default function PlantHistoryPage({
       loler_certificate_number: 'LOLER Certificate',
       loler_inspection_interval_months: 'LOLER Interval',
       tracker_id: 'GPS Tracker',
+      no_changes: 'Update (No Field Changes)',
     };
-    return labels[fieldName] || fieldName.replace(/_/g, ' ');
+    return labels[fieldName] || fieldName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   };
 
   if (!plant && !loading) {
@@ -635,13 +637,19 @@ export default function PlantHistoryPage({
                                 {getFieldLabel(entry.field_name)}
                               </Badge>
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                              <span className="line-through">{entry.old_value || 'None'}</span>
-                              {' → '}
-                              <span className="text-slate-200">{entry.new_value || 'None'}</span>
-                            </div>
+                            {/* Only show before/after if we have actual values (not "no_changes") */}
+                            {entry.field_name !== 'no_changes' && (entry.old_value || entry.new_value) && (
+                              <div className="text-sm text-muted-foreground">
+                                <span className="line-through">{entry.old_value || 'Not set'}</span>
+                                {' → '}
+                                <span className="text-slate-200 font-medium">{entry.new_value || 'Not set'}</span>
+                              </div>
+                            )}
                             {entry.comment && (
-                              <p className="text-sm text-muted-foreground italic">&quot;{entry.comment}&quot;</p>
+                              <div className="bg-slate-900/50 rounded p-2 border border-slate-700 mt-2">
+                                <p className="text-xs text-muted-foreground mb-1">Comment:</p>
+                                <p className="text-sm text-slate-200">&quot;{entry.comment}&quot;</p>
+                              </div>
                             )}
                             <p className="text-xs text-muted-foreground">
                               {formatRelativeTime(entry.created_at)}

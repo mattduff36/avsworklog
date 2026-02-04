@@ -191,8 +191,14 @@ export function EditPlantRecordDialog({
         .eq('id', user.id)
         .single();
 
-      // Track changed fields for history
-      const changedFields: string[] = [];
+      // Track changed fields with before/after values for history
+      type FieldChange = {
+        field_name: string;
+        old_value: string | null;
+        new_value: string | null;
+        value_type: 'text' | 'number' | 'date';
+      };
+      const fieldChanges: FieldChange[] = [];
 
       // Update plant nickname if changed
       const nicknameChanged = data.nickname?.trim() !== plant.nickname;
@@ -209,7 +215,12 @@ export function EditPlantRecordDialog({
           console.error('Error updating plant nickname:', nicknameError);
           // Continue with other updates even if nickname update fails
         } else {
-          changedFields.push('nickname');
+          fieldChanges.push({
+            field_name: 'nickname',
+            old_value: plant.nickname,
+            new_value: data.nickname?.trim() || null,
+            value_type: 'text'
+          });
         }
       }
 
@@ -217,19 +228,39 @@ export function EditPlantRecordDialog({
       const plantUpdates: Record<string, any> = {};
       if (data.loler_due_date !== formatDateForInput(plant.loler_due_date)) {
         plantUpdates.loler_due_date = data.loler_due_date || null;
-        changedFields.push('loler_due_date');
+        fieldChanges.push({
+          field_name: 'loler_due_date',
+          old_value: plant.loler_due_date,
+          new_value: data.loler_due_date || null,
+          value_type: 'date'
+        });
       }
       if (data.loler_last_inspection_date !== formatDateForInput(plant.loler_last_inspection_date)) {
         plantUpdates.loler_last_inspection_date = data.loler_last_inspection_date || null;
-        changedFields.push('loler_last_inspection_date');
+        fieldChanges.push({
+          field_name: 'loler_last_inspection_date',
+          old_value: plant.loler_last_inspection_date,
+          new_value: data.loler_last_inspection_date || null,
+          value_type: 'date'
+        });
       }
       if (data.loler_certificate_number !== plant.loler_certificate_number) {
         plantUpdates.loler_certificate_number = data.loler_certificate_number?.trim() || null;
-        changedFields.push('loler_certificate_number');
+        fieldChanges.push({
+          field_name: 'loler_certificate_number',
+          old_value: plant.loler_certificate_number,
+          new_value: data.loler_certificate_number?.trim() || null,
+          value_type: 'text'
+        });
       }
       if (data.loler_inspection_interval_months !== plant.loler_inspection_interval_months) {
         plantUpdates.loler_inspection_interval_months = data.loler_inspection_interval_months || 12;
-        changedFields.push('loler_inspection_interval_months');
+        fieldChanges.push({
+          field_name: 'loler_inspection_interval_months',
+          old_value: plant.loler_inspection_interval_months?.toString() || null,
+          new_value: (data.loler_inspection_interval_months || 12).toString(),
+          value_type: 'number'
+        });
       }
 
       // Update plant table if there are changes
@@ -257,16 +288,36 @@ export function EditPlantRecordDialog({
 
       if (data.current_hours !== maintenanceRecord?.current_hours) {
         maintenanceUpdates.last_hours_update = new Date().toISOString();
-        changedFields.push('current_hours');
+        fieldChanges.push({
+          field_name: 'current_hours',
+          old_value: maintenanceRecord?.current_hours?.toString() || plant.current_hours?.toString() || null,
+          new_value: data.current_hours?.toString() || null,
+          value_type: 'number'
+        });
       }
       if (data.last_service_hours !== maintenanceRecord?.last_service_hours) {
-        changedFields.push('last_service_hours');
+        fieldChanges.push({
+          field_name: 'last_service_hours',
+          old_value: maintenanceRecord?.last_service_hours?.toString() || null,
+          new_value: data.last_service_hours?.toString() || null,
+          value_type: 'number'
+        });
       }
       if (data.next_service_hours !== maintenanceRecord?.next_service_hours) {
-        changedFields.push('next_service_hours');
+        fieldChanges.push({
+          field_name: 'next_service_hours',
+          old_value: maintenanceRecord?.next_service_hours?.toString() || null,
+          new_value: data.next_service_hours?.toString() || null,
+          value_type: 'number'
+        });
       }
       if (data.tracker_id !== maintenanceRecord?.tracker_id) {
-        changedFields.push('tracker_id');
+        fieldChanges.push({
+          field_name: 'tracker_id',
+          old_value: maintenanceRecord?.tracker_id || null,
+          new_value: data.tracker_id?.trim() || null,
+          value_type: 'text'
+        });
       }
 
       if (isNewRecord) {
@@ -294,23 +345,45 @@ export function EditPlantRecordDialog({
         }
       }
 
-      // Create maintenance history entry (ALWAYS).
+      // Create maintenance history entries (one per changed field for clarity).
       // Note: This writes with plant_id after the migration.
-      const historyFieldName = changedFields.length > 0 ? changedFields.join(', ') : 'no_changes';
-      const { error: historyError } = await supabase.from('maintenance_history').insert({
-        plant_id: plant.id,
-        vehicle_id: null,
-        field_name: historyFieldName,
-        old_value: null,
-        new_value: null,
-        value_type: 'text',
-        comment: data.comment.trim(),
-        updated_by: user.id,
-        updated_by_name: profile?.full_name || 'Unknown User',
-      });
+      if (fieldChanges.length > 0) {
+        const historyEntries = fieldChanges.map(change => ({
+          plant_id: plant.id,
+          vehicle_id: null,
+          field_name: change.field_name,
+          old_value: change.old_value,
+          new_value: change.new_value,
+          value_type: change.value_type,
+          comment: data.comment.trim(),
+          updated_by: user.id,
+          updated_by_name: profile?.full_name || 'Unknown User',
+        }));
 
-      if (historyError) {
-        throw new Error(`Failed to write maintenance history: ${historyError.message}`);
+        const { error: historyError } = await supabase
+          .from('maintenance_history')
+          .insert(historyEntries);
+
+        if (historyError) {
+          throw new Error(`Failed to write maintenance history: ${historyError.message}`);
+        }
+      } else {
+        // No fields changed, but still log the update attempt with comment
+        const { error: historyError } = await supabase.from('maintenance_history').insert({
+          plant_id: plant.id,
+          vehicle_id: null,
+          field_name: 'no_changes',
+          old_value: null,
+          new_value: null,
+          value_type: 'text',
+          comment: data.comment.trim(),
+          updated_by: user.id,
+          updated_by_name: profile?.full_name || 'Unknown User',
+        });
+
+        if (historyError) {
+          throw new Error(`Failed to write maintenance history: ${historyError.message}`);
+        }
       }
 
       toast.success('Plant record updated successfully', {
