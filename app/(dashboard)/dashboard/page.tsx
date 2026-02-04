@@ -72,6 +72,14 @@ export default function DashboardPage() {
   // Intro animation state (all devices)
   const [showIntro, setShowIntro] = useState(true);
   
+  // Track if component is mounted (client-side only) to prevent hydration issues
+  const [isMounted, setIsMounted] = useState(false);
+  
+  // Set mounted state after hydration
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+  
   // Hide intro after 3 seconds
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -117,7 +125,7 @@ export default function DashboardPage() {
       // When viewing as different roles, simulate their permissions
       if (isSuperAdmin && viewAsRole !== 'actual') {
         if (viewAsRole === 'admin' || viewAsRole === 'manager') {
-          setUserPermissions(new Set(['timesheets', 'inspections', 'absence', 'rams', 'maintenance', 'workshop-tasks', 'approvals', 'actions', 'reports'] as ModuleName[]));
+          setUserPermissions(new Set(['timesheets', 'inspections', 'plant-inspections', 'absence', 'rams', 'maintenance', 'workshop-tasks', 'approvals', 'actions', 'reports'] as ModuleName[]));
         } else if (viewAsRole === 'employee') {
           // Simulate basic employee permissions (timesheets and inspections only)
           setUserPermissions(new Set(['timesheets', 'inspections'] as ModuleName[]));
@@ -126,10 +134,10 @@ export default function DashboardPage() {
         return;
       }
       
-      // Managers and admins have all permissions
+        // Managers and admins have all permissions
       if (isManager || isAdmin) {
         setUserPermissions(new Set([
-          'timesheets', 'inspections', 'rams', 'absence', 'maintenance', 'toolbox-talks', 'workshop-tasks',
+          'timesheets', 'inspections', 'plant-inspections', 'rams', 'absence', 'maintenance', 'toolbox-talks', 'workshop-tasks',
           'approvals', 'actions', 'reports', 'admin-users', 'admin-vehicles'
         ] as ModuleName[]));
         setPermissionsLoading(false);
@@ -436,8 +444,8 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 max-w-6xl">
-      {/* Offline Banner */}
-      {!isOnline && <OfflineBanner />}
+      {/* Offline Banner - Only render after mount to prevent hydration mismatch */}
+      {isMounted && !isOnline && <OfflineBanner />}
       
       {/* Welcome Section */}
       <div className="bg-slate-900 rounded-lg p-6 border border-slate-700 relative overflow-hidden">
@@ -477,6 +485,7 @@ export default function DashboardPage() {
                 const moduleMap: Record<string, ModuleName> = {
                   'timesheet': 'timesheets',
                   'inspection': 'inspections',
+                  'plant-inspection': 'plant-inspections',
                   'rams': 'rams',
                   'absence': 'absence',
                   'maintenance': 'maintenance',

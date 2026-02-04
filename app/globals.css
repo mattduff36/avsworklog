@@ -48,6 +48,10 @@
     --inspection-light: 30 100% 96%;
     --inspection-dark: 30 95% 40%;
     
+    --plant-inspection-primary: 30 95% 45%;
+    --plant-inspection-light: 30 100% 94%;
+    --plant-inspection-dark: 30 95% 32%;
+    
     --rams-primary: 142 76% 36%;
     --rams-light: 142 76% 95%;
     --rams-dark: 142 76% 28%;
@@ -121,6 +125,12 @@
     --primary: var(--inspection-primary);
     --primary-foreground: 210 40% 98%;
     --ring: var(--inspection-primary);
+  }
+
+  [data-accent="plant-inspections"] {
+    --primary: var(--plant-inspection-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--plant-inspection-primary);
   }
 
   [data-accent="rams"] {
@@ -222,6 +232,13 @@
   .bg-inspection-dark { background-color: hsl(var(--inspection-dark)); }
   .text-inspection { color: hsl(var(--inspection-primary)); }
   .border-inspection { border-color: hsl(var(--inspection-primary)); }
+  
+  /* Plant Inspection */
+  .bg-plant-inspection { background-color: hsl(var(--plant-inspection-primary)); }
+  .bg-plant-inspection-light { background-color: hsl(var(--plant-inspection-light)); }
+  .bg-plant-inspection-dark { background-color: hsl(var(--plant-inspection-dark)); }
+  .text-plant-inspection { color: hsl(var(--plant-inspection-primary)); }
+  .border-plant-inspection { border-color: hsl(var(--plant-inspection-primary)); }
   
   /* Report */
   .bg-report { background-color: hsl(var(--report-primary)); }

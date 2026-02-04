@@ -37,6 +37,7 @@ export interface NavItem {
   icon: LucideIcon;
   module?: ModuleName; // For permission checking
   category?: 'employee' | 'manager' | 'admin'; // Which nav area it belongs to
+  dropdownItems?: NavItem[]; // For dropdown menus
 }
 
 /**
@@ -58,7 +59,23 @@ export const employeeNavItems: NavItem[] = [
     label: 'Inspections', 
     icon: ClipboardCheck, 
     module: 'inspections',
-    category: 'employee'
+    category: 'employee',
+    dropdownItems: [
+      {
+        href: '/inspections',
+        label: 'Vehicle Inspections',
+        icon: ClipboardCheck,
+        module: 'inspections',
+        category: 'employee'
+      },
+      {
+        href: '/plant-inspections',
+        label: 'Plant Inspections',
+        icon: ClipboardCheck,
+        module: 'plant-inspections',
+        category: 'employee'
+      }
+    ]
   },
   { 
     href: '/rams', 
@@ -201,6 +218,19 @@ export function getFilteredEmployeeNav(
     // (RAMS should be visible to managers/admins regardless of assignments)
     if (isManager || isAdmin) {
       return true;
+    }
+    
+    // For items with dropdown children, check if user has access to ANY child
+    if (item.dropdownItems && item.dropdownItems.length > 0) {
+      const hasAccessToAnyChild = item.dropdownItems.some(child => {
+        // If child has no module requirement, it's accessible
+        if (!child.module) return true;
+        // Otherwise check if user has the module permission
+        return userPermissions.has(child.module);
+      });
+      
+      // If user has access to at least one child, show the parent
+      return hasAccessToAnyChild;
     }
     
     // Check basic permission for employees

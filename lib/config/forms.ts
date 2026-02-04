@@ -61,6 +61,16 @@ export const FORM_TYPES: FormType[] = [
     enabled: true,
   },
   {
+    id: 'plant-inspection',
+    title: 'Plant Inspections',
+    description: 'Plant machinery safety checklist',
+    icon: ClipboardCheck,
+    href: '/plant-inspections',
+    listHref: '/plant-inspections',
+    color: 'plant-inspection',
+    enabled: true,
+  },
+  {
     id: 'rams',
     title: 'RAMS Documents',
     description: 'Risk Assessment & Method Statement',

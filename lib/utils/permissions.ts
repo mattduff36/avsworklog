@@ -129,6 +129,7 @@ export async function getUserPermissions(
       return {
         'timesheets': true,
         'inspections': true,
+        'plant-inspections': true,
         'rams': true,
         'absence': true,
         'maintenance': true,

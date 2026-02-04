@@ -897,15 +897,15 @@ export default function UsersAdminPage() {
             <div className="space-y-4">
               {/* User Info */}
               <div className="bg-slate-800 rounded p-4 space-y-2">
-                <p className="text-sm">
+                <div className="text-sm">
                   <span className="text-muted-foreground">Name:</span>{' '}
                   <span className="text-white font-medium">{selectedUser.full_name}</span>
-                </p>
-                <p className="text-sm">
+                </div>
+                <div className="text-sm">
                   <span className="text-muted-foreground">Email:</span>{' '}
-                  <span className="text-white">{selectedUser.email}</span>
-                </p>
-                <p className="text-sm">
+                  <span className="text-slate-200">{selectedUser.email}</span>
+                </div>
+                <div className="text-sm">
                   <span className="text-muted-foreground">Role:</span>{' '}
                   <Badge variant={
                     selectedUser.email === 'admin@mpdee.co.uk' ? 'destructive' :
@@ -913,7 +913,7 @@ export default function UsersAdminPage() {
                   }>
                     {selectedUser.email === 'admin@mpdee.co.uk' ? 'SuperAdmin' : (selectedUser.role?.display_name || 'No Role')}
                   </Badge>
-                </p>
+                </div>
               </div>
 
               {/* Deletion Options */}
@@ -1049,7 +1049,7 @@ export default function UsersAdminPage() {
               </p>
               <p className="text-sm">
                 <span className="text-muted-foreground">Email:</span>{' '}
-                <span className="text-white">{selectedUser.email}</span>
+                <span className="text-slate-200">{selectedUser.email}</span>
               </p>
             </div>
           )}
