@@ -25,6 +25,7 @@ type PlantAsset = {
 type PlantMaintenanceWithStatus = {
   vehicle_id: string;
   plant_id: string;
+  is_plant?: boolean; // Flag to indicate this is plant machinery, not a vehicle
   vehicle?: PlantAsset;
   current_hours: number | null;
   next_service_hours: number | null;
@@ -83,6 +84,7 @@ export function PlantOverview({ onVehicleClick }: PlantOverviewProps) {
         return {
           vehicle_id: plant.id,
           plant_id: plant.id,
+          is_plant: true, // Flag to indicate this is plant, not vehicle
           vehicle: {
             ...plant,
             id: plant.id

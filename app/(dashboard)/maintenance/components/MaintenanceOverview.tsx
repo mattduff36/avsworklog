@@ -192,7 +192,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     fetchServiceCategory();
   }, []);
   
-  const fetchVehicleHistory = useCallback(async (vehicleId: string, force: boolean = false) => {
+  const fetchVehicleHistory = useCallback(async (vehicleId: string, isPlant: boolean = false, force: boolean = false) => {
     // Check if already fetching or already have data (unless forced)
     if (!force && (fetchingVehicles.current.has(vehicleId) || vehicleHistory[vehicleId])) {
       return; // Already fetching or already fetched
@@ -204,7 +204,12 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     setVehicleHistory(prev => ({ ...prev, [vehicleId]: { history: [], workshopTasks: [], loading: true } }));
     
     try {
-      const response = await fetch(`/api/maintenance/history/${vehicleId}`);
+      // Use plant endpoint if this is a plant asset, otherwise use vehicle endpoint
+      const endpoint = isPlant 
+        ? `/api/maintenance/history/plant/${vehicleId}`
+        : `/api/maintenance/history/${vehicleId}`;
+      
+      const response = await fetch(endpoint);
       if (!response.ok) throw new Error('Failed to fetch history');
       
       const data = await response.json();
@@ -229,6 +234,12 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     }
   }, [vehicleHistory]);
   
+  // Helper to determine if a vehicle ID corresponds to a plant asset
+  const isPlantAsset = useCallback((vehicleId: string) => {
+    const vehicle = vehicles.find(v => (v.vehicle_id || v.id) === vehicleId);
+    return vehicle && 'is_plant' in vehicle && vehicle.is_plant === true;
+  }, [vehicles]);
+  
   // Auto-fetch history for vehicles with alerts on mount
   useEffect(() => {
     const vehiclesWithAlerts = vehicles.filter(v => {
@@ -244,10 +255,12 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     vehiclesWithAlerts.forEach(vehicle => {
       const vehicleId = vehicle.vehicle_id || vehicle.id;
       if (vehicleId) {
-        fetchVehicleHistory(vehicleId);
+        // Check if this is a plant asset (has is_plant flag)
+        const isPlant = 'is_plant' in vehicle && vehicle.is_plant === true;
+        fetchVehicleHistory(vehicleId, isPlant);
       }
     });
-  }, [vehicles, fetchVehicleHistory]);
+  }, [vehicles, fetchVehicleHistory]); // Note: isPlantAsset not needed here since we check inline
   
   // Group vehicles by their most severe alert status
   const vehiclesWithAlerts: VehicleWithAlerts[] = vehicles.map(vehicle => {
@@ -428,7 +441,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         delete newHistory[officeActionVehicle.vehicleId];
         return newHistory;
       });
-      fetchVehicleHistory(officeActionVehicle.vehicleId, true);
+      fetchVehicleHistory(officeActionVehicle.vehicleId, isPlantAsset(officeActionVehicle.vehicleId), true);
     }
     // Trigger Next.js soft refresh to refetch server data without losing client state
     router.refresh();
@@ -450,7 +463,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       });
       
       // Force refetch (bypass cache check since state update is async)
-      fetchVehicleHistory(createTaskVehicleId, true);
+      fetchVehicleHistory(createTaskVehicleId, isPlantAsset(createTaskVehicleId), true);
     }
   };
 
@@ -511,7 +524,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           delete newHistory[vehicleId];
           return newHistory;
         });
-        fetchVehicleHistory(vehicleId, true);
+        fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId), true);
       }
     } catch (error: unknown) {
       console.error('Error marking task in progress:', error instanceof Error ? error.message : error);
@@ -554,7 +567,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           delete newHistory[vehicleId];
           return newHistory;
         });
-        fetchVehicleHistory(vehicleId, true);
+        fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId), true);
       }
     } catch (error: unknown) {
       console.error('Error undoing task:', error instanceof Error ? error.message : error);
@@ -680,7 +693,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           delete newHistory[vehicleId];
           return newHistory;
         });
-        fetchVehicleHistory(vehicleId, true);
+        fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId), true);
       }
 
       setUpdatingStatus(prev => {
@@ -755,7 +768,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           delete newHistory[vehicleId];
           return newHistory;
         });
-        fetchVehicleHistory(vehicleId, true);
+        fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId), true);
       }
     } catch (error: unknown) {
       console.error('Error marking task on hold:', error);
@@ -819,7 +832,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           delete newHistory[vehicleId];
           return newHistory;
         });
-        fetchVehicleHistory(vehicleId, true);
+        fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId), true);
       }
     } catch (error: unknown) {
       console.error('Error resuming task:', error instanceof Error ? error.message : error);
@@ -839,7 +852,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       newExpanded.delete(vehicleId);
     } else {
       newExpanded.add(vehicleId);
-      fetchVehicleHistory(vehicleId);
+      fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId));
     }
     setExpandedVehicles(newExpanded);
   };

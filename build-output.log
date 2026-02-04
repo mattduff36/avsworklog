@@ -2,7 +2,8 @@
 > avsworklog@0.1.0 build
 > next build
 
-   ▲ Next.js 15.5.7
+ ⚠ Mismatching @next/swc version, detected: 15.5.7 while Next.js is on 15.5.11. Please ensure these match
+   ▲ Next.js 15.5.11
    - Environments: .env.local
 
    Creating an optimized production build ...
@@ -15,8 +16,7 @@
 > [PWA]   scope: /
 > [PWA] Fallback to precache routes when fetch failed from cache or network:
 > [PWA]   document (page): /offline
-<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (118kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
- ✓ Compiled successfully in 39.6s
+ ✓ Compiled successfully in 22.3s
    Skipping validation of types
    Skipping linting
    Collecting page data ...
@@ -31,7 +31,7 @@
 Route (app)                                                      Size  First Load JS
 ┌ ƒ /                                                           537 B         103 kB
 ├ ƒ /_not-found                                                  1 kB         104 kB
-├ ƒ /absence                                                  16.4 kB         237 kB
+├ ƒ /absence                                                  16.4 kB         236 kB
 ├ ƒ /absence/manage                                           7.14 kB         238 kB
 ├ ƒ /absence/manage/allowances                                10.8 kB         213 kB
 ├ ƒ /absence/manage/reasons                                   10.9 kB         213 kB
@@ -135,16 +135,16 @@ Route (app)                                                      Size  First Loa
 ├ ƒ /api/workshop-tasks/subcategories/[id]                      354 B         103 kB
 ├ ƒ /api/workshop-tasks/tasks/[taskId]/comments                 354 B         103 kB
 ├ ƒ /approvals                                                9.94 kB         211 kB
-├ ƒ /change-password                                          4.58 kB         169 kB
+├ ƒ /change-password                                          4.58 kB         168 kB
 ├ ƒ /dashboard                                                9.34 kB         207 kB
 ├ ƒ /debug                                                    21.2 kB         228 kB
 ├ ƒ /errors/manage                                            1.25 kB         104 kB
-├ ƒ /fleet                                                      63 kB         286 kB
+├ ƒ /fleet                                                    63.6 kB         287 kB
 ├ ƒ /fleet/plant/[plantId]/history                            9.12 kB         212 kB
 ├ ƒ /fleet/vehicles/[vehicleId]/history                       12.4 kB         193 kB
 ├ ƒ /help                                                     12.1 kB         222 kB
 ├ ƒ /inspections                                              10.5 kB         238 kB
-├ ƒ /inspections/[id]                                         11.8 kB         202 kB
+├ ƒ /inspections/[id]                                         11.8 kB         201 kB
 ├ ƒ /inspections/new                                            21 kB         242 kB
 ├ ƒ /login                                                    4.89 kB         169 kB
 ├ ƒ /maintenance                                              1.26 kB         104 kB
@@ -152,24 +152,24 @@ Route (app)                                                      Size  First Loa
 ├ ƒ /offline                                                  1.98 kB         114 kB
 ├ ƒ /pdf-viewer                                               2.39 kB         124 kB
 ├ ƒ /rams                                                     3.51 kB         210 kB
-├ ƒ /rams/[id]                                                7.83 kB         206 kB
+├ ƒ /rams/[id]                                                7.83 kB         205 kB
 ├ ƒ /rams/[id]/read                                           7.08 kB         203 kB
-├ ƒ /rams/manage                                                11 kB         204 kB
+├ ƒ /rams/manage                                                11 kB         203 kB
 ├ ƒ /reports                                                  9.82 kB         135 kB
 ├ ƒ /suggestions/manage                                       7.47 kB         218 kB
 ├ ƒ /test-error-logging                                       3.28 kB         125 kB
-├ ƒ /timesheets                                               4.26 kB         232 kB
+├ ƒ /timesheets                                               4.26 kB         231 kB
 ├ ƒ /timesheets/[id]                                            20 kB         219 kB
-├ ƒ /timesheets/new                                           23.5 kB         248 kB
+├ ƒ /timesheets/new                                           23.5 kB         247 kB
 ├ ƒ /toolbox-talks                                            12.7 kB         227 kB
 └ ƒ /workshop-tasks                                           18.1 kB         237 kB
 + First Load JS shared by all                                  103 kB
-  ├ chunks/1255-be62845a205f49d1.js                           45.5 kB
+  ├ chunks/1255-0d7294ce9fae1fd5.js                           45.6 kB
   ├ chunks/4bd1b696-100b9d70ed4e49c1.js                       54.2 kB
   └ other shared chunks (total)                               2.78 kB
 
 
-ƒ Middleware                                                  79.8 kB
+ƒ Middleware                                                  79.9 kB
 
 ƒ  (Dynamic)  server-rendered on demand
 
