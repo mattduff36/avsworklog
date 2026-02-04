@@ -486,7 +486,7 @@ function FleetContent() {
             <PlantTable 
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
-              onVehicleAdded={() => {}}
+              onVehicleAdded={fetchPlantAssets}
             />
           ) : (
             <PlantOverview 

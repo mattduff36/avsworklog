@@ -17,7 +17,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Save, Plus, Briefcase, Wrench, Bell, Mail, Eye } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2, Save, Plus, Briefcase, Wrench, Bell, Mail, Eye, Truck, HardHat } from 'lucide-react';
 import type { MaintenanceCategory, CreateCategoryRequest, UpdateCategoryRequest, CategoryResponsibility } from '@/types/maintenance';
 import { useCreateCategory, useUpdateCategory } from '@/lib/hooks/useMaintenance';
 
@@ -51,7 +52,9 @@ const createCategorySchema = z.object({
     .positive('Must be positive')
     .optional()
     .nullable(),
-  applies_to: z.array(z.enum(['vehicle', 'plant'])).default(['vehicle']),
+  applies_to: z.array(z.enum(['vehicle', 'plant']))
+    .min(1, 'Category must apply to at least one asset type')
+    .default(['vehicle']),
   sort_order: z.coerce.number().int().optional(),
   is_active: z.boolean().optional(),
   // New fields for duty/responsibility
@@ -455,6 +458,58 @@ export function CategoryDialog({
             />
             <p className="text-xs text-muted-foreground">
               Lower numbers appear first. Default is 999.
+            </p>
+          </div>
+
+          {/* Applies To Checkboxes */}
+          <div className="space-y-3">
+            <Label>Applies To <span className="text-red-400">*</span></Label>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="applies-vehicle"
+                  checked={appliesTo?.includes('vehicle') || false}
+                  onCheckedChange={(checked) => {
+                    const current = appliesTo || ['vehicle'];
+                    if (checked) {
+                      setValue('applies_to', [...current.filter(a => a !== 'vehicle'), 'vehicle']);
+                    } else {
+                      setValue('applies_to', current.filter(a => a !== 'vehicle'));
+                    }
+                  }}
+                  disabled={loading || selectedType === 'hours'}
+                  className="border-slate-600"
+                />
+                <Label htmlFor="applies-vehicle" className="text-white cursor-pointer flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-blue-400" />
+                  Vehicles
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="applies-plant"
+                  checked={appliesTo?.includes('plant') || false}
+                  onCheckedChange={(checked) => {
+                    const current = appliesTo || ['vehicle'];
+                    if (checked) {
+                      setValue('applies_to', [...current.filter(a => a !== 'plant'), 'plant']);
+                    } else {
+                      setValue('applies_to', current.filter(a => a !== 'plant'));
+                    }
+                  }}
+                  disabled={loading || selectedType === 'mileage'}
+                  className="border-slate-600"
+                />
+                <Label htmlFor="applies-plant" className="text-white cursor-pointer flex items-center gap-2">
+                  <HardHat className="h-4 w-4 text-orange-400" />
+                  Plant Machinery
+                </Label>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {selectedType === 'mileage' && 'Mileage-based categories only apply to vehicles.'}
+              {selectedType === 'hours' && 'Hours-based categories only apply to plant machinery.'}
+              {selectedType === 'date' && 'Select which asset types this category applies to (at least one required).'}
             </p>
           </div>
 
