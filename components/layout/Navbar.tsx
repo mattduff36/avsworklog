@@ -92,11 +92,17 @@ export function Navbar() {
   const [userEmail, setUserEmail] = useState<string>('');
   const [viewAsRole, setViewAsRole] = useState<ViewAsRole>('actual');
   const [hasRAMSAssignments, setHasRAMSAssignments] = useState(false);
+  const [isMounted, setIsMounted] = useState(false); // Track client hydration
   const supabase = createClient();
   
   const isSuperAdmin = userEmail === 'admin@mpdee.co.uk';
   const effectiveIsManager = isManager && !(isSuperAdmin && viewAsRole === 'employee');
   const effectiveIsAdmin = isAdmin && !(isSuperAdmin && viewAsRole === 'employee');
+
+  // Set mounted state after hydration to prevent hydration mismatches
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Fetch user email
   useEffect(() => {
@@ -391,18 +397,17 @@ export function Navbar() {
                 {/* Employee Navigation - Same for all */}
                 {employeeNav.map((item) => {
                   const Icon = item.icon;
-                  const isActive = isLinkActive(item.href);
-                  const activeColors = getNavItemActiveColors(item.href);
                   
                   // Check if this item has a dropdown and user has access to multiple items
+                  // Only filter by permissions after client hydration to prevent hydration mismatch
                   const hasDropdown = item.dropdownItems && item.dropdownItems.length > 0;
-                  const accessibleDropdownItems = hasDropdown
+                  const accessibleDropdownItems = hasDropdown && isMounted
                     ? item.dropdownItems!.filter(dropdownItem => {
                         if (!dropdownItem.module) return true;
                         return userPermissions.has(dropdownItem.module);
                       })
-                    : [];
-                  const shouldShowDropdown = accessibleDropdownItems.length > 1;
+                    : hasDropdown ? item.dropdownItems! : [];
+                  const shouldShowDropdown = isMounted && accessibleDropdownItems.length > 1;
                   
                   // If dropdown should be shown, render dropdown menu
                   if (shouldShowDropdown) {
@@ -456,6 +461,10 @@ export function Navbar() {
                   const finalHref = accessibleDropdownItems.length === 1 
                     ? accessibleDropdownItems[0].href 
                     : item.href;
+                  
+                  // Recalculate isActive based on finalHref to ensure correct styling
+                  const isActive = isLinkActive(finalHref);
+                  const activeColors = getNavItemActiveColors(finalHref);
                   
                   return (
                     <Link
@@ -552,8 +561,6 @@ export function Navbar() {
               {/* Employee Navigation */}
               {employeeNav.map((item) => {
                 const Icon = item.icon;
-                const isActive = isLinkActive(item.href);
-                const activeColors = getNavItemActiveColors(item.href);
                 
                 // Check if this item has a dropdown and user has access to multiple items
                 const hasDropdown = item.dropdownItems && item.dropdownItems.length > 0;
@@ -598,6 +605,10 @@ export function Navbar() {
                 const finalHref = accessibleDropdownItems.length === 1 
                   ? accessibleDropdownItems[0].href 
                   : item.href;
+                
+                // Recalculate isActive based on finalHref to ensure correct styling
+                const isActive = isLinkActive(finalHref);
+                const activeColors = getNavItemActiveColors(finalHref);
                 
                 return (
                   <Link
