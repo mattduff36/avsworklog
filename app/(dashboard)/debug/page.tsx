@@ -944,6 +944,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                     variant="destructive"
                     size="sm"
                     disabled={clearingErrors || errorLogs.length === 0}
+                    className="bg-red-600 hover:bg-red-700 text-white border-red-600"
                   >
                     {clearingErrors ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />

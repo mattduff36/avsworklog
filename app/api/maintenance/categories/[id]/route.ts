@@ -43,6 +43,8 @@ export async function PUT(
     if (body.description !== undefined) updates.description = body.description;
     if (body.alert_threshold_days !== undefined) updates.alert_threshold_days = body.alert_threshold_days;
     if (body.alert_threshold_miles !== undefined) updates.alert_threshold_miles = body.alert_threshold_miles;
+    if (body.alert_threshold_hours !== undefined) updates.alert_threshold_hours = body.alert_threshold_hours;
+    if (body.applies_to !== undefined) updates.applies_to = body.applies_to;
     if (body.is_active !== undefined) updates.is_active = body.is_active;
     if (body.sort_order !== undefined) updates.sort_order = body.sort_order;
     if (body.responsibility !== undefined) updates.responsibility = body.responsibility;

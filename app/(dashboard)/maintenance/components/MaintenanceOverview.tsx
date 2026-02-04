@@ -31,6 +31,7 @@ const ALERT_TO_CATEGORY_NAME: Record<string, string> = {
   'Service': 'service due',
   'Cambelt': 'cambelt replacement',
   'First Aid Kit': 'first aid kit expiry',
+  'LOLER': 'loler due',
 };
 
 interface MaintenanceOverviewProps {
@@ -105,7 +106,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
   const [createTaskVehicleId, setCreateTaskVehicleId] = useState<string | undefined>();
   const [createTaskCategoryId, setCreateTaskCategoryId] = useState<string | undefined>();
-  const [createTaskAlertType, setCreateTaskAlertType] = useState<'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | undefined>();
+  const [createTaskAlertType, setCreateTaskAlertType] = useState<'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER' | undefined>();
   const [maintenanceCategoryId, setMaintenanceCategoryId] = useState<string | undefined>();
   
   // Task Action Modals state
@@ -133,7 +134,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     vehicleId: string;
     vehicleReg: string;
     vehicleNickname?: string | null;
-    alertType: 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit';
+    alertType: 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER';
     dueInfo: string;
     currentDueDate?: string | null;
   } | null>(null);
@@ -191,7 +192,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     fetchServiceCategory();
   }, []);
   
-  const fetchVehicleHistory = useCallback(async (vehicleId: string, force: boolean = false) => {
+  const fetchVehicleHistory = useCallback(async (vehicleId: string, isPlant: boolean = false, force: boolean = false) => {
     // Check if already fetching or already have data (unless forced)
     if (!force && (fetchingVehicles.current.has(vehicleId) || vehicleHistory[vehicleId])) {
       return; // Already fetching or already fetched
@@ -203,7 +204,12 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     setVehicleHistory(prev => ({ ...prev, [vehicleId]: { history: [], workshopTasks: [], loading: true } }));
     
     try {
-      const response = await fetch(`/api/maintenance/history/${vehicleId}`);
+      // Use plant endpoint if this is a plant asset, otherwise use vehicle endpoint
+      const endpoint = isPlant 
+        ? `/api/maintenance/history/plant/${vehicleId}`
+        : `/api/maintenance/history/${vehicleId}`;
+      
+      const response = await fetch(endpoint);
       if (!response.ok) throw new Error('Failed to fetch history');
       
       const data = await response.json();
@@ -228,116 +234,170 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     }
   }, [vehicleHistory]);
   
+  // Helper to determine if a vehicle ID corresponds to a plant asset
+  const isPlantAsset = useCallback((vehicleId: string) => {
+    const vehicle = vehicles.find(v => v.vehicle_id === vehicleId || v.id === vehicleId);
+    return vehicle && 'is_plant' in vehicle && vehicle.is_plant === true;
+  }, [vehicles]);
+  
   // Auto-fetch history for vehicles with alerts on mount
   useEffect(() => {
     const vehiclesWithAlerts = vehicles.filter(v => {
-      // Check if vehicle has any overdue or due soon status
+      // For efficiency, first check alert counts (works for both vehicles and plant)
+      if (v.overdue_count > 0 || v.due_soon_count > 0) {
+        return true;
+      }
+      
+      // Fallback: Check individual status fields (for compatibility)
       return v.tax_status?.status === 'overdue' || v.tax_status?.status === 'due_soon' ||
         v.mot_status?.status === 'overdue' || v.mot_status?.status === 'due_soon' ||
         v.service_status?.status === 'overdue' || v.service_status?.status === 'due_soon' ||
         v.cambelt_status?.status === 'overdue' || v.cambelt_status?.status === 'due_soon' ||
-        v.first_aid_status?.status === 'overdue' || v.first_aid_status?.status === 'due_soon';
+        v.first_aid_status?.status === 'overdue' || v.first_aid_status?.status === 'due_soon' ||
+        v.loler_status?.status === 'overdue' || v.loler_status?.status === 'due_soon';
     });
     
     vehiclesWithAlerts.forEach(vehicle => {
       const vehicleId = vehicle.vehicle_id || vehicle.id;
       if (vehicleId) {
-        fetchVehicleHistory(vehicleId);
+        // Check if this is a plant asset (has is_plant flag)
+        const isPlant = 'is_plant' in vehicle && vehicle.is_plant === true;
+        fetchVehicleHistory(vehicleId, isPlant);
       }
     });
-  }, [vehicles, fetchVehicleHistory]);
+  }, [vehicles, fetchVehicleHistory]); // Note: isPlantAsset not needed here since we check inline
   
   // Group vehicles by their most severe alert status
   const vehiclesWithAlerts: VehicleWithAlerts[] = vehicles.map(vehicle => {
     const alerts: Alert[] = [];
+    const isPlant = 'is_plant' in vehicle && vehicle.is_plant === true;
+    const assetType = isPlant ? 'plant' : 'vehicle';
     
-    // Check Tax
-    if (vehicle.tax_status?.status === 'overdue') {
-      alerts.push({
-        type: 'Tax',
-        detail: formatDaysUntil(vehicle.tax_status.days_until),
-        severity: 'overdue',
-        sortValue: vehicle.tax_status.days_until ?? 0
-      });
-    } else if (vehicle.tax_status?.status === 'due_soon') {
-      alerts.push({
-        type: 'Tax',
-        detail: formatDaysUntil(vehicle.tax_status.days_until),
-        severity: 'due_soon',
-        sortValue: vehicle.tax_status.days_until ?? 0
-      });
+    // Helper to check if category applies to this asset
+    const categoryApplies = (categoryName: string): boolean => {
+      const category = maintenanceCategories.find(
+        c => c.name.toLowerCase() === categoryName.toLowerCase()
+      );
+      if (!category) return true; // Default to showing if category not found
+      return (category.applies_to || ['vehicle']).includes(assetType);
+    };
+    
+    // Check Tax (only if category applies to this asset type)
+    if (categoryApplies('tax due date')) {
+      if (vehicle.tax_status?.status === 'overdue') {
+        alerts.push({
+          type: 'Tax',
+          detail: formatDaysUntil(vehicle.tax_status.days_until),
+          severity: 'overdue',
+          sortValue: vehicle.tax_status.days_until ?? 0
+        });
+      } else if (vehicle.tax_status?.status === 'due_soon') {
+        alerts.push({
+          type: 'Tax',
+          detail: formatDaysUntil(vehicle.tax_status.days_until),
+          severity: 'due_soon',
+          sortValue: vehicle.tax_status.days_until ?? 0
+        });
+      }
     }
     
-    // Check MOT
-    if (vehicle.mot_status?.status === 'overdue') {
-      alerts.push({
-        type: 'MOT',
-        detail: formatDaysUntil(vehicle.mot_status.days_until),
-        severity: 'overdue',
-        sortValue: vehicle.mot_status.days_until ?? 0
-      });
-    } else if (vehicle.mot_status?.status === 'due_soon') {
-      alerts.push({
-        type: 'MOT',
-        detail: formatDaysUntil(vehicle.mot_status.days_until),
-        severity: 'due_soon',
-        sortValue: vehicle.mot_status.days_until ?? 0
-      });
+    // Check MOT (only if category applies to this asset type)
+    if (categoryApplies('mot due date')) {
+      if (vehicle.mot_status?.status === 'overdue') {
+        alerts.push({
+          type: 'MOT',
+          detail: formatDaysUntil(vehicle.mot_status.days_until),
+          severity: 'overdue',
+          sortValue: vehicle.mot_status.days_until ?? 0
+        });
+      } else if (vehicle.mot_status?.status === 'due_soon') {
+        alerts.push({
+          type: 'MOT',
+          detail: formatDaysUntil(vehicle.mot_status.days_until),
+          severity: 'due_soon',
+          sortValue: vehicle.mot_status.days_until ?? 0
+        });
+      }
     }
     
-    // Check Service (normalize miles to days equivalent for sorting)
-    if (vehicle.service_status?.status === 'overdue') {
-      const milesUntil = vehicle.service_status.miles_until ?? 0;
-      alerts.push({
-        type: 'Service',
-        detail: formatMilesUntil(milesUntil),
-        severity: 'overdue',
-        sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
-      });
-    } else if (vehicle.service_status?.status === 'due_soon') {
-      const milesUntil = vehicle.service_status.miles_until ?? 0;
-      alerts.push({
-        type: 'Service',
-        detail: formatMilesUntil(milesUntil),
-        severity: 'due_soon',
-        sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
-      });
+    // Check Service (normalize miles to days equivalent for sorting - only if category applies)
+    if (categoryApplies('service due')) {
+      if (vehicle.service_status?.status === 'overdue') {
+        const milesUntil = vehicle.service_status.miles_until ?? 0;
+        alerts.push({
+          type: 'Service',
+          detail: formatMilesUntil(milesUntil),
+          severity: 'overdue',
+          sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
+        });
+      } else if (vehicle.service_status?.status === 'due_soon') {
+        const milesUntil = vehicle.service_status.miles_until ?? 0;
+        alerts.push({
+          type: 'Service',
+          detail: formatMilesUntil(milesUntil),
+          severity: 'due_soon',
+          sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
+        });
+      }
     }
     
-    // Check Cambelt (normalize miles to days equivalent for sorting)
-    if (vehicle.cambelt_status?.status === 'overdue') {
-      const milesUntil = vehicle.cambelt_status.miles_until ?? 0;
-      alerts.push({
-        type: 'Cambelt',
-        detail: formatMilesUntil(milesUntil),
-        severity: 'overdue',
-        sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
-      });
-    } else if (vehicle.cambelt_status?.status === 'due_soon') {
-      const milesUntil = vehicle.cambelt_status.miles_until ?? 0;
-      alerts.push({
-        type: 'Cambelt',
-        detail: formatMilesUntil(milesUntil),
-        severity: 'due_soon',
-        sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
-      });
+    // Check Cambelt (normalize miles to days equivalent for sorting - only if category applies)
+    if (categoryApplies('cambelt replacement')) {
+      if (vehicle.cambelt_status?.status === 'overdue') {
+        const milesUntil = vehicle.cambelt_status.miles_until ?? 0;
+        alerts.push({
+          type: 'Cambelt',
+          detail: formatMilesUntil(milesUntil),
+          severity: 'overdue',
+          sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
+        });
+      } else if (vehicle.cambelt_status?.status === 'due_soon') {
+        const milesUntil = vehicle.cambelt_status.miles_until ?? 0;
+        alerts.push({
+          type: 'Cambelt',
+          detail: formatMilesUntil(milesUntil),
+          severity: 'due_soon',
+          sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
+        });
+      }
     }
     
-    // Check First Aid
-    if (vehicle.first_aid_status?.status === 'overdue') {
-      alerts.push({
-        type: 'First Aid Kit',
-        detail: formatDaysUntil(vehicle.first_aid_status.days_until),
-        severity: 'overdue',
-        sortValue: vehicle.first_aid_status.days_until ?? 0
-      });
-    } else if (vehicle.first_aid_status?.status === 'due_soon') {
-      alerts.push({
-        type: 'First Aid Kit',
-        detail: formatDaysUntil(vehicle.first_aid_status.days_until),
-        severity: 'due_soon',
-        sortValue: vehicle.first_aid_status.days_until ?? 0
-      });
+    // Check First Aid (only if category applies to this asset type)
+    if (categoryApplies('first aid kit expiry')) {
+      if (vehicle.first_aid_status?.status === 'overdue') {
+        alerts.push({
+          type: 'First Aid Kit',
+          detail: formatDaysUntil(vehicle.first_aid_status.days_until),
+          severity: 'overdue',
+          sortValue: vehicle.first_aid_status.days_until ?? 0
+        });
+      } else if (vehicle.first_aid_status?.status === 'due_soon') {
+        alerts.push({
+          type: 'First Aid Kit',
+          detail: formatDaysUntil(vehicle.first_aid_status.days_until),
+          severity: 'due_soon',
+          sortValue: vehicle.first_aid_status.days_until ?? 0
+        });
+      }
+    }
+    
+    // Check LOLER (for plant machinery - only if category applies)
+    if (categoryApplies('loler due')) {
+      if (vehicle.loler_status?.status === 'overdue') {
+        alerts.push({
+          type: 'LOLER',
+          detail: formatDaysUntil(vehicle.loler_status.days_until),
+          severity: 'overdue',
+          sortValue: vehicle.loler_status.days_until ?? 0
+        });
+      } else if (vehicle.loler_status?.status === 'due_soon') {
+        alerts.push({
+          type: 'LOLER',
+          detail: formatDaysUntil(vehicle.loler_status.days_until),
+          severity: 'due_soon',
+          sortValue: vehicle.loler_status.days_until ?? 0
+        });
+      }
     }
     
     return {
@@ -366,7 +426,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     // Prefill with Service category if available
     setCreateTaskCategoryId(maintenanceCategoryId);
     // Set the alert type from the first alert (prioritize overdue)
-    const alertType = vehicle.alerts?.[0]?.type as 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | undefined;
+    const alertType = vehicle.alerts?.[0]?.type as 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER' | undefined;
     setCreateTaskAlertType(alertType);
     
     setShowCreateTaskDialog(true);
@@ -376,7 +436,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     const alert = vehicle.alerts?.[0];
     if (!alert) return;
     
-    const alertType = alert.type as 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit';
+    const alertType = alert.type as 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER';
     
     // Get the current due date based on alert type
     let currentDueDate: string | null = null;
@@ -386,11 +446,13 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       currentDueDate = vehicle.mot_due_date || null;
     } else if (alertType === 'First Aid Kit') {
       currentDueDate = vehicle.first_aid_kit_expiry || null;
+    } else if (alertType === 'LOLER') {
+      currentDueDate = vehicle.loler_due_date || null;
     }
     
     setOfficeActionVehicle({
       vehicleId,
-      vehicleReg: vehicle.vehicle?.reg_number || 'Unknown',
+      vehicleReg: vehicle.vehicle?.reg_number || vehicle.vehicle?.plant_id || 'Unknown',
       vehicleNickname: vehicle.vehicle?.nickname,
       alertType,
       dueInfo: alert.detail,
@@ -407,7 +469,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         delete newHistory[officeActionVehicle.vehicleId];
         return newHistory;
       });
-      fetchVehicleHistory(officeActionVehicle.vehicleId, true);
+      fetchVehicleHistory(officeActionVehicle.vehicleId, isPlantAsset(officeActionVehicle.vehicleId), true);
     }
     // Trigger Next.js soft refresh to refetch server data without losing client state
     router.refresh();
@@ -429,7 +491,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       });
       
       // Force refetch (bypass cache check since state update is async)
-      fetchVehicleHistory(createTaskVehicleId, true);
+      fetchVehicleHistory(createTaskVehicleId, isPlantAsset(createTaskVehicleId), true);
     }
   };
 
@@ -490,7 +552,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           delete newHistory[vehicleId];
           return newHistory;
         });
-        fetchVehicleHistory(vehicleId, true);
+        fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId), true);
       }
     } catch (error: unknown) {
       console.error('Error marking task in progress:', error instanceof Error ? error.message : error);
@@ -533,7 +595,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           delete newHistory[vehicleId];
           return newHistory;
         });
-        fetchVehicleHistory(vehicleId, true);
+        fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId), true);
       }
     } catch (error: unknown) {
       console.error('Error undoing task:', error instanceof Error ? error.message : error);
@@ -659,7 +721,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           delete newHistory[vehicleId];
           return newHistory;
         });
-        fetchVehicleHistory(vehicleId, true);
+        fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId), true);
       }
 
       setUpdatingStatus(prev => {
@@ -734,7 +796,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           delete newHistory[vehicleId];
           return newHistory;
         });
-        fetchVehicleHistory(vehicleId, true);
+        fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId), true);
       }
     } catch (error: unknown) {
       console.error('Error marking task on hold:', error);
@@ -798,7 +860,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           delete newHistory[vehicleId];
           return newHistory;
         });
-        fetchVehicleHistory(vehicleId, true);
+        fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId), true);
       }
     } catch (error: unknown) {
       console.error('Error resuming task:', error instanceof Error ? error.message : error);
@@ -812,16 +874,19 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     setShowCommentsDrawer(true);
   };
 
-  const toggleVehicle = async (vehicleId: string, vehicle?: VehicleMaintenanceWithStatus) => {
-    const newExpanded = new Set(expandedVehicles);
-    if (newExpanded.has(vehicleId)) {
-      newExpanded.delete(vehicleId);
-    } else {
-      newExpanded.add(vehicleId);
-      fetchVehicleHistory(vehicleId);
-    }
-    setExpandedVehicles(newExpanded);
-  };
+  const toggleVehicle = useCallback(async (vehicleId: string, vehicle?: VehicleMaintenanceWithStatus) => {
+    setExpandedVehicles(prev => {
+      const newExpanded = new Set(prev);
+      if (newExpanded.has(vehicleId)) {
+        newExpanded.delete(vehicleId);
+      } else {
+        newExpanded.add(vehicleId);
+        // Fetch history when expanding (not when collapsing)
+        fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId));
+      }
+      return newExpanded;
+    });
+  }, [fetchVehicleHistory, isPlantAsset]);
 
   const handleCardClick = (vehicleId: string, vehicle: VehicleWithAlerts) => {
     // If onVehicleClick is provided, use it for navigation

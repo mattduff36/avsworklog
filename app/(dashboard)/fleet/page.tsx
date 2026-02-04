@@ -81,6 +81,7 @@ type Category = {
   id: string;
   name: string;
   description: string | null;
+  applies_to?: string[];
 };
 
 function FleetContent() {
@@ -89,7 +90,8 @@ function FleetContent() {
   const { profile, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const supabase = createClient();
   
-  const [activeTab, setActiveTab] = useState('maintenance'); // Default to maintenance, validate after auth loads
+  // Initialize to default - useEffect will sync with URL to prevent hydration mismatch
+  const [activeTab, setActiveTab] = useState('maintenance');
   const [hasModulePermission, setHasModulePermission] = useState<boolean | null>(null);
   const [maintenanceFilter, setMaintenanceFilter] = useState<'both' | 'vehicle' | 'plant'>('both'); // Filter for maintenance overview
   
@@ -132,6 +134,7 @@ function FleetContent() {
   
   // State for vehicles and categories
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [plantAssets, setPlantAssets] = useState<any[]>([]); // Separate state for plant assets
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   
@@ -152,6 +155,21 @@ function FleetContent() {
       }
     } catch (error) {
       logger.error('Failed to fetch vehicles', error, 'FleetPage');
+    }
+  };
+
+  // Fetch plant assets
+  const fetchPlantAssets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('plant')
+        .select('id, plant_id, nickname, status, category_id, vehicle_categories(name, id)')
+        .eq('status', 'active');
+      
+      if (error) throw error;
+      setPlantAssets(data || []);
+    } catch (error) {
+      logger.error('Failed to fetch plant assets', error, 'FleetPage');
     }
   };
 
@@ -225,6 +243,7 @@ function FleetContent() {
     } else if (activeTab === 'settings') {
       if (categories.length === 0) fetchCategories();
       if (vehicles.length === 0) fetchVehicles(); // Need vehicles for category counts
+      if (plantAssets.length === 0) fetchPlantAssets(); // Need plant assets for category counts
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
@@ -249,14 +268,27 @@ function FleetContent() {
     } else if (value === 'settings') {
       if (categories.length === 0) fetchCategories();
       if (vehicles.length === 0) fetchVehicles(); // Need vehicles for category counts
+      if (plantAssets.length === 0) fetchPlantAssets(); // Need plant assets for category counts
     }
   };
   
-  // Handler for navigating to vehicle history
+  // Handler for navigating to vehicle or plant history
   const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
-    const vehicleId = vehicle.vehicle_id || vehicle.id;
-    // Pass the current active tab as fromTab
-    router.push(`/fleet/vehicles/${vehicleId}/history?fromTab=${activeTab}`);
+    // Determine if this is a plant asset or vehicle
+    // Check the is_plant flag set by PlantOverview
+    const isPlant = vehicle.is_plant === true;
+    
+    // Get the correct asset ID (UUID) - use the vehicle.id (which is the UUID for both vehicles and plant)
+    // For plant: vehicle.vehicle?.id is the plant table UUID
+    // For vehicles: vehicle.vehicle_id is the vehicles table UUID
+    const assetId = vehicle.vehicle?.id || vehicle.vehicle_id || vehicle.id;
+    
+    // Navigate to appropriate history page
+    if (isPlant) {
+      router.push(`/fleet/plant/${assetId}/history?fromTab=${activeTab}`);
+    } else {
+      router.push(`/fleet/vehicles/${assetId}/history?fromTab=${activeTab}`);
+    }
   };
   
   // Vehicle Category Dialog Handlers
@@ -453,14 +485,12 @@ function FleetContent() {
             </Card>
           ) : canManageVehicles ? (
             <PlantTable 
-              vehicles={maintenanceData?.vehicles || []}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
-              onVehicleAdded={() => {}}
+              onVehicleAdded={fetchPlantAssets}
             />
           ) : (
             <PlantOverview 
-              vehicles={maintenanceData?.vehicles || []}
               onVehicleClick={handleVehicleClick}
             />
           )}
@@ -520,15 +550,10 @@ function FleetContent() {
                           </CardTitle>
                           <CardDescription className="text-muted-foreground">
                             {(() => {
-                              const plantCategoryNames = [
-                                'Excavation & Earthmoving',
-                                'Loading & Material Handling',
-                                'Compaction, Crushing & Processing',
-                                'Transport & Utility Vehicles',
-                                'Access & Site Support',
-                                'Unclassified'
-                              ];
-                              const plantCategories = categories.filter(c => plantCategoryNames.includes(c.name));
+                              // Filter categories that apply to plant
+                              const plantCategories = categories.filter(c => 
+                                (c.applies_to || ['vehicle']).includes('plant')
+                              );
                               return `${plantCategories.length} ${plantCategories.length === 1 ? 'category' : 'categories'}`;
                             })()}
                           </CardDescription>
@@ -555,16 +580,10 @@ function FleetContent() {
                           <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                         </div>
                       ) : (() => {
-                        // Plant category names from migration
-                        const plantCategoryNames = [
-                          'Excavation & Earthmoving',
-                          'Loading & Material Handling',
-                          'Compaction, Crushing & Processing',
-                          'Transport & Utility Vehicles',
-                          'Access & Site Support',
-                          'Unclassified'
-                        ];
-                        const plantCategories = categories.filter(c => plantCategoryNames.includes(c.name));
+                        // Filter categories that apply to plant
+                        const plantCategories = categories.filter(c => 
+                          (c.applies_to || ['vehicle']).includes('plant')
+                        );
                         
                         return plantCategories.length === 0 ? (
                           <div className="text-center py-8 text-muted-foreground">
@@ -572,7 +591,9 @@ function FleetContent() {
                           </div>
                         ) : (
                           <div className="space-y-3">
-                            {plantCategories.map((category) => (
+                            {plantCategories.map((category) => {
+                              const plantCount = plantAssets.filter(p => p.category_id === category.id).length;
+                              return (
                               <Card key={category.id} className="bg-slate-800/50 border-border">
                                 <CardContent className="p-4">
                                   <div className="flex items-center justify-between">
@@ -590,7 +611,7 @@ function FleetContent() {
                                     <div className="flex items-center gap-4">
                                       <div className="text-right">
                                         <div className="text-2xl font-bold text-orange-400">
-                                          {vehicles.filter(v => v.vehicle_categories?.name === category.name).length}
+                                          {plantCount}
                                         </div>
                                         <p className="text-xs text-muted-foreground">plant assets</p>
                                       </div>
@@ -618,7 +639,7 @@ function FleetContent() {
                                   </div>
                                 </CardContent>
                               </Card>
-                            ))}
+                            )})}
                           </div>
                         );
                       })()}
@@ -646,15 +667,10 @@ function FleetContent() {
                           </CardTitle>
                           <CardDescription className="text-muted-foreground">
                             {(() => {
-                              const plantCategoryNames = [
-                                'Excavation & Earthmoving',
-                                'Loading & Material Handling',
-                                'Compaction, Crushing & Processing',
-                                'Transport & Utility Vehicles',
-                                'Access & Site Support',
-                                'Unclassified'
-                              ];
-                              const vehicleCategories = categories.filter(c => !plantCategoryNames.includes(c.name));
+                              // Filter categories that apply to vehicles
+                              const vehicleCategories = categories.filter(c => 
+                                (c.applies_to || ['vehicle']).includes('vehicle')
+                              );
                               return `${vehicleCategories.length} ${vehicleCategories.length === 1 ? 'category' : 'categories'}`;
                             })()}
                           </CardDescription>
@@ -681,16 +697,11 @@ function FleetContent() {
                         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                       </div>
                     ) : (() => {
-                      // Plant category names to exclude
-                      const plantCategoryNames = [
-                        'Excavation & Earthmoving',
-                        'Loading & Material Handling',
-                        'Compaction, Crushing & Processing',
-                        'Transport & Utility Vehicles',
-                        'Access & Site Support',
-                        'Unclassified'
-                      ];
-                      const vehicleCategories = categories.filter(c => !plantCategoryNames.includes(c.name));
+                      // Filter categories that apply to vehicles (not plant-only categories)
+                      const vehicleCategories = categories.filter(c => {
+                        const appliesTo = (c as any).applies_to || ['vehicle'];
+                        return appliesTo.includes('vehicle');
+                      });
                       
                       return vehicleCategories.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">
@@ -716,7 +727,7 @@ function FleetContent() {
                                   <div className="flex items-center gap-4">
                                     <div className="text-right">
                                       <div className="text-2xl font-bold text-blue-400">
-                                        {vehicles.filter(v => v.vehicle_categories?.name === category.name).length}
+                                        {vehicles.filter(v => v.category_id === category.id).length}
                                       </div>
                                       <p className="text-xs text-muted-foreground">vehicles</p>
                                     </div>

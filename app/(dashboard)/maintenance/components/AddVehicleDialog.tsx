@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
@@ -28,7 +28,8 @@ import { logger } from '@/lib/utils/logger';
 interface AddVehicleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: () => void;
+  onSuccess?: () => void | Promise<void>; // ✅ Support both sync and async callbacks
+  assetType?: AssetType; // Default to 'vehicle' if not provided
 }
 
 interface Category {
@@ -41,12 +42,13 @@ type AssetType = 'vehicle' | 'plant';
 export function AddVehicleDialog({
   open,
   onOpenChange,
-  onSuccess
+  onSuccess,
+  assetType: initialAssetType = 'vehicle', // Default to 'vehicle'
 }: AddVehicleDialogProps) {
   const queryClient = useQueryClient();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
-  const [assetType, setAssetType] = useState<AssetType>('vehicle');
+  const [assetType, setAssetType] = useState<AssetType>(initialAssetType);
   const [formData, setFormData] = useState({
     reg_number: '',
     plant_id: '',
@@ -59,17 +61,51 @@ export function AddVehicleDialog({
   });
   const [error, setError] = useState('');
 
+  // ✅ Memoize fetchCategories with proper dependencies
+  const fetchCategories = useCallback(async () => {
+    try {
+      const supabase = createClient(); // Create client inside callback
+      const { data, error } = await supabase
+        .from('vehicle_categories')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      
+      // ✅ Filter categories based on asset type
+      // Consistent with SELECT dropdown: undefined applies_to defaults to ['vehicle']
+      const filtered = (data || []).filter(cat => {
+        const appliesTo = cat.applies_to || ['vehicle']; // ✅ Default to ['vehicle']
+        return appliesTo.includes(assetType);
+      });
+      
+      setCategories(filtered);
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+    }
+  }, [assetType]); // ✅ Only depends on assetType
+
   // Fetch categories when dialog opens
+  useEffect(() => {
+    if (open) {
+      // ✅ Set asset type FIRST, then fetch categories
+      // This ensures fetchCategories uses the correct assetType
+      setAssetType(initialAssetType);
+      // fetchCategories will run automatically via its dependency on assetType
+    }
+  }, [open, initialAssetType]);
+
+  // ✅ Fetch categories when assetType changes
   useEffect(() => {
     if (open) {
       fetchCategories();
     }
-  }, [open]);
+  }, [open, fetchCategories]);
 
   // Reset form when dialog closes
   useEffect(() => {
     if (!open) {
-      setAssetType('vehicle');
+      setAssetType(initialAssetType); // Reset to prop value, not hardcoded 'vehicle'
       setFormData({
         reg_number: '',
         plant_id: '',
@@ -82,19 +118,7 @@ export function AddVehicleDialog({
       });
       setError('');
     }
-  }, [open]);
-
-  async function fetchCategories() {
-    try {
-      const response = await fetch('/api/admin/categories');
-      const data = await response.json();
-      if (response.ok) {
-        setCategories(data.categories || []);
-      }
-    } catch (error) {
-      logger.error('Error fetching categories', error, 'AddVehicleDialog');
-    }
-  }
+  }, [open, initialAssetType]);
 
   // Handle registration input with auto-uppercase and smart spacing
   function handleRegistrationChange(value: string) {
@@ -198,7 +222,7 @@ export function AddVehicleDialog({
         }
         
         queryClient.invalidateQueries({ queryKey: ['maintenance'] });
-        onSuccess?.();
+        await onSuccess?.(); // ✅ Await async callback before closing dialog
         onOpenChange(false);
       } else {
         setError(data.error || `Failed to add ${assetType}`);
@@ -408,7 +432,14 @@ export function AddVehicleDialog({
                 <SelectValue placeholder="Select category..." />
               </SelectTrigger>
               <SelectContent className="bg-slate-800 border-slate-700 dark:text-slate-100 text-slate-900">
-                {categories.map((category) => (
+                {categories
+                  .filter(category => {
+                    // ✅ Filter categories based on asset type
+                    // Note: fetchCategories already filters, but double-check here for safety
+                    const appliesTo = category.applies_to || ['vehicle'];
+                    return appliesTo.includes(assetType);
+                  })
+                  .map((category) => (
                   <SelectItem
                     key={category.id}
                     value={category.id}

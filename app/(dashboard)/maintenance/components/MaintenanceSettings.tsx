@@ -65,7 +65,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
   
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Maintenance Categories Header */}
       <Card className="border-border">
         <CardHeader 
           className="cursor-pointer hover:bg-slate-800/30 transition-colors"
@@ -116,6 +116,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                   <TableRow className="border-slate-700 hover:bg-slate-800/50">
                     <TableHead className="text-muted-foreground">Name</TableHead>
                     <TableHead className="text-muted-foreground">Type</TableHead>
+                    <TableHead className="text-muted-foreground">Applies To</TableHead>
                     <TableHead className="text-muted-foreground">Alert Threshold</TableHead>
                     <TableHead className="text-muted-foreground">Responsibility</TableHead>
                     <TableHead className="text-muted-foreground">Reminders</TableHead>
@@ -141,9 +142,31 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                           </Badge>
                         </TableCell>
                         
+                        <TableCell>
+                          <div className="flex gap-1">
+                            {category.applies_to?.includes('vehicle') && (
+                              <Badge variant="outline" className="text-blue-400 border-blue-400/50 font-mono" title="Applies to vehicles">
+                                V
+                              </Badge>
+                            )}
+                            {category.applies_to?.includes('plant') && (
+                              <Badge variant="outline" className="text-purple-400 border-purple-400/50 font-mono" title="Applies to plant machinery">
+                                P
+                              </Badge>
+                            )}
+                            {(!category.applies_to || category.applies_to.length === 0) && (
+                              <Badge variant="outline" className="text-gray-400 border-gray-400/50">
+                                All
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        
                         <TableCell className="text-muted-foreground">
                           {category.type === 'date' 
                             ? `${category.alert_threshold_days} days`
+                            : category.type === 'hours'
+                            ? `${category.alert_threshold_hours} hours`
                             : `${category.alert_threshold_miles?.toLocaleString()} miles`
                           }
                         </TableCell>
@@ -243,20 +266,40 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-blue-800 dark:text-blue-200">
-              <p className="font-semibold mb-1">About Categories & Settings</p>
+              <p className="font-semibold mb-1">About Maintenance Categories</p>
               <p>
-                Categories define what types of maintenance to track. Each category has an alert threshold that determines when to show &quot;Due Soon&quot; warnings. 
-                Date-based categories (Tax, MOT, First Aid) use days, while mileage-based categories (Service, Cambelt) use miles.
+                Categories define what types of maintenance to track. Each category has an alert threshold and can apply to vehicles, plant machinery, or both.
               </p>
               <p className="mt-2">
-                <strong>Responsibility:</strong> Categories can be assigned to either Workshop (shows &quot;Create Task&quot; button) or Office (shows &quot;Office Action&quot; button with reminder and update options).
+                <strong>Category Types:</strong>
+              </p>
+              <ul className="list-disc list-inside mt-1 space-y-1">
+                <li><strong>Date-based</strong> (Tax, MOT, LOLER) - Alert X days before due</li>
+                <li><strong>Mileage-based</strong> (Service, Cambelt) - Alert X miles before due</li>
+                <li><strong>Hours-based</strong> (Plant Service) - Alert X engine hours before due</li>
+              </ul>
+              <p className="mt-2">
+                <strong>Applies To:</strong> Categories can apply to vehicles only, plant only, or both. Hours-based categories typically apply to plant machinery since they track engine operating hours.
+              </p>
+              <div className="mt-2 flex items-center gap-4 text-xs">
+                <span className="font-semibold">Key:</span>
+                <span className="flex items-center gap-1">
+                  <span className="font-mono px-1.5 py-0.5 rounded border border-blue-400/50 text-blue-400">V</span>
+                  = Vehicle
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="font-mono px-1.5 py-0.5 rounded border border-purple-400/50 text-purple-400">P</span>
+                  = Plant
+                </span>
+              </div>
+              <p className="mt-2">
+                <strong>Responsibility:</strong> Workshop categories show &quot;Create Task&quot; button; Office categories show &quot;Office Action&quot; with reminders.
               </p>
               <p className="mt-2">
-                <strong>Reminders:</strong> Office categories can have in-app and/or email notifications enabled. Click the <Users className="h-3 w-3 inline mx-1" /> button to manage who receives reminders.
+                <strong>Reminders:</strong> Office categories can send in-app and/or email notifications. Click <Users className="h-3 w-3 inline mx-1" /> to manage recipients.
               </p>
               <p className="mt-2">
-                <strong>Note:</strong> You cannot change a category&apos;s type (date ↔ mileage) after creation. 
-                Changes to settings apply immediately.
+                <strong>Note:</strong> Category type and &quot;Applies To&quot; cannot be changed after creation.
               </p>
             </div>
           </div>

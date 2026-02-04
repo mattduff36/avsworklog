@@ -6,9 +6,11 @@ export interface MaintenanceCategory {
   id: string;
   name: string;
   description: string | null;
-  type: 'date' | 'mileage';
+  type: 'date' | 'mileage' | 'hours';
   alert_threshold_days: number | null;
   alert_threshold_miles: number | null;
+  alert_threshold_hours: number | null;
+  applies_to: ('vehicle' | 'plant')[];
   is_active: boolean;
   sort_order: number;
   created_at: string;
@@ -40,6 +42,7 @@ export interface VehicleMaintenance {
   tax_due_date: string | null;
   mot_due_date: string | null;
   first_aid_kit_expiry: string | null;
+  loler_due_date?: string | null; // LOLER inspection due (plant machinery only)
   
   // Mileage-based maintenance (vehicles)
   current_mileage: number | null;
@@ -117,7 +120,8 @@ export interface VehicleMaintenance {
 
 export interface MaintenanceHistory {
   id: string;
-  vehicle_id: string;
+  vehicle_id: string | null;
+  plant_id: string | null;
   maintenance_category_id: string | null;
   field_name: string;
   old_value: string | null;
@@ -154,11 +158,16 @@ export interface MaintenanceItemStatus {
   status: MaintenanceStatus;
   days_until?: number;
   miles_until?: number;
+  hours_until?: number;
   due_date?: string;
   due_mileage?: number;
+  due_hours?: number;
 }
 
 export interface VehicleMaintenanceWithStatus extends VehicleMaintenance {
+  // Asset type flag (set by PlantOverview for plant assets)
+  is_plant?: boolean;
+  
   vehicle?: {
     id: string;
     reg_number: string | null;
@@ -183,6 +192,7 @@ export interface VehicleMaintenanceWithStatus extends VehicleMaintenance {
   service_status?: MaintenanceItemStatus;
   cambelt_status?: MaintenanceItemStatus;
   first_aid_status?: MaintenanceItemStatus;
+  loler_status?: MaintenanceItemStatus; // For plant machinery
   
   // Overall counts
   overdue_count: number;
@@ -201,6 +211,9 @@ export interface UpdateMaintenanceRequest {
   next_service_mileage?: number | null;
   last_service_mileage?: number | null;
   cambelt_due_mileage?: number | null;
+  current_hours?: number | null; // For plant machinery
+  last_service_hours?: number | null; // For plant machinery
+  next_service_hours?: number | null; // For plant machinery
   tracker_id?: string | null;
   notes?: string | null;
   comment: string; // Mandatory for audit trail (min 10 chars)
@@ -209,9 +222,11 @@ export interface UpdateMaintenanceRequest {
 export interface CreateCategoryRequest {
   name: string;
   description?: string;
-  type: 'date' | 'mileage';
+  type: 'date' | 'mileage' | 'hours';
   alert_threshold_days?: number;
   alert_threshold_miles?: number;
+  alert_threshold_hours?: number;
+  applies_to?: ('vehicle' | 'plant')[];
   sort_order?: number;
   responsibility?: CategoryResponsibility;
   show_on_overview?: boolean;
@@ -224,6 +239,8 @@ export interface UpdateCategoryRequest {
   description?: string;
   alert_threshold_days?: number;
   alert_threshold_miles?: number;
+  alert_threshold_hours?: number;
+  applies_to?: ('vehicle' | 'plant')[];
   is_active?: boolean;
   sort_order?: number;
   responsibility?: CategoryResponsibility;
@@ -340,5 +357,10 @@ export interface DateThreshold {
 
 export interface MileageThreshold {
   miles_until: number; // Negative if overdue
+  status: MaintenanceStatus;
+}
+
+export interface HoursThreshold {
+  hours_until: number; // Negative if overdue
   status: MaintenanceStatus;
 }

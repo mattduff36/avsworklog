@@ -205,8 +205,13 @@ export default function WorkshopTasksPage() {
   const handleTabChange = (newTab: string) => {
     const previousTab = assetTab;
     setAssetTab(newTab as 'vehicle' | 'plant' | 'tools' | 'settings');
-    // Reset filters when switching between vehicle/plant tabs
-    if ((newTab === 'vehicle' || newTab === 'plant') && (previousTab === 'vehicle' || previousTab === 'plant')) {
+    
+    // Reset filters when switching to a different asset type tab (vehicle or plant)
+    // This ensures filters are cleared when:
+    // 1. Switching directly between vehicle/plant tabs
+    // 2. Switching from vehicle/plant to settings/tools and back to the OTHER asset type
+    // 3. Any tab change that results in a different asset type being displayed
+    if ((newTab === 'vehicle' || newTab === 'plant') && previousTab !== newTab) {
       setVehicleFilter('all');
       setStatusFilter('all');
     }
@@ -237,16 +242,20 @@ export default function WorkshopTasksPage() {
             inspection_date,
             vehicles (
               reg_number,
-              nickname,
+              nickname
+            ),
+            plant (
               plant_id,
-              asset_type
+              nickname
             )
           ),
           vehicles (
             reg_number,
-            nickname,
+            nickname
+          ),
+          plant (
             plant_id,
-            asset_type
+            nickname
           ),
           workshop_task_categories (
             id,
@@ -278,7 +287,8 @@ export default function WorkshopTasksPage() {
       }
       
       if (vehicleFilter !== 'all') {
-        query = query.eq('vehicle_id', vehicleFilter);
+        // Filter by either vehicle_id OR plant_id depending on the filter value
+        query = query.or(`vehicle_id.eq.${vehicleFilter},plant_id.eq.${vehicleFilter}`);
       }
 
       const { data, error } = await query;
@@ -332,14 +342,43 @@ export default function WorkshopTasksPage() {
 
   const fetchVehicles = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch vehicles
+      const { data: vehicleData, error: vehicleError } = await supabase
         .from('vehicles')
-        .select('id, reg_number, plant_id, nickname, asset_type')
+        .select('id, reg_number, nickname')
         .eq('status', 'active')
         .order('reg_number');
 
-      if (error) throw error;
-      setVehicles(data || []);
+      if (vehicleError) throw vehicleError;
+
+      // Fetch plant
+      const { data: plantData, error: plantError } = await supabase
+        .from('plant')
+        .select('id, plant_id, nickname')
+        .eq('status', 'active')
+        .order('plant_id');
+
+      if (plantError) throw plantError;
+
+      // Combine both into a unified list with asset type indicators
+      const combinedVehicles = [
+        ...(vehicleData || []).map(v => ({
+          id: v.id,
+          reg_number: v.reg_number,
+          plant_id: null,
+          nickname: v.nickname,
+          asset_type: 'vehicle' as const
+        })),
+        ...(plantData || []).map(p => ({
+          id: p.id,
+          reg_number: null,
+          plant_id: p.plant_id,
+          nickname: p.nickname,
+          asset_type: 'plant' as const
+        }))
+      ];
+
+      setVehicles(combinedVehicles);
     } catch (err) {
       console.error('Error fetching vehicles:', err instanceof Error ? err.message : err);
     }
@@ -427,22 +466,40 @@ export default function WorkshopTasksPage() {
 
   const fetchCurrentMeterReading = async (vehicleId: string) => {
     try {
-      // First get the vehicle to check asset_type
-      const { data: vehicleData, error: vehicleError } = await supabase
+      // Check both vehicles and plant tables to determine asset type
+      let isPlant = false;
+
+      // Check if it's a vehicle
+      const { data: vehicleData } = await supabase
         .from('vehicles')
-        .select('asset_type')
+        .select('id')
         .eq('id', vehicleId)
-        .single();
+        .maybeSingle();
 
-      if (vehicleError) throw vehicleError;
+      // If not found in vehicles, check plant table
+      if (!vehicleData) {
+        const { data: plantData } = await supabase
+          .from('plant')
+          .select('id')
+          .eq('id', vehicleId)
+          .maybeSingle();
 
-      const isPlant = vehicleData?.asset_type === 'plant';
+        if (plantData) {
+          isPlant = true;
+        } else {
+          // Asset not found in either table
+          setCurrentMeterReading(null);
+          setMeterReadingType('mileage');
+          return;
+        }
+      }
+
       setMeterReadingType(isPlant ? 'hours' : 'mileage');
 
       const { data, error } = await supabase
         .from('vehicle_maintenance')
         .select(isPlant ? 'current_hours' : 'current_mileage')
-        .eq('vehicle_id', vehicleId)
+        .eq(isPlant ? 'plant_id' : 'vehicle_id', vehicleId)
         .single();
 
       if (error) {
@@ -497,21 +554,31 @@ export default function WorkshopTasksPage() {
 
       // Create the workshop task
       const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
+      const isPlant = selectedVehicle?.asset_type === 'plant';
       const taskTitle = `Workshop Task - ${getAssetIdLabel(selectedVehicle)}`;
+      
+      // Build task data with correct asset reference
+      const taskData: any = {
+        action_type: 'workshop_vehicle_task',
+        workshop_subcategory_id: selectedSubcategoryId,
+        workshop_comments: workshopComments,
+        title: taskTitle,
+        description: workshopComments.substring(0, 200),
+        status: 'pending',
+        priority: 'medium',
+        created_by: user!.id,
+      };
+
+      // Set either vehicle_id or plant_id, not both
+      if (isPlant) {
+        taskData.plant_id = selectedVehicleId;
+      } else {
+        taskData.vehicle_id = selectedVehicleId;
+      }
       
       const { data: newTask, error } = await supabase
         .from('actions')
-        .insert({
-          action_type: 'workshop_vehicle_task',
-          vehicle_id: selectedVehicleId,
-          workshop_subcategory_id: selectedSubcategoryId,
-          workshop_comments: workshopComments,
-          title: taskTitle,
-          description: workshopComments.substring(0, 200),
-          status: 'pending',
-          priority: 'medium',
-          created_by: user!.id,
-        })
+        .insert(taskData)
         .select('id')
         .single();
 
@@ -542,27 +609,26 @@ export default function WorkshopTasksPage() {
         }
       }
 
-      // Update vehicle meter reading in vehicle_maintenance table
-      const updateData = meterReadingType === 'hours' 
-        ? {
-            vehicle_id: selectedVehicleId,
-            current_hours: readingValue,
-            last_hours_update: new Date().toISOString(),
-            last_updated_at: new Date().toISOString(),
-            last_updated_by: user!.id,
-          }
-        : {
-            vehicle_id: selectedVehicleId,
-            current_mileage: readingValue,
-            last_mileage_update: new Date().toISOString(),
-            last_updated_at: new Date().toISOString(),
-            last_updated_by: user!.id,
-          };
+      // Update meter reading in vehicle_maintenance table
+      const updateData: any = {
+        last_updated_at: new Date().toISOString(),
+        last_updated_by: user!.id,
+      };
+
+      if (isPlant) {
+        updateData.plant_id = selectedVehicleId;
+        updateData.current_hours = readingValue;
+        updateData.last_hours_update = new Date().toISOString();
+      } else {
+        updateData.vehicle_id = selectedVehicleId;
+        updateData.current_mileage = readingValue;
+        updateData.last_mileage_update = new Date().toISOString();
+      }
 
       const { error: meterReadingError } = await supabase
         .from('vehicle_maintenance')
         .upsert(updateData, {
-          onConflict: 'vehicle_id',
+          onConflict: isPlant ? 'plant_id' : 'vehicle_id',
         });
 
       if (meterReadingError) {
@@ -1129,37 +1195,60 @@ export default function WorkshopTasksPage() {
     try {
       setSubmitting(true);
 
-      // Update the workshop task
+      // Determine if this is a plant or vehicle
+      const selectedVehicle = vehicles.find(v => v.id === editVehicleId);
+      const isPlant = selectedVehicle?.asset_type === 'plant';
+
+      // Update the workshop task with correct asset reference
+      const updateData: any = {
+        workshop_category_id: editCategoryId,
+        workshop_subcategory_id: editSubcategoryId || null,
+        workshop_comments: editComments,
+        title: `Workshop Task - ${getAssetIdLabel(selectedVehicle)}`,
+        description: editComments.substring(0, 200),
+      };
+
+      // Update the correct asset reference
+      if (isPlant) {
+        updateData.plant_id = editVehicleId;
+        updateData.vehicle_id = null;
+      } else {
+        updateData.vehicle_id = editVehicleId;
+        updateData.plant_id = null;
+      }
+
       const { error } = await supabase
         .from('actions')
-        .update({
-          vehicle_id: editVehicleId,
-          workshop_category_id: editCategoryId,
-          workshop_subcategory_id: editSubcategoryId || null,
-          workshop_comments: editComments,
-          title: `Workshop Task - ${vehicles.find(v => v.id === editVehicleId)?.reg_number}`,
-          description: editComments.substring(0, 200),
-        })
+        .update(updateData)
         .eq('id', editingTask.id);
 
       if (error) throw error;
 
-      // Update vehicle mileage
+      // Update meter reading
+      const meterUpdateData: any = {
+        last_updated_at: new Date().toISOString(),
+        last_updated_by: user.id,
+      };
+
+      if (isPlant) {
+        meterUpdateData.plant_id = editVehicleId;
+        meterUpdateData.current_hours = mileageValue;
+        meterUpdateData.last_hours_update = new Date().toISOString();
+      } else {
+        meterUpdateData.vehicle_id = editVehicleId;
+        meterUpdateData.current_mileage = mileageValue;
+        meterUpdateData.last_mileage_update = new Date().toISOString();
+      }
+
       const { error: mileageError } = await supabase
         .from('vehicle_maintenance')
-        .upsert({
-          vehicle_id: editVehicleId,
-          current_mileage: mileageValue,
-          last_mileage_update: new Date().toISOString(),
-          last_updated_at: new Date().toISOString(),
-          last_updated_by: user.id,
-        }, {
-          onConflict: 'vehicle_id',
+        .upsert(meterUpdateData, {
+          onConflict: isPlant ? 'plant_id' : 'vehicle_id',
         });
 
       if (mileageError) {
-        console.error('Error updating mileage:', mileageError);
-        toast.error('Task updated but failed to update mileage');
+        console.error('Error updating meter reading:', mileageError);
+        toast.error('Task updated but failed to update meter reading');
       } else {
         toast.success('Workshop task updated successfully');
       }
@@ -1216,28 +1305,40 @@ export default function WorkshopTasksPage() {
     }
   };
 
-  const getAssetIdLabel = (vehicle?: { reg_number: string | null; plant_id?: string | null; asset_type?: 'vehicle' | 'plant' | 'tool' }) => {
-    if (!vehicle) return 'Unknown';
-    if (vehicle.asset_type === 'plant') {
-      return vehicle.plant_id ?? 'Unknown Plant';
+  const getAssetIdLabel = (asset?: { reg_number?: string | null; plant_id?: string | null }) => {
+    if (!asset) return 'Unknown';
+    if (asset.plant_id) {
+      return asset.plant_id;
     }
-    return vehicle.reg_number ?? 'Unknown Vehicle';
+    if (asset.reg_number) {
+      return asset.reg_number;
+    }
+    return 'Unknown';
   };
 
-  const getAssetDisplay = (vehicle?: { reg_number: string | null; plant_id?: string | null; nickname: string | null; asset_type?: 'vehicle' | 'plant' | 'tool' }) => {
-    if (!vehicle) return 'Unknown';
-    const idLabel = getAssetIdLabel(vehicle);
-    if (vehicle.nickname) {
-      return `${idLabel} (${vehicle.nickname})`;
+  const getAssetDisplay = (asset?: { reg_number?: string | null; plant_id?: string | null; nickname?: string | null }) => {
+    if (!asset) return 'Unknown';
+    const idLabel = getAssetIdLabel(asset);
+    if (asset.nickname) {
+      return `${idLabel} (${asset.nickname})`;
     }
     return idLabel;
   };
 
   const getVehicleReg = (task: Action) => {
+    // Check direct vehicle or plant reference
     if (task.vehicles) {
       return getAssetDisplay(task.vehicles);
-    } else if (task.vehicle_inspections?.vehicles) {
-      return getAssetDisplay(task.vehicle_inspections.vehicles);
+    } else if (task.plant) {
+      return getAssetDisplay(task.plant);
+    } 
+    // Check via inspection
+    else if (task.vehicle_inspections) {
+      if (task.vehicle_inspections.vehicles) {
+        return getAssetDisplay(task.vehicle_inspections.vehicles);
+      } else if (task.vehicle_inspections.plant) {
+        return getAssetDisplay(task.vehicle_inspections.plant);
+      }
     }
     return 'Unknown';
   };
@@ -1427,16 +1528,11 @@ export default function WorkshopTasksPage() {
   // Filter tasks by asset type based on current tab
   const getTabFilteredTasks = () => {
     if (assetTab === 'plant') {
-      return tasks.filter(t => t.vehicles?.asset_type === 'plant');
+      // Plant tab: show tasks with plant_id set
+      return tasks.filter(t => t.plant_id !== null);
     } else if (assetTab === 'vehicle') {
-      return tasks.filter(t => {
-        // For inspection defects, check the asset type of the inspected vehicle
-        if (t.action_type === 'inspection_defect') {
-          return t.vehicle_inspections?.vehicles?.asset_type !== 'plant';
-        }
-        // For other tasks, exclude plant assets
-        return t.vehicles?.asset_type !== 'plant';
-      });
+      // Vehicle tab: show tasks with vehicle_id set
+      return tasks.filter(t => t.vehicle_id !== null);
     }
     return tasks;
   };
@@ -2903,7 +2999,7 @@ export default function WorkshopTasksPage() {
               onEditSubcategory={openEditSubcategoryModal}
               onDeleteSubcategory={handleDeleteSubcategory}
             />
-            <AttachmentManagementPanel />
+            <AttachmentManagementPanel taxonomyMode={categoryTaxonomyMode} />
           </TabsContent>
         )}
       </Tabs>
@@ -2922,7 +3018,7 @@ export default function WorkshopTasksPage() {
           <DialogHeader>
             <DialogTitle className="text-foreground text-xl">Create Workshop Task</DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Add a new vehicle repair or maintenance task
+              Add a new {assetTab === 'plant' ? 'plant' : 'vehicle'} repair or maintenance task
             </DialogDescription>
           </DialogHeader>
 
@@ -3340,7 +3436,7 @@ export default function WorkshopTasksPage() {
                   supabase
                     .from('vehicle_maintenance')
                     .select(fieldToSelect)
-                    .eq('vehicle_id', value)
+                    .eq(isPlant ? 'plant_id' : 'vehicle_id', value)
                     .single()
                     .then(({ data, error }) => {
                       if (error && error.code !== 'PGRST116') {

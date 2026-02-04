@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
     domains: [], // Add Supabase storage domain when configured
   },
   // Mark server-only packages to prevent client-side bundling
-  serverExternalPackages: ['xlsx'],
+  serverExternalPackages: ['exceljs'],
   eslint: {
     // Warning: This allows production builds to successfully complete even if
     // your project has ESLint errors.

@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash2, ChevronDown, ChevronUp, Settings } from 'lucide-react';
 
 type Category = {
@@ -46,25 +45,21 @@ export function CategoryManagementPanel({
 }: CategoryManagementPanelProps) {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [expandedSubcategories, setExpandedSubcategories] = useState<Set<string>>(new Set());
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  // Auto-select first category on load or when categories change
-  useEffect(() => {
-    if (categories.length > 0 && !selectedCategoryId) {
-      setSelectedCategoryId(categories[0].id);
-    } else if (categories.length > 0 && selectedCategoryId) {
-      // Check if selected category still exists
-      const categoryExists = categories.some(c => c.id === selectedCategoryId);
-      if (!categoryExists) {
-        setSelectedCategoryId(categories[0].id);
-      }
-    } else if (categories.length === 0) {
-      setSelectedCategoryId(null);
+  const effectiveSelectedCategoryId = useMemo(() => {
+    if (selectedCategoryId && categories.some((category) => category.id === selectedCategoryId)) {
+      return selectedCategoryId;
     }
+
+    return categories[0]?.id ?? null;
   }, [categories, selectedCategoryId]);
 
-  const selectedCategory = categories.find(c => c.id === selectedCategoryId);
-  const categorySubcategories = selectedCategoryId
-    ? subcategories.filter(s => s.category_id === selectedCategoryId).sort((a, b) => a.name.localeCompare(b.name))
+  const selectedCategory = categories.find(c => c.id === effectiveSelectedCategoryId);
+  const categorySubcategories = effectiveSelectedCategoryId
+    ? subcategories
+        .filter(s => s.category_id === effectiveSelectedCategoryId)
+        .sort((a, b) => a.name.localeCompare(b.name))
     : [];
 
   const toggleSubcategoryExpansion = (subcategoryId: string) => {
@@ -79,44 +74,93 @@ export function CategoryManagementPanel({
 
   if (categories.length === 0) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <Settings className="h-16 w-16 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">
-            No Categories Yet
-          </h3>
-          <p className="text-muted-foreground mb-6 text-center max-w-md">
-            Create your first workshop task category to organize repairs and maintenance work
-          </p>
-          <Button onClick={onAddCategory} className="bg-workshop hover:bg-workshop-dark text-white">
-            <Plus className="h-4 w-4 mr-2" />
-            Add First Category
-          </Button>
-        </CardContent>
+      <Card className="border-border">
+        <CardHeader
+          className="cursor-pointer hover:bg-slate-800/30 transition-colors"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 flex-1">
+              <ChevronDown 
+                className={`h-5 w-5 text-muted-foreground transition-transform ${
+                  isExpanded ? 'rotate-180' : ''
+                }`}
+              />
+              <div>
+                <CardTitle className="text-white">Category Management</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  0 categories
+                </CardDescription>
+              </div>
+            </div>
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddCategory();
+              }}
+              className="bg-workshop hover:bg-workshop-dark text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Category
+            </Button>
+          </div>
+        </CardHeader>
+        {isExpanded && (
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center justify-center py-12">
+              <Settings className="h-16 w-16 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">
+                No Categories Yet
+              </h3>
+              <p className="text-muted-foreground text-center max-w-md">
+                Create your first workshop task category to organize repairs and maintenance work
+              </p>
+            </div>
+          </CardContent>
+        )}
       </Card>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="border-border">
+      <CardHeader
+        className="cursor-pointer hover:bg-slate-800/30 transition-colors"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
         <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Category Management</CardTitle>
-            <CardDescription>
-              Organize workshop tasks with categories and subcategories
-            </CardDescription>
+          <div className="flex items-center gap-3 flex-1">
+            <ChevronDown 
+              className={`h-5 w-5 text-muted-foreground transition-transform ${
+                isExpanded ? 'rotate-180' : ''
+              }`}
+            />
+            <div>
+              <CardTitle className="text-white">Category Management</CardTitle>
+              <CardDescription className="text-muted-foreground">
+                {categories.length} {categories.length === 1 ? 'category' : 'categories'} • Organize workshop tasks by type
+              </CardDescription>
+            </div>
           </div>
-          <Button onClick={onAddCategory} className="bg-workshop hover:bg-workshop-dark text-white">
+          <Button
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddCategory();
+            }}
+            className="bg-workshop hover:bg-workshop-dark text-white"
+          >
             <Plus className="h-4 w-4 mr-2" />
             Add Category
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
-          {/* Left Column: Category List */}
-          <div className="space-y-2">
+      
+      {isExpanded && (
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
+            {/* Left Column: Category List */}
+            <div className="space-y-2">
             <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wide">
               Categories ({categories.length})
             </p>
@@ -124,7 +168,7 @@ export function CategoryManagementPanel({
               .sort((a, b) => a.name.localeCompare(b.name))
               .map((category) => {
                 const subcategoryCount = subcategories.filter(s => s.category_id === category.id).length;
-                const isSelected = selectedCategoryId === category.id;
+                const isSelected = effectiveSelectedCategoryId === category.id;
 
                 return (
                   <button
@@ -300,6 +344,7 @@ export function CategoryManagementPanel({
           </div>
         </div>
       </CardContent>
+      )}
     </Card>
   );
 }

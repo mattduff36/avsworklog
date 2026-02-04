@@ -5,13 +5,16 @@ import { useOfflineStore } from '@/lib/stores/offline-queue';
 import { toast } from 'sonner';
 
 export function useOfflineSync() {
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState(() => {
+    if (typeof navigator === 'undefined') {
+      return true;
+    }
+
+    return navigator.onLine;
+  });
   const { queue, processQueue } = useOfflineStore();
 
   useEffect(() => {
-    // Check initial online status
-    setIsOnline(navigator.onLine);
-
     // Listen for online/offline events
     const handleOnline = async () => {
       setIsOnline(true);

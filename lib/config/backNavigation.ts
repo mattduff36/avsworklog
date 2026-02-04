@@ -42,6 +42,18 @@ export function getParentHref(
     return '/fleet?tab=vehicles';
   }
   
+  // Plant history routes - always return to plant tab
+  if (normalizedPath.match(/^\/fleet\/plant\/[^/]+\/history$/)) {
+    const fromTab = searchParams?.get('fromTab');
+    // Validate fromTab to prevent injection
+    const validTabs = ['maintenance', 'plant', 'vehicles', 'settings'];
+    if (fromTab && validTabs.includes(fromTab)) {
+      return `/fleet?tab=${fromTab}`;
+    }
+    // Default fallback to plant tab
+    return '/fleet?tab=plant';
+  }
+  
   // Inspection routes
   if (normalizedPath === '/inspections/new') {
     return '/inspections';

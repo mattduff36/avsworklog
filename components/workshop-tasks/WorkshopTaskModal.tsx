@@ -39,15 +39,19 @@ type Task = {
     vehicles?: {
       reg_number: string;
       nickname: string | null;
-      asset_type?: 'vehicle' | 'plant' | 'tool';
-      plant_id?: string | null;
+    };
+    plant?: {
+      plant_id: string;
+      nickname: string | null;
     };
   };
   vehicles?: {
     reg_number: string;
     nickname: string | null;
-    asset_type?: 'vehicle' | 'plant' | 'tool';
-    plant_id?: string | null;
+  };
+  plant?: {
+    plant_id: string;
+    nickname: string | null;
   };
 };
 
@@ -84,28 +88,39 @@ export function WorkshopTaskModal({
   if (!task) return null;
 
   const getVehicleDisplay = () => {
-    const getAssetIdLabel = (vehicle?: { reg_number: string | null; plant_id?: string | null; asset_type?: 'vehicle' | 'plant' | 'tool' }) => {
-      if (!vehicle) return 'Unknown';
-      if (vehicle.asset_type === 'plant') {
-        return vehicle.plant_id ?? 'Unknown Plant';
+    const getAssetIdLabel = (asset?: { reg_number?: string | null; plant_id?: string | null }) => {
+      if (!asset) return 'Unknown';
+      if (asset.plant_id) {
+        return asset.plant_id;
       }
-      return vehicle.reg_number ?? 'Unknown Vehicle';
+      if (asset.reg_number) {
+        return asset.reg_number;
+      }
+      return 'Unknown';
     };
 
-    const getAssetDisplay = (vehicle?: { reg_number: string | null; plant_id?: string | null; nickname: string | null; asset_type?: 'vehicle' | 'plant' | 'tool' }) => {
-      if (!vehicle) return 'Unknown';
-      const idLabel = getAssetIdLabel(vehicle);
-      if (vehicle.nickname) {
-        return `${idLabel} (${vehicle.nickname})`;
+    const getAssetDisplay = (asset?: { reg_number?: string | null; plant_id?: string | null; nickname?: string | null }) => {
+      if (!asset) return 'Unknown';
+      const idLabel = getAssetIdLabel(asset);
+      if (asset.nickname) {
+        return `${idLabel} (${asset.nickname})`;
       }
       return idLabel;
     };
 
+    // Check direct vehicle or plant reference
     if (task.vehicles) {
       return getAssetDisplay(task.vehicles);
+    } else if (task.plant) {
+      return getAssetDisplay(task.plant);
     }
-    if (task.vehicle_inspections?.vehicles) {
-      return getAssetDisplay(task.vehicle_inspections.vehicles);
+    // Check via inspection
+    if (task.vehicle_inspections) {
+      if (task.vehicle_inspections.vehicles) {
+        return getAssetDisplay(task.vehicle_inspections.vehicles);
+      } else if (task.vehicle_inspections.plant) {
+        return getAssetDisplay(task.vehicle_inspections.plant);
+      }
     }
     return 'Unknown Vehicle';
   };

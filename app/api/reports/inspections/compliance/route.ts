@@ -9,6 +9,25 @@ import {
   formatExcelStatus
 } from '@/lib/utils/excel';
 
+type VehicleRow = {
+  reg_number?: string | null;
+};
+
+type InspectorRow = {
+  full_name?: string | null;
+  employee_id?: string | null;
+};
+
+type InspectionRow = {
+  vehicle?: VehicleRow | null;
+  inspector?: InspectorRow | null;
+  inspection_date: string;
+  inspection_end_date?: string | null;
+  status: string;
+  submitted_at?: string | null;
+  reviewed_at?: string | null;
+};
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -78,7 +97,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform data for Excel
-    const excelData = inspections.map((inspection: any) => ({
+    const excelData = (inspections as InspectionRow[]).map((inspection) => ({
       'Vehicle Reg': inspection.vehicle?.reg_number || '-',
       'Vehicle Type': getVehicleCategoryName(inspection.vehicle),
       'Inspector': inspection.inspector?.full_name || 'Unknown',
@@ -92,8 +111,8 @@ export async function GET(request: NextRequest) {
 
     // Add summary statistics
     const totalInspections = inspections.length;
-    const submittedCount = inspections.filter((i: any) => i.status !== 'draft').length;
-    const approvedCount = inspections.filter((i: any) => i.status === 'approved').length;
+    const submittedCount = (inspections as InspectionRow[]).filter((inspection) => inspection.status !== 'draft').length;
+    const approvedCount = (inspections as InspectionRow[]).filter((inspection) => inspection.status === 'approved').length;
     const complianceRate = totalInspections > 0 ? ((submittedCount / totalInspections) * 100).toFixed(1) : '0';
 
     excelData.push({
@@ -121,7 +140,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Generate Excel file
-    const buffer = generateExcelFile([
+    const buffer = await generateExcelFile([
       {
         sheetName: 'Inspection Compliance',
         columns: [

@@ -1,5 +1,5 @@
 import 'server-only';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 /**
  * Excel utility functions for generating reports
@@ -15,60 +15,31 @@ export interface ExcelColumn {
 export interface ExcelWorksheetData {
   sheetName: string;
   columns: ExcelColumn[];
-  data: any[];
+  data: Array<Record<string, string | number | null>>;
 }
 
 /**
  * Generate Excel file from worksheet data
  */
-export function generateExcelFile(worksheets: ExcelWorksheetData[]): Buffer {
-  const workbook = XLSX.utils.book_new();
+export async function generateExcelFile(worksheets: ExcelWorksheetData[]): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
 
   worksheets.forEach((worksheet) => {
-    // Guard against empty data - create minimal worksheet with just headers
-    if (!worksheet.data || worksheet.data.length === 0) {
-      const headerRow: any = {};
-      worksheet.columns.forEach((col) => {
-        headerRow[col.key] = col.header;
-      });
-      const ws = XLSX.utils.json_to_sheet([headerRow]);
-      
-      // Set column widths
-      ws['!cols'] = worksheet.columns.map((col) => ({
-        wch: col.width || 15,
-      }));
-      
-      XLSX.utils.book_append_sheet(workbook, ws, worksheet.sheetName);
-      return; // Skip to next worksheet
-    }
-    
-    // Create worksheet from data
-    const ws = XLSX.utils.json_to_sheet(worksheet.data, {
-      header: worksheet.columns.map((col) => col.key),
-    });
+    const sheet = workbook.addWorksheet(worksheet.sheetName);
 
-    // Set column headers
-    const headerRow: any = {};
-    worksheet.columns.forEach((col) => {
-      headerRow[col.key] = col.header;
-    });
-    XLSX.utils.sheet_add_json(ws, [headerRow], {
-      skipHeader: true,
-      origin: 0,
-    });
-
-    // Set column widths
-    ws['!cols'] = worksheet.columns.map((col) => ({
-      wch: col.width || 15,
+    sheet.columns = worksheet.columns.map((col) => ({
+      header: col.header,
+      key: col.key,
+      width: col.width ?? 15,
     }));
 
-    // Add worksheet to workbook
-    XLSX.utils.book_append_sheet(workbook, ws, worksheet.sheetName);
+    if (worksheet.data && worksheet.data.length > 0) {
+      sheet.addRows(worksheet.data);
+    }
   });
 
-  // Generate buffer
-  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-  return buffer;
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer as ArrayBuffer);
 }
 
 /**
@@ -109,31 +80,41 @@ export function formatExcelStatus(status: string): string {
 /**
  * Create summary row for Excel
  */
-export function createSummaryRow(data: any[]): any {
+export function createSummaryRow<Row extends Record<string, string | number | null>>(
+  row: Row
+): Row & { isSummary: true } {
   return {
     isSummary: true,
-    ...data,
+    ...row,
   };
 }
 
 /**
  * Add totals row to worksheet data
  */
-export function addTotalsRow(
-  data: any[],
+export function addTotalsRow<Row extends Record<string, string | number | null>>(
+  data: Row[],
   totalLabel: string,
-  sumColumns: string[]
-): any[] {
-  const totals: any = { [Object.keys(data[0])[0]]: totalLabel };
+  sumColumns: Array<keyof Row & string>
+): Row[] {
+  if (data.length === 0) {
+    return data;
+  }
+
+  const firstKey = Object.keys(data[0])[0];
+  const totals: Record<string, string> = { [firstKey]: totalLabel };
 
   sumColumns.forEach((col) => {
-    totals[col] = data.reduce((sum, row) => {
-      const value = parseFloat(row[col]) || 0;
-      return sum + value;
-    }, 0).toFixed(2);
+    totals[col] = data
+      .reduce((sum, row) => {
+        const rawValue = row[col];
+        const value = parseFloat(String(rawValue ?? 0)) || 0;
+        return sum + value;
+      }, 0)
+      .toFixed(2);
   });
 
-  return [...data, totals];
+  return [...data, totals as Row];
 }
 
 /**

@@ -5,9 +5,41 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 import { 
   generateExcelFile, 
   formatExcelDate, 
-  formatExcelHours, 
-  formatExcelStatus
+  formatExcelHours
 } from '@/lib/utils/excel';
+
+type AbsenceReasonRow = {
+  is_paid?: boolean | null;
+};
+
+type AbsenceRow = {
+  profile_id: string;
+  duration_days?: number | null;
+  absence_reasons?: AbsenceReasonRow | null;
+};
+
+type TimesheetEntryRow = {
+  day_of_week: number;
+  daily_total?: number | null;
+  working_in_yard?: boolean | null;
+  did_not_work?: boolean | null;
+  job_number?: string | null;
+  night_shift?: boolean | null;
+  bank_holiday?: boolean | null;
+};
+
+type EmployeeRow = {
+  full_name?: string | null;
+  employee_id?: string | null;
+};
+
+type TimesheetRow = {
+  user_id: string;
+  week_ending: string;
+  reviewed_at?: string | null;
+  employee?: EmployeeRow | null;
+  timesheet_entries?: TimesheetEntryRow[] | null;
+};
 
 export async function GET(request: NextRequest) {
   try {
@@ -122,7 +154,7 @@ export async function GET(request: NextRequest) {
     const absencesByEmployee = new Map<string, { paidDays: number; unpaidDays: number }>();
     
     if (absences && absences.length > 0) {
-      absences.forEach((absence: any) => {
+      (absences as AbsenceRow[]).forEach((absence) => {
         const employeeId = absence.profile_id;
         const isPaid = absence.absence_reasons?.is_paid || false;
         const days = absence.duration_days || 0;
@@ -141,9 +173,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform data for Excel - Payroll format
-    const excelData: any[] = [];
+    const excelData: Array<Record<string, string>> = [];
 
-    timesheets.forEach((timesheet: any) => {
+    (timesheets as TimesheetRow[]).forEach((timesheet) => {
       const employee = timesheet.employee;
       const entries = timesheet.timesheet_entries || [];
 
@@ -157,13 +189,13 @@ export async function GET(request: NextRequest) {
       let overtime15Hours = 0;    // Sat-Sun hours at 1.5x
       let overtime2Hours = 0;     // Night shifts + Bank holidays at 2x
 
-      entries.forEach((entry: any) => {
+      entries.forEach((entry) => {
         // Skip days not worked
         if (entry.did_not_work) {
           return;
         }
 
-        const hours = entry.daily_total || 0;
+        const hours = entry.daily_total ?? 0;
         const dayOfWeek = entry.day_of_week; // Integer: 1=Mon, 2=Tue, ..., 6=Sat, 7=Sun
         const isNightShift = entry.night_shift || false;
         const isBankHoliday = entry.bank_holiday || false;
@@ -199,7 +231,7 @@ export async function GET(request: NextRequest) {
         'Paid Absence Hours': formatExcelHours(paidAbsenceHours),
         'Unpaid Absence Hours': formatExcelHours(unpaidAbsenceHours),
         'Total Hours': formatExcelHours(totalHours),
-        'Approved Date': formatExcelDate(timesheet.reviewed_at),
+        'Approved Date': timesheet.reviewed_at ? formatExcelDate(timesheet.reviewed_at) : '-',
       });
     });
 
@@ -238,7 +270,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Generate Excel file
-    const buffer = generateExcelFile([
+    const buffer = await generateExcelFile([
       {
         sheetName: 'Payroll Report',
         columns: [
