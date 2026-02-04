@@ -94,8 +94,8 @@ export const useOfflineStore = create<OfflineStore>()(
               }
             } else if (item.type === 'inspection') {
               if (item.action === 'create') {
-                // Extract items from data
-                const { items, ...inspectionData } = item.data as InspectionInsert & { items?: unknown[] };
+                // Extract items and dailyHours from data
+                const { items, dailyHours, ...inspectionData } = item.data as InspectionInsert & { items?: unknown[]; dailyHours?: unknown[] };
                 
                 // Insert inspection
                 const { data: inspection, error: inspectionError } = await supabase
@@ -119,6 +119,24 @@ export const useOfflineStore = create<OfflineStore>()(
                     .insert(itemsToInsert);
 
                   if (itemsError) throw itemsError;
+                }
+
+                // Sync daily hours if this is a plant inspection
+                if (inspectionData.plant_id && dailyHours && Array.isArray(dailyHours) && dailyHours.length > 0) {
+                  const hoursToInsert = dailyHours.map((dh: Record<string, unknown>) => ({
+                    inspection_id: inspection.id,
+                    day_of_week: dh.day_of_week as number,
+                    hours: dh.hours as number
+                  }));
+                  
+                  const { error: hoursError } = await supabase
+                    .from('inspection_daily_hours')
+                    .insert(hoursToInsert);
+                  
+                  if (hoursError) {
+                    console.error('Failed to sync daily hours:', hoursError);
+                    // Continue - inspection still created
+                  }
                 }
               } else if (item.action === 'update') {
                 await supabase
