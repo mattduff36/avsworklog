@@ -45,7 +45,7 @@ type PlantAsset = {
 };
 
 type PlantMaintenanceWithStatus = {
-  plant_id: string;
+  plant_id: string; // Human-readable identifier (P001, P002, etc.)
   plant: PlantAsset;
   current_hours: number | null;
   next_service_hours: number | null;
@@ -131,7 +131,7 @@ export function PlantTable({
         const maintenance = maintenanceData?.find((m) => m.plant_id === plant.id);
         
         return {
-          plant_id: plant.id,
+          plant_id: plant.plant_id, // Human-readable identifier (P001, P002, etc.)
           plant: plant as PlantAsset,
           current_hours: maintenance?.current_hours || plant.current_hours || null,
           next_service_hours: maintenance?.next_service_hours || null,

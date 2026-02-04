@@ -243,7 +243,12 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   // Auto-fetch history for vehicles with alerts on mount
   useEffect(() => {
     const vehiclesWithAlerts = vehicles.filter(v => {
-      // Check if vehicle has any overdue or due soon status
+      // For efficiency, first check alert counts (works for both vehicles and plant)
+      if (v.overdue_count > 0 || v.due_soon_count > 0) {
+        return true;
+      }
+      
+      // Fallback: Check individual status fields (for compatibility)
       return v.tax_status?.status === 'overdue' || v.tax_status?.status === 'due_soon' ||
         v.mot_status?.status === 'overdue' || v.mot_status?.status === 'due_soon' ||
         v.service_status?.status === 'overdue' || v.service_status?.status === 'due_soon' ||
@@ -265,111 +270,134 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   // Group vehicles by their most severe alert status
   const vehiclesWithAlerts: VehicleWithAlerts[] = vehicles.map(vehicle => {
     const alerts: Alert[] = [];
+    const isPlant = 'is_plant' in vehicle && vehicle.is_plant === true;
+    const assetType = isPlant ? 'plant' : 'vehicle';
     
-    // Check Tax
-    if (vehicle.tax_status?.status === 'overdue') {
-      alerts.push({
-        type: 'Tax',
-        detail: formatDaysUntil(vehicle.tax_status.days_until),
-        severity: 'overdue',
-        sortValue: vehicle.tax_status.days_until ?? 0
-      });
-    } else if (vehicle.tax_status?.status === 'due_soon') {
-      alerts.push({
-        type: 'Tax',
-        detail: formatDaysUntil(vehicle.tax_status.days_until),
-        severity: 'due_soon',
-        sortValue: vehicle.tax_status.days_until ?? 0
-      });
+    // Helper to check if category applies to this asset
+    const categoryApplies = (categoryName: string): boolean => {
+      const category = maintenanceCategories.find(
+        c => c.name.toLowerCase() === categoryName.toLowerCase()
+      );
+      if (!category) return true; // Default to showing if category not found
+      return (category.applies_to || ['vehicle']).includes(assetType);
+    };
+    
+    // Check Tax (only if category applies to this asset type)
+    if (categoryApplies('tax due date')) {
+      if (vehicle.tax_status?.status === 'overdue') {
+        alerts.push({
+          type: 'Tax',
+          detail: formatDaysUntil(vehicle.tax_status.days_until),
+          severity: 'overdue',
+          sortValue: vehicle.tax_status.days_until ?? 0
+        });
+      } else if (vehicle.tax_status?.status === 'due_soon') {
+        alerts.push({
+          type: 'Tax',
+          detail: formatDaysUntil(vehicle.tax_status.days_until),
+          severity: 'due_soon',
+          sortValue: vehicle.tax_status.days_until ?? 0
+        });
+      }
     }
     
-    // Check MOT
-    if (vehicle.mot_status?.status === 'overdue') {
-      alerts.push({
-        type: 'MOT',
-        detail: formatDaysUntil(vehicle.mot_status.days_until),
-        severity: 'overdue',
-        sortValue: vehicle.mot_status.days_until ?? 0
-      });
-    } else if (vehicle.mot_status?.status === 'due_soon') {
-      alerts.push({
-        type: 'MOT',
-        detail: formatDaysUntil(vehicle.mot_status.days_until),
-        severity: 'due_soon',
-        sortValue: vehicle.mot_status.days_until ?? 0
-      });
+    // Check MOT (only if category applies to this asset type)
+    if (categoryApplies('mot due date')) {
+      if (vehicle.mot_status?.status === 'overdue') {
+        alerts.push({
+          type: 'MOT',
+          detail: formatDaysUntil(vehicle.mot_status.days_until),
+          severity: 'overdue',
+          sortValue: vehicle.mot_status.days_until ?? 0
+        });
+      } else if (vehicle.mot_status?.status === 'due_soon') {
+        alerts.push({
+          type: 'MOT',
+          detail: formatDaysUntil(vehicle.mot_status.days_until),
+          severity: 'due_soon',
+          sortValue: vehicle.mot_status.days_until ?? 0
+        });
+      }
     }
     
-    // Check Service (normalize miles to days equivalent for sorting)
-    if (vehicle.service_status?.status === 'overdue') {
-      const milesUntil = vehicle.service_status.miles_until ?? 0;
-      alerts.push({
-        type: 'Service',
-        detail: formatMilesUntil(milesUntil),
-        severity: 'overdue',
-        sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
-      });
-    } else if (vehicle.service_status?.status === 'due_soon') {
-      const milesUntil = vehicle.service_status.miles_until ?? 0;
-      alerts.push({
-        type: 'Service',
-        detail: formatMilesUntil(milesUntil),
-        severity: 'due_soon',
-        sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
-      });
+    // Check Service (normalize miles to days equivalent for sorting - only if category applies)
+    if (categoryApplies('service due')) {
+      if (vehicle.service_status?.status === 'overdue') {
+        const milesUntil = vehicle.service_status.miles_until ?? 0;
+        alerts.push({
+          type: 'Service',
+          detail: formatMilesUntil(milesUntil),
+          severity: 'overdue',
+          sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
+        });
+      } else if (vehicle.service_status?.status === 'due_soon') {
+        const milesUntil = vehicle.service_status.miles_until ?? 0;
+        alerts.push({
+          type: 'Service',
+          detail: formatMilesUntil(milesUntil),
+          severity: 'due_soon',
+          sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
+        });
+      }
     }
     
-    // Check Cambelt (normalize miles to days equivalent for sorting)
-    if (vehicle.cambelt_status?.status === 'overdue') {
-      const milesUntil = vehicle.cambelt_status.miles_until ?? 0;
-      alerts.push({
-        type: 'Cambelt',
-        detail: formatMilesUntil(milesUntil),
-        severity: 'overdue',
-        sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
-      });
-    } else if (vehicle.cambelt_status?.status === 'due_soon') {
-      const milesUntil = vehicle.cambelt_status.miles_until ?? 0;
-      alerts.push({
-        type: 'Cambelt',
-        detail: formatMilesUntil(milesUntil),
-        severity: 'due_soon',
-        sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
-      });
+    // Check Cambelt (normalize miles to days equivalent for sorting - only if category applies)
+    if (categoryApplies('cambelt replacement')) {
+      if (vehicle.cambelt_status?.status === 'overdue') {
+        const milesUntil = vehicle.cambelt_status.miles_until ?? 0;
+        alerts.push({
+          type: 'Cambelt',
+          detail: formatMilesUntil(milesUntil),
+          severity: 'overdue',
+          sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
+        });
+      } else if (vehicle.cambelt_status?.status === 'due_soon') {
+        const milesUntil = vehicle.cambelt_status.miles_until ?? 0;
+        alerts.push({
+          type: 'Cambelt',
+          detail: formatMilesUntil(milesUntil),
+          severity: 'due_soon',
+          sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
+        });
+      }
     }
     
-    // Check First Aid
-    if (vehicle.first_aid_status?.status === 'overdue') {
-      alerts.push({
-        type: 'First Aid Kit',
-        detail: formatDaysUntil(vehicle.first_aid_status.days_until),
-        severity: 'overdue',
-        sortValue: vehicle.first_aid_status.days_until ?? 0
-      });
-    } else if (vehicle.first_aid_status?.status === 'due_soon') {
-      alerts.push({
-        type: 'First Aid Kit',
-        detail: formatDaysUntil(vehicle.first_aid_status.days_until),
-        severity: 'due_soon',
-        sortValue: vehicle.first_aid_status.days_until ?? 0
-      });
+    // Check First Aid (only if category applies to this asset type)
+    if (categoryApplies('first aid kit expiry')) {
+      if (vehicle.first_aid_status?.status === 'overdue') {
+        alerts.push({
+          type: 'First Aid Kit',
+          detail: formatDaysUntil(vehicle.first_aid_status.days_until),
+          severity: 'overdue',
+          sortValue: vehicle.first_aid_status.days_until ?? 0
+        });
+      } else if (vehicle.first_aid_status?.status === 'due_soon') {
+        alerts.push({
+          type: 'First Aid Kit',
+          detail: formatDaysUntil(vehicle.first_aid_status.days_until),
+          severity: 'due_soon',
+          sortValue: vehicle.first_aid_status.days_until ?? 0
+        });
+      }
     }
     
-    // Check LOLER (for plant machinery)
-    if (vehicle.loler_status?.status === 'overdue') {
-      alerts.push({
-        type: 'LOLER',
-        detail: formatDaysUntil(vehicle.loler_status.days_until),
-        severity: 'overdue',
-        sortValue: vehicle.loler_status.days_until ?? 0
-      });
-    } else if (vehicle.loler_status?.status === 'due_soon') {
-      alerts.push({
-        type: 'LOLER',
-        detail: formatDaysUntil(vehicle.loler_status.days_until),
-        severity: 'due_soon',
-        sortValue: vehicle.loler_status.days_until ?? 0
-      });
+    // Check LOLER (for plant machinery - only if category applies)
+    if (categoryApplies('loler due')) {
+      if (vehicle.loler_status?.status === 'overdue') {
+        alerts.push({
+          type: 'LOLER',
+          detail: formatDaysUntil(vehicle.loler_status.days_until),
+          severity: 'overdue',
+          sortValue: vehicle.loler_status.days_until ?? 0
+        });
+      } else if (vehicle.loler_status?.status === 'due_soon') {
+        alerts.push({
+          type: 'LOLER',
+          detail: formatDaysUntil(vehicle.loler_status.days_until),
+          severity: 'due_soon',
+          sortValue: vehicle.loler_status.days_until ?? 0
+        });
+      }
     }
     
     return {

@@ -24,13 +24,19 @@ type PlantAsset = {
 
 type PlantMaintenanceWithStatus = {
   vehicle_id: string;
-  plant_id: string;
+  plant_id: string; // Human-readable identifier (P001, P002, etc.)
   is_plant?: boolean; // Flag to indicate this is plant machinery, not a vehicle
   vehicle?: PlantAsset;
   current_hours: number | null;
   next_service_hours: number | null;
   loler_due_date?: string | null; // LOLER due date for office actions
   loler_status?: MaintenanceItemStatus; // LOLER status for plant machinery
+  // Plant assets don't have these statuses, but MaintenanceOverview expects them
+  tax_status?: null;
+  mot_status?: null;
+  service_status?: null;
+  cambelt_status?: null;
+  first_aid_status?: null;
   overdue_count: number;
   due_soon_count: number;
 };
@@ -79,7 +85,7 @@ export function PlantOverview({ onVehicleClick }: PlantOverviewProps) {
         
         return {
           vehicle_id: plant.id,
-          plant_id: plant.id,
+          plant_id: plant.plant_id, // Human-readable identifier (P001, P002, etc.)
           is_plant: true, // Flag to indicate this is plant, not vehicle
           vehicle: {
             ...plant,
@@ -89,6 +95,12 @@ export function PlantOverview({ onVehicleClick }: PlantOverviewProps) {
           next_service_hours: maintenance?.next_service_hours || null,
           loler_due_date: plant.loler_due_date, // Add LOLER due date for office actions
           loler_status, // Add LOLER status so MaintenanceOverview can detect it
+          // Set other status fields to null for plant assets (they don't have these)
+          tax_status: null,
+          mot_status: null,
+          service_status: null,
+          cambelt_status: null,
+          first_aid_status: null,
           overdue_count: alertCounts.overdue,
           due_soon_count: alertCounts.due_soon,
         };
