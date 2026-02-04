@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -74,7 +74,8 @@ export function PlantTable({
   onVehicleAdded
 }: PlantTableProps) {
   const router = useRouter();
-  const supabase = createClient();
+  // ✅ Create supabase client using useMemo to avoid recreating on every render
+  const supabase = useMemo(() => createClient(), []);
   const [sortField, setSortField] = useState<SortField>('plant_id');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [addVehicleDialogOpen, setAddVehicleDialogOpen] = useState(false);

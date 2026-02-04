@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { MaintenanceOverview } from './MaintenanceOverview';
@@ -42,7 +42,8 @@ type PlantMaintenanceWithStatus = {
 };
 
 export function PlantOverview({ onVehicleClick }: PlantOverviewProps) {
-  const supabase = createClient();
+  // ✅ Create supabase client using useMemo to avoid recreating on every render
+  const supabase = useMemo(() => createClient(), []);
   const [plantAssets, setPlantAssets] = useState<PlantMaintenanceWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
 

@@ -61,13 +61,35 @@ export function AddVehicleDialog({
   });
   const [error, setError] = useState('');
 
+  // ✅ Memoize fetchCategories with proper dependencies
+  const fetchCategories = useCallback(async () => {
+    try {
+      const supabase = createClient(); // Create client inside callback
+      const { data, error } = await supabase
+        .from('vehicle_categories')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      
+      // Filter categories based on asset type
+      const filtered = (data || []).filter(cat => 
+        cat.applies_to?.includes(assetType) ?? true
+      );
+      
+      setCategories(filtered);
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+    }
+  }, [assetType]); // ✅ Only depends on assetType
+
   // Fetch categories when dialog opens
   useEffect(() => {
     if (open) {
-      fetchCategories();
+      fetchCategories(); // ✅ Now included in dependencies
       setAssetType(initialAssetType); // Sync state with prop when dialog opens
     }
-  }, [open, initialAssetType]);
+  }, [open, initialAssetType, fetchCategories]); // ✅ Added fetchCategories
 
   // Reset form when dialog closes
   useEffect(() => {
@@ -86,18 +108,6 @@ export function AddVehicleDialog({
       setError('');
     }
   }, [open, initialAssetType]);
-
-  async function fetchCategories() {
-    try {
-      const response = await fetch('/api/admin/categories');
-      const data = await response.json();
-      if (response.ok) {
-        setCategories(data.categories || []);
-      }
-    } catch (error) {
-      logger.error('Error fetching categories', error, 'AddVehicleDialog');
-    }
-  }
 
   // Handle registration input with auto-uppercase and smart spacing
   function handleRegistrationChange(value: string) {
