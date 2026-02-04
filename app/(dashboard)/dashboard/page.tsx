@@ -72,6 +72,14 @@ export default function DashboardPage() {
   // Intro animation state (all devices)
   const [showIntro, setShowIntro] = useState(true);
   
+  // Track if component is mounted (client-side only) to prevent hydration issues
+  const [isMounted, setIsMounted] = useState(false);
+  
+  // Set mounted state after hydration
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+  
   // Hide intro after 3 seconds
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -436,8 +444,8 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 max-w-6xl">
-      {/* Offline Banner */}
-      {!isOnline && <OfflineBanner />}
+      {/* Offline Banner - Only render after mount to prevent hydration mismatch */}
+      {isMounted && !isOnline && <OfflineBanner />}
       
       {/* Welcome Section */}
       <div className="bg-slate-900 rounded-lg p-6 border border-slate-700 relative overflow-hidden">
