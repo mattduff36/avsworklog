@@ -3,8 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
-import { useOfflineStore } from '@/lib/stores/offline-queue';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +11,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { OfflineBanner } from '@/components/ui/offline-banner';
 import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User, WifiOff } from 'lucide-react';
 import Link from 'next/link';
 // Removed: getWeekEnding, formatDateISO - no longer needed (week comes from props)
@@ -30,7 +27,7 @@ import { ConfirmationModal } from '../../components/ConfirmationModal';
  * Civils Timesheet Component
  * 
  * This is the standard weekly timesheet for civil engineering work.
- * Supports offline mode, bank holiday detection, and automatic time calculations.
+ * Supports bank holiday detection and automatic time calculations.
  * 
  * @param weekEnding - The Sunday date for this timesheet (YYYY-MM-DD format)
  * @param existingId - ID of existing timesheet to edit (null for new)
@@ -47,8 +44,6 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
   const router = useRouter();
   const { user, profile, isManager, isAdmin, isSuperAdmin } = useAuth();
   
-  const { isOnline } = useOfflineSync();
-  const { addToQueue } = useOfflineStore();
   const supabase = createClient();
   
   // SuperAdmins, admins, and managers all have elevated permissions
@@ -765,45 +760,6 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
     try {
       let timesheetId: string;
 
-      // Check if offline
-      if (!isOnline) {
-        // Save to offline queue
-        const timesheetData = {
-          id: existingTimesheetId || undefined,
-          user_id: selectedEmployeeId,
-          reg_number: regNumber || null,
-          week_ending: weekEnding,
-          status,
-          submitted_at: status === 'submitted' ? new Date().toISOString() : null,
-          signature_data: signatureData || null,
-          signed_at: signatureData ? new Date().toISOString() : null,
-          entries: entries.filter(entry => entry.time_started || entry.time_finished || entry.remarks || entry.did_not_work).map(entry => ({
-            day_of_week: entry.day_of_week,
-            time_started: entry.time_started || null,
-            time_finished: entry.time_finished || null,
-            job_number: entry.job_number || null,
-            working_in_yard: entry.working_in_yard,
-            did_not_work: entry.did_not_work,
-            daily_total: entry.daily_total,
-            remarks: entry.remarks || null,
-          })),
-        };
-        
-        addToQueue({
-          type: 'timesheet',
-          action: existingTimesheetId ? 'update' : 'create',
-          data: timesheetData,
-        });
-        
-        toast.success('Timesheet saved offline', {
-          description: 'Your timesheet will be submitted when you are back online.',
-          icon: <WifiOff className="h-4 w-4" />,
-        });
-        
-        router.push('/timesheets');
-        return;
-      }
-
       // Update existing timesheet or create new one
       if (existingTimesheetId) {
         // Update existing timesheet
@@ -925,13 +881,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       // Handle errors
       const error = err as { code?: string; message?: string; details?: string; hint?: string };
       
-      // Check if this is a network/offline error
-      if (!isOnline || error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError') || error?.message?.includes('network')) {
-        setError('Unable to save timesheet - no internet connection. Please connect to the internet to submit your timesheet.');
-        toast.error('Cannot save while offline', {
-          description: 'Please check your internet connection and try again.',
-        });
-      } else if (error?.code === '23505' || error?.message?.includes('duplicate key') || error?.message?.includes('timesheets_user_id_week_ending_key')) {
+      if (error?.code === '23505' || error?.message?.includes('duplicate key') || error?.message?.includes('timesheets_user_id_week_ending_key')) {
         // Only handle duplicate error if we're not updating an existing timesheet
         if (!existingTimesheetId) {
           // Find the existing timesheet and redirect user to edit it
@@ -980,8 +930,6 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
 
   return (
     <div className="space-y-4 pb-32 md:pb-6 max-w-5xl">
-      {/* Offline Banner */}
-      {!isOnline && <OfflineBanner />}
       
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">

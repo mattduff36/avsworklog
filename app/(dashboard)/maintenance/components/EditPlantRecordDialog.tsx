@@ -20,6 +20,8 @@ import { Loader2, Save, Archive } from 'lucide-react';
 import { formatDateForInput } from '@/lib/utils/maintenanceCalculations';
 import { triggerShakeAnimation } from '@/lib/utils/animations';
 import { createClient } from '@/lib/supabase/client';
+import type { MaintenanceHistoryValueType } from '@/lib/utils/maintenance-history';
+import { safeMaintenanceHistoryFieldName } from '@/lib/utils/maintenance-history';
 import { toast } from 'sonner';
 
 // ============================================================================
@@ -196,7 +198,8 @@ export function EditPlantRecordDialog({
         field_name: string;
         old_value: string | null;
         new_value: string | null;
-        value_type: 'text' | 'number' | 'date';
+        // Must align with maintenance_history.value_type CHECK constraint
+        value_type: MaintenanceHistoryValueType;
       };
       const fieldChanges: FieldChange[] = [];
 
@@ -259,7 +262,7 @@ export function EditPlantRecordDialog({
           field_name: 'loler_inspection_interval_months',
           old_value: plant.loler_inspection_interval_months?.toString() || null,
           new_value: (data.loler_inspection_interval_months || 12).toString(),
-          value_type: 'number'
+          value_type: 'mileage'
         });
       }
 
@@ -292,7 +295,7 @@ export function EditPlantRecordDialog({
           field_name: 'current_hours',
           old_value: maintenanceRecord?.current_hours?.toString() || plant.current_hours?.toString() || null,
           new_value: data.current_hours?.toString() || null,
-          value_type: 'number'
+          value_type: 'mileage'
         });
       }
       if (data.last_service_hours !== maintenanceRecord?.last_service_hours) {
@@ -300,7 +303,7 @@ export function EditPlantRecordDialog({
           field_name: 'last_service_hours',
           old_value: maintenanceRecord?.last_service_hours?.toString() || null,
           new_value: data.last_service_hours?.toString() || null,
-          value_type: 'number'
+          value_type: 'mileage'
         });
       }
       if (data.next_service_hours !== maintenanceRecord?.next_service_hours) {
@@ -308,7 +311,7 @@ export function EditPlantRecordDialog({
           field_name: 'next_service_hours',
           old_value: maintenanceRecord?.next_service_hours?.toString() || null,
           new_value: data.next_service_hours?.toString() || null,
-          value_type: 'number'
+          value_type: 'mileage'
         });
       }
       if (data.tracker_id !== maintenanceRecord?.tracker_id) {
@@ -320,7 +323,28 @@ export function EditPlantRecordDialog({
         });
       }
 
-      if (isNewRecord) {
+      // ----------------------------------------------------------------------
+      // Create or update vehicle_maintenance for this plant.
+      // Production errors showed duplicate creates (unique_plant_maintenance),
+      // so we *always* verify existence by plant_id before inserting.
+      // ----------------------------------------------------------------------
+      let maintenanceId = maintenanceRecord?.id ?? null;
+      
+      if (!maintenanceId) {
+        const { data: existing, error: existingError } = await supabase
+          .from('vehicle_maintenance')
+          .select('id')
+          .eq('plant_id', plant.id)
+          .maybeSingle();
+        
+        if (existingError) {
+          throw new Error(`Failed to check existing maintenance record: ${existingError.message}`);
+        }
+        
+        maintenanceId = existing?.id ?? null;
+      }
+      
+      if (!maintenanceId) {
         // Create new maintenance record
         const { error: createError } = await supabase
           .from('vehicle_maintenance')
@@ -331,14 +355,41 @@ export function EditPlantRecordDialog({
           });
 
         if (createError) {
-          throw new Error(`Failed to create maintenance record: ${createError.message}`);
+          // If a duplicate slipped through (race condition), fall back to update
+          const isDuplicate =
+            createError.code === '23505' ||
+            createError.message?.includes('unique_plant_maintenance') ||
+            createError.message?.toLowerCase().includes('duplicate key');
+          
+          if (!isDuplicate) {
+            throw new Error(`Failed to create maintenance record: ${createError.message}`);
+          }
+          
+          const { data: existing, error: existingError } = await supabase
+            .from('vehicle_maintenance')
+            .select('id')
+            .eq('plant_id', plant.id)
+            .maybeSingle();
+          
+          if (existingError || !existing?.id) {
+            throw new Error(`Failed to recover from duplicate maintenance record: ${createError.message}`);
+          }
+          
+          const { error: updateError } = await supabase
+            .from('vehicle_maintenance')
+            .update(maintenanceUpdates)
+            .eq('id', existing.id);
+          
+          if (updateError) {
+            throw new Error(`Failed to update maintenance record: ${updateError.message}`);
+          }
         }
       } else {
         // Update existing maintenance record
         const { error: updateError } = await supabase
           .from('vehicle_maintenance')
           .update(maintenanceUpdates)
-          .eq('id', maintenanceRecord.id);
+          .eq('id', maintenanceId);
 
         if (updateError) {
           throw new Error(`Failed to update maintenance record: ${updateError.message}`);
@@ -351,7 +402,7 @@ export function EditPlantRecordDialog({
         const historyEntries = fieldChanges.map(change => ({
           plant_id: plant.id,
           vehicle_id: null,
-          field_name: change.field_name,
+          field_name: safeMaintenanceHistoryFieldName(change.field_name),
           old_value: change.old_value,
           new_value: change.new_value,
           value_type: change.value_type,

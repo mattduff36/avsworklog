@@ -4,8 +4,6 @@ import { useState, useEffect, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
-import { useOfflineStore } from '@/lib/stores/offline-queue';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,7 +15,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { OfflineBanner } from '@/components/ui/offline-banner';
 import { Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Check, WifiOff, Camera } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
 import { formatDateISO, formatDate, getWeekEnding } from '@/lib/utils/date';
@@ -84,8 +81,6 @@ function NewPlantInspectionContent() {
   const searchParams = useSearchParams();
   const draftId = searchParams.get('id');
   const { user, isManager } = useAuth();
-  const { isOnline } = useOfflineSync();
-  const { addToQueue } = useOfflineStore();
   const supabase = createClient();
   
   const [plants, setPlants] = useState<Array<{ 
@@ -549,50 +544,6 @@ function NewPlantInspectionContent() {
         inspector_comments: inspectorComments.trim() || null,
       };
 
-      if (!isOnline) {
-        type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
-        const items: Omit<InspectionItemInsert, 'inspection_id'>[] = [];
-        
-        for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
-          currentChecklist.forEach((item, index) => {
-            const itemNumber = index + 1;
-            const key = `${dayOfWeek}-${itemNumber}`;
-            
-            if (checkboxStates[key]) {
-              items.push({
-                item_number: itemNumber,
-                day_of_week: dayOfWeek,
-                item_description: item,
-                status: checkboxStates[key],
-              });
-            }
-          });
-        }
-
-        addToQueue({
-          type: 'inspection',
-          action: 'create',
-          data: {
-            ...inspectionData,
-            items,
-            dailyHours: Object.entries(dailyHours)
-              .filter(([_, hours]) => hours !== null)
-              .map(([day, hours]) => ({
-                day_of_week: parseInt(day),
-                hours
-              }))
-          },
-        });
-        
-        toast.success('Inspection saved offline', {
-          description: 'Will be submitted when back online.',
-          icon: <WifiOff className="h-4 w-4" />,
-        });
-        
-        router.push('/plant-inspections');
-        return;
-      }
-
       let inspection: InspectionWithRelations;
 
       if (existingInspectionId) {
@@ -832,19 +783,11 @@ function NewPlantInspectionContent() {
         errorMessage = err.message;
       }
       
-      if (!isOnline || (err instanceof Error && err.message.includes('network'))) {
-        showErrorWithReport(
-          'Cannot save while offline',
-          'No internet connection detected.',
-          { offline: true, plantId: selectedPlantId, weekEnding }
-        );
-      } else {
-        showErrorWithReport(
-          'Failed to save inspection',
-          errorMessage,
-          { plantId: selectedPlantId, weekEnding, existingInspectionId }
-        );
-      }
+      showErrorWithReport(
+        'Failed to save inspection',
+        errorMessage,
+        { plantId: selectedPlantId, weekEnding, existingInspectionId }
+      );
     } finally {
       setLoading(false);
     }
@@ -881,7 +824,6 @@ function NewPlantInspectionContent() {
 
   return (
     <div className="space-y-4 pb-32 md:pb-6 max-w-5xl">
-      {!isOnline && <OfflineBanner />}
       
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">

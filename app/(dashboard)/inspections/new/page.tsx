@@ -4,8 +4,6 @@ import { useState, useEffect, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
-import { useOfflineStore } from '@/lib/stores/offline-queue';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,7 +16,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { OfflineBanner } from '@/components/ui/offline-banner';
 import { Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus, Check, WifiOff, Camera, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { BackButton } from '@/components/ui/back-button';
@@ -96,8 +93,6 @@ function NewInspectionContent() {
   const searchParams = useSearchParams();
   const draftId = searchParams.get('id'); // Get draft ID from URL if editing
   const { user, isManager } = useAuth();
-  const { isOnline } = useOfflineSync();
-  const { addToQueue } = useOfflineStore();
   const supabase = createClient();
   
   const [vehicles, setVehicles] = useState<Array<{ 
@@ -892,48 +887,6 @@ function NewInspectionContent() {
         inspector_comments: inspectorComments.trim() || null,
       };
 
-      // Check if offline
-      if (!isOnline) {
-        // Prepare items data - ONLY items that have been explicitly set by the user
-        type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
-        const items: Omit<InspectionItemInsert, 'inspection_id'>[] = [];
-        
-        for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
-          currentChecklist.forEach((item, index) => {
-            const itemNumber = index + 1;
-            const key = `${dayOfWeek}-${itemNumber}`;
-            
-            // Only save items that have been explicitly set by the user
-            if (checkboxStates[key]) {
-              items.push({
-                item_number: itemNumber,
-                day_of_week: dayOfWeek,
-                item_description: item,
-                status: checkboxStates[key],
-              });
-            }
-          });
-        }
-
-        // Save to offline queue
-        addToQueue({
-          type: 'inspection',
-          action: 'create',
-          data: {
-            ...inspectionData,
-            items,
-          },
-        });
-        
-        toast.success('Inspection saved offline', {
-          description: 'Your inspection will be submitted when you are back online.',
-          icon: <WifiOff className="h-4 w-4" />,
-        });
-        
-        router.push('/inspections');
-        return;
-      }
-
       let inspection: InspectionWithRelations;
 
       // Update existing draft or create new inspection
@@ -1274,28 +1227,15 @@ function NewInspectionContent() {
         console.error('Error stack:', err.stack);
       }
       
-      // Check if this is a network/offline error
-      if (!isOnline || (err instanceof Error && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('network')))) {
-        showErrorWithReport(
-          'Cannot save while offline',
-          'No internet connection detected. Please check your connection and try again.',
-          {
-            offline: true,
-            vehicleId,
-            weekEnding,
-          }
-        );
-      } else {
-        showErrorWithReport(
-          'Failed to save inspection',
-          errorMessage,
-          {
-            vehicleId,
-            weekEnding,
-            existingInspectionId: existingInspectionId || null,
-          }
-        );
-      }
+      showErrorWithReport(
+        'Failed to save inspection',
+        errorMessage,
+        {
+          vehicleId,
+          weekEnding,
+          existingInspectionId: existingInspectionId || null,
+        }
+      );
     } finally {
       setLoading(false);
     }
@@ -1332,8 +1272,6 @@ function NewInspectionContent() {
 
   return (
     <div className="space-y-4 pb-32 md:pb-6 max-w-5xl">
-      {/* Offline Banner */}
-      {!isOnline && <OfflineBanner />}
       
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useInspectionRealtime } from '@/lib/hooks/useRealtime';
 import { createClient } from '@/lib/supabase/client';
@@ -12,7 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { OfflineBanner } from '@/components/ui/offline-banner';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, FileText, Wrench } from 'lucide-react';
@@ -49,7 +47,6 @@ interface Plant {
 
 function PlantInspectionsContent() {
   const { user, isManager } = useAuth();
-  const { isOnline } = useOfflineSync();
   usePermissionCheck('plant-inspections');
   const router = useRouter();
   const [inspections, setInspections] = useState<InspectionWithPlant[]>([]);
@@ -316,7 +313,6 @@ function PlantInspectionsContent() {
 
   return (
     <div className="space-y-6 max-w-6xl">
-      {!isOnline && <OfflineBanner />}
       
       {/* Header */}
       <div className="bg-slate-900 rounded-lg p-6 border border-border">

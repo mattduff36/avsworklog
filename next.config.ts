@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import withPWA from "next-pwa";
 import withBundleAnalyzer from "@next/bundle-analyzer";
 
 const bundleAnalyzer = withBundleAnalyzer({
@@ -56,33 +55,4 @@ const nextConfig: NextConfig = {
   skipTrailingSlashRedirect: true,
 };
 
-export default bundleAnalyzer(withPWA({
-  dest: "public",
-  register: true,
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === "development",
-  // Use custom service worker
-  sw: "sw-custom.js",
-  // Fallback for offline navigation - this pre-caches the /offline page
-  fallbacks: {
-    document: "/offline",
-  },
-  // Runtime caching with explicit fallback handling
-  runtimeCaching: [
-    // Special handling for the start URL (/)
-    {
-      urlPattern: ({ url }: { url: URL }) => url.pathname === "/",
-      handler: "NetworkFirst",
-      options: {
-        cacheName: "start-url",
-        networkTimeoutSeconds: 10,
-        plugins: [
-          {
-            // Redirect to offline page on failure
-            handlerDidError: async () => Response.redirect('/offline', 302),
-          },
-        ],
-      },
-    },
-  ],
-})(nextConfig));
+export default bundleAnalyzer(nextConfig);

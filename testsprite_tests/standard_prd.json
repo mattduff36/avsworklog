@@ -11,7 +11,7 @@
     "Implement a hierarchical two-tier taxonomy for workshop task categorization for better organization and reporting.",
     "Provide a dedicated vehicle history page integrating maintenance, MOT, documents, and notes for comprehensive vehicle lifecycle tracking.",
     "Ensure strict role-based access control with granular permissions for employees, managers, and admins.",
-    "Deliver seamless user experience with offline support, responsive design, and instant data fetching with React Query.",
+    "Deliver seamless user experience with responsive design and instant data fetching with React Query.",
     "Maintain high data integrity through database migrations, triggers, and RLS policies.",
     "Support extensive reporting, timesheets, inspections, and risk assessments within the platform."
   ],
@@ -25,7 +25,6 @@
     "Digital vehicle inspections with defect tracking, PDF exports, and compliance reporting.",
     "Risk Assessment Method Statements with digital signature workflows and export capabilities.",
     "Internal messaging and notifications system with blocking messages and dismissal tracking.",
-    "Offline support as a Progressive Web App with service worker and pull-to-refresh functionality.",
     "Reusable UI components library based on Shadcn UI and Radix UI with Tailwind CSS styling.",
     "Centralized error logging with daily summaries and dashboard monitoring."
   ],
@@ -38,7 +37,6 @@
     "Users perform vehicle inspections through forms capturing defects; compliance reports and PDFs are generated for records.",
     "Managers conduct Risk Assessment Method Statements with workflow for digital signatures and visitor acknowledgments, generating emails and exports as needed.",
     "All users receive internal messages and notifications relevant to their role, dismissing blocking messages such as mandatory password changes or toolbox talks.",
-    "The application supports offline usage with data sync on reconnect, ensuring continuous productivity even without internet connectivity.",
     "Developers and admins monitor logs and error reports via the centralized dashboard to ensure system health."
   ],
   "validation_criteria": [
@@ -50,7 +48,6 @@
     "Vehicle History page tabs display accurate maintenance, MOT data with integration of task comments and taxonomy badges.",
     "Timesheet, inspection, and RAMS workflows function completely with appropriate user actions and data integrity.",
     "Role-based restrictions prevent unauthorized data access and modification with HTTP 403 errors returned where applicable.",
-    "Offline support functions including service worker caching, pull-to-refresh, and background sync operate without data loss or UI errors.",
     "Error logging captures exceptions and reports them via email and dashboard, with no missed events.",
     "All database migrations complete successfully without data loss, and backfill scripts update legacy data correctly.",
     "Redirects from deprecated fleet routes are seamless with no content flashes and correct final URLs.",
@@ -72,7 +69,6 @@
       "Shadcn UI",
       "Radix UI",
       "Zod (validation)",
-      "next-pwa (Progressive Web App)",
       "date-fns",
       "Vitest (testing)"
     ],
@@ -277,18 +273,6 @@
           "components/layout/MobileNavBar.tsx",
           "components/layout/DashboardContent.tsx",
           "lib/config/navigation.ts"
-        ]
-      },
-      {
-        "name": "Offline Support & PWA",
-        "description": "Progressive Web App features with offline support, service worker, and pull-to-refresh.",
-        "files": [
-          "public/sw-custom.js",
-          "public/manifest.json",
-          "next.config.ts",
-          "components/layout/PullToRefresh.tsx",
-          "components/ui/offline-banner.tsx",
-          "lib/hooks/useOfflineSync.ts"
         ]
       },
       {

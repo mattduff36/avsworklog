@@ -6,8 +6,6 @@ import { DashboardContent } from '@/components/layout/DashboardContent';
 import { MessageBlockingCheck } from '@/components/messages/MessageBlockingCheck';
 import { MobileNavBar } from '@/components/layout/MobileNavBar';
 import { PullToRefresh } from '@/components/layout/PullToRefresh';
-import { OfflineBanner } from '@/components/ui/offline-banner';
-import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { getAccentFromRoute } from '@/lib/theme/getAccentFromRoute';
 
 export function DashboardLayoutClient({
@@ -15,7 +13,6 @@ export function DashboardLayoutClient({
 }: {
   children: React.ReactNode;
 }) {
-  const { isOnline } = useOfflineSync();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   
@@ -35,8 +32,6 @@ export function DashboardLayoutClient({
       <Navbar />
       <PullToRefresh />
       <DashboardContent>
-        {/* Global Offline Banner - shown on all dashboard pages */}
-        {!isOnline && <OfflineBanner />}
         {children}
       </DashboardContent>
       

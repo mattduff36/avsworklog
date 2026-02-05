@@ -1,12 +1,10 @@
 'use client';
 
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { OfflineBanner } from '@/components/ui/offline-banner';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -54,7 +52,6 @@ function applyAlphaToHSL(color: string): string {
 
 export default function DashboardPage() {
   const { profile, isManager, isAdmin } = useAuth();
-  const { isOnline } = useOfflineSync();
   const formTypes = getEnabledForms();
   const supabase = createClient();
 
@@ -444,8 +441,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 max-w-6xl">
-      {/* Offline Banner - Only render after mount to prevent hydration mismatch */}
-      {isMounted && !isOnline && <OfflineBanner />}
       
       {/* Welcome Section */}
       <div className="bg-slate-900 rounded-lg p-6 border border-slate-700 relative overflow-hidden">

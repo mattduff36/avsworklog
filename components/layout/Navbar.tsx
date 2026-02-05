@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useOfflineSync } from '@/lib/hooks/useOfflineSync';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -82,7 +81,6 @@ export function Navbar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user, profile, signOut, isAdmin, isManager } = useAuth();
-  useOfflineSync(); // Keep hook for potential future use
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar starts collapsed
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
@@ -315,6 +313,12 @@ export function Navbar() {
     
     // If no query params in href, path match is sufficient
     if (!linkQuery) {
+      return true;
+    }
+
+    // Hydration safety: search params can differ during SSR vs client hydration.
+    // Until mounted, only use path matching to keep server/client HTML identical.
+    if (!isMounted) {
       return true;
     }
     
