@@ -231,8 +231,14 @@ export function EditPlantRecordDialog({
       // Update plant table fields (LOLER)
       const plantUpdates: Record<string, any> = {};
       
-      const newLolerDueDate = data.loler_due_date || null;
-      const oldLolerDueDate = formatDateForInput(plant.loler_due_date);
+      // Normalize date values for comparison (treat null, undefined, empty string as equivalent)
+      const normalizeDateValue = (val: string | null | undefined): string | null => {
+        if (!val || val === '') return null;
+        return val;
+      };
+      
+      const newLolerDueDate = normalizeDateValue(data.loler_due_date);
+      const oldLolerDueDate = normalizeDateValue(formatDateForInput(plant.loler_due_date));
       if (newLolerDueDate !== oldLolerDueDate) {
         plantUpdates.loler_due_date = newLolerDueDate;
         fieldChanges.push({
@@ -243,8 +249,8 @@ export function EditPlantRecordDialog({
         });
       }
 
-      const newLolerLastInspection = data.loler_last_inspection_date || null;
-      const oldLolerLastInspection = formatDateForInput(plant.loler_last_inspection_date);
+      const newLolerLastInspection = normalizeDateValue(data.loler_last_inspection_date);
+      const oldLolerLastInspection = normalizeDateValue(formatDateForInput(plant.loler_last_inspection_date));
       if (newLolerLastInspection !== oldLolerLastInspection) {
         plantUpdates.loler_last_inspection_date = newLolerLastInspection;
         fieldChanges.push({
