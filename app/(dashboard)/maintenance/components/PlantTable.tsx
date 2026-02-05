@@ -84,29 +84,32 @@ export function PlantTable({
   const [loading, setLoading] = useState(true);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   
-  // Column visibility state - Load from localStorage or use defaults
-  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
-    // Try to load saved preferences from localStorage
-    if (typeof window !== 'undefined') {
+  // Column visibility defaults - category hidden by default
+  const defaultVisibility: ColumnVisibility = {
+    nickname: true,
+    category: false,
+    current_hours: true,
+    service_due: true,
+    loler_due: true,
+  };
+
+  // Initialise with defaults; useEffect below will hydrate from localStorage
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(defaultVisibility);
+
+  // On mount, load saved preferences from localStorage (safe for SSR)
+  useEffect(() => {
+    try {
       const saved = localStorage.getItem('plant-table-column-visibility');
       if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          console.error('Failed to parse saved column visibility:', e);
-        }
+        const parsed = JSON.parse(saved) as Partial<ColumnVisibility>;
+        // Merge with defaults so any newly-added columns get their default value
+        setColumnVisibility(prev => ({ ...prev, ...parsed }));
       }
+    } catch (e) {
+      console.error('Failed to parse saved column visibility:', e);
     }
-    // Default visibility - category hidden by default
-    return {
-      nickname: true,
-      category: false, // Hidden by default
-      current_hours: true,
-      service_due: true,
-      loler_due: true,
-    };
-  });
-  
+  }, []);
+
   // Persist column visibility changes to localStorage
   const toggleColumn = (column: keyof ColumnVisibility) => {
     setColumnVisibility(prev => {
@@ -114,10 +117,7 @@ export function PlantTable({
         ...prev,
         [column]: !prev[column]
       };
-      // Save to localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('plant-table-column-visibility', JSON.stringify(newVisibility));
-      }
+      localStorage.setItem('plant-table-column-visibility', JSON.stringify(newVisibility));
       return newVisibility;
     });
   };
