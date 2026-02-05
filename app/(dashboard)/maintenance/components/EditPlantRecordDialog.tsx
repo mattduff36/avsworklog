@@ -204,12 +204,13 @@ export function EditPlantRecordDialog({
       const fieldChanges: FieldChange[] = [];
 
       // Update plant nickname if changed
-      const nicknameChanged = data.nickname?.trim() !== plant.nickname;
-      if (nicknameChanged) {
+      const newNickname = data.nickname?.trim() || null;
+      const oldNickname = plant.nickname;
+      if (newNickname !== oldNickname) {
         const { error: nicknameError } = await supabase
           .from('plant')
           .update({ 
-            nickname: data.nickname?.trim() || null,
+            nickname: newNickname,
             updated_at: new Date().toISOString()
           })
           .eq('id', plant.id);
@@ -220,8 +221,8 @@ export function EditPlantRecordDialog({
         } else {
           fieldChanges.push({
             field_name: 'nickname',
-            old_value: plant.nickname,
-            new_value: data.nickname?.trim() || null,
+            old_value: oldNickname,
+            new_value: newNickname,
             value_type: 'text'
           });
         }
@@ -229,39 +230,51 @@ export function EditPlantRecordDialog({
 
       // Update plant table fields (LOLER)
       const plantUpdates: Record<string, any> = {};
-      if (data.loler_due_date !== formatDateForInput(plant.loler_due_date)) {
-        plantUpdates.loler_due_date = data.loler_due_date || null;
+      
+      const newLolerDueDate = data.loler_due_date || null;
+      const oldLolerDueDate = formatDateForInput(plant.loler_due_date);
+      if (newLolerDueDate !== oldLolerDueDate) {
+        plantUpdates.loler_due_date = newLolerDueDate;
         fieldChanges.push({
           field_name: 'loler_due_date',
           old_value: plant.loler_due_date,
-          new_value: data.loler_due_date || null,
+          new_value: newLolerDueDate,
           value_type: 'date'
         });
       }
-      if (data.loler_last_inspection_date !== formatDateForInput(plant.loler_last_inspection_date)) {
-        plantUpdates.loler_last_inspection_date = data.loler_last_inspection_date || null;
+
+      const newLolerLastInspection = data.loler_last_inspection_date || null;
+      const oldLolerLastInspection = formatDateForInput(plant.loler_last_inspection_date);
+      if (newLolerLastInspection !== oldLolerLastInspection) {
+        plantUpdates.loler_last_inspection_date = newLolerLastInspection;
         fieldChanges.push({
           field_name: 'loler_last_inspection_date',
           old_value: plant.loler_last_inspection_date,
-          new_value: data.loler_last_inspection_date || null,
+          new_value: newLolerLastInspection,
           value_type: 'date'
         });
       }
-      if (data.loler_certificate_number !== plant.loler_certificate_number) {
-        plantUpdates.loler_certificate_number = data.loler_certificate_number?.trim() || null;
+
+      const newLolerCertNumber = data.loler_certificate_number?.trim() || null;
+      const oldLolerCertNumber = plant.loler_certificate_number;
+      if (newLolerCertNumber !== oldLolerCertNumber) {
+        plantUpdates.loler_certificate_number = newLolerCertNumber;
         fieldChanges.push({
           field_name: 'loler_certificate_number',
-          old_value: plant.loler_certificate_number,
-          new_value: data.loler_certificate_number?.trim() || null,
+          old_value: oldLolerCertNumber,
+          new_value: newLolerCertNumber,
           value_type: 'text'
         });
       }
-      if (data.loler_inspection_interval_months !== plant.loler_inspection_interval_months) {
-        plantUpdates.loler_inspection_interval_months = data.loler_inspection_interval_months || 12;
+
+      const newLolerInterval = data.loler_inspection_interval_months || 12;
+      const oldLolerInterval = plant.loler_inspection_interval_months || 12;
+      if (newLolerInterval !== oldLolerInterval) {
+        plantUpdates.loler_inspection_interval_months = newLolerInterval;
         fieldChanges.push({
           field_name: 'loler_inspection_interval_months',
-          old_value: plant.loler_inspection_interval_months?.toString() || null,
-          new_value: (data.loler_inspection_interval_months || 12).toString(),
+          old_value: oldLolerInterval.toString(),
+          new_value: newLolerInterval.toString(),
           value_type: 'mileage'
         });
       }
@@ -289,36 +302,54 @@ export function EditPlantRecordDialog({
         updated_at: new Date().toISOString(),
       };
 
-      if (data.current_hours !== maintenanceRecord?.current_hours) {
+      // Helper to normalize values for comparison (treat undefined, null, '', 0 as equivalent for comparison)
+      const normalizeValue = (val: any): any => {
+        if (val === undefined || val === null || val === '') return null;
+        return val;
+      };
+
+      // Only track changes where the values are actually different
+      const newCurrentHours = normalizeValue(data.current_hours);
+      const oldCurrentHours = normalizeValue(maintenanceRecord?.current_hours ?? plant.current_hours);
+      if (newCurrentHours !== oldCurrentHours) {
         maintenanceUpdates.last_hours_update = new Date().toISOString();
         fieldChanges.push({
           field_name: 'current_hours',
-          old_value: maintenanceRecord?.current_hours?.toString() || plant.current_hours?.toString() || null,
-          new_value: data.current_hours?.toString() || null,
+          old_value: oldCurrentHours?.toString() || null,
+          new_value: newCurrentHours?.toString() || null,
           value_type: 'mileage'
         });
       }
-      if (data.last_service_hours !== maintenanceRecord?.last_service_hours) {
+
+      const newLastServiceHours = normalizeValue(data.last_service_hours);
+      const oldLastServiceHours = normalizeValue(maintenanceRecord?.last_service_hours);
+      if (newLastServiceHours !== oldLastServiceHours) {
         fieldChanges.push({
           field_name: 'last_service_hours',
-          old_value: maintenanceRecord?.last_service_hours?.toString() || null,
-          new_value: data.last_service_hours?.toString() || null,
+          old_value: oldLastServiceHours?.toString() || null,
+          new_value: newLastServiceHours?.toString() || null,
           value_type: 'mileage'
         });
       }
-      if (data.next_service_hours !== maintenanceRecord?.next_service_hours) {
+
+      const newNextServiceHours = normalizeValue(data.next_service_hours);
+      const oldNextServiceHours = normalizeValue(maintenanceRecord?.next_service_hours);
+      if (newNextServiceHours !== oldNextServiceHours) {
         fieldChanges.push({
           field_name: 'next_service_hours',
-          old_value: maintenanceRecord?.next_service_hours?.toString() || null,
-          new_value: data.next_service_hours?.toString() || null,
+          old_value: oldNextServiceHours?.toString() || null,
+          new_value: newNextServiceHours?.toString() || null,
           value_type: 'mileage'
         });
       }
-      if (data.tracker_id !== maintenanceRecord?.tracker_id) {
+
+      const newTrackerId = normalizeValue(data.tracker_id?.trim());
+      const oldTrackerId = normalizeValue(maintenanceRecord?.tracker_id);
+      if (newTrackerId !== oldTrackerId) {
         fieldChanges.push({
           field_name: 'tracker_id',
-          old_value: maintenanceRecord?.tracker_id || null,
-          new_value: data.tracker_id?.trim() || null,
+          old_value: oldTrackerId,
+          new_value: newTrackerId,
           value_type: 'text'
         });
       }
