@@ -281,7 +281,7 @@ export function EditPlantRecordDialog({
           field_name: 'loler_inspection_interval_months',
           old_value: oldLolerInterval.toString(),
           new_value: newLolerInterval.toString(),
-          value_type: 'mileage'
+          value_type: 'text' // Configuration value, not a measurement
         });
       }
 
