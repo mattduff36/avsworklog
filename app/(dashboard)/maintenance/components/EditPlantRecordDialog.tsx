@@ -408,8 +408,11 @@ export function EditPlantRecordDialog({
             .eq('plant_id', plant.id)
             .maybeSingle();
           
-          if (existingError || !existing?.id) {
-            throw new Error(`Failed to recover from duplicate maintenance record: ${createError.message}`);
+          if (existingError) {
+            throw new Error(`Failed to find existing maintenance record after duplicate: ${existingError.message}`);
+          }
+          if (!existing?.id) {
+            throw new Error(`Failed to recover from duplicate maintenance record: no matching record found for plant ${plant.id}`);
           }
           
           const { error: updateError } = await supabase
