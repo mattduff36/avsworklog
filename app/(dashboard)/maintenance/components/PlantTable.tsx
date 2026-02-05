@@ -84,20 +84,42 @@ export function PlantTable({
   const [loading, setLoading] = useState(true);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   
-  // Column visibility state - all columns visible by default
-  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
-    nickname: true,
-    category: true,
-    current_hours: true,
-    service_due: true,
-    loler_due: true,
+  // Column visibility state - Load from localStorage or use defaults
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
+    // Try to load saved preferences from localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('plant-table-column-visibility');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error('Failed to parse saved column visibility:', e);
+        }
+      }
+    }
+    // Default visibility - category hidden by default
+    return {
+      nickname: true,
+      category: false, // Hidden by default
+      current_hours: true,
+      service_due: true,
+      loler_due: true,
+    };
   });
   
+  // Persist column visibility changes to localStorage
   const toggleColumn = (column: keyof ColumnVisibility) => {
-    setColumnVisibility(prev => ({
-      ...prev,
-      [column]: !prev[column]
-    }));
+    setColumnVisibility(prev => {
+      const newVisibility = {
+        ...prev,
+        [column]: !prev[column]
+      };
+      // Save to localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('plant-table-column-visibility', JSON.stringify(newVisibility));
+      }
+      return newVisibility;
+    });
   };
 
   const fetchPlantData = useCallback(async () => {
