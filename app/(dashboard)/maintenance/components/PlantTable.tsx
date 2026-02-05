@@ -461,7 +461,7 @@ export function PlantTable({
                         {columnVisibility.current_hours && (
                           <TableCell className="text-muted-foreground">
                             {asset.current_hours ? (
-                              `${asset.current_hours.toLocaleString()}h`
+                              <>{asset.current_hours.toLocaleString()}h</>
                             ) : (
                               <span className="text-slate-400 italic">Not set</span>
                             )}
@@ -556,7 +556,7 @@ export function PlantTable({
                             <div className="flex justify-between">
                               <span>Hours:</span>
                               <span className="text-white">
-                                {asset.current_hours ? `${asset.current_hours.toLocaleString()}h` : 'Not set'}
+                                {asset.current_hours ? <>{asset.current_hours.toLocaleString()}h</> : 'Not set'}
                               </span>
                             </div>
                             <div className="flex justify-between">
@@ -585,7 +585,9 @@ export function PlantTable({
                             <div className="flex items-center justify-between">
                               <span className="text-sm text-muted-foreground">Current Hours:</span>
                               <span className="text-white font-medium">
-                                {asset.current_hours ? `${asset.current_hours.toLocaleString()}h` : (
+                                {asset.current_hours ? (
+                                  <>{asset.current_hours.toLocaleString()}h</>
+                                ) : (
                                   <span className="text-slate-400 italic">Not set</span>
                                 )}
                               </span>
