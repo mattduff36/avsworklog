@@ -459,15 +459,11 @@ export function PlantTable({
                         
                         {/* Hours */}
                         {columnVisibility.current_hours && (
-                          <TableCell>
+                          <TableCell className="text-muted-foreground">
                             {asset.current_hours ? (
-                              <Badge className={`font-medium ${getStatusColorClass('not_set')}`}>
-                                {asset.current_hours.toLocaleString()}h
-                              </Badge>
+                              `${asset.current_hours.toLocaleString()}h`
                             ) : (
-                              <Badge className={`font-medium ${getStatusColorClass('not_set')}`}>
-                                Not set
-                              </Badge>
+                              <span className="text-slate-400 italic">Not set</span>
                             )}
                           </TableCell>
                         )}
@@ -588,15 +584,11 @@ export function PlantTable({
                             </div>
                             <div className="flex items-center justify-between">
                               <span className="text-sm text-muted-foreground">Current Hours:</span>
-                              {asset.current_hours ? (
-                                <Badge className={`font-medium ${getStatusColorClass('not_set')}`}>
-                                  {asset.current_hours.toLocaleString()}h
-                                </Badge>
-                              ) : (
-                                <Badge className={`font-medium ${getStatusColorClass('not_set')}`}>
-                                  Not set
-                                </Badge>
-                              )}
+                              <span className="text-white font-medium">
+                                {asset.current_hours ? `${asset.current_hours.toLocaleString()}h` : (
+                                  <span className="text-slate-400 italic">Not set</span>
+                                )}
+                              </span>
                             </div>
                             <div className="flex items-center justify-between">
                               <span className="text-sm text-muted-foreground">Service Due:</span>
