@@ -202,7 +202,7 @@ function PlantInspectionsContent() {
         console.error('Error fetching plant inspections:', error);
       }
 
-      if (!isOnline || isNetworkFailure) {
+      if (!navigator.onLine || isNetworkFailure) {
         try {
           toast.error('Unable to load plant inspections', {
             description: 'Please check your internet connection.',

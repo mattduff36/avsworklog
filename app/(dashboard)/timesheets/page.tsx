@@ -141,7 +141,7 @@ export default function TimesheetsPage() {
     } catch (error) {
       console.error('Error fetching timesheets:', error);
       // Show friendly message if offline
-      if (!isOnline) {
+      if (!navigator.onLine) {
         toast.error('Unable to load timesheets', {
           description: 'Please check your internet connection.',
         });

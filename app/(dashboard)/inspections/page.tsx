@@ -212,7 +212,7 @@ function InspectionsContent() {
       }
 
       // Show friendly message if offline or network failure
-      if (!isOnline || isNetworkFailure) {
+      if (!navigator.onLine || isNetworkFailure) {
         try {
           toast.error('Unable to load inspections', {
             description: 'Please check your internet connection.',

@@ -189,7 +189,7 @@ export default function DashboardPage() {
 
   const fetchPendingApprovals = async () => {
     // Skip fetching if offline - rely on cached page data
-    if (!isOnline) {
+    if (!navigator.onLine) {
       setLoading(false);
       return;
     }
