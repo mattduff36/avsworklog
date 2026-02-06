@@ -76,21 +76,21 @@ export function DeletePlantDialog({
         return;
       }
 
-      // Update plant status to retired
+      // Update plant status to retired with reason and timestamp
+      const now = new Date().toISOString();
       const { error: updateError } = await supabase
         .from('plant')
         .update({ 
           status: 'retired',
-          updated_at: new Date().toISOString()
+          retired_at: now,
+          retire_reason: reason,
+          updated_at: now,
         })
         .eq('id', plant.id);
 
       if (updateError) {
         throw new Error(`Failed to retire plant: ${updateError.message}`);
       }
-
-      // TODO: If plant_archive table exists, insert archive record here
-      // Similar to vehicle_archive pattern
 
       toast.success('Plant retired successfully', {
         description: `${plant.plant_id} has been moved to Retired Plant. Historic data is preserved.`,

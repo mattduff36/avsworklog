@@ -33,7 +33,7 @@ import { formatMaintenanceDate, getStatusColorClass } from '@/lib/utils/maintena
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
-import { RotateCcw } from 'lucide-react';
+import { Undo2, XCircle } from 'lucide-react';
 
 type PlantAsset = {
   id: string;
@@ -43,6 +43,8 @@ type PlantAsset = {
   loler_due_date: string | null;
   current_hours: number | null;
   status: string;
+  retired_at: string | null;
+  retire_reason: string | null;
   vehicle_categories?: { name: string; id: string } | null;
 };
 
@@ -85,8 +87,8 @@ export function PlantTable({
   const [retiredPlantAssets, setRetiredPlantAssets] = useState<PlantAsset[]>([]);
   const [retiredPlantCount, setRetiredPlantCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [retiredLoading, setRetiredLoading] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [retiredSearchQuery, setRetiredSearchQuery] = useState('');
   
@@ -256,30 +258,62 @@ export function PlantTable({
     router.push(`/fleet/plant/${plantId}/history?fromTab=plant`);
   };
 
-  const handleRestorePlant = async (plant: PlantAsset) => {
-    try {
-      setRestoringId(plant.id);
-      const { error } = await supabase
-        .from('plant')
-        .update({ status: 'active' })
-        .eq('id', plant.id);
+  const handleRestorePlant = (plant: PlantAsset) => {
+    if (!confirm(`Restore ${plant.plant_id} to active plant?\n\nThis will:\n• Move plant back to Active Plant tab\n• Restore all maintenance data\n\nContinue?`)) return;
 
-      if (error) throw error;
+    setRestoringId(plant.id);
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('plant')
+          .update({ status: 'active', retired_at: null, retire_reason: null })
+          .eq('id', plant.id);
 
-      toast.success('Plant restored', {
-        description: `${plant.plant_id} has been moved back to Active Plant.`,
-      });
+        if (error) throw error;
 
-      // Refresh data
-      fetchPlantData();
-    } catch (error: any) {
-      console.error('Error restoring plant:', error);
-      toast.error('Failed to restore plant', {
-        description: error.message || 'Please try again.',
-      });
-    } finally {
-      setRestoringId(null);
-    }
+        toast.success('Plant restored', {
+          description: `${plant.plant_id} has been moved back to Active Plant.`,
+        });
+
+        fetchPlantData();
+      } catch (error: any) {
+        console.error('Error restoring plant:', error);
+        toast.error('Failed to restore plant', {
+          description: error.message || 'Please try again.',
+        });
+      } finally {
+        setRestoringId(null);
+      }
+    })();
+  };
+
+  const handlePermanentDelete = (plant: PlantAsset) => {
+    if (!confirm(`\u26A0\uFE0F Permanently remove ${plant.plant_id}?\n\nThis will:\n• Remove from Retired Plant tab\n• Preserve all inspection history\n• Cannot be undone\n\nContinue?`)) return;
+
+    setDeletingId(plant.id);
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('plant')
+          .delete()
+          .eq('id', plant.id);
+
+        if (error) throw error;
+
+        toast.success('Plant permanently removed', {
+          description: `${plant.plant_id} has been permanently deleted from the archive.`,
+        });
+
+        fetchPlantData();
+      } catch (error: any) {
+        console.error('Error permanently deleting plant:', error);
+        toast.error('Failed to permanently remove plant', {
+          description: error.message || 'Please try again.',
+        });
+      } finally {
+        setDeletingId(null);
+      }
+    })();
   };
 
   // Filter retired plant based on search
@@ -690,39 +724,51 @@ export function PlantTable({
             {/* Retired Plant Tab */}
             <TabsContent value="deleted" className="space-y-4 mt-4">
               {/* Search Bar for Retired Plant */}
-              {retiredPlantCount > 0 && (
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search retired plant by ID or nickname..."
-                    value={retiredSearchQuery}
-                    onChange={(e) => setRetiredSearchQuery(e.target.value)}
-                    className="pl-11 bg-slate-900/50 border-slate-600 text-white"
-                  />
-                </div>
-              )}
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search retired plant by registration..."
+                  value={retiredSearchQuery}
+                  onChange={(e) => setRetiredSearchQuery(e.target.value)}
+                  className="pl-11 bg-slate-900/50 border-slate-600 text-white"
+                />
+              </div>
 
               {loading ? (
                 <div className="text-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-3" />
                   <p className="text-muted-foreground">Loading retired plant...</p>
                 </div>
-              ) : filteredRetiredPlant.length === 0 ? (
+              ) : !filteredRetiredPlant || filteredRetiredPlant.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <FolderClock className="h-12 w-12 mx-auto mb-3 text-slate-600" />
-                  <p>{retiredPlantCount === 0 ? 'No retired plant machinery' : 'No matches found'}</p>
+                  <p>{retiredPlantCount === 0 ? 'No retired plant found.' : 'No matches found.'}</p>
                 </div>
               ) : (
                 <>
-                  {/* Desktop Table View */}
+                  {/* Desktop Table View for Retired Plant */}
                   <div className="hidden md:block border border-slate-700 rounded-lg">
-                    <Table>
+                    <Table className="min-w-full">
                       <TableHeader>
-                        <TableRow className="border-slate-700 hover:bg-transparent">
-                          <TableHead className="text-slate-300 font-semibold">Plant ID</TableHead>
-                          <TableHead className="text-slate-300 font-semibold">Nickname</TableHead>
-                          <TableHead className="text-slate-300 font-semibold">Category</TableHead>
-                          <TableHead className="text-slate-300 font-semibold text-right">Actions</TableHead>
+                        <TableRow className="border-border">
+                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
+                            Plant ID
+                          </TableHead>
+                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
+                            Nickname
+                          </TableHead>
+                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
+                            Category
+                          </TableHead>
+                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
+                            Retired Date
+                          </TableHead>
+                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
+                            Reason
+                          </TableHead>
+                          <TableHead className="bg-slate-900 text-right text-muted-foreground border-b-2 border-border">
+                            Actions
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -731,33 +777,80 @@ export function PlantTable({
                             key={plant.id}
                             className="border-slate-700 hover:bg-slate-800/30"
                           >
-                            <TableCell className="font-medium text-white">{plant.plant_id}</TableCell>
-                            <TableCell className="text-slate-300">{plant.nickname || '—'}</TableCell>
-                            <TableCell className="text-slate-300">{plant.vehicle_categories?.name || '—'}</TableCell>
+                            {/* Plant ID */}
+                            <TableCell className="font-medium text-white">
+                              {plant.plant_id}
+                            </TableCell>
+
+                            {/* Nickname */}
+                            <TableCell className="text-muted-foreground">
+                              {plant.nickname || (
+                                <span className="text-slate-400 italic">No nickname</span>
+                              )}
+                            </TableCell>
+
+                            {/* Category */}
+                            <TableCell className="text-muted-foreground">
+                              {plant.vehicle_categories?.name || '—'}
+                            </TableCell>
+
+                            {/* Retired Date */}
+                            <TableCell className="text-muted-foreground">
+                              {plant.retired_at
+                                ? new Date(plant.retired_at).toLocaleDateString()
+                                : '—'}
+                            </TableCell>
+
+                            {/* Reason */}
+                            <TableCell>
+                              {plant.retire_reason ? (
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    plant.retire_reason === 'Sold'
+                                      ? 'border-blue-500 text-blue-400'
+                                      : plant.retire_reason === 'Scrapped'
+                                      ? 'border-red-500 text-red-400'
+                                      : 'border-slate-500 text-muted-foreground'
+                                  }
+                                >
+                                  {plant.retire_reason}
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+
+                            {/* Actions */}
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleViewHistory(plant.id)}
-                                  className="border-slate-600 text-slate-300 hover:bg-slate-700"
-                                >
-                                  <History className="h-4 w-4 mr-1" />
-                                  History
-                                </Button>
-                                <Button
-                                  variant="outline"
+                                  variant="ghost"
                                   size="sm"
                                   onClick={() => handleRestorePlant(plant)}
                                   disabled={restoringId === plant.id}
-                                  className="border-green-600/50 text-green-400 hover:bg-green-900/30 hover:text-green-300"
+                                  className="text-green-400 hover:text-green-300 hover:bg-green-900/20"
+                                  title="Restore to Active"
                                 >
                                   {restoringId === plant.id ? (
-                                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                    <Loader2 className="h-3 w-3 animate-spin" />
                                   ) : (
-                                    <RotateCcw className="h-4 w-4 mr-1" />
+                                    <Undo2 className="h-3 w-3" />
                                   )}
-                                  Restore
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handlePermanentDelete(plant)}
+                                  disabled={deletingId === plant.id}
+                                  className="text-red-400 hover:text-red-300 hover:bg-slate-800"
+                                  title="Permanently Remove"
+                                >
+                                  {deletingId === plant.id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <XCircle className="h-3 w-3" />
+                                  )}
                                 </Button>
                               </div>
                             </TableCell>
@@ -767,50 +860,99 @@ export function PlantTable({
                     </Table>
                   </div>
 
-                  {/* Mobile Card View */}
+                  {/* Mobile Card View for Retired Plant */}
                   <div className="md:hidden space-y-3">
                     {filteredRetiredPlant.map((plant) => (
-                      <Card key={plant.id} className="bg-slate-800 border-border">
+                      <Card
+                        key={plant.id}
+                        className="bg-slate-800 border-border"
+                      >
                         <CardContent className="p-4">
-                          <div className="flex items-center justify-between mb-2">
+                          {/* Header */}
+                          <div className="flex items-center justify-between mb-3">
                             <div>
-                              <p className="font-semibold text-white text-lg">{plant.plant_id}</p>
+                              <h3 className="font-semibold text-white text-lg">{plant.plant_id}</h3>
                               {plant.nickname && (
-                                <p className="text-sm text-slate-400">{plant.nickname}</p>
+                                <p className="text-xs text-muted-foreground">{plant.nickname}</p>
                               )}
                             </div>
-                            <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-500/10">
-                              Retired
-                            </Badge>
+                            {plant.retire_reason ? (
+                              <Badge
+                                variant="outline"
+                                className={
+                                  plant.retire_reason === 'Sold'
+                                    ? 'border-blue-500 text-blue-400'
+                                    : plant.retire_reason === 'Scrapped'
+                                    ? 'border-red-500 text-red-400'
+                                    : 'border-slate-500 text-muted-foreground'
+                                }
+                              >
+                                {plant.retire_reason}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-500/10">
+                                Retired
+                              </Badge>
+                            )}
                           </div>
-                          {plant.vehicle_categories?.name && (
-                            <p className="text-sm text-muted-foreground mb-3">
-                              Category: {plant.vehicle_categories.name}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-2 pt-2 border-t border-border">
+
+                          {/* Details */}
+                          <div className="space-y-2 text-sm">
+                            {plant.vehicle_categories?.name && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Category:</span>
+                                <span className="text-white">{plant.vehicle_categories.name}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Retired:</span>
+                              <span className="text-white">
+                                {plant.retired_at
+                                  ? new Date(plant.retired_at).toLocaleDateString()
+                                  : '—'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="mt-4 pt-3 border-t border-slate-700 space-y-2">
                             <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleViewHistory(plant.id)}
-                              className="border-slate-600 text-slate-300 hover:bg-slate-700"
-                            >
-                              <History className="h-4 w-4 mr-1" />
-                              History
-                            </Button>
-                            <Button
-                              variant="outline"
+                              variant="ghost"
                               size="sm"
                               onClick={() => handleRestorePlant(plant)}
                               disabled={restoringId === plant.id}
-                              className="border-green-600/50 text-green-400 hover:bg-green-900/30 hover:text-green-300"
+                              className="w-full text-green-400 hover:text-green-300 hover:bg-green-900/20"
                             >
                               {restoringId === plant.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Restoring...
+                                </>
                               ) : (
-                                <RotateCcw className="h-4 w-4 mr-1" />
+                                <>
+                                  <Undo2 className="h-4 w-4 mr-2" />
+                                  Restore to Active
+                                </>
                               )}
-                              Restore
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handlePermanentDelete(plant)}
+                              disabled={deletingId === plant.id}
+                              className="w-full text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                            >
+                              {deletingId === plant.id ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Removing...
+                                </>
+                              ) : (
+                                <>
+                                  <XCircle className="h-4 w-4 mr-2" />
+                                  Permanently Remove
+                                </>
+                              )}
                             </Button>
                           </div>
                         </CardContent>
