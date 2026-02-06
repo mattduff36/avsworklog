@@ -184,7 +184,12 @@ export function PlantTable({
         .eq('status', 'retired')
         .order('updated_at', { ascending: false });
 
-      if (!retiredError) {
+      if (retiredError) {
+        console.error('Error fetching retired plant assets:', retiredError);
+        toast.error('Unable to load retired plant', {
+          description: 'Retired plant data may be incomplete. Please refresh.',
+        });
+      } else {
         setRetiredPlantAssets(retiredData || []);
         setRetiredPlantCount(retiredData?.length || 0);
       }
@@ -293,12 +298,17 @@ export function PlantTable({
     setDeletingId(plant.id);
     (async () => {
       try {
-        const { error } = await supabase
+        const { error, count } = await supabase
           .from('plant')
-          .delete()
+          .delete({ count: 'exact' })
           .eq('id', plant.id);
 
         if (error) throw error;
+
+        // Supabase returns success with 0 rows when RLS blocks the delete
+        if (count === 0) {
+          throw new Error('You do not have permission to permanently delete plant records.');
+        }
 
         toast.success('Plant permanently removed', {
           description: `${plant.plant_id} has been permanently deleted from the archive.`,
