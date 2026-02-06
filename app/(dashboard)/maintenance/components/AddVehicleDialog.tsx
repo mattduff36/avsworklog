@@ -321,6 +321,26 @@ export function AddVehicleDialog({
                 </p>
               </div>
 
+              {/* Nickname */}
+              <div className="space-y-2">
+                <Label htmlFor="nickname" className="text-white">
+                  Nickname <span className="text-slate-400 text-xs">(Optional)</span>
+                </Label>
+                <Input
+                  id="nickname"
+                  value={formData.nickname}
+                  onChange={(e) =>
+                    setFormData({ ...formData, nickname: e.target.value })
+                  }
+                  placeholder="e.g., Mini Excavator, Forklift"
+                  className="bg-input border-border text-white placeholder:text-muted-foreground"
+                  disabled={loading}
+                />
+                <p className="text-xs text-muted-foreground">
+                  A friendly name to help identify this plant quickly
+                </p>
+              </div>
+
               {/* Optional Registration for Plant */}
               <div className="space-y-2">
                 <Label htmlFor="plant_reg" className="text-white">
@@ -339,82 +359,30 @@ export function AddVehicleDialog({
                   maxLength={9}
                 />
               </div>
-
-              {/* Serial Number */}
-              <div className="space-y-2">
-                <Label htmlFor="serial_number" className="text-white">
-                  Serial Number <span className="text-slate-400 text-xs">(Optional)</span>
-                </Label>
-                <Input
-                  id="serial_number"
-                  value={formData.serial_number}
-                  onChange={(e) =>
-                    setFormData({ ...formData, serial_number: e.target.value })
-                  }
-                  placeholder="e.g., SN12345678"
-                  className="bg-input border-border text-white placeholder:text-muted-foreground"
-                  disabled={loading}
-                />
-              </div>
-
-              {/* Year */}
-              <div className="space-y-2">
-                <Label htmlFor="year" className="text-white">
-                  Year <span className="text-slate-400 text-xs">(Optional)</span>
-                </Label>
-                <Input
-                  id="year"
-                  type="number"
-                  value={formData.year}
-                  onChange={(e) =>
-                    setFormData({ ...formData, year: e.target.value })
-                  }
-                  placeholder="e.g., 2023"
-                  className="bg-input border-border text-white placeholder:text-muted-foreground"
-                  disabled={loading}
-                  min="1900"
-                  max="2100"
-                />
-              </div>
-
-              {/* Weight Class */}
-              <div className="space-y-2">
-                <Label htmlFor="weight_class" className="text-white">
-                  Weight Class <span className="text-slate-400 text-xs">(Optional)</span>
-                </Label>
-                <Input
-                  id="weight_class"
-                  value={formData.weight_class}
-                  onChange={(e) =>
-                    setFormData({ ...formData, weight_class: e.target.value })
-                  }
-                  placeholder="e.g., 8-9t, 1.5-2t"
-                  className="bg-input border-border text-white placeholder:text-muted-foreground"
-                  disabled={loading}
-                />
-              </div>
             </>
           )}
 
-          {/* Nickname/Description */}
-          <div className="space-y-2">
-            <Label htmlFor="nickname" className="text-white">
-              {assetType === 'plant' ? 'Description' : 'Nickname'} <span className="text-slate-400 text-xs">(Optional)</span>
-            </Label>
-            <Input
-              id="nickname"
-              value={formData.nickname}
-              onChange={(e) =>
-                setFormData({ ...formData, nickname: e.target.value })
-              }
-              placeholder={assetType === 'plant' ? 'e.g., Mini Excavator, Forklift' : "e.g., Andy's Van, Red Pickup"}
-              className="bg-input border-border text-white placeholder:text-muted-foreground"
-              disabled={loading}
-            />
-            <p className="text-xs text-muted-foreground">
-              A friendly name to help identify this {assetType} quickly
-            </p>
-          </div>
+          {/* Nickname (vehicles only - plant has its own above) */}
+          {assetType === 'vehicle' && (
+            <div className="space-y-2">
+              <Label htmlFor="nickname" className="text-white">
+                Nickname <span className="text-slate-400 text-xs">(Optional)</span>
+              </Label>
+              <Input
+                id="nickname"
+                value={formData.nickname}
+                onChange={(e) =>
+                  setFormData({ ...formData, nickname: e.target.value })
+                }
+                placeholder="e.g., Andy's Van, Red Pickup"
+                className="bg-input border-border text-white placeholder:text-muted-foreground"
+                disabled={loading}
+              />
+              <p className="text-xs text-muted-foreground">
+                A friendly name to help identify this vehicle quickly
+              </p>
+            </div>
+          )}
 
           {/* Category */}
           <div className="space-y-2">
