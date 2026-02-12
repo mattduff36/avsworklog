@@ -170,7 +170,7 @@ export const adminNavItems: NavItem[] = [
   },
   { 
     href: '/fleet?tab=vehicles', 
-    label: 'Vehicles', 
+    label: 'Fleet / Assets', 
     icon: Truck,
     category: 'admin'
   },
