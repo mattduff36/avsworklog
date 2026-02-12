@@ -265,6 +265,26 @@ export function AttachmentFormModal({
     return value && value.trim() !== '';
   }).length;
 
+  /** Sort questions so answered/checked items appear first, preserving relative order within each group. */
+  function sortQuestionsCompletedFirst(
+    qs: AttachmentQuestion[],
+    resps: Record<string, string>,
+  ): AttachmentQuestion[] {
+    return [...qs].sort((a, b) => {
+      const aCompleted = isQuestionCompleted(a, resps);
+      const bCompleted = isQuestionCompleted(b, resps);
+      if (aCompleted === bCompleted) return 0;
+      return aCompleted ? -1 : 1;
+    });
+  }
+
+  function isQuestionCompleted(q: AttachmentQuestion, resps: Record<string, string>): boolean {
+    const val = resps[q.id];
+    if (!val) return false;
+    if (q.question_type === 'checkbox') return val === 'true';
+    return val.trim() !== '';
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh]">
@@ -287,7 +307,8 @@ export function AttachmentFormModal({
 
         <ScrollArea className="max-h-[60vh] pr-4">
           <div className="space-y-4">
-            {questions.map((question) => (
+            {/* In read-only mode, show completed items first */}
+            {(readOnly ? sortQuestionsCompletedFirst(questions, responses) : questions).map((question) => (
               <div
                 key={question.id}
                 className={`p-4 rounded-lg border transition-all ${

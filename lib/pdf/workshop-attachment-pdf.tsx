@@ -222,6 +222,21 @@ export function WorkshopAttachmentPDF({
     return val.trim() !== '';
   }).length;
 
+  // Sort so completed/answered items appear first, preserving relative order within each group
+  const sortedQuestions = [...questions].sort((a, b) => {
+    const aDone = isItemCompleted(a);
+    const bDone = isItemCompleted(b);
+    if (aDone === bDone) return 0;
+    return aDone ? -1 : 1;
+  });
+
+  function isItemCompleted(q: QuestionData): boolean {
+    const val = responsesMap.get(q.id);
+    if (!val) return false;
+    if (q.question_type === 'checkbox') return val === 'true';
+    return val.trim() !== '';
+  }
+
   function formatResponseValue(question: QuestionData, value: string | null): string {
     if (!value || value.trim() === '') return '';
     if (question.question_type === 'date') {
@@ -314,10 +329,10 @@ export function WorkshopAttachmentPDF({
           </View>
         </View>
 
-        {/* Questions & Responses */}
+        {/* Questions & Responses – completed/answered items first */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Checklist Items</Text>
-          {questions.map((question) => {
+          {sortedQuestions.map((question) => {
             const responseValue = responsesMap.get(question.id);
             const hasResponse = responseValue && responseValue.trim() !== '';
             const isCheckbox = question.question_type === 'checkbox';
