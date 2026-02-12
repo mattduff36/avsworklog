@@ -261,7 +261,7 @@ export function useAuth() {
   // Fetch effective role when view-as cookie is set and user is actual super admin
   useEffect(() => {
     const viewAsRoleId = getViewAsRoleId();
-    const isActualSuper = profile?.is_super_admin || profile?.role?.is_super_admin || false;
+    const isActualSuper = profile?.super_admin || profile?.role?.is_super_admin || false;
 
     if (!viewAsRoleId || !isActualSuper) {
       setEffectiveRole(null);
@@ -327,7 +327,7 @@ export function useAuth() {
   };
 
   // Actual (real) super admin flag – never affected by view-as
-  const isActualSuperAdmin = profile?.is_super_admin || profile?.role?.is_super_admin || false;
+  const isActualSuperAdmin = profile?.super_admin || profile?.role?.is_super_admin || false;
 
   // When viewing as another role, derive flags from the effective role
   const isViewingAs = isActualSuperAdmin && effectiveRole !== null;

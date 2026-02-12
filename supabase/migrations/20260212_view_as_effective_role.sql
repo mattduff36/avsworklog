@@ -48,12 +48,14 @@ RETURNS BOOLEAN AS $$
 DECLARE
   result BOOLEAN;
 BEGIN
-  SELECT COALESCE(p.is_super_admin, FALSE) OR COALESCE(r.is_super_admin, FALSE)
+  SELECT COALESCE(p.super_admin, FALSE) OR COALESCE(r.is_super_admin, FALSE)
   INTO result
   FROM profiles p
   LEFT JOIN roles r ON p.role_id = r.id
   WHERE p.id = auth.uid();
   RETURN COALESCE(result, FALSE);
+EXCEPTION WHEN OTHERS THEN
+  RETURN FALSE;
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER
    SET search_path = public, pg_temp;
