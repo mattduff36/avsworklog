@@ -610,26 +610,38 @@ export default function WorkshopTasksPage() {
       }
 
       // Update meter reading in vehicle_maintenance table
-      const updateData: any = {
+      // Use select-then-insert/update instead of upsert (partial unique indexes
+      // are incompatible with ON CONFLICT)
+      const idColumn = isPlant ? 'plant_id' : 'vehicle_id';
+      const { data: existingMaintenance } = await supabase
+        .from('vehicle_maintenance')
+        .select('id')
+        .eq(idColumn, selectedVehicleId)
+        .maybeSingle();
+
+      const meterFields: Record<string, unknown> = {
         last_updated_at: new Date().toISOString(),
         last_updated_by: user!.id,
       };
 
       if (isPlant) {
-        updateData.plant_id = selectedVehicleId;
-        updateData.current_hours = readingValue;
-        updateData.last_hours_update = new Date().toISOString();
+        meterFields.plant_id = selectedVehicleId;
+        meterFields.current_hours = readingValue;
+        meterFields.last_hours_update = new Date().toISOString();
       } else {
-        updateData.vehicle_id = selectedVehicleId;
-        updateData.current_mileage = readingValue;
-        updateData.last_mileage_update = new Date().toISOString();
+        meterFields.vehicle_id = selectedVehicleId;
+        meterFields.current_mileage = readingValue;
+        meterFields.last_mileage_update = new Date().toISOString();
       }
 
-      const { error: meterReadingError } = await supabase
-        .from('vehicle_maintenance')
-        .upsert(updateData, {
-          onConflict: isPlant ? 'plant_id' : 'vehicle_id',
-        });
+      const { error: meterReadingError } = existingMaintenance
+        ? await supabase
+            .from('vehicle_maintenance')
+            .update(meterFields)
+            .eq('id', existingMaintenance.id)
+        : await supabase
+            .from('vehicle_maintenance')
+            .insert(meterFields);
 
       if (meterReadingError) {
         console.error('Error updating meter reading:', meterReadingError);
@@ -1225,26 +1237,38 @@ export default function WorkshopTasksPage() {
       if (error) throw error;
 
       // Update meter reading
-      const meterUpdateData: any = {
+      // Use select-then-insert/update instead of upsert (partial unique indexes
+      // are incompatible with ON CONFLICT)
+      const editIdColumn = isPlant ? 'plant_id' : 'vehicle_id';
+      const { data: existingEditMaintenance } = await supabase
+        .from('vehicle_maintenance')
+        .select('id')
+        .eq(editIdColumn, editVehicleId)
+        .maybeSingle();
+
+      const meterUpdateFields: Record<string, unknown> = {
         last_updated_at: new Date().toISOString(),
         last_updated_by: user.id,
       };
 
       if (isPlant) {
-        meterUpdateData.plant_id = editVehicleId;
-        meterUpdateData.current_hours = mileageValue;
-        meterUpdateData.last_hours_update = new Date().toISOString();
+        meterUpdateFields.plant_id = editVehicleId;
+        meterUpdateFields.current_hours = mileageValue;
+        meterUpdateFields.last_hours_update = new Date().toISOString();
       } else {
-        meterUpdateData.vehicle_id = editVehicleId;
-        meterUpdateData.current_mileage = mileageValue;
-        meterUpdateData.last_mileage_update = new Date().toISOString();
+        meterUpdateFields.vehicle_id = editVehicleId;
+        meterUpdateFields.current_mileage = mileageValue;
+        meterUpdateFields.last_mileage_update = new Date().toISOString();
       }
 
-      const { error: mileageError } = await supabase
-        .from('vehicle_maintenance')
-        .upsert(meterUpdateData, {
-          onConflict: isPlant ? 'plant_id' : 'vehicle_id',
-        });
+      const { error: mileageError } = existingEditMaintenance
+        ? await supabase
+            .from('vehicle_maintenance')
+            .update(meterUpdateFields)
+            .eq('id', existingEditMaintenance.id)
+        : await supabase
+            .from('vehicle_maintenance')
+            .insert(meterUpdateFields);
 
       if (mileageError) {
         console.error('Error updating meter reading:', mileageError);

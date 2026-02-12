@@ -277,7 +277,7 @@ function NewPlantInspectionContent() {
 
         // Initialize all cells to default 'ok' state
         for (let day = 1; day <= 7; day++) {
-          for (let itemNum = 1; itemNum <= PLANT_CHECKLIST_ITEMS.length; itemNum++) {
+          for (let itemNum = 1; itemNum <= PLANT_INSPECTION_ITEMS.length; itemNum++) {
             const stateKey = `${day}-${itemNum}`;
             newCheckboxStates[stateKey] = 'ok';
             newComments[stateKey] = '';
@@ -433,7 +433,13 @@ function NewPlantInspectionContent() {
   };
 
   const handleHoursChange = (dayOfWeek: number, hours: string) => {
-    const hoursNum = hours === '' ? null : parseInt(hours);
+    if (hours === '') {
+      setDailyHours(prev => ({ ...prev, [dayOfWeek]: null }));
+      return;
+    }
+    const hoursNum = Math.round(parseFloat(hours));
+    // Validate against the DB check constraint (hours >= 0 AND hours <= 24)
+    if (isNaN(hoursNum) || hoursNum < 0 || hoursNum > 24) return;
     setDailyHours(prev => ({ ...prev, [dayOfWeek]: hoursNum }));
   };
 
@@ -583,13 +589,13 @@ function NewPlantInspectionContent() {
 
       if (!inspection) throw new Error('Failed to save inspection');
 
-      // Save daily hours
+      // Save daily hours (validate against DB constraint: hours >= 0 AND hours <= 24)
       const dailyHoursToInsert = Object.entries(dailyHours)
-        .filter(([_, hours]) => hours !== null)
+        .filter(([_, hours]) => hours !== null && !isNaN(hours as number) && (hours as number) >= 0 && (hours as number) <= 24)
         .map(([day, hours]) => ({
           inspection_id: inspection.id,
           day_of_week: parseInt(day),
-          hours: hours!
+          hours: Math.round(hours as number)
         }));
 
       if (dailyHoursToInsert.length > 0) {
