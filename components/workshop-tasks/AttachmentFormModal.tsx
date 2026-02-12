@@ -7,9 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Check, AlertCircle } from 'lucide-react';
+import { Check, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Database } from '@/types/database';
 
@@ -22,8 +21,12 @@ interface AttachmentFormModalProps {
   templateName: string;
   questions: AttachmentQuestion[];
   existingResponses?: AttachmentResponse[];
-  onSave: (responses: { question_id: string; response_value: string | null }[], markComplete: boolean) => Promise<void>;
+  onSave?: (responses: { question_id: string; response_value: string | null }[], markComplete: boolean) => Promise<void>;
   readOnly?: boolean;
+  /** When provided, shows a "Download PDF" button in read-only mode */
+  attachmentId?: string;
+  /** Controls whether the PDF download button is enabled (only for completed attachments) */
+  isCompleted?: boolean;
 }
 
 export function AttachmentFormModal({
@@ -34,6 +37,8 @@ export function AttachmentFormModal({
   existingResponses = [],
   onSave,
   readOnly = false,
+  attachmentId,
+  isCompleted = false,
 }: AttachmentFormModalProps) {
   const [responses, setResponses] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -85,7 +90,10 @@ export function AttachmentFormModal({
     return true;
   };
 
+  const [downloading, setDownloading] = useState(false);
+
   const handleSave = async (markComplete: boolean) => {
+    if (!onSave) return;
     if (markComplete && !validateResponses()) {
       return;
     }
@@ -105,6 +113,33 @@ export function AttachmentFormModal({
       toast.error('Failed to save responses');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!attachmentId) return;
+    setDownloading(true);
+    try {
+      const response = await fetch(`/api/workshop-tasks/attachments/${attachmentId}/pdf`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to generate PDF');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${templateName.replace(/[^a-z0-9]/gi, '_')}_attachment.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('PDF downloaded');
+    } catch (err) {
+      console.error('Error downloading PDF:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to download PDF');
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -307,10 +342,25 @@ export function AttachmentFormModal({
         )}
 
         {readOnly && (
-          <DialogFooter>
-            <Button onClick={() => onOpenChange(false)}>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
               Close
             </Button>
+            {attachmentId && (
+              <Button
+                onClick={handleDownloadPdf}
+                disabled={downloading || !isCompleted}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                title={isCompleted ? 'Download as PDF' : 'Complete the attachment to enable PDF export'}
+              >
+                {downloading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                {downloading ? 'Generating...' : 'Download PDF'}
+              </Button>
+            )}
           </DialogFooter>
         )}
       </DialogContent>

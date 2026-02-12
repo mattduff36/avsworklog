@@ -37,6 +37,7 @@ const EditMaintenanceDialog = dynamic(() => import('@/app/(dashboard)/maintenanc
 const DeleteVehicleDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/DeleteVehicleDialog').then(m => ({ default: m.DeleteVehicleDialog })), { ssr: false });
 const WorkshopTaskHistoryCard = dynamic(() => import('@/components/workshop-tasks/WorkshopTaskHistoryCard').then(m => ({ default: m.WorkshopTaskHistoryCard })), { ssr: false });
 import { Paperclip } from 'lucide-react';
+import { AttachmentHistoryViewer } from '@/components/workshop-tasks/AttachmentHistoryViewer';
 
 type Vehicle = {
   id: string;
@@ -139,6 +140,7 @@ type WorkshopTask = {
 type TaskAttachment = {
   id: string;
   task_id: string;
+  status: 'pending' | 'completed';
   created_at: string;
   workshop_attachment_templates: {
     name: string;
@@ -167,6 +169,7 @@ function DocumentsTabContent({ vehicleId, workshopTasks }: { vehicleId: string; 
           .select(`
             id,
             task_id,
+            status,
             created_at,
             workshop_attachment_templates (
               name,
@@ -223,78 +226,101 @@ function DocumentsTabContent({ vehicleId, workshopTasks }: { vehicleId: string; 
   }, {} as Record<string, TaskAttachment[]>);
 
   return (
-    <div className="space-y-4">
-      {Object.entries(attachmentsByTask).map(([taskId, taskAttachments]) => {
-        const task = workshopTasks.find(t => t.id === taskId);
-        if (!task) return null;
+    <AttachmentHistoryViewer>
+      {({ openAttachment, loadingAttachmentId }) => (
+        <div className="space-y-4">
+          {Object.entries(attachmentsByTask).map(([taskId, taskAttachments]) => {
+            const task = workshopTasks.find(t => t.id === taskId);
+            if (!task) return null;
 
-        return (
-          <Card key={taskId} className="bg-slate-800/30 border-slate-700">
-            <CardContent className="pt-6">
-              <div className="space-y-3">
-                {/* Task Header */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <Wrench className="h-4 w-4 text-workshop" />
-                      <h4 className="font-medium text-white">
-                        {task.workshop_task_categories?.name || 'Workshop Task'}
-                      </h4>
-                      <Badge 
-                        variant="outline" 
-                        className={
-                          task.status === 'completed' 
-                            ? 'bg-green-500/10 text-green-300 border-green-500/30'
-                            : 'bg-blue-500/10 text-blue-300 border-blue-500/30'
-                        }
-                      >
-                        {task.status === 'completed' ? 'Completed' : 'In Progress'}
+            return (
+              <Card key={taskId} className="bg-slate-800/30 border-slate-700">
+                <CardContent className="pt-6">
+                  <div className="space-y-3">
+                    {/* Task Header */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Wrench className="h-4 w-4 text-workshop" />
+                          <h4 className="font-medium text-white">
+                            {task.workshop_task_categories?.name || 'Workshop Task'}
+                          </h4>
+                          <Badge 
+                            variant="outline" 
+                            className={
+                              task.status === 'completed' 
+                                ? 'bg-green-500/10 text-green-300 border-green-500/30'
+                                : 'bg-blue-500/10 text-blue-300 border-blue-500/30'
+                            }
+                          >
+                            {task.status === 'completed' ? 'Completed' : 'In Progress'}
+                          </Badge>
+                        </div>
+                        {task.workshop_comments && (
+                          <p className="text-sm text-muted-foreground line-clamp-2">
+                            {task.workshop_comments}
+                          </p>
+                        )}
+                      </div>
+                      <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30">
+                        <Paperclip className="h-3 w-3 mr-1" />
+                        {taskAttachments.length}
                       </Badge>
                     </div>
-                    {task.workshop_comments && (
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {task.workshop_comments}
-                      </p>
-                    )}
-                  </div>
-                  <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30">
-                    <Paperclip className="h-3 w-3 mr-1" />
-                    {taskAttachments.length}
-                  </Badge>
-                </div>
 
-                {/* Attachments List */}
-                <div className="space-y-2 pl-6 border-l-2 border-slate-700">
-                  {taskAttachments.map(attachment => (
-                    <div 
-                      key={attachment.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-blue-400" />
-                        <div>
-                          <p className="text-sm font-medium text-white">
-                            {attachment.workshop_attachment_templates?.name || 'Attachment'}
-                          </p>
-                          {attachment.workshop_attachment_templates?.description && (
-                            <p className="text-xs text-muted-foreground">
-                              {attachment.workshop_attachment_templates.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(attachment.created_at).toLocaleDateString()}
-                      </span>
+                    {/* Attachments List */}
+                    <div className="space-y-2 pl-6 border-l-2 border-slate-700">
+                      {taskAttachments.map(attachment => {
+                        const isLoading = loadingAttachmentId === attachment.id;
+                        return (
+                          <button
+                            type="button"
+                            key={attachment.id}
+                            onClick={() => openAttachment(attachment.id)}
+                            disabled={isLoading}
+                            className="relative w-full text-left flex items-center justify-between p-3 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                          >
+                            {isLoading && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 rounded-lg z-10">
+                                <Loader2 className="h-5 w-5 text-blue-400 animate-spin" />
+                              </div>
+                            )}
+                            <div className="flex items-center gap-3">
+                              <FileText className="h-5 w-5 text-blue-400" />
+                              <div>
+                                <p className="text-sm font-medium text-white">
+                                  {attachment.workshop_attachment_templates?.name || 'Attachment'}
+                                </p>
+                                {attachment.workshop_attachment_templates?.description && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {attachment.workshop_attachment_templates.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {attachment.status === 'completed' && (
+                                <Badge variant="outline" className="bg-green-500/10 text-green-300 border-green-500/30 text-xs">
+                                  Completed
+                                </Badge>
+                              )}
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(attachment.created_at).toLocaleDateString()}
+                              </span>
+                              <ChevronDown className="h-4 w-4 text-muted-foreground rotate-[-90deg]" />
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </AttachmentHistoryViewer>
   );
 }
 
