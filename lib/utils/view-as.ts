@@ -62,7 +62,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
       .from('profiles')
       .select(`
         id,
-        is_super_admin,
+        super_admin,
         role_id,
         role:roles(
           id,
@@ -86,7 +86,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
     } | null;
 
     const isActualSuperAdmin =
-      profile.is_super_admin === true || actualRole?.is_super_admin === true;
+      profile.super_admin === true || actualRole?.is_super_admin === true;
 
     // Build baseline result from actual role
     const result: EffectiveRoleInfo = {
