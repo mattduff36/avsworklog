@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getEffectiveRole } from '@/lib/utils/view-as';
-import { logServerError } from '@/lib/utils/server-error-logger';
 
 // Helper to create admin client with service role key
 function getSupabaseAdmin() {
@@ -55,15 +53,6 @@ export async function GET() {
     return NextResponse.json({ users: usersWithEmails });
   } catch (error) {
     console.error('Error in list-with-emails:', error);
-
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: '/api/admin/users/list-with-emails',
-      additionalData: {
-        endpoint: '/api/admin/users/list-with-emails',
-      },
-    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

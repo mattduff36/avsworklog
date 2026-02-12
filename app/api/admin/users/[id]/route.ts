@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createClient as createServerClient } from '@/lib/supabase/server';
 import { sendProfileUpdateEmail } from '@/lib/utils/email';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
@@ -55,8 +54,10 @@ export async function PUT(
       return NextResponse.json({ error: 'Role is required' }, { status: 400 });
     }
 
+    const supabaseAdmin = getSupabaseAdmin();
+
     // Fetch existing user data for change tracking and email notification
-    const { data: existingUser, error: fetchError } = await supabase
+    const { data: existingUser, error: fetchError } = await supabaseAdmin
       .from('profiles')
       .select('*')
       .eq('id', userId)
@@ -71,7 +72,6 @@ export async function PUT(
     }
 
     // Get existing email from auth
-    const supabaseAdmin = getSupabaseAdmin();
     const { data: existingAuthUser } = await supabaseAdmin.auth.admin.getUserById(userId);
     const existingEmail = existingAuthUser?.user?.email || '';
 
@@ -201,7 +201,7 @@ export async function DELETE(
     const userId = (await params).id;
 
     // Prevent self-deletion
-    if (userId === user.id) {
+    if (userId === effectiveRole.user_id) {
       return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 });
     }
 
@@ -212,7 +212,7 @@ export async function DELETE(
     const supabaseAdmin = getSupabaseAdmin();
 
     // Get user's current name for the "(Deleted User)" suffix
-    const { data: userProfile } = await supabase
+    const { data: userProfile } = await supabaseAdmin
       .from('profiles')
       .select('full_name')
       .eq('id', userId)

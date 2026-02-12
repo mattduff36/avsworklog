@@ -51,7 +51,7 @@ function applyAlphaToHSL(color: string): string {
 }
 
 export default function DashboardPage() {
-  const { profile, isManager, isAdmin, isActualSuperAdmin, isViewingAs } = useAuth();
+  const { profile, isManager, isAdmin, isActualSuperAdmin, isViewingAs, effectiveRole } = useAuth();
   const formTypes = getEnabledForms();
   const supabase = createClient();
 
@@ -108,8 +108,33 @@ export default function DashboardPage() {
         return;
       }
       
-      // Fetch role permissions for regular users / view-as non-manager roles
       try {
+        const enabledModules = new Set<ModuleName>();
+
+        // When viewing as another role, fetch permissions from the EFFECTIVE role
+        // (not the actual profile's role which is still admin/superadmin).
+        // If viewAsRoleId is empty (stale cookie), deny to avoid privilege escalation.
+        if (isViewingAs && effectiveRole) {
+          const viewAsRoleId = (await import('@/lib/utils/view-as-cookie')).getViewAsRoleId();
+          if (viewAsRoleId) {
+            const { data: perms } = await supabase
+              .from('role_permissions')
+              .select('module_name, enabled')
+              .eq('role_id', viewAsRoleId);
+            perms?.forEach((perm: { module_name: string; enabled: boolean }) => {
+              if (perm.enabled) {
+                enabledModules.add(perm.module_name as ModuleName);
+              }
+            });
+            setUserPermissions(enabledModules);
+          } else {
+            setUserPermissions(new Set());
+          }
+          setPermissionsLoading(false);
+          return;
+        }
+
+        // Normal flow: fetch from profile → role → permissions
         const { data } = await supabase
           .from('profiles')
           .select(`
@@ -124,8 +149,6 @@ export default function DashboardPage() {
           .eq('id', profile.id)
           .single();
         
-        // Build Set of enabled permissions
-        const enabledModules = new Set<ModuleName>();
         data?.roles?.role_permissions?.forEach((perm: { enabled: boolean; module_name: string }) => {
           if (perm.enabled) {
             enabledModules.add(perm.module_name as ModuleName);
@@ -141,7 +164,7 @@ export default function DashboardPage() {
       }
     }
     fetchPermissions();
-  }, [profile?.id, isManager, isAdmin, supabase]);
+  }, [profile?.id, isManager, isAdmin, isViewingAs, effectiveRole, supabase]);
 
   useEffect(() => {
     // Fetch manager data only when the effective role has manager/admin access

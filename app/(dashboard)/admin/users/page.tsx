@@ -74,7 +74,7 @@ export default function UsersAdminPage() {
   const [deletionMode, setDeletionMode] = useState<'keep-data' | 'delete-all'>('keep-data');
   const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
   const [passwordDisplayDialogOpen, setPasswordDisplayDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [selectedUser, setSelectedUser] = useState<ProfileWithEmail | null>(null);
   
   // Password display states
   const [temporaryPassword, setTemporaryPassword] = useState('');
@@ -349,29 +349,31 @@ export default function UsersAdminPage() {
   }
 
   // Open edit dialog
-  function openEditDialog(user: Profile) {
-    setSelectedUser(user);
+  function openEditDialog(userProfile: ProfileWithEmail) {
+    setSelectedUser(userProfile);
+    // Email comes from auth (merged into ProfileWithEmail), not from the profiles table
+    const authEmail = userProfile.email || '';
     setFormData({
-      email: user.email || '',
-      full_name: user.full_name || '',
-      phone_number: user.phone_number || '',
-      employee_id: user.employee_id || '',
-      role_id: user.role_id || '',
+      email: authEmail,
+      full_name: userProfile.full_name || '',
+      phone_number: userProfile.phone_number || '',
+      employee_id: userProfile.employee_id || '',
+      role_id: userProfile.role_id || '',
     });
     setFormError('');
     setEditDialogOpen(true);
   }
 
   // Open delete dialog
-  function openDeleteDialog(user: Profile) {
-    setSelectedUser(user);
+  function openDeleteDialog(userProfile: ProfileWithEmail) {
+    setSelectedUser(userProfile);
     setFormError('');
     setDeleteOptionsDialogOpen(true);
   }
 
   // Open reset password dialog
-  function openResetPasswordDialog(user: Profile) {
-    setSelectedUser(user);
+  function openResetPasswordDialog(userProfile: ProfileWithEmail) {
+    setSelectedUser(userProfile);
     setFormError('');
     setResetPasswordDialogOpen(true);
   }

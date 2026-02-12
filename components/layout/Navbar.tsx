@@ -78,7 +78,7 @@ function getNavItemActiveColors(href: string): { bg: string; text: string } {
 export function Navbar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { user, profile, signOut, isAdmin, isManager, isActualSuperAdmin, isViewingAs } = useAuth();
+  const { user, profile, signOut, isAdmin, isManager, isActualSuperAdmin, isViewingAs, effectiveRole } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar starts collapsed
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
@@ -114,8 +114,33 @@ export function Navbar() {
         return;
       }
 
-      // Fetch role permissions for regular users / view-as non-manager roles
       try {
+        const enabledModules = new Set<ModuleName>();
+
+        // When viewing as another role, fetch permissions from the EFFECTIVE role
+        // (not the actual profile's role which is still admin/superadmin).
+        // If viewAsRoleId is empty (stale cookie), deny to avoid privilege escalation.
+        if (isViewingAs && effectiveRole) {
+          const viewAsRoleId = (await import('@/lib/utils/view-as-cookie')).getViewAsRoleId();
+          if (viewAsRoleId) {
+            const { data: perms } = await supabase
+              .from('role_permissions')
+              .select('module_name, enabled')
+              .eq('role_id', viewAsRoleId);
+            perms?.forEach((perm: { module_name: string; enabled: boolean }) => {
+              if (perm.enabled) {
+                enabledModules.add(perm.module_name as ModuleName);
+              }
+            });
+            setUserPermissions(enabledModules);
+          } else {
+            setUserPermissions(new Set());
+          }
+          setPermissionsLoading(false);
+          return;
+        }
+
+        // Normal flow: fetch from profile → role → permissions
         const { data } = await supabase
           .from('profiles')
           .select(`
@@ -130,8 +155,6 @@ export function Navbar() {
           .eq('id', profile.id)
           .single();
         
-        // Build Set of enabled permissions
-        const enabledModules = new Set<ModuleName>();
         const rolePerms = data?.roles as any;
         rolePerms?.role_permissions?.forEach((perm: any) => {
           if (perm.enabled) {
@@ -148,7 +171,7 @@ export function Navbar() {
       }
     }
     fetchPermissions();
-  }, [profile?.id, isManager, isAdmin, supabase]);
+  }, [profile?.id, isManager, isAdmin, isViewingAs, effectiveRole, supabase]);
 
   // Fetch RAMS assignments to determine if RAMS should be visible
   useEffect(() => {
