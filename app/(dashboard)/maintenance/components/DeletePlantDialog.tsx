@@ -73,6 +73,7 @@ export function DeletePlantDialog({
           description: 'Please complete or delete all open tasks before retiring this plant machinery.',
           duration: 5000,
         });
+        setLoading(false);
         return;
       }
 

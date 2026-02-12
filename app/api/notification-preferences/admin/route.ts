@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type {
   GetAllNotificationPreferencesResponse,
@@ -15,16 +16,14 @@ import type {
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    // Check effective role (respects View As mode)
+    const effectiveRole = await getEffectiveRole();
 
-    // Check authentication
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
+    if (!effectiveRole.user_id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is super admin (using email check for consistency with debug page)
-    if (user.email !== 'admin@mpdee.co.uk') {
+    if (!effectiveRole.is_super_admin) {
       return NextResponse.json({ error: 'Forbidden: SuperAdmin access required' }, { status: 403 });
     }
 
@@ -91,37 +90,14 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    // Check effective role (respects View As mode)
+    const effectiveRole = await getEffectiveRole();
 
-    // Check authentication
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
+    if (!effectiveRole.user_id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is super admin (using role-based check for consistency)
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select(`
-        id,
-        role:roles (
-          id,
-          name,
-          is_super_admin,
-          is_manager_admin
-        )
-      `)
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      console.error('Error fetching user profile:', profileError);
-      return NextResponse.json({ error: 'Forbidden: Unable to verify permissions' }, { status: 403 });
-    }
-
-    // Allow SuperAdmin role OR hardcoded email (for backwards compatibility)
-    const isSupeAdmin = profile.role?.is_super_admin === true || user.email === 'admin@mpdee.co.uk';
-    if (!isSupeAdmin) {
+    if (!effectiveRole.is_super_admin) {
       return NextResponse.json({ error: 'Forbidden: SuperAdmin access required' }, { status: 403 });
     }
 

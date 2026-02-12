@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { generateSecurePassword, validatePasswordStrength } from '@/lib/utils/password';
 import { sendPasswordEmail } from '@/lib/utils/email';
-import { getProfileWithRole } from '@/lib/utils/permissions';
+import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
 // Helper to create admin client with service role key
@@ -22,20 +22,14 @@ function getSupabaseAdmin() {
 
 export async function POST(request: NextRequest) {
   try {
-    // Check if requester is admin
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // Check effective role (respects View As mode)
+    const effectiveRole = await getEffectiveRole();
 
-    if (!user) {
+    if (!effectiveRole.user_id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin
-    const profile = await getProfileWithRole(user.id);
-
-    if (!profile || profile.role?.name !== 'admin') {
+    if (!effectiveRole.is_manager_admin) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database';
-import { getProfileWithRole } from '@/lib/utils/permissions';
+import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
 type Manager = {
@@ -38,21 +38,14 @@ function compareManagers(a: Manager, b: Manager): number {
 
 export async function GET() {
   try {
-    const supabase = await createServerClient();
+    // Use effective role (respects View As mode for super admins)
+    const effectiveRole = await getEffectiveRole();
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    if (!effectiveRole.user_id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only allow managers/admins to fetch the list
-    const profile = await getProfileWithRole(user.id);
-
-    if (!profile || !profile.role?.is_manager_admin) {
+    if (!effectiveRole.is_manager_admin) {
       return NextResponse.json(
         { error: 'Only managers and admins can view this list' },
         { status: 403 }

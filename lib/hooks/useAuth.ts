@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { Database } from '@/types/database';
+import { getViewAsRoleId } from '@/lib/utils/view-as-cookie';
 
 type Profile = Database['public']['Tables']['profiles']['Row'] & {
   role?: {
@@ -14,10 +15,18 @@ type Profile = Database['public']['Tables']['profiles']['Row'] & {
   } | null;
 };
 
+interface EffectiveRole {
+  name: string;
+  display_name: string;
+  is_manager_admin: boolean;
+  is_super_admin: boolean;
+}
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [effectiveRole, setEffectiveRole] = useState<EffectiveRole | null>(null);
   const supabase = createClient();
 
   const isNetworkFetchError = (err: unknown): boolean => {
@@ -249,6 +258,35 @@ export function useAuth() {
     }
   };
 
+  // Fetch effective role when view-as cookie is set and user is actual super admin
+  useEffect(() => {
+    const viewAsRoleId = getViewAsRoleId();
+    const isActualSuper = profile?.is_super_admin || profile?.role?.is_super_admin || false;
+
+    if (!viewAsRoleId || !isActualSuper) {
+      setEffectiveRole(null);
+      return;
+    }
+
+    async function fetchEffectiveRole() {
+      try {
+        const { data, error } = await supabase
+          .from('roles')
+          .select('name, display_name, is_manager_admin, is_super_admin')
+          .eq('id', viewAsRoleId)
+          .single();
+        if (!error && data) {
+          setEffectiveRole(data);
+        } else {
+          setEffectiveRole(null);
+        }
+      } catch {
+        setEffectiveRole(null);
+      }
+    }
+    fetchEffectiveRole();
+  }, [profile, supabase]);
+
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -288,6 +326,13 @@ export function useAuth() {
     return { data, error };
   };
 
+  // Actual (real) super admin flag – never affected by view-as
+  const isActualSuperAdmin = profile?.is_super_admin || profile?.role?.is_super_admin || false;
+
+  // When viewing as another role, derive flags from the effective role
+  const isViewingAs = isActualSuperAdmin && effectiveRole !== null;
+  const roleForFlags = isViewingAs ? effectiveRole : profile?.role ?? null;
+
   return {
     user,
     profile,
@@ -295,10 +340,15 @@ export function useAuth() {
     signIn,
     signOut,
     signUp,
-    isAdmin: profile?.role?.name === 'admin',
-    isManager: profile?.role?.is_manager_admin || false,
-    isEmployee: profile?.role?.name?.startsWith('employee-') || false,
-    isSuperAdmin: profile?.is_super_admin || profile?.role?.is_super_admin || false,
+    // These flags reflect the EFFECTIVE role (overridden when viewing-as)
+    isAdmin: roleForFlags?.name === 'admin',
+    isManager: roleForFlags?.is_manager_admin || false,
+    isEmployee: roleForFlags?.name?.startsWith('employee-') || false,
+    isSuperAdmin: isViewingAs ? (roleForFlags?.is_super_admin || false) : isActualSuperAdmin,
+    // Always reflects the real user, unaffected by view-as
+    isActualSuperAdmin,
+    isViewingAs,
+    effectiveRole,
   };
 }
 

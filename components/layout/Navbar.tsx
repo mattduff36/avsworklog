@@ -30,8 +30,6 @@ import {
   adminNavItems 
 } from '@/lib/config/navigation';
 
-type ViewAsRole = 'actual' | 'employee' | 'manager' | 'admin';
-
 /**
  * Get the module-specific active color classes for a nav item
  * Each module gets its own color when the link is active
@@ -80,72 +78,31 @@ function getNavItemActiveColors(href: string): { bg: string; text: string } {
 export function Navbar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { user, profile, signOut, isAdmin, isManager } = useAuth();
+  const { user, profile, signOut, isAdmin, isManager, isActualSuperAdmin, isViewingAs } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar starts collapsed
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
   const [permissionsLoading, setPermissionsLoading] = useState(true);
-  const [userEmail, setUserEmail] = useState<string>('');
-  const [viewAsRole, setViewAsRole] = useState<ViewAsRole>('actual');
   const [hasRAMSAssignments, setHasRAMSAssignments] = useState(false);
   const [isMounted, setIsMounted] = useState(false); // Track client hydration
   const supabase = createClient();
-  
-  const isSuperAdmin = userEmail === 'admin@mpdee.co.uk';
-  const effectiveIsManager = isManager && !(isSuperAdmin && viewAsRole === 'employee');
-  const effectiveIsAdmin = isAdmin && !(isSuperAdmin && viewAsRole === 'employee');
+
+  // useAuth now provides effective role flags (respecting View As cookie)
+  const isSuperAdmin = isActualSuperAdmin;
+  const effectiveIsManager = isManager;
+  const effectiveIsAdmin = isAdmin;
 
   // Set mounted state after hydration to prevent hydration mismatches
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Fetch user email
-  useEffect(() => {
-    async function fetchUserEmail() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        setUserEmail(user.email);
-      }
-    }
-    fetchUserEmail();
-  }, [supabase]);
-
-  // Load persisted viewAs setting
-  useEffect(() => {
-    if (isSuperAdmin) {
-      const stored = localStorage.getItem('viewAsRole');
-      if (stored) {
-        setViewAsRole(stored as ViewAsRole);
-      }
-    }
-  }, [isSuperAdmin]);
-
-  // Persist viewAs setting
-  useEffect(() => {
-    if (isSuperAdmin) {
-      localStorage.setItem('viewAsRole', viewAsRole);
-    }
-  }, [viewAsRole, isSuperAdmin]);
-
-  // Fetch user permissions (adjusted for viewAs mode)
+  // Fetch user permissions (useAuth flags already respect View As mode)
   useEffect(() => {
     async function fetchPermissions() {
       if (!profile?.id) {
-        setPermissionsLoading(false);
-        return;
-      }
-
-      // When viewing as different roles, simulate their permissions
-      if (isSuperAdmin && viewAsRole !== 'actual') {
-        if (viewAsRole === 'admin' || viewAsRole === 'manager') {
-          setUserPermissions(new Set(['timesheets', 'inspections', 'plant-inspections', 'absence', 'rams', 'maintenance', 'workshop-tasks', 'approvals', 'actions', 'reports'] as ModuleName[]));
-        } else if (viewAsRole === 'employee') {
-          // Simulate basic employee permissions
-          setUserPermissions(new Set(['timesheets', 'inspections'] as ModuleName[]));
-        }
         setPermissionsLoading(false);
         return;
       }
@@ -157,7 +114,7 @@ export function Navbar() {
         return;
       }
 
-      // Fetch role permissions for regular users
+      // Fetch role permissions for regular users / view-as non-manager roles
       try {
         const { data } = await supabase
           .from('profiles')
@@ -191,7 +148,7 @@ export function Navbar() {
       }
     }
     fetchPermissions();
-  }, [profile?.id, isManager, isAdmin, supabase, isSuperAdmin, viewAsRole]);
+  }, [profile?.id, isManager, isAdmin, supabase]);
 
   // Fetch RAMS assignments to determine if RAMS should be visible
   useEffect(() => {
@@ -703,8 +660,8 @@ export function Navbar() {
                     </>
                   )}
                   
-                  {/* Developer Tools (Mobile) - SuperAdmin Only */}
-                  {isSuperAdmin && viewAsRole === 'actual' && (
+                  {/* Developer Tools (Mobile) - SuperAdmin Only (not when viewing as another role) */}
+                  {isActualSuperAdmin && !isViewingAs && (
                     <>
                       <div className="px-3 py-2 text-xs font-semibold text-red-500 uppercase tracking-wider mt-4">
                         Developer

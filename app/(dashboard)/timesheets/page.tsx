@@ -48,6 +48,7 @@ export default function TimesheetsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [timesheetToDelete, setTimesheetToDelete] = useState<{ id: string; weekEnding: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [displayCount, setDisplayCount] = useState(12); // Show 12 timesheets initially
   const supabase = createClient();
 
@@ -106,6 +107,7 @@ export default function TimesheetsPage() {
 
   const fetchTimesheets = async () => {
     if (!user) return;
+    setFetchError(null);
     
     try {
       let query = supabase
@@ -139,11 +141,35 @@ export default function TimesheetsPage() {
       if (error) throw error;
       setTimesheets(data || []);
     } catch (error) {
-      console.error('Error fetching timesheets:', error);
-      // Show friendly message if offline
-      if (!navigator.onLine) {
+      const message = (() => {
+        if (error instanceof Error) return error.message;
+        if (typeof error === 'string') return error;
+        try {
+          return JSON.stringify(error);
+        } catch {
+          return String(error);
+        }
+      })();
+      const isNetworkFailure =
+        message.includes('Failed to fetch') || message.includes('NetworkError') || message.toLowerCase().includes('network');
+
+      // Avoid escalating common mobile/offline network failures into centralized error logs
+      if (isNetworkFailure) {
+        console.warn('Unable to load timesheets (network):', error);
+      } else {
+        console.error('Error fetching timesheets:', error);
+      }
+
+      // Always set inline error state so the UI shows feedback even if toast fails
+      if (!navigator.onLine || isNetworkFailure) {
+        setFetchError('Unable to load timesheets. Please check your internet connection.');
         toast.error('Unable to load timesheets', {
           description: 'Please check your internet connection.',
+        });
+      } else {
+        setFetchError('Unable to load timesheets. Please try again.');
+        toast.error('Unable to load timesheets', {
+          description: 'Something went wrong. Please try again.',
         });
       }
     } finally {
@@ -353,6 +379,23 @@ export default function TimesheetsPage() {
                 ))}
               </div>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {fetchError && !loading && (
+        <Card className="border-destructive/50 bg-destructive/10">
+          <CardContent className="flex items-center gap-3 py-4">
+            <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
+            <p className="text-sm text-destructive">{fetchError}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-auto shrink-0"
+              onClick={() => fetchTimesheets()}
+            >
+              Retry
+            </Button>
           </CardContent>
         </Card>
       )}

@@ -15,11 +15,18 @@ import {
   Shield,
   Check
 } from 'lucide-react';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { managerNavItems, adminNavItems } from '@/lib/config/navigation';
+import { getViewAsRoleId, setViewAsRoleId } from '@/lib/utils/view-as-cookie';
 
-type ViewAsRole = 'actual' | 'employee' | 'manager' | 'admin';
+interface RoleOption {
+  id: string;
+  name: string;
+  display_name: string;
+  is_super_admin: boolean;
+  is_manager_admin: boolean;
+}
 
 interface SidebarNavProps {
   open: boolean;
@@ -31,10 +38,10 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const { isAdmin, isManager } = useAuth();
   const supabase = createClient();
   const [userEmail, setUserEmail] = useState<string>('');
-  const [viewAsRole, setViewAsRole] = useState<ViewAsRole>('actual');
+  const [viewAsRoleId, setViewAsRoleIdState] = useState<string>('');
+  const [allRoles, setAllRoles] = useState<RoleOption[]>([]);
 
-
-  // Fetch user email and view as role
+  // Fetch user email, all roles, and current view-as selection
   useEffect(() => {
     async function fetchUserData() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -43,14 +50,31 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
       }
     }
     fetchUserData();
-    
-    // Retrieve and validate stored View As preference
-    const storedViewAs = localStorage.getItem('viewAsRole');
-    if (storedViewAs) {
-      // Validate it's a valid ViewAsRole value before using it
-      const validRoles: ViewAsRole[] = ['actual', 'employee', 'manager', 'admin'];
-      if (validRoles.includes(storedViewAs as ViewAsRole)) {
-        setViewAsRole(storedViewAs as ViewAsRole);
+
+    // Fetch all roles for the View As menu
+    async function fetchRoles() {
+      const { data, error } = await supabase
+        .from('roles')
+        .select('id, name, display_name, is_super_admin, is_manager_admin')
+        .order('is_super_admin', { ascending: false })
+        .order('is_manager_admin', { ascending: false })
+        .order('display_name', { ascending: true });
+      if (!error && data) {
+        setAllRoles(data);
+      }
+    }
+    fetchRoles();
+
+    // Read current selection from cookie (or legacy localStorage)
+    const cookieVal = getViewAsRoleId();
+    if (cookieVal) {
+      setViewAsRoleIdState(cookieVal);
+    } else {
+      // Migrate legacy localStorage value if present
+      const legacy = localStorage.getItem('viewAsRole');
+      if (legacy && legacy !== 'actual') {
+        // Can't auto-map old string names to UUIDs – just clear
+        localStorage.removeItem('viewAsRole');
       }
     }
   }, [supabase]);
@@ -64,7 +88,11 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   }, [pathname]);
 
   const isSuperAdmin = userEmail === 'admin@mpdee.co.uk';
-  const showDeveloperTools = isSuperAdmin && viewAsRole === 'actual';
+  const isViewingAsOtherRole = isSuperAdmin && viewAsRoleId !== '';
+  const showDeveloperTools = isSuperAdmin && !isViewingAsOtherRole;
+
+  // Find the currently-selected role object for display
+  const selectedRole = allRoles.find((r) => r.id === viewAsRoleId) ?? null;
   
   // Show sidebar for managers/admins or superadmins (who need View As feature)
   if (!isManager && !isSuperAdmin) return null;
@@ -225,24 +253,25 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                 {open ? (
                   <Button
                     variant="outline"
-                    className="w-full justify-start gap-2 bg-slate-800/50 border-border text-muted-foreground hover:bg-slate-700 hover:text-white text-xs h-9"
+                    className={`w-full justify-start gap-2 border-border text-xs h-9 ${
+                      isViewingAsOtherRole
+                        ? 'bg-amber-600/30 border-amber-500/50 text-amber-200 hover:bg-amber-600/40 hover:text-amber-100'
+                        : 'bg-slate-800/50 text-muted-foreground hover:bg-slate-700 hover:text-white'
+                    }`}
                   >
                     <Eye className="w-4 h-4 flex-shrink-0" />
                     <span className="flex-1 text-left truncate">
-                      {viewAsRole === 'actual' && 'Actual Role'}
-                      {viewAsRole === 'employee' && 'View as Employee'}
-                      {viewAsRole === 'manager' && 'View as Manager'}
-                      {viewAsRole === 'admin' && 'View as Admin'}
+                      {selectedRole ? `View as ${selectedRole.display_name}` : 'Actual Role'}
                     </span>
                   </Button>
                 ) : (
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="w-full h-10 p-0 hover:bg-slate-800"
+                    className={`w-full h-10 p-0 ${isViewingAsOtherRole ? 'bg-amber-600/30' : 'hover:bg-slate-800'}`}
                     title="View As"
                   >
-                    <Eye className="w-5 h-5 text-slate-400 hover:text-white" />
+                    <Eye className={`w-5 h-5 ${isViewingAsOtherRole ? 'text-amber-300' : 'text-slate-400 hover:text-white'}`} />
                   </Button>
                 )}
               </PopoverTrigger>
@@ -250,40 +279,58 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                 side="right"
                 align="start"
                 sideOffset={12}
-                className="w-56 p-2 bg-slate-900 border border-slate-700 shadow-2xl"
+                className="w-64 p-2 bg-slate-900 border border-slate-700 shadow-2xl max-h-[70vh] overflow-y-auto"
                 style={{ zIndex: 999999, color: '#e2e8f0' }}
               >
                 <div className="space-y-1">
                   <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: '#cbd5e1' }}>
-                    View As
+                    View As Role
                   </div>
-                  {[
-                    { value: 'actual', label: 'Actual Role', icon: Crown },
-                    { value: 'employee', label: 'Employee', icon: User },
-                    { value: 'manager', label: 'Manager', icon: Users },
-                    { value: 'admin', label: 'Admin', icon: Shield },
-                  ].map((role) => {
-                    const Icon = role.icon;
-                    const isActive = viewAsRole === role.value;
+                  {/* Actual Role (reset) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setViewAsRoleIdState('');
+                      setViewAsRoleId('');
+                      setTimeout(() => window.location.reload(), 100);
+                    }}
+                    className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
+                      viewAsRoleId === '' ? 'bg-avs-yellow' : 'hover:bg-slate-800 hover:text-white'
+                    }`}
+                    style={viewAsRoleId === '' ? { color: '#0f172a' } : { color: '#e2e8f0' }}
+                  >
+                    <Crown className="w-4 h-4" style={viewAsRoleId === '' ? { color: '#0f172a' } : { color: '#e2e8f0' }} />
+                    <span className="flex-1 text-left" style={viewAsRoleId === '' ? { color: '#0f172a' } : { color: '#e2e8f0' }}>
+                      Actual Role (SuperAdmin)
+                    </span>
+                    {viewAsRoleId === '' && <Check className="w-4 h-4" style={{ color: '#0f172a' }} />}
+                  </button>
+
+                  <div className="border-t border-slate-700 my-1" />
+
+                  {/* All roles from database */}
+                  {allRoles.map((role) => {
+                    const isActive = viewAsRoleId === role.id;
+                    const RoleIcon = role.is_super_admin ? Shield : role.is_manager_admin ? Users : User;
                     return (
                       <button
-                        key={role.value}
+                        key={role.id}
                         type="button"
                         onClick={() => {
-                          setViewAsRole(role.value as ViewAsRole);
-                          localStorage.setItem('viewAsRole', role.value);
+                          setViewAsRoleIdState(role.id);
+                          setViewAsRoleId(role.id);
                           setTimeout(() => window.location.reload(), 100);
                         }}
                         className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
-                          isActive
-                            ? 'bg-avs-yellow'
-                            : 'hover:bg-slate-800 hover:text-white'
+                          isActive ? 'bg-avs-yellow' : 'hover:bg-slate-800 hover:text-white'
                         }`}
                         style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }}
                       >
-                        <Icon className="w-4 h-4" style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }} />
-                        <span className="flex-1 text-left" style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }}>{role.label}</span>
-                        {isActive && <Check className="w-4 h-4" style={{ color: '#0f172a' }} />}
+                        <RoleIcon className="w-4 h-4 flex-shrink-0" style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }} />
+                        <span className="flex-1 text-left truncate" style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }}>
+                          {role.display_name}
+                        </span>
+                        {isActive && <Check className="w-4 h-4 flex-shrink-0" style={{ color: '#0f172a' }} />}
                       </button>
                     );
                   })}

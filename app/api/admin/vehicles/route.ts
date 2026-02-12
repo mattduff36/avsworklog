@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
-import { getProfileWithRole } from '@/lib/utils/permissions';
+import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { createDVLAApiService } from '@/lib/services/dvla-api';
 import { createMotHistoryService } from '@/lib/services/mot-history-api';
@@ -24,24 +24,21 @@ function getSupabaseAdmin() {
 // GET - List all vehicles with category and last inspector info
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // Check effective role (respects View As mode)
+    const effectiveRole = await getEffectiveRole();
 
-    if (!user) {
+    if (!effectiveRole.user_id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin or manager
-    const profile = await getProfileWithRole(user.id);
-
-    if (!profile || !profile.role?.is_manager_admin) {
+    if (!effectiveRole.is_manager_admin) {
       return NextResponse.json(
         { error: 'Forbidden: Manager or Admin access required' },
         { status: 403 }
       );
     }
+
+    const supabase = await createServerClient();
 
     // Fetch vehicles with category info and last inspection
     const { data: vehicles, error } = await supabase

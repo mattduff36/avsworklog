@@ -69,7 +69,7 @@ WITH CHECK (
   )
 );
 
--- DELETE: Only admins (super admin) can permanently delete plant records
+-- DELETE: Admins and managers can permanently delete plant records
 CREATE POLICY "plant_delete_policy"
 ON plant FOR DELETE
 TO authenticated
@@ -78,6 +78,6 @@ USING (
     SELECT 1 FROM profiles p
     JOIN roles r ON p.role_id = r.id
     WHERE p.id = auth.uid()
-    AND r.is_super_admin = true
+    AND r.is_manager_admin = true
   )
 );

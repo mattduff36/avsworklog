@@ -51,7 +51,7 @@ function applyAlphaToHSL(color: string): string {
 }
 
 export default function DashboardPage() {
-  const { profile, isManager, isAdmin } = useAuth();
+  const { profile, isManager, isAdmin, isActualSuperAdmin, isViewingAs } = useAuth();
   const formTypes = getEnabledForms();
   const supabase = createClient();
 
@@ -63,8 +63,6 @@ export default function DashboardPage() {
   const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
   const [permissionsLoading, setPermissionsLoading] = useState(true);
   const [ramsLoading, setRamsLoading] = useState(true);
-  const [userEmail, setUserEmail] = useState<string>('');
-  const [viewAsRole, setViewAsRole] = useState<string>('actual');
   
   // Intro animation state (all devices)
   const [showIntro, setShowIntro] = useState(true);
@@ -85,31 +83,12 @@ export default function DashboardPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Removed placeholder tiles - no longer needed
-  const isSuperAdmin = userEmail === 'admin@mpdee.co.uk';
-  
-  // Determine if user should see manager/admin features based on View As mode
-  const effectiveIsManager = isManager && !(isSuperAdmin && viewAsRole === 'employee');
-  const effectiveIsAdmin = isAdmin && !(isSuperAdmin && viewAsRole === 'employee');
+  // useAuth flags already reflect the effective (view-as) role
+  const isSuperAdmin = isActualSuperAdmin;
+  const effectiveIsManager = isManager;
+  const effectiveIsAdmin = isAdmin;
 
-  // Fetch user email and view as role
-  useEffect(() => {
-    async function fetchUserEmail() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        setUserEmail(user.email);
-      }
-    }
-    fetchUserEmail();
-    
-    // Check viewAs mode from localStorage
-    const storedViewAs = localStorage.getItem('viewAsRole');
-    if (storedViewAs) {
-      setViewAsRole(storedViewAs);
-    }
-  }, [supabase]);
-
-  // Fetch user permissions (respects View As mode)
+  // Fetch user permissions (useAuth flags already respect View As mode)
   useEffect(() => {
     async function fetchPermissions() {
       if (!profile?.id) {
@@ -119,19 +98,7 @@ export default function DashboardPage() {
       
       setPermissionsLoading(true);
       
-      // When viewing as different roles, simulate their permissions
-      if (isSuperAdmin && viewAsRole !== 'actual') {
-        if (viewAsRole === 'admin' || viewAsRole === 'manager') {
-          setUserPermissions(new Set(['timesheets', 'inspections', 'plant-inspections', 'absence', 'rams', 'maintenance', 'workshop-tasks', 'approvals', 'actions', 'reports'] as ModuleName[]));
-        } else if (viewAsRole === 'employee') {
-          // Simulate basic employee permissions (timesheets and inspections only)
-          setUserPermissions(new Set(['timesheets', 'inspections'] as ModuleName[]));
-        }
-        setPermissionsLoading(false);
-        return;
-      }
-      
-        // Managers and admins have all permissions
+      // Managers and admins have all permissions
       if (isManager || isAdmin) {
         setUserPermissions(new Set([
           'timesheets', 'inspections', 'plant-inspections', 'rams', 'absence', 'maintenance', 'toolbox-talks', 'workshop-tasks',
@@ -141,6 +108,7 @@ export default function DashboardPage() {
         return;
       }
       
+      // Fetch role permissions for regular users / view-as non-manager roles
       try {
         const { data } = await supabase
           .from('profiles')
@@ -173,19 +141,17 @@ export default function DashboardPage() {
       }
     }
     fetchPermissions();
-  }, [profile?.id, isManager, isAdmin, supabase, isSuperAdmin, viewAsRole]);
+  }, [profile?.id, isManager, isAdmin, supabase]);
 
   useEffect(() => {
-    // Only fetch manager/admin data if actually a manager/admin and not viewing as employee
-    const shouldFetchManagerData = (isManager || isAdmin) && !(isSuperAdmin && viewAsRole === 'employee');
-    
-    if (shouldFetchManagerData) {
+    // Fetch manager data only when the effective role has manager/admin access
+    if (isManager || isAdmin) {
       fetchPendingApprovals();
       fetchTopActions();
     }
     fetchPendingRAMS();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isManager, isAdmin, profile, isSuperAdmin, viewAsRole]);
+  }, [isManager, isAdmin, profile]);
 
   const fetchPendingApprovals = async () => {
     // Skip fetching if offline - rely on cached page data
@@ -583,7 +549,7 @@ export default function DashboardPage() {
             })}
             
             {/* SuperAdmin Only - Debug Link (only when viewing as actual role) */}
-            {isSuperAdmin && viewAsRole === 'actual' && (() => {
+            {isActualSuperAdmin && !isViewingAs && (() => {
               const Icon = Bug;
               const animationIndex = managerNavItems.length + (effectiveIsAdmin ? adminNavItems.length : 0);
               

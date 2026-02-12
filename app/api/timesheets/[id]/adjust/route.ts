@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { sendTimesheetAdjustmentEmail } from '@/lib/utils/email';
+import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { Database } from '@/types/database';
 
@@ -34,38 +35,30 @@ export async function POST(
       );
     }
 
-    // Get current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
+    // Get current user and check effective role (respects View As mode)
+    const effectiveRole = await getEffectiveRole();
+    if (!effectiveRole.user_id) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    // Verify user is a manager/admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select(`
-        id,
-        full_name,
-        roles!inner(is_manager_admin)
-      `)
-      .eq('id', user.id)
-      .single();
-
-    const typedProfile = profile as unknown as { 
-      id: string; 
-      full_name: string; 
-      roles: { is_manager_admin: boolean } 
-    } | null;
-
-    if (!typedProfile?.roles?.is_manager_admin) {
+    if (!effectiveRole.is_manager_admin) {
       return NextResponse.json(
         { error: 'Only managers and admins can adjust timesheets' },
         { status: 403 }
       );
     }
+
+    // Fetch profile for downstream use (name, etc.)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .eq('id', effectiveRole.user_id)
+      .single();
+
+    const typedProfile = profile as { id: string; full_name: string } | null;
 
     // Get timesheet details
     const { data: timesheet, error: timesheetError } = await supabase
@@ -120,7 +113,7 @@ export async function POST(
       .from('timesheets')
       .update({
         status: 'adjusted',
-        adjusted_by: user.id,
+        adjusted_by: effectiveRole.user_id!,
         adjusted_at: new Date().toISOString(),
         adjustment_recipients: notifyManagerIds || [],
         manager_comments: comments.trim(),
@@ -200,7 +193,7 @@ export async function POST(
           year: 'numeric',
         })} has been adjusted by ${typedProfile!.full_name}.\n\nAdjustment Details: ${comments.trim()}`,
         message_type: 'timesheet_adjustment',
-        created_by: user.id,
+        created_by: effectiveRole.user_id!,
       })
       .select('id')
       .single();
@@ -229,7 +222,7 @@ export async function POST(
             year: 'numeric',
           })}) has been adjusted by ${typedProfile!.full_name}.\n\nAdjustment Details: ${comments.trim()}`,
           message_type: 'timesheet_adjustment',
-          created_by: user.id,
+          created_by: effectiveRole.user_id!,
         })
         .select('id')
         .single();

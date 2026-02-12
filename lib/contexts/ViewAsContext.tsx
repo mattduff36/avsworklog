@@ -1,13 +1,15 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-
-type ViewAsRole = 'actual' | 'employee' | 'manager' | 'admin';
+import { getViewAsRoleId, setViewAsRoleId as setCookie } from '@/lib/utils/view-as-cookie';
 
 interface ViewAsContextType {
-  viewAsRole: ViewAsRole;
-  setViewAsRole: (role: ViewAsRole) => void;
+  /** UUID of the role being viewed-as, or empty string for actual role */
+  viewAsRoleId: string;
+  setViewAsRoleId: (roleId: string) => void;
+  /** True when the super admin is actively viewing as another role */
   isViewingAs: boolean;
+  /** True when the underlying user is a real super admin */
   isSuperAdmin: boolean;
 }
 
@@ -21,29 +23,27 @@ export function ViewAsProvider({
   userEmail: string | null;
 }) {
   const isSuperAdmin = userEmail === 'admin@mpdee.co.uk';
-  const [viewAsRole, setViewAsRole] = useState<ViewAsRole>(() => {
+  const [viewAsRoleId, setViewAsRoleIdState] = useState<string>(() => {
     if (typeof window === 'undefined' || !isSuperAdmin) {
-      return 'actual';
+      return '';
     }
-
-    const stored = window.localStorage.getItem('viewAsRole') as ViewAsRole | null;
-    return stored ?? 'actual';
+    return getViewAsRoleId();
   });
-  const isViewingAs = viewAsRole !== 'actual';
 
-  useEffect(() => {
-    if (isSuperAdmin) {
-      localStorage.setItem('viewAsRole', viewAsRole);
-    }
-  }, [viewAsRole, isSuperAdmin]);
+  const isViewingAs = viewAsRoleId !== '';
 
-  // If not superadmin, always use actual role
-  const effectiveViewAsRole = isSuperAdmin ? viewAsRole : 'actual';
+  function setViewAsRoleId(roleId: string) {
+    setViewAsRoleIdState(roleId);
+    setCookie(roleId);
+  }
+
+  // If not superadmin, always clear
+  const effectiveRoleId = isSuperAdmin ? viewAsRoleId : '';
 
   return (
     <ViewAsContext.Provider value={{
-      viewAsRole: effectiveViewAsRole,
-      setViewAsRole,
+      viewAsRoleId: effectiveRoleId,
+      setViewAsRoleId,
       isViewingAs: isSuperAdmin && isViewingAs,
       isSuperAdmin
     }}>
@@ -59,4 +59,3 @@ export function useViewAs() {
   }
   return context;
 }
-

@@ -152,8 +152,9 @@ export default function DebugPage() {
       
       setUserEmail(authUser.email || '');
       
-      // Check if viewing as another role
-      const viewAsRole = localStorage.getItem('viewAsRole') || 'actual';
+      // Check if viewing as another role (using the new cookie-based approach)
+      const { getViewAsRoleId } = await import('@/lib/utils/view-as-cookie');
+      const viewAsRoleId = getViewAsRoleId();
       
       // SECURITY: Check if user has super admin role
       const { data: profile, error: profileError } = await supabase
@@ -186,7 +187,7 @@ export default function DebugPage() {
       }
       
       // Redirect if viewing as another role (debug must be in actual role mode)
-      if (viewAsRole !== 'actual') {
+      if (viewAsRoleId) {
         toast.error('Debug console only available in Actual Role mode');
         router.push('/dashboard');
         return;
