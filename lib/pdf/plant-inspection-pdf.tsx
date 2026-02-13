@@ -225,6 +225,7 @@ interface PlantInspectionPDFProps {
   plant: {
     plant_id: string;
     nickname: string | null;
+    serial_number: string | null;
     vehicle_categories: { name: string } | null;
   };
   operator: {
@@ -271,6 +272,7 @@ export function PlantInspectionPDF({
               <Text style={styles.value}>
                 {plant.plant_id}
                 {plant.nickname && ` (${plant.nickname})`}
+                {plant.serial_number && ` (SN: ${plant.serial_number})`}
               </Text>
             </View>
             <View style={styles.infoBox}>

@@ -21,6 +21,7 @@ type Vehicle = {
   reg_number: string | null;
   plant_id: string | null;
   nickname: string | null;
+  serial_number: string | null;
   asset_type: 'vehicle' | 'plant' | 'tool';
 };
 
@@ -120,7 +121,7 @@ export function CreateWorkshopTaskDialog({
       // Fetch plant
       const { data: plantData, error: plantError } = await supabase
         .from('plant')
-        .select('id, plant_id, nickname')
+        .select('id, plant_id, nickname, serial_number')
         .eq('status', 'active')
         .order('plant_id');
 

@@ -274,7 +274,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                 <strong>Category Types:</strong>
               </p>
               <ul className="list-disc list-inside mt-1 space-y-1">
-                <li><strong>Date-based</strong> (Tax, MOT, LOLER) - Alert X days before due</li>
+                <li><strong>Date-based</strong> (Tax, MOT, LOLOR / Inspection) - Alert X days before due</li>
                 <li><strong>Mileage-based</strong> (Service, Cambelt) - Alert X miles before due</li>
                 <li><strong>Hours-based</strong> (Plant Service) - Alert X engine hours before due</li>
               </ul>

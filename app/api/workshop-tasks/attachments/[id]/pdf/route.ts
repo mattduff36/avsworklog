@@ -147,12 +147,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     } else if (task?.plant_id) {
       const { data: plant } = await supabase
         .from('plant')
-        .select('plant_id, nickname')
+        .select('plant_id, nickname, serial_number')
         .eq('id', task.plant_id)
         .single();
       if (plant) {
-        const p = plant as { plant_id: string; nickname: string | null };
-        assetName = `${p.plant_id}${p.nickname ? ` (${p.nickname})` : ''}`;
+        const p = plant as { plant_id: string; nickname: string | null; serial_number: string | null };
+        assetName = `${p.plant_id}${p.nickname ? ` (${p.nickname})` : ''}${p.serial_number ? ` (SN: ${p.serial_number})` : ''}`;
         assetType = 'plant';
       }
     }

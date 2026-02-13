@@ -27,6 +27,7 @@ export async function GET(
         plant (
           plant_id,
           nickname,
+          serial_number,
           vehicle_categories(name)
         ),
         profile:profiles!vehicle_inspections_user_id_fkey(full_name)

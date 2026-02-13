@@ -27,6 +27,7 @@ interface PlantInspectionWithDetails {
   plant: {
     plant_id: string;
     nickname: string | null;
+    serial_number: string | null;
     vehicle_categories: {
       name: string;
     } | null;
@@ -79,6 +80,7 @@ export default function ViewPlantInspectionPage() {
           plant (
             plant_id,
             nickname,
+            serial_number,
             vehicle_categories (name)
           ),
           profiles!vehicle_inspections_user_id_fkey (full_name)
@@ -485,7 +487,7 @@ export default function ViewPlantInspectionPage() {
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-foreground">Plant Inspection</h1>
               <p className="text-sm md:text-base text-muted-foreground">
-                {inspection.plant?.plant_id} {inspection.plant?.nickname && `(${inspection.plant.nickname})`} • {
+                {inspection.plant?.plant_id} {inspection.plant?.nickname && `(${inspection.plant.nickname})`} {inspection.plant?.serial_number && `(SN: ${inspection.plant.serial_number})`} • {
                   inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
                     ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
                     : formatDate(inspection.inspection_date)

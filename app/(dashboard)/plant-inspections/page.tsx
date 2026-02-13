@@ -34,6 +34,7 @@ interface InspectionWithPlant extends VehicleInspection {
   plant: {
     plant_id: string;
     nickname: string | null;
+    serial_number: string | null;
     vehicle_categories: { name: string } | null;
   };
 }
@@ -42,6 +43,7 @@ interface Plant {
   id: string;
   plant_id: string;
   nickname: string | null;
+  serial_number: string | null;
   vehicle_categories: { name: string } | null;
 }
 
@@ -123,6 +125,7 @@ function PlantInspectionsContent() {
           id, 
           plant_id,
           nickname,
+          serial_number,
           vehicle_categories (
             name
           )
@@ -148,6 +151,7 @@ function PlantInspectionsContent() {
           plant (
             plant_id,
             nickname,
+            serial_number,
             vehicle_categories (
               name
             )
@@ -470,6 +474,7 @@ function PlantInspectionsContent() {
                       <CardTitle className="text-lg text-white">
                         {inspection.plant?.plant_id || 'Unknown Plant'}
                         {inspection.plant?.nickname && ` - ${inspection.plant.nickname}`}
+                        {inspection.plant?.serial_number && ` (SN: ${inspection.plant.serial_number})`}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
                         {isManager && (inspection as any).profile?.full_name && (

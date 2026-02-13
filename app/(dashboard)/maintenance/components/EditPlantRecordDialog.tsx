@@ -23,6 +23,7 @@ import { createClient } from '@/lib/supabase/client';
 import type { MaintenanceHistoryValueType } from '@/lib/utils/maintenance-history';
 import { safeMaintenanceHistoryFieldName } from '@/lib/utils/maintenance-history';
 import { toast } from 'sonner';
+import { normalizePlantSerialNumber, isValidPlantSerialNumber } from '@/lib/utils/plant-serial-number';
 
 // ============================================================================
 // Types
@@ -32,6 +33,7 @@ type Plant = {
   id: string;
   plant_id: string;
   nickname: string | null;
+  serial_number: string | null;
   loler_due_date: string | null;
   loler_last_inspection_date: string | null;
   loler_certificate_number: string | null;
@@ -56,6 +58,12 @@ type MaintenanceRecord = {
 const editPlantRecordSchema = z.object({
   // Nickname
   nickname: z.string().max(100, 'Nickname must be less than 100 characters').optional().nullable(),
+  // Serial Number
+  serial_number: z.string()
+    .max(100, 'Serial number must be less than 100 characters')
+    .transform(val => val ? normalizePlantSerialNumber(val) : null)
+    .refine(val => !val || isValidPlantSerialNumber(val), 'Serial Number must be alphanumeric (letters and numbers only)')
+    .optional().nullable(),
   // Hours-based fields
   current_hours: z.preprocess(
     (val) => val === '' || val === null || val === undefined ? null : Number(val),
@@ -134,6 +142,7 @@ export function EditPlantRecordDialog({
     if (plant) {
       reset({
         nickname: plant.nickname || '',
+        serial_number: plant.serial_number || '',
         current_hours: maintenanceRecord?.current_hours || plant.current_hours || undefined,
         last_service_hours: maintenanceRecord?.last_service_hours || undefined,
         next_service_hours: maintenanceRecord?.next_service_hours || undefined,
@@ -223,6 +232,35 @@ export function EditPlantRecordDialog({
             field_name: 'nickname',
             old_value: oldNickname,
             new_value: newNickname,
+            value_type: 'text'
+          });
+        }
+      }
+
+      // Update plant serial number if changed
+      const newSerialNumber = data.serial_number?.trim() || null;
+      const oldSerialNumber = plant.serial_number;
+      if (newSerialNumber !== oldSerialNumber) {
+        const { error: serialError } = await supabase
+          .from('plant')
+          .update({ 
+            serial_number: newSerialNumber,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', plant.id);
+
+        if (serialError) {
+          // Check for unique constraint violation
+          if (serialError.message?.toLowerCase().includes('unique') && serialError.message?.toLowerCase().includes('serial')) {
+            throw new Error('This serial number is already in use. Please use a unique serial number.');
+          }
+          console.error('Error updating plant serial number:', serialError);
+          // Continue with other updates even if serial number update fails
+        } else {
+          fieldChanges.push({
+            field_name: 'serial_number',
+            old_value: oldSerialNumber,
+            new_value: newSerialNumber,
             value_type: 'text'
           });
         }
@@ -523,7 +561,7 @@ export function EditPlantRecordDialog({
           <DialogDescription className="text-muted-foreground">
             {isNewRecord 
               ? 'Set up maintenance schedule for this plant machinery. A comment is required to explain the initial setup.' 
-              : 'Update maintenance schedules and LOLER information. A comment is required to explain changes.'
+              : 'Update maintenance schedules and LOLOR / Inspection information. A comment is required to explain changes.'
             }
           </DialogDescription>
         </DialogHeader>
@@ -545,6 +583,25 @@ export function EditPlantRecordDialog({
             </p>
             {errors.nickname && (
               <p className="text-sm text-red-400">{errors.nickname.message}</p>
+            )}
+          </div>
+
+          {/* Serial Number */}
+          <div className="space-y-2">
+            <Label htmlFor="serial_number" className="text-white">
+              Serial Number <span className="text-slate-400 text-xs">(Optional)</span>
+            </Label>
+            <Input
+              id="serial_number"
+              {...register('serial_number')}
+              placeholder="e.g., MANUFACTURERSN123"
+              className="bg-input border-border text-white uppercase"
+            />
+            <p className="text-xs text-muted-foreground">
+              Manufacturer's serial number (alphanumeric only, auto-uppercase)
+            </p>
+            {errors.serial_number && (
+              <p className="text-sm text-red-400">{errors.serial_number.message}</p>
             )}
           </div>
 
@@ -607,16 +664,16 @@ export function EditPlantRecordDialog({
             </div>
           </div>
 
-          {/* LOLER Compliance */}
+          {/* LOLOR / Inspection Compliance */}
           <div className="space-y-4">
             <h3 className="font-semibold text-lg border-b border-slate-700 pb-2">
-              LOLER Compliance
+              LOLOR / Inspection Compliance
             </h3>
             
             <div className="grid md:grid-cols-2 gap-4">
-              {/* LOLER Due Date */}
+              {/* LOLOR / Inspection Due Date */}
               <div className="space-y-2">
-                <Label htmlFor="loler_due_date">LOLER Due Date</Label>
+                <Label htmlFor="loler_due_date">LOLOR / Inspection Due Date</Label>
                 <Input
                   id="loler_due_date"
                   type="date"
@@ -628,7 +685,7 @@ export function EditPlantRecordDialog({
                 )}
               </div>
 
-              {/* LOLER Last Inspection Date */}
+              {/* Last Inspection Date */}
               <div className="space-y-2">
                 <Label htmlFor="loler_last_inspection_date">Last Inspection Date</Label>
                 <Input
@@ -642,7 +699,7 @@ export function EditPlantRecordDialog({
                 )}
               </div>
 
-              {/* LOLER Certificate Number */}
+              {/* Certificate Number */}
               <div className="space-y-2">
                 <Label htmlFor="loler_certificate_number">Certificate Number</Label>
                 <Input
@@ -656,7 +713,7 @@ export function EditPlantRecordDialog({
                 )}
               </div>
 
-              {/* LOLER Inspection Interval */}
+              {/* Inspection Interval */}
               <div className="space-y-2">
                 <Label htmlFor="loler_inspection_interval_months">Inspection Interval (months)</Label>
                 <Input

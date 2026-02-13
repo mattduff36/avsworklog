@@ -40,6 +40,7 @@ type PlantAsset = {
   plant_id: string;
   reg_number: string | null;
   nickname: string | null;
+  serial_number: string | null;
   loler_due_date: string | null;
   current_hours: number | null;
   status: string;
@@ -61,11 +62,12 @@ interface PlantTableProps {
   onVehicleAdded?: () => void;
 }
 
-type SortField = 'plant_id' | 'nickname' | 'category' | 'current_hours' | 'next_service_hours' | 'loler_due';
+type SortField = 'plant_id' | 'nickname' | 'serial_number' | 'category' | 'current_hours' | 'next_service_hours' | 'loler_due';
 type SortDirection = 'asc' | 'desc';
 
 interface ColumnVisibility {
   nickname: boolean;
+  serial_number: boolean;
   category: boolean;
   current_hours: boolean;
   service_due: boolean;
@@ -95,6 +97,7 @@ export function PlantTable({
   // Column visibility defaults - category hidden by default
   const defaultVisibility: ColumnVisibility = {
     nickname: true,
+    serial_number: true,
     category: false,
     current_hours: true,
     service_due: true,
@@ -213,10 +216,12 @@ export function PlantTable({
     const plantId = asset.plant?.plant_id?.toLowerCase() || '';
     const regNumber = asset.plant?.reg_number?.toLowerCase() || '';
     const nickname = asset.plant?.nickname?.toLowerCase() || '';
+    const serialNumber = asset.plant?.serial_number?.toLowerCase() || '';
     
     return plantId.includes(searchLower) || 
            regNumber.includes(searchLower) ||
-           nickname.includes(searchLower);
+           nickname.includes(searchLower) ||
+           serialNumber.includes(searchLower);
   });
 
   // Sort
@@ -229,6 +234,9 @@ export function PlantTable({
       
       case 'nickname':
         return multiplier * (a.plant?.nickname || '').localeCompare(b.plant?.nickname || '');
+      
+      case 'serial_number':
+        return multiplier * (a.plant?.serial_number || '').localeCompare(b.plant?.serial_number || '');
       
       case 'category':
         return multiplier * (a.plant?.vehicle_categories?.name || '').localeCompare(b.plant?.vehicle_categories?.name || '');
@@ -333,7 +341,8 @@ export function PlantTable({
     return (
       (plant.plant_id || '').toLowerCase().includes(q) ||
       (plant.nickname || '').toLowerCase().includes(q) ||
-      (plant.reg_number || '').toLowerCase().includes(q)
+      (plant.reg_number || '').toLowerCase().includes(q) ||
+      (plant.serial_number || '').toLowerCase().includes(q)
     );
   });
 
@@ -415,6 +424,12 @@ export function PlantTable({
                   Nickname
                 </DropdownMenuCheckboxItem>
                 <DropdownMenuCheckboxItem
+                  checked={columnVisibility.serial_number}
+                  onCheckedChange={() => toggleColumn('serial_number')}
+                >
+                  Serial Number
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
                   checked={columnVisibility.category}
                   onCheckedChange={() => toggleColumn('category')}
                 >
@@ -436,7 +451,7 @@ export function PlantTable({
                   checked={columnVisibility.loler_due}
                   onCheckedChange={() => toggleColumn('loler_due')}
                 >
-                  LOLER Due
+                  LOLOR / Inspection Due
                 </DropdownMenuCheckboxItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -463,13 +478,25 @@ export function PlantTable({
                         </div>
                       </TableHead>
                       {columnVisibility.nickname && (
+                      <TableHead 
+                        className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
+                        style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
+                        onClick={() => handleSort('nickname')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Nickname
+                          <ArrowUpDown className="h-3 w-3" />
+                        </div>
+                      </TableHead>
+                      )}
+                      {columnVisibility.serial_number && (
                         <TableHead 
                           className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
                           style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
-                          onClick={() => handleSort('nickname')}
+                          onClick={() => handleSort('serial_number')}
                         >
                           <div className="flex items-center gap-2">
-                            Nickname
+                            Serial Number
                             <ArrowUpDown className="h-3 w-3" />
                           </div>
                         </TableHead>
@@ -517,7 +544,7 @@ export function PlantTable({
                           onClick={() => handleSort('loler_due')}
                         >
                           <div className="flex items-center gap-2">
-                            LOLER Due
+                            LOLOR / Inspection Due
                             <ArrowUpDown className="h-3 w-3" />
                           </div>
                         </TableHead>
@@ -541,6 +568,15 @@ export function PlantTable({
                           <TableCell className="text-muted-foreground">
                             {asset.plant?.nickname || (
                               <span className="text-slate-400 italic">No nickname</span>
+                            )}
+                          </TableCell>
+                        )}
+                        
+                        {/* Serial Number */}
+                        {columnVisibility.serial_number && (
+                          <TableCell className="text-muted-foreground">
+                            {asset.plant?.serial_number || (
+                              <span className="text-slate-400 italic">Not set</span>
                             )}
                           </TableCell>
                         )}
@@ -648,6 +684,12 @@ export function PlantTable({
                         {/* Collapsed View - Essential Info Only */}
                         {!isExpanded && (
                           <div className="text-xs text-slate-400 space-y-0.5">
+                            {asset.plant?.serial_number && (
+                              <div className="flex justify-between">
+                                <span>Serial:</span>
+                                <span className="text-white">{asset.plant.serial_number}</span>
+                              </div>
+                            )}
                             <div className="flex justify-between">
                               <span>Hours:</span>
                               <span className="text-white">
@@ -655,7 +697,7 @@ export function PlantTable({
                               </span>
                             </div>
                             <div className="flex justify-between">
-                              <span>LOLER Due:</span>
+                              <span>LOLOR / Inspection Due:</span>
                               <span className="text-white">{formatMaintenanceDate(asset.plant?.loler_due_date || null)}</span>
                             </div>
                           </div>
@@ -671,6 +713,12 @@ export function PlantTable({
                               <div className="flex items-center justify-between">
                                 <span className="text-sm text-muted-foreground">Registration:</span>
                                 <span className="text-white font-medium">{asset.plant.reg_number}</span>
+                              </div>
+                            )}
+                            {asset.plant?.serial_number && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground">Serial Number:</span>
+                                <span className="text-white font-medium">{asset.plant.serial_number}</span>
                               </div>
                             )}
                             <div className="flex items-center justify-between">
@@ -700,7 +748,7 @@ export function PlantTable({
                               )}
                             </div>
                             <div className="flex items-center justify-between">
-                              <span className="text-sm text-muted-foreground">LOLER Due:</span>
+                              <span className="text-sm text-muted-foreground">LOLOR / Inspection Due:</span>
                               <Badge className={`font-medium ${getStatusColorClass(asset.plant?.loler_due_date ? 'ok' : 'not_set')}`}>
                                 {formatMaintenanceDate(asset.plant?.loler_due_date || null)}
                               </Badge>
@@ -768,6 +816,9 @@ export function PlantTable({
                             Nickname
                           </TableHead>
                           <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
+                            Serial Number
+                          </TableHead>
+                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
                             Category
                           </TableHead>
                           <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
@@ -796,6 +847,13 @@ export function PlantTable({
                             <TableCell className="text-muted-foreground">
                               {plant.nickname || (
                                 <span className="text-slate-400 italic">No nickname</span>
+                              )}
+                            </TableCell>
+
+                            {/* Serial Number */}
+                            <TableCell className="text-muted-foreground">
+                              {plant.serial_number || (
+                                <span className="text-slate-400 italic">Not set</span>
                               )}
                             </TableCell>
 
@@ -908,6 +966,12 @@ export function PlantTable({
 
                           {/* Details */}
                           <div className="space-y-2 text-sm">
+                            {plant.serial_number && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Serial Number:</span>
+                                <span className="text-white">{plant.serial_number}</span>
+                              </div>
+                            )}
                             {plant.vehicle_categories?.name && (
                               <div className="flex justify-between">
                                 <span className="text-muted-foreground">Category:</span>

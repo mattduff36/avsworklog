@@ -39,7 +39,7 @@ export async function GET(
     // Get plant info
     const { data: plant, error: plantError } = await supabase
       .from('plant')
-      .select('id, plant_id, nickname')
+      .select('id, plant_id, nickname, serial_number')
       .eq('id', plantId)
       .single();
     
@@ -141,7 +141,8 @@ export async function GET(
       plant: {
         id: plant.id,
         plant_id: plant.plant_id,
-        nickname: plant.nickname
+        nickname: plant.nickname,
+        serial_number: plant.serial_number
       },
       maintenanceData: maintenanceData || null
     };

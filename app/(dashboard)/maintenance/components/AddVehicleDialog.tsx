@@ -25,6 +25,7 @@ import { Loader2, Plus, Truck, HardHat } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { logger } from '@/lib/utils/logger';
+import { normalizePlantSerialNumber, isValidPlantSerialNumber } from '@/lib/utils/plant-serial-number';
 
 interface AddVehicleDialogProps {
   open: boolean;
@@ -174,6 +175,14 @@ export function AddVehicleDialog({
       return;
     }
 
+    // Validate serial number for plant (if provided)
+    if (assetType === 'plant' && formData.serial_number.trim()) {
+      if (!isValidPlantSerialNumber(formData.serial_number.trim())) {
+        setError('Serial Number must contain only letters and numbers (no spaces or special characters)');
+        return;
+      }
+    }
+
     try {
       setLoading(true);
       
@@ -226,9 +235,15 @@ export function AddVehicleDialog({
         await onSuccess?.(); // ✅ Await async callback before closing dialog
         onOpenChange(false);
       } else {
-        setError(data.error || `Failed to add ${assetType}`);
+        // Handle unique constraint violation for serial number
+        const errorMessage = data.error || `Failed to add ${assetType}`;
+        const isSerialDuplicate = errorMessage.toLowerCase().includes('serial') && errorMessage.toLowerCase().includes('unique');
+        
+        setError(errorMessage);
         toast.error(`Failed to add ${assetType}`, {
-          description: data.error || 'Please try again.',
+          description: isSerialDuplicate 
+            ? 'This serial number is already in use. Please use a unique serial number.'
+            : errorMessage || 'Please try again.',
         });
       }
     } catch (error: any) {
@@ -338,6 +353,27 @@ export function AddVehicleDialog({
                 />
                 <p className="text-xs text-muted-foreground">
                   A friendly name to help identify this plant quickly
+                </p>
+              </div>
+
+              {/* Serial Number */}
+              <div className="space-y-2">
+                <Label htmlFor="plant_serial" className="text-white">
+                  Serial Number <span className="text-slate-400 text-xs">(Optional)</span>
+                </Label>
+                <Input
+                  id="plant_serial"
+                  value={formData.serial_number}
+                  onChange={(e) => {
+                    const normalized = normalizePlantSerialNumber(e.target.value) || '';
+                    setFormData({ ...formData, serial_number: normalized });
+                  }}
+                  placeholder="e.g., MANUFACTURERSN123"
+                  className="bg-input border-border text-white placeholder:text-muted-foreground uppercase"
+                  disabled={loading}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Manufacturer's serial number (alphanumeric only, auto-uppercase)
                 </p>
               </div>
 

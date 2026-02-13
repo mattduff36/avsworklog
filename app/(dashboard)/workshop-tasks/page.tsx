@@ -354,7 +354,7 @@ export default function WorkshopTasksPage() {
       // Fetch plant
       const { data: plantData, error: plantError } = await supabase
         .from('plant')
-        .select('id, plant_id, nickname')
+        .select('id, plant_id, nickname, serial_number')
         .eq('status', 'active')
         .order('plant_id');
 

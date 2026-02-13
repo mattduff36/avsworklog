@@ -31,7 +31,7 @@ const ALERT_TO_CATEGORY_NAME: Record<string, string> = {
   'Service': 'service due',
   'Cambelt': 'cambelt replacement',
   'First Aid Kit': 'first aid kit expiry',
-  'LOLER': 'loler due',
+  'LOLER': 'lolor / inspection due',
 };
 
 interface MaintenanceOverviewProps {

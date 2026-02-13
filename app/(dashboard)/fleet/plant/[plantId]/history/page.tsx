@@ -379,13 +379,14 @@ export default function PlantHistoryPage({
   const getFieldLabel = (fieldName: string): string => {
     const labels: Record<string, string> = {
       nickname: 'Nickname',
+      serial_number: 'Serial Number',
       current_hours: 'Current Hours',
       last_service_hours: 'Last Service Hours',
       next_service_hours: 'Next Service Hours',
-      loler_due_date: 'LOLER Due Date',
-      loler_last_inspection_date: 'LOLER Last Inspection',
-      loler_certificate_number: 'LOLER Certificate',
-      loler_inspection_interval_months: 'LOLER Interval',
+      loler_due_date: 'LOLOR / Inspection Due Date',
+      loler_last_inspection_date: 'LOLOR / Inspection Last Inspection',
+      loler_certificate_number: 'LOLOR / Inspection Certificate',
+      loler_inspection_interval_months: 'LOLOR / Inspection Interval',
       tracker_id: 'GPS Tracker',
       no_changes: 'Update (No Field Changes)',
     };
@@ -559,9 +560,9 @@ export default function PlantHistoryPage({
                     </p>
                   </div>
 
-                  {/* LOLER Due Date */}
+                  {/* LOLOR / Inspection Due Date */}
                   <div className="space-y-1">
-                    <span className="text-xs text-slate-400 uppercase tracking-wide">LOLER Due</span>
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">LOLOR / Inspection Due</span>
                     <p className="text-lg font-semibold text-white">
                       {formatMaintenanceDate(plant?.loler_due_date)}
                     </p>
