@@ -141,7 +141,7 @@ export function AssetLocationMapModal({
 
       const map = new maptilersdk.Map({
         container: mapContainerRef.current,
-        style: maptilersdk.MapStyle.STREETS.DARK,
+        style: '019c5e68-f020-7497-955c-16a05a3779b3',
         center: [location.lng, location.lat],
         zoom: 15,
         interactive: true,
