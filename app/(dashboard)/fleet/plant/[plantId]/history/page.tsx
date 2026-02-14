@@ -34,6 +34,10 @@ const EditPlantRecordDialog = dynamic(() => import('@/app/(dashboard)/maintenanc
 const DeletePlantDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/DeletePlantDialog').then(m => ({ default: m.DeletePlantDialog })), { ssr: false });
 const WorkshopTaskHistoryCard = dynamic(() => import('@/components/workshop-tasks/WorkshopTaskHistoryCard').then(m => ({ default: m.WorkshopTaskHistoryCard })), { ssr: false });
 
+// Dynamic imports for map components
+const AssetLocationMap = dynamic(() => import('@/components/fleet/AssetLocationMap').then(m => ({ default: m.AssetLocationMap })), { ssr: false });
+const AssetLocationMapModal = dynamic(() => import('@/components/fleet/AssetLocationMapModal').then(m => ({ default: m.AssetLocationMapModal })), { ssr: false });
+
 type Plant = {
   id: string;
   plant_id: string;
@@ -315,6 +319,12 @@ export default function PlantHistoryPage({
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [showWorkshopTasks, setShowWorkshopTasks] = useState(true);
   const [showRecordUpdates, setShowRecordUpdates] = useState(true);
+  const [hasMapMatch, setHasMapMatch] = useState(false);
+  const [mapModalOpen, setMapModalOpen] = useState(false);
+  const [mapLocationData, setMapLocationData] = useState<{
+    lat: number; lng: number; speed: number; heading: number;
+    updatedAt: string; name: string; vrn: string; vehicleId: string;
+  } | null>(null);
 
   // Use the plant history hook
   const { data: historyData, refetch: refetchHistory } = usePlantMaintenanceHistory(unwrappedParams.plantId);
@@ -443,66 +453,86 @@ export default function PlantHistoryPage({
       {plant && (
         <Card className="bg-gradient-to-r from-amber-900/20 to-amber-800/10 border-amber-700/30">
           <CardContent className="pt-6">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
-              {/* Registration (if exists) */}
-              {plant.reg_number && (
-                <div>
-                  <span className="text-muted-foreground">Registration:</span>
-                  <span className="ml-2 text-white font-medium">{plant.reg_number}</span>
-                </div>
-              )}
-              
-              {/* Serial Number */}
-              {plant.serial_number && (
-                <div>
-                  <span className="text-muted-foreground">Serial Number:</span>
-                  <span className="ml-2 text-white font-medium">{plant.serial_number}</span>
-                </div>
-              )}
-              
-              {/* Year */}
-              {plant.year && (
-                <div>
-                  <span className="text-muted-foreground">Year:</span>
-                  <span className="ml-2 text-white font-medium">{plant.year}</span>
-                </div>
-              )}
-              
-              {/* Weight Class */}
-              {plant.weight_class && (
-                <div>
-                  <span className="text-muted-foreground">Weight Class:</span>
-                  <span className="ml-2 text-white font-medium">{plant.weight_class}</span>
-                </div>
-              )}
-              
-              {/* Category */}
-              {plant.vehicle_categories?.name && (
-                <div>
-                  <span className="text-muted-foreground">Category:</span>
-                  <span className="ml-2 text-white font-medium">{plant.vehicle_categories.name}</span>
-                </div>
-              )}
-              
-              {/* Make */}
-              {plant.make && (
-                <div>
-                  <span className="text-muted-foreground">Make:</span>
-                  <span className="ml-2 text-white font-medium">{plant.make}</span>
-                </div>
-              )}
-              
-              {/* Model */}
-              {plant.model && (
-                <div>
-                  <span className="text-muted-foreground">Model:</span>
-                  <span className="ml-2 text-white font-medium">{plant.model}</span>
-                </div>
-              )}
+            <div className={`grid gap-4 ${hasMapMatch ? 'grid-cols-1 md:grid-cols-[1fr_280px]' : 'grid-cols-1'}`}>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
+                {/* Registration (if exists) */}
+                {plant.reg_number && (
+                  <div>
+                    <span className="text-muted-foreground">Registration:</span>
+                    <span className="ml-2 text-white font-medium">{plant.reg_number}</span>
+                  </div>
+                )}
+                
+                {/* Serial Number */}
+                {plant.serial_number && (
+                  <div>
+                    <span className="text-muted-foreground">Serial Number:</span>
+                    <span className="ml-2 text-white font-medium">{plant.serial_number}</span>
+                  </div>
+                )}
+                
+                {/* Year */}
+                {plant.year && (
+                  <div>
+                    <span className="text-muted-foreground">Year:</span>
+                    <span className="ml-2 text-white font-medium">{plant.year}</span>
+                  </div>
+                )}
+                
+                {/* Weight Class */}
+                {plant.weight_class && (
+                  <div>
+                    <span className="text-muted-foreground">Weight Class:</span>
+                    <span className="ml-2 text-white font-medium">{plant.weight_class}</span>
+                  </div>
+                )}
+                
+                {/* Category */}
+                {plant.vehicle_categories?.name && (
+                  <div>
+                    <span className="text-muted-foreground">Category:</span>
+                    <span className="ml-2 text-white font-medium">{plant.vehicle_categories.name}</span>
+                  </div>
+                )}
+                
+                {/* Make */}
+                {plant.make && (
+                  <div>
+                    <span className="text-muted-foreground">Make:</span>
+                    <span className="ml-2 text-white font-medium">{plant.make}</span>
+                  </div>
+                )}
+                
+                {/* Model */}
+                {plant.model && (
+                  <div>
+                    <span className="text-muted-foreground">Model:</span>
+                    <span className="ml-2 text-white font-medium">{plant.model}</span>
+                  </div>
+                )}
+              </div>
+              {/* Map */}
+              <AssetLocationMap
+                plantId={plant.plant_id}
+                regNumber={plant.reg_number ?? undefined}
+                assetLabel={plant.plant_id || 'Unknown'}
+                className="h-[180px]"
+                onMatchResult={setHasMapMatch}
+                onLocationData={setMapLocationData}
+                onClick={() => setMapModalOpen(true)}
+              />
             </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Map Modal */}
+      <AssetLocationMapModal
+        open={mapModalOpen}
+        onOpenChange={setMapModalOpen}
+        assetLabel={plant?.plant_id || 'Unknown'}
+        location={mapLocationData}
+      />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
