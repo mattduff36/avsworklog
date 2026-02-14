@@ -86,7 +86,10 @@ export function AssetLocationMapModal({
           return;
         }
         const data = await res.json();
-        console.log('[MapModal] Fetched vehicles count:', data.count, 'array length:', data.vehicles?.length);
+        console.log('[MapModal] Fetched vehicles count:', data.count, 'totalVehicles:', data.totalVehicles, 'array length:', data.vehicles?.length);
+        if (data.vehicles?.length > 0) {
+          console.log('[MapModal] Sample vehicle:', JSON.stringify(data.vehicles[0]));
+        }
         if (!cancelled) {
           setOtherVehicles(data.vehicles ?? []);
           setFetchDone(true);

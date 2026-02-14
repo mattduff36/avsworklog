@@ -12,22 +12,6 @@ interface FleetVehicle {
   [key: string]: unknown;
 }
 
-/**
- * Flat JSON format from /api/vehicle_locations.json
- * Fields are top-level (no `attributes` nesting).
- */
-interface FlatLocationEntry {
-  id: number | string;
-  vehicle_id: number | string;
-  latitude: string | number;
-  longitude: string | number;
-  speed: number;
-  heading: number;
-  date_time: string;
-  address?: string;
-  [key: string]: unknown;
-}
-
 interface VehicleWithLocation {
   vehicleId: string;
   name: string;
@@ -121,8 +105,40 @@ async function fetchVehicles(): Promise<FleetVehicle[]> {
 }
 
 /**
- * Fetch latest locations for ALL vehicles using the FLAT .json format.
- * This avoids JSON:API relationship issues and gives us direct vehicle_id access.
+ * Try to extract vehicle_id from a JSON:API resource.
+ * Checks: attributes.vehicle_id, relationships.vehicle.data.id
+ */
+function extractVehicleId(resource: Record<string, unknown>): string | null {
+  // 1. Try attributes.vehicle_id
+  const attrs = resource.attributes as Record<string, unknown> | undefined;
+  if (attrs?.vehicle_id != null) {
+    return String(attrs.vehicle_id);
+  }
+
+  // 2. Try relationships.vehicle.data.id (JSON:API standard)
+  const rels = resource.relationships as Record<string, unknown> | undefined;
+  if (rels?.vehicle) {
+    const vehicleRel = rels.vehicle as Record<string, unknown>;
+    const data = vehicleRel.data as Record<string, unknown> | undefined;
+    if (data?.id != null) {
+      return String(data.id);
+    }
+  }
+
+  // 3. Try top-level vehicle_id (flat format mixed in)
+  if ((resource as Record<string, unknown>).vehicle_id != null) {
+    return String((resource as Record<string, unknown>).vehicle_id);
+  }
+
+  return null;
+}
+
+/**
+ * Fetch latest locations for ALL vehicles.
+ * Strategy:
+ * 1. Try JSON:API format with large page size (multiple pages if needed)
+ * 2. Extract vehicle_id from attributes or relationships
+ * 3. Deduplicate to latest per vehicle
  */
 async function fetchAllLatestLocations(
   vehicles: FleetVehicle[]
@@ -131,53 +147,100 @@ async function fetchAllLatestLocations(
     return cache.allLocations;
   }
 
-  // Use the .json flat format (not JSON:API) — same pattern as vehicles endpoint
-  const url = `${BASE}/api/vehicle_locations.json?page%5Bsize%5D=500`;
-  const res = await fetchWithRetry(url, {
-    headers: fleetsmartHeaders(),
-    cache: 'no-store',
-  });
-
-  if (!res.ok) throw new Error(`FleetSmart all-locations: ${res.status}`);
-
-  const json = await res.json();
-
-  // .json format can be a plain array OR { data: [...] }
-  const entries: FlatLocationEntry[] = Array.isArray(json) ? json : (json.data ?? []);
-
-  console.log(`[FleetSmart All-Locations] Fetched ${entries.length} location entries`);
-
-  if (entries.length > 0) {
-    // Log first entry's keys for debugging
-    console.log('[FleetSmart All-Locations] Sample entry keys:', Object.keys(entries[0]));
-  }
-
-  // Build vehicle lookup by id
   const vehicleMap = new Map<string, FleetVehicle>();
   for (const v of vehicles) {
     vehicleMap.set(String(v.id), v);
   }
 
-  // Deduplicate: keep only the latest entry per vehicle_id
-  // Entries are in default order (may not be sorted), so track by date_time
-  const latestByVehicle = new Map<string, FlatLocationEntry>();
+  // Collect all raw entries across pages
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allEntries: Record<string, any>[] = [];
+  let page = 1;
+  const maxPages = 5; // safety limit
 
-  for (const entry of entries) {
-    const vid = String(entry.vehicle_id);
-    if (!vid || vid === 'undefined' || vid === 'null') continue;
+  while (page <= maxPages) {
+    const url = `${BASE}/api/vehicle_locations?sort=-date_time&page%5Bnumber%5D=${page}&page%5Bsize%5D=200`;
+    const res = await fetchWithRetry(url, {
+      headers: fleetsmartHeaders(),
+      cache: 'no-store',
+    });
+
+    if (!res.ok) {
+      console.error(`[FleetSmart All-Locations] Page ${page} failed: ${res.status}`);
+      break;
+    }
+
+    const json = await res.json();
+
+    // Log raw structure on first page for debugging
+    if (page === 1) {
+      const dataArr = json.data ?? [];
+      console.log(`[FleetSmart All-Locations] Page 1: ${dataArr.length} entries`);
+      if (dataArr.length > 0) {
+        const sample = dataArr[0];
+        console.log('[FleetSmart All-Locations] Sample entry keys:', Object.keys(sample));
+        if (sample.attributes) {
+          console.log('[FleetSmart All-Locations] Sample attributes keys:', Object.keys(sample.attributes));
+        }
+        if (sample.relationships) {
+          console.log('[FleetSmart All-Locations] Sample relationships keys:', Object.keys(sample.relationships));
+        }
+      }
+      // Log meta/links for pagination info
+      if (json.meta) {
+        console.log('[FleetSmart All-Locations] Meta:', JSON.stringify(json.meta));
+      }
+      if (json.links) {
+        console.log('[FleetSmart All-Locations] Links:', JSON.stringify(json.links));
+      }
+    }
+
+    const entries = json.data ?? [];
+    if (entries.length === 0) break;
+
+    allEntries.push(...entries);
+
+    // Check if there are more pages
+    const hasNextPage = json.links?.next != null;
+    if (!hasNextPage || entries.length < 200) break;
+
+    page++;
+  }
+
+  console.log(`[FleetSmart All-Locations] Total raw entries across ${page} page(s): ${allEntries.length}`);
+
+  // Deduplicate: keep latest per vehicle_id
+  const latestByVehicle = new Map<string, { entry: Record<string, unknown>; dateTime: string }>();
+
+  let unknownVidCount = 0;
+
+  for (const entry of allEntries) {
+    const vid = extractVehicleId(entry);
+    if (!vid) {
+      unknownVidCount++;
+      continue;
+    }
+
+    const attrs = (entry.attributes ?? entry) as Record<string, unknown>;
+    const dateTime = String(attrs.date_time ?? attrs.dateTime ?? '');
 
     const existing = latestByVehicle.get(vid);
-    if (!existing || (entry.date_time > existing.date_time)) {
-      latestByVehicle.set(vid, entry);
+    if (!existing || dateTime > existing.dateTime) {
+      latestByVehicle.set(vid, { entry, dateTime });
     }
+  }
+
+  if (unknownVidCount > 0) {
+    console.warn(`[FleetSmart All-Locations] ${unknownVidCount} entries had no extractable vehicle_id`);
   }
 
   const results: VehicleWithLocation[] = [];
 
-  for (const [vid, entry] of latestByVehicle) {
-    const lat = typeof entry.latitude === 'number' ? entry.latitude : parseFloat(String(entry.latitude));
-    const lng = typeof entry.longitude === 'number' ? entry.longitude : parseFloat(String(entry.longitude));
+  for (const [vid, { entry }] of latestByVehicle) {
+    const attrs = (entry.attributes ?? entry) as Record<string, unknown>;
 
+    const lat = parseFloat(String(attrs.latitude ?? ''));
+    const lng = parseFloat(String(attrs.longitude ?? ''));
     if (isNaN(lat) || isNaN(lng)) continue;
 
     const vehicle = vehicleMap.get(vid);
@@ -188,9 +251,9 @@ async function fetchAllLatestLocations(
       vrn: vehicle?.vrn ?? '',
       lat,
       lng,
-      speed: entry.speed ?? 0,
-      heading: entry.heading ?? 0,
-      updatedAt: entry.date_time,
+      speed: Number(attrs.speed ?? 0),
+      heading: Number(attrs.heading ?? 0),
+      updatedAt: String(attrs.date_time ?? attrs.dateTime ?? ''),
     });
   }
 
@@ -214,7 +277,11 @@ export async function GET() {
     const vehicles = await fetchVehicles();
     const allLocations = await fetchAllLatestLocations(vehicles);
 
-    return NextResponse.json({ vehicles: allLocations, count: allLocations.length });
+    return NextResponse.json({
+      vehicles: allLocations,
+      count: allLocations.length,
+      totalVehicles: vehicles.length,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
 
