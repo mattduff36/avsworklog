@@ -12,13 +12,20 @@ interface FleetVehicle {
   [key: string]: unknown;
 }
 
-interface FleetLocation {
-  latitude: number;
-  longitude: number;
+interface FleetLocationAttributes {
+  latitude: string;
+  longitude: string;
   speed: number;
   heading: number;
-  timestamp: string;
+  date_time: string;
+  address: string;
   [key: string]: unknown;
+}
+
+interface FleetLocationResource {
+  id: string;
+  type: string;
+  attributes: FleetLocationAttributes;
 }
 
 interface LocationResult {
@@ -123,7 +130,7 @@ async function fetchVehicles(): Promise<FleetVehicle[]> {
     return cache.vehicles;
   }
 
-  const url = `${BASE}/api/vehicles.json`;
+  const url = `${BASE}/api/vehicles.json?page%5Bsize%5D=200`;
   const res = await fetchWithRetry(url, {
     headers: fleetsmartHeaders(),
     cache: 'no-store',
@@ -149,7 +156,8 @@ async function fetchLatestLocation(
     return cached.data;
   }
 
-  const url = `${BASE}/api/vehicle_locations.json?filter[vehicle_id]=${vehicleId}&sort=-timestamp&page[size]=1`;
+  // Use JSON:API format (not .json) for sorting/pagination support
+  const url = `${BASE}/api/vehicle_locations?filter%5Bvehicle_id%5D=${vehicleId}&sort=-date_time&page%5Bsize%5D=1`;
   const res = await fetchWithRetry(url, {
     headers: fleetsmartHeaders(),
     cache: 'no-store',
@@ -160,16 +168,16 @@ async function fetchLatestLocation(
   }
 
   const json = await res.json();
-  const locations: FleetLocation[] = json.data ?? json ?? [];
-  if (locations.length === 0) return null;
+  const resources: FleetLocationResource[] = json.data ?? [];
+  if (resources.length === 0) return null;
 
-  const loc = locations[0];
+  const attrs = resources[0].attributes;
   const result: LocationResult = {
-    lat: loc.latitude,
-    lng: loc.longitude,
-    speed: loc.speed,
-    heading: loc.heading,
-    updatedAt: loc.timestamp,
+    lat: parseFloat(attrs.latitude),
+    lng: parseFloat(attrs.longitude),
+    speed: attrs.speed ?? 0,
+    heading: attrs.heading ?? 0,
+    updatedAt: attrs.date_time,
   };
 
   cache.locationCache.set(vehicleId, { data: result, cachedAt: Date.now() });
