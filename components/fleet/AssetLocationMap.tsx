@@ -100,6 +100,10 @@ export function AssetLocationMap({
           setHasMatch(true);
           onMatchResultRef.current?.(true);
           onLocationDataRef.current?.(loc);
+
+          // Pre-warm the all-locations cache in the background so the
+          // modal map has data ready when the user clicks to expand.
+          fetch('/api/fleetsmart/all-locations').catch(() => {});
         } else {
           setHasMatch(false);
           onMatchResultRef.current?.(false);

@@ -67,7 +67,9 @@ export function AssetLocationMapModal({
   const [otherVehicles, setOtherVehicles] = useState<OtherVehicle[]>([]);
   const [fetchDone, setFetchDone] = useState(false);
 
-  // Fetch all vehicle locations when modal opens
+  // Fetch all vehicle locations when modal opens.
+  // The server fetches per-vehicle locations in the background.
+  // We poll until the server reports loading=false (all fetched).
   useEffect(() => {
     if (!open) {
       setFetchDone(false);
@@ -76,32 +78,41 @@ export function AssetLocationMapModal({
     }
 
     let cancelled = false;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function fetchAll() {
       try {
         const res = await fetch('/api/fleetsmart/all-locations');
         if (!res.ok) {
-          console.warn('[MapModal] all-locations fetch failed:', res.status);
           if (!cancelled) setFetchDone(true);
           return;
         }
         const data = await res.json();
-        console.log('[MapModal] Fetched vehicles count:', data.count, 'totalVehicles:', data.totalVehicles, 'array length:', data.vehicles?.length);
-        if (data.vehicles?.length > 0) {
-          console.log('[MapModal] Sample vehicle:', JSON.stringify(data.vehicles[0]));
-        }
-        if (!cancelled) {
-          setOtherVehicles(data.vehicles ?? []);
+        if (cancelled) return;
+
+        const vehicles = data.vehicles ?? [];
+        setOtherVehicles(vehicles);
+
+        // If the server is still loading (background fetch in progress),
+        // poll every 5 seconds to get updated data
+        if (data.loading && !data.cached) {
+          pollTimer = setTimeout(fetchAll, 5_000);
+        } else {
           setFetchDone(true);
         }
-      } catch (err) {
-        console.warn('[MapModal] all-locations fetch error:', err);
+      } catch {
         if (!cancelled) setFetchDone(true);
       }
     }
 
+    // Start immediately — even partial data is useful
+    setFetchDone(true); // allow map to render with whatever we have
     fetchAll();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+      if (pollTimer) clearTimeout(pollTimer);
+    };
   }, [open]);
 
   // Initialize map ONLY after fetch is done (or at least attempted)
