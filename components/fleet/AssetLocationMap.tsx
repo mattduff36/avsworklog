@@ -85,10 +85,12 @@ export function AssetLocationMap({
           return;
         }
 
-        if (data.lat && data.lng) {
+        const lat = typeof data.lat === 'number' ? data.lat : parseFloat(data.lat);
+        const lng = typeof data.lng === 'number' ? data.lng : parseFloat(data.lng);
+        if (!isNaN(lat) && !isNaN(lng)) {
           const loc: LocationData = {
-            lat: data.lat,
-            lng: data.lng,
+            lat,
+            lng,
             speed: data.speed,
             heading: data.heading,
             updatedAt: data.updatedAt,
