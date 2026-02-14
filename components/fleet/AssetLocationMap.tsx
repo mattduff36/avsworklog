@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MapPin } from 'lucide-react';
 import * as maptilersdk from '@maptiler/sdk';
@@ -42,66 +42,85 @@ export function AssetLocationMap({
   const [locationData, setLocationData] = useState<LocationData | null>(null);
   const [hasMatch, setHasMatch] = useState<boolean | null>(null);
 
-  const fetchLocation = useCallback(async () => {
+  // Stable refs for callbacks to avoid re-triggering the fetch
+  const onMatchResultRef = useRef(onMatchResult);
+  const onLocationDataRef = useRef(onLocationData);
+  useEffect(() => { onMatchResultRef.current = onMatchResult; }, [onMatchResult]);
+  useEffect(() => { onLocationDataRef.current = onLocationData; }, [onLocationData]);
+
+  useEffect(() => {
     if (!plantId && !regNumber) {
       setHasMatch(false);
-      onMatchResult?.(false);
+      onMatchResultRef.current?.(false);
       setLoading(false);
       return;
     }
 
-    try {
-      const params = new URLSearchParams();
-      if (plantId) params.set('plantId', plantId);
-      if (regNumber) params.set('regNumber', regNumber);
+    let cancelled = false;
 
-      const res = await fetch(`/api/fleetsmart/location?${params.toString()}`);
-      const data = await res.json();
+    async function fetchLocation() {
+      try {
+        const params = new URLSearchParams();
+        if (plantId) params.set('plantId', plantId);
+        if (regNumber) params.set('regNumber', regNumber);
 
-      if (data.error === 'not_found' || data.error === 'missing_credentials') {
-        setHasMatch(false);
-        onMatchResult?.(false);
-        setLoading(false);
-        return;
+        const res = await fetch(`/api/fleetsmart/location?${params.toString()}`);
+
+        if (!res.ok) {
+          // Auth error, rate limit, or server error
+          if (!cancelled) {
+            setHasMatch(false);
+            onMatchResultRef.current?.(false);
+            setLoading(false);
+          }
+          return;
+        }
+
+        const data = await res.json();
+        if (cancelled) return;
+
+        if (data.error) {
+          setHasMatch(false);
+          onMatchResultRef.current?.(false);
+          setLoading(false);
+          return;
+        }
+
+        if (data.lat && data.lng) {
+          const loc: LocationData = {
+            lat: data.lat,
+            lng: data.lng,
+            speed: data.speed,
+            heading: data.heading,
+            updatedAt: data.updatedAt,
+            name: data.name,
+            vrn: data.vrn,
+            vehicleId: data.vehicleId,
+          };
+          setLocationData(loc);
+          setHasMatch(true);
+          onMatchResultRef.current?.(true);
+          onLocationDataRef.current?.(loc);
+        } else {
+          setHasMatch(false);
+          onMatchResultRef.current?.(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setHasMatch(false);
+          onMatchResultRef.current?.(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-
-      if (data.error === 'no_location') {
-        setHasMatch(false);
-        onMatchResult?.(false);
-        setLoading(false);
-        return;
-      }
-
-      if (data.lat && data.lng) {
-        const loc: LocationData = {
-          lat: data.lat,
-          lng: data.lng,
-          speed: data.speed,
-          heading: data.heading,
-          updatedAt: data.updatedAt,
-          name: data.name,
-          vrn: data.vrn,
-          vehicleId: data.vehicleId,
-        };
-        setLocationData(loc);
-        setHasMatch(true);
-        onMatchResult?.(true);
-        onLocationData?.(loc);
-      } else {
-        setHasMatch(false);
-        onMatchResult?.(false);
-      }
-    } catch {
-      setHasMatch(false);
-      onMatchResult?.(false);
-    } finally {
-      setLoading(false);
     }
-  }, [plantId, regNumber, onMatchResult, onLocationData]);
 
-  useEffect(() => {
     fetchLocation();
-  }, [fetchLocation]);
+
+    return () => { cancelled = true; };
+  }, [plantId, regNumber]);
 
   // Initialise map once we have location
   useEffect(() => {
