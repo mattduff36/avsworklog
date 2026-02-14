@@ -12,21 +12,20 @@ interface FleetVehicle {
   [key: string]: unknown;
 }
 
-interface FleetLocationAttributes {
-  latitude: string;
-  longitude: string;
+/**
+ * Flat JSON format from /api/vehicle_locations.json
+ * Fields are top-level (no `attributes` nesting).
+ */
+interface FlatLocationEntry {
+  id: number | string;
+  vehicle_id: number | string;
+  latitude: string | number;
+  longitude: string | number;
   speed: number;
   heading: number;
   date_time: string;
-  address: string;
-  vehicle_id: number;
+  address?: string;
   [key: string]: unknown;
-}
-
-interface FleetLocationResource {
-  id: string;
-  type: string;
-  attributes: FleetLocationAttributes;
 }
 
 interface VehicleWithLocation {
@@ -61,8 +60,8 @@ if (!g.__fleetsmartAllLocCache) {
 }
 const cache = g.__fleetsmartAllLocCache;
 
-const VEHICLES_TTL_MS = 60_000; // cache vehicle list for 60 s
-const ALL_LOC_TTL_MS = 60_000;  // cache all locations for 60 s
+const VEHICLES_TTL_MS = 60_000;
+const ALL_LOC_TTL_MS = 60_000;
 const MIN_INTERVAL_MS = 2_000;
 
 /* ---------- helpers ---------- */
@@ -122,20 +121,18 @@ async function fetchVehicles(): Promise<FleetVehicle[]> {
 }
 
 /**
- * Fetch latest locations for ALL vehicles in bulk.
- * Strategy: fetch the most recent 500 location entries (no vehicle_id filter),
- * then deduplicate to keep only the latest per vehicle.
+ * Fetch latest locations for ALL vehicles using the FLAT .json format.
+ * This avoids JSON:API relationship issues and gives us direct vehicle_id access.
  */
 async function fetchAllLatestLocations(
   vehicles: FleetVehicle[]
 ): Promise<VehicleWithLocation[]> {
-  // Return from cache if still fresh
   if (cache.allLocations && Date.now() - cache.allLocationsCachedAt < ALL_LOC_TTL_MS) {
     return cache.allLocations;
   }
 
-  // Fetch a large batch of recent locations across all vehicles
-  const url = `${BASE}/api/vehicle_locations?sort=-date_time&page%5Bsize%5D=500`;
+  // Use the .json flat format (not JSON:API) — same pattern as vehicles endpoint
+  const url = `${BASE}/api/vehicle_locations.json?page%5Bsize%5D=500`;
   const res = await fetchWithRetry(url, {
     headers: fleetsmartHeaders(),
     cache: 'no-store',
@@ -144,7 +141,16 @@ async function fetchAllLatestLocations(
   if (!res.ok) throw new Error(`FleetSmart all-locations: ${res.status}`);
 
   const json = await res.json();
-  const resources: FleetLocationResource[] = json.data ?? [];
+
+  // .json format can be a plain array OR { data: [...] }
+  const entries: FlatLocationEntry[] = Array.isArray(json) ? json : (json.data ?? []);
+
+  console.log(`[FleetSmart All-Locations] Fetched ${entries.length} location entries`);
+
+  if (entries.length > 0) {
+    // Log first entry's keys for debugging
+    console.log('[FleetSmart All-Locations] Sample entry keys:', Object.keys(entries[0]));
+  }
 
   // Build vehicle lookup by id
   const vehicleMap = new Map<string, FleetVehicle>();
@@ -152,20 +158,29 @@ async function fetchAllLatestLocations(
     vehicleMap.set(String(v.id), v);
   }
 
-  // Deduplicate: keep the first (most recent due to sort) entry per vehicle_id
-  const seen = new Set<string>();
+  // Deduplicate: keep only the latest entry per vehicle_id
+  // Entries are in default order (may not be sorted), so track by date_time
+  const latestByVehicle = new Map<string, FlatLocationEntry>();
+
+  for (const entry of entries) {
+    const vid = String(entry.vehicle_id);
+    if (!vid || vid === 'undefined' || vid === 'null') continue;
+
+    const existing = latestByVehicle.get(vid);
+    if (!existing || (entry.date_time > existing.date_time)) {
+      latestByVehicle.set(vid, entry);
+    }
+  }
+
   const results: VehicleWithLocation[] = [];
 
-  for (const r of resources) {
-    const vid = String(r.attributes.vehicle_id);
-    if (seen.has(vid)) continue;
-    seen.add(vid);
-
-    const vehicle = vehicleMap.get(vid);
-    const lat = parseFloat(r.attributes.latitude);
-    const lng = parseFloat(r.attributes.longitude);
+  for (const [vid, entry] of latestByVehicle) {
+    const lat = typeof entry.latitude === 'number' ? entry.latitude : parseFloat(String(entry.latitude));
+    const lng = typeof entry.longitude === 'number' ? entry.longitude : parseFloat(String(entry.longitude));
 
     if (isNaN(lat) || isNaN(lng)) continue;
+
+    const vehicle = vehicleMap.get(vid);
 
     results.push({
       vehicleId: vid,
@@ -173,11 +188,13 @@ async function fetchAllLatestLocations(
       vrn: vehicle?.vrn ?? '',
       lat,
       lng,
-      speed: r.attributes.speed ?? 0,
-      heading: r.attributes.heading ?? 0,
-      updatedAt: r.attributes.date_time,
+      speed: entry.speed ?? 0,
+      heading: entry.heading ?? 0,
+      updatedAt: entry.date_time,
     });
   }
+
+  console.log(`[FleetSmart All-Locations] Resolved ${results.length} unique vehicle locations`);
 
   cache.allLocations = results;
   cache.allLocationsCachedAt = Date.now();
@@ -197,7 +214,7 @@ export async function GET() {
     const vehicles = await fetchVehicles();
     const allLocations = await fetchAllLatestLocations(vehicles);
 
-    return NextResponse.json({ vehicles: allLocations });
+    return NextResponse.json({ vehicles: allLocations, count: allLocations.length });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
 
@@ -208,7 +225,7 @@ export async function GET() {
       );
     }
 
-    console.error('[FleetSmart All-Locations]', message);
+    console.error('[FleetSmart All-Locations] Error:', message);
     return NextResponse.json(
       { error: 'server_error', message: 'Failed to fetch all vehicle locations' },
       { status: 500 }
