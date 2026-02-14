@@ -96,7 +96,7 @@ export function AssetLocationMapModal({
         // If the server is still loading (background fetch in progress),
         // poll every 5 seconds to get updated data
         if (data.loading && !data.cached) {
-          pollTimer = setTimeout(fetchAll, 5_000);
+          pollTimer = setTimeout(fetchAll, 30_000);
         } else {
           setFetchDone(true);
         }
