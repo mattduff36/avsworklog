@@ -3,6 +3,12 @@ import { createClient } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { GetNotificationsResponse, NotificationItem } from '@/types/messages';
 
+function normalizeError(error: unknown): Error {
+  if (error instanceof Error) return error;
+  if (typeof error === 'string') return new Error(error);
+  return new Error('Unknown error');
+}
+
 /**
  * GET /api/messages/notifications
  * Fetch notification inbox for current user (last 60 days, not cleared)
@@ -55,7 +61,7 @@ export async function GET() {
 
     if (fetchError) {
       console.error('Error fetching notifications:', fetchError);
-      throw fetchError;
+      throw new Error(fetchError.message || 'Failed to fetch notifications');
     }
 
     // Transform to NotificationItem format
@@ -86,17 +92,22 @@ export async function GET() {
     return NextResponse.json(response);
 
   } catch (error) {
-    console.error('Error in GET /api/messages/notifications:', error);
+    const normalizedError = normalizeError(error);
+    console.error('Error in GET /api/messages/notifications:', normalizedError);
 
-    await logServerError({
-      error: error as Error,
-      componentName: '/api/messages/notifications',
-      additionalData: {
-        endpoint: '/api/messages/notifications',
-      },
-    });
+    try {
+      await logServerError({
+        error: normalizedError,
+        componentName: '/api/messages/notifications',
+        additionalData: {
+          endpoint: '/api/messages/notifications',
+        },
+      });
+    } catch (logError) {
+      console.error('Failed to log server error for /api/messages/notifications:', logError);
+    }
     return NextResponse.json({ 
-      error: error instanceof Error ? error.message : 'Internal server error' 
+      error: normalizedError.message || 'Internal server error',
     }, { status: 500 });
   }
 }

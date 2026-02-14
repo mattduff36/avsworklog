@@ -239,6 +239,37 @@ export default function DashboardPage() {
 
   const fetchTopActions = async () => {
     try {
+      // Skip fetching if offline - rely on cached page data
+      if (!navigator.onLine) {
+        setActionsSummary([
+          {
+            type: 'workshop',
+            label: 'Workshop Tasks',
+            count: 0,
+            icon: Wrench,
+            color: 'hsl(13 37% 48%)',
+            href: '/workshop-tasks'
+          },
+          {
+            type: 'maintenance',
+            label: 'Maintenance & Service',
+            count: 0,
+            icon: Settings,
+            color: 'hsl(0 84% 60%)',
+            href: '/maintenance'
+          },
+          {
+            type: 'inspections',
+            label: 'Site Audit Inspections',
+            count: 0,
+            icon: FileText,
+            color: 'hsl(215 20% 50%)',
+            href: '#'
+          }
+        ]);
+        return;
+      }
+
       // Fetch all actions to count workshop tasks
       const { data: allActions, error: actionsError } = await supabase
         .from('actions')

@@ -50,7 +50,12 @@ export default function ActionsPage() {
 
   const fetchActions = useCallback(async () => {
     try {
+      setError('');
       setLoading(true);
+      if (!navigator.onLine) {
+        setError('You appear to be offline.');
+        return;
+      }
       const { data, error } = await supabase
         .from('actions')
         .select(`

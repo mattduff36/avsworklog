@@ -4,6 +4,12 @@ import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { GetNotificationsResponse, NotificationItem } from '@/types/messages';
 
+function normalizeError(error: unknown): Error {
+  if (error instanceof Error) return error;
+  if (typeof error === 'string') return new Error(error);
+  return new Error('Unknown error');
+}
+
 /**
  * GET /api/messages/notifications/admin
  * Fetch notifications for a specific user
@@ -87,7 +93,7 @@ export async function GET(request: NextRequest) {
 
     if (fetchError) {
       console.error('Error fetching notifications:', fetchError);
-      throw fetchError;
+      throw new Error(fetchError.message || 'Failed to fetch notifications');
     }
 
     // Transform to NotificationItem format
@@ -118,18 +124,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(response);
 
   } catch (error) {
-    console.error('Error in GET /api/messages/notifications/admin:', error);
+    const normalizedError = normalizeError(error);
+    console.error('Error in GET /api/messages/notifications/admin:', normalizedError);
 
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: '/api/messages/notifications/admin',
-      additionalData: {
-        endpoint: '/api/messages/notifications/admin',
-      },
-    });
+    try {
+      await logServerError({
+        error: normalizedError,
+        request,
+        componentName: '/api/messages/notifications/admin',
+        additionalData: {
+          endpoint: '/api/messages/notifications/admin',
+        },
+      });
+    } catch (logError) {
+      console.error('Failed to log server error for /api/messages/notifications/admin:', logError);
+    }
     return NextResponse.json({ 
-      error: error instanceof Error ? error.message : 'Internal server error' 
+      error: normalizedError.message || 'Internal server error',
     }, { status: 500 });
   }
 }
