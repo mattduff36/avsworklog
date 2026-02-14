@@ -720,7 +720,7 @@ export default function VehicleHistoryPage({
         /* Plant Data Card */
         <Card className="bg-gradient-to-r from-amber-900/20 to-amber-800/10 border-amber-700/30">
           <CardContent className="pt-6">
-            <div className={`grid gap-6 ${hasMapMatch ? 'grid-cols-1 md:grid-cols-[2fr_3fr]' : 'grid-cols-1'}`}>
+            <div className={`grid gap-6 ${hasMapMatch ? 'grid-cols-1 md:grid-cols-[3fr_2fr]' : 'grid-cols-1'}`}>
               <div className={hasMapMatch ? 'space-y-2.5 text-sm' : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm'}>
                 {vehicle.plant_id && (
                   <div className="flex items-baseline gap-2">
@@ -764,7 +764,7 @@ export default function VehicleHistoryPage({
                 plantId={vehicle.plant_id ?? undefined}
                 regNumber={vehicle.reg_number ?? undefined}
                 assetLabel={vehicle.plant_id || vehicle.reg_number || 'Unknown'}
-                className="h-full min-h-[200px]"
+                className="h-full min-h-[265px]"
                 onMatchResult={setHasMapMatch}
                 onLocationData={setMapLocationData}
                 onClick={() => setMapModalOpen(true)}
@@ -777,7 +777,7 @@ export default function VehicleHistoryPage({
         vehicleData && (vehicleData.ves_make || vehicleData.mot_make) ? (
           <Card className="bg-gradient-to-r from-blue-900/20 to-blue-800/10 border-blue-700/30">
             <CardContent className="pt-6">
-              <div className={`grid gap-6 ${hasMapMatch ? 'grid-cols-1 md:grid-cols-[2fr_3fr]' : 'grid-cols-1'}`}>
+              <div className={`grid gap-6 ${hasMapMatch ? 'grid-cols-1 md:grid-cols-[3fr_2fr]' : 'grid-cols-1'}`}>
                 <div className={hasMapMatch ? 'space-y-2.5 text-sm' : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm'}>
                   {(vehicleData.ves_make || vehicleData.mot_make) && (
                     <div className="flex items-baseline gap-2">
@@ -863,7 +863,7 @@ export default function VehicleHistoryPage({
                   regNumber={vehicle?.reg_number ?? undefined}
                   plantId={vehicle?.plant_id ?? undefined}
                   assetLabel={vehicle?.reg_number || vehicle?.plant_id || 'Unknown'}
-                  className="h-full min-h-[200px]"
+                  className="h-full min-h-[265px]"
                   onMatchResult={setHasMapMatch}
                   onLocationData={setMapLocationData}
                   onClick={() => setMapModalOpen(true)}

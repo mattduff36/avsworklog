@@ -453,7 +453,7 @@ export default function PlantHistoryPage({
       {plant && (
         <Card className="bg-gradient-to-r from-amber-900/20 to-amber-800/10 border-amber-700/30">
           <CardContent className="pt-6">
-            <div className={`grid gap-6 ${hasMapMatch ? 'grid-cols-1 md:grid-cols-[2fr_3fr]' : 'grid-cols-1'}`}>
+            <div className={`grid gap-6 ${hasMapMatch ? 'grid-cols-1 md:grid-cols-[3fr_2fr]' : 'grid-cols-1'}`}>
               <div className={hasMapMatch ? 'space-y-2.5 text-sm' : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm'}>
                 {plant.reg_number && (
                   <div className="flex items-baseline gap-2">
@@ -503,7 +503,7 @@ export default function PlantHistoryPage({
                 plantId={plant.plant_id}
                 regNumber={plant.reg_number ?? undefined}
                 assetLabel={plant.plant_id || 'Unknown'}
-                className="h-full min-h-[200px]"
+                className="h-full min-h-[265px]"
                 onMatchResult={setHasMapMatch}
                 onLocationData={setMapLocationData}
                 onClick={() => setMapModalOpen(true)}

@@ -159,7 +159,7 @@ export function AssetLocationMap({
   if (loading) {
     return (
       <div className={`rounded-lg overflow-hidden ${className}`}>
-        <Skeleton className="w-full h-full min-h-[200px]" />
+        <Skeleton className="w-full h-full min-h-[265px]" />
       </div>
     );
   }
@@ -177,7 +177,7 @@ export function AssetLocationMap({
       {/* Map container – hide all SDK UI controls via CSS */}
       <div
         ref={mapContainerRef}
-        className="w-full h-full min-h-[200px] [&_.maplibregl-ctrl-bottom-left]:!hidden [&_.maplibregl-ctrl-bottom-right]:!hidden [&_.maplibregl-ctrl-top-left]:!hidden [&_.maplibregl-ctrl-top-right]:!hidden"
+        className="w-full h-full min-h-[265px] [&_.maplibregl-ctrl-bottom-left]:!hidden [&_.maplibregl-ctrl-bottom-right]:!hidden [&_.maplibregl-ctrl-top-left]:!hidden [&_.maplibregl-ctrl-top-right]:!hidden"
       />
       {/* Expand hint on hover */}
       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center pointer-events-none">
