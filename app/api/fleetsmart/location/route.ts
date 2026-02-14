@@ -4,14 +4,6 @@ const BASE = process.env.FLEETSMART_BASE_URL ?? 'https://www.fleetsmartlive.com'
 const CLIENT_ID = process.env.FLEETSMART_CLIENT_ID ?? '';
 const API_KEY = process.env.FLEETSMART_API_KEY ?? '';
 
-/* ---------- rate-limit / cache ---------- */
-let cachedVehicles: FleetVehicle[] | null = null;
-let vehiclesCachedAt = 0;
-const VEHICLES_TTL_MS = 10_000; // cache the vehicle list for 10 s
-
-let lastRequestAt = 0;
-const MIN_INTERVAL_MS = 1_100; // respect ~1 req/s
-
 /* ---------- types ---------- */
 interface FleetVehicle {
   id: string;
@@ -28,6 +20,38 @@ interface FleetLocation {
   timestamp: string;
   [key: string]: unknown;
 }
+
+interface LocationResult {
+  lat: number;
+  lng: number;
+  speed: number;
+  heading: number;
+  updatedAt: string;
+}
+
+/* ---------- persistent cache (survives HMR in dev) ---------- */
+interface FleetsmartCache {
+  vehicles: FleetVehicle[] | null;
+  vehiclesCachedAt: number;
+  locationCache: Map<string, { data: LocationResult; cachedAt: number }>;
+  lastRequestAt: number;
+}
+
+const g = globalThis as unknown as { __fleetsmartCache?: FleetsmartCache };
+if (!g.__fleetsmartCache) {
+  g.__fleetsmartCache = {
+    vehicles: null,
+    vehiclesCachedAt: 0,
+    locationCache: new Map(),
+    lastRequestAt: 0,
+  };
+}
+const cache = g.__fleetsmartCache;
+
+const VEHICLES_TTL_MS = 30_000; // cache vehicle list for 30 s
+const LOCATION_TTL_MS = 30_000; // cache per-vehicle location for 30 s
+const MIN_INTERVAL_MS = 2_000;  // 2 s between FleetSmart requests (safety margin)
+const MAX_RETRIES = 2;
 
 /* ---------- helpers ---------- */
 function fleetsmartHeaders(): HeadersInit {
@@ -67,23 +91,40 @@ function matchAsset(
 
 async function throttle(): Promise<void> {
   const now = Date.now();
-  const elapsed = now - lastRequestAt;
+  const elapsed = now - cache.lastRequestAt;
   if (elapsed < MIN_INTERVAL_MS) {
     await new Promise((r) => setTimeout(r, MIN_INTERVAL_MS - elapsed));
   }
-  lastRequestAt = Date.now();
+  cache.lastRequestAt = Date.now();
+}
+
+async function fetchWithRetry(
+  url: string,
+  opts: RequestInit,
+  retries = MAX_RETRIES
+): Promise<Response> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    await throttle();
+    const res = await fetch(url, opts);
+    if (res.status === 429 && attempt < retries) {
+      // Wait extra before retrying on rate limit
+      await new Promise((r) => setTimeout(r, 3_000));
+      continue;
+    }
+    return res;
+  }
+  // Should not reach here, but satisfy TS
+  throw new Error('FleetSmart request failed after retries');
 }
 
 async function fetchVehicles(): Promise<FleetVehicle[]> {
   const now = Date.now();
-  if (cachedVehicles && now - vehiclesCachedAt < VEHICLES_TTL_MS) {
-    return cachedVehicles;
+  if (cache.vehicles && now - cache.vehiclesCachedAt < VEHICLES_TTL_MS) {
+    return cache.vehicles;
   }
 
-  await throttle();
-
   const url = `${BASE}/api/vehicles.json`;
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     headers: fleetsmartHeaders(),
     cache: 'no-store',
   });
@@ -94,18 +135,22 @@ async function fetchVehicles(): Promise<FleetVehicle[]> {
 
   const json = await res.json();
   const vehicles: FleetVehicle[] = json.data ?? json ?? [];
-  cachedVehicles = vehicles;
-  vehiclesCachedAt = Date.now();
+  cache.vehicles = vehicles;
+  cache.vehiclesCachedAt = Date.now();
   return vehicles;
 }
 
 async function fetchLatestLocation(
   vehicleId: string
-): Promise<FleetLocation | null> {
-  await throttle();
+): Promise<LocationResult | null> {
+  // Check per-vehicle location cache
+  const cached = cache.locationCache.get(vehicleId);
+  if (cached && Date.now() - cached.cachedAt < LOCATION_TTL_MS) {
+    return cached.data;
+  }
 
   const url = `${BASE}/api/vehicle_locations.json?filter[vehicle_id]=${vehicleId}&sort=-timestamp&page[size]=1`;
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     headers: fleetsmartHeaders(),
     cache: 'no-store',
   });
@@ -116,7 +161,19 @@ async function fetchLatestLocation(
 
   const json = await res.json();
   const locations: FleetLocation[] = json.data ?? json ?? [];
-  return locations.length > 0 ? locations[0] : null;
+  if (locations.length === 0) return null;
+
+  const loc = locations[0];
+  const result: LocationResult = {
+    lat: loc.latitude,
+    lng: loc.longitude,
+    speed: loc.speed,
+    heading: loc.heading,
+    updatedAt: loc.timestamp,
+  };
+
+  cache.locationCache.set(vehicleId, { data: result, cachedAt: Date.now() });
+  return result;
 }
 
 /* ---------- route handler ---------- */
@@ -161,11 +218,11 @@ export async function GET(request: NextRequest) {
       vehicleId: matched.id,
       name: matched.name,
       vrn: matched.vrn,
-      lat: location.latitude,
-      lng: location.longitude,
+      lat: location.lat,
+      lng: location.lng,
       speed: location.speed,
       heading: location.heading,
-      updatedAt: location.timestamp,
+      updatedAt: location.updatedAt,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
