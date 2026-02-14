@@ -720,53 +720,42 @@ export default function VehicleHistoryPage({
         /* Plant Data Card */
         <Card className="bg-gradient-to-r from-amber-900/20 to-amber-800/10 border-amber-700/30">
           <CardContent className="pt-6">
-            <div className={`grid gap-4 ${hasMapMatch ? 'grid-cols-1 md:grid-cols-[1fr_280px]' : 'grid-cols-1'}`}>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
-                {/* Plant ID */}
+            <div className={`grid gap-4 ${hasMapMatch ? 'grid-cols-1 md:grid-cols-[1fr_320px]' : 'grid-cols-1'}`}>
+              <div className={hasMapMatch ? 'space-y-2.5 text-sm' : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm'}>
                 {vehicle.plant_id && (
-                  <div>
-                    <span className="text-muted-foreground">Plant ID:</span>
-                    <span className="ml-2 text-white font-medium">{vehicle.plant_id}</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Plant ID</span>
+                    <span className="text-white font-medium">{vehicle.plant_id}</span>
                   </div>
                 )}
-                
-                {/* Registration (if exists) */}
                 {vehicle.reg_number && (
-                  <div>
-                    <span className="text-muted-foreground">Registration:</span>
-                    <span className="ml-2 text-white font-medium">{vehicle.reg_number}</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Registration</span>
+                    <span className="text-white font-medium">{vehicle.reg_number}</span>
                   </div>
                 )}
-                
-                {/* Type */}
                 {vehicle.vehicle_type && (
-                  <div>
-                    <span className="text-muted-foreground">Type:</span>
-                    <span className="ml-2 text-white font-medium">{vehicle.vehicle_type}</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Type</span>
+                    <span className="text-white font-medium">{vehicle.vehicle_type}</span>
                   </div>
                 )}
-                
-                {/* Serial Number */}
                 {vehicle.serial_number && (
-                  <div>
-                    <span className="text-muted-foreground">Serial Number:</span>
-                    <span className="ml-2 text-white font-medium">{vehicle.serial_number}</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Serial No.</span>
+                    <span className="text-white font-medium">{vehicle.serial_number}</span>
                   </div>
                 )}
-                
-                {/* Year */}
                 {vehicle.year && (
-                  <div>
-                    <span className="text-muted-foreground">Year:</span>
-                    <span className="ml-2 text-white font-medium">{vehicle.year}</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Year</span>
+                    <span className="text-white font-medium">{vehicle.year}</span>
                   </div>
                 )}
-                
-                {/* Weight Class */}
                 {vehicle.weight_class && (
-                  <div>
-                    <span className="text-muted-foreground">Weight Class:</span>
-                    <span className="ml-2 text-white font-medium">{vehicle.weight_class}</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Weight Class</span>
+                    <span className="text-white font-medium">{vehicle.weight_class}</span>
                   </div>
                 )}
               </div>
@@ -775,7 +764,7 @@ export default function VehicleHistoryPage({
                 plantId={vehicle.plant_id ?? undefined}
                 regNumber={vehicle.reg_number ?? undefined}
                 assetLabel={vehicle.plant_id || vehicle.reg_number || 'Unknown'}
-                className="h-[180px]"
+                className="h-full min-h-[200px]"
                 onMatchResult={setHasMapMatch}
                 onLocationData={setMapLocationData}
                 onClick={() => setMapModalOpen(true)}
@@ -788,53 +777,42 @@ export default function VehicleHistoryPage({
         vehicleData && (vehicleData.ves_make || vehicleData.mot_make) ? (
           <Card className="bg-gradient-to-r from-blue-900/20 to-blue-800/10 border-blue-700/30">
             <CardContent className="pt-6">
-              <div className={`grid gap-4 ${hasMapMatch ? 'grid-cols-1 md:grid-cols-[1fr_280px]' : 'grid-cols-1'}`}>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
-                  {/* Make - prefer VES, fallback to MOT */}
+              <div className={`grid gap-4 ${hasMapMatch ? 'grid-cols-1 md:grid-cols-[1fr_320px]' : 'grid-cols-1'}`}>
+                <div className={hasMapMatch ? 'space-y-2.5 text-sm' : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm'}>
                   {(vehicleData.ves_make || vehicleData.mot_make) && (
-                    <div>
-                      <span className="text-muted-foreground">Make:</span>
-                      <span className="ml-2 text-white font-medium">{vehicleData.ves_make || vehicleData.mot_make}</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Make</span>
+                      <span className="text-white font-medium">{vehicleData.ves_make || vehicleData.mot_make}</span>
                     </div>
                   )}
-                  
-                  {/* Model - from MOT API only */}
                   {vehicleData.mot_model && (
-                    <div>
-                      <span className="text-muted-foreground">Model:</span>
-                      <span className="ml-2 text-white font-medium">{vehicleData.mot_model}</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Model</span>
+                      <span className="text-white font-medium">{vehicleData.mot_model}</span>
                     </div>
                   )}
-                  
-                  {/* Colour - prefer VES, fallback to MOT */}
                   {(vehicleData.ves_colour || vehicleData.mot_primary_colour) && (
-                    <div>
-                      <span className="text-muted-foreground">Colour:</span>
-                      <span className="ml-2 text-white font-medium">{vehicleData.ves_colour || vehicleData.mot_primary_colour}</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Colour</span>
+                      <span className="text-white font-medium">{vehicleData.ves_colour || vehicleData.mot_primary_colour}</span>
                     </div>
                   )}
-                  
-                  {/* Year - prefer VES, fallback to MOT */}
                   {(vehicleData.ves_year_of_manufacture || vehicleData.mot_year_of_manufacture) && (
-                    <div>
-                      <span className="text-muted-foreground">Year:</span>
-                      <span className="ml-2 text-white font-medium">{vehicleData.ves_year_of_manufacture || vehicleData.mot_year_of_manufacture}</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Year</span>
+                      <span className="text-white font-medium">{vehicleData.ves_year_of_manufacture || vehicleData.mot_year_of_manufacture}</span>
                     </div>
                   )}
-                  
-                  {/* Fuel - prefer VES, fallback to MOT */}
                   {(vehicleData.ves_fuel_type || vehicleData.mot_fuel_type) && (
-                    <div>
-                      <span className="text-muted-foreground">Fuel:</span>
-                      <span className="ml-2 text-white font-medium">{vehicleData.ves_fuel_type || vehicleData.mot_fuel_type}</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Fuel</span>
+                      <span className="text-white font-medium">{vehicleData.ves_fuel_type || vehicleData.mot_fuel_type}</span>
                     </div>
                   )}
-                  
-                  {/* First Registration - from MOT API */}
                   {vehicleData.mot_first_used_date && (
-                    <div>
-                      <span className="text-muted-foreground">First Reg:</span>
-                      <span className="ml-2 text-white font-medium">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">First Reg</span>
+                      <span className="text-white font-medium">
                         {new Date(vehicleData.mot_first_used_date).toLocaleDateString('en-GB', {
                           day: 'numeric',
                           month: 'short',
@@ -843,52 +821,40 @@ export default function VehicleHistoryPage({
                       </span>
                     </div>
                   )}
-                  
-                  {/* Engine - from VES only */}
                   {vehicleData.ves_engine_capacity && (
-                    <div>
-                      <span className="text-muted-foreground">Engine:</span>
-                      <span className="ml-2 text-white font-medium">{vehicleData.ves_engine_capacity}cc</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Engine</span>
+                      <span className="text-white font-medium">{vehicleData.ves_engine_capacity}cc</span>
                     </div>
                   )}
-                  
-                  {/* Tax Status - from VES */}
                   {vehicleData.ves_tax_status && (
-                    <div>
-                      <span className="text-muted-foreground">Tax Status:</span>
-                      <span className="ml-2 text-white font-medium">{vehicleData.ves_tax_status}</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Tax Status</span>
+                      <span className="text-white font-medium">{vehicleData.ves_tax_status}</span>
                     </div>
                   )}
-                  
-                  {/* MOT Status - from VES */}
                   {vehicleData.ves_mot_status && (
-                    <div>
-                      <span className="text-muted-foreground">MOT Status:</span>
-                      <span className="ml-2 text-white font-medium">{vehicleData.ves_mot_status}</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">MOT Status</span>
+                      <span className="text-white font-medium">{vehicleData.ves_mot_status}</span>
                     </div>
                   )}
-                  
-                  {/* CO2 Emissions - from VES */}
                   {vehicleData.ves_co2_emissions && (
-                    <div>
-                      <span className="text-muted-foreground">CO2:</span>
-                      <span className="ml-2 text-white font-medium">{vehicleData.ves_co2_emissions}g/km</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">CO2</span>
+                      <span className="text-white font-medium">{vehicleData.ves_co2_emissions}g/km</span>
                     </div>
                   )}
-                  
-                  {/* Euro Status - from VES */}
                   {vehicleData.ves_euro_status && (
-                    <div>
-                      <span className="text-muted-foreground">Euro Status:</span>
-                      <span className="ml-2 text-white font-medium">{vehicleData.ves_euro_status}</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Euro Status</span>
+                      <span className="text-white font-medium">{vehicleData.ves_euro_status}</span>
                     </div>
                   )}
-                  
-                  {/* Wheelplan - from VES */}
                   {vehicleData.ves_wheelplan && (
-                    <div className="col-span-2">
-                      <span className="text-muted-foreground">Wheelplan:</span>
-                      <span className="ml-2 text-white font-medium">{vehicleData.ves_wheelplan}</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Wheelplan</span>
+                      <span className="text-white font-medium">{vehicleData.ves_wheelplan}</span>
                     </div>
                   )}
                 </div>
@@ -897,7 +863,7 @@ export default function VehicleHistoryPage({
                   regNumber={vehicle?.reg_number ?? undefined}
                   plantId={vehicle?.plant_id ?? undefined}
                   assetLabel={vehicle?.reg_number || vehicle?.plant_id || 'Unknown'}
-                  className="h-[180px]"
+                  className="h-full min-h-[200px]"
                   onMatchResult={setHasMapMatch}
                   onLocationData={setMapLocationData}
                   onClick={() => setMapModalOpen(true)}
