@@ -7,7 +7,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogClose,
 } from '@/components/ui/dialog';
+import { X } from 'lucide-react';
 import * as maptilersdk from '@maptiler/sdk';
 import '@maptiler/sdk/dist/maptiler-sdk.css';
 
@@ -108,8 +110,13 @@ export function AssetLocationMapModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[90vw] w-[90vw] max-h-[85vh] p-0 gap-0 flex flex-col">
-        <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0">
+      <DialogContent className="max-w-[90vw] w-[90vw] max-h-[85vh] p-0 gap-0 flex flex-col [&>button:last-of-type]:hidden">
+        {/* Custom larger close button */}
+        <DialogClose className="absolute right-4 top-4 z-10 h-10 w-10 flex items-center justify-center rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 transition-colors focus:outline-none focus:ring-2 focus:ring-ring">
+          <X className="h-5 w-5 text-slate-100" />
+          <span className="sr-only">Close</span>
+        </DialogClose>
+        <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0 pr-16">
           <DialogTitle>Location – {assetLabel}</DialogTitle>
           <DialogDescription>
             {location

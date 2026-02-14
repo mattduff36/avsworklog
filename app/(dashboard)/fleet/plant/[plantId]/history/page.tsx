@@ -453,7 +453,7 @@ export default function PlantHistoryPage({
       {plant && (
         <Card className="bg-gradient-to-r from-amber-900/20 to-amber-800/10 border-amber-700/30">
           <CardContent className="pt-6">
-            <div className={`grid gap-4 ${hasMapMatch ? 'grid-cols-1 md:grid-cols-[1fr_320px]' : 'grid-cols-1'}`}>
+            <div className={`grid gap-6 ${hasMapMatch ? 'grid-cols-1 md:grid-cols-[2fr_3fr]' : 'grid-cols-1'}`}>
               <div className={hasMapMatch ? 'space-y-2.5 text-sm' : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm'}>
                 {plant.reg_number && (
                   <div className="flex items-baseline gap-2">
