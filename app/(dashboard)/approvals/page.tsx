@@ -10,7 +10,15 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, Clock, CheckCircle2, XCircle, User, Filter, Calendar, Package, LayoutGrid, Table2 } from 'lucide-react';
+import { FileText, Clock, CheckCircle2, XCircle, User, Filter, Calendar, Package, LayoutGrid, Table2, Settings2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
@@ -18,7 +26,8 @@ import { AbsenceWithRelations } from '@/types/absence';
 import { TimesheetStatusFilter, StatusFilter } from '@/types/common';
 import { usePendingAbsences, useApproveAbsence, useRejectAbsence, useAbsenceSummaryForEmployee } from '@/lib/hooks/useAbsence';
 import { toast } from 'sonner';
-import { TimesheetsApprovalTable } from './components/TimesheetsApprovalTable';
+import { TimesheetsApprovalTable, COLUMN_VISIBILITY_STORAGE_KEY, DEFAULT_COLUMN_VISIBILITY } from './components/TimesheetsApprovalTable';
+import type { ColumnVisibility } from './components/TimesheetsApprovalTable';
 import { ProcessTimesheetModal } from './components/ProcessTimesheetModal';
 
 interface TimesheetEntry {
@@ -55,6 +64,29 @@ function ApprovalsContent() {
     }
     return 'cards';
   });
+
+  // Column visibility - lifted from table component so the dropdown can sit in the toolbar
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(DEFAULT_COLUMN_VISIBILITY);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(COLUMN_VISIBILITY_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Partial<ColumnVisibility>;
+        setColumnVisibility(prev => ({ ...prev, ...parsed }));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const toggleColumn = (column: keyof ColumnVisibility) => {
+    setColumnVisibility(prev => {
+      const next = { ...prev, [column]: !prev[column] };
+      localStorage.setItem(COLUMN_VISIBILITY_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
 
   // Process modal state
   const [processModalOpen, setProcessModalOpen] = useState(false);
@@ -380,10 +412,10 @@ function ApprovalsContent() {
                   {getFilterOptions().map((filter) => (
                     <Button
                       key={filter}
-                      variant={statusFilter === filter ? 'default' : 'outline'}
+                      variant="outline"
                       size="sm"
                       onClick={() => handleFilterChange(filter)}
-                      className={statusFilter === filter ? '' : 'border-border text-muted-foreground hover:bg-slate-700/50'}
+                      className={statusFilter === filter ? 'bg-white text-slate-900 border-white/80 hover:bg-slate-200' : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'}
                     >
                       {filter === 'pending' && <Clock className="h-3 w-3 mr-1" />}
                       {filter === 'approved' && <CheckCircle2 className="h-3 w-3 mr-1" />}
@@ -407,26 +439,55 @@ function ApprovalsContent() {
               </Card>
             ) : (
               <>
-                {/* View Toggle - Desktop Only */}
-                <div className="hidden md:flex justify-end">
+                {/* Toolbar: Columns + View Toggle - Desktop Only */}
+                <div className="hidden md:flex items-center justify-end gap-2">
+                  {viewMode === 'table' && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="border-slate-600">
+                          <Settings2 className="h-4 w-4 mr-2" />
+                          Columns
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56 bg-slate-900 border border-border">
+                        <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem checked={columnVisibility.employeeId} onCheckedChange={() => toggleColumn('employeeId')}>
+                          Employee ID
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuCheckboxItem checked={columnVisibility.totalHours} onCheckedChange={() => toggleColumn('totalHours')}>
+                          Total Hours
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuCheckboxItem checked={columnVisibility.jobNumber} onCheckedChange={() => toggleColumn('jobNumber')}>
+                          Job Number
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuCheckboxItem checked={columnVisibility.status} onCheckedChange={() => toggleColumn('status')}>
+                          Status
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuCheckboxItem checked={columnVisibility.submittedAt} onCheckedChange={() => toggleColumn('submittedAt')}>
+                          Submitted
+                        </DropdownMenuCheckboxItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                   <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => { setViewMode('cards'); localStorage.setItem('approvals-view-mode', 'cards'); }}
-                      className={`h-8 px-3 ${viewMode === 'cards' ? 'bg-slate-700 text-white' : 'text-muted-foreground hover:text-white'}`}
+                      onClick={() => { setViewMode('table'); localStorage.setItem('approvals-view-mode', 'table'); }}
+                      className={`h-8 px-3 ${viewMode === 'table' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
                     >
-                      <LayoutGrid className="h-4 w-4 mr-1.5" />
-                      Cards
+                      <Table2 className="h-4 w-4 mr-1.5" />
+                      Table
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => { setViewMode('table'); localStorage.setItem('approvals-view-mode', 'table'); }}
-                      className={`h-8 px-3 ${viewMode === 'table' ? 'bg-slate-700 text-white' : 'text-muted-foreground hover:text-white'}`}
+                      onClick={() => { setViewMode('cards'); localStorage.setItem('approvals-view-mode', 'cards'); }}
+                      className={`h-8 px-3 ${viewMode === 'cards' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
                     >
-                      <Table2 className="h-4 w-4 mr-1.5" />
-                      Table
+                      <LayoutGrid className="h-4 w-4 mr-1.5" />
+                      Cards
                     </Button>
                   </div>
                 </div>
@@ -439,6 +500,7 @@ function ApprovalsContent() {
                       onApprove={async (id) => { await handleQuickApprove('timesheet', id); }}
                       onReject={async (id) => { await handleQuickReject('timesheet', id); }}
                       onProcess={handleOpenProcessModal}
+                      columnVisibility={columnVisibility}
                     />
                   </div>
                 )}

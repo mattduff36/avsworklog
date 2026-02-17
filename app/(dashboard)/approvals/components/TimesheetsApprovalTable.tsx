@@ -1,17 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   ArrowUpDown,
   CheckCircle2,
@@ -19,7 +11,6 @@ import {
   Clock,
   FileText,
   Package,
-  Settings2,
   ExternalLink,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -41,17 +32,7 @@ interface TimesheetWithProfile extends Timesheet {
   timesheet_entries?: TimesheetEntry[];
 }
 
-interface TimesheetsApprovalTableProps {
-  timesheets: TimesheetWithProfile[];
-  onApprove: (id: string) => Promise<void>;
-  onReject: (id: string) => Promise<void>;
-  onProcess: (id: string) => void;
-}
-
-type SortField = 'name' | 'date' | 'totalHours' | 'status' | 'submittedAt';
-type SortDirection = 'asc' | 'desc';
-
-interface ColumnVisibility {
+export interface ColumnVisibility {
   employeeId: boolean;
   totalHours: boolean;
   jobNumber: boolean;
@@ -59,7 +40,26 @@ interface ColumnVisibility {
   submittedAt: boolean;
 }
 
-const STORAGE_KEY = 'timesheets-approval-table-column-visibility';
+export const COLUMN_VISIBILITY_STORAGE_KEY = 'timesheets-approval-table-column-visibility';
+
+export const DEFAULT_COLUMN_VISIBILITY: ColumnVisibility = {
+  employeeId: false,
+  totalHours: true,
+  jobNumber: true,
+  status: true,
+  submittedAt: true,
+};
+
+interface TimesheetsApprovalTableProps {
+  timesheets: TimesheetWithProfile[];
+  onApprove: (id: string) => Promise<void>;
+  onReject: (id: string) => Promise<void>;
+  onProcess: (id: string) => void;
+  columnVisibility: ColumnVisibility;
+}
+
+type SortField = 'name' | 'date' | 'totalHours' | 'status' | 'submittedAt';
+type SortDirection = 'asc' | 'desc';
 
 function computeTotalHours(entries?: TimesheetEntry[]): number {
   if (!entries || entries.length === 0) return 0;
@@ -80,39 +80,10 @@ export function TimesheetsApprovalTable({
   onApprove,
   onReject,
   onProcess,
+  columnVisibility,
 }: TimesheetsApprovalTableProps) {
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-
-  const defaultVisibility: ColumnVisibility = {
-    employeeId: false,
-    totalHours: true,
-    jobNumber: true,
-    status: true,
-    submittedAt: true,
-  };
-
-  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(defaultVisibility);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved) as Partial<ColumnVisibility>;
-        setColumnVisibility(prev => ({ ...prev, ...parsed }));
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  const toggleColumn = (column: keyof ColumnVisibility) => {
-    setColumnVisibility(prev => {
-      const next = { ...prev, [column]: !prev[column] };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      return next;
-    });
-  };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -201,37 +172,6 @@ export function TimesheetsApprovalTable({
 
   return (
     <div className="space-y-3">
-      {/* Column Visibility */}
-      <div className="flex justify-end">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="border-slate-600">
-              <Settings2 className="h-4 w-4 mr-2" />
-              Columns
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 bg-slate-900 border border-border">
-            <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuCheckboxItem checked={columnVisibility.employeeId} onCheckedChange={() => toggleColumn('employeeId')}>
-              Employee ID
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem checked={columnVisibility.totalHours} onCheckedChange={() => toggleColumn('totalHours')}>
-              Total Hours
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem checked={columnVisibility.jobNumber} onCheckedChange={() => toggleColumn('jobNumber')}>
-              Job Number
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem checked={columnVisibility.status} onCheckedChange={() => toggleColumn('status')}>
-              Status
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem checked={columnVisibility.submittedAt} onCheckedChange={() => toggleColumn('submittedAt')}>
-              Submitted
-            </DropdownMenuCheckboxItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
       {/* Table */}
       <div className="border border-slate-700 rounded-lg">
         <Table className="min-w-full">

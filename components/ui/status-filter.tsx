@@ -22,9 +22,10 @@ export function StatusFilter<T extends string>({
       {options.map((option) => (
         <Button
           key={option}
-          variant={value === option ? 'default' : 'outline'}
+          variant="outline"
           size="sm"
           onClick={() => onChange(option)}
+          className={value === option ? 'bg-white text-slate-900 border-white/80 hover:bg-slate-200' : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'}
         >
           {getLabel(option)}
         </Button>

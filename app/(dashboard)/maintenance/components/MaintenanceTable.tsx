@@ -239,10 +239,10 @@ export function MaintenanceTable({
           {/* Internal Tabs for Active vs Retired Vehicles */}
           <Tabs defaultValue="active" className="w-full">
             <TabsList className="bg-slate-800 border-border">
-              <TabsTrigger value="active" className="data-[state=active]:bg-slate-700">
+              <TabsTrigger value="active">
                 Active Vehicles ({vehicles.length})
               </TabsTrigger>
-              <TabsTrigger value="deleted" className="data-[state=active]:bg-slate-700 flex items-center gap-2">
+              <TabsTrigger value="deleted" className="flex items-center gap-2">
                 <FolderClock className="h-4 w-4" />
                 Retired Vehicles ({retiredData?.count || 0})
               </TabsTrigger>

@@ -93,10 +93,10 @@ function NewPlantInspectionContent() {
   const [weekEnding, setWeekEnding] = useState('');
   const [activeDay, setActiveDay] = useState('0'); // 0-6 for Monday-Sunday
   
-  // Daily hours state (7 days: Mon-Sun)
-  const [dailyHours, setDailyHours] = useState<Record<number, number | null>>({
-    1: null, 2: null, 3: null, 4: null, 5: null, 6: null, 7: null
-  });
+  // Current hours state (single value, like vehicle mileage)
+  const [currentHours, setCurrentHours] = useState('');
+  // Track original current_mileage for backward compatibility with old drafts
+  const [originalCurrentMileage, setOriginalCurrentMileage] = useState<number | null | undefined>(undefined);
   
   const [checkboxStates, setCheckboxStates] = useState<Record<string, InspectionStatus>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
@@ -271,8 +271,8 @@ function NewPlantInspectionContent() {
 
         setLoggedDefects(loggedMap);
 
-        // Reset all checkbox states and comments, then mark only locked items
-        const newCheckboxStates: Record<string, CheckboxState> = {};
+        // Initialize all checkbox states to default 'ok', then mark locked defect items
+        const newCheckboxStates: Record<string, InspectionStatus> = {};
         const newComments: Record<string, string> = {};
 
         // Initialize all cells to default 'ok' state
@@ -284,7 +284,7 @@ function NewPlantInspectionContent() {
           }
         }
 
-        // Mark only locked defect items
+        // Override with locked defect items (marked as 'attention')
         loggedMap.forEach((loggedInfo, key) => {
           const [itemNumStr] = key.split('-');
           const itemNum = parseInt(itemNumStr);
@@ -362,15 +362,6 @@ function NewPlantInspectionContent() {
 
       if (itemsError) throw itemsError;
 
-      // Fetch daily hours
-      const { data: hoursData, error: hoursError } = await supabase
-        .from('inspection_daily_hours')
-        .select('*')
-        .eq('inspection_id', id)
-        .order('day_of_week');
-
-      if (hoursError) throw hoursError;
-
       // Populate form
       setExistingInspectionId(id);
       const inspectionData = inspection as InspectionWithRelations;
@@ -378,14 +369,10 @@ function NewPlantInspectionContent() {
       setWeekEnding(inspection.inspection_end_date || formatDateISO(getWeekEnding()));
       setSelectedEmployeeId(inspection.user_id);
 
-      // Populate daily hours
-      const hoursMap: Record<number, number | null> = {
-        1: null, 2: null, 3: null, 4: null, 5: null, 6: null, 7: null
-      };
-      (hoursData || []).forEach((h: any) => {
-        hoursMap[h.day_of_week] = h.hours;
-      });
-      setDailyHours(hoursMap);
+      // Populate current hours from current_mileage field
+      // Store original value for backward compatibility validation
+      setOriginalCurrentMileage(inspection.current_mileage);
+      setCurrentHours(inspection.current_mileage?.toString() || '');
 
       // Populate checkbox states and comments
       const newCheckboxStates: Record<string, InspectionStatus> = {};
@@ -432,15 +419,11 @@ function NewPlantInspectionContent() {
     setComments(prev => ({ ...prev, [key]: comment }));
   };
 
-  const handleHoursChange = (dayOfWeek: number, hours: string) => {
-    if (hours === '') {
-      setDailyHours(prev => ({ ...prev, [dayOfWeek]: null }));
-      return;
-    }
-    const hoursNum = Math.round(parseFloat(hours));
-    // Validate against the DB check constraint (hours >= 0 AND hours <= 24)
-    if (isNaN(hoursNum) || hoursNum < 0 || hoursNum > 24) return;
-    setDailyHours(prev => ({ ...prev, [dayOfWeek]: hoursNum }));
+  const getParsedHours = (): number | null => {
+    if (!currentHours || currentHours.trim() === '') return null;
+    const hoursValue = parseInt(currentHours, 10);
+    if (Number.isNaN(hoursValue) || hoursValue < 0) return null;
+    return hoursValue;
   };
 
   const handleSubmit = () => {
@@ -455,6 +438,14 @@ function NewPlantInspectionContent() {
   const validateAndSubmit = () => {
     if (!selectedPlantId) {
       setError('Please select a plant');
+      return;
+    }
+
+    const hoursValue = getParsedHours();
+    // Allow null hours only for existing inspections that originally had null (backward compatibility)
+    const isOldDraftWithoutHours = existingInspectionId && originalCurrentMileage === null;
+    if (hoursValue === null && !isOldDraftWithoutHours) {
+      setError('Please enter a valid current hours reading');
       return;
     }
 
@@ -542,7 +533,7 @@ function NewPlantInspectionContent() {
         user_id: selectedEmployeeId,
         inspection_date: formatDateISO(startDate),
         inspection_end_date: weekEnding,
-        current_mileage: null, // Not applicable for plant
+        current_mileage: getParsedHours(),
         status,
         submitted_at: status === 'submitted' ? new Date().toISOString() : null,
         signature_data: signatureData || null,
@@ -569,12 +560,6 @@ function NewPlantInspectionContent() {
           if (deleteError) throw new Error(`Failed to delete existing items: ${deleteError.message}`);
         }
 
-        // Delete existing daily hours
-        await supabase
-          .from('inspection_daily_hours')
-          .delete()
-          .eq('inspection_id', existingInspectionId);
-
         inspection = { id: existingInspectionId };
       } else {
         const { data: newInspection, error: insertError } = await supabase
@@ -588,25 +573,6 @@ function NewPlantInspectionContent() {
       }
 
       if (!inspection) throw new Error('Failed to save inspection');
-
-      // Save daily hours (validate against DB constraint: hours >= 0 AND hours <= 24)
-      const dailyHoursToInsert = Object.entries(dailyHours)
-        .filter(([_, hours]) => hours !== null && !isNaN(hours as number) && (hours as number) >= 0 && (hours as number) <= 24)
-        .map(([day, hours]) => ({
-          inspection_id: inspection.id,
-          day_of_week: parseInt(day),
-          hours: Math.round(hours as number)
-        }));
-
-      if (dailyHoursToInsert.length > 0) {
-        const { error: hoursError } = await supabase
-          .from('inspection_daily_hours')
-          .insert(dailyHoursToInsert);
-
-        if (hoursError) {
-          console.error('Error saving daily hours:', hoursError);
-        }
-      }
 
       // Create inspection items
       type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
@@ -649,7 +615,7 @@ function NewPlantInspectionContent() {
           user_id: selectedEmployeeId,
           inspection_date: formatDateISO(startDate),
           inspection_end_date: weekEnding,
-          current_mileage: null,
+          current_mileage: getParsedHours(),
           status,
           submitted_at: status === 'submitted' ? new Date().toISOString() : null,
           signature_data: signatureData || null,
@@ -954,30 +920,30 @@ function NewPlantInspectionContent() {
             </div>
           </div>
 
-          {/* Daily Hours Grid */}
+          {/* Current Hours */}
           <div className="space-y-2">
-            <Label className="text-foreground text-base">Daily Hours (Mon-Sun)</Label>
-            <div className="grid grid-cols-7 gap-2">
-              {DAY_NAMES.map((day, idx) => {
-                const dayOfWeek = idx + 1;
-                return (
-                  <div key={dayOfWeek} className="flex flex-col">
-                    <label className="text-xs text-muted-foreground mb-1 text-center">{day.substring(0, 3)}</label>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="24"
-                      step="0.5"
-                      value={dailyHours[dayOfWeek] ?? ''}
-                      onChange={(e) => handleHoursChange(dayOfWeek, e.target.value)}
-                      placeholder="-"
-                      className="h-10 text-center bg-slate-900/50 border-slate-600 text-white"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-            <p className="text-xs text-muted-foreground">Enter hours worked each day (optional)</p>
+            <Label htmlFor="currentHours" className="text-foreground text-base flex items-center gap-2">
+              Current Hours
+              {!(existingInspectionId && originalCurrentMileage === null) && (
+                <span className="text-red-400">*</span>
+              )}
+            </Label>
+            <Input
+              id="currentHours"
+              type="number"
+              value={currentHours}
+              onChange={(e) => setCurrentHours(e.target.value)}
+              placeholder="e.g., 45000"
+              min="0"
+              step="1"
+              className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground"
+              required={!(existingInspectionId && originalCurrentMileage === null)}
+            />
+            {existingInspectionId && originalCurrentMileage === null && (
+              <p className="text-xs text-muted-foreground">
+                Optional for this draft (created before current hours was required)
+              </p>
+            )}
           </div>
           
           {checklistStarted && (
