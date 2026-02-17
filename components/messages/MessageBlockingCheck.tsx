@@ -125,7 +125,7 @@ export function MessageBlockingCheck() {
       <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
         <div className="bg-white dark:bg-slate-900 rounded-lg p-6 flex items-center gap-3">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Checking for messages...</p>
+          <p className="text-sm text-muted-foreground">Loading SquiresApp...</p>
         </div>
       </div>
     );

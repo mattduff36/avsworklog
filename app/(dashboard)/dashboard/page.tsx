@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { 
@@ -470,9 +471,18 @@ export default function DashboardPage() {
             showIntro ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}
         >
-          <span className="text-2xl md:text-3xl font-bold text-avs-yellow tracking-wide">
-            SquiresApp.com
-          </span>
+          <div className="flex items-center gap-2">
+            <Image
+              src="/icon-192x192.png"
+              alt=""
+              width={36}
+              height={36}
+              className="h-8 w-8 md:h-9 md:w-9"
+            />
+            <span className="text-2xl md:text-3xl font-bold text-avs-yellow tracking-wide">
+              SquiresApp
+            </span>
+          </div>
         </div>
         
         {/* Actual Content */}
