@@ -186,11 +186,13 @@ export function CategoryManagementPanel({
                         }`}>
                           {category.name}
                         </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-muted-foreground">
-                            {subcategoryCount} {subcategoryCount === 1 ? 'subcategory' : 'subcategories'}
-                          </span>
-                        </div>
+                        {subcategoryCount > 0 && (
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-muted-foreground">
+                              {subcategoryCount} {subcategoryCount === 1 ? 'subcategory' : 'subcategories'}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </button>
@@ -250,22 +252,7 @@ export function CategoryManagementPanel({
                     </Button>
                   </div>
 
-                  {categorySubcategories.length === 0 ? (
-                    <div className="text-center py-8 bg-muted/30 rounded-lg border border-border">
-                      <p className="text-muted-foreground mb-3">
-                        No subcategories yet
-                      </p>
-                      <Button
-                        size="sm"
-                        onClick={() => onAddSubcategory(selectedCategory)}
-                        variant="outline"
-                        className="border-workshop/30 text-workshop hover:bg-workshop/10"
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Add First Subcategory
-                      </Button>
-                    </div>
-                  ) : (
+                  {categorySubcategories.length === 0 ? null : (
                     <div className="space-y-2">
                       {categorySubcategories.map((subcategory) => {
                         const isExpanded = expandedSubcategories.has(subcategory.id);
