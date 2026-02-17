@@ -28,7 +28,8 @@ export function ReminderModal({
 }: ReminderModalProps) {
   const hasDismissed = useRef(false);
 
-  // Auto-dismiss (mark as read) when the modal opens — fire-and-forget
+  // Auto-dismiss (mark as read) silently when the modal opens — fire-and-forget.
+  // Does NOT close the modal; the user reads at their own pace and closes manually.
   useEffect(() => {
     if (!open || hasDismissed.current) return;
     hasDismissed.current = true;
@@ -36,17 +37,21 @@ export function ReminderModal({
     fetch(`/api/messages/${message.recipient_id}/dismiss`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-    })
-      .then((res) => {
-        if (res.ok) onDismissed();
-      })
-      .catch(() => {
-        // Silently fail — the notification will stay unread and can be retried
-      });
-  }, [open, message.recipient_id, onDismissed]);
+    }).catch(() => {
+      // Silently fail — the notification stays unread and can be retried next time
+    });
+  }, [open, message.recipient_id]);
+
+  // When the user closes the modal, notify the parent so it can refresh/advance
+  function handleClose() {
+    if (hasDismissed.current) {
+      onDismissed();
+    }
+    onClose();
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[80vh]">
         <DialogHeader>
           <div className="flex items-center gap-2">
@@ -74,7 +79,7 @@ export function ReminderModal({
         <DialogFooter>
           <Button
             variant="outline"
-            onClick={onClose}
+            onClick={handleClose}
             className="border-border text-muted-foreground hover:bg-accent"
           >
             Close
