@@ -89,7 +89,7 @@ function getErrorSeverity(log: ErrorLogEntry): ErrorSeverity {
     | undefined;
 
   if (handling) {
-    if (!handling.wasHandled && !handling.didShowMessage) return 'urgent';
+    if (!handling.wasHandled && handling.didShowMessage === false) return 'urgent';
     if (handling.wasHandled && handling.didShowMessage === true) return 'important';
     if (handling.wasHandled && handling.didShowMessage === false) return 'medium';
     if (handling.didShowMessage === null) return 'low';
