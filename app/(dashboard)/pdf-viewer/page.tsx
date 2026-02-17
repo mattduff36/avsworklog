@@ -37,7 +37,11 @@ function PDFViewerContent() {
   }, [url]);
 
   const handleBack = () => {
-    router.push(returnUrl);
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push(returnUrl);
+    }
   };
 
   const handleDownload = async () => {

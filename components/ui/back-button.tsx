@@ -21,8 +21,9 @@ interface BackButtonProps {
  * Standardized back button component
  * - Icon-only for clean UI
  * - High contrast for visibility on dark backgrounds
- * - Context-aware: respects ?from= query param when present
- * - Falls back to sitemap parent route
+ * - Uses browser history (router.back) when available so it returns
+ *   to whichever page the user actually came from
+ * - Falls back to computed parent route for direct URL access
  */
 export function BackButton({ className, userRole, fallbackHref }: BackButtonProps) {
   const router = useRouter()
@@ -30,16 +31,19 @@ export function BackButton({ className, userRole, fallbackHref }: BackButtonProp
   const searchParams = useSearchParams()
   
   const handleBack = () => {
-    // Get the 'from' or 'fromTab' query parameter
+    // Prefer browser back navigation — this correctly returns to /approvals,
+    // /timesheets, or wherever the user actually navigated from.
+    // history.length > 1 means there is at least one previous entry.
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back()
+      return
+    }
+
+    // Fallback for direct URL access (no browser history):
+    // use ?from= param or computed parent route from sitemap config
     const from = searchParams.get('from') || searchParams.get('fromTab')
-    
-    // Determine fallback parent (pass searchParams for context-aware navigation)
     const computedFallback = fallbackHref || getParentHref(pathname, searchParams, userRole)
-    
-    // Get safe back href (validates 'from' param)
     const backHref = getBackHref(from, computedFallback)
-    
-    // Navigate to the determined route
     router.push(backHref)
   }
   
