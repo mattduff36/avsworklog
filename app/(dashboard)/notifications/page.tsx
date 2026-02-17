@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
+import { useQueryState } from 'nuqs';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { resolveNotificationToOpen } from '@/lib/utils/notification-helpers';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -46,6 +48,14 @@ const MODULE_ICONS: Record<string, any> = {
 export default function NotificationsPage() {
   const { profile, isAdmin, isSuperAdmin, isManager } = useAuth();
   
+  // Deep-link query param from notification panel
+  const [openNotificationId, setOpenNotificationId] = useQueryState('openNotification', {
+    defaultValue: '',
+    clearOnDefault: true,
+    shallow: true,
+  });
+  const hasHandledDeepLink = useRef(false);
+
   // Notifications state
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [filteredNotifications, setFilteredNotifications] = useState<NotificationItem[]>([]);
@@ -147,6 +157,20 @@ export default function NotificationsPage() {
       setFilteredNotifications(notifications);
     }
   }, [searchQuery, notifications]);
+
+  // Deep-link: auto-open a notification when navigated from the notification panel
+  useEffect(() => {
+    if (loading || !openNotificationId || hasHandledDeepLink.current) return;
+
+    const match = resolveNotificationToOpen(openNotificationId, notifications);
+    if (match) {
+      handleNotificationClick(match);
+    }
+
+    // Clear param after processing so refresh / back doesn't re-open
+    hasHandledDeepLink.current = true;
+    setOpenNotificationId('');
+  }, [loading, openNotificationId, notifications, setOpenNotificationId]);
 
   const fetchAdminNotifications = async (userId: string) => {
     if (userId === 'all') {

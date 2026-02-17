@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Bell, AlertTriangle, Loader2, CheckCircle2, X } from 'lucide-react';
+import { Bell, Loader2, X } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import type { NotificationItem } from '@/types/messages';
@@ -13,13 +13,17 @@ import type { NotificationItem } from '@/types/messages';
 interface NotificationPanelProps {
   open: boolean;
   onClose: () => void;
-  onNotificationClick?: (notification: NotificationItem) => void;
 }
 
-export function NotificationPanel({ open, onClose, onNotificationClick }: NotificationPanelProps) {
+function getIsUnread(notification: NotificationItem): boolean {
+  return notification.status === 'PENDING';
+}
+
+export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     if (open) {
@@ -80,40 +84,9 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
     }
   }
 
-  function getStatusBadge(status: string) {
-    switch (status) {
-      case 'SIGNED':
-        return (
-          <Badge variant="default" className="gap-1 bg-green-600">
-            <CheckCircle2 className="h-3 w-3" />
-            Signed
-          </Badge>
-        );
-      case 'DISMISSED':
-        return (
-          <Badge variant="secondary" className="gap-1">
-            Acknowledged
-          </Badge>
-        );
-      case 'SHOWN':
-        return (
-          <Badge variant="secondary" className="gap-1">
-            Viewed
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="destructive" className="gap-1">
-            <AlertTriangle className="h-3 w-3" />
-            Pending
-          </Badge>
-        );
-    }
-  }
-
-  function truncateText(text: string, maxLength: number = 100) {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
+  function handleNotificationClick(notification: NotificationItem) {
+    onClose();
+    router.push(`/notifications?openNotification=${notification.id}`);
   }
 
   if (!open) return null;
@@ -126,19 +99,19 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
         onClick={onClose}
       />
 
-      {/* Panel */}
-      <div className="fixed top-16 right-4 z-50 w-[400px] max-w-[calc(100vw-2rem)] bg-slate-900 rounded-lg shadow-2xl border border-slate-700 animate-in slide-in-from-top-2 duration-200">
+      {/* Panel — mobile: near-full width, desktop: 420px right-aligned */}
+      <div className="fixed top-16 left-2 right-2 z-50 sm:left-auto sm:right-4 sm:w-[420px] bg-slate-900 rounded-lg shadow-2xl border border-slate-700 animate-in slide-in-from-top-2 duration-200 flex flex-col max-h-[70vh]">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
           <div className="flex items-center gap-2">
-            <Bell className="h-5 w-5 text-muted-foreground" />
-            <h3 className="font-semibold text-white">Notifications</h3>
+            <Bell className="h-5 w-5 text-slate-400" />
+            <h3 className="font-semibold text-white text-base">Notifications</h3>
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={onClose}
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 p-0 text-slate-400 hover:text-white"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -151,9 +124,9 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
           </div>
         ) : notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-            <Bell className="h-12 w-12 text-muted-foreground dark:text-slate-600 mb-3" />
-            <p className="text-sm text-muted-foreground">No notifications</p>
-            <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
+            <Bell className="h-10 w-10 text-slate-600 mb-3" />
+            <p className="text-sm text-slate-400">No notifications</p>
+            <p className="text-xs text-slate-500 mt-1">
               You&apos;re all caught up!
             </p>
             <Link href="/notifications" onClick={onClose}>
@@ -164,52 +137,47 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
           </div>
         ) : (
           <>
-            <ScrollArea className="h-[400px]">
-              <div className="divide-y divide-slate-200 dark:divide-slate-700">
-                {notifications.map((notification) => (
-                  <div
-                    key={notification.id}
-                    className="p-4 hover:bg-slate-800/50 transition-colors cursor-pointer"
-                    onClick={() => onNotificationClick?.(notification)}
-                  >
-                    <div className="flex items-start gap-3">
-                      {/* Priority Indicator */}
-                      {notification.priority === 'HIGH' && (
-                        <div className="mt-1">
-                          <AlertTriangle className="h-4 w-4 text-red-600" />
-                        </div>
-                      )}
+            <ScrollArea className="flex-1 overflow-auto">
+              <div className="divide-y divide-slate-700/50">
+                {notifications.map((notification) => {
+                  const isUnread = getIsUnread(notification);
+                  return (
+                    <button
+                      key={notification.id}
+                      type="button"
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-800/60 transition-colors text-left min-h-[52px] focus:outline-none focus-visible:ring-2 focus-visible:ring-avs-yellow focus-visible:ring-inset"
+                      onClick={() => handleNotificationClick(notification)}
+                    >
+                      {/* Unread dot */}
+                      <span
+                        className={`flex-shrink-0 h-2.5 w-2.5 rounded-full ${
+                          isUnread ? 'bg-avs-yellow' : 'bg-transparent'
+                        }`}
+                        aria-label={isUnread ? 'Unread' : 'Read'}
+                      />
 
-                      {/* Content */}
+                      {/* Subject + time */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <h4 className="font-medium text-sm text-white leading-tight">
-                            {notification.subject}
-                          </h4>
-                          {getStatusBadge(notification.status)}
-                        </div>
-
-                        <p className="text-xs text-slate-400 mb-2">
-                          {truncateText(notification.body)}
+                        <p className={`text-sm leading-tight line-clamp-1 ${
+                          isUnread ? 'font-semibold text-white' : 'font-normal text-slate-300'
+                        }`}>
+                          {notification.subject}
                         </p>
-
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground dark:text-muted-foreground">
-                          <span>From: {notification.sender_name}</span>
-                          <span>•</span>
-                          <span>{formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}</span>
-                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                        </p>
                       </div>
-                    </div>
-                  </div>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             </ScrollArea>
 
             {/* Footer */}
-            <div className="p-3 border-t border-slate-700 bg-slate-50 dark:bg-slate-800/50 rounded-b-lg">
-              <div className="flex items-center justify-between gap-2">
+            <div className="px-3 py-2 border-t border-slate-700 bg-slate-800/50 rounded-b-lg">
+              <div className="flex items-center justify-between">
                 <Link href="/notifications" onClick={onClose}>
-                  <Button variant="ghost" size="sm" className="text-xs">
+                  <Button variant="ghost" size="sm" className="text-xs text-slate-400 hover:text-white">
                     See all notifications
                   </Button>
                 </Link>
@@ -219,7 +187,7 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
                   size="sm"
                   onClick={handleClearAll}
                   disabled={clearing}
-                  className="text-xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                  className="text-xs text-slate-500 hover:text-white"
                 >
                   {clearing ? (
                     <>
@@ -238,4 +206,3 @@ export function NotificationPanel({ open, onClose, onNotificationClick }: Notifi
     </>
   );
 }
-
