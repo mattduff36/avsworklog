@@ -52,10 +52,12 @@ const createCategorySchema = z.object({
     .positive('Must be positive')
     .optional()
     .nullable(),
+  period_value: z.coerce.number()
+    .int('Period must be a whole number')
+    .positive('Period must be a positive number'),
   applies_to: z.array(z.enum(['vehicle', 'plant']))
     .min(1, 'Category must apply to at least one asset type')
     .default(['vehicle']),
-  sort_order: z.coerce.number().int().optional(),
   is_active: z.boolean().optional(),
   // New fields for duty/responsibility
   responsibility: z.enum(['workshop', 'office']).default('workshop'),
@@ -150,11 +152,11 @@ export function CategoryDialog({
         name: category.name,
         description: category.description || '',
         type: category.type,
+        period_value: category.period_value,
         alert_threshold_days: category.alert_threshold_days || undefined,
         alert_threshold_miles: category.alert_threshold_miles || undefined,
         alert_threshold_hours: category.alert_threshold_hours || undefined,
         applies_to: category.applies_to || ['vehicle'],
-        sort_order: category.sort_order,
         is_active: category.is_active,
         responsibility: category.responsibility || 'workshop',
         show_on_overview: category.show_on_overview !== false,
@@ -166,11 +168,11 @@ export function CategoryDialog({
         name: '',
         description: '',
         type: 'date',
+        period_value: 12,
         alert_threshold_days: 30,
         alert_threshold_miles: undefined,
         alert_threshold_hours: undefined,
         applies_to: ['vehicle'],
-        sort_order: 999,
         is_active: true,
         responsibility: 'workshop',
         show_on_overview: true,
@@ -180,7 +182,7 @@ export function CategoryDialog({
     }
   }, [open, mode, category, reset]);
 
-  // Clear opposite threshold when type changes
+  // Clear opposite threshold and set sensible defaults when type changes
   useEffect(() => {
     if (selectedType === 'date') {
       setValue('alert_threshold_miles', null);
@@ -188,17 +190,26 @@ export function CategoryDialog({
       if (!watch('alert_threshold_days')) {
         setValue('alert_threshold_days', 30);
       }
+      if (!watch('period_value')) {
+        setValue('period_value', 12);
+      }
     } else if (selectedType === 'mileage') {
       setValue('alert_threshold_days', null);
       setValue('alert_threshold_hours', null);
       if (!watch('alert_threshold_miles')) {
         setValue('alert_threshold_miles', 1000);
       }
+      if (!watch('period_value')) {
+        setValue('period_value', 10000);
+      }
     } else if (selectedType === 'hours') {
       setValue('alert_threshold_days', null);
       setValue('alert_threshold_miles', null);
       if (!watch('alert_threshold_hours')) {
         setValue('alert_threshold_hours', 50);
+      }
+      if (!watch('period_value')) {
+        setValue('period_value', 250);
       }
       // Hours-based categories are for plant machinery
       setValue('applies_to', ['plant']);
@@ -211,11 +222,11 @@ export function CategoryDialog({
         name: data.name,
         description: data.description || undefined,
         type: data.type,
+        period_value: data.period_value,
         alert_threshold_days: data.type === 'date' ? data.alert_threshold_days : undefined,
         alert_threshold_miles: data.type === 'mileage' ? data.alert_threshold_miles : undefined,
         alert_threshold_hours: data.type === 'hours' ? data.alert_threshold_hours : undefined,
         applies_to: data.applies_to,
-        sort_order: data.sort_order,
         responsibility: data.responsibility,
         show_on_overview: data.show_on_overview,
         reminder_in_app_enabled: data.reminder_in_app_enabled,
@@ -227,12 +238,12 @@ export function CategoryDialog({
       const updateData: UpdateCategoryRequest = {
         name: data.name,
         description: data.description || undefined,
+        period_value: data.period_value,
         alert_threshold_days: data.type === 'date' ? data.alert_threshold_days : undefined,
         alert_threshold_miles: data.type === 'mileage' ? data.alert_threshold_miles : undefined,
         alert_threshold_hours: data.type === 'hours' ? data.alert_threshold_hours : undefined,
         applies_to: data.applies_to,
         is_active: data.is_active,
-        sort_order: data.sort_order,
         responsibility: data.responsibility,
         show_on_overview: data.show_on_overview,
         reminder_in_app_enabled: data.reminder_in_app_enabled,
@@ -252,7 +263,7 @@ export function CategoryDialog({
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {mode === 'create' 
-              ? 'Create a new maintenance category with custom alert threshold'
+              ? 'Create a new maintenance category with period and alert threshold'
               : 'Update category settings. Note: Type cannot be changed after creation.'
             }
           </DialogDescription>
@@ -318,12 +329,9 @@ export function CategoryDialog({
                       <div className="w-2 h-2 rounded-full bg-white" />
                     )}
                   </div>
-                  <div>
-                    <p className={`font-medium ${selectedType === 'date' ? 'text-blue-400' : 'text-white'}`}>
-                      Date
-                    </p>
-                    <p className="text-xs text-muted-foreground">Tax, MOT</p>
-                  </div>
+                  <p className={`font-medium ${selectedType === 'date' ? 'text-blue-400' : 'text-white'}`}>
+                    Date
+                  </p>
                 </div>
               </button>
               
@@ -349,12 +357,9 @@ export function CategoryDialog({
                       <div className="w-2 h-2 rounded-full bg-white" />
                     )}
                   </div>
-                  <div>
-                    <p className={`font-medium ${selectedType === 'mileage' ? 'text-blue-400' : 'text-white'}`}>
-                      Mileage
-                    </p>
-                    <p className="text-xs text-muted-foreground">Service</p>
-                  </div>
+                  <p className={`font-medium ${selectedType === 'mileage' ? 'text-blue-400' : 'text-white'}`}>
+                    Mileage
+                  </p>
                 </div>
               </button>
               
@@ -380,12 +385,9 @@ export function CategoryDialog({
                       <div className="w-2 h-2 rounded-full bg-white" />
                     )}
                   </div>
-                  <div>
-                    <p className={`font-medium ${selectedType === 'hours' ? 'text-blue-400' : 'text-white'}`}>
-                      Hours
-                    </p>
-                    <p className="text-xs text-muted-foreground">Plant</p>
-                  </div>
+                  <p className={`font-medium ${selectedType === 'hours' ? 'text-blue-400' : 'text-white'}`}>
+                    Hours
+                  </p>
                 </div>
               </button>
             </div>
@@ -456,19 +458,38 @@ export function CategoryDialog({
             )}
           </div>
 
-          {/* Sort Order */}
+          {/* Period (Due Interval) */}
           <div className="space-y-2">
-            <Label htmlFor="sort_order">Display Order (Optional)</Label>
+            <Label htmlFor="period_value">
+              {selectedType === 'date'
+                ? 'Period (Months)'
+                : selectedType === 'mileage'
+                ? 'Period (Miles)'
+                : 'Period (Hours)'} <span className="text-red-400">*</span>
+            </Label>
             <Input
-              id="sort_order"
+              id="period_value"
               type="number"
-              {...register('sort_order')}
-              placeholder="e.g., 1"
+              {...register('period_value')}
+              placeholder={
+                selectedType === 'date'
+                  ? 'e.g., 12'
+                  : selectedType === 'mileage'
+                  ? 'e.g., 10000'
+                  : 'e.g., 250'
+              }
               className="bg-input border-border text-white"
             />
             <p className="text-xs text-muted-foreground">
-              Lower numbers appear first. Default is 999.
+              {selectedType === 'date'
+                ? 'How often this is due, in months (e.g. 12 = every 12 months)'
+                : selectedType === 'mileage'
+                ? 'How often this is due, in miles (e.g. 10,000 = every 10,000 miles)'
+                : 'How often this is due, in engine hours (e.g. 250 = every 250 hours)'}
             </p>
+            {errors.period_value && (
+              <p className="text-sm text-red-400">{errors.period_value.message}</p>
+            )}
           </div>
 
           {/* Applies To Checkboxes */}

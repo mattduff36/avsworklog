@@ -179,9 +179,11 @@ export interface Database {
           id: string
           name: string
           description: string | null
-          type: 'date' | 'mileage'
+          type: 'date' | 'mileage' | 'hours'
+          period_value: number
           alert_threshold_days: number | null
           alert_threshold_miles: number | null
+          alert_threshold_hours: number | null
           is_active: boolean
           sort_order: number
           created_at: string
@@ -191,9 +193,11 @@ export interface Database {
           id?: string
           name: string
           description?: string | null
-          type: 'date' | 'mileage'
+          type: 'date' | 'mileage' | 'hours'
+          period_value: number
           alert_threshold_days?: number | null
           alert_threshold_miles?: number | null
+          alert_threshold_hours?: number | null
           is_active?: boolean
           sort_order?: number
           created_at?: string
@@ -203,9 +207,11 @@ export interface Database {
           id?: string
           name?: string
           description?: string | null
-          type?: 'date' | 'mileage'
+          type?: 'date' | 'mileage' | 'hours'
+          period_value?: number
           alert_threshold_days?: number | null
           alert_threshold_miles?: number | null
+          alert_threshold_hours?: number | null
           is_active?: boolean
           sort_order?: number
           created_at?: string

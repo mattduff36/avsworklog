@@ -7,6 +7,7 @@ export interface MaintenanceCategory {
   name: string;
   description: string | null;
   type: 'date' | 'mileage' | 'hours';
+  period_value: number;
   alert_threshold_days: number | null;
   alert_threshold_miles: number | null;
   alert_threshold_hours: number | null;
@@ -223,6 +224,7 @@ export interface CreateCategoryRequest {
   name: string;
   description?: string;
   type: 'date' | 'mileage' | 'hours';
+  period_value: number;
   alert_threshold_days?: number;
   alert_threshold_miles?: number;
   alert_threshold_hours?: number;
@@ -237,6 +239,7 @@ export interface CreateCategoryRequest {
 export interface UpdateCategoryRequest {
   name?: string;
   description?: string;
+  period_value?: number;
   alert_threshold_days?: number;
   alert_threshold_miles?: number;
   alert_threshold_hours?: number;

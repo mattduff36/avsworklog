@@ -22,11 +22,11 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    // Get all categories (RLS handles permission check)
+    // Get all categories ordered alphabetically (RLS handles permission check)
     const { data: categories, error } = await supabase
       .from('maintenance_categories')
       .select('*')
-      .order('sort_order');
+      .order('name');
     
     if (error) {
       logger.error('Failed to fetch categories', error);
@@ -91,6 +91,14 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Validate period_value
+    if (!body.period_value || body.period_value <= 0) {
+      return NextResponse.json(
+        { error: 'period_value is required and must be a positive number' },
+        { status: 400 }
+      );
+    }
+    
     // Validate type
     if (!['date', 'mileage', 'hours'].includes(body.type)) {
       return NextResponse.json(
@@ -128,6 +136,7 @@ export async function POST(request: NextRequest) {
         name: body.name,
         description: body.description || null,
         type: body.type,
+        period_value: body.period_value,
         alert_threshold_days: body.type === 'date' ? body.alert_threshold_days : null,
         alert_threshold_miles: body.type === 'mileage' ? body.alert_threshold_miles : null,
         alert_threshold_hours: body.type === 'hours' ? body.alert_threshold_hours : null,

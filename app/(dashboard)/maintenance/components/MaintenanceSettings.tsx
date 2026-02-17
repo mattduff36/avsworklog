@@ -117,6 +117,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                     <TableHead className="text-muted-foreground">Name</TableHead>
                     <TableHead className="text-muted-foreground">Type</TableHead>
                     <TableHead className="text-muted-foreground">Applies To</TableHead>
+                    <TableHead className="text-muted-foreground">Period</TableHead>
                     <TableHead className="text-muted-foreground">Alert Threshold</TableHead>
                     <TableHead className="text-muted-foreground">Responsibility</TableHead>
                     <TableHead className="text-muted-foreground">Reminders</TableHead>
@@ -126,7 +127,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                 </TableHeader>
                 <TableBody>
                   {categories
-                    .sort((a, b) => a.sort_order - b.sort_order)
+                    .sort((a, b) => a.name.localeCompare(b.name))
                     .map((category) => (
                       <TableRow
                         key={category.id}
@@ -160,6 +161,15 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                               </Badge>
                             )}
                           </div>
+                        </TableCell>
+                        
+                        <TableCell className="text-muted-foreground">
+                          {category.type === 'date'
+                            ? `${category.period_value} months`
+                            : category.type === 'hours'
+                            ? `${category.period_value?.toLocaleString()} hours`
+                            : `${category.period_value?.toLocaleString()} miles`
+                          }
                         </TableCell>
                         
                         <TableCell className="text-muted-foreground">

@@ -41,6 +41,7 @@ export async function PUT(
     const updates: Record<string, any> = {};
     if (body.name !== undefined) updates.name = body.name;
     if (body.description !== undefined) updates.description = body.description;
+    if (body.period_value !== undefined) updates.period_value = body.period_value;
     if (body.alert_threshold_days !== undefined) updates.alert_threshold_days = body.alert_threshold_days;
     if (body.alert_threshold_miles !== undefined) updates.alert_threshold_miles = body.alert_threshold_miles;
     if (body.alert_threshold_hours !== undefined) updates.alert_threshold_hours = body.alert_threshold_hours;
