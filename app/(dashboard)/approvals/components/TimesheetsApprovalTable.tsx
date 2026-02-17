@@ -173,7 +173,7 @@ export function TimesheetsApprovalTable({
   return (
     <div className="space-y-3">
       {/* Table */}
-      <div className="border border-slate-700 rounded-lg">
+      <div className="border border-slate-700 rounded-lg overflow-hidden">
         <Table className="min-w-full">
           <TableHeader>
             <TableRow className="border-border">
