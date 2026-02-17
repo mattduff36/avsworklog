@@ -326,35 +326,26 @@ function ApprovalsContent() {
               Review and manage submissions
             </p>
           </div>
-          <Badge variant={statusFilter === 'pending' ? 'warning' : 'secondary'} className="text-lg px-4 py-2">
+          <Badge 
+            variant={
+              statusFilter === 'pending' ? 'warning' :
+              statusFilter === 'approved' ? 'success' :
+              statusFilter === 'rejected' ? 'destructive' :
+              'secondary'
+            }
+            className={`text-lg px-4 py-2 ${
+              statusFilter === 'approved' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
+              statusFilter === 'processed' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+              statusFilter === 'adjusted' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+              ''
+            }`}
+          >
             {totalCount} {getFilterLabel(statusFilter)}
           </Badge>
         </div>
       </div>
 
-      {totalCount === 0 ? (
-        <Card className="border-border">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            {statusFilter === 'pending' && <CheckCircle2 className="h-16 w-16 text-green-400 mb-4" />}
-            {statusFilter === 'approved' && <CheckCircle2 className="h-16 w-16 text-green-400 mb-4" />}
-            {statusFilter === 'rejected' && <XCircle className="h-16 w-16 text-red-400 mb-4" />}
-            {statusFilter === 'all' && <FileText className="h-16 w-16 text-muted-foreground mb-4" />}
-            <h3 className="text-lg font-semibold text-white mb-2">
-              {statusFilter === 'pending' && 'All caught up!'}
-              {statusFilter === 'approved' && 'No approved submissions'}
-              {statusFilter === 'rejected' && 'No rejected submissions'}
-              {statusFilter === 'all' && 'No submissions yet'}
-            </h3>
-            <p className="text-muted-foreground">
-              {statusFilter === 'pending' && 'There are no pending approvals at the moment'}
-              {statusFilter === 'approved' && 'There are no approved submissions to display'}
-              {statusFilter === 'rejected' && 'There are no rejected submissions to display'}
-              {statusFilter === 'all' && 'No submissions have been made yet'}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full max-w-3xl grid-cols-2 h-auto p-0 bg-slate-100 dark:bg-slate-800 rounded-lg">
             <TabsTrigger 
               value="timesheets" 
@@ -432,9 +423,21 @@ function ApprovalsContent() {
 
           <TabsContent value="timesheets" className="mt-6 space-y-4">
             {timesheets.length === 0 ? (
-              <Card className="">
-                <CardContent className="py-12 text-center text-muted-foreground">
-                  No pending timesheet approvals
+              <Card className="border-border">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  {statusFilter === 'pending' ? (
+                    <CheckCircle2 className="h-12 w-12 text-green-400 mb-3" />
+                  ) : (
+                    <FileText className="h-12 w-12 text-muted-foreground mb-3" />
+                  )}
+                  <h3 className="text-lg font-semibold text-white mb-1">
+                    {statusFilter === 'pending' ? 'All caught up!' : `No ${getFilterLabel(statusFilter).toLowerCase()} timesheets`}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {statusFilter === 'pending'
+                      ? 'There are no pending approvals at the moment'
+                      : `There are no ${getFilterLabel(statusFilter).toLowerCase()} timesheets to display`}
+                  </p>
                 </CardContent>
               </Card>
             ) : (
@@ -470,7 +473,7 @@ function ApprovalsContent() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
-                  <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
+                  <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-0">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -595,7 +598,6 @@ function ApprovalsContent() {
             )}
           </TabsContent>
         </Tabs>
-      )}
 
       {/* Process Timesheet Modal */}
       <ProcessTimesheetModal
