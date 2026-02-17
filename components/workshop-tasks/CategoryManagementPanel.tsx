@@ -4,15 +4,12 @@ import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Edit, Trash2, ChevronDown, ChevronUp, Settings } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-
 type Category = {
   id: string;
   name: string;
   slug: string | null;
   is_active: boolean;
   sort_order: number;
-  requires_subcategories: boolean;
 };
 
 type Subcategory = {
@@ -211,20 +208,9 @@ export function CategoryManagementPanel({
                     <h3 className="text-xl font-semibold text-foreground mb-1">
                       {selectedCategory.name}
                     </h3>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">
-                        Organized alphabetically
-                      </span>
-                      {selectedCategory.requires_subcategories ? (
-                        <Badge variant="outline" className="text-xs border-green-500/30 text-green-500">
-                          Subcategories required
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs border-border text-muted-foreground">
-                          No subcategories required
-                        </Badge>
-                      )}
-                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      Organized alphabetically
+                    </span>
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -251,7 +237,7 @@ export function CategoryManagementPanel({
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-sm font-semibold text-foreground uppercase tracking-wide">
-                      Subcategories ({categorySubcategories.length})
+                      Subcategories (Optional) ({categorySubcategories.length})
                     </h4>
                     <Button
                       size="sm"

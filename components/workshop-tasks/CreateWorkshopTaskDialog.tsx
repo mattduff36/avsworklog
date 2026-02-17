@@ -31,7 +31,6 @@ type Category = {
   slug: string | null;
   is_active: boolean;
   sort_order: number;
-  requires_subcategories: boolean;
   applies_to: 'vehicle' | 'plant';
 };
 
@@ -157,7 +156,7 @@ export function CreateWorkshopTaskDialog({
       // Fetch both vehicle and plant categories
       const { data, error } = await supabase
         .from('workshop_task_categories')
-        .select('id, name, slug, is_active, sort_order, requires_subcategories, applies_to')
+        .select('id, name, slug, is_active, sort_order, applies_to')
         .eq('is_active', true)
         .order('name');
 
@@ -255,10 +254,6 @@ export function CreateWorkshopTaskDialog({
   // Filter categories by selected vehicle's asset type
   const filteredCategories = categories.filter(cat => cat.applies_to === selectedAssetType);
 
-  // Check if selected category requires subcategories
-  const selectedCategory = filteredCategories.find(c => c.id === selectedCategoryId);
-  const selectedCategoryRequiresSubcategories = selectedCategory?.requires_subcategories ?? false;
-
   // Filter subcategories by selected category and asset type
   const filteredSubcategories = selectedCategoryId
     ? subcategories.filter(sub => {
@@ -269,6 +264,9 @@ export function CreateWorkshopTaskDialog({
         return true;
       })
     : [];
+
+  // Dynamically determine if the selected category has active subcategories
+  const categoryHasSubcategories = filteredSubcategories.length > 0;
 
   const handleCategoryChange = (categoryId: string) => {
     setSelectedCategoryId(categoryId);
@@ -282,7 +280,7 @@ export function CreateWorkshopTaskDialog({
       return;
     }
 
-    const needsSubcategory = selectedCategoryRequiresSubcategories;
+    const needsSubcategory = categoryHasSubcategories;
     if (!selectedVehicleId || !selectedCategoryId || (needsSubcategory && !selectedSubcategoryId) || !workshopComments.trim() || !newMeterReading.trim()) {
       toast.error('Please fill in all required fields');
       return;
@@ -330,8 +328,8 @@ export function CreateWorkshopTaskDialog({
         created_by: user.id,
       };
 
-      // Set category/subcategory based on whether subcategories are required
-      if (selectedCategoryRequiresSubcategories) {
+      // Set category/subcategory based on whether subcategories exist for this category
+      if (categoryHasSubcategories && selectedSubcategoryId) {
         taskData.workshop_subcategory_id = selectedSubcategoryId;
       } else {
         taskData.workshop_category_id = selectedCategoryId;
@@ -531,7 +529,7 @@ export function CreateWorkshopTaskDialog({
             </Select>
           </div>
 
-          {selectedCategoryRequiresSubcategories && (
+          {categoryHasSubcategories && (
             <div className="space-y-2">
               <Label htmlFor="subcategory">
                 Subcategory <span className="text-red-500">*</span>
@@ -643,7 +641,7 @@ export function CreateWorkshopTaskDialog({
           </Button>
           <Button
             onClick={handleAddTask}
-            disabled={submitting || !selectedVehicleId || !selectedSubcategoryId || workshopComments.length < 10 || !newMeterReading.trim()}
+            disabled={submitting || !selectedVehicleId || !selectedCategoryId || (categoryHasSubcategories && !selectedSubcategoryId) || workshopComments.length < 10 || !newMeterReading.trim()}
             className="bg-workshop hover:bg-workshop-dark text-white"
           >
             {submitting ? 'Creating...' : 'Create Task'}

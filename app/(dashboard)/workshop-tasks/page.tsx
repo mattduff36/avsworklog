@@ -15,7 +15,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, FileText, Wrench, Undo2, Info, Edit, Trash2, ChevronDown, ChevronUp, MessageSquare, Pause, Paperclip } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
@@ -76,7 +75,6 @@ type Category = {
   slug: string | null;
   is_active: boolean;
   sort_order: number;
-  requires_subcategories: boolean;
 };
 
 type Subcategory = {
@@ -162,12 +160,14 @@ export default function WorkshopTasksPage() {
   const [editComments, setEditComments] = useState('');
   const [editMileage, setEditMileage] = useState('');
   const [editCurrentMileage, setEditCurrentMileage] = useState<number | null>(null);
+  // Legacy-safe edit: capture initial state to decide subcategory requirement
+  const [initialEditCategoryId, setInitialEditCategoryId] = useState('');
+  const [initialEditHadSubcategory, setInitialEditHadSubcategory] = useState(false);
   
   // Category Management
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryName, setCategoryName] = useState('');
-  const [categoryRequiresSubcategories, setCategoryRequiresSubcategories] = useState(false);
   const [submittingCategory, setSubmittingCategory] = useState(false);
 
   // Subcategory Management
@@ -336,7 +336,7 @@ export default function WorkshopTasksPage() {
         setTaskAttachmentCounts(counts);
       }
     } catch (err) {
-      console.error('Error fetching tasks:', err instanceof Error ? err.message : err);
+      console.error('Error fetching tasks:', err instanceof Error ? err.message : JSON.stringify(err));
       toast.error('Failed to load workshop tasks');
     } finally {
       setLoading(false);
@@ -383,7 +383,7 @@ export default function WorkshopTasksPage() {
 
       setVehicles(combinedVehicles);
     } catch (err) {
-      console.error('Error fetching vehicles:', err instanceof Error ? err.message : err);
+      console.error('Error fetching vehicles:', err instanceof Error ? err.message : JSON.stringify(err));
     }
   };
 
@@ -391,7 +391,7 @@ export default function WorkshopTasksPage() {
     try {
       const { data, error } = await supabase
         .from('workshop_task_categories')
-        .select('id, name, slug, is_active, sort_order, requires_subcategories')
+        .select('id, name, slug, is_active, sort_order')
         .eq('applies_to', 'vehicle')
         .eq('is_active', true)
         .order('name');
@@ -399,7 +399,7 @@ export default function WorkshopTasksPage() {
       if (error) throw error;
       setCategories(data || []);
     } catch (err) {
-      console.error('Error fetching categories:', err instanceof Error ? err.message : err);
+      console.error('Error fetching categories:', err instanceof Error ? err.message : JSON.stringify(err));
     }
   };
 
@@ -407,7 +407,7 @@ export default function WorkshopTasksPage() {
     try {
       const { data, error } = await supabase
         .from('workshop_task_categories')
-        .select('id, name, slug, is_active, sort_order, requires_subcategories')
+        .select('id, name, slug, is_active, sort_order')
         .eq('applies_to', 'plant')
         .eq('is_active', true)
         .order('name');
@@ -415,7 +415,7 @@ export default function WorkshopTasksPage() {
       if (error) throw error;
       setPlantCategories(data || []);
     } catch (err) {
-      console.error('Error fetching plant categories:', err instanceof Error ? err.message : err);
+      console.error('Error fetching plant categories:', err instanceof Error ? err.message : JSON.stringify(err));
     }
   };
 
@@ -439,7 +439,7 @@ export default function WorkshopTasksPage() {
       if (error) throw error;
       setSubcategories(data || []);
     } catch (err) {
-      console.error('Error fetching subcategories:', err instanceof Error ? err.message : err);
+      console.error('Error fetching subcategories:', err instanceof Error ? err.message : JSON.stringify(err));
     }
   };
 
@@ -463,7 +463,7 @@ export default function WorkshopTasksPage() {
       if (error) throw error;
       setPlantSubcategories(data || []);
     } catch (err) {
-      console.error('Error fetching plant subcategories:', err instanceof Error ? err.message : err);
+      console.error('Error fetching plant subcategories:', err instanceof Error ? err.message : JSON.stringify(err));
     }
   };
 
@@ -515,7 +515,7 @@ export default function WorkshopTasksPage() {
       }
       setCurrentMeterReading(isPlant ? (data?.current_hours || null) : (data?.current_mileage || null));
     } catch (err) {
-      console.error('Error fetching current meter reading:', err instanceof Error ? err.message : err);
+      console.error('Error fetching current meter reading:', err instanceof Error ? err.message : JSON.stringify(err));
       setCurrentMeterReading(null);
     }
   };
@@ -528,11 +528,11 @@ export default function WorkshopTasksPage() {
   // Get the correct categories based on current tab
   const activeCategories = assetTab === 'plant' ? plantCategories : categories;
 
-  // Check if the selected add-task category requires subcategories
-  const addCategoryRequiresSubcategories = activeCategories.find(c => c.id === selectedCategoryId)?.requires_subcategories ?? false;
+  // Dynamically determine if the selected category has active subcategories
+  const categoryHasSubcategories = filteredSubcategories.length > 0;
 
   const handleAddTask = async () => {
-    const needsSubcategory = addCategoryRequiresSubcategories;
+    const needsSubcategory = categoryHasSubcategories;
     if (!selectedVehicleId || !selectedCategoryId || (needsSubcategory && !selectedSubcategoryId) || !workshopComments.trim() || !newMeterReading.trim()) {
       toast.error('Please fill in all required fields');
       return;
@@ -576,7 +576,7 @@ export default function WorkshopTasksPage() {
       };
 
       // Set category/subcategory based on whether subcategories are required
-      if (addCategoryRequiresSubcategories) {
+      if (categoryHasSubcategories) {
         taskData.workshop_subcategory_id = selectedSubcategoryId;
       } else {
         taskData.workshop_category_id = selectedCategoryId;
@@ -668,7 +668,7 @@ export default function WorkshopTasksPage() {
       resetAddForm();
       fetchTasks();
     } catch (err) {
-      console.error('Error creating task:', err instanceof Error ? err.message : err);
+      console.error('Error creating task:', err instanceof Error ? err.message : JSON.stringify(err));
       toast.error('Failed to create task');
     } finally {
       setSubmitting(false);
@@ -750,7 +750,7 @@ export default function WorkshopTasksPage() {
         return newSet;
       });
     } catch (err) {
-      console.error('Error updating status:', err instanceof Error ? err.message : err);
+      console.error('Error updating status:', err instanceof Error ? err.message : JSON.stringify(err));
       toast.error('Failed to update status');
       setUpdatingStatus(prev => {
         const newSet = new Set(prev);
@@ -1025,7 +1025,7 @@ export default function WorkshopTasksPage() {
         return newSet;
       });
     } catch (err) {
-      console.error('Error marking complete:', err instanceof Error ? err.message : err);
+      console.error('Error marking complete:', err instanceof Error ? err.message : JSON.stringify(err));
       toast.error('Failed to mark complete');
       setUpdatingStatus(prev => {
         const newSet = new Set(prev);
@@ -1073,7 +1073,7 @@ export default function WorkshopTasksPage() {
         return newSet;
       });
     } catch (err) {
-      console.error('Error undoing complete:', err instanceof Error ? err.message : err);
+      console.error('Error undoing complete:', err instanceof Error ? err.message : JSON.stringify(err));
       toast.error('Failed to undo');
       setUpdatingStatus(prev => {
         const newSet = new Set(prev);
@@ -1119,7 +1119,7 @@ export default function WorkshopTasksPage() {
         return newSet;
       });
     } catch (err) {
-      console.error('Error undoing logged:', err instanceof Error ? err.message : err);
+      console.error('Error undoing logged:', err instanceof Error ? err.message : JSON.stringify(err));
       toast.error('Failed to undo');
       setUpdatingStatus(prev => {
         const newSet = new Set(prev);
@@ -1131,25 +1131,33 @@ export default function WorkshopTasksPage() {
 
   const handleEditTask = async (task: Action) => {
     setEditingTask(task);
-    setEditVehicleId(task.vehicle_id || '');
+    setEditVehicleId(task.vehicle_id || task.plant_id || '');
     setEditCategoryId(task.workshop_category_id || '');
     setEditSubcategoryId(task.workshop_subcategory_id || '');
     setEditComments(task.workshop_comments || '');
     setEditMileage('');
+    // Capture initial values for legacy-safe subcategory logic
+    setInitialEditCategoryId(task.workshop_category_id || '');
+    setInitialEditHadSubcategory(!!task.workshop_subcategory_id);
     
-    // Fetch current mileage for the vehicle
-    if (task.vehicle_id) {
+    // Fetch current meter reading (mileage for vehicles, hours for plant)
+    const assetId = task.vehicle_id || task.plant_id;
+    if (assetId) {
+      const isPlantTask = !!task.plant_id;
+      const fieldToSelect = isPlantTask ? 'current_hours' : 'current_mileage';
+      const idColumn = isPlantTask ? 'plant_id' : 'vehicle_id';
+      
       try {
         const { data, error } = await supabase
           .from('vehicle_maintenance')
-          .select('current_mileage')
-          .eq('vehicle_id', task.vehicle_id)
+          .select(fieldToSelect)
+          .eq(idColumn, assetId)
           .single();
 
         if (error && error.code !== 'PGRST116') throw error;
-        setEditCurrentMileage(data?.current_mileage || null);
+        setEditCurrentMileage(data?.[fieldToSelect] || null);
       } catch (err) {
-        console.error('Error fetching mileage:', err instanceof Error ? err.message : err);
+        console.error('Error fetching meter reading:', err instanceof Error ? err.message : JSON.stringify(err));
         setEditCurrentMileage(null);
       }
     }
@@ -1180,7 +1188,7 @@ export default function WorkshopTasksPage() {
       setTaskToDelete(null);
       fetchTasks();
     } catch (err) {
-      console.error('Error deleting task:', err instanceof Error ? err.message : err);
+      console.error('Error deleting task:', err instanceof Error ? err.message : JSON.stringify(err));
       toast.error('Failed to delete task');
     } finally {
       setDeleting(false);
@@ -1194,8 +1202,15 @@ export default function WorkshopTasksPage() {
       return;
     }
 
-    const editCategory = [...categories, ...plantCategories].find(c => c.id === editCategoryId);
-    const editNeedsSubcategory = editCategory?.requires_subcategories ?? false;
+    // Compute whether the current edit category has active subcategories
+    const editSubcategoriesArray = editingTask?.plant_id ? plantSubcategories : subcategories;
+    const editFilteredSubs = editSubcategoriesArray.filter(s => s.category_id === editCategoryId);
+    const editCategoryHasSubcategories = editFilteredSubs.length > 0;
+
+    // Legacy-safe: require subcategory only if category has subcategories AND
+    // (the task originally had one, OR the user changed the category)
+    const categoryChanged = editCategoryId !== initialEditCategoryId;
+    const editNeedsSubcategory = editCategoryHasSubcategories && (initialEditHadSubcategory || categoryChanged);
 
     if (!editVehicleId || !editCategoryId || (editNeedsSubcategory && !editSubcategoryId) || !editComments.trim() || !editMileage.trim()) {
       toast.error('Please fill in all fields');
@@ -1235,8 +1250,8 @@ export default function WorkshopTasksPage() {
         description: editComments.substring(0, 200),
       };
 
-      // Set category/subcategory based on whether subcategories are required
-      if (editNeedsSubcategory) {
+      // Set category/subcategory: save subcategory when category has subs and user selected one
+      if (editCategoryHasSubcategories && editSubcategoryId) {
         updateData.workshop_subcategory_id = editSubcategoryId;
         // workshop_category_id auto-synced by DB trigger from subcategory
       } else {
@@ -1309,9 +1324,11 @@ export default function WorkshopTasksPage() {
       setEditComments('');
       setEditMileage('');
       setEditCurrentMileage(null);
+      setInitialEditCategoryId('');
+      setInitialEditHadSubcategory(false);
       fetchTasks();
     } catch (err) {
-      console.error('Error updating task:', err instanceof Error ? err.message : err);
+      console.error('Error updating task:', err instanceof Error ? err.message : JSON.stringify(err));
       toast.error('Failed to update task');
     } finally {
       setSubmitting(false);
@@ -1399,14 +1416,12 @@ export default function WorkshopTasksPage() {
   const openAddCategoryModal = () => {
     setEditingCategory(null);
     setCategoryName('');
-    setCategoryRequiresSubcategories(false);
     setShowCategoryModal(true);
   };
 
   const openEditCategoryModal = (category: Category) => {
     setEditingCategory(category);
     setCategoryName(category.name);
-    setCategoryRequiresSubcategories(category.requires_subcategories);
     setShowCategoryModal(true);
   };
 
@@ -1425,7 +1440,6 @@ export default function WorkshopTasksPage() {
           .from('workshop_task_categories')
           .update({
             name: categoryName.trim(),
-            requires_subcategories: categoryRequiresSubcategories,
           })
           .eq('id', editingCategory.id);
 
@@ -1440,7 +1454,6 @@ export default function WorkshopTasksPage() {
             applies_to: categoryTaxonomyMode,
             is_active: true,
             sort_order: 0,
-            requires_subcategories: categoryRequiresSubcategories,
             created_by: user?.id,
           });
 
@@ -1455,7 +1468,7 @@ export default function WorkshopTasksPage() {
         fetchCategories();
       }
     } catch (err) {
-      console.error('Error saving category:', err instanceof Error ? err.message : err);
+      console.error('Error saving category:', err instanceof Error ? err.message : JSON.stringify(err));
       toast.error('Failed to save category');
     } finally {
       setSubmittingCategory(false);
@@ -1486,7 +1499,7 @@ export default function WorkshopTasksPage() {
       toast.success('Category deleted successfully');
       fetchCategories();
     } catch (err) {
-      console.error('Error deleting category:', err instanceof Error ? err.message : err);
+      console.error('Error deleting category:', err instanceof Error ? err.message : JSON.stringify(err));
       toast.error('Failed to delete category');
     }
   };
@@ -3120,7 +3133,7 @@ export default function WorkshopTasksPage() {
               </Select>
             </div>
 
-            {addCategoryRequiresSubcategories && (
+            {categoryHasSubcategories && (
               <div className="space-y-2">
                 <Label htmlFor="subcategory" className="text-foreground">
                   Subcategory <span className="text-red-500">*</span>
@@ -3239,7 +3252,7 @@ export default function WorkshopTasksPage() {
             </Button>
             <Button
               onClick={handleAddTask}
-              disabled={submitting || !selectedVehicleId || !selectedSubcategoryId || workshopComments.length < 10 || !newMeterReading.trim()}
+              disabled={submitting || !selectedVehicleId || !selectedCategoryId || (categoryHasSubcategories && !selectedSubcategoryId) || workshopComments.length < 10 || !newMeterReading.trim()}
               className="bg-workshop hover:bg-workshop-dark text-white"
             >
               {submitting ? 'Creating...' : 'Create Task'}
@@ -3472,7 +3485,7 @@ export default function WorkshopTasksPage() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="edit-vehicle" className="text-foreground">
-                Vehicle <span className="text-red-500">*</span>
+                {editingTask?.plant_id ? 'Plant' : 'Vehicle'} <span className="text-red-500">*</span>
               </Label>
               <Select value={editVehicleId} onValueChange={(value) => {
                 setEditVehicleId(value);
@@ -3503,11 +3516,16 @@ export default function WorkshopTasksPage() {
                 }
               }}>
                 <SelectTrigger id="edit-vehicle" className="bg-white dark:bg-slate-800 border-border text-foreground">
-                  <SelectValue placeholder="Select vehicle" />
+                  <SelectValue placeholder={editingTask?.plant_id ? "Select plant" : "Select vehicle"} />
                 </SelectTrigger>
                 <SelectContent>
                   {(() => {
-                    const { recentVehicles, otherVehicles } = splitVehiclesByRecent(vehicles, recentVehicleIds);
+                    // Filter vehicles/plant based on the task being edited
+                    const isEditingPlant = !!editingTask?.plant_id;
+                    const filteredVehicles = vehicles.filter(v => 
+                      isEditingPlant ? v.asset_type === 'plant' : v.asset_type !== 'plant'
+                    );
+                    const { recentVehicles, otherVehicles } = splitVehiclesByRecent(filteredVehicles, recentVehicleIds);
                     return (
                       <>
                         {recentVehicles.length > 0 && (
@@ -3526,7 +3544,7 @@ export default function WorkshopTasksPage() {
                         {otherVehicles.length > 0 && (
                           <SelectGroup>
                             {recentVehicles.length > 0 && (
-                              <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">All Vehicles</SelectLabel>
+                              <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">All {isEditingPlant ? 'Plant' : 'Vehicles'}</SelectLabel>
                             )}
                             {otherVehicles.map((vehicle) => (
                               <SelectItem key={vehicle.id} value={vehicle.id}>
@@ -3554,23 +3572,33 @@ export default function WorkshopTasksPage() {
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
+                  {(() => {
+                    // Determine which categories to show based on the task being edited
+                    const editCategories = editingTask?.plant_id ? plantCategories : categories;
+                    return editCategories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ));
+                  })()}
                 </SelectContent>
               </Select>
             </div>
 
             {(() => {
-              const editCategory = categories.find(c => c.id === editCategoryId);
-              if (!editCategory?.requires_subcategories) return null;
-              const editFilteredSubcategories = subcategories.filter(s => s.category_id === editCategoryId);
+              // Show subcategory picker only when the category has active subcategories
+              const editSubcategoriesArray = editingTask?.plant_id ? plantSubcategories : subcategories;
+              const editFilteredSubcategories = editSubcategoriesArray.filter(s => s.category_id === editCategoryId);
+              if (editFilteredSubcategories.length === 0) return null;
+
+              // Legacy-safe: require subcategory if task originally had one or category changed
+              const categoryChanged = editCategoryId !== initialEditCategoryId;
+              const isRequired = initialEditHadSubcategory || categoryChanged;
+
               return (
                 <div className="space-y-2">
                   <Label htmlFor="edit-subcategory" className="text-foreground">
-                    Subcategory <span className="text-red-500">*</span>
+                    Subcategory {isRequired && <span className="text-red-500">*</span>}
                   </Label>
                   <Select value={editSubcategoryId} onValueChange={setEditSubcategoryId}>
                     <SelectTrigger id="edit-subcategory" className="bg-white dark:bg-slate-800 border-border text-foreground">
@@ -3635,9 +3663,12 @@ export default function WorkshopTasksPage() {
                 setEditingTask(null);
                 setEditVehicleId('');
                 setEditCategoryId('');
+                setEditSubcategoryId('');
                 setEditComments('');
                 setEditMileage('');
                 setEditCurrentMileage(null);
+                setInitialEditCategoryId('');
+                setInitialEditHadSubcategory(false);
               }}
               className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
             >
@@ -3645,7 +3676,15 @@ export default function WorkshopTasksPage() {
             </Button>
             <Button
               onClick={handleSaveEdit}
-              disabled={submitting || !editVehicleId || !editCategoryId || (categories.find(c => c.id === editCategoryId)?.requires_subcategories && !editSubcategoryId) || editComments.length < 10 || !editMileage.trim()}
+              disabled={(() => {
+                if (submitting || !editVehicleId || !editCategoryId || editComments.length < 10 || !editMileage.trim()) return true;
+                // Dynamic subcategory requirement for Save button
+                const editSubsArr = editingTask?.plant_id ? plantSubcategories : subcategories;
+                const editHasSubs = editSubsArr.filter(s => s.category_id === editCategoryId).length > 0;
+                const catChanged = editCategoryId !== initialEditCategoryId;
+                const needsSub = editHasSubs && (initialEditHadSubcategory || catChanged);
+                return needsSub && !editSubcategoryId;
+              })()}
               className="bg-workshop hover:bg-workshop-dark text-white"
             >
               {submitting ? 'Saving...' : 'Save Changes'}
@@ -3685,21 +3724,6 @@ export default function WorkshopTasksPage() {
                 </p>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border border-border p-3">
-                <div className="space-y-0.5">
-                  <Label htmlFor="requires-subcategories" className="text-foreground text-sm font-medium">
-                    Require subcategories
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    When enabled, users must select a subcategory when creating tasks
-                  </p>
-                </div>
-                <Switch
-                  id="requires-subcategories"
-                  checked={categoryRequiresSubcategories}
-                  onCheckedChange={setCategoryRequiresSubcategories}
-                />
-              </div>
             </div>
 
             <DialogFooter>
@@ -3709,7 +3733,6 @@ export default function WorkshopTasksPage() {
                   setShowCategoryModal(false);
                   setEditingCategory(null);
                   setCategoryName('');
-                  setCategoryRequiresSubcategories(false);
                 }}
                 className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
               >
