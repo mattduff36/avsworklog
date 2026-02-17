@@ -6,6 +6,12 @@
 
 import { createClient } from '@/lib/supabase/client';
 
+export interface ErrorHandlingMetadata {
+  wasHandled: boolean;
+  didShowMessage: boolean | null;
+  messageChannel?: 'toast' | 'inline' | 'modal' | 'unknown';
+}
+
 export interface ErrorLog {
   id: string;
   timestamp: string;
@@ -71,6 +77,7 @@ class ErrorLogger {
             colno: event.colno,
             location,
             description: `Unhandled JavaScript error thrown at runtime`,
+            errorHandling: { wasHandled: false, didShowMessage: false } as ErrorHandlingMetadata,
           },
         });
       });
@@ -96,6 +103,7 @@ class ErrorLogger {
             reasonType: typeof reason,
             description: 'Promise was rejected but no .catch() handler was attached',
             pageUrl: window.location.href,
+            errorHandling: { wasHandled: false, didShowMessage: false } as ErrorHandlingMetadata,
           },
         });
       });
@@ -196,6 +204,7 @@ class ErrorLogger {
               description: 'Error logged via console.error() in application code',
               pageUrl: typeof window !== 'undefined' ? window.location.href : 'N/A',
               callStack: new Error().stack,
+              errorHandling: { wasHandled: true, didShowMessage: false } as ErrorHandlingMetadata,
             },
           });
         }
@@ -365,12 +374,14 @@ export function logErrorFromBoundary(error: Error, errorInfo: { componentStack: 
     componentName: 'Error Boundary',
     additionalData: {
       componentStack: errorInfo.componentStack,
+      errorHandling: { wasHandled: false, didShowMessage: false } as ErrorHandlingMetadata,
     },
   });
 }
 
 /**
- * Helper to log errors with toast notifications
+ * Helper to log errors with toast notifications.
+ * Use when the user DOES see an error message (e.g. via toast).
  */
 export function logAndToastError(error: Error | string, componentName?: string) {
   const message = typeof error === 'string' ? error : error.message;
@@ -378,9 +389,35 @@ export function logAndToastError(error: Error | string, componentName?: string) 
   errorLogger.logError({
     error,
     componentName,
+    additionalData: {
+      errorHandling: {
+        wasHandled: true,
+        didShowMessage: true,
+        messageChannel: 'toast',
+      } as ErrorHandlingMetadata,
+    },
   });
 
   // Return the message so it can be used with toast
   return message;
+}
+
+/**
+ * Helper to log errors that are handled silently (no user-facing message).
+ * Use when you catch an error but do NOT show anything to the user.
+ */
+export function logHandledError(
+  error: Error | string,
+  componentName?: string,
+  additionalData?: Record<string, unknown> | null,
+) {
+  errorLogger.logError({
+    error,
+    componentName,
+    additionalData: {
+      ...additionalData,
+      errorHandling: { wasHandled: true, didShowMessage: false } as ErrorHandlingMetadata,
+    },
+  });
 }
 

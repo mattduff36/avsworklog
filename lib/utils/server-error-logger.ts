@@ -116,7 +116,8 @@ export async function logServerError({
     // Generate enhanced error description
     const enhancedMessage = generateErrorDescription(errorObj, componentName, requestContext);
     
-    // Merge request context with additional data
+    // Merge request context with additional data.
+    // Preserve caller-supplied errorHandling if present; otherwise default to unknown.
     const enrichedData = {
       ...requestContext,
       ...additionalData,
@@ -124,6 +125,10 @@ export async function logServerError({
         originalMessage: errorObj.message,
         errorName: errorObj.name,
         timestamp: new Date().toISOString(),
+      },
+      errorHandling: (additionalData as Record<string, unknown> | null)?.errorHandling ?? {
+        wasHandled: true,
+        didShowMessage: null,
       },
     };
 

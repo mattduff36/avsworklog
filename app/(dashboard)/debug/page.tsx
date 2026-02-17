@@ -79,6 +79,43 @@ type ErrorLogEntry = {
   additional_data: Record<string, unknown> | null;
 };
 
+type ErrorSeverity = 'urgent' | 'important' | 'medium' | 'low';
+
+const UNHANDLED_COMPONENTS = ['Global Error Handler', 'Unhandled Promise Rejection', 'Error Boundary'];
+
+function getErrorSeverity(log: ErrorLogEntry): ErrorSeverity {
+  const handling = (log.additional_data as Record<string, unknown> | null)?.errorHandling as
+    | { wasHandled?: boolean; didShowMessage?: boolean | null }
+    | undefined;
+
+  if (handling) {
+    if (!handling.wasHandled && !handling.didShowMessage) return 'urgent';
+    if (handling.wasHandled && handling.didShowMessage === true) return 'important';
+    if (handling.wasHandled && handling.didShowMessage === false) return 'medium';
+    if (handling.didShowMessage === null) return 'low';
+  }
+
+  // Heuristic fallback for legacy logs without errorHandling metadata
+  const comp = log.component_name ?? '';
+  if (UNHANDLED_COMPONENTS.includes(comp)) return 'urgent';
+  if (comp === 'Console Error') return 'medium';
+  if (comp.startsWith('/api/')) return 'low';
+  return 'urgent';
+}
+
+function getErrorBadgeProps(severity: ErrorSeverity): { variant: 'destructive' | 'warning' | 'secondary'; className: string } {
+  switch (severity) {
+    case 'urgent':
+      return { variant: 'destructive', className: 'font-mono text-xs' };
+    case 'important':
+      return { variant: 'warning', className: 'font-mono text-xs' };
+    case 'medium':
+      return { variant: 'secondary', className: 'font-mono text-xs bg-yellow-500 text-black hover:bg-yellow-600' };
+    case 'low':
+      return { variant: 'secondary', className: 'font-mono text-xs bg-slate-500 text-white hover:bg-slate-600' };
+  }
+}
+
 export default function DebugPage() {
   const { profile } = useAuth();
   const router = useRouter();
@@ -1146,6 +1183,8 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                                 const browserMatch = log.user_agent.match(/(Chrome|Safari|Firefox|Edge)\/[\d.]+/);
                                 const browser = browserMatch ? browserMatch[0] : 'Unknown';
                                 const isExpanded = expandedErrors.includes(log.id);
+                                const severity = getErrorSeverity(log);
+                                const badgeProps = getErrorBadgeProps(severity);
 
                                 return (
                                   <div
@@ -1166,7 +1205,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                                         <XCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
                                         <div className="flex-1 min-w-0">
                                           <div className="flex items-center gap-2 flex-wrap mb-1">
-                                            <Badge variant="destructive" className="font-mono text-xs">
+                                            <Badge variant={badgeProps.variant} className={badgeProps.className}>
                                               {log.error_type}
                                             </Badge>
                                             {log.component_name && (
@@ -1290,6 +1329,8 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                     const browserMatch = log.user_agent.match(/(Chrome|Safari|Firefox|Edge)\/[\d.]+/);
                     const browser = browserMatch ? browserMatch[0] : 'Unknown';
                     const isExpanded = expandedErrors.includes(log.id);
+                    const severity = getErrorSeverity(log);
+                    const badgeProps = getErrorBadgeProps(severity);
 
                     return (
                       <div
@@ -1310,7 +1351,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                             <XCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <Badge variant="destructive" className="font-mono text-xs">
+                                <Badge variant={badgeProps.variant} className={badgeProps.className}>
                                   {log.error_type}
                                 </Badge>
                                 {log.component_name && (
