@@ -50,7 +50,7 @@ export default function ToolboxTalksPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 bg-slate-800 p-1">
+        <TabsList className="grid w-full grid-cols-3 bg-slate-800 p-0">
           <TabsTrigger value="create-toolbox-talk" data-tab="toolbox-talk" className="gap-2 data-[state=active]:bg-red-600 data-[state=active]:text-white">
             <MessageSquare className="h-4 w-4" />
             Create Toolbox Talk

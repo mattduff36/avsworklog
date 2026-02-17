@@ -472,7 +472,7 @@ export default function UsersAdminPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-2 bg-slate-100 dark:bg-slate-800 p-1">
+        <TabsList className="grid w-full max-w-md grid-cols-2 bg-slate-100 dark:bg-slate-800 p-0">
           <TabsTrigger 
             value="users" 
             className="gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white"

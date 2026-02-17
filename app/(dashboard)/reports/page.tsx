@@ -400,7 +400,7 @@ export default function ReportsPage() {
 
       {/* Tabs Navigation */}
       <Tabs defaultValue="timesheets" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full max-w-2xl grid-cols-3 h-auto p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+        <TabsList className="grid w-full max-w-2xl grid-cols-3 h-auto p-0 bg-slate-100 dark:bg-slate-800 rounded-lg">
           <TabsTrigger 
             value="timesheets" 
             className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
