@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, FileText, Wrench, Undo2, Info, Edit, Trash2, ChevronDown, ChevronUp, MessageSquare, Pause, Paperclip } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
@@ -75,6 +76,7 @@ type Category = {
   slug: string | null;
   is_active: boolean;
   sort_order: number;
+  requires_subcategories: boolean;
 };
 
 type Subcategory = {
@@ -165,6 +167,7 @@ export default function WorkshopTasksPage() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryName, setCategoryName] = useState('');
+  const [categoryRequiresSubcategories, setCategoryRequiresSubcategories] = useState(false);
   const [submittingCategory, setSubmittingCategory] = useState(false);
 
   // Subcategory Management
@@ -388,7 +391,7 @@ export default function WorkshopTasksPage() {
     try {
       const { data, error } = await supabase
         .from('workshop_task_categories')
-        .select('id, name, slug, is_active, sort_order')
+        .select('id, name, slug, is_active, sort_order, requires_subcategories')
         .eq('applies_to', 'vehicle')
         .eq('is_active', true)
         .order('name');
@@ -404,7 +407,7 @@ export default function WorkshopTasksPage() {
     try {
       const { data, error } = await supabase
         .from('workshop_task_categories')
-        .select('id, name, slug, is_active, sort_order')
+        .select('id, name, slug, is_active, sort_order, requires_subcategories')
         .eq('applies_to', 'plant')
         .eq('is_active', true)
         .order('name');
@@ -525,8 +528,12 @@ export default function WorkshopTasksPage() {
   // Get the correct categories based on current tab
   const activeCategories = assetTab === 'plant' ? plantCategories : categories;
 
+  // Check if the selected add-task category requires subcategories
+  const addCategoryRequiresSubcategories = activeCategories.find(c => c.id === selectedCategoryId)?.requires_subcategories ?? false;
+
   const handleAddTask = async () => {
-    if (!selectedVehicleId || !selectedSubcategoryId || !workshopComments.trim() || !newMeterReading.trim()) {
+    const needsSubcategory = addCategoryRequiresSubcategories;
+    if (!selectedVehicleId || !selectedCategoryId || (needsSubcategory && !selectedSubcategoryId) || !workshopComments.trim() || !newMeterReading.trim()) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -560,7 +567,6 @@ export default function WorkshopTasksPage() {
       // Build task data with correct asset reference
       const taskData: any = {
         action_type: 'workshop_vehicle_task',
-        workshop_subcategory_id: selectedSubcategoryId,
         workshop_comments: workshopComments,
         title: taskTitle,
         description: workshopComments.substring(0, 200),
@@ -568,6 +574,14 @@ export default function WorkshopTasksPage() {
         priority: 'medium',
         created_by: user!.id,
       };
+
+      // Set category/subcategory based on whether subcategories are required
+      if (addCategoryRequiresSubcategories) {
+        taskData.workshop_subcategory_id = selectedSubcategoryId;
+      } else {
+        taskData.workshop_category_id = selectedCategoryId;
+        taskData.workshop_subcategory_id = null;
+      }
 
       // Set either vehicle_id or plant_id, not both
       if (isPlant) {
@@ -1180,7 +1194,10 @@ export default function WorkshopTasksPage() {
       return;
     }
 
-    if (!editVehicleId || !editCategoryId || !editComments.trim() || !editMileage.trim()) {
+    const editCategory = [...categories, ...plantCategories].find(c => c.id === editCategoryId);
+    const editNeedsSubcategory = editCategory?.requires_subcategories ?? false;
+
+    if (!editVehicleId || !editCategoryId || (editNeedsSubcategory && !editSubcategoryId) || !editComments.trim() || !editMileage.trim()) {
       toast.error('Please fill in all fields');
       return;
     }
@@ -1213,12 +1230,19 @@ export default function WorkshopTasksPage() {
 
       // Update the workshop task with correct asset reference
       const updateData: any = {
-        workshop_category_id: editCategoryId,
-        workshop_subcategory_id: editSubcategoryId || null,
         workshop_comments: editComments,
         title: `Workshop Task - ${getAssetIdLabel(selectedVehicle)}`,
         description: editComments.substring(0, 200),
       };
+
+      // Set category/subcategory based on whether subcategories are required
+      if (editNeedsSubcategory) {
+        updateData.workshop_subcategory_id = editSubcategoryId;
+        // workshop_category_id auto-synced by DB trigger from subcategory
+      } else {
+        updateData.workshop_category_id = editCategoryId;
+        updateData.workshop_subcategory_id = null;
+      }
 
       // Update the correct asset reference
       if (isPlant) {
@@ -1375,12 +1399,14 @@ export default function WorkshopTasksPage() {
   const openAddCategoryModal = () => {
     setEditingCategory(null);
     setCategoryName('');
+    setCategoryRequiresSubcategories(false);
     setShowCategoryModal(true);
   };
 
   const openEditCategoryModal = (category: Category) => {
     setEditingCategory(category);
     setCategoryName(category.name);
+    setCategoryRequiresSubcategories(category.requires_subcategories);
     setShowCategoryModal(true);
   };
 
@@ -1394,11 +1420,12 @@ export default function WorkshopTasksPage() {
       setSubmittingCategory(true);
 
       if (editingCategory) {
-        // Update existing category (name only, sort order will be recalculated on fetch)
+        // Update existing category
         const { error } = await supabase
           .from('workshop_task_categories')
           .update({
             name: categoryName.trim(),
+            requires_subcategories: categoryRequiresSubcategories,
           })
           .eq('id', editingCategory.id);
 
@@ -1413,6 +1440,7 @@ export default function WorkshopTasksPage() {
             applies_to: categoryTaxonomyMode,
             is_active: true,
             sort_order: 0,
+            requires_subcategories: categoryRequiresSubcategories,
             created_by: user?.id,
           });
 
@@ -3092,27 +3120,29 @@ export default function WorkshopTasksPage() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="subcategory" className="text-foreground">
-                Subcategory <span className="text-red-500">*</span>
-              </Label>
-              <Select 
-                value={selectedSubcategoryId} 
-                onValueChange={setSelectedSubcategoryId}
-                disabled={!selectedCategoryId}
-              >
-                <SelectTrigger id="subcategory" className="bg-white dark:bg-slate-800 border-border text-foreground">
-                  <SelectValue placeholder={selectedCategoryId ? "Select subcategory" : "Select a category first"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredSubcategories.map((subcategory) => (
-                    <SelectItem key={subcategory.id} value={subcategory.id}>
-                      {subcategory.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {addCategoryRequiresSubcategories && (
+              <div className="space-y-2">
+                <Label htmlFor="subcategory" className="text-foreground">
+                  Subcategory <span className="text-red-500">*</span>
+                </Label>
+                <Select 
+                  value={selectedSubcategoryId} 
+                  onValueChange={setSelectedSubcategoryId}
+                  disabled={!selectedCategoryId}
+                >
+                  <SelectTrigger id="subcategory" className="bg-white dark:bg-slate-800 border-border text-foreground">
+                    <SelectValue placeholder={selectedCategoryId ? "Select subcategory" : "Select a category first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredSubcategories.map((subcategory) => (
+                      <SelectItem key={subcategory.id} value={subcategory.id}>
+                        {subcategory.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="mileage" className="text-foreground">
@@ -3516,7 +3546,10 @@ export default function WorkshopTasksPage() {
               <Label htmlFor="edit-category" className="text-foreground">
                 Category <span className="text-red-500">*</span>
               </Label>
-              <Select value={editCategoryId} onValueChange={setEditCategoryId}>
+              <Select value={editCategoryId} onValueChange={(value) => {
+                setEditCategoryId(value);
+                setEditSubcategoryId('');
+              }}>
                 <SelectTrigger id="edit-category" className="bg-white dark:bg-slate-800 border-border text-foreground">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
@@ -3529,6 +3562,31 @@ export default function WorkshopTasksPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {(() => {
+              const editCategory = categories.find(c => c.id === editCategoryId);
+              if (!editCategory?.requires_subcategories) return null;
+              const editFilteredSubcategories = subcategories.filter(s => s.category_id === editCategoryId);
+              return (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-subcategory" className="text-foreground">
+                    Subcategory <span className="text-red-500">*</span>
+                  </Label>
+                  <Select value={editSubcategoryId} onValueChange={setEditSubcategoryId}>
+                    <SelectTrigger id="edit-subcategory" className="bg-white dark:bg-slate-800 border-border text-foreground">
+                      <SelectValue placeholder="Select subcategory" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {editFilteredSubcategories.map((sub) => (
+                        <SelectItem key={sub.id} value={sub.id}>
+                          {sub.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              );
+            })()}
 
             <div className="space-y-2">
               <Label htmlFor="edit-mileage" className="text-foreground">
@@ -3587,7 +3645,7 @@ export default function WorkshopTasksPage() {
             </Button>
             <Button
               onClick={handleSaveEdit}
-              disabled={submitting || !editVehicleId || !editCategoryId || editComments.length < 10 || !editMileage.trim()}
+              disabled={submitting || !editVehicleId || !editCategoryId || (categories.find(c => c.id === editCategoryId)?.requires_subcategories && !editSubcategoryId) || editComments.length < 10 || !editMileage.trim()}
               className="bg-workshop hover:bg-workshop-dark text-white"
             >
               {submitting ? 'Saving...' : 'Save Changes'}
@@ -3626,6 +3684,22 @@ export default function WorkshopTasksPage() {
                   Categories are automatically organized alphabetically
                 </p>
               </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                <div className="space-y-0.5">
+                  <Label htmlFor="requires-subcategories" className="text-foreground text-sm font-medium">
+                    Require subcategories
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    When enabled, users must select a subcategory when creating tasks
+                  </p>
+                </div>
+                <Switch
+                  id="requires-subcategories"
+                  checked={categoryRequiresSubcategories}
+                  onCheckedChange={setCategoryRequiresSubcategories}
+                />
+              </div>
             </div>
 
             <DialogFooter>
@@ -3635,6 +3709,7 @@ export default function WorkshopTasksPage() {
                   setShowCategoryModal(false);
                   setEditingCategory(null);
                   setCategoryName('');
+                  setCategoryRequiresSubcategories(false);
                 }}
                 className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
               >

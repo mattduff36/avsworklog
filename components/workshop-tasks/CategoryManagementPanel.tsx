@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Edit, Trash2, ChevronDown, ChevronUp, Settings } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 type Category = {
   id: string;
@@ -11,6 +12,7 @@ type Category = {
   slug: string | null;
   is_active: boolean;
   sort_order: number;
+  requires_subcategories: boolean;
 };
 
 type Subcategory = {
@@ -213,6 +215,15 @@ export function CategoryManagementPanel({
                       <span className="text-xs text-muted-foreground">
                         Organized alphabetically
                       </span>
+                      {selectedCategory.requires_subcategories ? (
+                        <Badge variant="outline" className="text-xs border-green-500/30 text-green-500">
+                          Subcategories required
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs border-border text-muted-foreground">
+                          No subcategories required
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   <div className="flex gap-2">

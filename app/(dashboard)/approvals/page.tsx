@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, Clock, CheckCircle2, XCircle, User, Filter, Calendar, Package } from 'lucide-react';
+import { FileText, Clock, CheckCircle2, XCircle, User, Filter, Calendar, Package, LayoutGrid, Table2 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
@@ -18,12 +18,22 @@ import { AbsenceWithRelations } from '@/types/absence';
 import { TimesheetStatusFilter, StatusFilter } from '@/types/common';
 import { usePendingAbsences, useApproveAbsence, useRejectAbsence, useAbsenceSummaryForEmployee } from '@/lib/hooks/useAbsence';
 import { toast } from 'sonner';
+import { TimesheetsApprovalTable } from './components/TimesheetsApprovalTable';
+import { ProcessTimesheetModal } from './components/ProcessTimesheetModal';
+
+interface TimesheetEntry {
+  daily_total: number | null;
+  job_number: string | null;
+  working_in_yard: boolean;
+  did_not_work: boolean;
+}
 
 interface TimesheetWithProfile extends Timesheet {
   user: {
     full_name: string;
     employee_id: string;
   };
+  timesheet_entries?: TimesheetEntry[];
 }
 
 function ApprovalsContent() {
@@ -37,6 +47,19 @@ function ApprovalsContent() {
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'timesheets');
   const [timesheetFilter, setTimesheetFilter] = useState<TimesheetStatusFilter>('pending');
   const statusFilter: StatusFilter = timesheetFilter;
+
+  // View mode (cards vs table) - persisted to localStorage
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('approvals-view-mode') as 'cards' | 'table') || 'cards';
+    }
+    return 'cards';
+  });
+
+  // Process modal state
+  const [processModalOpen, setProcessModalOpen] = useState(false);
+  const [processingTimesheetId, setProcessingTimesheetId] = useState<string | null>(null);
+  const [processingInProgress, setProcessingInProgress] = useState(false);
   
   // Absence hooks
   const { data: absences } = usePendingAbsences();
@@ -55,6 +78,12 @@ function ApprovalsContent() {
           user:profiles!user_id (
             full_name,
             employee_id
+          ),
+          timesheet_entries (
+            daily_total,
+            job_number,
+            working_in_yard,
+            did_not_work
           )
         `);
 
@@ -94,7 +123,7 @@ function ApprovalsContent() {
     }
   }, [isManager, authLoading, router, fetchApprovals, statusFilter, activeTab]);
 
-  const handleQuickApprove = async (type: 'timesheet', id: string) => {
+  const handleQuickApprove = async (_type: 'timesheet', id: string) => {
     try {
       const { error } = await supabase
         .from('timesheets')
@@ -112,7 +141,7 @@ function ApprovalsContent() {
     }
   };
 
-  const handleQuickReject = async (type: 'timesheet', id: string) => {
+  const handleQuickReject = async (_type: 'timesheet', id: string) => {
     const comments = prompt('Enter rejection reason:');
     if (!comments) return;
 
@@ -131,6 +160,38 @@ function ApprovalsContent() {
       await fetchApprovals(statusFilter);
     } catch (error) {
       console.error('Error rejecting:', error);
+    }
+  };
+
+  const handleOpenProcessModal = (id: string) => {
+    setProcessingTimesheetId(id);
+    setProcessModalOpen(true);
+  };
+
+  const handleConfirmProcess = async () => {
+    if (!processingTimesheetId) return;
+
+    try {
+      setProcessingInProgress(true);
+      const { error } = await supabase
+        .from('timesheets')
+        .update({
+          status: 'processed',
+          processed_at: new Date().toISOString(),
+        })
+        .eq('id', processingTimesheetId);
+
+      if (error) throw error;
+
+      toast.success('Timesheet marked as processed');
+      setProcessModalOpen(false);
+      setProcessingTimesheetId(null);
+      await fetchApprovals(statusFilter);
+    } catch (error) {
+      console.error('Error processing timesheet:', error);
+      toast.error('Failed to mark timesheet as processed');
+    } finally {
+      setProcessingInProgress(false);
     }
   };
 
@@ -345,68 +406,109 @@ function ApprovalsContent() {
                 </CardContent>
               </Card>
             ) : (
-              timesheets.map((timesheet) => (
-                <Link key={timesheet.id} href={`/timesheets/${timesheet.id}`} className="block">
-                  <Card className="bg-white dark:bg-slate-900 border-border hover:shadow-lg hover:border-timesheet/50 transition-all duration-200 cursor-pointer">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center space-x-3">
-                          <FileText className="h-5 w-5 text-amber-600" />
-                          <div>
-                            <CardTitle className="text-lg">
-                              Week Ending {formatDate(timesheet.week_ending)}
-                            </CardTitle>
-                            <CardDescription className="flex items-center gap-2 mt-1">
-                              <User className="h-3 w-3" />
-                              {timesheet.user?.full_name || 'Unknown'} 
-                              {timesheet.user?.employee_id && ` (${timesheet.user.employee_id})`}
-                            </CardDescription>
+              <>
+                {/* View Toggle - Desktop Only */}
+                <div className="hidden md:flex justify-end">
+                  <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setViewMode('cards'); localStorage.setItem('approvals-view-mode', 'cards'); }}
+                      className={`h-8 px-3 ${viewMode === 'cards' ? 'bg-slate-700 text-white' : 'text-muted-foreground hover:text-white'}`}
+                    >
+                      <LayoutGrid className="h-4 w-4 mr-1.5" />
+                      Cards
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setViewMode('table'); localStorage.setItem('approvals-view-mode', 'table'); }}
+                      className={`h-8 px-3 ${viewMode === 'table' ? 'bg-slate-700 text-white' : 'text-muted-foreground hover:text-white'}`}
+                    >
+                      <Table2 className="h-4 w-4 mr-1.5" />
+                      Table
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Table View - Desktop Only */}
+                {viewMode === 'table' && (
+                  <div className="hidden md:block">
+                    <TimesheetsApprovalTable
+                      timesheets={timesheets}
+                      onApprove={async (id) => { await handleQuickApprove('timesheet', id); }}
+                      onReject={async (id) => { await handleQuickReject('timesheet', id); }}
+                      onProcess={handleOpenProcessModal}
+                    />
+                  </div>
+                )}
+
+                {/* Card View - Always on mobile, conditional on desktop */}
+                <div className={viewMode === 'table' ? 'md:hidden space-y-4' : 'space-y-4'}>
+                  {timesheets.map((timesheet) => (
+                    <Link key={timesheet.id} href={`/timesheets/${timesheet.id}`} className="block">
+                      <Card className="bg-white dark:bg-slate-900 border-border hover:shadow-lg hover:border-timesheet/50 transition-all duration-200 cursor-pointer">
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center space-x-3">
+                              <FileText className="h-5 w-5 text-amber-600" />
+                              <div>
+                                <CardTitle className="text-lg">
+                                  Week Ending {formatDate(timesheet.week_ending)}
+                                </CardTitle>
+                                <CardDescription className="flex items-center gap-2 mt-1">
+                                  <User className="h-3 w-3" />
+                                  {timesheet.user?.full_name || 'Unknown'} 
+                                  {timesheet.user?.employee_id && ` (${timesheet.user.employee_id})`}
+                                </CardDescription>
+                              </div>
+                            </div>
+                            {getStatusBadge(timesheet.status)}
                           </div>
-                        </div>
-                        {getStatusBadge(timesheet.status)}
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm text-muted-foreground">
-                          {timesheet.submitted_at ? `Submitted ${formatDate(timesheet.submitted_at)}` : 'Not submitted'}
-                          {timesheet.reg_number && ` • Reg: ${timesheet.reg_number}`}
-                        </div>
-                        {timesheet.status === 'submitted' && (
-                          <div className="flex gap-2" onClick={(e) => e.preventDefault()}>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleQuickReject('timesheet', timesheet.id);
-                              }}
-                              className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Reject
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleQuickApprove('timesheet', timesheet.id);
-                              }}
-                              className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
-                            >
-                              <CheckCircle2 className="h-4 w-4 mr-1" />
-                              Approve
-                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm text-muted-foreground">
+                              {timesheet.submitted_at ? `Submitted ${formatDate(timesheet.submitted_at)}` : 'Not submitted'}
+                              {timesheet.reg_number && ` • Reg: ${timesheet.reg_number}`}
+                            </div>
+                            {timesheet.status === 'submitted' && (
+                              <div className="flex gap-2" onClick={(e) => e.preventDefault()}>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleQuickReject('timesheet', timesheet.id);
+                                  }}
+                                  className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
+                                >
+                                  <XCircle className="h-4 w-4 mr-1" />
+                                  Reject
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleQuickApprove('timesheet', timesheet.id);
+                                  }}
+                                  className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
+                                >
+                                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                                  Approve
+                                </Button>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              </>
             )}
           </TabsContent>
 
@@ -432,6 +534,17 @@ function ApprovalsContent() {
           </TabsContent>
         </Tabs>
       )}
+
+      {/* Process Timesheet Modal */}
+      <ProcessTimesheetModal
+        open={processModalOpen}
+        onOpenChange={(open) => {
+          setProcessModalOpen(open);
+          if (!open) setProcessingTimesheetId(null);
+        }}
+        onConfirm={handleConfirmProcess}
+        processing={processingInProgress}
+      />
     </div>
   );
 }
