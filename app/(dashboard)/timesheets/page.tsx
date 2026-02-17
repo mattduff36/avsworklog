@@ -72,38 +72,6 @@ export default function TimesheetsPage() {
     }
   }, [user, isManager, supabase]);
 
-  useEffect(() => {
-    fetchTimesheets();
-  }, [user?.id, isManager, selectedEmployeeId, statusFilter, fetchTimesheets]);
-
-  // Listen for realtime updates to timesheets
-  useTimesheetRealtime((payload) => {
-    console.log('Realtime timesheet update:', payload);
-    
-    // Refetch timesheets when changes occur
-    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
-      fetchTimesheets();
-      
-      // Show toast notification for significant changes
-      if (payload.eventType === 'UPDATE' && payload.new && 'status' in payload.new) {
-        const status = (payload.new as { status?: string }).status;
-        if (status === 'approved') {
-          toast.success('Timesheet approved!', {
-            description: 'A timesheet has been approved by your manager.',
-          });
-        } else if (status === 'rejected') {
-          toast.error('Timesheet rejected', {
-            description: 'A timesheet has been rejected. Please review the comments.',
-          });
-        } else if (status === 'processed') {
-          toast.success('Timesheet processed!', {
-            description: 'A timesheet has been processed for payroll.',
-          });
-        }
-      }
-    }
-  });
-
   const fetchTimesheets = useCallback(async () => {
     if (!user) return;
     setFetchError(null);
@@ -175,6 +143,38 @@ export default function TimesheetsPage() {
       setLoading(false);
     }
   }, [user, isManager, selectedEmployeeId, statusFilter, supabase]);
+
+  useEffect(() => {
+    fetchTimesheets();
+  }, [fetchTimesheets]);
+
+  // Listen for realtime updates to timesheets
+  useTimesheetRealtime((payload) => {
+    console.log('Realtime timesheet update:', payload);
+    
+    // Refetch timesheets when changes occur
+    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+      fetchTimesheets();
+      
+      // Show toast notification for significant changes
+      if (payload.eventType === 'UPDATE' && payload.new && 'status' in payload.new) {
+        const status = (payload.new as { status?: string }).status;
+        if (status === 'approved') {
+          toast.success('Timesheet approved!', {
+            description: 'A timesheet has been approved by your manager.',
+          });
+        } else if (status === 'rejected') {
+          toast.error('Timesheet rejected', {
+            description: 'A timesheet has been rejected. Please review the comments.',
+          });
+        } else if (status === 'processed') {
+          toast.success('Timesheet processed!', {
+            description: 'A timesheet has been processed for payroll.',
+          });
+        }
+      }
+    }
+  });
 
   const getStatusBadge = (status: string) => {
     const variants = {

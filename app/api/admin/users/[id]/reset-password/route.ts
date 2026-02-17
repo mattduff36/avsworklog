@@ -41,6 +41,9 @@ export async function POST(
 
     const userId = (await params).id;
 
+    // Get server client for profile operations
+    const supabase = await createServerClient();
+
     // Get target user's profile
     const { data: targetProfile, error: profileError } = await supabase
       .from('profiles')
