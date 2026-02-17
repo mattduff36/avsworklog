@@ -22,7 +22,7 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "setup:storage": "tsx scripts/setup-storage.ts",
-    "setup:test-users": "tsx scripts/create-test-users.ts",
+    "setup:test-users": "tsx scripts/setup-test-users.ts",
     "seed:sample-data": "tsx scripts/seed-sample-data.ts",
     "clear:inspections": "tsx scripts/clear-inspections.ts",
     "reseed:inspections": "npm run clear:inspections && npm run seed:sample-data",
@@ -32,7 +32,12 @@
     "test:reports": "tsx scripts/test-reports.ts",
     "test:processed-status": "tsx scripts/test-processed-status.ts",
     "lint:theme": "tsx scripts/lint-high-risk-patterns.ts",
-    "test:contrast:workshop": "playwright test tests/ui/contrast.spec.ts"
+    "test:contrast:workshop": "playwright test tests/ui/contrast.spec.ts",
+    "testsuite:setup": "tsx scripts/setup-test-users.ts",
+    "testsuite:ui": "npx playwright test --config=testsuite/config/playwright.config.ts",
+    "testsuite:api": "vitest run --config=testsuite/config/vitest.config.ts",
+    "testsuite": "npm run testsuite:api && npm run testsuite:ui",
+    "testsuite:report": "tsx testsuite/runner/report.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
