@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse} from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { validateRegistrationNumber, formatRegistrationForStorage } from '@/lib/utils/registration';
 
 // Helper to create admin client with service role key
 function getSupabaseAdmin() {
@@ -38,6 +39,7 @@ export async function PUT(
       );
     }
 
+    const supabase = await createServerClient();
     const vehicleId = (await params).id;
     const body = await request.json();
     const { reg_number, category_id, status, nickname } = body;
@@ -130,7 +132,7 @@ export async function PUT(
   }
 }
 
-// DELETE - Delete vehicle
+// DELETE - Delete vehicle (archive)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -148,6 +150,12 @@ export async function DELETE(
         { error: 'Forbidden: Manager or Admin access required' },
         { status: 403 }
       );
+    }
+
+    const supabase = await createServerClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const vehicleId = (await params).id;

@@ -716,7 +716,8 @@ function NewPlantInspectionContent() {
             body: JSON.stringify({
               inspectionId: inspection.id,
               plantId: selectedPlantId,
-              comment: inspectorComments.trim(),
+              createdBy: user!.id,
+              comments: inspectorComments.trim(),
             }),
           });
 

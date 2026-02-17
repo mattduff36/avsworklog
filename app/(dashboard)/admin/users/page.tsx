@@ -209,6 +209,11 @@ export default function UsersAdminPage() {
       return;
     }
 
+    if (!formData.role_id) {
+      setFormError('Please select a role');
+      return;
+    }
+
     try {
       setFormLoading(true);
       setFormError('');

@@ -41,6 +41,14 @@ export async function GET(
       return NextResponse.json({ error: 'Inspection not found' }, { status: 404 });
     }
 
+    // Guard: vehicle must exist with category data for PDF generation
+    if (!(inspection as any).vehicle) {
+      return NextResponse.json(
+        { error: 'Vehicle data not found for this inspection. The vehicle may have been deleted.' },
+        { status: 404 }
+      );
+    }
+
     // Fetch inspection items
     const { data: items, error: itemsError } = await supabase
       .from('inspection_items')
