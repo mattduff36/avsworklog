@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
     // Transform data for Excel
     const excelData = (inspections as InspectionRow[]).map((inspection) => ({
       'Vehicle Reg': inspection.vehicle?.reg_number || '-',
-      'Vehicle Type': getVehicleCategoryName(inspection.vehicle),
+      'Vehicle Type': inspection.vehicle ? getVehicleCategoryName(inspection.vehicle) : 'Unknown',
       'Inspector': inspection.inspector?.full_name || 'Unknown',
       'Employee ID': inspection.inspector?.employee_id || '-',
       'Inspection Date': formatExcelDate(inspection.inspection_date),

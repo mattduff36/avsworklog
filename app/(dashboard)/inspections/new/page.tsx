@@ -160,6 +160,27 @@ function NewInspectionContent() {
   const [informWorkshop, setInformWorkshop] = useState(false);
   const [creatingWorkshopTask, setCreatingWorkshopTask] = useState(false);
 
+  const fetchVehicles = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('vehicles')
+        .select(`
+          *,
+          vehicle_categories (
+            name
+          )
+        `)
+        .eq('status', 'active')
+        .order('reg_number');
+
+      if (error) throw error;
+      setVehicles(data || []);
+    } catch (err) {
+      console.error('Error fetching vehicles:', err);
+      setError('Failed to load vehicles');
+    }
+  }, [supabase]);
+
   useEffect(() => {
     fetchVehicles();
     const fetchCategories = async () => {
@@ -178,10 +199,103 @@ function NewInspectionContent() {
     fetchCategories();
   }, [fetchVehicles, supabase]);
 
+  const loadDraftInspection = useCallback(async (id: string) => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          role:roles (
+            name,
+            is_manager_admin
+          )
+        `)
+        .eq('id', user?.id)
+        .single();
+
+      const userIsManager = (profileData as ProfileWithRole)?.role?.is_manager_admin || false;
+
+      const { data: inspection, error: inspectionError } = await supabase
+        .from('vehicle_inspections')
+        .select(`
+          *,
+          vehicles (
+            id,
+            reg_number,
+            vehicle_type,
+            vehicle_categories (name)
+          )
+        `)
+        .eq('id', id)
+        .single();
+
+      if (inspectionError) throw inspectionError;
+
+      if (!userIsManager && inspection.user_id !== user?.id) {
+        setError('You do not have permission to edit this inspection');
+        return;
+      }
+
+      if (inspection.status !== 'draft') {
+        setError('Only draft inspections can be edited here');
+        return;
+      }
+
+      let checklist = INSPECTION_ITEMS;
+      const inspectionData = inspection as InspectionWithRelations;
+      if (inspectionData.vehicles?.vehicle_categories?.name || inspectionData.vehicles?.vehicle_type) {
+        const categoryName = inspectionData.vehicles?.vehicle_categories?.name || inspectionData.vehicles?.vehicle_type;
+        checklist = getChecklistForCategory(categoryName);
+        setCurrentChecklist(checklist);
+      }
+
+      const { data: items, error: itemsError } = await supabase
+        .from('inspection_items')
+        .select('*')
+        .eq('inspection_id', id)
+        .order('item_number');
+
+      if (itemsError) throw itemsError;
+
+      setExistingInspectionId(id);
+      setVehicleId(inspectionData.vehicles?.id || '');
+      setWeekEnding(inspection.inspection_end_date || formatDateISO(getWeekEnding()));
+      setCurrentMileage(inspection.current_mileage?.toString() || '');
+      setSelectedEmployeeId(inspection.user_id);
+
+      const newCheckboxStates: Record<string, InspectionStatus> = {};
+      const newComments: Record<string, string> = {};
+      
+      (items as InspectionItem[] | null)?.forEach((item: InspectionItem) => {
+        const key = `${item.day_of_week}-${item.item_number}`;
+        newCheckboxStates[key] = item.status;
+        if (item.comments) {
+          newComments[key] = item.comments;
+        }
+      });
+
+      setCheckboxStates(newCheckboxStates);
+      setComments(newComments);
+      
+      if (Object.keys(newCheckboxStates).length > 0) {
+        setChecklistStarted(true);
+      }
+
+      toast.success('Draft inspection loaded');
+    } catch (err) {
+      console.error('Error loading draft inspection:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load draft inspection');
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase, user?.id]);
+
   // Load draft inspection if ID is provided in URL
   useEffect(() => {
     if (draftId && user && !loadingRef.current) {
-      // Wait a bit for isManager to be set
       const timer = setTimeout(() => {
         loadDraftInspection(draftId);
       }, 100);
@@ -234,33 +348,65 @@ function NewInspectionContent() {
     }
   }, [user?.id]);
 
+  // Check for duplicate inspection (same vehicle + week ending)
+  // clearOtherErrors: whether to clear non-duplicate validation errors
+  const checkForDuplicate = useCallback(async (
+    vehicleIdToCheck: string, 
+    weekEndingToCheck: string,
+    clearOtherErrors: boolean = false
+  ): Promise<boolean> => {
+    if (!vehicleIdToCheck || !weekEndingToCheck || existingInspectionId) {
+      setDuplicateInspection(null);
+      return false;
+    }
+
+    setDuplicateCheckLoading(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('vehicle_inspections')
+        .select('id, status')
+        .eq('vehicle_id', vehicleIdToCheck)
+        .eq('inspection_end_date', weekEndingToCheck)
+        .limit(1);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const existing = data[0];
+        setDuplicateInspection(existing.id);
+        setError(`An inspection for this vehicle and week already exists (${existing.status}). Please select a different vehicle or week.`);
+        return true;
+      } else {
+        setDuplicateInspection(null);
+        setError(prev => {
+          if (prev.includes('already exists')) {
+            return '';
+          }
+          return clearOtherErrors ? '' : prev;
+        });
+        return false;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.toLowerCase().includes('network')) {
+        console.warn('Duplicate check skipped (network issue)');
+      } else {
+        console.error('Error checking for duplicate:', err);
+      }
+      setDuplicateInspection(null);
+      return false;
+    } finally {
+      setDuplicateCheckLoading(false);
+    }
+  }, [supabase, existingInspectionId]);
+
   // Check for duplicate inspection when vehicle or week ending changes
   useEffect(() => {
     if (vehicleId && weekEnding && !existingInspectionId) {
       checkForDuplicate(vehicleId, weekEnding);
     }
   }, [vehicleId, weekEnding, existingInspectionId, checkForDuplicate]);
-
-  const fetchVehicles = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('vehicles')
-        .select(`
-          *,
-          vehicle_categories (
-            name
-          )
-        `)
-        .eq('status', 'active')
-        .order('reg_number');
-
-      if (error) throw error;
-      setVehicles(data || []);
-    } catch (err) {
-      console.error('Error fetching vehicles:', err);
-      setError('Failed to load vehicles');
-    }
-  }, [supabase]);
 
   // Fetch baseline mileage for sanity checking
   const fetchBaselineMileage = async (selectedVehicleId: string) => {
@@ -316,67 +462,6 @@ function NewInspectionContent() {
     if (Number.isNaN(mileageValue) || mileageValue < 0) return null;
     return mileageValue;
   };
-
-  // Check for duplicate inspection (same vehicle + week ending)
-  // clearOtherErrors: whether to clear non-duplicate validation errors
-  //   - false for background checks (useEffect) - preserves validation errors
-  //   - true for explicit save checks - clears stale errors before validation re-runs
-  const checkForDuplicate = useCallback(async (
-    vehicleIdToCheck: string, 
-    weekEndingToCheck: string,
-    clearOtherErrors: boolean = false
-  ): Promise<boolean> => {
-    if (!vehicleIdToCheck || !weekEndingToCheck || existingInspectionId) {
-      setDuplicateInspection(null);
-      return false;
-    }
-
-    setDuplicateCheckLoading(true);
-    
-    try {
-      const { data, error } = await supabase
-        .from('vehicle_inspections')
-        .select('id, status')
-        .eq('vehicle_id', vehicleIdToCheck)
-        .eq('inspection_end_date', weekEndingToCheck)
-        .limit(1);
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        const existing = data[0];
-        setDuplicateInspection(existing.id);
-        setError(`An inspection for this vehicle and week already exists (${existing.status}). Please select a different vehicle or week.`);
-        return true; // Duplicate found
-      } else {
-        setDuplicateInspection(null);
-        // Always clear duplicate-related errors when no duplicate is found
-        // For other validation errors, only clear if explicitly requested
-        setError(prev => {
-          // If previous error was about duplicates, always clear it
-          if (prev.includes('already exists')) {
-            return '';
-          }
-          // For other validation errors, only clear if clearOtherErrors=true
-          return clearOtherErrors ? '' : prev;
-        });
-        return false; // No duplicate
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      // Network failures are common on mobile; don't escalate to console.error (captured by global logger)
-      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.toLowerCase().includes('network')) {
-        console.warn('Duplicate check skipped (network issue)');
-      } else {
-        console.error('Error checking for duplicate:', err);
-      }
-      // Don't block the user if the check fails
-      setDuplicateInspection(null);
-      return false;
-    } finally {
-      setDuplicateCheckLoading(false);
-    }
-  }, [supabase, existingInspectionId]);
 
   // Load previous defects for the selected vehicle
   const loadPreviousDefects = async (selectedVehicleId: string) => {
@@ -504,111 +589,6 @@ function NewInspectionContent() {
       setLoggedDefects(new Map());
     }
   };
-
-  const loadDraftInspection = useCallback(async (id: string) => {
-    try {
-      setLoading(true);
-      setError('');
-
-      // Fetch user's profile to check if they're a manager (bypasses hook timing issues)
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          role:roles (
-            name,
-            is_manager_admin
-          )
-        `)
-        .eq('id', user?.id)
-        .single();
-
-      const userIsManager = (profileData as ProfileWithRole)?.role?.is_manager_admin || false;
-
-      // Fetch inspection
-      const { data: inspection, error: inspectionError } = await supabase
-        .from('vehicle_inspections')
-        .select(`
-          *,
-          vehicles (
-            id,
-            reg_number,
-            vehicle_type,
-            vehicle_categories (name)
-          )
-        `)
-        .eq('id', id)
-        .single();
-
-      if (inspectionError) throw inspectionError;
-
-      // Check if user has access (must be owner or manager)
-      if (!userIsManager && inspection.user_id !== user?.id) {
-        setError('You do not have permission to edit this inspection');
-        return;
-      }
-
-      // Only allow loading drafts
-      if (inspection.status !== 'draft') {
-        setError('Only draft inspections can be edited here');
-        return;
-      }
-
-      // Update checklist FIRST based on vehicle category (important for progress calculation)
-      let checklist = INSPECTION_ITEMS;
-      const inspectionData = inspection as InspectionWithRelations;
-      if (inspectionData.vehicles?.vehicle_categories?.name || inspectionData.vehicles?.vehicle_type) {
-        const categoryName = inspectionData.vehicles?.vehicle_categories?.name || inspectionData.vehicles?.vehicle_type;
-        checklist = getChecklistForCategory(categoryName);
-        setCurrentChecklist(checklist);
-      }
-
-      // Fetch inspection items
-      const { data: items, error: itemsError } = await supabase
-        .from('inspection_items')
-        .select('*')
-        .eq('inspection_id', id)
-        .order('item_number');
-
-      if (itemsError) throw itemsError;
-
-      // Populate form with inspection data
-      setExistingInspectionId(id);
-      setVehicleId(inspectionData.vehicles?.id || '');
-      setWeekEnding(inspection.inspection_end_date || formatDateISO(getWeekEnding()));
-      setCurrentMileage(inspection.current_mileage?.toString() || '');
-      
-      // Set the employee (for managers creating inspections for others)
-      setSelectedEmployeeId(inspection.user_id);
-
-      // Populate checkbox states and comments from items
-      const newCheckboxStates: Record<string, InspectionStatus> = {};
-      const newComments: Record<string, string> = {};
-      
-      (items as InspectionItem[] | null)?.forEach((item: InspectionItem) => {
-        const key = `${item.day_of_week}-${item.item_number}`;
-        newCheckboxStates[key] = item.status;
-        if (item.comments) {
-          newComments[key] = item.comments;
-        }
-      });
-
-      setCheckboxStates(newCheckboxStates);
-      setComments(newComments);
-      
-      // If draft has any items, mark checklist as started (locks vehicle/date fields)
-      if (Object.keys(newCheckboxStates).length > 0) {
-        setChecklistStarted(true);
-      }
-
-      toast.success('Draft inspection loaded');
-    } catch (err) {
-      console.error('Error loading draft inspection:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load draft inspection');
-    } finally {
-      setLoading(false);
-    }
-  }, [supabase, user?.id]);
 
   // Format UK registration plates (LLNNLLL -> LLNN LLL)
   const formatRegistration = (reg: string): string => {

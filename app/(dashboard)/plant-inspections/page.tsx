@@ -118,28 +118,6 @@ function PlantInspectionsContent() {
     fetchPlants();
   }, [user, isManager, supabase]);
 
-  useEffect(() => {
-    fetchInspections();
-  }, [user?.id, isManager, selectedEmployeeId, statusFilter, plantFilter, fetchInspections]);
-
-  // Listen for realtime updates to inspections
-  useInspectionRealtime((payload) => {
-    console.log('Realtime plant inspection update:', payload);
-    
-    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
-      fetchInspections();
-      
-      if (payload.eventType === 'UPDATE' && payload.new && 'status' in payload.new) {
-        const status = (payload.new as { status?: string }).status;
-        if (status === 'submitted') {
-          toast.success('Plant inspection submitted', {
-            description: 'A plant inspection has been submitted.',
-          });
-        }
-      }
-    }
-  });
-
   const fetchInspections = useCallback(async () => {
     if (!user) return;
     
@@ -219,6 +197,28 @@ function PlantInspectionsContent() {
       setLoading(false);
     }
   }, [user, isManager, selectedEmployeeId, statusFilter, plantFilter, supabase]);
+
+  useEffect(() => {
+    fetchInspections();
+  }, [fetchInspections]);
+
+  // Listen for realtime updates to inspections
+  useInspectionRealtime((payload) => {
+    console.log('Realtime plant inspection update:', payload);
+    
+    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+      fetchInspections();
+      
+      if (payload.eventType === 'UPDATE' && payload.new && 'status' in payload.new) {
+        const status = (payload.new as { status?: string }).status;
+        if (status === 'submitted') {
+          toast.success('Plant inspection submitted', {
+            description: 'A plant inspection has been submitted.',
+          });
+        }
+      }
+    }
+  });
 
   const getFilterLabel = (filter: InspectionStatusFilter) => {
     switch (filter) {

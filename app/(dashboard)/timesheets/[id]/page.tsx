@@ -64,7 +64,14 @@ export default function ViewTimesheetPage() {
         .eq('id', id)
         .single();
 
-      if (timesheetError) throw timesheetError;
+      if (timesheetError) {
+        if (timesheetError.code === 'PGRST116') {
+          setError('Timesheet not found. It may have been deleted.');
+          setLoading(false);
+          return;
+        }
+        throw timesheetError;
+      }
       
       // Check if user has access
       if (!isManager && timesheetData.user_id !== user?.id) {

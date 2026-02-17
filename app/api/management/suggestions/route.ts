@@ -31,27 +31,43 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') as SuggestionStatus | null;
     const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 200);
 
-    // Build query
-    // Note: suggestions table added by migration - types will update after migration runs
+    // Build query — fetch suggestions first, then look up profiles separately
+    // (no direct FK from suggestions.created_by → profiles.id)
     let query = (supabase as any)
       .from('suggestions')
-      .select(`
-        *,
-        user:profiles!created_by(full_name)
-      `)
+      .select('*')
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    // Apply status filter
     if (status) {
       query = query.eq('status', status);
     }
 
-    const { data: suggestions, error } = await query;
+    const { data: rawSuggestions, error } = await query;
 
     if (error) {
       throw error;
     }
+
+    // Batch-lookup profile names for the creators
+    const creatorIds = [...new Set((rawSuggestions || []).map((s: { created_by: string }) => s.created_by).filter(Boolean))];
+    let profileMap = new Map<string, { full_name: string | null }>();
+
+    if (creatorIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', creatorIds);
+
+      if (profiles) {
+        profileMap = new Map(profiles.map((p: { id: string; full_name: string | null }) => [p.id, { full_name: p.full_name }]));
+      }
+    }
+
+    const suggestions = (rawSuggestions || []).map((s: Record<string, unknown>) => ({
+      ...s,
+      user: profileMap.get(s.created_by as string) || null,
+    }));
 
     // Get counts by status
     const { data: countData } = await (supabase as any)
