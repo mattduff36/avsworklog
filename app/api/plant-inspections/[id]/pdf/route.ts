@@ -85,6 +85,7 @@ export async function GET(
         id: inspection.id,
         inspection_date: inspection.inspection_date,
         inspection_end_date: inspection.inspection_end_date,
+        current_mileage: inspection.current_mileage,
         inspector_comments: inspection.inspector_comments,
         signature_data: inspection.signature_data,
       },

@@ -172,23 +172,23 @@ export default function RAMSPage() {
 
             <div className="flex gap-2">
               <Button
-                variant={statusFilter === 'all' ? 'default' : 'outline'}
+                variant="outline"
                 onClick={() => setStatusFilter('all')}
-                className={statusFilter === 'all' ? 'bg-rams hover:bg-rams-dark text-white' : 'border-border text-muted-foreground hover:bg-slate-700/50'}
+                className={statusFilter === 'all' ? 'bg-white text-slate-900 border-white/80 hover:bg-slate-200' : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'}
               >
                 All
               </Button>
               <Button
-                variant={statusFilter === 'pending' ? 'default' : 'outline'}
+                variant="outline"
                 onClick={() => setStatusFilter('pending')}
-                className={statusFilter === 'pending' ? 'bg-rams hover:bg-rams-dark text-white' : 'border-border text-muted-foreground hover:bg-slate-700/50'}
+                className={statusFilter === 'pending' ? 'bg-white text-slate-900 border-white/80 hover:bg-slate-200' : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'}
               >
                 Pending
               </Button>
               <Button
-                variant={statusFilter === 'signed' ? 'default' : 'outline'}
+                variant="outline"
                 onClick={() => setStatusFilter('signed')}
-                className={statusFilter === 'signed' ? 'bg-rams hover:bg-rams-dark text-white' : 'border-border text-muted-foreground hover:bg-slate-700/50'}
+                className={statusFilter === 'signed' ? 'bg-white text-slate-900 border-white/80 hover:bg-slate-200' : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'}
               >
                 Signed
               </Button>

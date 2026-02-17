@@ -217,7 +217,7 @@ export default function SuggestionsManagePage() {
           <Card 
             key={key}
             className={`cursor-pointer transition-all ${
-              statusFilter === key ? 'ring-2 ring-yellow-500' : ''
+              statusFilter === key ? 'ring-2 ring-yellow-500 bg-white/10' : ''
             } bg-white dark:bg-slate-900 border-border`}
             onClick={() => setStatusFilter(key)}
           >

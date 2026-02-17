@@ -441,20 +441,20 @@ export default function HelpPage() {
               {/* Category Filter */}
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button
-                  variant={selectedCategory === null ? 'default' : 'outline'}
+                  variant="outline"
                   size="sm"
                   onClick={() => setSelectedCategory(null)}
-                  className={selectedCategory === null ? 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900' : ''}
+                  className={selectedCategory === null ? 'bg-white text-slate-900 border-white/80 hover:bg-slate-200' : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'}
                 >
                   All Categories
                 </Button>
                 {filteredCategories.map((category) => (
                   <Button
                     key={category.id}
-                    variant={selectedCategory === category.slug ? 'default' : 'outline'}
+                    variant="outline"
                     size="sm"
                     onClick={() => setSelectedCategory(category.slug)}
-                    className={selectedCategory === category.slug ? 'bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900' : ''}
+                    className={selectedCategory === category.slug ? 'bg-white text-slate-900 border-white/80 hover:bg-slate-200' : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'}
                   >
                     {category.name}
                   </Button>

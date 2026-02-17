@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Edit, Trash2, ChevronDown, ChevronUp, Settings } from 'lucide-react';
-
 type Category = {
   id: string;
   name: string;
@@ -187,11 +186,13 @@ export function CategoryManagementPanel({
                         }`}>
                           {category.name}
                         </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-muted-foreground">
-                            {subcategoryCount} {subcategoryCount === 1 ? 'subcategory' : 'subcategories'}
-                          </span>
-                        </div>
+                        {subcategoryCount > 0 && (
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-muted-foreground">
+                              {subcategoryCount} {subcategoryCount === 1 ? 'subcategory' : 'subcategories'}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </button>
@@ -209,11 +210,9 @@ export function CategoryManagementPanel({
                     <h3 className="text-xl font-semibold text-foreground mb-1">
                       {selectedCategory.name}
                     </h3>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">
-                        Organized alphabetically
-                      </span>
-                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      Organized alphabetically
+                    </span>
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -240,7 +239,7 @@ export function CategoryManagementPanel({
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-sm font-semibold text-foreground uppercase tracking-wide">
-                      Subcategories ({categorySubcategories.length})
+                      Subcategories (Optional) ({categorySubcategories.length})
                     </h4>
                     <Button
                       size="sm"
@@ -253,22 +252,7 @@ export function CategoryManagementPanel({
                     </Button>
                   </div>
 
-                  {categorySubcategories.length === 0 ? (
-                    <div className="text-center py-8 bg-muted/30 rounded-lg border border-border">
-                      <p className="text-muted-foreground mb-3">
-                        No subcategories yet
-                      </p>
-                      <Button
-                        size="sm"
-                        onClick={() => onAddSubcategory(selectedCategory)}
-                        variant="outline"
-                        className="border-workshop/30 text-workshop hover:bg-workshop/10"
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Add First Subcategory
-                      </Button>
-                    </div>
-                  ) : (
+                  {categorySubcategories.length === 0 ? null : (
                     <div className="space-y-2">
                       {categorySubcategories.map((subcategory) => {
                         const isExpanded = expandedSubcategories.has(subcategory.id);

@@ -221,7 +221,7 @@ export default function ErrorReportsManagePage() {
           <Card 
             key={key}
             className={`cursor-pointer transition-all ${
-              statusFilter === key ? 'ring-2 ring-red-500' : ''
+              statusFilter === key ? 'ring-2 ring-red-500 bg-white/10' : ''
             } bg-white dark:bg-slate-900 border-border`}
             onClick={() => setStatusFilter(key)}
           >

@@ -258,7 +258,6 @@ export function CreateWorkshopTaskDialog({
   const filteredSubcategories = selectedCategoryId
     ? subcategories.filter(sub => {
         if (sub.category_id !== selectedCategoryId) return false;
-        // Also check that the subcategory's parent category applies to the selected asset type
         if (sub.workshop_task_categories) {
           return sub.workshop_task_categories.applies_to === selectedAssetType;
         }
@@ -266,20 +265,23 @@ export function CreateWorkshopTaskDialog({
       })
     : [];
 
+  // Dynamically determine if the selected category has active subcategories
+  const categoryHasSubcategories = filteredSubcategories.length > 0;
+
   const handleCategoryChange = (categoryId: string) => {
     setSelectedCategoryId(categoryId);
-    setSelectedSubcategoryId('');  // Reset subcategory
+    setSelectedSubcategoryId('');
   };
 
   const handleAddTask = async () => {
-    // Validate user is authenticated before proceeding
     if (!user?.id) {
       toast.error('You must be logged in to create tasks');
       onOpenChange(false);
       return;
     }
 
-    if (!selectedVehicleId || !selectedSubcategoryId || !workshopComments.trim() || !newMeterReading.trim()) {
+    const needsSubcategory = categoryHasSubcategories;
+    if (!selectedVehicleId || !selectedCategoryId || (needsSubcategory && !selectedSubcategoryId) || !workshopComments.trim() || !newMeterReading.trim()) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -318,7 +320,6 @@ export function CreateWorkshopTaskDialog({
       // Create the workshop task with correct asset reference
       const taskData: any = {
         action_type: 'workshop_vehicle_task',
-        workshop_subcategory_id: selectedSubcategoryId,
         workshop_comments: workshopComments,
         title: taskTitle,
         description: workshopComments.substring(0, 200),
@@ -326,6 +327,14 @@ export function CreateWorkshopTaskDialog({
         priority: 'medium',
         created_by: user.id,
       };
+
+      // Set category/subcategory based on whether subcategories exist for this category
+      if (categoryHasSubcategories && selectedSubcategoryId) {
+        taskData.workshop_subcategory_id = selectedSubcategoryId;
+      } else {
+        taskData.workshop_category_id = selectedCategoryId;
+        taskData.workshop_subcategory_id = null;
+      }
 
       // Set either vehicle_id or plant_id, not both
       if (isPlant) {
@@ -412,8 +421,8 @@ export function CreateWorkshopTaskDialog({
     setSelectedCategoryId('');
     setSelectedSubcategoryId('');
     setWorkshopComments('');
-    setNewMileage('');
-    setCurrentMileage(null);
+    setNewMeterReading('');
+    setCurrentMeterReading(null);
     setSelectedTemplateIds([]);
   };
 
@@ -520,27 +529,29 @@ export function CreateWorkshopTaskDialog({
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="subcategory">
-              Subcategory <span className="text-red-500">*</span>
-            </Label>
-            <Select 
-              value={selectedSubcategoryId} 
-              onValueChange={setSelectedSubcategoryId}
-              disabled={!selectedCategoryId}
-            >
-              <SelectTrigger id="subcategory">
-                <SelectValue placeholder={selectedCategoryId ? "Select subcategory" : "Select a category first"} />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredSubcategories.map((subcategory) => (
-                  <SelectItem key={subcategory.id} value={subcategory.id}>
-                    {subcategory.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {categoryHasSubcategories && (
+            <div className="space-y-2">
+              <Label htmlFor="subcategory">
+                Subcategory <span className="text-red-500">*</span>
+              </Label>
+              <Select 
+                value={selectedSubcategoryId} 
+                onValueChange={setSelectedSubcategoryId}
+                disabled={!selectedCategoryId}
+              >
+                <SelectTrigger id="subcategory">
+                  <SelectValue placeholder={selectedCategoryId ? "Select subcategory" : "Select a category first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredSubcategories.map((subcategory) => (
+                    <SelectItem key={subcategory.id} value={subcategory.id}>
+                      {subcategory.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="mileage">
@@ -630,7 +641,7 @@ export function CreateWorkshopTaskDialog({
           </Button>
           <Button
             onClick={handleAddTask}
-            disabled={submitting || !selectedVehicleId || !selectedSubcategoryId || workshopComments.length < 10 || !newMeterReading.trim()}
+            disabled={submitting || !selectedVehicleId || !selectedCategoryId || (categoryHasSubcategories && !selectedSubcategoryId) || workshopComments.length < 10 || !newMeterReading.trim()}
             className="bg-workshop hover:bg-workshop-dark text-white"
           >
             {submitting ? 'Creating...' : 'Create Task'}

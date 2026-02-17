@@ -22,6 +22,7 @@ interface PlantInspectionWithDetails {
   plant_id: string;
   inspection_date: string;
   inspection_end_date: string;
+  current_mileage: number | null;
   status: string;
   inspector_comments: string | null;
   plant: {
@@ -546,7 +547,22 @@ export default function ViewPlantInspectionPage() {
         </Card>
       </div>
 
-      {/* Daily Hours */}
+      {/* Current Hours */}
+      {inspection.current_mileage != null && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Current Hours</CardTitle>
+            <CardDescription>Machine hours at time of inspection</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">
+              {inspection.current_mileage.toLocaleString()}h
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Daily Hours (legacy - for older inspections) */}
       {dailyHours.length > 0 && (
         <Card>
           <CardHeader>

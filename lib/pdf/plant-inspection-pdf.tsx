@@ -219,6 +219,7 @@ interface PlantInspectionPDFProps {
     id: string;
     inspection_date: string;
     inspection_end_date: string;
+    current_mileage: number | null;
     inspector_comments: string | null;
     signature_data: string | null;
   };
@@ -280,15 +281,26 @@ export function PlantInspectionPDF({
               <Text style={styles.value}>{operator.full_name}</Text>
             </View>
           </View>
-          {plant.vehicle_categories && (
-            <View style={[styles.infoBox, { marginBottom: 8 }]}>
-              <Text style={styles.label}>CATEGORY</Text>
-              <Text style={styles.value}>{plant.vehicle_categories.name}</Text>
+          {(plant.vehicle_categories || inspection.current_mileage != null) && (
+            <View style={styles.infoRow}>
+              {plant.vehicle_categories && (
+                <View style={styles.infoBox}>
+                  <Text style={styles.label}>CATEGORY</Text>
+                  <Text style={styles.value}>{plant.vehicle_categories.name}</Text>
+                </View>
+              )}
+              {inspection.current_mileage != null && (
+                <View style={styles.infoBox}>
+                  <Text style={styles.label}>CURRENT HOURS</Text>
+                  <Text style={styles.value}>{inspection.current_mileage.toLocaleString()}h</Text>
+                </View>
+              )}
             </View>
           )}
         </View>
 
-        {/* Hours Table */}
+        {/* Hours Table (legacy - for older inspections with daily hours) */}
+        {dailyHours.length > 0 && (
         <View style={styles.hoursTable}>
           <View style={styles.tableHeader}>
             {dayNames.map((day, idx) => (
@@ -314,6 +326,7 @@ export function PlantInspectionPDF({
             })}
           </View>
         </View>
+        )}
 
         {/* Checklist */}
         <View style={styles.checklist}>

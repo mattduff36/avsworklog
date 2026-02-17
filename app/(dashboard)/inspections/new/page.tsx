@@ -1280,7 +1280,7 @@ function NewInspectionContent() {
             <BackButton fallbackHref="/inspections" />
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-foreground">
-                {existingInspectionId ? 'Edit Inspection' : 'New Inspection'}
+                {existingInspectionId ? 'Edit Vehicle Inspection' : 'New Vehicle Inspection'}
               </h1>
               <p className="text-sm text-muted-foreground hidden md:block">
                 {existingInspectionId ? 'Continue editing your draft' : 'Daily safety check'}

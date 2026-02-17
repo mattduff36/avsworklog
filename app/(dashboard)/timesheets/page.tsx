@@ -363,10 +363,10 @@ export default function TimesheetsPage() {
                 {(['all', 'draft', 'pending', 'approved', 'rejected', 'processed', 'adjusted'] as TimesheetStatusFilter[]).map((filter) => (
                   <Button
                     key={filter}
-                    variant={statusFilter === filter ? 'default' : 'outline'}
+                    variant="outline"
                     size="sm"
                     onClick={() => setStatusFilter(filter)}
-                    className={statusFilter === filter ? '' : 'border-slate-600 text-slate-600 dark:text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-700/50'}
+                    className={statusFilter === filter ? 'bg-white text-slate-900 border-white/80 hover:bg-slate-200' : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'}
                   >
                     {filter === 'pending' && <Clock className="h-3 w-3 mr-1" />}
                     {filter === 'approved' && <CheckCircle2 className="h-3 w-3 mr-1" />}

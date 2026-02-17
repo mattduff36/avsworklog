@@ -735,6 +735,7 @@ export interface Database {
           slug: string | null
           is_active: boolean
           sort_order: number
+          requires_subcategories: boolean
           ui_color: string | null
           ui_icon: string | null
           ui_badge_style: string | null
@@ -750,6 +751,7 @@ export interface Database {
           slug?: string | null
           is_active?: boolean
           sort_order?: number
+          requires_subcategories?: boolean
           ui_color?: string | null
           ui_icon?: string | null
           ui_badge_style?: string | null
@@ -765,6 +767,7 @@ export interface Database {
           slug?: string | null
           is_active?: boolean
           sort_order?: number
+          requires_subcategories?: boolean
           ui_color?: string | null
           ui_icon?: string | null
           ui_badge_style?: string | null
