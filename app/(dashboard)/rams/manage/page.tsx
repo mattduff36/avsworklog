@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Database } from '@/types/database';
@@ -64,7 +64,7 @@ export default function RAMSManagePage() {
     }
   }, [isManager, isAdmin, authLoading, router]);
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     // Don't fetch if user is not manager/admin (they'll be redirected)
     if (!isManager && !isAdmin) return;
     
@@ -82,14 +82,13 @@ export default function RAMSManagePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isManager, isAdmin]);
 
   useEffect(() => {
-    // Only fetch if auth is loaded and user IS a manager/admin
     if (!authLoading && (isManager || isAdmin)) {
       fetchDocuments();
     }
-  }, [authLoading, isManager, isAdmin]);
+  }, [authLoading, isManager, isAdmin, fetchDocuments]);
 
   useEffect(() => {
     let filtered = documents;

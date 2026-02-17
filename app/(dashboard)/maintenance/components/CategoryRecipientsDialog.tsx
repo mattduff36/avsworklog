@@ -49,44 +49,43 @@ export function CategoryRecipientsDialog({
   // Fetch profiles and current recipients when dialog opens
   useEffect(() => {
     if (open) {
+      const fetchData = async () => {
+        setLoading(true);
+        const supabase = createClient();
+        
+        try {
+          // Fetch all profiles (managers/admins primarily)
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select(`
+              id,
+              full_name,
+              role:roles(name, is_manager_admin)
+            `)
+            .order('full_name');
+          
+          if (profilesError) throw profilesError;
+          
+          // Fetch current recipients for this category
+          const { data: recipientsData, error: recipientsError } = await supabase
+            .from('maintenance_category_recipients')
+            .select('user_id')
+            .eq('category_id', category.id);
+          
+          if (recipientsError) throw recipientsError;
+          
+          setProfiles(profilesData || []);
+          setSelectedUserIds(new Set(recipientsData?.map(r => r.user_id) || []));
+        } catch (error) {
+          console.error('Error fetching data:', error);
+          toast.error('Failed to load recipients');
+        } finally {
+          setLoading(false);
+        }
+      };
       fetchData();
     }
   }, [open, category.id]);
-  
-  const fetchData = async () => {
-    setLoading(true);
-    const supabase = createClient();
-    
-    try {
-      // Fetch all profiles (managers/admins primarily)
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          full_name,
-          role:roles(name, is_manager_admin)
-        `)
-        .order('full_name');
-      
-      if (profilesError) throw profilesError;
-      
-      // Fetch current recipients for this category
-      const { data: recipientsData, error: recipientsError } = await supabase
-        .from('maintenance_category_recipients')
-        .select('user_id')
-        .eq('category_id', category.id);
-      
-      if (recipientsError) throw recipientsError;
-      
-      setProfiles(profilesData || []);
-      setSelectedUserIds(new Set(recipientsData?.map(r => r.user_id) || []));
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error('Failed to load recipients');
-    } finally {
-      setLoading(false);
-    }
-  };
   
   const handleToggleUser = (userId: string) => {
     const newSelected = new Set(selectedUserIds);

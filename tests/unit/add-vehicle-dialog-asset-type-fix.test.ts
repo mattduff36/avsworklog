@@ -296,8 +296,8 @@ describe('AddVehicleDialog Asset Type State Management Bug Fix', () => {
       let effectRunCount = 0;
       const maxRuns = 10;
 
-      let open = true;
-      let initialAssetType = 'plant';
+      const open = true;
+      const initialAssetType = 'plant';
       let assetType = initialAssetType;
 
       // Simulate useEffect

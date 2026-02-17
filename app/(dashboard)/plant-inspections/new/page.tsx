@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -128,81 +128,164 @@ function NewPlantInspectionContent() {
   const [creatingWorkshopTask, setCreatingWorkshopTask] = useState(false);
 
   useEffect(() => {
+    const fetchPlants = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('plant')
+          .select(`
+            *,
+            vehicle_categories (
+              name
+            )
+          `)
+          .eq('status', 'active')
+          .order('plant_id');
+
+        if (error) throw error;
+        setPlants(data || []);
+      } catch (err) {
+        console.error('Error fetching plants:', err);
+        setError('Failed to load plants');
+      }
+    };
+
     fetchPlants();
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     if (draftId && user && !loading) {
+      const loadDraftInspection = async (id: string) => {
+        try {
+          setLoading(true);
+          setError('');
+
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select(`
+              id,
+              role:roles (
+                name,
+                is_manager_admin
+              )
+            `)
+            .eq('id', user?.id)
+            .single();
+
+          const userIsManager = (profileData as ProfileWithRole)?.role?.is_manager_admin || false;
+
+          const { data: inspection, error: inspectionError } = await supabase
+            .from('vehicle_inspections')
+            .select(`
+              *,
+              plant (
+                id,
+                plant_id,
+                nickname,
+                vehicle_categories (name)
+              )
+            `)
+            .eq('id', id)
+            .single();
+
+          if (inspectionError) throw inspectionError;
+
+          if (!userIsManager && inspection.user_id !== user?.id) {
+            setError('You do not have permission to edit this inspection');
+            return;
+          }
+
+          if (inspection.status !== 'draft') {
+            setError('Only draft inspections can be edited here');
+            return;
+          }
+
+          const { data: items, error: itemsError } = await supabase
+            .from('inspection_items')
+            .select('*')
+            .eq('inspection_id', id)
+            .order('item_number');
+
+          if (itemsError) throw itemsError;
+
+          setExistingInspectionId(id);
+          const inspectionData = inspection as InspectionWithRelations;
+          setSelectedPlantId(inspectionData.plant?.id || '');
+          setWeekEnding(inspection.inspection_end_date || formatDateISO(getWeekEnding()));
+          setSelectedEmployeeId(inspection.user_id);
+
+          setOriginalCurrentMileage(inspection.current_mileage);
+          setCurrentHours(inspection.current_mileage?.toString() || '');
+
+          const newCheckboxStates: Record<string, InspectionStatus> = {};
+          const newComments: Record<string, string> = {};
+          
+          (items as InspectionItem[] | null)?.forEach((item: InspectionItem) => {
+            const key = `${item.day_of_week}-${item.item_number}`;
+            newCheckboxStates[key] = item.status;
+            if (item.comments) {
+              newComments[key] = item.comments;
+            }
+          });
+
+          setCheckboxStates(newCheckboxStates);
+          setComments(newComments);
+          
+          if (Object.keys(newCheckboxStates).length > 0) {
+            setChecklistStarted(true);
+          }
+
+          toast.success('Draft inspection loaded');
+        } catch (err) {
+          console.error('Error loading draft inspection:', err);
+          setError(err instanceof Error ? err.message : 'Failed to load draft inspection');
+        } finally {
+          setLoading(false);
+        }
+      };
+
       const timer = setTimeout(() => {
         loadDraftInspection(draftId);
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [draftId, user]);
+  }, [draftId, user, loading, supabase]);
 
   useEffect(() => {
     if (user && isManager) {
+      const fetchEmployees = async () => {
+        try {
+          const { data: profiles, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, employee_id')
+            .order('full_name');
+
+          if (error) throw error;
+
+          const formattedEmployees: Employee[] = (profiles || [])
+            .map((emp) => ({
+              id: emp.id,
+              full_name: emp.full_name || 'Unnamed User',
+              employee_id: emp.employee_id || null,
+            }))
+            .sort((a, b) => a.full_name.localeCompare(b.full_name));
+          
+          setEmployees(formattedEmployees);
+          
+          if (user) {
+            setSelectedEmployeeId(user.id);
+          }
+        } catch (err) {
+          console.error('Error fetching employees:', err);
+        }
+      };
+
       fetchEmployees();
     } else if (user) {
       setSelectedEmployeeId(user.id);
     }
-  }, [user, isManager]);
+  }, [user, isManager, supabase]);
 
-  useEffect(() => {
-    if (selectedPlantId && weekEnding && !existingInspectionId) {
-      checkForDuplicate(selectedPlantId, weekEnding);
-    }
-  }, [selectedPlantId, weekEnding, existingInspectionId]);
-
-  const fetchEmployees = async () => {
-    try {
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, employee_id')
-        .order('full_name');
-
-      if (error) throw error;
-
-      const formattedEmployees: Employee[] = (profiles || [])
-        .map((emp) => ({
-          id: emp.id,
-          full_name: emp.full_name || 'Unnamed User',
-          employee_id: emp.employee_id || null,
-        }))
-        .sort((a, b) => a.full_name.localeCompare(b.full_name));
-      
-      setEmployees(formattedEmployees);
-      
-      if (user) {
-        setSelectedEmployeeId(user.id);
-      }
-    } catch (err) {
-      console.error('Error fetching employees:', err);
-    }
-  };
-
-  const fetchPlants = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('plant')
-        .select(`
-          *,
-          vehicle_categories (
-            name
-          )
-        `)
-        .eq('status', 'active')
-        .order('plant_id');
-
-      if (error) throw error;
-      setPlants(data || []);
-    } catch (err) {
-      console.error('Error fetching plants:', err);
-      setError('Failed to load plants');
-    }
-  };
-
-  const checkForDuplicate = async (
+  const checkForDuplicate = useCallback(async (
     plantIdToCheck: string, 
     weekEndingToCheck: string,
     clearOtherErrors: boolean = false
@@ -246,7 +329,13 @@ function NewPlantInspectionContent() {
     } finally {
       setDuplicateCheckLoading(false);
     }
-  };
+  }, [existingInspectionId, supabase]);
+
+  useEffect(() => {
+    if (selectedPlantId && weekEnding && !existingInspectionId) {
+      checkForDuplicate(selectedPlantId, weekEnding);
+    }
+  }, [selectedPlantId, weekEnding, existingInspectionId, checkForDuplicate]);
 
   const loadLockedDefects = async (plantId: string) => {
     try {
@@ -305,100 +394,6 @@ function NewPlantInspectionContent() {
     } catch (err) {
       console.error('Error loading locked defects:', err);
       setLoggedDefects(new Map());
-    }
-  };
-
-  const loadDraftInspection = async (id: string) => {
-    try {
-      setLoading(true);
-      setError('');
-
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          role:roles (
-            name,
-            is_manager_admin
-          )
-        `)
-        .eq('id', user?.id)
-        .single();
-
-      const userIsManager = (profileData as ProfileWithRole)?.role?.is_manager_admin || false;
-
-      const { data: inspection, error: inspectionError } = await supabase
-        .from('vehicle_inspections')
-        .select(`
-          *,
-          plant (
-            id,
-            plant_id,
-            nickname,
-            vehicle_categories (name)
-          )
-        `)
-        .eq('id', id)
-        .single();
-
-      if (inspectionError) throw inspectionError;
-
-      if (!userIsManager && inspection.user_id !== user?.id) {
-        setError('You do not have permission to edit this inspection');
-        return;
-      }
-
-      if (inspection.status !== 'draft') {
-        setError('Only draft inspections can be edited here');
-        return;
-      }
-
-      // Fetch inspection items
-      const { data: items, error: itemsError } = await supabase
-        .from('inspection_items')
-        .select('*')
-        .eq('inspection_id', id)
-        .order('item_number');
-
-      if (itemsError) throw itemsError;
-
-      // Populate form
-      setExistingInspectionId(id);
-      const inspectionData = inspection as InspectionWithRelations;
-      setSelectedPlantId(inspectionData.plant?.id || '');
-      setWeekEnding(inspection.inspection_end_date || formatDateISO(getWeekEnding()));
-      setSelectedEmployeeId(inspection.user_id);
-
-      // Populate current hours from current_mileage field
-      // Store original value for backward compatibility validation
-      setOriginalCurrentMileage(inspection.current_mileage);
-      setCurrentHours(inspection.current_mileage?.toString() || '');
-
-      // Populate checkbox states and comments
-      const newCheckboxStates: Record<string, InspectionStatus> = {};
-      const newComments: Record<string, string> = {};
-      
-      (items as InspectionItem[] | null)?.forEach((item: InspectionItem) => {
-        const key = `${item.day_of_week}-${item.item_number}`;
-        newCheckboxStates[key] = item.status;
-        if (item.comments) {
-          newComments[key] = item.comments;
-        }
-      });
-
-      setCheckboxStates(newCheckboxStates);
-      setComments(newComments);
-      
-      if (Object.keys(newCheckboxStates).length > 0) {
-        setChecklistStarted(true);
-      }
-
-      toast.success('Draft inspection loaded');
-    } catch (err) {
-      console.error('Error loading draft inspection:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load draft inspection');
-    } finally {
-      setLoading(false);
     }
   };
 

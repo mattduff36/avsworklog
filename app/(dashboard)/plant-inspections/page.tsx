@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useInspectionRealtime } from '@/lib/hooks/useRealtime';
@@ -75,15 +75,52 @@ function PlantInspectionsContent() {
   const supabase = createClient();
 
   useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, full_name, employee_id')
+          .order('full_name');
+        
+        if (error) throw error;
+        setEmployees(data || []);
+      } catch (err) {
+        console.error('Error fetching employees:', err);
+      }
+    };
+
+    const fetchPlants = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('plant')
+          .select(`
+            id, 
+            plant_id,
+            nickname,
+            serial_number,
+            vehicle_categories (
+              name
+            )
+          `)
+          .eq('status', 'active')
+          .order('plant_id');
+        
+        if (error) throw error;
+        setPlants(data || []);
+      } catch (err) {
+        console.error('Error fetching plants:', err);
+      }
+    };
+
     if (user && isManager) {
       fetchEmployees();
     }
     fetchPlants();
-  }, [user?.id, isManager]);
+  }, [user, isManager, supabase]);
 
   useEffect(() => {
     fetchInspections();
-  }, [user?.id, isManager, selectedEmployeeId, statusFilter, plantFilter]);
+  }, [user?.id, isManager, selectedEmployeeId, statusFilter, plantFilter, fetchInspections]);
 
   // Listen for realtime updates to inspections
   useInspectionRealtime((payload) => {
@@ -103,44 +140,7 @@ function PlantInspectionsContent() {
     }
   });
 
-  const fetchEmployees = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, employee_id')
-        .order('full_name');
-      
-      if (error) throw error;
-      setEmployees(data || []);
-    } catch (err) {
-      console.error('Error fetching employees:', err);
-    }
-  };
-
-  const fetchPlants = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('plant')
-        .select(`
-          id, 
-          plant_id,
-          nickname,
-          serial_number,
-          vehicle_categories (
-            name
-          )
-        `)
-        .eq('status', 'active')
-        .order('plant_id');
-      
-      if (error) throw error;
-      setPlants(data || []);
-    } catch (err) {
-      console.error('Error fetching plants:', err);
-    }
-  };
-
-  const fetchInspections = async () => {
+  const fetchInspections = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -218,7 +218,7 @@ function PlantInspectionsContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, isManager, selectedEmployeeId, statusFilter, plantFilter, supabase]);
 
   const getFilterLabel = (filter: InspectionStatusFilter) => {
     switch (filter) {

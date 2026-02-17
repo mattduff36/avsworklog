@@ -77,7 +77,7 @@ describe('Fleet Page and Category Dialog Bug Fixes', () => {
     it('should prevent stale counts in settings tab', () => {
       // Simulate the bug: counts don't update until tab is reopened
       let displayedCount = 2;
-      let actualPlantAssets = [
+      const actualPlantAssets = [
         { id: '1', category_id: 'cat-1' },
         { id: '2', category_id: 'cat-1' },
       ];
@@ -298,7 +298,7 @@ describe('Fleet Page and Category Dialog Bug Fixes', () => {
       expect(validCategory.success).toBe(true);
 
       // Step 3: Add plant asset and sync counts
-      let plantAssets: any[] = [];
+      const plantAssets: any[] = [];
       
       const addPlantAsset = (categoryId: string) => {
         plantAssets.push({ id: 'p1', category_id: categoryId });

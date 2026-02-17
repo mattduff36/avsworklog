@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, useCallback, use } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -366,22 +366,7 @@ export default function VehicleHistoryPage({
     enabled: workshopTasks.length > 0
   });
 
-  useEffect(() => {
-    if (user && resolvedParams.vehicleId) {
-      fetchVehicleData();
-      fetchMaintenanceRecord();
-      fetchMaintenanceHistory();
-      fetchWorkshopTasks();
-    }
-  }, [user, resolvedParams.vehicleId]);
-
-  useEffect(() => {
-    if (activeTab === 'mot' && !motData && vehicle?.reg_number) {
-      fetchMotHistory();
-    }
-  }, [activeTab, motData, vehicle?.reg_number]);
-
-  const fetchVehicleData = async () => {
+  const fetchVehicleData = useCallback(async () => {
     try {
       // Fetch basic vehicle info including plant fields
       const { data: vehicleInfo, error: vehicleError } = await supabase
@@ -426,9 +411,9 @@ export default function VehicleHistoryPage({
     } catch (error) {
       console.error('Error fetching vehicle:', error);
     }
-  };
+  }, [supabase, resolvedParams.vehicleId]);
 
-  const fetchMaintenanceRecord = async () => {
+  const fetchMaintenanceRecord = useCallback(async () => {
     try {
       const response = await fetch('/api/maintenance');
       
@@ -460,9 +445,9 @@ export default function VehicleHistoryPage({
     } catch (error) {
       console.error('Error fetching maintenance record:', error);
     }
-  };
+  }, [resolvedParams.vehicleId]);
 
-  const fetchMaintenanceHistory = async () => {
+  const fetchMaintenanceHistory = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('maintenance_history')
@@ -493,9 +478,9 @@ export default function VehicleHistoryPage({
     } catch (error) {
       console.error('Error fetching maintenance history:', error instanceof Error ? error.message : error);
     }
-  };
+  }, [supabase, resolvedParams.vehicleId]);
 
-  const fetchWorkshopTasks = async () => {
+  const fetchWorkshopTasks = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -583,24 +568,37 @@ export default function VehicleHistoryPage({
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase, resolvedParams.vehicleId]);
 
-
-  const fetchMotHistory = async () => {
-    setMotLoading(true);
-    try {
-      const response = await fetch(`/api/maintenance/mot-history/${resolvedParams.vehicleId}`);
-      const result = await response.json();
-      
-      if (result.success && result.data) {
-        setMotData(result.data);
-      }
-    } catch (error) {
-      console.error('Error fetching MOT history:', error);
-    } finally {
-      setMotLoading(false);
+  useEffect(() => {
+    if (user && resolvedParams.vehicleId) {
+      fetchVehicleData();
+      fetchMaintenanceRecord();
+      fetchMaintenanceHistory();
+      fetchWorkshopTasks();
     }
-  };
+  }, [user, resolvedParams.vehicleId, fetchVehicleData, fetchMaintenanceRecord, fetchMaintenanceHistory, fetchWorkshopTasks]);
+
+  useEffect(() => {
+    if (activeTab === 'mot' && !motData && vehicle?.reg_number) {
+      const fetchMotHistory = async () => {
+        setMotLoading(true);
+        try {
+          const response = await fetch(`/api/maintenance/mot-history/${resolvedParams.vehicleId}`);
+          const result = await response.json();
+          
+          if (result.success && result.data) {
+            setMotData(result.data);
+          }
+        } catch (error) {
+          console.error('Error fetching MOT history:', error);
+        } finally {
+          setMotLoading(false);
+        }
+      };
+      fetchMotHistory();
+    }
+  }, [activeTab, motData, vehicle?.reg_number, resolvedParams.vehicleId]);
 
   const toggleTaskExpansion = (taskId: string) => {
     setExpandedTasks(prev => {

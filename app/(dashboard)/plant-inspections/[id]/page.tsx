@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
@@ -64,13 +64,7 @@ export default function ViewPlantInspectionPage() {
     1: null, 2: null, 3: null, 4: null, 5: null, 6: null, 7: null
   });
 
-  useEffect(() => {
-    if (params.id && !authLoading) {
-      fetchInspection(params.id as string);
-    }
-  }, [params.id, user, authLoading]);
-
-  const fetchInspection = async (id: string) => {
+  const fetchInspection = useCallback(async (id: string) => {
     try {
       setError('');
       
@@ -143,7 +137,13 @@ export default function ViewPlantInspectionPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase, isManager, user]);
+
+  useEffect(() => {
+    if (params.id && !authLoading) {
+      fetchInspection(params.id as string);
+    }
+  }, [params.id, authLoading, fetchInspection]);
 
   const updateItem = (itemNumber: number, field: string, value: string | InspectionStatus) => {
     const newItems = items.map(item => 

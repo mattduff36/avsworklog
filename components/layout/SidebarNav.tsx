@@ -15,7 +15,7 @@ import {
   Shield,
   Check
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { managerNavItems, adminNavItems } from '@/lib/config/navigation';
 import { getViewAsRoleId, setViewAsRoleId } from '@/lib/utils/view-as-cookie';
@@ -80,12 +80,15 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   }, [supabase]);
 
   // Collapse sidebar on route change (don't close completely)
+  const prevPathnameRef = useRef(pathname);
   useEffect(() => {
-    if (open) {
-      onToggle();
+    if (prevPathnameRef.current !== pathname) {
+      prevPathnameRef.current = pathname;
+      if (open) {
+        onToggle();
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  }, [pathname, open, onToggle]);
 
   const isSuperAdmin = userEmail === 'admin@mpdee.co.uk';
   const isViewingAsOtherRole = isSuperAdmin && viewAsRoleId !== '';

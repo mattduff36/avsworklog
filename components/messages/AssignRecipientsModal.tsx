@@ -47,10 +47,45 @@ export function AssignRecipientsModal({
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [selectedRole, setSelectedRole] = useState<string>('');
-  const supabase = createClient();
-
   useEffect(() => {
     if (open) {
+      async function fetchEmployees() {
+        setFetching(true);
+        try {
+          const supabase = createClient();
+          // Fetch all roles
+          const { data: rolesData, error: rolesError } = await supabase
+            .from('roles')
+            .select('name, display_name')
+            .order('display_name');
+
+          if (rolesError) throw rolesError;
+          setRoles(rolesData || []);
+
+          // Fetch all employees with roles
+          const { data: allEmployees, error: empError } = await supabase
+            .from('profiles')
+            .select(`
+              id,
+              full_name,
+              role:roles(
+                name,
+                display_name
+              )
+            `)
+            .order('full_name');
+
+          if (empError) throw empError;
+
+          setEmployees(allEmployees || []);
+          setFilteredEmployees(allEmployees || []);
+        } catch (error) {
+          console.error('Error fetching employees:', error);
+          toast.error('Failed to load employees');
+        } finally {
+          setFetching(false);
+        }
+      }
       fetchEmployees();
     }
   }, [open]);
@@ -66,43 +101,6 @@ export function AssignRecipientsModal({
       setFilteredEmployees(employees);
     }
   }, [searchQuery, employees]);
-
-  const fetchEmployees = async () => {
-    setFetching(true);
-    try {
-      // Fetch all roles
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('roles')
-        .select('name, display_name')
-        .order('display_name');
-
-      if (rolesError) throw rolesError;
-      setRoles(rolesData || []);
-
-      // Fetch all employees with roles
-      const { data: allEmployees, error: empError } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          full_name,
-          role:roles(
-            name,
-            display_name
-          )
-        `)
-        .order('full_name');
-
-      if (empError) throw empError;
-
-      setEmployees(allEmployees || []);
-      setFilteredEmployees(allEmployees || []);
-    } catch (error) {
-      console.error('Error fetching employees:', error);
-      toast.error('Failed to load employees');
-    } finally {
-      setFetching(false);
-    }
-  };
 
   const handleToggleEmployee = (id: string) => {
     const newSelected = new Set(selectedIds);

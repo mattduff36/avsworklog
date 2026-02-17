@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
@@ -38,13 +38,7 @@ export default function ViewInspectionPage() {
   const [error, setError] = useState('');
   const [photoUploadItem, setPhotoUploadItem] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (params.id && !authLoading) {
-      fetchInspection(params.id as string);
-    }
-  }, [params.id, user, authLoading]);
-
-  const fetchInspection = async (id: string) => {
+  const fetchInspection = useCallback(async (id: string) => {
     try {
       setError(''); // Clear any previous errors
       
@@ -97,7 +91,13 @@ export default function ViewInspectionPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase, isManager, user?.id]);
+
+  useEffect(() => {
+    if (params.id && !authLoading) {
+      fetchInspection(params.id as string);
+    }
+  }, [params.id, authLoading, fetchInspection]);
 
   const updateItem = (itemNumber: number, field: string, value: string | InspectionStatus) => {
     const newItems = items.map(item => 

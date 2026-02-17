@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -84,115 +84,7 @@ export function CreateWorkshopTaskDialog({
   // Fetch available attachment templates
   const { templates: attachmentTemplates } = useAttachmentTemplates();
 
-  // Load initial data and set prefilled values
-  useEffect(() => {
-    if (open) {
-      fetchVehicles();
-      fetchCategories();
-      fetchSubcategories();
-      
-      // Load recent vehicle IDs
-      if (user?.id) {
-        setRecentVehicleIds(getRecentVehicleIds(user.id));
-      }
-      
-      // Set initial values if provided
-      if (initialVehicleId) {
-        setSelectedVehicleId(initialVehicleId);
-        fetchCurrentMeterReading(initialVehicleId);
-      }
-      if (initialCategoryId) {
-        setSelectedCategoryId(initialCategoryId);
-      }
-    }
-  }, [open, initialVehicleId, initialCategoryId]);
-
-  const fetchVehicles = async () => {
-    try {
-      // Fetch vehicles
-      const { data: vehicleData, error: vehicleError } = await supabase
-        .from('vehicles')
-        .select('id, reg_number, nickname')
-        .eq('status', 'active')
-        .order('reg_number');
-
-      if (vehicleError) throw vehicleError;
-
-      // Fetch plant
-      const { data: plantData, error: plantError } = await supabase
-        .from('plant')
-        .select('id, plant_id, nickname, serial_number')
-        .eq('status', 'active')
-        .order('plant_id');
-
-      if (plantError) throw plantError;
-
-      // Combine both into a unified list with asset type indicators
-      const combinedVehicles = [
-        ...(vehicleData || []).map(v => ({
-          id: v.id,
-          reg_number: v.reg_number,
-          plant_id: null,
-          nickname: v.nickname,
-          asset_type: 'vehicle' as const
-        })),
-        ...(plantData || []).map(p => ({
-          id: p.id,
-          reg_number: null,
-          plant_id: p.plant_id,
-          nickname: p.nickname,
-          asset_type: 'plant' as const
-        }))
-      ];
-
-      setVehicles(combinedVehicles);
-    } catch (err) {
-      console.error('Error fetching vehicles:', err);
-    }
-  };
-
-  const fetchCategories = async () => {
-    try {
-      // Fetch both vehicle and plant categories
-      const { data, error } = await supabase
-        .from('workshop_task_categories')
-        .select('id, name, slug, is_active, sort_order, applies_to')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      
-      setCategories(data || []);
-    } catch (err) {
-      console.error('Error fetching categories:', err);
-    }
-  };
-
-  const fetchSubcategories = async () => {
-    try {
-      // Fetch all subcategories with their parent category's applies_to
-      const { data, error } = await supabase
-        .from('workshop_task_subcategories')
-        .select(`
-          id,
-          category_id,
-          name,
-          slug,
-          is_active,
-          sort_order,
-          workshop_task_categories!inner(applies_to)
-        `)
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      setSubcategories(data || []);
-    } catch (err) {
-      console.error('Error fetching subcategories:', err);
-    }
-  };
-
-  const fetchCurrentMeterReading = async (assetId: string) => {
+  const fetchCurrentMeterReading = useCallback(async (assetId: string) => {
     try {
       // First, determine asset type by checking both vehicles and plant tables
       // This is necessary because this function may be called before the vehicles state is populated
@@ -245,7 +137,115 @@ export function CreateWorkshopTaskDialog({
       console.error('Error fetching current meter reading:', err);
       setCurrentMeterReading(null);
     }
-  };
+  }, [supabase]);
+
+  // Load initial data and set prefilled values
+  useEffect(() => {
+    if (open) {
+      async function fetchVehicles() {
+        try {
+          // Fetch vehicles
+          const { data: vehicleData, error: vehicleError } = await supabase
+            .from('vehicles')
+            .select('id, reg_number, nickname')
+            .eq('status', 'active')
+            .order('reg_number');
+
+          if (vehicleError) throw vehicleError;
+
+          // Fetch plant
+          const { data: plantData, error: plantError } = await supabase
+            .from('plant')
+            .select('id, plant_id, nickname, serial_number')
+            .eq('status', 'active')
+            .order('plant_id');
+
+          if (plantError) throw plantError;
+
+          // Combine both into a unified list with asset type indicators
+          const combinedVehicles = [
+            ...(vehicleData || []).map(v => ({
+              id: v.id,
+              reg_number: v.reg_number,
+              plant_id: null,
+              nickname: v.nickname,
+              asset_type: 'vehicle' as const
+            })),
+            ...(plantData || []).map(p => ({
+              id: p.id,
+              reg_number: null,
+              plant_id: p.plant_id,
+              nickname: p.nickname,
+              asset_type: 'plant' as const
+            }))
+          ];
+
+          setVehicles(combinedVehicles);
+        } catch (err) {
+          console.error('Error fetching vehicles:', err);
+        }
+      }
+
+      async function fetchCategories() {
+        try {
+          // Fetch both vehicle and plant categories
+          const { data, error } = await supabase
+            .from('workshop_task_categories')
+            .select('id, name, slug, is_active, sort_order, applies_to')
+            .eq('is_active', true)
+            .order('name');
+
+          if (error) throw error;
+          
+          setCategories(data || []);
+        } catch (err) {
+          console.error('Error fetching categories:', err);
+        }
+      }
+
+      async function fetchSubcategories() {
+        try {
+          // Fetch all subcategories with their parent category's applies_to
+          const { data, error } = await supabase
+            .from('workshop_task_subcategories')
+            .select(`
+              id,
+              category_id,
+              name,
+              slug,
+              is_active,
+              sort_order,
+              workshop_task_categories!inner(applies_to)
+            `)
+            .eq('is_active', true)
+            .order('name');
+
+          if (error) throw error;
+          setSubcategories(data || []);
+        } catch (err) {
+          console.error('Error fetching subcategories:', err);
+        }
+      }
+
+      fetchVehicles();
+      fetchCategories();
+      fetchSubcategories();
+      
+      // Load recent vehicle IDs
+      if (user?.id) {
+        setRecentVehicleIds(getRecentVehicleIds(user.id));
+      }
+      
+      // Set initial values if provided
+      if (initialVehicleId) {
+        setSelectedVehicleId(initialVehicleId);
+        fetchCurrentMeterReading(initialVehicleId);
+      }
+      if (initialCategoryId) {
+        setSelectedCategoryId(initialCategoryId);
+      }
+    }
+  }, [open, initialVehicleId, initialCategoryId, user?.id, fetchCurrentMeterReading, supabase]);
 
   // Get selected vehicle's asset type
   const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);

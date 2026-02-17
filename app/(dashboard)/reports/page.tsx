@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,20 @@ interface BulkDownloadProgress {
   status: string;
 }
 
+const getMonday = (date: Date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff));
+};
+
+const getSunday = (date: Date) => {
+  const monday = getMonday(date);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return sunday;
+};
+
 export default function ReportsPage() {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('timesheets');
@@ -46,28 +60,7 @@ export default function ReportsPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  useEffect(() => {
-    // Set default date range to last week (Mon-Sun of previous week)
-    setLastWeek();
-  }, []);
-
-  // Helper to get Monday of a given date's week
-  const getMonday = (date: Date) => {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
-    return new Date(d.setDate(diff));
-  };
-
-  // Helper to get Sunday of a given date's week
-  const getSunday = (date: Date) => {
-    const monday = getMonday(date);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    return sunday;
-  };
-
-  const setLastWeek = () => {
+  const setLastWeek = useCallback(() => {
     const today = new Date();
     const lastWeekEnd = new Date(today);
     lastWeekEnd.setDate(today.getDate() - today.getDay() - (today.getDay() === 0 ? 0 : 1)); // Last Sunday (or today if Sunday)
@@ -76,7 +69,11 @@ export default function ReportsPage() {
     
     setDateFrom(lastWeekStart.toISOString().split('T')[0]);
     setDateTo(lastWeekSunday.toISOString().split('T')[0]);
-  };
+  }, []);
+
+  useEffect(() => {
+    setLastWeek();
+  }, [setLastWeek]);
 
   const setLastMonth = () => {
     const today = new Date();

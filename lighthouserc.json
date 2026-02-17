@@ -2,9 +2,9 @@
   "ci": {
     "collect": {
       "startServerCommand": "cross-env PORT=3001 npm run start",
-      "startServerReadyPattern": "started server on",
+      "startServerReadyPattern": "Ready in",
       "startServerReadyTimeout": 60000,
-      "url": ["http://localhost:3001"],
+      "url": ["http://localhost:3001/login"],
       "numberOfRuns": 1,
       "settings": {
         "preset": "desktop",

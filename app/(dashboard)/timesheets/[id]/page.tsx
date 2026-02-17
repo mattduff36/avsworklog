@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
@@ -53,13 +53,7 @@ export default function ViewTimesheetPage() {
   const [dataChanged, setDataChanged] = useState(false);
   const [manuallyEditedDays, setManuallyEditedDays] = useState<Set<number>>(new Set());
 
-  useEffect(() => {
-    if (params.id && !authLoading) {
-      fetchTimesheet(params.id as string);
-    }
-  }, [params.id, user, authLoading]);
-
-  const fetchTimesheet = async (id: string) => {
+  const fetchTimesheet = useCallback(async (id: string) => {
     try {
       setError(''); // Clear any previous errors
       
@@ -125,7 +119,13 @@ export default function ViewTimesheetPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase, isManager, user]);
+
+  useEffect(() => {
+    if (params.id && !authLoading) {
+      fetchTimesheet(params.id as string);
+    }
+  }, [params.id, authLoading, fetchTimesheet]);
 
   const updateEntry = (dayIndex: number, field: string, value: string | boolean | number) => {
     const newEntries = [...entries];

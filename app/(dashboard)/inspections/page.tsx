@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useInspectionRealtime } from '@/lib/hooks/useRealtime';
@@ -76,74 +76,48 @@ function InspectionsContent() {
   // Fetch employees and vehicles
   useEffect(() => {
     if (user && isManager) {
+      const fetchEmployees = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, employee_id')
+            .order('full_name');
+          
+          if (error) throw error;
+          setEmployees(data || []);
+        } catch (err) {
+          console.error('Error fetching employees:', err);
+        }
+      };
       fetchEmployees();
     }
+    const fetchVehicles = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('vehicles')
+          .select(`
+            id, 
+            reg_number, 
+            vehicle_categories (
+              name
+            )
+          `)
+          .order('reg_number');
+        
+        if (error) throw error;
+        setVehicles(data || []);
+      } catch (err) {
+        console.error('Error fetching vehicles:', err);
+      }
+    };
     fetchVehicles();
     // Load recent vehicle IDs
     if (user?.id) {
       setRecentVehicleIds(getRecentVehicleIds(user.id));
     }
-  }, [user?.id, isManager]);
+  }, [user, isManager, supabase]);
 
-  useEffect(() => {
-    fetchInspections();
-  }, [user?.id, isManager, selectedEmployeeId, statusFilter, vehicleFilter]);
-
-  // Listen for realtime updates to inspections
-  useInspectionRealtime((payload) => {
-    console.log('Realtime inspection update:', payload);
-    
-      // Refetch inspections when changes occur
-      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
-        fetchInspections();
-        
-        // Show toast notification when inspection is submitted
-        if (payload.eventType === 'UPDATE' && payload.new && 'status' in payload.new) {
-          const status = (payload.new as { status?: string }).status;
-          if (status === 'submitted') {
-            toast.success('Inspection submitted', {
-              description: 'A vehicle inspection has been submitted.',
-            });
-          }
-        }
-      }
-  });
-
-  const fetchEmployees = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, employee_id')
-        .order('full_name');
-      
-      if (error) throw error;
-      setEmployees(data || []);
-    } catch (err) {
-      console.error('Error fetching employees:', err);
-    }
-  };
-
-  const fetchVehicles = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('vehicles')
-        .select(`
-          id, 
-          reg_number, 
-          vehicle_categories (
-            name
-          )
-        `)
-        .order('reg_number');
-      
-      if (error) throw error;
-      setVehicles(data || []);
-    } catch (err) {
-      console.error('Error fetching vehicles:', err);
-    }
-  };
-
-  const fetchInspections = async () => {
+  const fetchInspections = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -224,7 +198,31 @@ function InspectionsContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, isManager, selectedEmployeeId, statusFilter, vehicleFilter, supabase]);
+
+  useEffect(() => {
+    fetchInspections();
+  }, [fetchInspections]);
+
+  // Listen for realtime updates to inspections
+  useInspectionRealtime((payload) => {
+    console.log('Realtime inspection update:', payload);
+    
+      // Refetch inspections when changes occur
+      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+        fetchInspections();
+        
+        // Show toast notification when inspection is submitted
+        if (payload.eventType === 'UPDATE' && payload.new && 'status' in payload.new) {
+          const status = (payload.new as { status?: string }).status;
+          if (status === 'submitted') {
+            toast.success('Inspection submitted', {
+              description: 'A vehicle inspection has been submitted.',
+            });
+          }
+        }
+      }
+  });
 
   const getFilterLabel = (filter: InspectionStatusFilter) => {
     switch (filter) {

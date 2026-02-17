@@ -53,51 +53,52 @@ export function MaintenanceHistoryDialog({
   // Auto-sync on modal open if last sync was >24h ago
   useEffect(() => {
     if (open && vehicleId && vesData) {
+      // Check if sync is needed (>24 hours since last sync)
+      const checkIfSyncNeeded = (data: Record<string, unknown>): boolean => {
+        const lastDvlaSync = data.last_dvla_sync ? new Date(data.last_dvla_sync as string).getTime() : 0;
+        const lastMotSync = data.last_mot_api_sync ? new Date(data.last_mot_api_sync as string).getTime() : 0;
+        const now = Date.now();
+        const twentyFourHours = 24 * 60 * 60 * 1000;
+        
+        // Sync if either TAX or MOT hasn't been synced in 24h
+        const dvlaStale = (now - lastDvlaSync) > twentyFourHours;
+        const motStale = (now - lastMotSync) > twentyFourHours;
+        
+        return dvlaStale || motStale;
+      };
+
+      // Perform auto-sync in background
+      const performAutoSync = async () => {
+        if (isSyncing) return;
+        
+        setIsSyncing(true);
+        try {
+          const response = await fetch('/api/maintenance/sync-dvla', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vehicleIds: [vehicleId] }),
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            // Silently refresh data without full page reload
+            window.location.reload();
+          }
+        } catch (error) {
+          console.error('Auto-sync error:', error);
+          // Fail silently - don't interrupt user experience
+        } finally {
+          setIsSyncing(false);
+        }
+      };
+
       const shouldSync = checkIfSyncNeeded(vesData);
       if (shouldSync) {
         performAutoSync();
       }
     }
-  }, [open, vehicleId]);
-  
-  // Check if sync is needed (>24 hours since last sync)
-  const checkIfSyncNeeded = (data: any): boolean => {
-    const lastDvlaSync = data.last_dvla_sync ? new Date(data.last_dvla_sync).getTime() : 0;
-    const lastMotSync = data.last_mot_api_sync ? new Date(data.last_mot_api_sync).getTime() : 0;
-    const now = Date.now();
-    const twentyFourHours = 24 * 60 * 60 * 1000;
-    
-    // Sync if either TAX or MOT hasn't been synced in 24h
-    const dvlaStale = (now - lastDvlaSync) > twentyFourHours;
-    const motStale = (now - lastMotSync) > twentyFourHours;
-    
-    return dvlaStale || motStale;
-  };
-  
-  // Perform auto-sync in background
-  const performAutoSync = async () => {
-    if (!vehicleId || isSyncing) return;
-    
-    setIsSyncing(true);
-    try {
-      const response = await fetch('/api/maintenance/sync-dvla', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vehicleIds: [vehicleId] }),
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        // Silently refresh data without full page reload
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error('Auto-sync error:', error);
-      // Fail silently - don't interrupt user experience
-    } finally {
-      setIsSyncing(false);
-    }
+  }, [open, vehicleId, vesData, isSyncing]);
   };
   
   // Group combined items by date (show all changes made together)

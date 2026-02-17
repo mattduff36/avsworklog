@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -41,12 +41,7 @@ export function MessagesReportView() {
   const [messageToDelete, setMessageToDelete] = useState<{id: string; subject: string} | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    fetchReports();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [typeFilter, statusFilter]);
-
-  async function fetchReports() {
+  const fetchReports = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -65,7 +60,11 @@ export function MessagesReportView() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [typeFilter, statusFilter]);
+
+  useEffect(() => {
+    fetchReports();
+  }, [fetchReports]);
 
   async function handleDelete() {
     if (!messageToDelete) return;

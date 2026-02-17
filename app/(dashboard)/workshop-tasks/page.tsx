@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
@@ -220,20 +220,7 @@ export default function WorkshopTasksPage() {
     }
   };
 
-  useEffect(() => {
-    if (user) {
-      fetchTasks();
-      fetchVehicles();
-      fetchCategories();
-      fetchPlantCategories();
-      fetchSubcategories();
-      fetchPlantSubcategories();
-      // Load recent vehicle IDs
-      setRecentVehicleIds(getRecentVehicleIds(user.id));
-    }
-  }, [user, statusFilter, vehicleFilter]);
-
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -341,53 +328,10 @@ export default function WorkshopTasksPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase, statusFilter, vehicleFilter]);
 
-  const fetchVehicles = async () => {
-    try {
-      // Fetch vehicles
-      const { data: vehicleData, error: vehicleError } = await supabase
-        .from('vehicles')
-        .select('id, reg_number, nickname')
-        .eq('status', 'active')
-        .order('reg_number');
 
-      if (vehicleError) throw vehicleError;
-
-      // Fetch plant
-      const { data: plantData, error: plantError } = await supabase
-        .from('plant')
-        .select('id, plant_id, nickname, serial_number')
-        .eq('status', 'active')
-        .order('plant_id');
-
-      if (plantError) throw plantError;
-
-      // Combine both into a unified list with asset type indicators
-      const combinedVehicles = [
-        ...(vehicleData || []).map(v => ({
-          id: v.id,
-          reg_number: v.reg_number,
-          plant_id: null,
-          nickname: v.nickname,
-          asset_type: 'vehicle' as const
-        })),
-        ...(plantData || []).map(p => ({
-          id: p.id,
-          reg_number: null,
-          plant_id: p.plant_id,
-          nickname: p.nickname,
-          asset_type: 'plant' as const
-        }))
-      ];
-
-      setVehicles(combinedVehicles);
-    } catch (err) {
-      console.error('Error fetching vehicles:', err instanceof Error ? err.message : JSON.stringify(err));
-    }
-  };
-
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('workshop_task_categories')
@@ -401,9 +345,9 @@ export default function WorkshopTasksPage() {
     } catch (err) {
       console.error('Error fetching categories:', err instanceof Error ? err.message : JSON.stringify(err));
     }
-  };
+  }, [supabase]);
 
-  const fetchPlantCategories = async () => {
+  const fetchPlantCategories = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('workshop_task_categories')
@@ -417,9 +361,9 @@ export default function WorkshopTasksPage() {
     } catch (err) {
       console.error('Error fetching plant categories:', err instanceof Error ? err.message : JSON.stringify(err));
     }
-  };
+  }, [supabase]);
 
-  const fetchSubcategories = async () => {
+  const fetchSubcategories = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('workshop_task_subcategories')
@@ -441,31 +385,84 @@ export default function WorkshopTasksPage() {
     } catch (err) {
       console.error('Error fetching subcategories:', err instanceof Error ? err.message : JSON.stringify(err));
     }
-  };
+  }, [supabase]);
 
-  const fetchPlantSubcategories = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('workshop_task_subcategories')
-        .select(`
-          id,
-          category_id,
-          name,
-          slug,
-          is_active,
-          sort_order,
-          workshop_task_categories!inner (applies_to)
-        `)
-        .eq('is_active', true)
-        .eq('workshop_task_categories.applies_to', 'plant')
-        .order('name');
+  useEffect(() => {
+    if (user) {
+      const fetchVehiclesInner = async () => {
+        try {
+          const { data: vehicleData, error: vehicleError } = await supabase
+            .from('vehicles')
+            .select('id, reg_number, nickname')
+            .eq('status', 'active')
+            .order('reg_number');
 
-      if (error) throw error;
-      setPlantSubcategories(data || []);
-    } catch (err) {
-      console.error('Error fetching plant subcategories:', err instanceof Error ? err.message : JSON.stringify(err));
+          if (vehicleError) throw vehicleError;
+
+          const { data: plantData, error: plantError } = await supabase
+            .from('plant')
+            .select('id, plant_id, nickname, serial_number')
+            .eq('status', 'active')
+            .order('plant_id');
+
+          if (plantError) throw plantError;
+
+          const combinedVehicles = [
+            ...(vehicleData || []).map(v => ({
+              id: v.id,
+              reg_number: v.reg_number,
+              plant_id: null,
+              nickname: v.nickname,
+              asset_type: 'vehicle' as const
+            })),
+            ...(plantData || []).map(p => ({
+              id: p.id,
+              reg_number: null,
+              plant_id: p.plant_id,
+              nickname: p.nickname,
+              asset_type: 'plant' as const
+            }))
+          ];
+
+          setVehicles(combinedVehicles);
+        } catch (err) {
+          console.error('Error fetching vehicles:', err instanceof Error ? err.message : JSON.stringify(err));
+        }
+      };
+
+      const fetchPlantSubcategoriesInner = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('workshop_task_subcategories')
+            .select(`
+              id,
+              category_id,
+              name,
+              slug,
+              is_active,
+              sort_order,
+              workshop_task_categories!inner (applies_to)
+            `)
+            .eq('is_active', true)
+            .eq('workshop_task_categories.applies_to', 'plant')
+            .order('name');
+
+          if (error) throw error;
+          setPlantSubcategories(data || []);
+        } catch (err) {
+          console.error('Error fetching plant subcategories:', err instanceof Error ? err.message : JSON.stringify(err));
+        }
+      };
+
+      fetchTasks();
+      fetchVehiclesInner();
+      fetchCategories();
+      fetchPlantCategories();
+      fetchSubcategories();
+      fetchPlantSubcategoriesInner();
+      setRecentVehicleIds(getRecentVehicleIds(user.id));
     }
-  };
+  }, [user, statusFilter, vehicleFilter, fetchTasks, fetchCategories, fetchPlantCategories, fetchSubcategories, supabase]);
 
   const fetchCurrentMeterReading = async (vehicleId: string) => {
     try {
@@ -1176,17 +1173,24 @@ export default function WorkshopTasksPage() {
     try {
       setDeleting(true);
 
-      const { error } = await supabase
+      const { data: deleted, error } = await supabase
         .from('actions')
         .delete()
-        .eq('id', taskToDelete.id);
+        .eq('id', taskToDelete.id)
+        .select('id');
 
       if (error) throw error;
+      if (!deleted?.length) {
+        toast.error('Task could not be deleted. You may not have permission.');
+        return;
+      }
 
-      toast.success('Task deleted successfully');
+      const deletedId = taskToDelete.id;
       setShowDeleteConfirm(false);
       setTaskToDelete(null);
-      fetchTasks();
+      setTasks(prev => prev.filter(t => t.id !== deletedId));
+      toast.success('Task deleted successfully');
+      await fetchTasks();
     } catch (err) {
       console.error('Error deleting task:', err instanceof Error ? err.message : JSON.stringify(err));
       toast.error('Failed to delete task');

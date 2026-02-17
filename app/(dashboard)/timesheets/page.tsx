@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useTimesheetRealtime } from '@/lib/hooks/useRealtime';
@@ -52,16 +52,29 @@ export default function TimesheetsPage() {
   const [displayCount, setDisplayCount] = useState(12); // Show 12 timesheets initially
   const supabase = createClient();
 
-  // Fetch employees if manager
   useEffect(() => {
     if (user && isManager) {
+      const fetchEmployees = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, employee_id')
+            .order('full_name');
+          
+          if (error) throw error;
+          setEmployees(data || []);
+        } catch (err) {
+          console.error('Error fetching employees:', err);
+        }
+      };
+
       fetchEmployees();
     }
-  }, [user?.id, isManager]);
+  }, [user, isManager, supabase]);
 
   useEffect(() => {
     fetchTimesheets();
-  }, [user?.id, isManager, selectedEmployeeId, statusFilter]);
+  }, [user?.id, isManager, selectedEmployeeId, statusFilter, fetchTimesheets]);
 
   // Listen for realtime updates to timesheets
   useTimesheetRealtime((payload) => {
@@ -91,21 +104,7 @@ export default function TimesheetsPage() {
     }
   });
 
-  const fetchEmployees = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, employee_id')
-        .order('full_name');
-      
-      if (error) throw error;
-      setEmployees(data || []);
-    } catch (err) {
-      console.error('Error fetching employees:', err);
-    }
-  };
-
-  const fetchTimesheets = async () => {
+  const fetchTimesheets = useCallback(async () => {
     if (!user) return;
     setFetchError(null);
     
@@ -175,7 +174,7 @@ export default function TimesheetsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, isManager, selectedEmployeeId, statusFilter, supabase]);
 
   const getStatusBadge = (status: string) => {
     const variants = {

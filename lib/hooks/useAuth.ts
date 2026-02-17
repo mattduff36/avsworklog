@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { Database } from '@/types/database';
@@ -22,32 +22,99 @@ interface EffectiveRole {
   is_super_admin: boolean;
 }
 
+const isNetworkFetchError = (err: unknown): boolean => {
+  if (!err) return false;
+  if (err instanceof TypeError) {
+    return (
+      err.message.includes('Failed to fetch') ||
+      err.message.includes('NetworkError') ||
+      err.message.toLowerCase().includes('network')
+    );
+  }
+  if (typeof err === 'object' && err !== null && 'message' in err) {
+    const msg = String((err as any).message || '');
+    return (
+      msg.includes('Failed to fetch') ||
+      msg.includes('NetworkError') ||
+      msg.toLowerCase().includes('network')
+    );
+  }
+  return false;
+};
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [effectiveRole, setEffectiveRole] = useState<EffectiveRole | null>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
-  const isNetworkFetchError = (err: unknown): boolean => {
-    if (!err) return false;
-    if (err instanceof TypeError) {
-      return (
-        err.message.includes('Failed to fetch') ||
-        err.message.includes('NetworkError') ||
-        err.message.toLowerCase().includes('network')
-      );
+  const fetchProfile = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select(`
+          *,
+          role:roles(
+            name,
+            display_name,
+            is_manager_admin,
+            is_super_admin
+          )
+        `)
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        // If profile doesn't exist, it might be created by trigger
+        // Wait a moment and try again
+        if (error.code === 'PGRST116') {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          const { data: retryData, error: retryError } = await supabase
+            .from('profiles')
+            .select(`
+              *,
+              role:roles(
+                name,
+                display_name,
+                is_manager_admin,
+                is_super_admin
+              )
+            `)
+            .eq('id', userId)
+            .single();
+          
+          if (retryError) {
+            // Not actionable in most cases (profile creation trigger timing) + avoid console.error interception
+            console.warn('Profile not found after retry:', retryError);
+            // Only clear profile if we didn't already have one
+            setProfile(prev => prev ?? null);
+          } else {
+            setProfile(retryData as Profile);
+          }
+        } else {
+          // If offline / flaky network, don't wipe the existing profile and don't escalate to console.error.
+          if (isNetworkFetchError(error)) {
+            console.warn('Profile fetch failed (network issue)');
+            return;
+          }
+          console.error('Error fetching profile:', error);
+          setProfile(prev => prev ?? null);
+        }
+      } else {
+        setProfile(data as Profile);
+      }
+    } catch (error) {
+      if (isNetworkFetchError(error)) {
+        console.warn('Profile fetch failed (network issue)');
+      } else {
+        console.error('Error fetching profile:', error);
+      }
+      setProfile(prev => prev ?? null);
+    } finally {
+      setLoading(false);
     }
-    if (typeof err === 'object' && err !== null && 'message' in err) {
-      const msg = String((err as any).message || '');
-      return (
-        msg.includes('Failed to fetch') ||
-        msg.includes('NetworkError') ||
-        msg.toLowerCase().includes('network')
-      );
-    }
-    return false;
-  };
+  }, [supabase]);
 
   useEffect(() => {
     // Get initial session
@@ -74,7 +141,7 @@ export function useAuth() {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [fetchProfile, supabase]);
 
   // Auto-detect role changes and force re-login
   useEffect(() => {
@@ -109,7 +176,7 @@ export function useAuth() {
       // First time or after logout - store current role
       localStorage.setItem(storageKey, currentRoleId);
     }
-  }, [user, profile]);
+  }, [user, profile, supabase]);
 
   // Realtime subscription for profile changes (immediate detection)
   useEffect(() => {
@@ -136,7 +203,7 @@ export function useAuth() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, fetchProfile, supabase]);
 
   // Periodic check as backup (every 30 seconds)
   useEffect(() => {
@@ -189,74 +256,7 @@ export function useAuth() {
     }, 30000); // Check every 30 seconds
 
     return () => clearInterval(interval);
-  }, [user]);
-
-  const fetchProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          role:roles(
-            name,
-            display_name,
-            is_manager_admin,
-            is_super_admin
-          )
-        `)
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        // If profile doesn't exist, it might be created by trigger
-        // Wait a moment and try again
-        if (error.code === 'PGRST116') {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          const { data: retryData, error: retryError } = await supabase
-            .from('profiles')
-            .select(`
-              *,
-              role:roles(
-                name,
-                display_name,
-                is_manager_admin,
-                is_super_admin
-              )
-            `)
-            .eq('id', userId)
-            .single();
-          
-          if (retryError) {
-            // Not actionable in most cases (profile creation trigger timing) + avoid console.error interception
-            console.warn('Profile not found after retry:', retryError);
-            // Only clear profile if we didn't already have one
-            if (!profile) setProfile(null);
-          } else {
-            setProfile(retryData as Profile);
-          }
-        } else {
-          // If offline / flaky network, don't wipe the existing profile and don't escalate to console.error.
-          if (isNetworkFetchError(error)) {
-            console.warn('Profile fetch failed (network issue)');
-            return;
-          }
-          console.error('Error fetching profile:', error);
-          if (!profile) setProfile(null);
-        }
-      } else {
-        setProfile(data as Profile);
-      }
-    } catch (error) {
-      if (isNetworkFetchError(error)) {
-        console.warn('Profile fetch failed (network issue)');
-      } else {
-        console.error('Error fetching profile:', error);
-      }
-      if (!profile) setProfile(null);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [user, supabase]);
 
   // Fetch effective role when view-as cookie is set and user is actual super admin
   useEffect(() => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -32,11 +32,7 @@ export default function PhotoUpload({ inspectionId, itemNumber, onClose, onUploa
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    fetchExistingPhotos();
-  }, []);
-
-  const fetchExistingPhotos = async () => {
+  const fetchExistingPhotos = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('inspection_photos')
@@ -49,7 +45,11 @@ export default function PhotoUpload({ inspectionId, itemNumber, onClose, onUploa
     } catch (err) {
       console.error('Error fetching photos:', err);
     }
-  };
+  }, [supabase, inspectionId, itemNumber]);
+
+  useEffect(() => {
+    fetchExistingPhotos();
+  }, [fetchExistingPhotos]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

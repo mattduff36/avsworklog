@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, useCallback, use } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -338,14 +338,7 @@ export default function PlantHistoryPage({
     enabled: workshopTasks.length > 0
   });
 
-  useEffect(() => {
-    if (user && unwrappedParams.plantId) {
-      fetchPlantData();
-      fetchMaintenanceRecord();
-    }
-  }, [user, unwrappedParams.plantId]);
-
-  const fetchPlantData = async () => {
+  const fetchPlantData = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -366,9 +359,9 @@ export default function PlantHistoryPage({
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase, unwrappedParams.plantId]);
 
-  const fetchMaintenanceRecord = async () => {
+  const fetchMaintenanceRecord = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('vehicle_maintenance')
@@ -384,7 +377,14 @@ export default function PlantHistoryPage({
     } catch (err) {
       console.error('Error fetching maintenance record:', err);
     }
-  };
+  }, [supabase, unwrappedParams.plantId]);
+
+  useEffect(() => {
+    if (user && unwrappedParams.plantId) {
+      fetchPlantData();
+      fetchMaintenanceRecord();
+    }
+  }, [user, unwrappedParams.plantId, fetchPlantData, fetchMaintenanceRecord]);
 
   const getFieldLabel = (fieldName: string): string => {
     const labels: Record<string, string> = {

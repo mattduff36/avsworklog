@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -49,11 +49,7 @@ export default function ReadRAMSPage() {
   
   const supabase = createClient();
 
-  useEffect(() => {
-    fetchDocument();
-  }, [documentId]);
-
-  const fetchDocument = async () => {
+  const fetchDocument = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -128,7 +124,11 @@ export default function ReadRAMSPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [documentId, supabase, router]);
+
+  useEffect(() => {
+    fetchDocument();
+  }, [fetchDocument]);
 
   const recordAction = async (action: 'downloaded' | 'opened' | 'emailed', requireAssignment: boolean = true) => {
     // For signed documents, we don't require assignment to exist

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Database } from '@/types/database';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -45,7 +45,7 @@ export default function RAMSPage() {
 
   const supabase = createClient();
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     setLoading(true);
     try {
       // Fetch documents for all users (API handles permissions)
@@ -73,14 +73,13 @@ export default function RAMSPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    // Fetch documents once auth is loaded
     if (!authLoading) {
       fetchDocuments();
     }
-  }, [authLoading]);
+  }, [authLoading, fetchDocuments]);
 
   useEffect(() => {
     let filtered = documents;

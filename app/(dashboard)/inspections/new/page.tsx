@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -113,6 +113,8 @@ function NewInspectionContent() {
   // Dynamic checklist items based on selected vehicle category
   const [currentChecklist, setCurrentChecklist] = useState<string[]>(INSPECTION_ITEMS);
   const [loading, setLoading] = useState(false);
+  const loadingRef = useRef(false);
+  loadingRef.current = loading;
   const [error, setError] = useState('');
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
@@ -160,29 +162,70 @@ function NewInspectionContent() {
 
   useEffect(() => {
     fetchVehicles();
+    const fetchCategories = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('vehicle_categories')
+          .select('id, name')
+          .order('name');
+
+        if (error) throw error;
+        setCategories(data || []);
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+      }
+    };
     fetchCategories();
-  }, []);
+  }, [fetchVehicles, supabase]);
 
   // Load draft inspection if ID is provided in URL
   useEffect(() => {
-    if (draftId && user && !loading) {
+    if (draftId && user && !loadingRef.current) {
       // Wait a bit for isManager to be set
       const timer = setTimeout(() => {
         loadDraftInspection(draftId);
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [draftId, user]);
+  }, [draftId, user, loadDraftInspection]);
 
   // Fetch employees if manager, and set initial selected employee
   useEffect(() => {
     if (user && isManager) {
+      const fetchEmployees = async () => {
+        try {
+          const { data: profiles, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, employee_id')
+            .order('full_name');
+
+          if (error) throw error;
+
+          const allEmployees = profiles || [];
+          
+          const formattedEmployees: Employee[] = allEmployees
+            .map((emp) => ({
+              id: emp.id,
+              full_name: emp.full_name || 'Unnamed User',
+              employee_id: emp.employee_id || null,
+            }))
+            .sort((a, b) => a.full_name.localeCompare(b.full_name));
+          
+          setEmployees(formattedEmployees);
+          
+          if (user) {
+            setSelectedEmployeeId(user.id);
+          }
+        } catch (err) {
+          console.error('Error fetching employees:', err);
+        }
+      };
       fetchEmployees();
     } else if (user) {
       // If not a manager, set selected employee to current user
       setSelectedEmployeeId(user.id);
     }
-  }, [user, isManager]);
+  }, [user, isManager, supabase]);
 
   // Load recent vehicle IDs for the user
   useEffect(() => {
@@ -196,41 +239,9 @@ function NewInspectionContent() {
     if (vehicleId && weekEnding && !existingInspectionId) {
       checkForDuplicate(vehicleId, weekEnding);
     }
-  }, [vehicleId, weekEnding, existingInspectionId]);
+  }, [vehicleId, weekEnding, existingInspectionId, checkForDuplicate]);
 
-  const fetchEmployees = async () => {
-    try {
-      // Get all profiles
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, employee_id')
-        .order('full_name');
-
-      if (error) throw error;
-
-      const allEmployees = profiles || [];
-      
-      // Convert to expected format
-      const formattedEmployees: Employee[] = allEmployees
-        .map((emp) => ({
-          id: emp.id,
-          full_name: emp.full_name || 'Unnamed User',
-          employee_id: emp.employee_id || null,
-        }))
-        .sort((a, b) => a.full_name.localeCompare(b.full_name));
-      
-      setEmployees(formattedEmployees);
-      
-      // Set default to current user
-      if (user) {
-        setSelectedEmployeeId(user.id);
-      }
-    } catch (err) {
-      console.error('Error fetching employees:', err);
-    }
-  };
-
-  const fetchVehicles = async () => {
+  const fetchVehicles = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('vehicles')
@@ -249,21 +260,7 @@ function NewInspectionContent() {
       console.error('Error fetching vehicles:', err);
       setError('Failed to load vehicles');
     }
-  };
-
-  const fetchCategories = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('vehicle_categories')
-        .select('id, name')
-        .order('name');
-
-      if (error) throw error;
-      setCategories(data || []);
-    } catch (err) {
-      console.error('Error fetching categories:', err);
-    }
-  };
+  }, [supabase]);
 
   // Fetch baseline mileage for sanity checking
   const fetchBaselineMileage = async (selectedVehicleId: string) => {
@@ -324,7 +321,7 @@ function NewInspectionContent() {
   // clearOtherErrors: whether to clear non-duplicate validation errors
   //   - false for background checks (useEffect) - preserves validation errors
   //   - true for explicit save checks - clears stale errors before validation re-runs
-  const checkForDuplicate = async (
+  const checkForDuplicate = useCallback(async (
     vehicleIdToCheck: string, 
     weekEndingToCheck: string,
     clearOtherErrors: boolean = false
@@ -379,7 +376,7 @@ function NewInspectionContent() {
     } finally {
       setDuplicateCheckLoading(false);
     }
-  };
+  }, [supabase, existingInspectionId]);
 
   // Load previous defects for the selected vehicle
   const loadPreviousDefects = async (selectedVehicleId: string) => {
@@ -508,7 +505,7 @@ function NewInspectionContent() {
     }
   };
 
-  const loadDraftInspection = async (id: string) => {
+  const loadDraftInspection = useCallback(async (id: string) => {
     try {
       setLoading(true);
       setError('');
@@ -611,7 +608,7 @@ function NewInspectionContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase, user?.id]);
 
   // Format UK registration plates (LLNNLLL -> LLNN LLL)
   const formatRegistration = (reg: string): string => {

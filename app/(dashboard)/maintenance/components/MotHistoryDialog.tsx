@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -238,14 +238,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
   const [error, setError] = useState<string | null>(null);
   const [vehicleNotFound, setVehicleNotFound] = useState(false);
   
-  // Fetch MOT history from database when dialog opens (no API call)
-  useEffect(() => {
-    if (open && vehicleId) {
-      fetchMotHistoryFromDB();
-    }
-  }, [open, vehicleId]);
-  
-  const fetchMotHistoryFromDB = async () => {
+  const fetchMotHistoryFromDB = useCallback(async () => {
     setLoading(true);
     setError(null);
     setVehicleNotFound(false);
@@ -271,7 +264,14 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
     } finally {
       setLoading(false);
     }
-  };
+  }, [vehicleId]);
+
+  // Fetch MOT history from database when dialog opens (no API call)
+  useEffect(() => {
+    if (open && vehicleId) {
+      fetchMotHistoryFromDB();
+    }
+  }, [open, vehicleId, fetchMotHistoryFromDB]);
   
   const getDefectColor = (type: string) => {
     switch (type) {

@@ -43,13 +43,90 @@ export function AssignEmployeesModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const supabase = createClient();
-
   useEffect(() => {
     if (open) {
+      async function fetchEmployees() {
+        setFetching(true);
+        try {
+          const supabase = createClient();
+          // Fetch employees with RAMS permission
+          // Join: profiles -> roles -> role_permissions
+          const { data: profiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select(`
+              id,
+              full_name,
+              role_id,
+              roles!inner(
+                id,
+                name,
+                display_name,
+                is_manager_admin,
+                role_permissions!inner(
+                  role_id,
+                  module_name,
+                  enabled
+                )
+              )
+            `)
+            .eq('roles.role_permissions.module_name', 'rams')
+            .eq('roles.role_permissions.enabled', true)
+            .order('full_name');
+
+          if (profilesError) {
+            console.error('Error fetching profiles:', profilesError);
+            throw profilesError;
+          }
+
+          const allEmployees = profiles || [];
+
+          // Fetch existing assignments for this document
+          const { data: assignments, error: assignError } = await supabase
+            .from('rams_assignments')
+            .select('employee_id, status')
+            .eq('rams_document_id', documentId);
+
+          if (assignError) throw assignError;
+
+          // Mark employees who have already signed
+          const signedEmployeeIds = new Set(
+            assignments?.filter(a => a.status === 'signed').map(a => a.employee_id) || []
+          );
+
+          // Mark employees who are currently assigned (regardless of status)
+          const assignedEmployeeIds = new Set(
+            assignments?.map(a => a.employee_id) || []
+          );
+
+          // Set original assigned IDs for comparison
+          setOriginalAssignedIds(assignedEmployeeIds);
+
+          // Pre-select all currently assigned employees
+          setSelectedIds(assignedEmployeeIds);
+
+          const employeesWithStatus = allEmployees?.map((emp: any) => ({
+            id: emp.id,
+            full_name: emp.full_name,
+            role: emp.roles ? {
+              name: emp.roles.name,
+              display_name: emp.roles.display_name,
+            } : null,
+            alreadySigned: signedEmployeeIds.has(emp.id),
+            isAssigned: assignedEmployeeIds.has(emp.id),
+          })) || [];
+
+          setEmployees(employeesWithStatus);
+          setFilteredEmployees(employeesWithStatus);
+        } catch (error) {
+          console.error('Error fetching employees:', error);
+          toast.error('Failed to load employees');
+        } finally {
+          setFetching(false);
+        }
+      }
       fetchEmployees();
     }
-  }, [open]);
+  }, [open, documentId]);
 
   useEffect(() => {
     if (searchQuery) {
@@ -62,85 +139,6 @@ export function AssignEmployeesModal({
       setFilteredEmployees(employees);
     }
   }, [searchQuery, employees]);
-
-  const fetchEmployees = async () => {
-    setFetching(true);
-    try {
-      // Fetch employees with RAMS permission
-      // Join: profiles -> roles -> role_permissions
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          full_name,
-          role_id,
-          roles!inner(
-            id,
-            name,
-            display_name,
-            is_manager_admin,
-            role_permissions!inner(
-              role_id,
-              module_name,
-              enabled
-            )
-          )
-        `)
-        .eq('roles.role_permissions.module_name', 'rams')
-        .eq('roles.role_permissions.enabled', true)
-        .order('full_name');
-
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        throw profilesError;
-      }
-
-      const allEmployees = profiles || [];
-
-      // Fetch existing assignments for this document
-      const { data: assignments, error: assignError } = await supabase
-        .from('rams_assignments')
-        .select('employee_id, status')
-        .eq('rams_document_id', documentId);
-
-      if (assignError) throw assignError;
-
-      // Mark employees who have already signed
-      const signedEmployeeIds = new Set(
-        assignments?.filter(a => a.status === 'signed').map(a => a.employee_id) || []
-      );
-
-      // Mark employees who are currently assigned (regardless of status)
-      const assignedEmployeeIds = new Set(
-        assignments?.map(a => a.employee_id) || []
-      );
-
-      // Set original assigned IDs for comparison
-      setOriginalAssignedIds(assignedEmployeeIds);
-
-      // Pre-select all currently assigned employees
-      setSelectedIds(assignedEmployeeIds);
-
-      const employeesWithStatus = allEmployees?.map((emp: any) => ({
-        id: emp.id,
-        full_name: emp.full_name,
-        role: emp.roles ? {
-          name: emp.roles.name,
-          display_name: emp.roles.display_name,
-        } : null,
-        alreadySigned: signedEmployeeIds.has(emp.id),
-        isAssigned: assignedEmployeeIds.has(emp.id),
-      })) || [];
-
-      setEmployees(employeesWithStatus);
-      setFilteredEmployees(employeesWithStatus);
-    } catch (error) {
-      console.error('Error fetching employees:', error);
-      toast.error('Failed to load employees');
-    } finally {
-      setFetching(false);
-    }
-  };
 
   const handleToggleEmployee = (id: string) => {
     // Prevent unchecking employees who have already signed

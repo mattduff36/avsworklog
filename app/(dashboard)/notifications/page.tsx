@@ -74,28 +74,6 @@ export default function NotificationsPage() {
     return false;
   });
 
-  useEffect(() => {
-    fetchNotifications();
-    fetchPreferences();
-    if (isAdmin) {
-      fetchUsers();
-    }
-  }, [isAdmin]);
-
-  useEffect(() => {
-    if (searchQuery) {
-      setFilteredNotifications(
-        notifications.filter(n =>
-          n.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          n.sender_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          n.body.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      );
-    } else {
-      setFilteredNotifications(notifications);
-    }
-  }, [searchQuery, notifications]);
-
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     try {
@@ -113,42 +91,62 @@ export default function NotificationsPage() {
     }
   }, []);
 
-  const fetchPreferences = async () => {
-    setLoadingPrefs(true);
-    try {
-      const response = await fetch('/api/notification-preferences');
-      const data = await response.json();
+  useEffect(() => {
+    fetchNotifications();
+    const fetchPreferences = async () => {
+      setLoadingPrefs(true);
+      try {
+        const response = await fetch('/api/notification-preferences');
+        const data = await response.json();
 
-      if (data.success) {
-        setPreferences(data.preferences || []);
+        if (data.success) {
+          setPreferences(data.preferences || []);
+        }
+      } catch (error) {
+        console.error('Error fetching preferences:', error);
+      } finally {
+        setLoadingPrefs(false);
       }
-    } catch (error) {
-      console.error('Error fetching preferences:', error);
-    } finally {
-      setLoadingPrefs(false);
-    }
-  };
+    };
+    fetchPreferences();
+    if (isAdmin) {
+      const fetchUsers = async () => {
+        setLoadingUsers(true);
+        try {
+          const { data: profilesData, error } = await (await import('@/lib/supabase/client')).createClient()
+            .from('profiles')
+            .select('id, full_name, role:roles(name)')
+            .order('full_name');
 
-  const fetchUsers = async () => {
-    setLoadingUsers(true);
-    try {
-      const { data: profilesData, error } = await (await import('@/lib/supabase/client')).createClient()
-        .from('profiles')
-        .select('id, full_name, role:roles(name)')
-        .order('full_name');
-
-      if (error) throw error;
-      setUsers((profilesData || []).map((p: any) => ({
-        id: p.id,
-        full_name: p.full_name,
-        role: p.role?.name || 'unknown',
-      })));
-    } catch (error) {
-      console.error('Error fetching users:', error);
-    } finally {
-      setLoadingUsers(false);
+          if (error) throw error;
+          setUsers((profilesData || []).map((p: any) => ({
+            id: p.id,
+            full_name: p.full_name,
+            role: p.role?.name || 'unknown',
+          })));
+        } catch (error) {
+          console.error('Error fetching users:', error);
+        } finally {
+          setLoadingUsers(false);
+        }
+      };
+      fetchUsers();
     }
-  };
+  }, [isAdmin, fetchNotifications]);
+
+  useEffect(() => {
+    if (searchQuery) {
+      setFilteredNotifications(
+        notifications.filter(n =>
+          n.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          n.sender_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          n.body.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      );
+    } else {
+      setFilteredNotifications(notifications);
+    }
+  }, [searchQuery, notifications]);
 
   const fetchAdminNotifications = async (userId: string) => {
     if (userId === 'all') {

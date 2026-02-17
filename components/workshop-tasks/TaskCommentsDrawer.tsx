@@ -49,30 +49,29 @@ export function TaskCommentsDrawer({
   // Fetch timeline when dialog opens
   useEffect(() => {
     if (open && taskId) {
+      async function fetchTimeline() {
+        setLoading(true);
+        try {
+          const response = await fetch(
+            `/api/workshop-tasks/tasks/${taskId}/comments?order=asc`
+          );
+
+          if (!response.ok) {
+            throw new Error('Failed to fetch timeline');
+          }
+
+          const data = await response.json();
+          setTimeline(data.items || []);
+        } catch (error) {
+          console.error('Error fetching timeline:', error);
+          toast.error('Failed to load timeline');
+        } finally {
+          setLoading(false);
+        }
+      }
       fetchTimeline();
     }
   }, [open, taskId]);
-
-  const fetchTimeline = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(
-        `/api/workshop-tasks/tasks/${taskId}/comments?order=asc`
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch timeline');
-      }
-
-      const data = await response.json();
-      setTimeline(data.items || []);
-    } catch (error) {
-      console.error('Error fetching timeline:', error);
-      toast.error('Failed to load timeline');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleAddComment = async () => {
     if (!newComment.trim()) {

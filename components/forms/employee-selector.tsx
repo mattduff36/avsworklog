@@ -27,37 +27,36 @@ export function EmployeeSelector({
 }: EmployeeSelectorProps) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
 
   useEffect(() => {
-    fetchEmployees();
-  }, [isManager]);
+    async function fetchEmployees() {
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, full_name, employee_id')
+          .order('full_name');
 
-  async function fetchEmployees() {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, employee_id')
-        .order('full_name');
+        if (error) throw error;
 
-      if (error) throw error;
+        // Sort: current user first, then alphabetically
+        const sorted = (data || []).sort((a, b) => {
+          if (currentUserId) {
+            if (a.id === currentUserId) return -1;
+            if (b.id === currentUserId) return 1;
+          }
+          return a.full_name.localeCompare(b.full_name);
+        });
 
-      // Sort: current user first, then alphabetically
-      const sorted = (data || []).sort((a, b) => {
-        if (currentUserId) {
-          if (a.id === currentUserId) return -1;
-          if (b.id === currentUserId) return 1;
-        }
-        return a.full_name.localeCompare(b.full_name);
-      });
-
-      setEmployees(sorted);
-    } catch (error) {
-      console.error('Error fetching employees:', error);
-    } finally {
-      setLoading(false);
+        setEmployees(sorted);
+      } catch (error) {
+        console.error('Error fetching employees:', error);
+      } finally {
+        setLoading(false);
+      }
     }
-  }
+    fetchEmployees();
+  }, [isManager, currentUserId]);
 
   if (!isManager) return null;
 

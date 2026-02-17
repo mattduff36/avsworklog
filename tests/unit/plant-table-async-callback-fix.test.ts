@@ -186,7 +186,7 @@ describe('Plant Table Async Callback Timing Fix', () => {
 
   describe('Parent component state synchronization', () => {
     it('should provide fresh data to parent component', async () => {
-      let parentState = { plantCount: 0 };
+      const parentState = { plantCount: 0 };
 
       const fetchPlantData = async () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -209,7 +209,7 @@ describe('Plant Table Async Callback Timing Fix', () => {
     });
 
     it('should show stale data sent to parent without await', async () => {
-      let parentState = { plantCount: 0 };
+      const parentState = { plantCount: 0 };
       let currentCount = 0;
 
       const fetchPlantData = async () => {

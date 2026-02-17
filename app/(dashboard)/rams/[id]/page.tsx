@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -92,14 +92,7 @@ export default function RAMSDetailsPage() {
     }
   }, [isManager, isAdmin, authLoading, router]);
 
-  useEffect(() => {
-    // Only fetch if auth is loaded and user IS a manager/admin
-    if (!authLoading && (isManager || isAdmin) && documentId) {
-      fetchDocumentDetails();
-    }
-  }, [documentId, authLoading, isManager, isAdmin]);
-
-  const fetchDocumentDetails = async () => {
+  const fetchDocumentDetails = useCallback(async () => {
     setLoading(true);
     try {
       // Fetch document - use maybeSingle() instead of single() to handle 0 rows gracefully
@@ -168,7 +161,13 @@ export default function RAMSDetailsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [documentId, supabase]);
+
+  useEffect(() => {
+    if (!authLoading && (isManager || isAdmin) && documentId) {
+      fetchDocumentDetails();
+    }
+  }, [documentId, authLoading, isManager, isAdmin, fetchDocumentDetails]);
 
   const handleAssignSuccess = () => {
     setAssignModalOpen(false);

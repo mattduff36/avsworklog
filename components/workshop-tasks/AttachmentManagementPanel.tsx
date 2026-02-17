@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -64,11 +64,42 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
   const [deleteQuestionId, setDeleteQuestionId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const fetchTemplates = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('workshop_attachment_templates')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setTemplates(data || []);
+    } catch (err) {
+      console.error('Error fetching templates:', err);
+      toast.error('Failed to load attachment templates');
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase]);
+
+  const fetchQuestions = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('workshop_attachment_questions')
+        .select('*')
+        .order('sort_order');
+
+      if (error) throw error;
+      setQuestions(data || []);
+    } catch (err) {
+      console.error('Error fetching questions:', err);
+    }
+  }, [supabase]);
+
   // Fetch templates and questions on mount
   useEffect(() => {
     fetchTemplates();
     fetchQuestions();
-  }, []);
+  }, [fetchTemplates, fetchQuestions]);
 
   // Filter templates by taxonomy mode if provided
   const filteredTemplates = taxonomyMode 
@@ -88,37 +119,6 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
       setSelectedTemplateId(null);
     }
   }, [filteredTemplates, selectedTemplateId]);
-
-  const fetchTemplates = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('workshop_attachment_templates')
-        .select('*')
-        .order('name');
-
-      if (error) throw error;
-      setTemplates(data || []);
-    } catch (err) {
-      console.error('Error fetching templates:', err);
-      toast.error('Failed to load attachment templates');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchQuestions = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('workshop_attachment_questions')
-        .select('*')
-        .order('sort_order');
-
-      if (error) throw error;
-      setQuestions(data || []);
-    } catch (err) {
-      console.error('Error fetching questions:', err);
-    }
-  };
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
   
