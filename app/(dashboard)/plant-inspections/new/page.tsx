@@ -345,7 +345,7 @@ function NewPlantInspectionContent() {
         const loggedMap = new Map<string, { comment: string; actionId: string }>();
         
         lockedItems.forEach((item: any) => {
-          const key = `${item.item_number}-${item.item_description}`;
+          const key = `${item.item_number}`;
           const statusLabel = 
             item.status === 'on_hold' ? 'on hold' :
             item.status === 'logged' ? 'logged' :
@@ -361,12 +361,9 @@ function NewPlantInspectionContent() {
         const newCheckboxStates: Record<string, InspectionStatus> = {};
         const newComments: Record<string, string> = {};
 
-        loggedMap.forEach((loggedInfo, key) => {
-          const [itemNumStr] = key.split('-');
-          const itemNum = parseInt(itemNumStr);
-          const stateKey = `${itemNum}`;
-          newCheckboxStates[stateKey] = 'attention';
-          newComments[stateKey] = loggedInfo.comment;
+        loggedMap.forEach((loggedInfo, itemNum) => {
+          newCheckboxStates[itemNum] = 'attention';
+          newComments[itemNum] = loggedInfo.comment;
         });
 
         setCheckboxStates(newCheckboxStates);
@@ -933,8 +930,7 @@ function NewPlantInspectionContent() {
               const key = `${itemNumber}`;
               const currentStatus = checkboxStates[key];
               
-              const loggedKey = `${itemNumber}-${item}`;
-              const isLogged = loggedDefects.has(loggedKey);
+              const isLogged = loggedDefects.has(`${itemNumber}`);
         
               return (
                 <div key={itemNumber} className={`bg-slate-900/30 border rounded-lg p-4 space-y-3 ${
@@ -1030,8 +1026,7 @@ function NewPlantInspectionContent() {
                   const key = `${itemNumber}`;
                   const currentStatus = checkboxStates[key];
                   
-                  const loggedKey = `${itemNumber}-${item}`;
-                  const isLogged = loggedDefects.has(loggedKey);
+                  const isLogged = loggedDefects.has(`${itemNumber}`);
                   
                   return (
                     <tr key={itemNumber} className={`border-b border-border/50 hover:bg-slate-800/30 ${
