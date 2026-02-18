@@ -89,13 +89,11 @@ export async function POST(request: NextRequest) {
     let emailSuccess = false;
 
     try {
-      // Find all admin users for notification
-      // NOTE: PostgREST's `.or(...)` does not support dotted paths like `role.name` reliably.
-      // We query role IDs first, then fetch profiles by role_id.
+      // Only notify super-admins (not regular admins or manager-admins)
       const { data: adminRoles, error: adminRolesError } = await supabase
         .from('roles')
         .select('id')
-        .or('name.eq.admin,is_super_admin.is.true,is_manager_admin.is.true');
+        .is('is_super_admin', true);
 
       if (adminRolesError) {
         console.error('Error finding admin roles for notification:', adminRolesError);
@@ -104,7 +102,7 @@ export async function POST(request: NextRequest) {
 
       const adminRoleIds = (adminRoles ?? []).map(r => r.id);
       if (adminRoleIds.length === 0) {
-        console.warn('No admin users found for notification - skipping email alerts');
+        console.warn('No super-admin roles found for notification - skipping alerts');
       } else {
         const { data: adminProfiles, error: adminProfilesError } = await supabase
           .from('profiles')
@@ -112,16 +110,16 @@ export async function POST(request: NextRequest) {
           .in('role_id', adminRoleIds);
 
         if (adminProfilesError) {
-          console.error('Error finding admin profiles for notification:', adminProfilesError);
-          throw new Error(`Failed to find admin profiles: ${adminProfilesError.message}`);
+          console.error('Error finding super-admin profiles for notification:', adminProfilesError);
+          throw new Error(`Failed to find super-admin profiles: ${adminProfilesError.message}`);
         }
 
         if (!adminProfiles || adminProfiles.length === 0) {
-          console.warn('No admin profiles found for notification - skipping email alerts');
+          console.warn('No super-admin profiles found for notification - skipping alerts');
         } else {
 
           const adminUserIds = adminProfiles.map(p => p.id);
-          console.log(`Found ${adminUserIds.length} admin users for notification:`, adminUserIds);
+          console.log(`Found ${adminUserIds.length} super-admin users for notification:`, adminUserIds);
 
           // Fetch admin notification preferences
           const { data: allPrefs } = await supabase

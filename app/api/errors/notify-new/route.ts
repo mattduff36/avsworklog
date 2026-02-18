@@ -75,12 +75,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Error log entry not found' }, { status: 404 });
     }
 
-    // Find all admin users
-    // NOTE: Avoid `.or()` with dotted paths like `role.name` (PostgREST parse errors).
+    // Only notify super-admins (not regular admins or manager-admins)
     const { data: adminRoles, error: adminRolesError } = await supabase
       .from('roles')
       .select('id')
-      .or('name.eq.admin,is_super_admin.is.true,is_manager_admin.is.true');
+      .is('is_super_admin', true);
 
     if (adminRolesError) {
       console.error('Error finding admin roles:', adminRolesError);
