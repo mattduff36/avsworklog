@@ -217,6 +217,8 @@ function NewPlantInspectionContent() {
           
           (items as InspectionItem[] | null)?.forEach((item: InspectionItem) => {
             const key = `${item.item_number}`;
+            const existing = newCheckboxStates[key];
+            if (existing && existing === 'attention') return;
             newCheckboxStates[key] = item.status;
             if (item.comments) {
               newComments[key] = item.comments;
