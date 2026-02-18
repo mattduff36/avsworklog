@@ -6,7 +6,7 @@
 
 ## Overview
 
-Added a user-facing error reporting system in the Help section where users can report bugs and errors. All admin users are notified via in-app notifications and email when errors are reported, and can manage reports through a dedicated admin interface.
+Added a user-facing error reporting system in the Help section where users can report bugs and errors. Super-admin users are notified via in-app notifications and email when errors are reported, and can manage reports through a dedicated admin interface.
 
 ## Features Implemented
 
@@ -54,7 +54,7 @@ When a user submits an error report:
 - Includes full error details and link to management page
 
 **Email Notifications:**
-- Sends via Resend to all admin email addresses
+- Sends via Resend to all super-admin email addresses
 - Professional HTML template with error details
 - Includes "Manage Error Reports" button linking to admin page
 - Batched sending for multiple admins (up to 10 per batch)
@@ -100,7 +100,7 @@ error_report_updates
 **User Endpoints:**
 - `POST /api/errors/report` - Submit error report (enhanced existing endpoint)
   - Persists to database
-  - Notifies all admins
+  - Notifies all super-admins
   - Sends emails
   - Returns: `{ success, report_id, notification_sent, email_sent }`
 - `GET /api/error-reports` - Get current user's reports
@@ -118,7 +118,7 @@ error_report_updates
 
 **Function:** `sendErrorReportEmailToAdmins` in `lib/utils/email.ts`
 
-- Multi-recipient support (all admins)
+- Multi-recipient support (all super-admins)
 - Batched sending (10 emails per batch, 1s delay)
 - Professional HTML template with:
   - Report title and description
@@ -174,9 +174,9 @@ Exported types:
 
 3. **Service Role Usage:**
    - Error reporting endpoint uses service role to:
-     - Find all admin users
-     - Create notifications for admins
-     - Send emails to admin addresses
+     - Find all super-admin users
+     - Create notifications for super-admins
+     - Send emails to super-admin addresses
    - User identity still verified via session
 
 4. **Data Privacy:**
@@ -244,8 +244,8 @@ Exported types:
 3. **Multi-Admin Test:**
    - Create multiple admin accounts (if available)
    - Submit error report as regular user
-   - Verify all admin accounts receive notification
-   - Verify all admin email addresses receive email
+   - Verify all super-admin accounts receive notification
+   - Verify all super-admin email addresses receive email
 
 ### Database Verification
 

@@ -208,7 +208,7 @@ If all tests pass:
    - Verify they see "My Errors" list
    - Verify they DON'T see admin management links
 2. Test with multiple admin accounts
-   - Verify all admins receive notifications
+   - Verify all super-admins receive notifications
    - Verify preferences work independently per admin
 3. Monitor production after deployment
    - Check error_reports table for submissions

@@ -17,7 +17,7 @@ Users see a new "Errors" tab in Help & FAQ with:
   - Error Title (required)
   - Description (required) - space for detailed explanation
   - Related Page/Feature (optional)
-  - Submit button that notifies admins instantly
+  - Submit button that notifies super-admins instantly
 
 - **My Errors List:**
   - All previously submitted error reports
@@ -54,19 +54,19 @@ Admins see a full management dashboard with:
   - Complete history timeline
   - Save button
 
-## Admin Notifications
+## Super-Admin Notifications
 
 When an error is reported:
 
 ### In-App Notification
 - High-priority reminder notification
-- Sent to **all admins** (`roles.name = 'admin'` OR `roles.is_super_admin = true`)
+- Sent to **super-admins only** (`roles.is_super_admin = true`)
 - Appears in notification bell icon
 - Contains full error details
 
 ### Email Notification
 - Professional HTML email via Resend
-- Sent to all admin email addresses
+- Sent to all super-admin email addresses
 - Includes:
   - Report title and description
   - Reporter information
@@ -199,7 +199,7 @@ The feature is complete and ready to use. Admins should:
 ## Key Benefits
 
 - 🐛 Users can easily report bugs without technical knowledge
-- 📧 Admins are notified immediately via app and email
+- 📧 Super-admins are notified immediately via app and email
 - 📊 Complete tracking and audit trail
 - 🔒 Secure, role-based access control
 - 🎯 Professional, polished user experience

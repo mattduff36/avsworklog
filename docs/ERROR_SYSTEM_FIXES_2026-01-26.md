@@ -58,7 +58,7 @@ Admin discovery in error report pipeline was using incorrect PostgREST query syn
 
 **Impact:**
 - ✅ Admin lookup now works correctly
-- ✅ All admins (including managers with admin flag) are found
+- ✅ Super-admins are found correctly
 - ✅ Clear error messages if admin discovery fails
 
 ---
@@ -75,7 +75,7 @@ Admins can now opt in/out of receiving error notifications on a per-channel basi
 - **Email Notifications:** Resend email alerts
 
 **Default Behavior:**
-- Both channels enabled by default for all admins
+- Both channels enabled by default for all super-admins
 - Preferences persist per admin user
 - Applies to both Help-reported errors AND debug-detected errors
 
@@ -176,7 +176,7 @@ Replaced text input with required dropdown showing:
 ### 6. 🔔 Debug Page Error Alerts
 
 **Feature:**
-When the `/debug` page detects new error log entries, admins are automatically notified.
+When the `/debug` page detects new error log entries, super-admins are automatically notified.
 
 **Behavior:**
 - Debug page polls `error_logs` table
@@ -419,14 +419,14 @@ curl -X PUT http://localhost:3001/api/admin/error-notification-preferences \
 
 ### Before Fixes:
 - ❌ No in-app notifications ever showed up (bell always 0)
-- ❌ Error reports submitted but admins never notified
+- ❌ Error reports submitted but super-admins never notified
 - ❌ Debug page detected errors but never alerted anyone
 - ❌ No way for admins to control notification preferences
 - ❌ Free-text page field made categorization difficult
 
 ### After Fixes:
 - ✅ In-app notifications fully functional system-wide
-- ✅ Error reports notify all admins instantly (in-app + email)
+- ✅ Error reports notify all super-admins instantly (in-app + email)
 - ✅ Debug page auto-alerts admins of new errors (respects preferences)
 - ✅ Admins can toggle in-app/email per channel
 - ✅ Structured dropdown for page/feature selection
@@ -469,7 +469,7 @@ Debug Error Detection:
   ↓
   Load admin preferences
   ↓
-  Create notifications + emails for opted-in admins
+  Create notifications + emails for opted-in super-admins
   ↓
   Record in error_log_alerts (prevent duplicates)
 ```
