@@ -203,6 +203,52 @@ const styles = StyleSheet.create({
     fontSize: 7,
     lineHeight: 1.4,
   },
+  dailyChecklistItemHeader: {
+    width: '55%',
+    fontSize: 7,
+    fontWeight: 'bold',
+    paddingLeft: 4,
+  },
+  dailyChecklistStatusHeader: {
+    width: '15%',
+    fontSize: 7,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    borderLeftWidth: 1,
+    borderLeftColor: '#000',
+    paddingVertical: 2,
+  },
+  dailyChecklistCommentsHeader: {
+    width: '25%',
+    fontSize: 7,
+    fontWeight: 'bold',
+    paddingLeft: 4,
+    borderLeftWidth: 1,
+    borderLeftColor: '#000',
+    paddingVertical: 2,
+  },
+  dailyItemDescription: {
+    width: '55%',
+    padding: 3,
+    fontSize: 6,
+    justifyContent: 'center',
+  },
+  dailyStatusCell: {
+    width: '15%',
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderLeftWidth: 1,
+    borderLeftColor: '#000',
+  },
+  dailyCommentsCell: {
+    width: '25%',
+    padding: 3,
+    fontSize: 6,
+    justifyContent: 'center',
+    borderLeftWidth: 1,
+    borderLeftColor: '#000',
+  },
   footer: {
     position: 'absolute',
     bottom: 20,
@@ -253,6 +299,7 @@ export function PlantInspectionPDF({
   dailyHours 
 }: PlantInspectionPDFProps) {
   const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const isDaily = inspection.inspection_date === inspection.inspection_end_date;
 
   return (
     <Document>
@@ -261,7 +308,10 @@ export function PlantInspectionPDF({
         <View style={styles.header}>
           <Text style={styles.title}>OPERATED PLANT INSPECTION PAD</Text>
           <Text style={styles.subtitle}>
-            Week: {formatDate(inspection.inspection_date)} - {formatDate(inspection.inspection_end_date)}
+            {isDaily
+              ? `Date: ${formatDate(inspection.inspection_date)}`
+              : `Week: ${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
+            }
           </Text>
         </View>
 
@@ -277,7 +327,7 @@ export function PlantInspectionPDF({
               </Text>
             </View>
             <View style={styles.infoBox}>
-              <Text style={styles.label}>OPERATOR'S NAME</Text>
+              <Text style={styles.label}>OPERATOR&apos;S NAME</Text>
               <Text style={styles.value}>{operator.full_name}</Text>
             </View>
           </View>
@@ -330,40 +380,31 @@ export function PlantInspectionPDF({
 
         {/* Checklist */}
         <View style={styles.checklist}>
-          {/* Header Row */}
-          <View style={styles.checklistHeaderRow}>
-            <Text style={styles.checklistNumberHeader}>#</Text>
-            <Text style={styles.checklistItemHeader}>Item</Text>
-            {dayNames.map((day) => (
-              <Text key={day} style={styles.checklistDayHeader}>
-                {day}
-              </Text>
-            ))}
-          </View>
-
-          {/* Checklist Rows */}
-          {PLANT_INSPECTION_ITEMS.map((item, idx) => {
-            const itemNumber = idx + 1;
-            const isLast = idx === PLANT_INSPECTION_ITEMS.length - 1;
-            
-            return (
-              <View 
-                key={itemNumber} 
-                style={isLast ? styles.checklistRowLast : styles.checklistRow}
-              >
-                <View style={styles.itemNumber}>
-                  <Text>{itemNumber}</Text>
-                </View>
-                <View style={styles.itemDescription}>
-                  <Text>{item}</Text>
-                </View>
-                {[1, 2, 3, 4, 5, 6, 7].map((dayOfWeek) => {
-                  const itemStatus = items.find(
-                    i => i.item_number === itemNumber && i.day_of_week === dayOfWeek
-                  );
-                  
-                  return (
-                    <View key={dayOfWeek} style={styles.statusCell}>
+          {isDaily ? (
+            <>
+              <View style={styles.checklistHeaderRow}>
+                <Text style={styles.checklistNumberHeader}>#</Text>
+                <Text style={styles.dailyChecklistItemHeader}>Item</Text>
+                <Text style={styles.dailyChecklistStatusHeader}>Status</Text>
+                <Text style={styles.dailyChecklistCommentsHeader}>Comments</Text>
+              </View>
+              {PLANT_INSPECTION_ITEMS.map((item, idx) => {
+                const itemNumber = idx + 1;
+                const isLast = idx === PLANT_INSPECTION_ITEMS.length - 1;
+                const itemStatus = items.find(i => i.item_number === itemNumber);
+                
+                return (
+                  <View 
+                    key={itemNumber} 
+                    style={isLast ? styles.checklistRowLast : styles.checklistRow}
+                  >
+                    <View style={styles.itemNumber}>
+                      <Text>{itemNumber}</Text>
+                    </View>
+                    <View style={styles.dailyItemDescription}>
+                      <Text>{item}</Text>
+                    </View>
+                    <View style={styles.dailyStatusCell}>
                       {itemStatus?.status === 'ok' && (
                         <Text style={[styles.statusText, styles.okText]}>✓</Text>
                       )}
@@ -373,12 +414,67 @@ export function PlantInspectionPDF({
                       {itemStatus?.status === 'na' && (
                         <Text style={[styles.statusText, styles.naText]}>N/A</Text>
                       )}
+                      {!itemStatus && (
+                        <Text style={[styles.statusText, styles.naText]}>-</Text>
+                      )}
                     </View>
-                  );
-                })}
+                    <View style={styles.dailyCommentsCell}>
+                      <Text>{itemStatus?.comments || ''}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </>
+          ) : (
+            <>
+              <View style={styles.checklistHeaderRow}>
+                <Text style={styles.checklistNumberHeader}>#</Text>
+                <Text style={styles.checklistItemHeader}>Item</Text>
+                {dayNames.map((day) => (
+                  <Text key={day} style={styles.checklistDayHeader}>
+                    {day}
+                  </Text>
+                ))}
               </View>
-            );
-          })}
+              {PLANT_INSPECTION_ITEMS.map((item, idx) => {
+                const itemNumber = idx + 1;
+                const isLast = idx === PLANT_INSPECTION_ITEMS.length - 1;
+                
+                return (
+                  <View 
+                    key={itemNumber} 
+                    style={isLast ? styles.checklistRowLast : styles.checklistRow}
+                  >
+                    <View style={styles.itemNumber}>
+                      <Text>{itemNumber}</Text>
+                    </View>
+                    <View style={styles.itemDescription}>
+                      <Text>{item}</Text>
+                    </View>
+                    {[1, 2, 3, 4, 5, 6, 7].map((dayOfWeek) => {
+                      const itemStatus = items.find(
+                        i => i.item_number === itemNumber && i.day_of_week === dayOfWeek
+                      );
+                      
+                      return (
+                        <View key={dayOfWeek} style={styles.statusCell}>
+                          {itemStatus?.status === 'ok' && (
+                            <Text style={[styles.statusText, styles.okText]}>✓</Text>
+                          )}
+                          {itemStatus?.status === 'attention' && (
+                            <Text style={[styles.statusText, styles.failText]}>✗</Text>
+                          )}
+                          {itemStatus?.status === 'na' && (
+                            <Text style={[styles.statusText, styles.naText]}>N/A</Text>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                );
+              })}
+            </>
+          )}
         </View>
 
         {/* Signature Section */}

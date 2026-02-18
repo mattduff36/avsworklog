@@ -10,14 +10,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Check, WifiOff, Camera } from 'lucide-react';
+import { Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Camera } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
-import { formatDateISO, formatDate, getWeekEnding } from '@/lib/utils/date';
+import { formatDateISO, formatDate, getDayOfWeek } from '@/lib/utils/date';
 import { InspectionStatus } from '@/types/inspection';
 import { PLANT_INSPECTION_ITEMS } from '@/lib/checklists/plant-checklists';
 import { Database } from '@/types/database';
@@ -28,8 +27,6 @@ import { showErrorWithReport } from '@/lib/utils/error-reporting';
 // Dynamic imports for heavy components
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
 const SignaturePad = dynamic(() => import('@/components/forms/SignaturePad'), { ssr: false });
-
-const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 // Type definitions
 type InspectionItem = {
@@ -90,8 +87,7 @@ function NewPlantInspectionContent() {
     vehicle_categories?: { name: string } | null;
   }>>([]);
   const [selectedPlantId, setSelectedPlantId] = useState('');
-  const [weekEnding, setWeekEnding] = useState('');
-  const [activeDay, setActiveDay] = useState('0'); // 0-6 for Monday-Sunday
+  const [inspectionDate, setInspectionDate] = useState('');
   
   // Current hours state (single value, like vehicle mileage)
   const [currentHours, setCurrentHours] = useState('');
@@ -210,7 +206,7 @@ function NewPlantInspectionContent() {
           setExistingInspectionId(id);
           const inspectionData = inspection as InspectionWithRelations;
           setSelectedPlantId(inspectionData.plant?.id || '');
-          setWeekEnding(inspection.inspection_end_date || formatDateISO(getWeekEnding()));
+          setInspectionDate(inspection.inspection_date || formatDateISO(new Date()));
           setSelectedEmployeeId(inspection.user_id);
 
           setOriginalCurrentMileage(inspection.current_mileage);
@@ -220,7 +216,7 @@ function NewPlantInspectionContent() {
           const newComments: Record<string, string> = {};
           
           (items as InspectionItem[] | null)?.forEach((item: InspectionItem) => {
-            const key = `${item.day_of_week}-${item.item_number}`;
+            const key = `${item.item_number}`;
             newCheckboxStates[key] = item.status;
             if (item.comments) {
               newComments[key] = item.comments;
@@ -287,10 +283,10 @@ function NewPlantInspectionContent() {
 
   const checkForDuplicate = useCallback(async (
     plantIdToCheck: string, 
-    weekEndingToCheck: string,
+    dateToCheck: string,
     clearOtherErrors: boolean = false
   ): Promise<boolean> => {
-    if (!plantIdToCheck || !weekEndingToCheck || existingInspectionId) {
+    if (!plantIdToCheck || !dateToCheck || existingInspectionId) {
       setDuplicateInspection(null);
       return false;
     }
@@ -302,7 +298,7 @@ function NewPlantInspectionContent() {
         .from('vehicle_inspections')
         .select('id, status')
         .eq('plant_id', plantIdToCheck)
-        .eq('inspection_end_date', weekEndingToCheck)
+        .eq('inspection_date', dateToCheck)
         .limit(1);
 
       if (error) throw error;
@@ -310,7 +306,7 @@ function NewPlantInspectionContent() {
       if (data && data.length > 0) {
         const existing = data[0];
         setDuplicateInspection(existing.id);
-        setError(`An inspection for this plant and week already exists (${existing.status}). Please select a different plant or week.`);
+        setError(`An inspection for this plant and date already exists (${existing.status}). Please select a different plant or date.`);
         return true;
       } else {
         setDuplicateInspection(null);
@@ -332,10 +328,10 @@ function NewPlantInspectionContent() {
   }, [existingInspectionId, supabase]);
 
   useEffect(() => {
-    if (selectedPlantId && weekEnding && !existingInspectionId) {
-      checkForDuplicate(selectedPlantId, weekEnding);
+    if (selectedPlantId && inspectionDate && !existingInspectionId) {
+      checkForDuplicate(selectedPlantId, inspectionDate);
     }
-  }, [selectedPlantId, weekEnding, existingInspectionId, checkForDuplicate]);
+  }, [selectedPlantId, inspectionDate, existingInspectionId, checkForDuplicate]);
 
   const loadLockedDefects = async (plantId: string) => {
     try {
@@ -360,29 +356,15 @@ function NewPlantInspectionContent() {
 
         setLoggedDefects(loggedMap);
 
-        // Initialize all checkbox states to default 'ok', then mark locked defect items
         const newCheckboxStates: Record<string, InspectionStatus> = {};
         const newComments: Record<string, string> = {};
 
-        // Initialize all cells to default 'ok' state
-        for (let day = 1; day <= 7; day++) {
-          for (let itemNum = 1; itemNum <= PLANT_INSPECTION_ITEMS.length; itemNum++) {
-            const stateKey = `${day}-${itemNum}`;
-            newCheckboxStates[stateKey] = 'ok';
-            newComments[stateKey] = '';
-          }
-        }
-
-        // Override with locked defect items (marked as 'attention')
         loggedMap.forEach((loggedInfo, key) => {
           const [itemNumStr] = key.split('-');
           const itemNum = parseInt(itemNumStr);
-          
-          for (let day = 1; day <= 7; day++) {
-            const stateKey = `${day}-${itemNum}`;
-            newCheckboxStates[stateKey] = 'attention';
-            newComments[stateKey] = loggedInfo.comment;
-          }
+          const stateKey = `${itemNum}`;
+          newCheckboxStates[stateKey] = 'attention';
+          newComments[stateKey] = loggedInfo.comment;
         });
 
         setCheckboxStates(newCheckboxStates);
@@ -398,8 +380,7 @@ function NewPlantInspectionContent() {
   };
 
   const handleStatusChange = (itemNumber: number, status: InspectionStatus) => {
-    const dayOfWeek = parseInt(activeDay) + 1;
-    const key = `${dayOfWeek}-${itemNumber}`;
+    const key = `${itemNumber}`;
     
     if (!checklistStarted) {
       setChecklistStarted(true);
@@ -409,8 +390,7 @@ function NewPlantInspectionContent() {
   };
 
   const handleCommentChange = (itemNumber: number, comment: string) => {
-    const dayOfWeek = parseInt(activeDay) + 1;
-    const key = `${dayOfWeek}-${itemNumber}`;
+    const key = `${itemNumber}`;
     setComments(prev => ({ ...prev, [key]: comment }));
   };
 
@@ -444,21 +424,13 @@ function NewPlantInspectionContent() {
       return;
     }
 
-    // Validate week ending is a Sunday
-    const weekEndDate = new Date(weekEnding + 'T00:00:00');
-    if (weekEndDate.getDay() !== 0) {
-      setError('Week ending must be a Sunday');
-      return;
-    }
-
     // Validate: all defects must have comments
     const defectsWithoutComments: string[] = [];
     Object.entries(checkboxStates).forEach(([key, status]) => {
       if (status === 'attention' && !comments[key]) {
-        const [dayOfWeek, itemNumber] = key.split('-').map(Number);
-        const dayName = DAY_NAMES[dayOfWeek - 1] || `Day ${dayOfWeek}`;
+        const itemNumber = parseInt(key);
         const itemName = currentChecklist[itemNumber - 1] || `Item ${itemNumber}`;
-        defectsWithoutComments.push(`${itemName} (${dayName})`);
+        defectsWithoutComments.push(itemName);
       }
     });
 
@@ -494,19 +466,19 @@ function NewPlantInspectionContent() {
   const saveInspection = async (status: 'draft' | 'submitted', signatureData?: string) => {
     if (!user || !selectedEmployeeId || !selectedPlantId) return;
     
-    if (!weekEnding || weekEnding.trim() === '') {
-      setError('Please select a week ending date');
+    if (!inspectionDate || inspectionDate.trim() === '') {
+      setError('Please select an inspection date');
       return;
     }
     
     if (duplicateInspection) {
-      setError('An inspection for this plant and week already exists.');
+      setError('An inspection for this plant and date already exists.');
       return;
     }
     
-    const isDuplicate = await checkForDuplicate(selectedPlantId, weekEnding, true);
+    const isDuplicate = await checkForDuplicate(selectedPlantId, inspectionDate, true);
     if (isDuplicate) {
-      setError('An inspection for this plant and week already exists.');
+      setError('An inspection for this plant and date already exists.');
       return;
     }
     
@@ -518,16 +490,12 @@ function NewPlantInspectionContent() {
     setLoading(true);
 
     try {
-      const weekEndDate = new Date(weekEnding + 'T00:00:00');
-      const startDate = new Date(weekEndDate);
-      startDate.setDate(weekEndDate.getDate() - 6);
-      
       type InspectionInsert = Database['public']['Tables']['vehicle_inspections']['Insert'];
       const inspectionData: InspectionInsert = {
         plant_id: selectedPlantId,
         user_id: selectedEmployeeId,
-        inspection_date: formatDateISO(startDate),
-        inspection_end_date: weekEnding,
+        inspection_date: inspectionDate,
+        inspection_end_date: inspectionDate,
         current_mileage: getParsedHours(),
         status,
         submitted_at: status === 'submitted' ? new Date().toISOString() : null,
@@ -569,27 +537,25 @@ function NewPlantInspectionContent() {
 
       if (!inspection) throw new Error('Failed to save inspection');
 
-      // Create inspection items
       type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
       const items: InspectionItemInsert[] = [];
+      const dayOfWeek = getDayOfWeek(new Date(inspectionDate + 'T00:00:00'));
       
-      for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
-        currentChecklist.forEach((item, index) => {
-          const itemNumber = index + 1;
-          const key = `${dayOfWeek}-${itemNumber}`;
-          
-          if (checkboxStates[key]) {
-            items.push({
-              inspection_id: inspection.id,
-              item_number: itemNumber,
-              item_description: item,
-              day_of_week: dayOfWeek,
-              status: checkboxStates[key],
-              comments: comments[key] || null,
-            });
-          }
-        });
-      }
+      currentChecklist.forEach((item, index) => {
+        const itemNumber = index + 1;
+        const key = `${itemNumber}`;
+        
+        if (checkboxStates[key]) {
+          items.push({
+            inspection_id: inspection.id,
+            item_number: itemNumber,
+            item_description: item,
+            day_of_week: dayOfWeek,
+            status: checkboxStates[key],
+            comments: comments[key] || null,
+          });
+        }
+      });
 
       let insertedItems: InspectionItem[] = [];
       if (items.length > 0) {
@@ -608,8 +574,8 @@ function NewPlantInspectionContent() {
         const inspectionUpdate: InspectionUpdate = {
           plant_id: selectedPlantId,
           user_id: selectedEmployeeId,
-          inspection_date: formatDateISO(startDate),
-          inspection_end_date: weekEnding,
+          inspection_date: inspectionDate,
+          inspection_end_date: inspectionDate,
           current_mileage: getParsedHours(),
           status,
           submitted_at: status === 'submitted' ? new Date().toISOString() : null,
@@ -754,7 +720,7 @@ function NewPlantInspectionContent() {
       showErrorWithReport(
         'Failed to save inspection',
         errorMessage,
-        { plantId: selectedPlantId, weekEnding, existingInspectionId }
+        { plantId: selectedPlantId, inspectionDate, existingInspectionId }
       );
     } finally {
       setLoading(false);
@@ -785,8 +751,7 @@ function NewPlantInspectionContent() {
     }
   };
 
-  // Calculate progress
-  const totalItems = currentChecklist.length * 7;
+  const totalItems = currentChecklist.length;
   const completedItems = Object.keys(checkboxStates).length;
   const progressPercent = Math.round((completedItems / totalItems) * 100);
 
@@ -836,7 +801,7 @@ function NewPlantInspectionContent() {
         <CardHeader className="pb-4">
           <CardTitle className="text-foreground">Inspection Details</CardTitle>
           <CardDescription className="text-muted-foreground">
-            Week ending: {formatDate(weekEnding)}
+            {inspectionDate ? `Date: ${formatDate(inspectionDate)}` : 'Select a date'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -891,24 +856,19 @@ function NewPlantInspectionContent() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="weekEnding" className="text-foreground text-base flex items-center gap-2">
-                Week Ending (Sunday)
+              <Label htmlFor="inspectionDate" className="text-foreground text-base flex items-center gap-2">
+                Inspection Date
                 <span className="text-red-400">*</span>
               </Label>
               <Input
-                id="weekEnding"
+                id="inspectionDate"
                 type="date"
-                value={weekEnding}
+                value={inspectionDate}
                 onChange={(e) => {
-                  const selectedDate = new Date(e.target.value + 'T00:00:00');
-                  if (selectedDate.getDay() !== 0) {
-                    setError('Week ending must be a Sunday');
-                    return;
-                  }
                   setError('');
-                  setWeekEnding(e.target.value);
+                  setInspectionDate(e.target.value);
                 }}
-                max={formatDateISO(getWeekEnding())}
+                max={formatDateISO(new Date())}
                 disabled={checklistStarted}
                 className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
                 required
@@ -946,7 +906,7 @@ function NewPlantInspectionContent() {
             <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
               <p className="text-sm text-blue-400">
                 <Info className="h-4 w-4 inline mr-2" />
-                Plant and week ending are locked once you start filling the checklist.
+                Plant and date are locked once you start filling the checklist.
               </p>
             </div>
           )}
@@ -954,56 +914,26 @@ function NewPlantInspectionContent() {
       </Card>
 
       {/* Safety Check */}
-      {selectedPlantId && weekEnding && !duplicateInspection && !duplicateCheckLoading && (
+      {selectedPlantId && inspectionDate && !duplicateInspection && !duplicateCheckLoading && (
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-foreground">{currentChecklist.length}-Point Plant Safety Check</CardTitle>
           <CardDescription className="text-muted-foreground">
-            Mark each item as Pass or Fail for each day
+            Mark each item as Pass or Fail
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 p-4 md:p-6">
-          
-          <Tabs value={activeDay} onValueChange={setActiveDay} className="w-full">
-            <TabsList className="grid w-full grid-cols-7 bg-slate-900/50 p-1 rounded-lg mb-4">
-              {DAY_NAMES.map((day, index) => {
-                const dayOfWeek = index + 1;
-                const isComplete = currentChecklist.every((_, itemIndex) => {
-                  const itemNumber = itemIndex + 1;
-                  const key = `${dayOfWeek}-${itemNumber}`;
-                  return checkboxStates[key] !== undefined;
-                });
-                
-                return (
-                  <TabsTrigger 
-                    key={index} 
-                    value={index.toString()} 
-                    className={`text-xs py-3 data-[state=active]:bg-plant-inspection data-[state=active]:text-slate-900 text-muted-foreground ${
-                      isComplete 
-                        ? 'data-[state=active]:border-2 data-[state=active]:border-green-500 border-2 border-green-500/50' 
-                        : 'data-[state=active]:border-2 data-[state=active]:border-white'
-                    }`}
-                  >
-                    {day.substring(0, 3)}
-                    {isComplete && <Check className="h-3 w-3 ml-1" />}
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
 
-            {DAY_NAMES.map((day, dayIndex) => (
-              <TabsContent key={dayIndex} value={dayIndex.toString()} className="mt-0">
-                {/* Mobile View */}
-                <div className="md:hidden space-y-3">
-                  {currentChecklist.map((item, index) => {
-                    const itemNumber = index + 1;
-                    const dayOfWeek = dayIndex + 1;
-                    const key = `${dayOfWeek}-${itemNumber}`;
-                    const currentStatus = checkboxStates[key];
-                    
-                    const loggedKey = `${itemNumber}-${item}`;
-                    const isLogged = loggedDefects.has(loggedKey);
+          {/* Mobile View */}
+          <div className="md:hidden space-y-3">
+            {currentChecklist.map((item, index) => {
+              const itemNumber = index + 1;
+              const key = `${itemNumber}`;
+              const currentStatus = checkboxStates[key];
               
+              const loggedKey = `${itemNumber}-${item}`;
+              const isLogged = loggedDefects.has(loggedKey);
+        
               return (
                 <div key={itemNumber} className={`bg-slate-900/30 border rounded-lg p-4 space-y-3 ${
                   isLogged ? 'border-red-500/50 bg-red-500/5' : 'border-border/50'
@@ -1016,7 +946,7 @@ function NewPlantInspectionContent() {
                       <h4 className="text-base font-medium text-white leading-tight">{item}</h4>
                       {isLogged && (
                         <Badge className="mt-2 bg-red-500/20 text-red-400 border-red-500/30">
-                          🔒 LOGGED DEFECT
+                          LOGGED DEFECT
                         </Badge>
                       )}
                     </div>
@@ -1063,7 +993,7 @@ function NewPlantInspectionContent() {
                       size="sm"
                       onClick={() => {
                         if (existingInspectionId) {
-                          setPhotoUploadItem({ itemNumber, dayOfWeek });
+                          setPhotoUploadItem({ itemNumber, dayOfWeek: getDayOfWeek(new Date(inspectionDate + 'T00:00:00')) });
                         } else {
                           toast.info('Save as draft first to upload photos');
                         }
@@ -1095,8 +1025,7 @@ function NewPlantInspectionContent() {
               <tbody>
                 {currentChecklist.map((item, index) => {
                   const itemNumber = index + 1;
-                  const dayOfWeek = dayIndex + 1;
-                  const key = `${dayOfWeek}-${itemNumber}`;
+                  const key = `${itemNumber}`;
                   const currentStatus = checkboxStates[key];
                   
                   const loggedKey = `${itemNumber}-${item}`;
@@ -1111,7 +1040,7 @@ function NewPlantInspectionContent() {
                         {item}
                         {isLogged && (
                           <Badge className="ml-2 bg-red-500/20 text-red-400 border-red-500/30 text-xs">
-                            🔒 LOGGED
+                            LOGGED
                           </Badge>
                         )}
                       </td>
@@ -1152,7 +1081,7 @@ function NewPlantInspectionContent() {
                             size="sm"
                             onClick={() => {
                               if (existingInspectionId) {
-                                setPhotoUploadItem({ itemNumber, dayOfWeek });
+                                setPhotoUploadItem({ itemNumber, dayOfWeek: getDayOfWeek(new Date(inspectionDate + 'T00:00:00')) });
                               } else {
                                 toast.info('Save draft first');
                               }
@@ -1172,10 +1101,6 @@ function NewPlantInspectionContent() {
               </tbody>
             </table>
           </div>
-
-              </TabsContent>
-            ))}
-          </Tabs>
 
           {/* End of Inspection Comments */}
           <div className="mt-6 p-4 bg-slate-800/40 border border-border/50 rounded-lg">
@@ -1297,12 +1222,12 @@ function NewPlantInspectionContent() {
             
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-4">
               <p className="text-slate-200">
-                Have you finished using this plant for the week?
+                Have you completed this plant inspection for {inspectionDate ? formatDate(inspectionDate) : 'today'}?
               </p>
             </div>
             <div className="space-y-2 text-sm text-muted-foreground">
               <p>
-                Plant inspections should be submitted <strong className="text-white">weekly</strong>.
+                Plant inspections should be submitted <strong className="text-white">daily</strong>.
               </p>
             </div>
           </div>

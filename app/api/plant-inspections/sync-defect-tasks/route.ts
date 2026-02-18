@@ -95,16 +95,19 @@ export async function POST(request: NextRequest) {
       }
 
       // Create new task
-      const daysText = defect.days.map((d: number) => 
-        ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d - 1]
-      ).join(', ');
+      const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const daysText = Array.isArray(defect.days) && defect.days.length > 0
+        ? defect.days.map((d: number) => dayNames[d - 1]).join(', ')
+        : defect.dayOfWeek ? dayNames[defect.dayOfWeek - 1] : '';
+
+      const daysPart = daysText ? ` (${daysText})` : '';
 
       const taskData: ActionInsert = {
         action_type: 'inspection_defect',
         plant_id: plantId,
         vehicle_id: null,
         title: `Plant ${plantNumber}: ${defect.item_description}`,
-        description: `Item ${defect.item_number} - ${defect.item_description} (Days: ${daysText})\n\nComment: ${defect.comment}`,
+        description: `Item ${defect.item_number} - ${defect.item_description}${daysPart}\n\nComment: ${defect.comment}`,
         status: 'pending',
         created_by: createdBy,
         inspection_id: inspectionId,

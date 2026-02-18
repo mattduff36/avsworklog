@@ -454,7 +454,8 @@ export default function ViewPlantInspectionPage() {
   const defectCount = items.filter(item => item.status === 'attention').length;
   const okCount = items.filter(item => item.status === 'ok').length;
 
-  const isWeeklyInspection = items.length > 0 && items[0].day_of_week !== null;
+  const isWeeklyInspection = inspection.inspection_end_date && 
+    inspection.inspection_end_date !== inspection.inspection_date;
 
   const uniqueItems: Array<{ number: number; description: string }> = [];
   if (isWeeklyInspection) {
@@ -803,7 +804,7 @@ export default function ViewPlantInspectionPage() {
                 })
                 .map((item) => {
                   const fullDayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-                  const dayName = item.day_of_week ? fullDayNames[item.day_of_week - 1] : '';
+                  const dayName = isWeeklyInspection && item.day_of_week ? fullDayNames[item.day_of_week - 1] : '';
                   const statusBadge = item.status === 'attention' 
                     ? <Badge variant="destructive" className="ml-2">DEFECT</Badge>
                     : <Badge variant="secondary" className="ml-2">NOTE</Badge>;
