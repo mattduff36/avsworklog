@@ -70,8 +70,7 @@ export async function POST(request: NextRequest) {
       status: 'pending',
       created_by: createdBy,
       inspection_id: inspectionId,
-      category_id: category?.id || null,
-      subcategory_id: null,
+      workshop_category_id: category?.id || null,
     };
 
     const { data: newTask, error: insertError } = await supabaseAdmin

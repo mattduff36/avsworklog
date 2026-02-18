@@ -112,8 +112,7 @@ export async function POST(request: NextRequest) {
         created_by: createdBy,
         inspection_id: inspectionId,
         inspection_item_id: defect.primaryInspectionItemId,
-        category_id: repairCategory?.id || null,
-        subcategory_id: defaultSubcategoryId,
+        workshop_category_id: repairCategory?.id || null,
       };
 
       const { error: insertError } = await supabaseAdmin
