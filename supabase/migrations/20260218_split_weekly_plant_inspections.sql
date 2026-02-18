@@ -53,7 +53,7 @@ BEGIN
           manager_comments, inspector_comments, signature_data, signed_at,
           created_at, updated_at
         ) VALUES (
-          rec.plant_id, rec.user_id, day_date::text, day_date::text,
+          rec.plant_id, rec.user_id, day_date, day_date,
           rec.current_mileage, rec.status, rec.submitted_at, rec.reviewed_by, rec.reviewed_at,
           rec.manager_comments, rec.inspector_comments, rec.signature_data, rec.signed_at,
           rec.created_at, rec.updated_at
