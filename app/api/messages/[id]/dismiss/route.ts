@@ -50,10 +50,10 @@ export async function POST(
       }, { status: 410 });
     }
 
-    // Verify this is a Reminder
-    if (recipient.messages.type !== 'REMINDER') {
+    // Verify this is a Reminder or Notification (both use the dismiss flow)
+    if (recipient.messages.type !== 'REMINDER' && recipient.messages.type !== 'NOTIFICATION') {
       return NextResponse.json({ 
-        error: 'Only Reminder messages can be dismissed' 
+        error: 'Only Reminder and Notification messages can be dismissed' 
       }, { status: 400 });
     }
 
