@@ -107,7 +107,13 @@ function InspectionsContent() {
         if (error) throw error;
         setVehicles(data || []);
       } catch (err) {
-        console.error('Error fetching vehicles:', err);
+        const msg = err instanceof Error ? err.message : String(err);
+        const isNetworkErr = msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.toLowerCase().includes('network');
+        if (isNetworkErr) {
+          console.warn('Unable to load vehicles (network):', err);
+        } else {
+          console.error('Error fetching vehicles:', err);
+        }
       }
     };
     fetchVehicles();

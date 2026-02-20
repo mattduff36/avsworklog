@@ -129,6 +129,7 @@ export function SignRAMSModal({
             <SignaturePad
               onSave={handleSaveSignature}
               onCancel={handleClose}
+              disabled={loading}
             />
           </div>
 

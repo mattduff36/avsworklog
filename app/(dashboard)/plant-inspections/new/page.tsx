@@ -708,17 +708,26 @@ function NewPlantInspectionContent() {
 
       router.push('/plant-inspections');
     } catch (err) {
-      console.error('Error saving inspection:', err);
+      const errMessage = err instanceof Error ? err.message : String(err);
       
-      let errorMessage = 'An unexpected error occurred';
-      
-      if (err instanceof Error) {
-        errorMessage = err.message;
+      const isDuplicateKey =
+        errMessage.includes('duplicate key') ||
+        errMessage.includes('idx_unique_plant_inspection_date') ||
+        errMessage.includes('23505');
+
+      if (isDuplicateKey) {
+        setError('An inspection for this plant and date already exists. Please select a different plant or date.');
+        toast.error('Duplicate inspection', {
+          description: 'An inspection already exists for this plant on this date.',
+        });
+        return;
       }
+
+      console.error('Error saving inspection:', err);
       
       showErrorWithReport(
         'Failed to save inspection',
-        errorMessage,
+        errMessage,
         { plantId: selectedPlantId, inspectionDate, existingInspectionId }
       );
     } finally {

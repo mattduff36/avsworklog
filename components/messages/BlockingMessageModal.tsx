@@ -83,6 +83,12 @@ export function BlockingMessageModal({
       const data = await response.json();
 
       if (!response.ok) {
+        // Treat "already signed" as success — modal should close gracefully
+        if (data.error === 'This message has already been signed') {
+          toast.info('This message has already been signed');
+          onSigned();
+          return;
+        }
         throw new Error(data.error || 'Failed to sign message');
       }
 
