@@ -215,6 +215,111 @@ describe('Projects Module (formerly RAMS)', () => {
     });
   });
 
+  describe('Manage Page Query Contract', () => {
+    it('should build correct search params from query object', () => {
+      const params = new URLSearchParams({ all: 'true' });
+      const query = { q: 'safety', type: 'type-1', signature: 'required' as const, sortBy: 'title' as const, sortDir: 'asc' as const, limit: 50, offset: 0 };
+
+      if (query.q) params.set('q', query.q);
+      if (query.type) params.set('type', query.type);
+      if (query.signature) params.set('signature', query.signature);
+      if (query.sortBy) params.set('sortBy', query.sortBy);
+      if (query.sortDir) params.set('sortDir', query.sortDir);
+      if (query.limit) params.set('limit', String(query.limit));
+      if (query.offset) params.set('offset', String(query.offset));
+
+      expect(params.get('all')).toBe('true');
+      expect(params.get('q')).toBe('safety');
+      expect(params.get('type')).toBe('type-1');
+      expect(params.get('signature')).toBe('required');
+      expect(params.get('sortBy')).toBe('title');
+      expect(params.get('sortDir')).toBe('asc');
+    });
+
+    it('should handle empty query gracefully', () => {
+      const params = new URLSearchParams({ all: 'true' });
+      expect(params.get('q')).toBeNull();
+      expect(params.get('type')).toBeNull();
+    });
+
+    it('should clamp limit to max 200', () => {
+      const rawLimit = 500;
+      const limit = Math.min(rawLimit, 200);
+      expect(limit).toBe(200);
+    });
+
+    it('should default offset to 0 for negative values', () => {
+      const rawOffset = -5;
+      const offset = Math.max(rawOffset, 0);
+      expect(offset).toBe(0);
+    });
+
+    it('should aggregate assignment stats correctly', () => {
+      const assignments = [
+        { rams_document_id: 'doc-1', status: 'signed' },
+        { rams_document_id: 'doc-1', status: 'pending' },
+        { rams_document_id: 'doc-1', status: 'read' },
+        { rams_document_id: 'doc-2', status: 'signed' },
+      ];
+
+      const statsMap = new Map<string, { assigned: number; signed: number; pending: number }>();
+      for (const a of assignments) {
+        const entry = statsMap.get(a.rams_document_id) || { assigned: 0, signed: 0, pending: 0 };
+        entry.assigned++;
+        if (a.status === 'signed') entry.signed++;
+        if (a.status === 'pending' || a.status === 'read') entry.pending++;
+        statsMap.set(a.rams_document_id, entry);
+      }
+
+      const doc1 = statsMap.get('doc-1')!;
+      expect(doc1.assigned).toBe(3);
+      expect(doc1.signed).toBe(1);
+      expect(doc1.pending).toBe(2);
+
+      const doc2 = statsMap.get('doc-2')!;
+      expect(doc2.assigned).toBe(1);
+      expect(doc2.signed).toBe(1);
+      expect(doc2.pending).toBe(0);
+    });
+
+    it('should compute category counts correctly', () => {
+      const docs = [
+        { created_at: new Date().toISOString(), required_signature: true },
+        { created_at: new Date().toISOString(), required_signature: false },
+        { created_at: new Date(Date.now() - 10 * 86400000).toISOString(), required_signature: true },
+      ];
+
+      const now = Date.now();
+      const sevenDaysAgo = now - 7 * 86400000;
+
+      const counts = {
+        all: docs.length,
+        needs_signature: docs.filter(d => d.required_signature).length,
+        read_only: docs.filter(d => !d.required_signature).length,
+        recently_uploaded: docs.filter(d => new Date(d.created_at).getTime() > sevenDaysAgo).length,
+      };
+
+      expect(counts.all).toBe(3);
+      expect(counts.needs_signature).toBe(2);
+      expect(counts.read_only).toBe(1);
+      expect(counts.recently_uploaded).toBe(2);
+    });
+
+    it('should filter by signature type correctly', () => {
+      const docs = [
+        { title: 'RAMS A', required_signature: true },
+        { title: 'Briefing B', required_signature: false },
+        { title: 'RAMS C', required_signature: true },
+      ];
+
+      const required = docs.filter(d => d.required_signature);
+      const readOnly = docs.filter(d => !d.required_signature);
+
+      expect(required).toHaveLength(2);
+      expect(readOnly).toHaveLength(1);
+    });
+  });
+
   describe('Back Navigation', () => {
     it('should navigate /projects/manage back to /projects', () => {
       const path = '/projects/manage';

@@ -161,3 +161,40 @@ export interface ProjectFavouriteWithDocument extends ProjectFavourite {
   document: RAMSDocumentWithStats;
 }
 
+// Manage page query/response types
+
+export interface ManageDocumentsQuery {
+  q?: string;
+  type?: string;
+  signature?: 'required' | 'read-only';
+  sortBy?: 'title' | 'created_at' | 'uploader' | 'completion';
+  sortDir?: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
+}
+
+export interface ManageDocumentRow extends RAMSDocument {
+  uploader_name: string;
+  total_assigned: number;
+  total_signed: number;
+  total_pending: number;
+  document_type_name: string | null;
+  required_signature: boolean;
+  is_favourite?: boolean;
+}
+
+export interface ManageDocumentsCounts {
+  all: number;
+  needs_signature: number;
+  read_only: number;
+  recently_uploaded: number;
+}
+
+export interface ManageDocumentsResponse {
+  success: boolean;
+  documents: ManageDocumentRow[];
+  counts: ManageDocumentsCounts;
+  total: number;
+  error?: string;
+}
+

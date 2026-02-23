@@ -28,17 +28,52 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status'); // 'pending' | 'signed' | 'all'
     const showAll = searchParams.get('all') === 'true'; // For manage page
 
-    // Managers/Admins requesting all documents (for /rams/manage page)
+    // Managers/Admins requesting all documents (for /projects/manage page)
     if (isManagerOrAdmin && showAll) {
-      const { data: documents, error } = await supabase
+      const q = searchParams.get('q')?.trim() || '';
+      const typeFilter = searchParams.get('type') || '';
+      const signatureFilter = searchParams.get('signature') || '';
+      const sortBy = searchParams.get('sortBy') || 'created_at';
+      const sortDir = searchParams.get('sortDir') || 'desc';
+      const limit = Math.min(Number(searchParams.get('limit')) || 50, 200);
+      const offset = Math.max(Number(searchParams.get('offset')) || 0, 0);
+
+      // Base query for documents
+      let docsQuery = supabase
         .from('rams_documents')
         .select(`
           *,
           uploader:profiles!rams_documents_uploaded_by_fkey(full_name),
           document_type:project_document_types(id, name, required_signature)
-        `)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
+        `, { count: 'exact' })
+        .eq('is_active', true);
+
+      // Server-side text search
+      if (q) {
+        docsQuery = docsQuery.or(`title.ilike.%${q}%,description.ilike.%${q}%`);
+      }
+
+      // Document type filter
+      if (typeFilter) {
+        docsQuery = docsQuery.eq('document_type_id', typeFilter);
+      }
+
+      // Sort
+      const ascending = sortDir === 'asc';
+      switch (sortBy) {
+        case 'title':
+          docsQuery = docsQuery.order('title', { ascending });
+          break;
+        case 'created_at':
+        default:
+          docsQuery = docsQuery.order('created_at', { ascending });
+          break;
+      }
+
+      // Pagination
+      docsQuery = docsQuery.range(offset, offset + limit - 1);
+
+      const { data: documents, error, count: totalCount } = await docsQuery;
 
       if (error) {
         console.error('Error fetching documents:', error);
@@ -48,33 +83,92 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      // Get assignment stats for each document
-      const documentsWithStats = await Promise.all(
-        documents.map(async (doc) => {
-          const { data: assignments } = await supabase
+      const docIds = documents.map(d => d.id);
+
+      // Batch-fetch all assignment stats in one query instead of N+1
+      const { data: allAssignments } = docIds.length > 0
+        ? await supabase
             .from('rams_assignments')
-            .select('status')
-            .eq('rams_document_id', doc.id);
+            .select('rams_document_id, status')
+            .in('rams_document_id', docIds)
+        : { data: [] as { rams_document_id: string; status: string }[] };
 
-          const totalAssigned = assignments?.length || 0;
-          const totalSigned = assignments?.filter(a => a.status === 'signed').length || 0;
-          const totalPending = assignments?.filter(a => a.status === 'pending' || a.status === 'read').length || 0;
+      const statsMap = new Map<string, { assigned: number; signed: number; pending: number }>();
+      for (const a of allAssignments || []) {
+        const entry = statsMap.get(a.rams_document_id) || { assigned: 0, signed: 0, pending: 0 };
+        entry.assigned++;
+        if (a.status === 'signed') entry.signed++;
+        if (a.status === 'pending' || a.status === 'read') entry.pending++;
+        statsMap.set(a.rams_document_id, entry);
+      }
 
-          return {
-            ...doc,
-            uploader_name: doc.uploader?.full_name || 'Unknown',
-            total_assigned: totalAssigned,
-            total_signed: totalSigned,
-            total_pending: totalPending,
-            document_type_name: doc.document_type?.name || null,
-            required_signature: doc.document_type?.required_signature ?? true,
-          };
-        })
-      );
+      // Check which docs are favourited by this user
+      const { data: userFavs } = docIds.length > 0
+        ? await supabase
+            .from('project_favourites')
+            .select('document_id')
+            .eq('user_id', user.id)
+            .in('document_id', docIds)
+        : { data: [] as { document_id: string }[] };
+
+      const favSet = new Set((userFavs || []).map(f => f.document_id));
+
+      let documentsWithStats = documents.map((doc) => {
+        const stats = statsMap.get(doc.id) || { assigned: 0, signed: 0, pending: 0 };
+        const reqSig = doc.document_type?.required_signature ?? true;
+        return {
+          ...doc,
+          uploader_name: doc.uploader?.full_name || 'Unknown',
+          total_assigned: stats.assigned,
+          total_signed: stats.signed,
+          total_pending: stats.pending,
+          document_type_name: doc.document_type?.name || null,
+          required_signature: reqSig,
+          is_favourite: favSet.has(doc.id),
+        };
+      });
+
+      // Post-filter: signature type (needs the joined field)
+      if (signatureFilter === 'required') {
+        documentsWithStats = documentsWithStats.filter(d => d.required_signature);
+      } else if (signatureFilter === 'read-only') {
+        documentsWithStats = documentsWithStats.filter(d => !d.required_signature);
+      }
+
+      // Post-sort by uploader or completion (requires joined data)
+      if (sortBy === 'uploader') {
+        documentsWithStats.sort((a, b) => {
+          const cmp = a.uploader_name.localeCompare(b.uploader_name);
+          return ascending ? cmp : -cmp;
+        });
+      } else if (sortBy === 'completion') {
+        documentsWithStats.sort((a, b) => {
+          const pctA = a.total_assigned ? a.total_signed / a.total_assigned : 0;
+          const pctB = b.total_assigned ? b.total_signed / b.total_assigned : 0;
+          return ascending ? pctA - pctB : pctB - pctA;
+        });
+      }
+
+      // Compute category counts (unfiltered, for stat cards)
+      const { data: allDocs } = await supabase
+        .from('rams_documents')
+        .select('id, created_at, document_type_id, document_type:project_document_types(required_signature)')
+        .eq('is_active', true);
+
+      const now = Date.now();
+      const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+      const counts = {
+        all: allDocs?.length || 0,
+        needs_signature: allDocs?.filter(d => (d.document_type as any)?.required_signature !== false).length || 0,
+        read_only: allDocs?.filter(d => (d.document_type as any)?.required_signature === false).length || 0,
+        recently_uploaded: allDocs?.filter(d => new Date(d.created_at).getTime() > sevenDaysAgo).length || 0,
+      };
 
       return NextResponse.json({
         success: true,
         documents: documentsWithStats,
+        counts,
+        total: totalCount ?? documentsWithStats.length,
       });
     }
 
