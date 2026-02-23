@@ -23,7 +23,7 @@ interface ProjectsManageFiltersProps {
   onSearchChange: (q: string) => void;
   sortBy: NonNullable<ManageDocumentsQuery['sortBy']>;
   sortDir: NonNullable<ManageDocumentsQuery['sortDir']>;
-  onSortChange: (field: NonNullable<ManageDocumentsQuery['sortBy']>) => void;
+  onSortChange: (field: NonNullable<ManageDocumentsQuery['sortBy']>, dir: NonNullable<ManageDocumentsQuery['sortDir']>) => void;
   typeFilter: string;
   onTypeFilterChange: (typeId: string) => void;
   documentTypes: DocumentTypeOption[];
@@ -86,8 +86,8 @@ export function ProjectsManageFilters({
             <Select
               value={`${sortBy}-${sortDir}`}
               onValueChange={(v) => {
-                const field = v.split('-')[0] as NonNullable<ManageDocumentsQuery['sortBy']>;
-                onSortChange(field);
+                const [field, dir] = v.split('-') as [NonNullable<ManageDocumentsQuery['sortBy']>, NonNullable<ManageDocumentsQuery['sortDir']>];
+                onSortChange(field, dir);
               }}
             >
               <SelectTrigger className="w-full sm:w-[200px] bg-white dark:bg-slate-800 border-border">

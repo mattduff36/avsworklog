@@ -117,15 +117,20 @@ export default function ProjectsManagePage() {
   const hasActiveFilters = !!(debouncedSearch || typeFilter);
 
   // Handlers
-  const handleSortChange = useCallback((field: NonNullable<ManageDocumentsQuery['sortBy']>) => {
-    setSortBy((prev) => {
-      if (prev === field) {
-        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-        return prev;
-      }
-      setSortDir(field === 'title' ? 'asc' : 'desc');
-      return field;
-    });
+  const handleSortChange = useCallback((field: NonNullable<ManageDocumentsQuery['sortBy']>, dir?: NonNullable<ManageDocumentsQuery['sortDir']>) => {
+    if (dir) {
+      setSortBy(field);
+      setSortDir(dir);
+    } else {
+      setSortBy((prev) => {
+        if (prev === field) {
+          setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+          return prev;
+        }
+        setSortDir(field === 'title' ? 'asc' : 'desc');
+        return field;
+      });
+    }
   }, []);
 
   const handleClearFilters = useCallback(() => {
