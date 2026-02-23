@@ -73,12 +73,16 @@ function CompletionBadge({ signed, assigned, requiresSig }: { signed: number; as
   }
   const pct = Math.round((signed / assigned) * 100);
   const label = requiresSig ? 'signed' : 'read';
-  let variant: 'default' | 'secondary' | 'outline' | 'destructive' = 'secondary';
-  if (pct === 100) variant = 'default';
-  else if (pct === 0) variant = 'outline';
+
+  let colorClasses = 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border-yellow-500/30';
+  if (signed === 0) {
+    colorClasses = 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30';
+  } else if (signed === assigned) {
+    colorClasses = 'bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30';
+  }
 
   return (
-    <Badge variant={variant} className="text-xs font-normal whitespace-nowrap">
+    <Badge variant="outline" className={`text-xs font-normal whitespace-nowrap ${colorClasses}`}>
       {signed}/{assigned} {label} ({pct}%)
     </Badge>
   );
@@ -98,7 +102,7 @@ export function ProjectsDocumentsTable({
       <Table>
         <TableHeader>
           <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-            <TableHead className="w-[40%]">
+            <TableHead className="w-[30%]">
               <SortHeader
                 label="Document"
                 field="title"
@@ -107,7 +111,8 @@ export function ProjectsDocumentsTable({
                 onSort={onSortChange}
               />
             </TableHead>
-            <TableHead className="w-[15%]">
+            <TableHead className="w-[12%]">Type</TableHead>
+            <TableHead className="w-[13%]">
               <SortHeader
                 label="Uploaded"
                 field="created_at"
@@ -116,8 +121,8 @@ export function ProjectsDocumentsTable({
                 onSort={onSortChange}
               />
             </TableHead>
-            <TableHead className="w-[12%]">Uploader</TableHead>
-            <TableHead className="w-[18%]">
+            <TableHead className="w-[10%]">Uploader</TableHead>
+            <TableHead className="w-[20%]">
               <SortHeader
                 label="Completion"
                 field="completion"
@@ -146,18 +151,16 @@ export function ProjectsDocumentsTable({
                     >
                       {doc.title}
                     </Link>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      {doc.document_type_name && (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                          {doc.document_type_name}
-                        </Badge>
-                      )}
-                      <span className="text-[11px] text-muted-foreground">
-                        {doc.file_type.toUpperCase()} &middot; {formatFileSize(doc.file_size)}
-                      </span>
-                    </div>
+                    <span className="text-[11px] text-muted-foreground mt-0.5 block">
+                      {doc.file_type.toUpperCase()} &middot; {formatFileSize(doc.file_size)}
+                    </span>
                   </div>
                 </div>
+              </TableCell>
+
+              {/* Type */}
+              <TableCell className="text-sm text-muted-foreground">
+                {doc.document_type_name || <span className="italic">None</span>}
               </TableCell>
 
               {/* Date */}

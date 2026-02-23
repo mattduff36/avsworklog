@@ -378,48 +378,29 @@ export default function RAMSDetailsPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-2 md:gap-4 grid-cols-4 md:grid-cols-4">
-        <Card className="bg-white dark:bg-slate-900 border-border p-1 md:p-6">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 md:pb-2 p-1 md:p-6">
-            <CardTitle className="text-[10px] md:text-sm font-medium text-foreground leading-tight">Total Assigned</CardTitle>
-            <Users className="h-2.5 w-2.5 md:h-4 md:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-1 md:p-6 pt-0">
-            <div className="text-sm md:text-2xl font-bold text-foreground">{totalAssigned}</div>
-            <p className="text-[9px] md:text-xs text-muted-foreground leading-tight">Employees</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-white dark:bg-slate-900 border-border p-1 md:p-6">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 md:pb-2 p-1 md:p-6">
-            <CardTitle className="text-[10px] md:text-sm font-medium text-foreground leading-tight">{requiredSignature ? 'Signed' : 'Read'}</CardTitle>
-            <CheckCircle2 className="h-2.5 w-2.5 md:h-4 md:w-4 text-green-400" />
-          </CardHeader>
-          <CardContent className="p-1 md:p-6 pt-0">
-            <div className="text-sm md:text-2xl font-bold text-green-600">{totalComplete}</div>
-            <p className="text-[9px] md:text-xs text-muted-foreground leading-tight">Completed</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-white dark:bg-slate-900 border-border p-1 md:p-6">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 md:pb-2 p-1 md:p-6">
-            <CardTitle className="text-[10px] md:text-sm font-medium text-foreground leading-tight">Pending</CardTitle>
-            <Clock className="h-2.5 w-2.5 md:h-4 md:w-4 text-orange-400" />
-          </CardHeader>
-          <CardContent className="p-1 md:p-6 pt-0">
-            <div className="text-sm md:text-2xl font-bold text-orange-600">{totalPending}</div>
-            <p className="text-[9px] md:text-xs text-muted-foreground leading-tight">{requiredSignature ? 'Awaiting signature' : 'Not yet read'}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-white dark:bg-slate-900 border-border p-1 md:p-6">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0.5 md:pb-2 p-1 md:p-6">
-            <CardTitle className="text-[10px] md:text-sm font-medium text-foreground leading-tight">Compliance</CardTitle>
-            <FileText className="h-2.5 w-2.5 md:h-4 md:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-1 md:p-6 pt-0">
-            <div className="text-sm md:text-2xl font-bold text-foreground">{complianceRate}%</div>
-            <p className="text-[9px] md:text-xs text-muted-foreground leading-tight">Completion rate</p>
-          </CardContent>
-        </Card>
+      {/* Compact Summary */}
+      <div className="bg-white dark:bg-slate-900 rounded-lg px-4 py-3 border border-border flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+        <div className="flex items-center gap-1.5">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          <span className="text-muted-foreground">Assigned:</span>
+          <span className="font-semibold text-foreground">{totalAssigned}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <CheckCircle2 className="h-4 w-4 text-green-500" />
+          <span className="text-muted-foreground">{requiredSignature ? 'Signed' : 'Read'}:</span>
+          <span className="font-semibold text-green-600">{totalComplete}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Clock className="h-4 w-4 text-orange-500" />
+          <span className="text-muted-foreground">Pending:</span>
+          <span className="font-semibold text-orange-600">{totalPending}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground">Compliance:</span>
+          <span className={`font-semibold ${
+            complianceRate === 100 ? 'text-green-600' : complianceRate === 0 && totalAssigned > 0 ? 'text-red-600' : 'text-foreground'
+          }`}>{complianceRate}%</span>
+        </div>
       </div>
 
       {/* Document Info */}

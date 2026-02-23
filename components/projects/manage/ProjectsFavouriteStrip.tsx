@@ -3,7 +3,6 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Star, Copy, FileText, ChevronDown, ChevronUp } from 'lucide-react';
-import Link from 'next/link';
 import { useState } from 'react';
 import type { FavouriteRow } from '@/lib/hooks/useProjectsManage';
 
@@ -11,6 +10,7 @@ interface ProjectsFavouriteStripProps {
   favourites: FavouriteRow[];
   onReuse: (fav: FavouriteRow) => void;
   onRemove: (documentId: string) => void;
+  onView: (fav: FavouriteRow) => void;
   removingId?: string;
 }
 
@@ -18,6 +18,7 @@ export function ProjectsFavouriteStrip({
   favourites,
   onReuse,
   onRemove,
+  onView,
   removingId,
 }: ProjectsFavouriteStripProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -73,11 +74,14 @@ export function ProjectsFavouriteStrip({
                     <Copy className="h-3 w-3 mr-1" />
                     <span className="hidden sm:inline">Reuse</span>
                   </Button>
-                  <Link href={`/projects/${fav.document_id}?from=/projects/manage`}>
-                    <Button size="sm" variant="outline" className="h-7 px-2 text-xs">
-                      View
-                    </Button>
-                  </Link>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onView(fav)}
+                    className="h-7 px-2 text-xs"
+                  >
+                    View
+                  </Button>
                   <Button
                     size="sm"
                     variant="ghost"

@@ -14,13 +14,11 @@ import {
 } from '@/lib/hooks/useProjectsManage';
 import { UploadRAMSModal } from '@/components/rams/UploadRAMSModal';
 import { ProjectsManageToolbar } from '@/components/projects/manage/ProjectsManageToolbar';
-import { ProjectsManageStats } from '@/components/projects/manage/ProjectsManageStats';
 import { ProjectsManageFilters } from '@/components/projects/manage/ProjectsManageFilters';
 import { ProjectsFavouriteStrip } from '@/components/projects/manage/ProjectsFavouriteStrip';
 import { ProjectsDocumentsTable } from '@/components/projects/manage/ProjectsDocumentsTable';
 import { ProjectsDocumentsMobileCards } from '@/components/projects/manage/ProjectsDocumentsMobileCards';
-import type { FilterKey } from '@/components/projects/manage/ProjectsManageStats';
-import type { ManageDocumentRow, ManageDocumentsQuery, ManageDocumentsCounts } from '@/types/rams';
+import type { ManageDocumentRow, ManageDocumentsQuery } from '@/types/rams';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,13 +35,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-
-const DEFAULT_COUNTS: ManageDocumentsCounts = {
-  all: 0,
-  needs_signature: 0,
-  read_only: 0,
-  recently_uploaded: 0,
-};
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { createClient } from '@/lib/supabase/client';
+import { toast } from 'sonner';
 
 export default function ProjectsManagePage() {
   const router = useRouter();
@@ -53,10 +52,8 @@ export default function ProjectsManagePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const [signatureFilter, setSignatureFilter] = useState<ManageDocumentsQuery['signature'] | ''>('');
   const [sortBy, setSortBy] = useState<NonNullable<ManageDocumentsQuery['sortBy']>>('created_at');
   const [sortDir, setSortDir] = useState<NonNullable<ManageDocumentsQuery['sortDir']>>('desc');
-  const [statFilter, setStatFilter] = useState<FilterKey>('all');
 
   // Upload modal
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -65,27 +62,26 @@ export default function ProjectsManagePage() {
   // Delete dialog
   const [deleteTarget, setDeleteTarget] = useState<ManageDocumentRow | null>(null);
 
+  // PDF viewer dialog
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
+  const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
+  const [pdfViewerTitle, setPdfViewerTitle] = useState('');
+  const [pdfViewerLoading, setPdfViewerLoading] = useState(false);
+  const supabase = createClient();
+
   // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Map stat card filter to API params
-  const computedSignature = useMemo(() => {
-    if (statFilter === 'needs_signature') return 'required' as const;
-    if (statFilter === 'read_only') return 'read-only' as const;
-    return signatureFilter || undefined;
-  }, [statFilter, signatureFilter]);
-
   const queryParams: ManageDocumentsQuery = useMemo(() => ({
     q: debouncedSearch || undefined,
     type: typeFilter || undefined,
-    signature: computedSignature,
     sortBy,
     sortDir,
     limit: 200,
-  }), [debouncedSearch, typeFilter, computedSignature, sortBy, sortDir]);
+  }), [debouncedSearch, typeFilter, sortBy, sortDir]);
 
   // Data hooks
   const {
@@ -111,7 +107,6 @@ export default function ProjectsManagePage() {
 
   // Derived data
   const documents = docsData?.documents ?? [];
-  const counts = docsData?.counts ?? DEFAULT_COUNTS;
   const total = docsData?.total ?? 0;
   const favourites = favsData?.favourites ?? [];
   const documentTypes = useMemo(
@@ -119,7 +114,7 @@ export default function ProjectsManagePage() {
     [typesData],
   );
 
-  const hasActiveFilters = !!(debouncedSearch || typeFilter || statFilter !== 'all');
+  const hasActiveFilters = !!(debouncedSearch || typeFilter);
 
   // Handlers
   const handleSortChange = useCallback((field: NonNullable<ManageDocumentsQuery['sortBy']>) => {
@@ -133,16 +128,10 @@ export default function ProjectsManagePage() {
     });
   }, []);
 
-  const handleStatFilter = useCallback((filter: FilterKey) => {
-    setStatFilter((prev) => (prev === filter ? 'all' : filter));
-  }, []);
-
   const handleClearFilters = useCallback(() => {
     setSearchQuery('');
     setDebouncedSearch('');
     setTypeFilter('');
-    setSignatureFilter('');
-    setStatFilter('all');
   }, []);
 
   const handleReuse = useCallback((fav: FavouriteRow) => {
@@ -183,6 +172,35 @@ export default function ProjectsManagePage() {
     setReuseDoc(null);
   }, []);
 
+  const handleViewFavourite = useCallback(async (fav: FavouriteRow) => {
+    if (!fav.document.file_path) {
+      toast.error('File path not available');
+      return;
+    }
+    setPdfViewerTitle(fav.document.title);
+    setPdfViewerLoading(true);
+    setPdfViewerOpen(true);
+    setPdfViewerUrl(null);
+
+    try {
+      const { data } = await supabase.storage
+        .from('rams-documents')
+        .createSignedUrl(fav.document.file_path, 3600);
+
+      if (data?.signedUrl) {
+        setPdfViewerUrl(data.signedUrl);
+      } else {
+        toast.error('Could not generate document URL');
+        setPdfViewerOpen(false);
+      }
+    } catch {
+      toast.error('Failed to load document');
+      setPdfViewerOpen(false);
+    } finally {
+      setPdfViewerLoading(false);
+    }
+  }, [supabase]);
+
   // Auth guard loading
   if (authLoading || (!isManager && !isAdmin)) {
     return (
@@ -205,26 +223,12 @@ export default function ProjectsManagePage() {
       {/* Toolbar */}
       <ProjectsManageToolbar onUploadClick={() => setUploadModalOpen(true)} />
 
-      {/* Stats cards */}
-      {docsLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-[72px] rounded-lg" />
-          ))}
-        </div>
-      ) : (
-        <ProjectsManageStats
-          counts={counts}
-          activeFilter={statFilter}
-          onFilterChange={handleStatFilter}
-        />
-      )}
-
       {/* Favourites strip */}
       <ProjectsFavouriteStrip
         favourites={favourites}
         onReuse={handleReuse}
         onRemove={(id) => removeFav.mutate(id)}
+        onView={handleViewFavourite}
       />
 
       {/* Filters */}
@@ -359,6 +363,46 @@ export default function ProjectsManagePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* PDF Viewer Dialog */}
+      <Dialog open={pdfViewerOpen} onOpenChange={(open) => { if (!open) { setPdfViewerOpen(false); setPdfViewerUrl(null); } }}>
+        <DialogContent className="max-w-4xl w-[95vw] h-[85vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-4 py-3 border-b border-border shrink-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-foreground truncate pr-4">
+                {pdfViewerTitle}
+              </DialogTitle>
+              {pdfViewerUrl && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(pdfViewerUrl, '_blank')}
+                  className="shrink-0 text-xs"
+                >
+                  Open in New Tab
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
+          <div className="flex-1 min-h-0">
+            {pdfViewerLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : pdfViewerUrl ? (
+              <iframe
+                src={pdfViewerUrl}
+                className="w-full h-full border-0"
+                title={pdfViewerTitle}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                Failed to load document
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

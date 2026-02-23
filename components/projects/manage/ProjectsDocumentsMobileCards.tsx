@@ -92,7 +92,13 @@ export function ProjectsDocumentsMobileCards({
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {doc.total_assigned > 0 && (
-                      <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                      <span className={`text-[11px] font-medium whitespace-nowrap ${
+                        doc.total_signed === 0
+                          ? 'text-red-500'
+                          : doc.total_signed === doc.total_assigned
+                            ? 'text-green-500'
+                            : 'text-yellow-500'
+                      }`}>
                         {doc.total_signed}/{doc.total_assigned}
                       </span>
                     )}

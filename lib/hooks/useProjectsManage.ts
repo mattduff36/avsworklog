@@ -69,6 +69,7 @@ export interface FavouriteRow {
     title: string;
     description: string | null;
     file_name: string;
+    file_path: string;
     file_type: string;
     file_size: number;
     document_type_id: string | null;
