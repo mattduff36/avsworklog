@@ -50,6 +50,17 @@ export async function updateSession(request: NextRequest) {
     // Continue without user
   }
 
+  // Permanent redirects: /rams* -> /projects*
+  if (request.nextUrl.pathname.startsWith('/rams')) {
+    const url = request.nextUrl.clone()
+    url.pathname = request.nextUrl.pathname.replace(/^\/rams/, '/projects')
+    const redirectResponse = NextResponse.redirect(url, 301)
+    supabaseResponse.cookies.getAll().forEach(cookie => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, cookie)
+    })
+    return redirectResponse
+  }
+
   // PUBLIC routes - ONLY these routes are accessible without authentication
   // All other routes require authentication (safer default)
   const publicPaths = [

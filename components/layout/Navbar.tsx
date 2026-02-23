@@ -51,8 +51,8 @@ function getNavItemActiveColors(href: string): { bg: string; text: string } {
   if (href.startsWith('/inspections')) {
     return { bg: 'bg-inspection', text: 'text-white' };
   }
-  // RAMS - Green
-  if (href.startsWith('/rams')) {
+  // Projects (formerly RAMS) - Green
+  if (href.startsWith('/projects') || href.startsWith('/rams')) {
     return { bg: 'bg-rams', text: 'text-white' };
   }
   // Absence - Purple

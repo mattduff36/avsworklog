@@ -978,6 +978,61 @@ export interface Database {
           updated_at?: string | null
         }
       }
+      project_document_types: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          required_signature: boolean
+          is_active: boolean
+          sort_order: number
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          required_signature?: boolean
+          is_active?: boolean
+          sort_order?: number
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          required_signature?: boolean
+          is_active?: boolean
+          sort_order?: number
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      project_favourites: {
+        Row: {
+          id: string
+          document_id: string
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          document_id: string
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          document_id?: string
+          user_id?: string
+          created_at?: string
+        }
+      }
       rams_documents: {
         Row: {
           id: string
@@ -992,6 +1047,7 @@ export interface Database {
           updated_at: string
           is_active: boolean
           version: number
+          document_type_id: string | null
         }
         Insert: {
           id?: string
@@ -1006,6 +1062,7 @@ export interface Database {
           updated_at?: string
           is_active?: boolean
           version?: number
+          document_type_id?: string | null
         }
         Update: {
           id?: string
@@ -1020,6 +1077,7 @@ export interface Database {
           updated_at?: string
           is_active?: boolean
           version?: number
+          document_type_id?: string | null
         }
       }
       rams_assignments: {

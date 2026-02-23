@@ -1,10 +1,29 @@
 /**
- * RAMS (Risk Assessment & Method Statement) Types
+ * Projects Module Types (formerly RAMS)
  */
 
 export type RAMSDocumentStatus = 'active' | 'archived';
 export type RAMSAssignmentStatus = 'pending' | 'read' | 'signed';
 export type RAMSFileType = 'pdf' | 'docx';
+
+export interface ProjectDocumentType {
+  id: string;
+  name: string;
+  description: string | null;
+  required_signature: boolean;
+  is_active: boolean;
+  sort_order: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectFavourite {
+  id: string;
+  document_id: string;
+  user_id: string;
+  created_at: string;
+}
 
 export interface RAMSDocument {
   id: string;
@@ -19,6 +38,7 @@ export interface RAMSDocument {
   updated_at: string;
   is_active: boolean;
   version: number;
+  document_type_id: string | null;
 }
 
 export interface RAMSAssignment {
@@ -125,5 +145,19 @@ export interface RAMSDetailsResponse {
   success: boolean;
   document?: RAMSDocumentWithAssignments;
   error?: string;
+}
+
+export interface RAMSDocumentWithType extends RAMSDocument {
+  document_type?: ProjectDocumentType | null;
+}
+
+export interface ProjectDocumentTypeListResponse {
+  success: boolean;
+  types?: ProjectDocumentType[];
+  error?: string;
+}
+
+export interface ProjectFavouriteWithDocument extends ProjectFavourite {
+  document: RAMSDocumentWithStats;
 }
 

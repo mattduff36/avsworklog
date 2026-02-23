@@ -34,7 +34,8 @@ export async function GET(request: NextRequest) {
         .from('rams_documents')
         .select(`
           *,
-          uploader:profiles!rams_documents_uploaded_by_fkey(full_name)
+          uploader:profiles!rams_documents_uploaded_by_fkey(full_name),
+          document_type:project_document_types(id, name, required_signature)
         `)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
@@ -65,6 +66,8 @@ export async function GET(request: NextRequest) {
             total_assigned: totalAssigned,
             total_signed: totalSigned,
             total_pending: totalPending,
+            document_type_name: doc.document_type?.name || null,
+            required_signature: doc.document_type?.required_signature ?? true,
           };
         })
       );
@@ -80,7 +83,10 @@ export async function GET(request: NextRequest) {
       .from('rams_assignments')
       .select(`
         *,
-        document:rams_documents!rams_assignments_rams_document_id_fkey(*)
+        document:rams_documents!rams_assignments_rams_document_id_fkey(
+          *,
+          document_type:project_document_types(id, name, required_signature)
+        )
       `)
       .eq('employee_id', user.id);
 
@@ -104,13 +110,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform data to include document details
-    const documents = assignments?.map(assignment => ({
-      ...assignment.document,
-      assignment_id: assignment.id,
-      assignment_status: assignment.status,
-      assigned_at: assignment.assigned_at,
-      signed_at: assignment.signed_at,
-    })) || [];
+    const documents = assignments?.map(assignment => {
+      const doc = assignment.document as any;
+      return {
+        ...doc,
+        assignment_id: assignment.id,
+        assignment_status: assignment.status,
+        assigned_at: assignment.assigned_at,
+        signed_at: assignment.signed_at,
+        document_type_name: doc?.document_type?.name || null,
+        required_signature: doc?.document_type?.required_signature ?? true,
+      };
+    }) || [];
 
     return NextResponse.json({
       success: true,

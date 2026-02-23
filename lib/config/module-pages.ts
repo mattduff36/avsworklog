@@ -38,10 +38,11 @@ export const MODULE_PAGES: ModulePage[] = [
     module: 'rams',
     displayName: MODULE_DISPLAY_NAMES.rams,
     subPages: [
-      { value: 'rams-list', label: 'RAMS List' },
-      { value: 'rams-manage', label: 'Manage RAMS' },
-      { value: 'rams-view', label: 'View RAMS' },
-      { value: 'rams-read', label: 'Read & Sign RAMS' },
+      { value: 'projects-list', label: 'Projects List' },
+      { value: 'projects-manage', label: 'Manage Projects' },
+      { value: 'projects-view', label: 'View Project Document' },
+      { value: 'projects-read', label: 'Read & Sign Document' },
+      { value: 'projects-settings', label: 'Projects Settings' },
     ],
   },
   {
@@ -182,11 +183,12 @@ export function getPageUrl(value: string): string {
     'inspections-new': '/inspections/new',
     'inspections-view': '/inspections/[id]',
     
-    // RAMS
-    'rams-list': '/rams',
-    'rams-manage': '/rams/manage',
-    'rams-view': '/rams/[id]',
-    'rams-read': '/rams/read/[id]',
+    // Projects (formerly RAMS)
+    'projects-list': '/projects',
+    'projects-manage': '/projects/manage',
+    'projects-view': '/projects/[id]',
+    'projects-read': '/projects/read/[id]',
+    'projects-settings': '/projects/settings',
     
     // Absence
     'absence-list': '/absence',

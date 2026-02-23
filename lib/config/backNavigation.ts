@@ -18,16 +18,23 @@ export function getParentHref(
   // Normalize pathname (remove trailing slashes)
   const normalizedPath = pathname.replace(/\/$/, '');
   
-  // RAMS routes
-  if (normalizedPath === '/rams/manage') {
-    return '/rams';
+  // Projects routes (formerly RAMS)
+  if (normalizedPath === '/projects/manage') {
+    return '/projects';
   }
-  if (normalizedPath.match(/^\/rams\/[^/]+$/)) {
-    // /rams/[id] - manager/admin goes to manage, others to list
-    return (userRole?.isManager || userRole?.isAdmin) ? '/rams/manage' : '/rams';
+  if (normalizedPath === '/projects/settings') {
+    return '/projects/manage';
   }
-  if (normalizedPath.match(/^\/rams\/[^/]+\/read$/)) {
-    return '/rams';
+  if (normalizedPath.match(/^\/projects\/[^/]+$/)) {
+    return (userRole?.isManager || userRole?.isAdmin) ? '/projects/manage' : '/projects';
+  }
+  if (normalizedPath.match(/^\/projects\/[^/]+\/read$/)) {
+    return '/projects';
+  }
+  
+  // Legacy RAMS redirects
+  if (normalizedPath.startsWith('/rams')) {
+    return '/projects';
   }
   
   // Fleet routes - support fromTab query param

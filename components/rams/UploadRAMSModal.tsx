@@ -1,26 +1,56 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Upload, File, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { validateRAMSFile, formatFileSize } from '@/lib/utils/file-validation';
+import type { ProjectDocumentType } from '@/types/rams';
 
 interface UploadRAMSModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  prefillTitle?: string;
+  prefillDescription?: string;
+  prefillTypeId?: string;
 }
 
-export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalProps) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+export function UploadRAMSModal({ open, onClose, onSuccess, prefillTitle, prefillDescription, prefillTypeId }: UploadRAMSModalProps) {
+  const [title, setTitle] = useState(prefillTitle || '');
+  const [description, setDescription] = useState(prefillDescription || '');
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [documentTypes, setDocumentTypes] = useState<ProjectDocumentType[]>([]);
+  const [selectedTypeId, setSelectedTypeId] = useState<string>(prefillTypeId || '');
+
+  useEffect(() => {
+    if (open) {
+      fetch('/api/projects/document-types')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            const active = data.types.filter((t: ProjectDocumentType) => t.is_active);
+            setDocumentTypes(active);
+            if (!selectedTypeId && active.length > 0) {
+              setSelectedTypeId(active[0].id);
+            }
+          }
+        })
+        .catch(err => console.error('Error loading document types:', err));
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (prefillTitle) setTitle(prefillTitle);
+    if (prefillDescription) setDescription(prefillDescription);
+    if (prefillTypeId) setSelectedTypeId(prefillTypeId);
+  }, [prefillTitle, prefillDescription, prefillTypeId]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -60,6 +90,9 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
       if (description.trim()) {
         formData.append('description', description.trim());
       }
+      if (selectedTypeId) {
+        formData.append('document_type_id', selectedTypeId);
+      }
 
       const response = await fetch('/api/rams/upload', {
         method: 'POST',
@@ -78,7 +111,7 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
         throw new Error(data.error || 'Failed to upload document');
       }
 
-      toast.success('RAMS document uploaded successfully');
+      toast.success('Document uploaded successfully');
 
       // Reset form
       setTitle('');
@@ -96,9 +129,12 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
 
   const handleClose = () => {
     if (uploading) return;
-    setTitle('');
-    setDescription('');
+    setTitle(prefillTitle || '');
+    setDescription(prefillDescription || '');
     setFile(null);
+    if (!prefillTypeId && documentTypes.length > 0) {
+      setSelectedTypeId(documentTypes[0].id);
+    }
     onClose();
   };
 
@@ -107,13 +143,34 @@ export function UploadRAMSModal({ open, onClose, onSuccess }: UploadRAMSModalPro
       <DialogContent className="sm:max-w-[600px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Upload RAMS Document</DialogTitle>
+            <DialogTitle>Upload Document</DialogTitle>
             <DialogDescription>
-              Upload a Risk Assessment & Method Statement document to share with employees
+              Upload a project document to share with employees
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
+            {/* Document Type */}
+            {documentTypes.length > 0 && (
+              <div className="grid gap-2">
+                <Label htmlFor="document-type">
+                  Document Type <span className="text-destructive">*</span>
+                </Label>
+                <Select value={selectedTypeId} onValueChange={setSelectedTypeId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a document type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {documentTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id}>
+                        {type.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {/* Title */}
             <div className="grid gap-2">
               <Label htmlFor="title">

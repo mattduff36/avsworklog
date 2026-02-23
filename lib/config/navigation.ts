@@ -78,8 +78,8 @@ export const employeeNavItems: NavItem[] = [
     ]
   },
   { 
-    href: '/rams', 
-    label: 'RAMS', 
+    href: '/projects', 
+    label: 'Projects', 
     icon: CheckSquare, 
     module: 'rams',
     category: 'employee'
