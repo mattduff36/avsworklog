@@ -36,7 +36,7 @@ interface InspectionWithPlant extends VehicleInspection {
     nickname: string | null;
     serial_number: string | null;
     vehicle_categories: { name: string } | null;
-  };
+  } | null;
 }
 
 interface Plant {
@@ -136,7 +136,7 @@ function PlantInspectionsContent() {
           ),
           profile:profiles!vehicle_inspections_user_id_fkey(full_name)
         `)
-        .not('plant_id', 'is', null)
+        .or('plant_id.not.is.null,is_hired_plant.eq.true')
         .order('inspection_date', { ascending: false });
 
       // Filter based on user role and selection
@@ -157,7 +157,9 @@ function PlantInspectionsContent() {
 
       // Apply plant filter
       const currentPlantFilter = plantFilter || 'all';
-      if (currentPlantFilter !== 'all') {
+      if (currentPlantFilter === 'hired') {
+        query = query.eq('is_hired_plant', true);
+      } else if (currentPlantFilter !== 'all') {
         query = query.eq('plant_id', currentPlantFilter);
       }
 
@@ -283,7 +285,9 @@ function PlantInspectionsContent() {
     e.stopPropagation();
     setInspectionToDelete({
       id: inspection.id,
-      plantId: inspection.plant?.plant_id || 'Unknown',
+      plantId: inspection.is_hired_plant
+        ? `Hired - ${inspection.hired_plant_id_serial || 'Unknown'}`
+        : (inspection.plant?.plant_id || 'Unknown'),
       date: formatDate(inspection.inspection_date),
     });
     setDeleteDialogOpen(true);
@@ -398,6 +402,7 @@ function PlantInspectionsContent() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Plant</SelectItem>
+                    <SelectItem value="hired" className="text-amber-400">Hired Plant</SelectItem>
                     {plants.map((plant) => (
                       <SelectItem key={plant.id} value={plant.id}>
                         {plant.plant_id}
@@ -472,9 +477,19 @@ function PlantInspectionsContent() {
                     {getStatusIcon(inspection.status)}
                     <div>
                       <CardTitle className="text-lg text-white">
-                        {inspection.plant?.plant_id || 'Unknown Plant'}
-                        {inspection.plant?.nickname && ` - ${inspection.plant.nickname}`}
-                        {inspection.plant?.serial_number && ` (SN: ${inspection.plant.serial_number})`}
+                        {inspection.is_hired_plant ? (
+                          <>
+                            <span className="text-amber-400">Hired</span>
+                            {' - '}
+                            {inspection.hired_plant_id_serial || 'Unknown'}
+                          </>
+                        ) : (
+                          <>
+                            {inspection.plant?.plant_id || 'Unknown Plant'}
+                            {inspection.plant?.nickname && ` - ${inspection.plant.nickname}`}
+                            {inspection.plant?.serial_number && ` (SN: ${inspection.plant.serial_number})`}
+                          </>
+                        )}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
                         {isManager && (inspection as any).profile?.full_name && (
@@ -483,7 +498,16 @@ function PlantInspectionsContent() {
                             {' • '}
                           </span>
                         )}
-                        {inspection.plant?.vehicle_categories?.name && `${inspection.plant.vehicle_categories.name} • `}
+                        {inspection.is_hired_plant ? (
+                          <>
+                            {inspection.hired_plant_description && `${inspection.hired_plant_description} • `}
+                            {inspection.hired_plant_hiring_company && `${inspection.hired_plant_hiring_company} • `}
+                          </>
+                        ) : (
+                          <>
+                            {inspection.plant?.vehicle_categories?.name && `${inspection.plant.vehicle_categories.name} • `}
+                          </>
+                        )}
                         {inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
                           ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
                           : formatDate(inspection.inspection_date)

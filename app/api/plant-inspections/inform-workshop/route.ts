@@ -42,6 +42,21 @@ export async function POST(request: NextRequest) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
+    // Guard: no workshop tasks for hired plant inspections
+    const { data: inspectionRecord } = await supabaseAdmin
+      .from('vehicle_inspections')
+      .select('is_hired_plant')
+      .eq('id', inspectionId)
+      .single();
+
+    if (inspectionRecord?.is_hired_plant) {
+      return NextResponse.json({
+        success: false,
+        skipped: true,
+        message: 'Hired plant: no workshop tasks created',
+      });
+    }
+
     // Get plant info
     const { data: plant } = await supabaseAdmin
       .from('plant')

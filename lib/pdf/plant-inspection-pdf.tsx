@@ -272,8 +272,10 @@ interface PlantInspectionPDFProps {
   plant: {
     plant_id: string;
     nickname: string | null;
-    serial_number: string | null;
+    serial_number?: string | null;
     vehicle_categories: { name: string } | null;
+    isHired?: boolean;
+    hiringCompany?: string | null;
   };
   operator: {
     full_name: string;
@@ -319,11 +321,15 @@ export function PlantInspectionPDF({
         <View style={styles.infoSection}>
           <View style={styles.infoRow}>
             <View style={styles.infoBox}>
-              <Text style={styles.label}>PLANT NUMBER</Text>
+              <Text style={styles.label}>{plant.isHired ? 'HIRED PLANT ID / SERIAL' : 'PLANT NUMBER'}</Text>
               <Text style={styles.value}>
-                {plant.plant_id}
-                {plant.nickname && ` (${plant.nickname})`}
-                {plant.serial_number && ` (SN: ${plant.serial_number})`}
+                {plant.isHired ? plant.plant_id : (
+                  <>
+                    {plant.plant_id}
+                    {plant.nickname && ` (${plant.nickname})`}
+                    {plant.serial_number && ` (SN: ${plant.serial_number})`}
+                  </>
+                )}
               </Text>
             </View>
             <View style={styles.infoBox}>
@@ -331,6 +337,22 @@ export function PlantInspectionPDF({
               <Text style={styles.value}>{operator.full_name}</Text>
             </View>
           </View>
+          {plant.isHired && (
+            <View style={styles.infoRow}>
+              {plant.nickname && (
+                <View style={styles.infoBox}>
+                  <Text style={styles.label}>PLANT DESCRIPTION</Text>
+                  <Text style={styles.value}>{plant.nickname}</Text>
+                </View>
+              )}
+              {plant.hiringCompany && (
+                <View style={styles.infoBox}>
+                  <Text style={styles.label}>HIRING COMPANY</Text>
+                  <Text style={styles.value}>{plant.hiringCompany}</Text>
+                </View>
+              )}
+            </View>
+          )}
           {(plant.vehicle_categories || inspection.current_mileage != null) && (
             <View style={styles.infoRow}>
               {plant.vehicle_categories && (

@@ -19,12 +19,16 @@ import { Database } from '@/types/database';
 interface PlantInspectionWithDetails {
   id: string;
   user_id: string;
-  plant_id: string;
+  plant_id: string | null;
   inspection_date: string;
   inspection_end_date: string;
   current_mileage: number | null;
   status: string;
   inspector_comments: string | null;
+  is_hired_plant?: boolean;
+  hired_plant_id_serial?: string | null;
+  hired_plant_description?: string | null;
+  hired_plant_hiring_company?: string | null;
   plant: {
     plant_id: string;
     nickname: string | null;
@@ -32,7 +36,7 @@ interface PlantInspectionWithDetails {
     vehicle_categories: {
       name: string;
     } | null;
-  };
+  } | null;
   profiles: {
     full_name: string;
   };
@@ -81,7 +85,7 @@ export default function ViewPlantInspectionPage() {
           profiles!vehicle_inspections_user_id_fkey (full_name)
         `)
         .eq('id', id)
-        .not('plant_id', 'is', null)
+        .or('plant_id.not.is.null,is_hired_plant.eq.true')
         .single();
 
       if (inspectionError) throw inspectionError;
@@ -235,10 +239,10 @@ export default function ViewPlantInspectionPage() {
         }
       }
 
-      // Sync defect tasks
+      // Sync defect tasks (skip for hired plant)
       const failedItems = itemsToInsert.filter(item => item.status === 'attention');
       
-      if (failedItems.length > 0) {
+      if (!inspection.is_hired_plant && failedItems.length > 0) {
         const { data: insertedItems } = await supabase
           .from('inspection_items')
           .select('*')
@@ -489,10 +493,23 @@ export default function ViewPlantInspectionPage() {
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-foreground">Plant Inspection</h1>
               <p className="text-sm md:text-base text-muted-foreground">
-                {inspection.plant?.plant_id} {inspection.plant?.nickname && `(${inspection.plant.nickname})`} {inspection.plant?.serial_number && `(SN: ${inspection.plant.serial_number})`} • {
-                  inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
-                    ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
-                    : formatDate(inspection.inspection_date)
+                {inspection.is_hired_plant ? (
+                  <>
+                    <span className="text-amber-400 font-medium">Hired</span>
+                    {' - '}
+                    {inspection.hired_plant_id_serial || 'Unknown'}
+                    {inspection.hired_plant_description && ` (${inspection.hired_plant_description})`}
+                    {inspection.hired_plant_hiring_company && ` • ${inspection.hired_plant_hiring_company}`}
+                  </>
+                ) : (
+                  <>
+                    {inspection.plant?.plant_id} {inspection.plant?.nickname && `(${inspection.plant.nickname})`} {inspection.plant?.serial_number && `(SN: ${inspection.plant.serial_number})`}
+                  </>
+                )}
+                {' • '}
+                {inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
+                  ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
+                  : formatDate(inspection.inspection_date)
                 }
               </p>
             </div>
@@ -507,7 +524,9 @@ export default function ViewPlantInspectionPage() {
                   const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
                   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
                   const pdfUrl = `/api/plant-inspections/${inspection.id}/pdf`;
-                  const plantId = inspection.plant?.plant_id || 'Unknown';
+                  const plantId = inspection.is_hired_plant
+                    ? (inspection.hired_plant_id_serial || 'Hired')
+                    : (inspection.plant?.plant_id || 'Unknown');
                   
                   if (isStandalone || isMobile) {
                     router.push(`/pdf-viewer?url=${encodeURIComponent(pdfUrl)}&title=${encodeURIComponent(`PlantInspection-${plantId}`)}&return=${encodeURIComponent(`/plant-inspections/${inspection.id}`)}`);

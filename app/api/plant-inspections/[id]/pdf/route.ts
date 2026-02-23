@@ -33,7 +33,7 @@ export async function GET(
         profile:profiles!vehicle_inspections_user_id_fkey(full_name)
       `)
       .eq('id', id)
-      .not('plant_id', 'is', null)
+      .or('plant_id.not.is.null,is_hired_plant.eq.true')
       .single();
 
     if (inspectionError || !inspection) {
@@ -79,6 +79,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
+    const isHired = inspection.is_hired_plant === true;
+
     // Generate PDF
     const pdfComponent = PlantInspectionPDF({
       inspection: {
@@ -89,11 +91,21 @@ export async function GET(
         inspector_comments: inspection.inspector_comments,
         signature_data: inspection.signature_data,
       },
-      plant: {
-        plant_id: (inspection as any).plant?.plant_id || 'Unknown',
-        nickname: (inspection as any).plant?.nickname,
-        vehicle_categories: (inspection as any).plant?.vehicle_categories,
-      },
+      plant: isHired
+        ? {
+            plant_id: inspection.hired_plant_id_serial || 'Unknown',
+            nickname: inspection.hired_plant_description || null,
+            serial_number: null,
+            vehicle_categories: null,
+            isHired: true,
+            hiringCompany: inspection.hired_plant_hiring_company || null,
+          }
+        : {
+            plant_id: (inspection as any).plant?.plant_id || 'Unknown',
+            nickname: (inspection as any).plant?.nickname,
+            serial_number: (inspection as any).plant?.serial_number || null,
+            vehicle_categories: (inspection as any).plant?.vehicle_categories,
+          },
       operator: {
         full_name: (inspection as any).profile?.full_name || 'Unknown',
       },
@@ -119,7 +131,9 @@ export async function GET(
     }
     const buffer = Buffer.concat(chunks);
 
-    const plantId = (inspection as any).plant?.plant_id || 'unknown';
+    const plantId = isHired
+      ? (inspection.hired_plant_id_serial || 'hired').replace(/[^a-zA-Z0-9-_]/g, '')
+      : ((inspection as any).plant?.plant_id || 'unknown');
     const date = inspection.inspection_end_date.replace(/-/g, '');
 
     // Return PDF

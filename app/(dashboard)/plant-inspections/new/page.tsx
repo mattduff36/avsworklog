@@ -123,6 +123,13 @@ function NewPlantInspectionContent() {
   const [informWorkshop, setInformWorkshop] = useState(false);
   const [creatingWorkshopTask, setCreatingWorkshopTask] = useState(false);
 
+  // Hired plant states
+  const HIRED_PLANT_SENTINEL = '__hired__';
+  const [isHiredPlant, setIsHiredPlant] = useState(false);
+  const [hiredPlantIdSerial, setHiredPlantIdSerial] = useState('');
+  const [hiredPlantDescription, setHiredPlantDescription] = useState('');
+  const [hiredPlantHiringCompany, setHiredPlantHiringCompany] = useState('');
+
   useEffect(() => {
     const fetchPlants = async () => {
       try {
@@ -205,7 +212,18 @@ function NewPlantInspectionContent() {
 
           setExistingInspectionId(id);
           const inspectionData = inspection as InspectionWithRelations;
-          setSelectedPlantId(inspectionData.plant?.id || '');
+          
+          if (inspection.is_hired_plant) {
+            setIsHiredPlant(true);
+            setSelectedPlantId('');
+            setHiredPlantIdSerial(inspection.hired_plant_id_serial || '');
+            setHiredPlantDescription(inspection.hired_plant_description || '');
+            setHiredPlantHiringCompany(inspection.hired_plant_hiring_company || '');
+          } else {
+            setIsHiredPlant(false);
+            setSelectedPlantId(inspectionData.plant?.id || '');
+          }
+          
           setInspectionDate(inspection.inspection_date || formatDateISO(new Date()));
           setSelectedEmployeeId(inspection.user_id);
 
@@ -288,7 +306,12 @@ function NewPlantInspectionContent() {
     dateToCheck: string,
     clearOtherErrors: boolean = false
   ): Promise<boolean> => {
-    if (!plantIdToCheck || !dateToCheck || existingInspectionId) {
+    if (!dateToCheck || existingInspectionId) {
+      setDuplicateInspection(null);
+      return false;
+    }
+
+    if (!plantIdToCheck && !isHiredPlant) {
       setDuplicateInspection(null);
       return false;
     }
@@ -296,12 +319,29 @@ function NewPlantInspectionContent() {
     setDuplicateCheckLoading(true);
     
     try {
-      const { data, error } = await supabase
-        .from('vehicle_inspections')
-        .select('id, status')
-        .eq('plant_id', plantIdToCheck)
-        .eq('inspection_date', dateToCheck)
-        .limit(1);
+      let query;
+      if (isHiredPlant) {
+        if (!hiredPlantIdSerial.trim()) {
+          setDuplicateInspection(null);
+          return false;
+        }
+        query = supabase
+          .from('vehicle_inspections')
+          .select('id, status')
+          .eq('is_hired_plant', true)
+          .eq('hired_plant_id_serial', hiredPlantIdSerial.trim())
+          .eq('inspection_date', dateToCheck)
+          .limit(1);
+      } else {
+        query = supabase
+          .from('vehicle_inspections')
+          .select('id, status')
+          .eq('plant_id', plantIdToCheck)
+          .eq('inspection_date', dateToCheck)
+          .limit(1);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -327,13 +367,15 @@ function NewPlantInspectionContent() {
     } finally {
       setDuplicateCheckLoading(false);
     }
-  }, [existingInspectionId, supabase]);
+  }, [existingInspectionId, isHiredPlant, hiredPlantIdSerial, supabase]);
 
   useEffect(() => {
-    if (selectedPlantId && inspectionDate && !existingInspectionId) {
+    if (isHiredPlant && hiredPlantIdSerial.trim() && inspectionDate && !existingInspectionId) {
+      checkForDuplicate('', inspectionDate);
+    } else if (selectedPlantId && inspectionDate && !existingInspectionId) {
       checkForDuplicate(selectedPlantId, inspectionDate);
     }
-  }, [selectedPlantId, inspectionDate, existingInspectionId, checkForDuplicate]);
+  }, [selectedPlantId, isHiredPlant, hiredPlantIdSerial, inspectionDate, existingInspectionId, checkForDuplicate]);
 
   const loadLockedDefects = async (plantId: string) => {
     try {
@@ -410,9 +452,24 @@ function NewPlantInspectionContent() {
   };
   
   const validateAndSubmit = () => {
-    if (!selectedPlantId) {
+    if (!isHiredPlant && !selectedPlantId) {
       setError('Please select a plant');
       return;
+    }
+
+    if (isHiredPlant) {
+      if (!hiredPlantIdSerial.trim()) {
+        setError('Please enter the hired plant ID / serial number');
+        return;
+      }
+      if (!hiredPlantDescription.trim()) {
+        setError('Please enter a plant description');
+        return;
+      }
+      if (!hiredPlantHiringCompany.trim()) {
+        setError('Please enter the hiring company');
+        return;
+      }
     }
 
     const hoursValue = getParsedHours();
@@ -441,8 +498,8 @@ function NewPlantInspectionContent() {
       return;
     }
 
-    // Validate inform workshop
-    if (informWorkshop && inspectorComments.trim().length < 10) {
+    // Validate inform workshop (not applicable for hired plant)
+    if (!isHiredPlant && informWorkshop && inspectorComments.trim().length < 10) {
       setError('Workshop notification requires at least 10 characters in the comment field');
       toast.error('Comment too short');
       return;
@@ -463,7 +520,8 @@ function NewPlantInspectionContent() {
   };
 
   const saveInspection = async (status: 'draft' | 'submitted', signatureData?: string) => {
-    if (!user || !selectedEmployeeId || !selectedPlantId) return;
+    if (!user || !selectedEmployeeId) return;
+    if (!isHiredPlant && !selectedPlantId) return;
     
     if (!inspectionDate || inspectionDate.trim() === '') {
       setError('Please select an inspection date');
@@ -475,7 +533,7 @@ function NewPlantInspectionContent() {
       return;
     }
     
-    const isDuplicate = await checkForDuplicate(selectedPlantId, inspectionDate, true);
+    const isDuplicate = await checkForDuplicate(isHiredPlant ? '' : selectedPlantId, inspectionDate, true);
     if (isDuplicate) {
       setError('An inspection for this plant and date already exists.');
       return;
@@ -491,7 +549,7 @@ function NewPlantInspectionContent() {
     try {
       type InspectionInsert = Database['public']['Tables']['vehicle_inspections']['Insert'];
       const inspectionData: InspectionInsert = {
-        plant_id: selectedPlantId,
+        plant_id: isHiredPlant ? null : selectedPlantId,
         user_id: selectedEmployeeId,
         inspection_date: inspectionDate,
         inspection_end_date: inspectionDate,
@@ -501,6 +559,10 @@ function NewPlantInspectionContent() {
         signature_data: signatureData || null,
         signed_at: signatureData ? new Date().toISOString() : null,
         inspector_comments: inspectorComments.trim() || null,
+        is_hired_plant: isHiredPlant,
+        hired_plant_id_serial: isHiredPlant ? hiredPlantIdSerial.trim() : null,
+        hired_plant_description: isHiredPlant ? hiredPlantDescription.trim() : null,
+        hired_plant_hiring_company: isHiredPlant ? hiredPlantHiringCompany.trim() : null,
       };
 
       let inspection: InspectionWithRelations;
@@ -571,7 +633,7 @@ function NewPlantInspectionContent() {
       if (existingInspectionId) {
         type InspectionUpdate = Database['public']['Tables']['vehicle_inspections']['Update'];
         const inspectionUpdate: InspectionUpdate = {
-          plant_id: selectedPlantId,
+          plant_id: isHiredPlant ? null : selectedPlantId,
           user_id: selectedEmployeeId,
           inspection_date: inspectionDate,
           inspection_end_date: inspectionDate,
@@ -581,6 +643,10 @@ function NewPlantInspectionContent() {
           signature_data: signatureData || null,
           signed_at: signatureData ? new Date().toISOString() : null,
           updated_at: new Date().toISOString(),
+          is_hired_plant: isHiredPlant,
+          hired_plant_id_serial: isHiredPlant ? hiredPlantIdSerial.trim() : null,
+          hired_plant_description: isHiredPlant ? hiredPlantDescription.trim() : null,
+          hired_plant_hiring_company: isHiredPlant ? hiredPlantHiringCompany.trim() : null,
         };
 
         const { data: updatedInspection, error: updateError } = await supabase
@@ -598,8 +664,8 @@ function NewPlantInspectionContent() {
         inspection = updatedInspection[0];
       }
 
-      // Sync defect tasks
-      if (insertedItems && insertedItems.length > 0) {
+      // Sync defect tasks (skip for hired plant)
+      if (!isHiredPlant && insertedItems && insertedItems.length > 0) {
         const failedItems = insertedItems.filter((item: InspectionItem) => item.status === 'attention');
         
         if (failedItems.length > 0) {
@@ -665,8 +731,8 @@ function NewPlantInspectionContent() {
         }
       }
 
-      // Handle inform workshop
-      if (informWorkshop && inspectorComments.trim().length >= 10) {
+      // Handle inform workshop (skip for hired plant)
+      if (!isHiredPlant && informWorkshop && inspectorComments.trim().length >= 10) {
         try {
           setCreatingWorkshopTask(true);
           
@@ -713,6 +779,7 @@ function NewPlantInspectionContent() {
       const isDuplicateKey =
         errMessage.includes('duplicate key') ||
         errMessage.includes('idx_unique_plant_inspection_date') ||
+        errMessage.includes('idx_unique_hired_plant_inspection_date') ||
         errMessage.includes('23505');
 
       if (isDuplicateKey) {
@@ -841,11 +908,23 @@ function NewPlantInspectionContent() {
             <div className="space-y-2">
               <Label htmlFor="plant" className="text-foreground text-base">Plant</Label>
               <Select 
-                value={selectedPlantId} 
+                value={isHiredPlant ? HIRED_PLANT_SENTINEL : selectedPlantId} 
                 disabled={checklistStarted}
                 onValueChange={(value) => {
-                  setSelectedPlantId(value);
-                  loadLockedDefects(value);
+                  if (value === HIRED_PLANT_SENTINEL) {
+                    setIsHiredPlant(true);
+                    setSelectedPlantId('');
+                    setLoggedDefects(new Map());
+                    setCheckboxStates({});
+                    setComments({});
+                  } else {
+                    setIsHiredPlant(false);
+                    setHiredPlantIdSerial('');
+                    setHiredPlantDescription('');
+                    setHiredPlantHiringCompany('');
+                    setSelectedPlantId(value);
+                    loadLockedDefects(value);
+                  }
                 }}
               >
                 <SelectTrigger id="plant" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white" disabled={checklistStarted}>
@@ -853,6 +932,9 @@ function NewPlantInspectionContent() {
                 </SelectTrigger>
                 <SelectContent className="border-border max-h-[300px] md:max-h-[400px]">
                   <SelectGroup>
+                    <SelectItem value={HIRED_PLANT_SENTINEL} className="font-semibold text-amber-400">
+                      Hired Plant
+                    </SelectItem>
                     {plants.map((plant) => (
                       <SelectItem key={plant.id} value={plant.id}>
                         {plant.plant_id} {plant.nickname ? `- ${plant.nickname}` : ''} ({plant.vehicle_categories?.name || 'Uncategorized'})
@@ -883,6 +965,57 @@ function NewPlantInspectionContent() {
               />
             </div>
           </div>
+
+          {/* Hired Plant Details */}
+          {isHiredPlant && (
+            <div className="p-4 bg-amber-500/5 border border-amber-500/30 rounded-lg space-y-4">
+              <p className="text-sm font-medium text-amber-400">Hired Plant Details</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="hiredPlantId" className="text-foreground text-sm flex items-center gap-2">
+                    Plant ID / Serial Number <span className="text-red-400">*</span>
+                  </Label>
+                  <Input
+                    id="hiredPlantId"
+                    value={hiredPlantIdSerial}
+                    onChange={(e) => setHiredPlantIdSerial(e.target.value)}
+                    placeholder="e.g. SN-12345"
+                    disabled={checklistStarted}
+                    className="h-12 text-base bg-slate-900/50 border-slate-600 text-white"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="hiredPlantDesc" className="text-foreground text-sm flex items-center gap-2">
+                    Plant Description <span className="text-red-400">*</span>
+                  </Label>
+                  <Input
+                    id="hiredPlantDesc"
+                    value={hiredPlantDescription}
+                    onChange={(e) => setHiredPlantDescription(e.target.value)}
+                    placeholder="e.g. 20T Excavator"
+                    disabled={checklistStarted}
+                    className="h-12 text-base bg-slate-900/50 border-slate-600 text-white"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="hiredPlantCompany" className="text-foreground text-sm flex items-center gap-2">
+                    Hiring Company <span className="text-red-400">*</span>
+                  </Label>
+                  <Input
+                    id="hiredPlantCompany"
+                    value={hiredPlantHiringCompany}
+                    onChange={(e) => setHiredPlantHiringCompany(e.target.value)}
+                    placeholder="e.g. ABC Plant Hire Ltd"
+                    disabled={checklistStarted}
+                    className="h-12 text-base bg-slate-900/50 border-slate-600 text-white"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Current Hours */}
           <div className="space-y-2">
@@ -922,7 +1055,7 @@ function NewPlantInspectionContent() {
       </Card>
 
       {/* Safety Check */}
-      {selectedPlantId && inspectionDate && !duplicateInspection && !duplicateCheckLoading && (
+      {(selectedPlantId || isHiredPlant) && inspectionDate && !duplicateInspection && !duplicateCheckLoading && (
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-foreground">{currentChecklist.length}-Point Plant Safety Check</CardTitle>
@@ -1125,28 +1258,36 @@ function NewPlantInspectionContent() {
                 />
               </div>
 
-              <div className="flex items-start space-x-3 p-3 bg-slate-900/30 rounded-lg border border-border/30">
-                <Checkbox
-                  id="inform-workshop"
-                  checked={informWorkshop}
-                  onCheckedChange={(checked) => setInformWorkshop(checked === true)}
-                  className="mt-0.5 border-slate-500 data-[state=checked]:bg-workshop data-[state=checked]:border-workshop"
-                />
-                <div className="flex-1">
-                  <Label 
-                    htmlFor="inform-workshop" 
-                    className="text-white cursor-pointer flex items-center gap-2"
-                  >
-                    Inform Workshop
-                    <Badge variant="outline" className="text-xs border-workshop/50 text-workshop">
-                      Creates Task
-                    </Badge>
-                  </Label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Creates a workshop task from your notes.
+              {isHiredPlant ? (
+                <div className="p-3 bg-slate-900/30 rounded-lg border border-border/30">
+                  <p className="text-xs text-muted-foreground">
+                    Workshop tasks are not created for hired plant inspections.
                   </p>
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-start space-x-3 p-3 bg-slate-900/30 rounded-lg border border-border/30">
+                  <Checkbox
+                    id="inform-workshop"
+                    checked={informWorkshop}
+                    onCheckedChange={(checked) => setInformWorkshop(checked === true)}
+                    className="mt-0.5 border-slate-500 data-[state=checked]:bg-workshop data-[state=checked]:border-workshop"
+                  />
+                  <div className="flex-1">
+                    <Label 
+                      htmlFor="inform-workshop" 
+                      className="text-white cursor-pointer flex items-center gap-2"
+                    >
+                      Inform Workshop
+                      <Badge variant="outline" className="text-xs border-workshop/50 text-workshop">
+                        Creates Task
+                      </Badge>
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Creates a workshop task from your notes.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1155,7 +1296,7 @@ function NewPlantInspectionContent() {
             <Button
               variant="outline"
               onClick={() => saveInspection('draft')}
-              disabled={loading || !selectedPlantId}
+              disabled={loading || (!selectedPlantId && !isHiredPlant)}
               className="border-slate-600 text-white hover:bg-slate-800"
             >
               <Save className="h-4 w-4 mr-2" />
@@ -1163,7 +1304,7 @@ function NewPlantInspectionContent() {
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={loading || !selectedPlantId}
+              disabled={loading || (!selectedPlantId && !isHiredPlant)}
               className="bg-plant-inspection hover:bg-plant-inspection/90 text-slate-900 font-semibold"
             >
               <Send className="h-4 w-4 mr-2" />
@@ -1180,7 +1321,7 @@ function NewPlantInspectionContent() {
           <Button
             variant="outline"
             onClick={() => saveInspection('draft')}
-            disabled={loading || !selectedPlantId}
+            disabled={loading || (!selectedPlantId && !isHiredPlant)}
             className="flex-1 h-14 border-slate-600 text-white hover:bg-slate-800"
           >
             <Save className="h-5 w-5 mr-2" />
@@ -1188,7 +1329,7 @@ function NewPlantInspectionContent() {
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={loading || !selectedPlantId}
+            disabled={loading || (!selectedPlantId && !isHiredPlant)}
             className="flex-1 h-14 bg-plant-inspection hover:bg-plant-inspection/90 text-slate-900 font-semibold text-base"
           >
             <Send className="h-5 w-5 mr-2" />

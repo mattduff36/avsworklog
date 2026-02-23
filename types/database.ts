@@ -523,6 +523,10 @@ export interface Database {
           inspector_comments: string | null
           signature_data: string | null
           signed_at: string | null
+          is_hired_plant: boolean
+          hired_plant_id_serial: string | null
+          hired_plant_description: string | null
+          hired_plant_hiring_company: string | null
           created_at: string
           updated_at: string
         }
@@ -542,6 +546,10 @@ export interface Database {
           inspector_comments?: string | null
           signature_data?: string | null
           signed_at?: string | null
+          is_hired_plant?: boolean
+          hired_plant_id_serial?: string | null
+          hired_plant_description?: string | null
+          hired_plant_hiring_company?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -561,6 +569,10 @@ export interface Database {
           inspector_comments?: string | null
           signature_data?: string | null
           signed_at?: string | null
+          is_hired_plant?: boolean
+          hired_plant_id_serial?: string | null
+          hired_plant_description?: string | null
+          hired_plant_hiring_company?: string | null
           created_at?: string
           updated_at?: string
         }
