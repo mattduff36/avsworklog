@@ -60,7 +60,7 @@ async function runMigration() {
       SELECT column_name, data_type, is_nullable, column_default
       FROM information_schema.columns
       WHERE table_name = 'vehicle_inspections'
-        AND column_name LIKE 'hired_%' OR column_name = 'is_hired_plant'
+        AND (column_name LIKE 'hired_%' OR column_name = 'is_hired_plant')
       ORDER BY column_name
     `);
 
