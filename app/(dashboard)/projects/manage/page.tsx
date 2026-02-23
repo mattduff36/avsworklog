@@ -367,9 +367,9 @@ export default function ProjectsManagePage() {
       {/* PDF Viewer Dialog */}
       <Dialog open={pdfViewerOpen} onOpenChange={(open) => { if (!open) { setPdfViewerOpen(false); setPdfViewerUrl(null); } }}>
         <DialogContent className="max-w-4xl w-[95vw] h-[85vh] flex flex-col p-0 gap-0">
-          <DialogHeader className="px-4 py-3 border-b border-border shrink-0">
-            <div className="flex items-center justify-between">
-              <DialogTitle className="text-foreground truncate pr-4">
+          <DialogHeader className="px-4 pr-12 py-3 border-b border-border shrink-0">
+            <div className="flex items-center justify-between gap-3">
+              <DialogTitle className="text-foreground truncate">
                 {pdfViewerTitle}
               </DialogTitle>
               {pdfViewerUrl && (
