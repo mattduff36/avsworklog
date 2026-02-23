@@ -196,7 +196,7 @@ export function ProjectsDocumentsTable({
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" className="bg-slate-900 border-border">
                       <DropdownMenuItem onClick={() => onReuse(doc)}>
                         <Copy className="h-4 w-4 mr-2" />
                         Reuse Metadata
