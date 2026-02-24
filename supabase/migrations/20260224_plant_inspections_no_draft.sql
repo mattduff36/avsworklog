@@ -38,7 +38,7 @@ SELECT
     WHEN 21 THEN 'Spill Kit'
     WHEN 22 THEN 'Greased'
   END AS item_description,
-  EXTRACT(DOW FROM vi.inspection_date::date)::int AS day_of_week,
+  EXTRACT(ISODOW FROM vi.inspection_date::date)::int AS day_of_week,
   'na' AS status,
   'Auto-filled by system migration' AS comments
 FROM vehicle_inspections vi
