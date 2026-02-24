@@ -103,7 +103,7 @@ export default function RAMSManagePage() {
     setFilteredDocuments(filtered);
   }, [searchQuery, documents]);
 
-  const handleUploadSuccess = () => {
+  const handleUploadSubmit = () => {
     setUploadModalOpen(false);
     fetchDocuments();
   };
@@ -282,7 +282,7 @@ export default function RAMSManagePage() {
       <UploadRAMSModal
         open={uploadModalOpen}
         onClose={() => setUploadModalOpen(false)}
-        onSuccess={handleUploadSuccess}
+        onSubmit={handleUploadSubmit}
       />
 
       {/* Delete Confirmation Dialog */}

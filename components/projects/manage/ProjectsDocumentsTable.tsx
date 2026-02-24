@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import {
   Table,
   TableBody,
@@ -24,20 +25,26 @@ import {
   Copy,
   MoreHorizontal,
   ArrowUpDown,
+  Loader2,
+  X,
+  AlertCircle,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { formatFileSize } from '@/lib/utils/file-validation';
 import type { ManageDocumentRow, ManageDocumentsQuery } from '@/types/rams';
+import type { UploadingDoc } from '@/app/(dashboard)/projects/manage/page';
 
 interface ProjectsDocumentsTableProps {
   documents: ManageDocumentRow[];
+  uploadingDocs?: UploadingDoc[];
   sortBy: NonNullable<ManageDocumentsQuery['sortBy']>;
   sortDir: NonNullable<ManageDocumentsQuery['sortDir']>;
   onSortChange: (field: NonNullable<ManageDocumentsQuery['sortBy']>) => void;
   onDelete: (doc: ManageDocumentRow) => void;
   onToggleFavourite: (doc: ManageDocumentRow) => void;
   onReuse: (doc: ManageDocumentRow) => void;
+  onDismissUpload?: (id: string) => void;
 }
 
 function SortHeader({
@@ -88,12 +95,14 @@ function CompletionBadge({ signed, assigned, requiresSig }: { signed: number; as
 
 export function ProjectsDocumentsTable({
   documents,
+  uploadingDocs = [],
   sortBy,
   sortDir,
   onSortChange,
   onDelete,
   onToggleFavourite,
   onReuse,
+  onDismissUpload,
 }: ProjectsDocumentsTableProps) {
   const router = useRouter();
 
@@ -135,13 +144,75 @@ export function ProjectsDocumentsTable({
           </TableRow>
         </TableHeader>
         <TableBody>
+          {/* Uploading rows (shown at the top) */}
+          {uploadingDocs.map((up) => (
+            <TableRow
+              key={up.id}
+              className="bg-rams/[0.03] hover:bg-rams/[0.06] transition-colors"
+            >
+              <TableCell>
+                <div className="flex items-start gap-3">
+                  <FileText className="h-4 w-4 text-rams shrink-0 mt-0.5 opacity-60" />
+                  <div className="min-w-0">
+                    <span className="font-medium text-foreground line-clamp-1">
+                      {up.title}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground mt-0.5 block">
+                      {up.fileType.toUpperCase()} &middot; {formatFileSize(up.fileSize)}
+                    </span>
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {up.documentTypeName || <span className="italic">None</span>}
+              </TableCell>
+              <TableCell>
+                {up.status === 'error' ? (
+                  <div className="flex items-center gap-1.5 text-red-500 text-xs font-medium">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    Upload failed
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <Progress
+                      value={up.progress}
+                      className="h-2 w-full"
+                      indicatorClassName="bg-rams"
+                    />
+                    <span className="text-[11px] text-muted-foreground">
+                      {up.status === 'processing' ? 'Processing...' : `${up.progress}%`}
+                    </span>
+                  </div>
+                )}
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground">You</TableCell>
+              <TableCell>
+                {up.status === 'uploading' || up.status === 'processing' ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-rams" />
+                ) : null}
+              </TableCell>
+              <TableCell className="text-right">
+                {up.status === 'error' && onDismissUpload && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                    onClick={() => onDismissUpload(up.id)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+
+          {/* Existing documents */}
           {documents.map((doc) => (
             <TableRow
               key={doc.id}
               onClick={() => router.push(`/projects/${doc.id}?from=/projects/manage`)}
               className="group hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors cursor-pointer"
             >
-              {/* Document info */}
               <TableCell>
                 <div className="flex items-start gap-3">
                   <FileText className="h-4 w-4 text-rams shrink-0 mt-0.5" />
@@ -155,23 +226,15 @@ export function ProjectsDocumentsTable({
                   </div>
                 </div>
               </TableCell>
-
-              {/* Type */}
               <TableCell className="text-sm text-muted-foreground">
                 {doc.document_type_name || <span className="italic">None</span>}
               </TableCell>
-
-              {/* Date */}
               <TableCell className="text-sm text-muted-foreground">
                 {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}
               </TableCell>
-
-              {/* Uploader */}
               <TableCell className="text-sm text-muted-foreground truncate max-w-[120px]">
                 {doc.uploader_name}
               </TableCell>
-
-              {/* Completion */}
               <TableCell>
                 <CompletionBadge
                   signed={doc.total_signed}
@@ -179,8 +242,6 @@ export function ProjectsDocumentsTable({
                   requiresSig={doc.required_signature}
                 />
               </TableCell>
-
-              {/* Actions */}
               <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

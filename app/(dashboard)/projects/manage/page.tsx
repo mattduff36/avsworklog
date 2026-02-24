@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -14,7 +14,7 @@ import {
   projectsManageKeys,
   type FavouriteRow,
 } from '@/lib/hooks/useProjectsManage';
-import { UploadRAMSModal } from '@/components/rams/UploadRAMSModal';
+import { UploadRAMSModal, type UploadSubmitPayload } from '@/components/rams/UploadRAMSModal';
 import { ProjectsManageToolbar } from '@/components/projects/manage/ProjectsManageToolbar';
 import { ProjectsManageFilters } from '@/components/projects/manage/ProjectsManageFilters';
 import { ProjectsFavouriteStrip } from '@/components/projects/manage/ProjectsFavouriteStrip';
@@ -46,6 +46,17 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 
+export interface UploadingDoc {
+  id: string;
+  title: string;
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  documentTypeName: string;
+  progress: number;
+  status: 'uploading' | 'processing' | 'error';
+}
+
 export default function ProjectsManagePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -61,6 +72,10 @@ export default function ProjectsManagePage() {
   // Upload modal
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [reuseDoc, setReuseDoc] = useState<{ title: string; description: string; typeId: string } | null>(null);
+
+  // In-flight uploads shown in the table
+  const [uploadingDocs, setUploadingDocs] = useState<UploadingDoc[]>([]);
+  const xhrMapRef = useRef<Map<string, XMLHttpRequest>>(new Map());
 
   // Delete dialog
   const [deleteTarget, setDeleteTarget] = useState<ManageDocumentRow | null>(null);
@@ -175,10 +190,67 @@ export default function ProjectsManagePage() {
     });
   }, [deleteTarget, deleteDoc]);
 
-  const handleUploadSuccess = useCallback(() => {
-    setUploadModalOpen(false);
-    setReuseDoc(null);
-    queryClient.invalidateQueries({ queryKey: projectsManageKeys.all });
+  const handleUploadSubmit = useCallback((payload: UploadSubmitPayload) => {
+    const uploadId = `upload-${Date.now()}`;
+
+    setUploadingDocs(prev => [{
+      id: uploadId,
+      title: payload.title,
+      fileName: payload.file.name,
+      fileSize: payload.file.size,
+      fileType: payload.file.name.split('.').pop()?.toLowerCase() || 'pdf',
+      documentTypeName: payload.documentTypeName,
+      progress: 0,
+      status: 'uploading',
+    }, ...prev]);
+
+    const formData = new FormData();
+    formData.append('file', payload.file);
+    formData.append('title', payload.title);
+    if (payload.description) formData.append('description', payload.description);
+    if (payload.documentTypeId) formData.append('document_type_id', payload.documentTypeId);
+
+    const xhr = new XMLHttpRequest();
+    xhrMapRef.current.set(uploadId, xhr);
+
+    xhr.upload.addEventListener('progress', (evt) => {
+      if (evt.lengthComputable) {
+        const pct = Math.round((evt.loaded / evt.total) * 100);
+        setUploadingDocs(prev =>
+          prev.map(d => d.id === uploadId
+            ? { ...d, progress: pct, status: pct === 100 ? 'processing' : 'uploading' }
+            : d
+          )
+        );
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      xhrMapRef.current.delete(uploadId);
+      if (xhr.status >= 200 && xhr.status < 300) {
+        toast.success('Document uploaded successfully');
+        setUploadingDocs(prev => prev.filter(d => d.id !== uploadId));
+        queryClient.invalidateQueries({ queryKey: projectsManageKeys.all });
+      } else {
+        let errorMsg = 'Failed to upload document';
+        try { const data = JSON.parse(xhr.responseText); if (data.error) errorMsg = data.error; } catch { /* use default */ }
+        toast.error(errorMsg);
+        setUploadingDocs(prev =>
+          prev.map(d => d.id === uploadId ? { ...d, status: 'error', progress: 0 } : d)
+        );
+      }
+    });
+
+    xhr.addEventListener('error', () => {
+      xhrMapRef.current.delete(uploadId);
+      toast.error('Upload failed. Please check your connection.');
+      setUploadingDocs(prev =>
+        prev.map(d => d.id === uploadId ? { ...d, status: 'error', progress: 0 } : d)
+      );
+    });
+
+    xhr.open('POST', '/api/rams/upload');
+    xhr.send(formData);
   }, [queryClient]);
 
   const handleViewFavourite = useCallback(async (fav: FavouriteRow) => {
@@ -288,7 +360,7 @@ export default function ProjectsManagePage() {
             </p>
           </CardContent>
         </Card>
-      ) : documents.length === 0 ? (
+      ) : documents.length === 0 && uploadingDocs.length === 0 ? (
         <Card className="bg-white dark:bg-slate-900 border-border">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-16 w-16 text-muted-foreground mb-4" />
@@ -320,20 +392,24 @@ export default function ProjectsManagePage() {
           {/* Desktop table */}
           <ProjectsDocumentsTable
             documents={documents}
+            uploadingDocs={uploadingDocs}
             sortBy={sortBy}
             sortDir={sortDir}
             onSortChange={handleSortChange}
             onDelete={setDeleteTarget}
             onToggleFavourite={handleToggleFavourite}
             onReuse={handleReuseFromRow}
+            onDismissUpload={(id) => setUploadingDocs(prev => prev.filter(d => d.id !== id))}
           />
 
           {/* Mobile cards */}
           <ProjectsDocumentsMobileCards
             documents={documents}
+            uploadingDocs={uploadingDocs}
             onDelete={setDeleteTarget}
             onToggleFavourite={handleToggleFavourite}
             onReuse={handleReuseFromRow}
+            onDismissUpload={(id) => setUploadingDocs(prev => prev.filter(d => d.id !== id))}
           />
         </>
       )}
@@ -342,7 +418,7 @@ export default function ProjectsManagePage() {
       <UploadRAMSModal
         open={uploadModalOpen}
         onClose={() => { setUploadModalOpen(false); setReuseDoc(null); }}
-        onSuccess={handleUploadSuccess}
+        onSubmit={handleUploadSubmit}
         prefillTitle={reuseDoc?.title}
         prefillDescription={reuseDoc?.description}
         prefillTypeId={reuseDoc?.typeId}

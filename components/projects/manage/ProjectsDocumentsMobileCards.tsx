@@ -4,6 +4,7 @@ import { useState, useRef, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import {
   FileText,
   Trash2,
@@ -12,24 +13,31 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
+  AlertCircle,
+  X,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { formatFileSize } from '@/lib/utils/file-validation';
 import type { ManageDocumentRow } from '@/types/rams';
+import type { UploadingDoc } from '@/app/(dashboard)/projects/manage/page';
 
 interface ProjectsDocumentsMobileCardsProps {
   documents: ManageDocumentRow[];
+  uploadingDocs?: UploadingDoc[];
   onDelete: (doc: ManageDocumentRow) => void;
   onToggleFavourite: (doc: ManageDocumentRow) => void;
   onReuse: (doc: ManageDocumentRow) => void;
+  onDismissUpload?: (id: string) => void;
 }
 
 export function ProjectsDocumentsMobileCards({
   documents,
+  uploadingDocs = [],
   onDelete,
   onToggleFavourite,
   onReuse,
+  onDismissUpload,
 }: ProjectsDocumentsMobileCardsProps) {
   const router = useRouter();
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -54,6 +62,66 @@ export function ProjectsDocumentsMobileCards({
 
   return (
     <div className="md:hidden space-y-2">
+      {/* Uploading cards (shown at top) */}
+      {uploadingDocs.map((up) => (
+        <Card
+          key={up.id}
+          className="bg-white dark:bg-slate-900 border-border border-rams/20"
+        >
+          <CardContent className="p-3">
+            <div className="flex items-start gap-2.5">
+              <FileText className="h-4 w-4 text-rams shrink-0 mt-0.5 opacity-60" />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm text-foreground line-clamp-1">
+                  {up.title}
+                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  {up.documentTypeName && (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
+                      {up.documentTypeName}
+                    </Badge>
+                  )}
+                  <span className="text-[11px] text-muted-foreground">
+                    {up.fileType.toUpperCase()} &middot; {formatFileSize(up.fileSize)}
+                  </span>
+                </div>
+                <div className="mt-2">
+                  {up.status === 'error' ? (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-red-500 text-xs font-medium">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        Upload failed
+                      </div>
+                      {onDismissUpload && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-muted-foreground"
+                          onClick={() => onDismissUpload(up.id)}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <Progress
+                        value={up.progress}
+                        className="h-1.5 w-full"
+                        indicatorClassName="bg-rams"
+                      />
+                      <span className="text-[11px] text-muted-foreground">
+                        {up.status === 'processing' ? 'Processing...' : `Uploading ${up.progress}%`}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+
       {documents.map((doc) => {
         const isExpanded = expandedId === doc.id;
         const pct = doc.total_assigned ? Math.round((doc.total_signed / doc.total_assigned) * 100) : 0;
