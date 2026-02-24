@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Camera } from 'lucide-react';
+import { Send, CheckCircle2, XCircle, AlertCircle, Info, User, Camera, MinusCircle } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
 import { formatDateISO, formatDate, getDayOfWeek } from '@/lib/utils/date';
 import { InspectionStatus } from '@/types/inspection';
@@ -98,11 +98,12 @@ function NewPlantInspectionContent() {
   const [comments, setComments] = useState<Record<string, string>>({});
   const currentChecklist = PLANT_INSPECTION_ITEMS;
   const [loading, setLoading] = useState(false);
+  const loadingRef = useRef(false);
+  loadingRef.current = loading;
   const [error, setError] = useState('');
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
   const [showConfirmSubmitDialog, setShowConfirmSubmitDialog] = useState(false);
-  const [savingDraftFromConfirm, setSavingDraftFromConfirm] = useState(false);
   const [existingInspectionId, setExistingInspectionId] = useState<string | null>(null);
   
   // Manager-specific states
@@ -155,116 +156,116 @@ function NewPlantInspectionContent() {
     fetchPlants();
   }, [supabase]);
 
-  useEffect(() => {
-    if (draftId && user && !loading) {
-      const loadDraftInspection = async (id: string) => {
-        try {
-          setLoading(true);
-          setError('');
+  const loadDraftInspection = useCallback(async (id: string) => {
+    try {
+      setLoading(true);
+      setError('');
 
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select(`
-              id,
-              role:roles (
-                name,
-                is_manager_admin
-              )
-            `)
-            .eq('id', user?.id)
-            .single();
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          role:roles (
+            name,
+            is_manager_admin
+          )
+        `)
+        .eq('id', user?.id)
+        .single();
 
-          const userIsManager = (profileData as ProfileWithRole)?.role?.is_manager_admin || false;
+      const userIsManager = (profileData as ProfileWithRole)?.role?.is_manager_admin || false;
 
-          const { data: inspection, error: inspectionError } = await supabase
-            .from('vehicle_inspections')
-            .select(`
-              *,
-              plant (
-                id,
-                plant_id,
-                nickname,
-                vehicle_categories (name)
-              )
-            `)
-            .eq('id', id)
-            .single();
+      const { data: inspection, error: inspectionError } = await supabase
+        .from('vehicle_inspections')
+        .select(`
+          *,
+          plant (
+            id,
+            plant_id,
+            nickname,
+            vehicle_categories (name)
+          )
+        `)
+        .eq('id', id)
+        .single();
 
-          if (inspectionError) throw inspectionError;
+      if (inspectionError) throw inspectionError;
 
-          if (!userIsManager && inspection.user_id !== user?.id) {
-            setError('You do not have permission to edit this inspection');
-            return;
-          }
+      if (!userIsManager && inspection.user_id !== user?.id) {
+        setError('You do not have permission to edit this inspection');
+        return;
+      }
 
-          if (inspection.status !== 'draft') {
-            setError('Only draft inspections can be edited here');
-            return;
-          }
+      if (inspection.status !== 'draft') {
+        setError('Only draft inspections can be edited here');
+        return;
+      }
 
-          const { data: items, error: itemsError } = await supabase
-            .from('inspection_items')
-            .select('*')
-            .eq('inspection_id', id)
-            .order('item_number');
+      const { data: items, error: itemsError } = await supabase
+        .from('inspection_items')
+        .select('*')
+        .eq('inspection_id', id)
+        .order('item_number');
 
-          if (itemsError) throw itemsError;
+      if (itemsError) throw itemsError;
 
-          setExistingInspectionId(id);
-          const inspectionData = inspection as InspectionWithRelations;
-          
-          if (inspection.is_hired_plant) {
-            setIsHiredPlant(true);
-            setSelectedPlantId('');
-            setHiredPlantIdSerial(inspection.hired_plant_id_serial || '');
-            setHiredPlantDescription(inspection.hired_plant_description || '');
-            setHiredPlantHiringCompany(inspection.hired_plant_hiring_company || '');
-          } else {
-            setIsHiredPlant(false);
-            setSelectedPlantId(inspectionData.plant?.id || '');
-          }
-          
-          setInspectionDate(inspection.inspection_date || formatDateISO(new Date()));
-          setSelectedEmployeeId(inspection.user_id);
+      setExistingInspectionId(id);
+      const inspectionData = inspection as InspectionWithRelations;
+      
+      if (inspection.is_hired_plant) {
+        setIsHiredPlant(true);
+        setSelectedPlantId('');
+        setHiredPlantIdSerial(inspection.hired_plant_id_serial || '');
+        setHiredPlantDescription(inspection.hired_plant_description || '');
+        setHiredPlantHiringCompany(inspection.hired_plant_hiring_company || '');
+      } else {
+        setIsHiredPlant(false);
+        setSelectedPlantId(inspectionData.plant?.id || '');
+      }
+      
+      setInspectionDate(inspection.inspection_date || formatDateISO(new Date()));
+      setSelectedEmployeeId(inspection.user_id);
 
-          setOriginalCurrentMileage(inspection.current_mileage);
-          setCurrentHours(inspection.current_mileage?.toString() || '');
+      setOriginalCurrentMileage(inspection.current_mileage);
+      setCurrentHours(inspection.current_mileage?.toString() || '');
 
-          const newCheckboxStates: Record<string, InspectionStatus> = {};
-          const newComments: Record<string, string> = {};
-          
-          (items as InspectionItem[] | null)?.forEach((item: InspectionItem) => {
-            const key = `${item.item_number}`;
-            const existing = newCheckboxStates[key];
-            if (existing && existing === 'attention') return;
-            newCheckboxStates[key] = item.status;
-            if (item.comments) {
-              newComments[key] = item.comments;
-            }
-          });
-
-          setCheckboxStates(newCheckboxStates);
-          setComments(newComments);
-          
-          if (Object.keys(newCheckboxStates).length > 0) {
-            setChecklistStarted(true);
-          }
-
-          toast.success('Draft inspection loaded');
-        } catch (err) {
-          console.error('Error loading draft inspection:', err);
-          setError(err instanceof Error ? err.message : 'Failed to load draft inspection');
-        } finally {
-          setLoading(false);
+      const newCheckboxStates: Record<string, InspectionStatus> = {};
+      const newComments: Record<string, string> = {};
+      
+      (items as InspectionItem[] | null)?.forEach((item: InspectionItem) => {
+        const key = `${item.item_number}`;
+        const existing = newCheckboxStates[key];
+        if (existing && existing === 'attention') return;
+        newCheckboxStates[key] = item.status;
+        if (item.comments) {
+          newComments[key] = item.comments;
         }
-      };
+      });
 
+      setCheckboxStates(newCheckboxStates);
+      setComments(newComments);
+      
+      if (Object.keys(newCheckboxStates).length > 0) {
+        setChecklistStarted(true);
+      }
+
+      toast.success('Draft inspection loaded');
+    } catch (err) {
+      console.error('Error loading draft inspection:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load draft inspection');
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase, user]);
+
+  useEffect(() => {
+    if (draftId && user && !loadingRef.current) {
       const timer = setTimeout(() => {
         loadDraftInspection(draftId);
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [draftId, user, loading, supabase]);
+  }, [draftId, user, loadDraftInspection]);
 
   useEffect(() => {
     if (user && isManager) {
@@ -480,6 +481,23 @@ function NewPlantInspectionContent() {
       return;
     }
 
+    // Validate: every checklist item must have a status selected
+    const missingItems: string[] = [];
+    currentChecklist.forEach((item, index) => {
+      const key = `${index + 1}`;
+      if (!checkboxStates[key]) {
+        missingItems.push(item);
+      }
+    });
+
+    if (missingItems.length > 0) {
+      setError(`Please select Pass, Fail, or N/A for all items. Missing: ${missingItems.slice(0, 3).join(', ')}${missingItems.length > 3 ? ` and ${missingItems.length - 3} more` : ''}`);
+      toast.error('Incomplete checklist', {
+        description: `${missingItems.length} item${missingItems.length > 1 ? 's' : ''} still need a status`,
+      });
+      return;
+    }
+
     // Validate: all defects must have comments
     const defectsWithoutComments: string[] = [];
     Object.entries(checkboxStates).forEach(([key, status]) => {
@@ -519,7 +537,7 @@ function NewPlantInspectionContent() {
     await saveInspection('submitted', sig);
   };
 
-  const saveInspection = async (status: 'draft' | 'submitted', signatureData?: string) => {
+  const saveInspection = async (status: 'submitted', signatureData?: string) => {
     if (!user || !selectedEmployeeId) return;
     if (!isHiredPlant && !selectedPlantId) return;
     
@@ -766,11 +784,7 @@ function NewPlantInspectionContent() {
         }
       }
 
-      if (status === 'draft') {
-        toast.success('Draft saved successfully');
-      } else {
-        toast.success('Inspection submitted successfully');
-      }
+      toast.success('Inspection submitted successfully');
 
       router.push('/plant-inspections');
     } catch (err) {
@@ -808,6 +822,8 @@ function NewPlantInspectionContent() {
         return <CheckCircle2 className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-green-400' : 'text-muted-foreground'}`} />;
       case 'attention':
         return <XCircle className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-red-400' : 'text-muted-foreground'}`} />;
+      case 'na':
+        return <MinusCircle className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-slate-300' : 'text-muted-foreground'}`} />;
       default:
         return null;
     }
@@ -821,6 +837,8 @@ function NewPlantInspectionContent() {
         return 'bg-green-500/20 border-green-500 shadow-lg shadow-green-500/20';
       case 'attention':
         return 'bg-red-500/20 border-red-500 shadow-lg shadow-red-500/20';
+      case 'na':
+        return 'bg-slate-500/20 border-slate-400 shadow-lg shadow-slate-500/20';
       default:
         return 'bg-slate-800/30 border-border';
     }
@@ -843,7 +861,7 @@ function NewPlantInspectionContent() {
                 {existingInspectionId ? 'Edit Plant Inspection' : 'New Plant Inspection'}
               </h1>
               <p className="text-sm text-muted-foreground hidden md:block">
-                {existingInspectionId ? 'Continue editing your draft' : 'Daily plant safety check'}
+                Daily plant safety check
               </p>
             </div>
           </div>
@@ -1060,7 +1078,7 @@ function NewPlantInspectionContent() {
         <CardHeader className="pb-3">
           <CardTitle className="text-foreground">{currentChecklist.length}-Point Plant Safety Check</CardTitle>
           <CardDescription className="text-muted-foreground">
-            Mark each item as Pass or Fail
+            Mark each item as Pass, Fail, or N/A
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 p-4 md:p-6">
@@ -1092,18 +1110,21 @@ function NewPlantInspectionContent() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    {(['ok', 'attention'] as InspectionStatus[]).map((status) => (
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['ok', 'attention', 'na'] as InspectionStatus[]).map((status) => (
                       <button
                         key={status}
                         type="button"
                         onClick={() => !isLogged && handleStatusChange(itemNumber, status)}
                         disabled={isLogged}
-                        className={`flex items-center justify-center h-12 rounded-xl border-3 transition-all ${
+                        className={`flex flex-col items-center justify-center h-14 rounded-xl border-3 transition-all ${
                           getStatusColor(status, currentStatus === status)
                         } ${isLogged ? 'opacity-60 cursor-not-allowed' : ''}`}
                       >
                         {getStatusIcon(status, currentStatus === status)}
+                        <span className="text-[10px] mt-1 text-muted-foreground">
+                          {status === 'ok' ? 'Pass' : status === 'attention' ? 'Fail' : 'N/A'}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -1135,14 +1156,14 @@ function NewPlantInspectionContent() {
                         if (existingInspectionId) {
                           setPhotoUploadItem({ itemNumber, dayOfWeek: getDayOfWeek(new Date(inspectionDate + 'T00:00:00')) });
                         } else {
-                          toast.info('Save as draft first to upload photos');
+                          toast.info('Photos can be added after submission');
                         }
                       }}
                       disabled={!existingInspectionId}
                       className="w-full border-border text-muted-foreground hover:bg-slate-800"
                     >
                       <Camera className="h-4 w-4 mr-2" />
-                      {existingInspectionId ? 'Add Photo' : 'Save draft to upload photos'}
+                      {existingInspectionId ? 'Add Photo' : 'Submit to upload photos'}
                     </Button>
                   )}
                 </div>
@@ -1184,19 +1205,22 @@ function NewPlantInspectionContent() {
                         )}
                       </td>
                       <td className="p-3">
-                        <div className="flex items-center justify-center gap-3">
-                          {(['ok', 'attention'] as InspectionStatus[]).map((status) => (
+                        <div className="flex items-center justify-center gap-2">
+                          {(['ok', 'attention', 'na'] as InspectionStatus[]).map((status) => (
                             <button
                               key={status}
                               type="button"
                               onClick={() => !isLogged && handleStatusChange(itemNumber, status)}
                               disabled={isLogged}
-                              className={`flex items-center justify-center w-12 h-12 rounded-lg border-2 transition-all ${
+                              className={`flex flex-col items-center justify-center w-14 h-14 rounded-lg border-2 transition-all ${
                                 getStatusColor(status, currentStatus === status)
                               } ${isLogged ? 'opacity-60 cursor-not-allowed' : ''}`}
-                              title={status === 'ok' ? 'Pass' : 'Fail'}
+                              title={status === 'ok' ? 'Pass' : status === 'attention' ? 'Fail' : 'N/A'}
                             >
                               {getStatusIcon(status, currentStatus === status)}
+                              <span className="text-[10px] mt-0.5 text-muted-foreground">
+                                {status === 'ok' ? 'Pass' : status === 'attention' ? 'Fail' : 'N/A'}
+                              </span>
                             </button>
                           ))}
                         </div>
@@ -1222,7 +1246,7 @@ function NewPlantInspectionContent() {
                               if (existingInspectionId) {
                                 setPhotoUploadItem({ itemNumber, dayOfWeek: getDayOfWeek(new Date(inspectionDate + 'T00:00:00')) });
                               } else {
-                                toast.info('Save draft first');
+                                toast.info('Photos can be added after submission');
                               }
                             }}
                             disabled={!existingInspectionId}
@@ -1294,15 +1318,6 @@ function NewPlantInspectionContent() {
           {/* Desktop Action Buttons */}
           <div className="hidden md:flex flex-row gap-3 justify-end pt-4">
             <Button
-              variant="outline"
-              onClick={() => saveInspection('draft')}
-              disabled={loading || (!selectedPlantId && !isHiredPlant)}
-              className="border-slate-600 text-white hover:bg-slate-800"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {loading ? 'Saving...' : 'Save Draft'}
-            </Button>
-            <Button
               onClick={handleSubmit}
               disabled={loading || (!selectedPlantId && !isHiredPlant)}
               className="bg-plant-inspection hover:bg-plant-inspection/90 text-slate-900 font-semibold"
@@ -1317,32 +1332,21 @@ function NewPlantInspectionContent() {
 
       {/* Mobile Sticky Footer */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-border/50 p-4 z-20">
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            onClick={() => saveInspection('draft')}
-            disabled={loading || (!selectedPlantId && !isHiredPlant)}
-            className="flex-1 h-14 border-slate-600 text-white hover:bg-slate-800"
-          >
-            <Save className="h-5 w-5 mr-2" />
-            Save Draft
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={loading || (!selectedPlantId && !isHiredPlant)}
-            className="flex-1 h-14 bg-plant-inspection hover:bg-plant-inspection/90 text-slate-900 font-semibold text-base"
-          >
-            <Send className="h-5 w-5 mr-2" />
-            Submit
-          </Button>
-        </div>
+        <Button
+          onClick={handleSubmit}
+          disabled={loading || (!selectedPlantId && !isHiredPlant)}
+          className="w-full h-14 bg-plant-inspection hover:bg-plant-inspection/90 text-slate-900 font-semibold text-base"
+        >
+          <Send className="h-5 w-5 mr-2" />
+          {loading ? 'Submitting...' : 'Submit Inspection'}
+        </Button>
       </div>
 
       {/* Confirmation Dialog */}
       <Dialog 
         open={showConfirmSubmitDialog} 
         onOpenChange={(open) => {
-          if (!open && (savingDraftFromConfirm || error)) return;
+          if (!open && error) return;
           if (!open) setError('');
           setShowConfirmSubmitDialog(open);
         }}
@@ -1385,32 +1389,12 @@ function NewPlantInspectionContent() {
                 setError('');
                 setShowConfirmSubmitDialog(false);
               }}
-              disabled={savingDraftFromConfirm}
               className="border-slate-600 text-white hover:bg-slate-800"
             >
               Cancel
             </Button>
             <Button
-              variant="outline"
-              onClick={async () => {
-                setSavingDraftFromConfirm(true);
-                try {
-                  await saveInspection('draft');
-                } catch (error) {
-                  console.error('Failed to save draft:', error);
-                } finally {
-                  setSavingDraftFromConfirm(false);
-                }
-              }}
-              disabled={savingDraftFromConfirm || loading}
-              className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {savingDraftFromConfirm ? 'Saving...' : 'Save Draft'}
-            </Button>
-            <Button
               onClick={validateAndSubmit}
-              disabled={savingDraftFromConfirm}
               className="bg-plant-inspection hover:bg-plant-inspection/90 text-slate-900 font-semibold"
             >
               <Send className="h-4 w-4 mr-2" />

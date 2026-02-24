@@ -132,9 +132,7 @@ export default function ViewPlantInspectionPage() {
       });
       setEditableDailyHours(hoursMap);
       
-      if (inspectionData && inspectionData.status === 'draft') {
-        setEditing(true);
-      }
+      // Plant inspections no longer support draft editing
     } catch (err) {
       console.error('Error fetching inspection:', err);
       setError(err instanceof Error ? err.message : 'Failed to load inspection');

@@ -464,11 +464,7 @@ function PlantInspectionsContent() {
               key={inspection.id} 
               className="border-border hover:shadow-lg hover:border-plant-inspection/50 transition-all duration-200 cursor-pointer"
               onClick={() => {
-                if (inspection.status === 'draft') {
-                  router.push(`/plant-inspections/new?id=${inspection.id}`);
-                } else {
-                  router.push(`/plant-inspections/${inspection.id}`);
-                }
+                router.push(`/plant-inspections/${inspection.id}`);
               }}
             >
               <CardHeader>

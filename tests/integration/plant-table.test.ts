@@ -404,7 +404,7 @@ describe('Plant Table Integration Tests', () => {
   });
 
   describe('Plant Inspections', () => {
-    it('should support plant inspections', async () => {
+    it('should support plant inspections (submitted only)', async () => {
       if (!testPlantId) {
         console.log('⏭️  Skipping plant inspection test - no test plant');
         return;
@@ -417,19 +417,45 @@ describe('Plant Table Integration Tests', () => {
           vehicle_id: null,
           user_id: testManagerId,
           inspection_date: new Date().toISOString(),
-          status: 'draft',
+          status: 'submitted',
+          submitted_at: new Date().toISOString(),
+          signature_data: 'test-signature',
+          signed_at: new Date().toISOString(),
         })
-        .select('id, plant_id, vehicle_id')
+        .select('id, plant_id, vehicle_id, status')
         .single();
 
       expect(error).toBeNull();
       expect(data).toHaveProperty('plant_id', testPlantId);
       expect(data?.vehicle_id).toBeNull();
+      expect(data?.status).toBe('submitted');
 
       // Clean up
       if (data?.id) {
         await supabase.from('vehicle_inspections').delete().eq('id', data.id);
       }
+    });
+
+    it('should reject draft status for plant inspections', async () => {
+      if (!testPlantId) {
+        console.log('⏭️  Skipping plant draft rejection test - no test plant');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('vehicle_inspections')
+        .insert({
+          plant_id: testPlantId,
+          vehicle_id: null,
+          user_id: testManagerId,
+          inspection_date: new Date().toISOString(),
+          status: 'draft',
+        })
+        .select('id')
+        .single();
+
+      expect(error).not.toBeNull();
+      expect(data).toBeNull();
     });
   });
 
