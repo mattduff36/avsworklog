@@ -483,7 +483,7 @@ export default function ActionsPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-workshop/20">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg" style={{ backgroundColor: 'hsl(13 37% 48% / 0.2)' }}>
                   <Wrench className="h-5 w-5 text-workshop" />
                 </div>
                 <div>
@@ -640,8 +640,8 @@ export default function ActionsPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-500/20">
-                  <Lightbulb className="h-5 w-5 text-blue-500" />
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg" style={{ backgroundColor: 'hsl(48 87% 69% / 0.2)' }}>
+                  <Lightbulb className="h-5 w-5 text-avs-yellow" />
                 </div>
                 <div>
                   <CardTitle className="text-foreground">Suggestions</CardTitle>
@@ -652,7 +652,7 @@ export default function ActionsPage() {
               </div>
               <Button
                 onClick={() => router.push('/suggestions/manage')}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
               >
                 <Lightbulb className="h-4 w-4 mr-2" />
                 Open Suggestions
@@ -698,8 +698,8 @@ export default function ActionsPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-orange-500/20">
-                  <Bug className="h-5 w-5 text-orange-500" />
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg" style={{ backgroundColor: 'hsl(48 87% 69% / 0.2)' }}>
+                  <Bug className="h-5 w-5 text-avs-yellow" />
                 </div>
                 <div>
                   <CardTitle className="text-foreground">Error Reports</CardTitle>
@@ -710,7 +710,7 @@ export default function ActionsPage() {
               </div>
               <Button
                 onClick={() => router.push('/admin/errors/manage')}
-                className="bg-orange-600 hover:bg-orange-700 text-white"
+                className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
               >
                 <Bug className="h-4 w-4 mr-2" />
                 Open Error Reports

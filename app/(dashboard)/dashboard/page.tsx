@@ -268,7 +268,7 @@ export default function DashboardPage() {
             label: 'Suggestions',
             count: 0,
             icon: Lightbulb,
-            color: 'hsl(217 91% 60%)',
+            color: 'hsl(48 87% 69%)',
             href: '/suggestions/manage'
           },
           {
@@ -276,7 +276,7 @@ export default function DashboardPage() {
             label: 'Error Reports',
             count: 0,
             icon: Bug,
-            color: 'hsl(24 95% 53%)',
+            color: 'hsl(48 87% 69%)',
             href: '/admin/errors/manage'
           },
           {
@@ -320,7 +320,7 @@ export default function DashboardPage() {
             label: 'Suggestions',
             count: 0,
             icon: Lightbulb,
-            color: 'hsl(217 91% 60%)',
+            color: 'hsl(48 87% 69%)',
             href: '/suggestions/manage'
           },
           {
@@ -328,7 +328,7 @@ export default function DashboardPage() {
             label: 'Error Reports',
             count: 0,
             icon: Bug,
-            color: 'hsl(24 95% 53%)',
+            color: 'hsl(48 87% 69%)',
             href: '/admin/errors/manage'
           },
           {
@@ -438,7 +438,7 @@ export default function DashboardPage() {
           label: 'Suggestions',
           count: suggestionsTotal,
           icon: Lightbulb,
-          color: 'hsl(217 91% 60%)',
+          color: 'hsl(48 87% 69%)',
           href: '/suggestions/manage'
         },
         {
@@ -446,7 +446,7 @@ export default function DashboardPage() {
           label: 'Error Reports',
           count: errorsTotal,
           icon: Bug,
-          color: 'hsl(24 95% 53%)',
+          color: 'hsl(48 87% 69%)',
           href: '/admin/errors/manage'
         },
         {
@@ -491,7 +491,7 @@ export default function DashboardPage() {
           label: 'Suggestions',
           count: 0,
           icon: Lightbulb,
-          color: 'hsl(217 91% 60%)',
+          color: 'hsl(48 87% 69%)',
           href: '/suggestions/manage'
         },
         {
@@ -499,7 +499,7 @@ export default function DashboardPage() {
           label: 'Error Reports',
           count: 0,
           icon: Bug,
-          color: 'hsl(24 95% 53%)',
+          color: 'hsl(48 87% 69%)',
           href: '/admin/errors/manage'
         },
         {
