@@ -455,59 +455,64 @@ export default function ActionsPage() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Pending</p>
-                    <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                      {workshopActions.filter(a => a.status === 'pending').length}
-                    </p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-muted-foreground">Pending</p>
+                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 opacity-50" />
+                </div>
+                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mb-3">
+                  {workshopActions.filter(a => a.status === 'pending').length}
+                </p>
+                <div className="space-y-1 border-t border-amber-500/20 pt-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Vehicle</span>
+                    <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'pending' && a.vehicle_id !== null).length}</span>
                   </div>
-                  <AlertTriangle className="h-8 w-8 text-amber-600 dark:text-amber-400 opacity-50" />
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Settings className="h-3 w-3" />Plant</span>
+                    <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'pending' && a.plant_id !== null).length}</span>
+                  </div>
                 </div>
               </div>
               <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">In Progress</p>
-                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                      {workshopActions.filter(a => a.status === 'logged').length}
-                    </p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-muted-foreground">In Progress</p>
+                  <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400 opacity-50" />
+                </div>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-3">
+                  {workshopActions.filter(a => a.status === 'logged').length}
+                </p>
+                <div className="space-y-1 border-t border-blue-500/20 pt-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Vehicle</span>
+                    <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'logged' && a.vehicle_id !== null).length}</span>
                   </div>
-                  <Clock className="h-8 w-8 text-blue-600 dark:text-blue-400 opacity-50" />
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Settings className="h-3 w-3" />Plant</span>
+                    <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'logged' && a.plant_id !== null).length}</span>
+                  </div>
                 </div>
               </div>
               <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/30">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Completed</p>
-                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                      {workshopActions.filter(a => a.status === 'completed').length}
-                    </p>
-                  </div>
-                  <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400 opacity-50" />
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-muted-foreground">Completed</p>
+                  <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 opacity-50" />
                 </div>
-              </div>
-            </div>
-            {/* Vehicle / Plant breakdown */}
-            <div className="flex flex-wrap gap-3 pt-1">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border text-sm text-muted-foreground">
-                <Wrench className="h-3.5 w-3.5" />
-                <span>
-                  <span className="font-semibold text-foreground">
-                    {workshopActions.filter(a => a.vehicle_id !== null).length}
-                  </span>{' '}vehicle task{workshopActions.filter(a => a.vehicle_id !== null).length !== 1 ? 's' : ''}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border text-sm text-muted-foreground">
-                <Settings className="h-3.5 w-3.5" />
-                <span>
-                  <span className="font-semibold text-foreground">
-                    {workshopActions.filter(a => a.plant_id !== null).length}
-                  </span>{' '}plant task{workshopActions.filter(a => a.plant_id !== null).length !== 1 ? 's' : ''}
-                </span>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400 mb-3">
+                  {workshopActions.filter(a => a.status === 'completed').length}
+                </p>
+                <div className="space-y-1 border-t border-green-500/20 pt-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Vehicle</span>
+                    <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'completed' && a.vehicle_id !== null).length}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Settings className="h-3 w-3" />Plant</span>
+                    <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'completed' && a.plant_id !== null).length}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>
