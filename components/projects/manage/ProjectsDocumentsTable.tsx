@@ -19,15 +19,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   FileText,
-  Users,
   Trash2,
   Star,
   Copy,
-  Eye,
   MoreHorizontal,
   ArrowUpDown,
 } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { formatFileSize } from '@/lib/utils/file-validation';
 import type { ManageDocumentRow, ManageDocumentsQuery } from '@/types/rams';
@@ -97,6 +95,8 @@ export function ProjectsDocumentsTable({
   onToggleFavourite,
   onReuse,
 }: ProjectsDocumentsTableProps) {
+  const router = useRouter();
+
   return (
     <div className="hidden md:block rounded-lg border border-border overflow-hidden bg-white dark:bg-slate-900">
       <Table>
@@ -112,7 +112,7 @@ export function ProjectsDocumentsTable({
               />
             </TableHead>
             <TableHead className="w-[12%]">Type</TableHead>
-            <TableHead className="w-[13%]">
+            <TableHead className="w-[15%]">
               <SortHeader
                 label="Uploaded"
                 field="created_at"
@@ -131,26 +131,24 @@ export function ProjectsDocumentsTable({
                 onSort={onSortChange}
               />
             </TableHead>
-            <TableHead className="w-[15%] text-right">Actions</TableHead>
+            <TableHead className="w-[13%] text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {documents.map((doc) => (
             <TableRow
               key={doc.id}
-              className="group hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors"
+              onClick={() => router.push(`/projects/${doc.id}?from=/projects/manage`)}
+              className="group hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors cursor-pointer"
             >
               {/* Document info */}
               <TableCell>
                 <div className="flex items-start gap-3">
                   <FileText className="h-4 w-4 text-rams shrink-0 mt-0.5" />
                   <div className="min-w-0">
-                    <Link
-                      href={`/projects/${doc.id}?from=/projects/manage`}
-                      className="font-medium text-foreground hover:text-rams transition-colors line-clamp-1"
-                    >
+                    <span className="font-medium text-foreground group-hover:text-rams transition-colors line-clamp-1">
                       {doc.title}
-                    </Link>
+                    </span>
                     <span className="text-[11px] text-muted-foreground mt-0.5 block">
                       {doc.file_type.toUpperCase()} &middot; {formatFileSize(doc.file_size)}
                     </span>
@@ -183,39 +181,32 @@ export function ProjectsDocumentsTable({
               </TableCell>
 
               {/* Actions */}
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-1">
-                  <Link href={`/projects/${doc.id}?from=/projects/manage`}>
-                    <Button variant="ghost" size="sm" className="h-8 px-2">
-                      <Eye className="h-4 w-4" />
+              <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <MoreHorizontal className="h-4 w-4" />
                     </Button>
-                  </Link>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-slate-900 border-border">
-                      <DropdownMenuItem onClick={() => onReuse(doc)}>
-                        <Copy className="h-4 w-4 mr-2" />
-                        Reuse Metadata
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onToggleFavourite(doc)}>
-                        <Star className={`h-4 w-4 mr-2 ${doc.is_favourite ? 'fill-yellow-500 text-yellow-500' : ''}`} />
-                        {doc.is_favourite ? 'Remove Favourite' : 'Add Favourite'}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() => onDelete(doc)}
-                        className="text-red-600 focus:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-slate-900 border-border">
+                    <DropdownMenuItem onClick={() => onReuse(doc)}>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Reuse Metadata
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onToggleFavourite(doc)}>
+                      <Star className={`h-4 w-4 mr-2 ${doc.is_favourite ? 'fill-yellow-500 text-yellow-500' : ''}`} />
+                      {doc.is_favourite ? 'Remove Favourite' : 'Add Favourite'}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => onDelete(doc)}
+                      className="text-red-600 focus:text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </TableCell>
             </TableRow>
           ))}

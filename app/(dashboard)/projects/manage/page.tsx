@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/hooks/useAuth';
 import {
   useManageDocuments,
@@ -10,6 +11,7 @@ import {
   useDeleteDocument,
   useAddFavourite,
   useRemoveFavourite,
+  projectsManageKeys,
   type FavouriteRow,
 } from '@/lib/hooks/useProjectsManage';
 import { UploadRAMSModal } from '@/components/rams/UploadRAMSModal';
@@ -46,6 +48,7 @@ import { toast } from 'sonner';
 
 export default function ProjectsManagePage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { isManager, isAdmin, loading: authLoading } = useAuth();
 
   // Search / filter / sort state
@@ -175,7 +178,8 @@ export default function ProjectsManagePage() {
   const handleUploadSuccess = useCallback(() => {
     setUploadModalOpen(false);
     setReuseDoc(null);
-  }, []);
+    queryClient.invalidateQueries({ queryKey: projectsManageKeys.all });
+  }, [queryClient]);
 
   const handleViewFavourite = useCallback(async (fav: FavouriteRow) => {
     if (!fav.document.file_path) {

@@ -6,15 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   FileText,
-  Users,
   Trash2,
   Star,
   Copy,
-  Eye,
+  ExternalLink,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { formatFileSize } from '@/lib/utils/file-validation';
 import type { ManageDocumentRow } from '@/types/rams';
@@ -32,6 +31,7 @@ export function ProjectsDocumentsMobileCards({
   onToggleFavourite,
   onReuse,
 }: ProjectsDocumentsMobileCardsProps) {
+  const router = useRouter();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -150,12 +150,14 @@ export function ProjectsDocumentsMobileCards({
 
                   {/* Actions */}
                   <div className="flex flex-wrap gap-2">
-                    <Link href={`/projects/${doc.id}?from=/projects/manage`} className="flex-1 min-w-[100px]">
-                      <Button size="sm" className="w-full h-9 bg-rams hover:bg-rams-dark text-white text-xs">
-                        <Eye className="h-3.5 w-3.5 mr-1.5" />
-                        View Details
-                      </Button>
-                    </Link>
+                    <Button
+                      size="sm"
+                      className="flex-1 min-w-[100px] h-9 bg-rams hover:bg-rams-dark text-white text-xs"
+                      onClick={() => router.push(`/projects/${doc.id}?from=/projects/manage`)}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                      View Details
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"

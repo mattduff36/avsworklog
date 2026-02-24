@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Upload, File, X } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Upload, File, X, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { validateRAMSFile, formatFileSize } from '@/lib/utils/file-validation';
 import type { ProjectDocumentType } from '@/types/rams';
@@ -26,8 +27,10 @@ export function UploadRAMSModal({ open, onClose, onSuccess, prefillTitle, prefil
   const [description, setDescription] = useState(prefillDescription || '');
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [documentTypes, setDocumentTypes] = useState<ProjectDocumentType[]>([]);
   const [selectedTypeId, setSelectedTypeId] = useState<string>(prefillTypeId || '');
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -68,10 +71,19 @@ export function UploadRAMSModal({ open, onClose, onSuccess, prefillTitle, prefil
 
   const handleRemoveFile = () => {
     setFile(null);
-    // Reset file input
     const fileInput = document.getElementById('file-upload') as HTMLInputElement;
     if (fileInput) fileInput.value = '';
   };
+
+  const resetForm = useCallback(() => {
+    setTitle(prefillTitle || '');
+    setDescription(prefillDescription || '');
+    setFile(null);
+    setUploadProgress(0);
+    if (!prefillTypeId && documentTypes.length > 0) {
+      setSelectedTypeId(documentTypes[0].id);
+    }
+  }, [prefillTitle, prefillDescription, prefillTypeId, documentTypes]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,59 +94,66 @@ export function UploadRAMSModal({ open, onClose, onSuccess, prefillTitle, prefil
     }
 
     setUploading(true);
+    setUploadProgress(0);
 
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('title', title.trim());
-      if (description.trim()) {
-        formData.append('description', description.trim());
-      }
-      if (selectedTypeId) {
-        formData.append('document_type_id', selectedTypeId);
-      }
-
-      const response = await fetch('/api/rams/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      // Check if response is JSON before parsing
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error(`Server error (${response.status}). Please try again or contact support if the issue persists.`);
-      }
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to upload document');
-      }
-
-      toast.success('Document uploaded successfully');
-
-      // Reset form
-      setTitle('');
-      setDescription('');
-      setFile(null);
-      
-      onSuccess();
-    } catch (error) {
-      console.error('Upload error:', error);
-      toast.error(error instanceof Error ? error.message : 'Upload failed');
-    } finally {
-      setUploading(false);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('title', title.trim());
+    if (description.trim()) {
+      formData.append('description', description.trim());
     }
+    if (selectedTypeId) {
+      formData.append('document_type_id', selectedTypeId);
+    }
+
+    const xhr = new XMLHttpRequest();
+    xhrRef.current = xhr;
+
+    xhr.upload.addEventListener('progress', (evt) => {
+      if (evt.lengthComputable) {
+        const pct = Math.round((evt.loaded / evt.total) * 100);
+        setUploadProgress(pct);
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      xhrRef.current = null;
+      if (xhr.status >= 200 && xhr.status < 300) {
+        toast.success('Document uploaded successfully');
+        resetForm();
+        onSuccess();
+      } else {
+        let errorMsg = 'Failed to upload document';
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (data.error) errorMsg = data.error;
+        } catch { /* use default */ }
+        toast.error(errorMsg);
+      }
+      setUploading(false);
+      setUploadProgress(0);
+    });
+
+    xhr.addEventListener('error', () => {
+      xhrRef.current = null;
+      toast.error('Upload failed. Please check your connection and try again.');
+      setUploading(false);
+      setUploadProgress(0);
+    });
+
+    xhr.addEventListener('abort', () => {
+      xhrRef.current = null;
+      setUploading(false);
+      setUploadProgress(0);
+    });
+
+    xhr.open('POST', '/api/rams/upload');
+    xhr.send(formData);
   };
 
   const handleClose = () => {
     if (uploading) return;
-    setTitle(prefillTitle || '');
-    setDescription(prefillDescription || '');
-    setFile(null);
-    if (!prefillTypeId && documentTypes.length > 0) {
-      setSelectedTypeId(documentTypes[0].id);
-    }
+    resetForm();
     onClose();
   };
 
@@ -257,11 +276,30 @@ export function UploadRAMSModal({ open, onClose, onSuccess, prefillTitle, prefil
               )}
             </div>
 
-            <div className="rounded-md bg-blue-900/20 border border-blue-800/30 p-3">
-              <p className="text-sm text-blue-100">
-                ℹ️ After uploading, you can assign this document to specific employees
-              </p>
-            </div>
+            {/* Upload Progress */}
+            {uploading && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Uploading...</span>
+                  <span className="font-medium text-foreground">{uploadProgress}%</span>
+                </div>
+                <Progress value={uploadProgress} className="h-2" />
+                {uploadProgress === 100 && (
+                  <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Processing document...</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!uploading && (
+              <div className="rounded-md bg-blue-900/20 border border-blue-800/30 p-3">
+                <p className="text-sm text-blue-100">
+                  After uploading, you can assign this document to specific employees
+                </p>
+              </div>
+            )}
           </div>
 
           <DialogFooter>
@@ -278,17 +316,8 @@ export function UploadRAMSModal({ open, onClose, onSuccess, prefillTitle, prefil
               disabled={uploading || !file || !title.trim()}
               className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
             >
-              {uploading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Document
-                </>
-              )}
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Document
             </Button>
           </DialogFooter>
         </form>
