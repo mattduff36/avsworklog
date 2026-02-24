@@ -233,7 +233,7 @@ export function ProjectsDocumentsMobileCards({
                       className="h-9 text-xs"
                     >
                       <Copy className="h-3.5 w-3.5 mr-1" />
-                      Reuse
+                      Template
                     </Button>
                     <Button
                       size="sm"

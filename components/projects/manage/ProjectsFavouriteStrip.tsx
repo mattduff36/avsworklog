@@ -72,7 +72,7 @@ export function ProjectsFavouriteStrip({
                     className="h-7 px-2 bg-rams hover:bg-rams-dark text-white text-xs"
                   >
                     <Copy className="h-3 w-3 mr-1" />
-                    <span className="hidden sm:inline">Reuse</span>
+                    <span className="hidden sm:inline">Use as Template</span>
                   </Button>
                   <Button
                     size="sm"

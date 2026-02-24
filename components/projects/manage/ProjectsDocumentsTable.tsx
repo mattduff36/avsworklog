@@ -252,7 +252,7 @@ export function ProjectsDocumentsTable({
                   <DropdownMenuContent align="end" className="bg-slate-900 border-border">
                     <DropdownMenuItem onClick={() => onReuse(doc)}>
                       <Copy className="h-4 w-4 mr-2" />
-                      Reuse Metadata
+                      Use as Template
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onToggleFavourite(doc)}>
                       <Star className={`h-4 w-4 mr-2 ${doc.is_favourite ? 'fill-yellow-500 text-yellow-500' : ''}`} />
