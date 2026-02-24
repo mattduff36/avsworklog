@@ -225,12 +225,15 @@ export default function ProjectsManagePage() {
       }
     });
 
-    xhr.addEventListener('load', () => {
+    xhr.addEventListener('load', async () => {
       xhrMapRef.current.delete(uploadId);
       if (xhr.status >= 200 && xhr.status < 300) {
         toast.success('Document uploaded successfully');
+        setUploadingDocs(prev =>
+          prev.map(d => d.id === uploadId ? { ...d, status: 'processing', progress: 100 } : d)
+        );
+        await queryClient.invalidateQueries({ queryKey: projectsManageKeys.all });
         setUploadingDocs(prev => prev.filter(d => d.id !== uploadId));
-        queryClient.invalidateQueries({ queryKey: projectsManageKeys.all });
       } else {
         let errorMsg = 'Failed to upload document';
         try { const data = JSON.parse(xhr.responseText); if (data.error) errorMsg = data.error; } catch { /* use default */ }
