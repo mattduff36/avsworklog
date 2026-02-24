@@ -392,11 +392,27 @@ export function CreateWorkshopTaskDialog({
         updateData.last_mileage_update = new Date().toISOString();
       }
 
-      const { error: meterReadingError } = await supabase
+      // Use select-then-insert/update instead of upsert (no guaranteed UNIQUE constraint
+      // on vehicle_id/plant_id, which makes ON CONFLICT fail in Postgres).
+      const idColumn = isPlant ? 'plant_id' : 'vehicle_id';
+      const { data: existingMaintenance, error: existingMaintenanceError } = await supabase
         .from('vehicle_maintenance')
-        .upsert(updateData, {
-          onConflict: isPlant ? 'plant_id' : 'vehicle_id',
-        });
+        .select('id')
+        .eq(idColumn, selectedVehicleId)
+        .order('last_updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingMaintenanceError) throw existingMaintenanceError;
+
+      const { error: meterReadingError } = existingMaintenance
+        ? await supabase
+            .from('vehicle_maintenance')
+            .update(updateData)
+            .eq('id', existingMaintenance.id)
+        : await supabase
+            .from('vehicle_maintenance')
+            .insert(updateData);
 
       if (meterReadingError) {
         console.error('Error updating meter reading:', meterReadingError);

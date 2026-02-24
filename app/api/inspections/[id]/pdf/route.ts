@@ -8,6 +8,8 @@ import { getProfileWithRole } from '@/lib/utils/permissions';
 import { getVehicleCategoryName } from '@/lib/utils/deprecation-logger';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
+export const runtime = 'nodejs';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -57,12 +59,24 @@ export async function GET(
       .order('item_number', { ascending: true });
 
     if (itemsError) {
-      console.error('Items error:', itemsError);
-      return NextResponse.json({ error: 'Failed to fetch inspection items', details: itemsError.message }, { status: 500 });
+      await logServerError({
+        error: new Error(`Failed to fetch inspection items: ${itemsError.message}`),
+        request,
+        componentName: '/api/inspections/[id]/pdf',
+        additionalData: {
+          inspectionId: id,
+          supabaseError: {
+            code: (itemsError as any).code,
+            message: itemsError.message,
+            details: (itemsError as any).details,
+            hint: (itemsError as any).hint,
+          },
+        },
+      });
+      return NextResponse.json({ error: 'Failed to fetch inspection items' }, { status: 500 });
     }
 
     if (!items || items.length === 0) {
-      console.error('No items found for inspection:', id);
       return NextResponse.json({ error: 'Inspection items not found' }, { status: 404 });
     }
 
@@ -100,9 +114,9 @@ export async function GET(
     const stream = await renderToStream(pdfComponent);
 
     // Convert stream to buffer
-    const chunks: Uint8Array[] = [];
-    for await (const chunk of stream) {
-      chunks.push(chunk);
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream as any) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
     const buffer = Buffer.concat(chunks);
 

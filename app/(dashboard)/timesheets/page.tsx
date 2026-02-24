@@ -230,7 +230,29 @@ export default function TimesheetsPage() {
     try {
       const response = await fetch(`/api/timesheets/${timesheetId}/pdf`);
       if (!response.ok) {
-        throw new Error('Failed to generate PDF');
+        const raw = await response.text().catch(() => '');
+        const serverMessage = (() => {
+          if (!raw) return '';
+          try {
+            const parsed = JSON.parse(raw) as { error?: unknown; message?: unknown };
+            const msg = parsed?.error ?? parsed?.message;
+            return typeof msg === 'string' ? msg : raw;
+          } catch {
+            return raw;
+          }
+        })();
+
+        console.warn('Timesheet PDF download failed:', {
+          timesheetId,
+          status: response.status,
+          statusText: response.statusText,
+          serverMessage,
+        });
+
+        toast.error('Failed to download PDF', {
+          description: serverMessage || 'Please try again or contact support if the problem persists.',
+        });
+        return;
       }
       
       const blob = await response.blob();
@@ -243,9 +265,23 @@ export default function TimesheetsPage() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      console.error('Error downloading PDF:', error);
+      const msg = error instanceof Error ? error.message : String(error);
+      const isNetworkFailure =
+        msg.includes('Failed to fetch') ||
+        msg.includes('NetworkError') ||
+        msg.includes('AuthRetryableFetchError') ||
+        msg.toLowerCase().includes('network');
+
+      if (isNetworkFailure) {
+        console.warn('Timesheet PDF download failed (network):', error);
+      } else {
+        console.error('Timesheet PDF download failed:', error);
+      }
+
       toast.error('Failed to download PDF', {
-        description: 'Please try again or contact support if the problem persists.',
+        description: isNetworkFailure
+          ? 'Please check your internet connection and try again.'
+          : 'Please try again or contact support if the problem persists.',
       });
     } finally {
       setDownloading(null);
