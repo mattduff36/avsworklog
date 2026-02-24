@@ -61,6 +61,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [pendingRAMSCount, setPendingRAMSCount] = useState(0);
   const [hasRAMSAssignments, setHasRAMSAssignments] = useState(false);
+  const [newSuggestionsCount, setNewSuggestionsCount] = useState(0);
+  const [newErrorReportsCount, setNewErrorReportsCount] = useState(0);
   const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
   const [permissionsLoading, setPermissionsLoading] = useState(true);
   const [ramsLoading, setRamsLoading] = useState(true);
@@ -172,6 +174,7 @@ export default function DashboardPage() {
     if (isManager || isAdmin) {
       fetchPendingApprovals();
       fetchTopActions();
+      fetchNotificationCounts();
     }
     fetchPendingRAMS();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -426,6 +429,28 @@ export default function DashboardPage() {
     }
   };
 
+  const fetchNotificationCounts = async () => {
+    if (!navigator.onLine) return;
+
+    try {
+      const [{ count: suggestionsCount }, { count: errorReportsCount }] = await Promise.all([
+        supabase
+          .from('suggestions')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'new'),
+        supabase
+          .from('error_reports')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'new'),
+      ]);
+
+      setNewSuggestionsCount(suggestionsCount || 0);
+      setNewErrorReportsCount(errorReportsCount || 0);
+    } catch (error) {
+      console.error('Error fetching notification counts:', error);
+    }
+  };
+
   const fetchPendingRAMS = async () => {
     if (!profile?.id) {
       // Don't set ramsLoading to false - keep it in loading state until profile loads
@@ -572,13 +597,19 @@ export default function DashboardPage() {
             {/* Manager Links - Using shared navigation config */}
             {managerNavItems.map((link, index) => {
               const Icon = link.icon;
+              const badgeCount = link.href === '/suggestions/manage' ? newSuggestionsCount : 0;
               
               return (
                 <Link key={link.href} href={link.href}>
                   <div 
-                    className="bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
+                    className="relative bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
                     style={{ height: '100px', animationDelay: `${index * 75}ms` }}
                   >
+                    {badgeCount > 0 && (
+                      <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800">
+                        {badgeCount > 99 ? '99+' : badgeCount}
+                      </div>
+                    )}
                     <div className="flex flex-col items-start justify-between h-full">
                       <Icon className="h-6 w-6 text-muted-foreground" />
                       <span className="text-white font-semibold text-base leading-tight">
@@ -594,13 +625,19 @@ export default function DashboardPage() {
             {effectiveIsAdmin && adminNavItems.map((link, index) => {
               const Icon = link.icon;
               const animationIndex = managerNavItems.length + index;
+              const badgeCount = link.href === '/admin/errors/manage' ? newErrorReportsCount : 0;
               
               return (
                 <Link key={link.href} href={link.href}>
                   <div 
-                    className="bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
+                    className="relative bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
                     style={{ height: '100px', animationDelay: `${animationIndex * 75}ms` }}
                   >
+                    {badgeCount > 0 && (
+                      <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800">
+                        {badgeCount > 99 ? '99+' : badgeCount}
+                      </div>
+                    )}
                     <div className="flex flex-col items-start justify-between h-full">
                       <Icon className="h-6 w-6 text-muted-foreground" />
                       <span className="text-white font-semibold text-base leading-tight">
