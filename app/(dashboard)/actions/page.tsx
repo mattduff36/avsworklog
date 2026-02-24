@@ -46,6 +46,10 @@ export default function ActionsPage() {
   const [completingActions, setCompletingActions] = useState<Set<string>>(new Set());
   const [maintenanceOverdue, setMaintenanceOverdue] = useState(0);
   const [maintenanceDueSoon, setMaintenanceDueSoon] = useState(0);
+  const [vehicleMaintenanceOverdue, setVehicleMaintenanceOverdue] = useState(0);
+  const [vehicleMaintenanceDueSoon, setVehicleMaintenanceDueSoon] = useState(0);
+  const [plantMaintenanceOverdue, setPlantMaintenanceOverdue] = useState(0);
+  const [plantMaintenanceDueSoon, setPlantMaintenanceDueSoon] = useState(0);
   
   // Logged modal states
   const [showLoggedDialog, setShowLoggedDialog] = useState(false);
@@ -105,28 +109,31 @@ export default function ActionsPage() {
       const data = await response.json();
       const vehicles = data.vehicles || [];
       
-      // Count individual alerts (same logic as MaintenanceOverview component)
-      let overdueCount = 0;
-      let dueSoonCount = 0;
-      
+      // Count individual vehicle alerts
+      let vehicleOverdue = 0;
+      let vehicleDueSoon = 0;
+
       vehicles.forEach((vehicle: { tax_status?: { status: string }, mot_status?: { status: string }, service_status?: { status: string }, cambelt_status?: { status: string }, first_aid_status?: { status: string } }) => {
-        if (vehicle.tax_status?.status === 'overdue') overdueCount++;
-        else if (vehicle.tax_status?.status === 'due_soon') dueSoonCount++;
-        
-        if (vehicle.mot_status?.status === 'overdue') overdueCount++;
-        else if (vehicle.mot_status?.status === 'due_soon') dueSoonCount++;
-        
-        if (vehicle.service_status?.status === 'overdue') overdueCount++;
-        else if (vehicle.service_status?.status === 'due_soon') dueSoonCount++;
-        
-        if (vehicle.cambelt_status?.status === 'overdue') overdueCount++;
-        else if (vehicle.cambelt_status?.status === 'due_soon') dueSoonCount++;
-        
-        if (vehicle.first_aid_status?.status === 'overdue') overdueCount++;
-        else if (vehicle.first_aid_status?.status === 'due_soon') dueSoonCount++;
+        if (vehicle.tax_status?.status === 'overdue') vehicleOverdue++;
+        else if (vehicle.tax_status?.status === 'due_soon') vehicleDueSoon++;
+
+        if (vehicle.mot_status?.status === 'overdue') vehicleOverdue++;
+        else if (vehicle.mot_status?.status === 'due_soon') vehicleDueSoon++;
+
+        if (vehicle.service_status?.status === 'overdue') vehicleOverdue++;
+        else if (vehicle.service_status?.status === 'due_soon') vehicleDueSoon++;
+
+        if (vehicle.cambelt_status?.status === 'overdue') vehicleOverdue++;
+        else if (vehicle.cambelt_status?.status === 'due_soon') vehicleDueSoon++;
+
+        if (vehicle.first_aid_status?.status === 'overdue') vehicleOverdue++;
+        else if (vehicle.first_aid_status?.status === 'due_soon') vehicleDueSoon++;
       });
 
       // Also fetch plant LOLER data
+      let plantOverdue = 0;
+      let plantDueSoon = 0;
+
       const { data: plantData, error: plantError } = await supabase
         .from('plant')
         .select('loler_due_date')
@@ -139,16 +146,20 @@ export default function ActionsPage() {
           if (plant.loler_due_date) {
             const dueDate = new Date(plant.loler_due_date);
             if (dueDate < today) {
-              overdueCount++;
+              plantOverdue++;
             } else if (dueDate <= thirtyDaysFromNow) {
-              dueSoonCount++;
+              plantDueSoon++;
             }
           }
         });
       }
-      
-      setMaintenanceOverdue(overdueCount);
-      setMaintenanceDueSoon(dueSoonCount);
+
+      setVehicleMaintenanceOverdue(vehicleOverdue);
+      setVehicleMaintenanceDueSoon(vehicleDueSoon);
+      setPlantMaintenanceOverdue(plantOverdue);
+      setPlantMaintenanceDueSoon(plantDueSoon);
+      setMaintenanceOverdue(vehicleOverdue + plantOverdue);
+      setMaintenanceDueSoon(vehicleDueSoon + plantDueSoon);
     } catch (err) {
       console.error('Error fetching maintenance counts:', err);
     }
@@ -546,25 +557,41 @@ export default function ActionsPage() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Overdue Tasks</p>
-                    <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                      {maintenanceOverdue}
-                    </p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-muted-foreground">Overdue Tasks</p>
+                  <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 opacity-50" />
+                </div>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-400 mb-3">
+                  {maintenanceOverdue}
+                </p>
+                <div className="space-y-1 border-t border-red-500/20 pt-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Vehicle</span>
+                    <span className="font-medium text-foreground">{vehicleMaintenanceOverdue}</span>
                   </div>
-                  <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400 opacity-50" />
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Settings className="h-3 w-3" />Plant</span>
+                    <span className="font-medium text-foreground">{plantMaintenanceOverdue}</span>
+                  </div>
                 </div>
               </div>
               <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Due Soon (30 days)</p>
-                    <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                      {maintenanceDueSoon}
-                    </p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-muted-foreground">Due Soon (30 days)</p>
+                  <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 opacity-50" />
+                </div>
+                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mb-3">
+                  {maintenanceDueSoon}
+                </p>
+                <div className="space-y-1 border-t border-amber-500/20 pt-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Vehicle</span>
+                    <span className="font-medium text-foreground">{vehicleMaintenanceDueSoon}</span>
                   </div>
-                  <Clock className="h-8 w-8 text-amber-600 dark:text-amber-400 opacity-50" />
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Settings className="h-3 w-3" />Plant</span>
+                    <span className="font-medium text-foreground">{plantMaintenanceDueSoon}</span>
+                  </div>
                 </div>
               </div>
             </div>
