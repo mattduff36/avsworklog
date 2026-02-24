@@ -29,6 +29,10 @@ type Action = Database['public']['Tables']['actions']['Row'] & {
     item_description: string;
     status: string;
   };
+  plant?: {
+    plant_id: string;
+    nickname: string | null;
+  } | null;
 };
 
 export default function ActionsPage() {
@@ -72,6 +76,10 @@ export default function ActionsPage() {
           inspection_items (
             item_description,
             status
+          ),
+          plant (
+            plant_id,
+            nickname
           )
         `)
         .order('created_at', { ascending: false });
@@ -88,7 +96,7 @@ export default function ActionsPage() {
 
   const fetchMaintenanceCounts = useCallback(async () => {
     try {
-      // Fetch maintenance data from API (same as maintenance page)
+      // Fetch vehicle maintenance data from API
       const response = await fetch('/api/maintenance');
       if (!response.ok) {
         throw new Error('Failed to fetch maintenance data');
@@ -102,33 +110,49 @@ export default function ActionsPage() {
       let dueSoonCount = 0;
       
       vehicles.forEach((vehicle: { tax_status?: { status: string }, mot_status?: { status: string }, service_status?: { status: string }, cambelt_status?: { status: string }, first_aid_status?: { status: string } }) => {
-        // Check Tax
         if (vehicle.tax_status?.status === 'overdue') overdueCount++;
         else if (vehicle.tax_status?.status === 'due_soon') dueSoonCount++;
         
-        // Check MOT
         if (vehicle.mot_status?.status === 'overdue') overdueCount++;
         else if (vehicle.mot_status?.status === 'due_soon') dueSoonCount++;
         
-        // Check Service
         if (vehicle.service_status?.status === 'overdue') overdueCount++;
         else if (vehicle.service_status?.status === 'due_soon') dueSoonCount++;
         
-        // Check Cambelt
         if (vehicle.cambelt_status?.status === 'overdue') overdueCount++;
         else if (vehicle.cambelt_status?.status === 'due_soon') dueSoonCount++;
         
-        // Check First Aid
         if (vehicle.first_aid_status?.status === 'overdue') overdueCount++;
         else if (vehicle.first_aid_status?.status === 'due_soon') dueSoonCount++;
       });
+
+      // Also fetch plant LOLER data
+      const { data: plantData, error: plantError } = await supabase
+        .from('plant')
+        .select('loler_due_date')
+        .eq('status', 'active');
+
+      if (!plantError && plantData) {
+        const today = new Date();
+        const thirtyDaysFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+        plantData.forEach((plant: { loler_due_date: string | null }) => {
+          if (plant.loler_due_date) {
+            const dueDate = new Date(plant.loler_due_date);
+            if (dueDate < today) {
+              overdueCount++;
+            } else if (dueDate <= thirtyDaysFromNow) {
+              dueSoonCount++;
+            }
+          }
+        });
+      }
       
       setMaintenanceOverdue(overdueCount);
       setMaintenanceDueSoon(dueSoonCount);
     } catch (err) {
       console.error('Error fetching maintenance counts:', err);
     }
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     if (!authLoading) {
@@ -417,7 +441,7 @@ export default function ActionsPage() {
                 <div>
                   <CardTitle className="text-foreground">Workshop Tasks</CardTitle>
                   <CardDescription className="text-muted-foreground">
-                    Vehicle repairs and inspection defects
+                    Vehicle &amp; plant repairs and inspection defects
                   </CardDescription>
                 </div>
               </div>
@@ -431,7 +455,7 @@ export default function ActionsPage() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
                 <div className="flex items-center justify-between">
@@ -467,6 +491,25 @@ export default function ActionsPage() {
                 </div>
               </div>
             </div>
+            {/* Vehicle / Plant breakdown */}
+            <div className="flex flex-wrap gap-3 pt-1">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border text-sm text-muted-foreground">
+                <Wrench className="h-3.5 w-3.5" />
+                <span>
+                  <span className="font-semibold text-foreground">
+                    {workshopActions.filter(a => a.vehicle_id !== null).length}
+                  </span>{' '}vehicle task{workshopActions.filter(a => a.vehicle_id !== null).length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border text-sm text-muted-foreground">
+                <Settings className="h-3.5 w-3.5" />
+                <span>
+                  <span className="font-semibold text-foreground">
+                    {workshopActions.filter(a => a.plant_id !== null).length}
+                  </span>{' '}plant task{workshopActions.filter(a => a.plant_id !== null).length !== 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -481,7 +524,7 @@ export default function ActionsPage() {
                 <div>
                   <CardTitle className="text-foreground">Maintenance & Service</CardTitle>
                   <CardDescription className="text-muted-foreground">
-                    Scheduled vehicle maintenance tracking
+                    Scheduled vehicle maintenance &amp; plant LOLER tracking
                   </CardDescription>
                 </div>
               </div>
