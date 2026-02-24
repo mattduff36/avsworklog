@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, CheckCircle2, Clock, Trash2, FileText, Undo2, Wrench, ArrowRight, Info, Settings, Ban } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Trash2, FileText, Undo2, Wrench, ArrowRight, Info, Settings, Ban, Lightbulb, Bug } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Database } from '@/types/database';
 import { toast } from 'sonner';
@@ -50,6 +50,14 @@ export default function ActionsPage() {
   const [vehicleMaintenanceDueSoon, setVehicleMaintenanceDueSoon] = useState(0);
   const [plantMaintenanceOverdue, setPlantMaintenanceOverdue] = useState(0);
   const [plantMaintenanceDueSoon, setPlantMaintenanceDueSoon] = useState(0);
+
+  const [suggestionsNew, setSuggestionsNew] = useState(0);
+  const [suggestionsUnderReview, setSuggestionsUnderReview] = useState(0);
+  const [suggestionsResolved, setSuggestionsResolved] = useState(0);
+
+  const [errorsNew, setErrorsNew] = useState(0);
+  const [errorsInvestigating, setErrorsInvestigating] = useState(0);
+  const [errorsResolved, setErrorsResolved] = useState(0);
   
   // Logged modal states
   const [showLoggedDialog, setShowLoggedDialog] = useState(false);
@@ -165,6 +173,34 @@ export default function ActionsPage() {
     }
   }, [supabase]);
 
+  const fetchSuggestionErrorCounts = useCallback(async () => {
+    try {
+      const [
+        { count: sNew },
+        { count: sReview },
+        { count: sResolved },
+        { count: eNew },
+        { count: eInv },
+        { count: eResolved },
+      ] = await Promise.all([
+        supabase.from('suggestions').select('*', { count: 'exact', head: true }).eq('status', 'new'),
+        supabase.from('suggestions').select('*', { count: 'exact', head: true }).in('status', ['under_review', 'planned']),
+        supabase.from('suggestions').select('*', { count: 'exact', head: true }).in('status', ['completed', 'declined']),
+        supabase.from('error_reports').select('*', { count: 'exact', head: true }).eq('status', 'new'),
+        supabase.from('error_reports').select('*', { count: 'exact', head: true }).eq('status', 'investigating'),
+        supabase.from('error_reports').select('*', { count: 'exact', head: true }).eq('status', 'resolved'),
+      ]);
+      setSuggestionsNew(sNew || 0);
+      setSuggestionsUnderReview(sReview || 0);
+      setSuggestionsResolved(sResolved || 0);
+      setErrorsNew(eNew || 0);
+      setErrorsInvestigating(eInv || 0);
+      setErrorsResolved(eResolved || 0);
+    } catch (err) {
+      console.error('Error fetching suggestion/error counts:', err);
+    }
+  }, [supabase]);
+
   useEffect(() => {
     if (!authLoading) {
       if (!isManager) {
@@ -173,8 +209,9 @@ export default function ActionsPage() {
       }
       fetchActions();
       fetchMaintenanceCounts();
+      fetchSuggestionErrorCounts();
     }
-  }, [authLoading, isManager, router, fetchActions, fetchMaintenanceCounts]);
+  }, [authLoading, isManager, router, fetchActions, fetchMaintenanceCounts, fetchSuggestionErrorCounts]);
 
   // Mark as logged - opens modal for comment
   const handleMarkAsLogged = (actionId: string) => {
@@ -593,6 +630,122 @@ export default function ActionsPage() {
                     <span className="font-medium text-foreground">{plantMaintenanceDueSoon}</span>
                   </div>
                 </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Suggestions */}
+        <Card className="">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-500/20">
+                  <Lightbulb className="h-5 w-5 text-blue-500" />
+                </div>
+                <div>
+                  <CardTitle className="text-foreground">Suggestions</CardTitle>
+                  <CardDescription className="text-muted-foreground">
+                    Staff suggestions and improvement ideas
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                onClick={() => router.push('/suggestions/manage')}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Lightbulb className="h-4 w-4 mr-2" />
+                Open Suggestions
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-muted-foreground">New</p>
+                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 opacity-50" />
+                </div>
+                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                  {suggestionsNew}
+                </p>
+              </div>
+              <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-muted-foreground">Under Review</p>
+                  <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400 opacity-50" />
+                </div>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {suggestionsUnderReview}
+                </p>
+              </div>
+              <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/30">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-muted-foreground">Resolved</p>
+                  <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 opacity-50" />
+                </div>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {suggestionsResolved}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Error Reports */}
+        <Card className="">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-orange-500/20">
+                  <Bug className="h-5 w-5 text-orange-500" />
+                </div>
+                <div>
+                  <CardTitle className="text-foreground">Error Reports</CardTitle>
+                  <CardDescription className="text-muted-foreground">
+                    Staff-submitted app error and bug reports
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                onClick={() => router.push('/admin/errors/manage')}
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+              >
+                <Bug className="h-4 w-4 mr-2" />
+                Open Error Reports
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-muted-foreground">New</p>
+                  <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 opacity-50" />
+                </div>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                  {errorsNew}
+                </p>
+              </div>
+              <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-muted-foreground">Investigating</p>
+                  <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400 opacity-50" />
+                </div>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {errorsInvestigating}
+                </p>
+              </div>
+              <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/30">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-muted-foreground">Resolved</p>
+                  <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 opacity-50" />
+                </div>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {errorsResolved}
+                </p>
               </div>
             </div>
           </CardContent>

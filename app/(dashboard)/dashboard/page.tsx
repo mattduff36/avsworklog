@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Bug,
+  Lightbulb,
   Wrench,
   Settings,
   FileText,
@@ -25,7 +26,7 @@ import { toast } from 'sonner';
 import { managerNavItems, adminNavItems } from '@/lib/config/navigation';
 
 type PendingApprovalCount = {
-  type: 'timesheets' | 'inspections' | 'absences' | 'pending' | 'logged' | 'completed' | 'workshop' | 'maintenance';
+  type: 'timesheets' | 'inspections' | 'absences' | 'pending' | 'logged' | 'completed' | 'workshop' | 'maintenance' | 'suggestions' | 'errors';
   label: string;
   count: number;
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
@@ -263,6 +264,22 @@ export default function DashboardPage() {
             href: '/maintenance'
           },
           {
+            type: 'suggestions',
+            label: 'Suggestions',
+            count: 0,
+            icon: Lightbulb,
+            color: 'hsl(217 91% 60%)',
+            href: '/suggestions/manage'
+          },
+          {
+            type: 'errors',
+            label: 'Error Reports',
+            count: 0,
+            icon: Bug,
+            color: 'hsl(24 95% 53%)',
+            href: '/admin/errors/manage'
+          },
+          {
             type: 'inspections',
             label: 'Site Audit Inspections',
             count: 0,
@@ -281,7 +298,6 @@ export default function DashboardPage() {
 
       if (actionsError) {
         console.error('Error fetching actions:', actionsError);
-        // Initialize with empty data on error
         setActionsSummary([
           {
             type: 'workshop',
@@ -297,7 +313,23 @@ export default function DashboardPage() {
             count: 0,
             icon: Settings,
             color: 'hsl(0 84% 60%)',
-            href: '/fleet'
+            href: '/maintenance'
+          },
+          {
+            type: 'suggestions',
+            label: 'Suggestions',
+            count: 0,
+            icon: Lightbulb,
+            color: 'hsl(217 91% 60%)',
+            href: '/suggestions/manage'
+          },
+          {
+            type: 'errors',
+            label: 'Error Reports',
+            count: 0,
+            icon: Bug,
+            color: 'hsl(24 95% 53%)',
+            href: '/admin/errors/manage'
           },
           {
             type: 'inspections',
@@ -359,6 +391,30 @@ export default function DashboardPage() {
 
       const maintenanceTotal = maintenanceOverdue + maintenanceDueSoon;
 
+      // Fetch suggestion counts (new + under_review/planned = needing attention)
+      let suggestionsTotal = 0;
+      try {
+        const [{ count: sNew }, { count: sReview }] = await Promise.all([
+          supabase.from('suggestions').select('*', { count: 'exact', head: true }).eq('status', 'new'),
+          supabase.from('suggestions').select('*', { count: 'exact', head: true }).in('status', ['under_review', 'planned']),
+        ]);
+        suggestionsTotal = (sNew || 0) + (sReview || 0);
+      } catch (e) {
+        console.error('Error fetching suggestion counts:', e);
+      }
+
+      // Fetch error report counts (new + investigating = needing attention)
+      let errorsTotal = 0;
+      try {
+        const [{ count: eNew }, { count: eInv }] = await Promise.all([
+          supabase.from('error_reports').select('*', { count: 'exact', head: true }).eq('status', 'new'),
+          supabase.from('error_reports').select('*', { count: 'exact', head: true }).eq('status', 'investigating'),
+        ]);
+        errorsTotal = (eNew || 0) + (eInv || 0);
+      } catch (e) {
+        console.error('Error fetching error report counts:', e);
+      }
+
       // Build actions summary array
       const actionTypes: PendingApprovalCount[] = [
         {
@@ -366,7 +422,7 @@ export default function DashboardPage() {
           label: 'Workshop Tasks',
           count: workshopTotal,
           icon: Wrench,
-          color: 'hsl(13 37% 48%)', // Workshop rust/brown color
+          color: 'hsl(13 37% 48%)',
           href: '/workshop-tasks'
         },
         {
@@ -374,15 +430,31 @@ export default function DashboardPage() {
           label: 'Maintenance & Service',
           count: maintenanceTotal,
           icon: Settings,
-          color: 'hsl(0 84% 60%)', // Red
+          color: 'hsl(0 84% 60%)',
           href: '/maintenance'
+        },
+        {
+          type: 'suggestions',
+          label: 'Suggestions',
+          count: suggestionsTotal,
+          icon: Lightbulb,
+          color: 'hsl(217 91% 60%)',
+          href: '/suggestions/manage'
+        },
+        {
+          type: 'errors',
+          label: 'Error Reports',
+          count: errorsTotal,
+          icon: Bug,
+          color: 'hsl(24 95% 53%)',
+          href: '/admin/errors/manage'
         },
         {
           type: 'inspections',
           label: 'Site Audit Inspections',
           count: 0,
           icon: FileText,
-          color: 'hsl(215 20% 50%)', // Slate/Gray
+          color: 'hsl(215 20% 50%)',
           href: '#'
         }
       ];
@@ -397,7 +469,6 @@ export default function DashboardPage() {
       } catch (toastError) {
         console.error('Unable to load actions data (toast unavailable)');
       }
-      // Initialize with empty data on error
       setActionsSummary([
         {
           type: 'workshop',
@@ -414,6 +485,22 @@ export default function DashboardPage() {
           icon: Settings,
           color: 'hsl(0 84% 60%)',
           href: '/maintenance'
+        },
+        {
+          type: 'suggestions',
+          label: 'Suggestions',
+          count: 0,
+          icon: Lightbulb,
+          color: 'hsl(217 91% 60%)',
+          href: '/suggestions/manage'
+        },
+        {
+          type: 'errors',
+          label: 'Error Reports',
+          count: 0,
+          icon: Bug,
+          color: 'hsl(24 95% 53%)',
+          href: '/admin/errors/manage'
         },
         {
           type: 'inspections',
