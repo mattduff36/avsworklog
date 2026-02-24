@@ -63,8 +63,8 @@ async function runMigration() {
     console.log('✨ Ready to test!');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     console.log('🎉 You can now use the forms:');
-    console.log('   • Timesheet: http://localhost:3000/timesheets/new');
-    console.log('   • Vehicle Inspection: http://localhost:3000/inspections/new\n');
+    console.log('   • Timesheet: http://localhost:4000/timesheets/new');
+    console.log('   • Vehicle Inspection: http://localhost:4000/inspections/new\n');
 
   } catch (error: any) {
     console.error('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');

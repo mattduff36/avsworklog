@@ -188,7 +188,7 @@ npm run test:reports
 ```
 
 **Test Configuration:**
-- Default URL: `http://localhost:3000`
+- Default URL: `http://localhost:4000`
 - Test user: `admin@avsworklog.test`
 - Password: `TestPass123!`
 - Can be overridden with environment variables

@@ -390,7 +390,7 @@ describe('Workshop Tasks Module Workflows', () => {
         is_active: true,
       };
 
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:4000';
       
       try {
         const response = await fetch(`${siteUrl}/api/workshop-tasks/categories`, {
@@ -455,7 +455,7 @@ describe('Workshop Tasks Module Workflows', () => {
         is_active: true,
       };
 
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:4000';
       const response = await fetch(`${siteUrl}/api/workshop-tasks/subcategories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -487,7 +487,7 @@ describe('Workshop Tasks Module Workflows', () => {
         slug: 'updated-test-subcategory',
       };
 
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:4000';
       const response = await fetch(`${siteUrl}/api/workshop-tasks/subcategories/${testSubcategoryId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -508,7 +508,7 @@ describe('Workshop Tasks Module Workflows', () => {
         return;
       }
 
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:4000';
       const response = await fetch(`${siteUrl}/api/workshop-tasks/subcategories/${testSubcategoryId}`, {
         method: 'DELETE',
       });
@@ -527,7 +527,7 @@ describe('Workshop Tasks Module Workflows', () => {
         return;
       }
 
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:4000';
       const response = await fetch(`${siteUrl}/api/workshop-tasks/categories/${testCategoryId}`, {
         method: 'DELETE',
       });

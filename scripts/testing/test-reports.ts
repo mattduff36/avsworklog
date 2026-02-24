@@ -30,7 +30,7 @@ let testsPassed = 0;
 let testsFailed = 0;
 
 // Configuration
-const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3000';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:4000';
 const TEST_USER_EMAIL = process.env.TEST_ADMIN_EMAIL || 'admin@avsworklog.test';
 const TEST_USER_PASSWORD = process.env.TEST_ADMIN_PASSWORD || 'TestPass123!';
 

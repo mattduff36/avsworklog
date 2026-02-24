@@ -19,7 +19,7 @@ async function disableAnimations(page: Page) {
 }
 
 async function login(page: Page) {
-  await page.goto('http://localhost:3000/login');
+  await page.goto('http://localhost:4000/login');
   await page.getByLabel('Email Address').fill(ADMIN_EMAIL);
   await page.getByLabel('Password').fill(ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Sign In' }).click();
@@ -127,7 +127,7 @@ test.describe('UI Contrast Tests', () => {
 
   test('Workshop Task Modal - Input fields have sufficient contrast', async ({ page }) => {
     // Navigate to workshop tasks page (adjust URL as needed)
-    await page.goto('http://localhost:3000/workshop-tasks');
+    await page.goto('http://localhost:4000/workshop-tasks');
     
     // Wait for page to load
     await page.waitForLoadState('networkidle');
@@ -154,7 +154,7 @@ test.describe('UI Contrast Tests', () => {
 
   test('RAMS Assign Modal - Select fields have sufficient contrast', async ({ page }) => {
     // This is a placeholder - adjust based on actual RAMS page structure
-    await page.goto('http://localhost:3000/rams/manage');
+    await page.goto('http://localhost:4000/rams/manage');
     await page.waitForLoadState('networkidle');
     
     // Look for assign button (adjust selector as needed)
@@ -179,7 +179,7 @@ test.describe('UI Contrast Tests', () => {
   });
 
   test('Timesheet Edit - Input fields have sufficient contrast', async ({ page }) => {
-    await page.goto('http://localhost:3000/timesheets/new');
+    await page.goto('http://localhost:4000/timesheets/new');
     await page.waitForLoadState('networkidle');
     
     // Check time input fields
@@ -194,7 +194,7 @@ test.describe('UI Contrast Tests', () => {
   });
 
   test('Inspection Form - Input fields have sufficient contrast', async ({ page }) => {
-    await page.goto('http://localhost:3000/inspections/new');
+    await page.goto('http://localhost:4000/inspections/new');
     await page.waitForLoadState('networkidle');
     
     // Check a few visible inputs/textareas directly (avoid brittle nth-of-type selectors)
@@ -246,7 +246,7 @@ test.describe('UI Contrast Tests', () => {
   });
 
   test('Workshop Tasks Settings - Category list items have proper contrast', async ({ page }) => {
-    await page.goto('http://localhost:3000/workshop-tasks');
+    await page.goto('http://localhost:4000/workshop-tasks');
     await page.waitForLoadState('networkidle');
     
     // Click on Settings tab

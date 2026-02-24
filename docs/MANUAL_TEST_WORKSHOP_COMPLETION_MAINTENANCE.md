@@ -103,7 +103,7 @@ When completing a **Service** workshop task, users can now update the vehicle's 
 # Get a vehicle ID and auth token from your session
 # Then test the new endpoint:
 
-curl -X POST http://localhost:3000/api/maintenance/by-vehicle/[VEHICLE_ID] \
+curl -X POST http://localhost:4000/api/maintenance/by-vehicle/[VEHICLE_ID] \
   -H "Content-Type: application/json" \
   -H "Cookie: [YOUR_SESSION_COOKIE]" \
   -d '{

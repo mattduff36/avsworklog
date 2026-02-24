@@ -210,7 +210,7 @@ async function main() {
   } else {
     console.log('✨ All tests passed!\n');
     console.log('🎯 Next Steps:');
-    console.log('   1. Navigate to http://localhost:3000/debug');
+    console.log('   1. Navigate to http://localhost:4000/debug');
     console.log('   2. Check the "Error Log" tab');
     console.log('   3. Verify errors have clear descriptions and context\n');
     process.exit(0);

@@ -30,7 +30,7 @@ async def run_test():
         page = await context.new_page()
         
         # Navigate to your target URL and wait until the network request is committed
-        await page.goto("http://localhost:3000/fleet", wait_until="commit", timeout=10000)
+        await page.goto("http://localhost:4000/fleet", wait_until="commit", timeout=10000)
         
         # Wait for the main page to reach DOMContentLoaded state (optional for stability)
         try:
@@ -73,17 +73,17 @@ async def run_test():
         
 
         # -> Trigger an intentional application error (e.g., invalid API call)
-        await page.goto('http://localhost:3000/api/invalid-endpoint', timeout=10000)
+        await page.goto('http://localhost:4000/api/invalid-endpoint', timeout=10000)
         await asyncio.sleep(3)
         
 
         # -> Navigate to centralized logging interface to verify error is logged
-        await page.goto('http://localhost:3000/logs', timeout=10000)
+        await page.goto('http://localhost:4000/logs', timeout=10000)
         await asyncio.sleep(3)
         
 
         # -> Return to dashboard and look for navigation or menu options to access centralized logs or error monitoring
-        await page.goto('http://localhost:3000/dashboard', timeout=10000)
+        await page.goto('http://localhost:4000/dashboard', timeout=10000)
         await asyncio.sleep(3)
         
 

@@ -38,7 +38,7 @@ Added rich context to every error:
 
 2. **Open the test page** in your browser:
    ```
-   http://localhost:3000/test-error-logging
+   http://localhost:4000/test-error-logging
    ```
 
 3. **Click the big button**: "Run All Tests"
@@ -47,7 +47,7 @@ Added rich context to every error:
 
 4. **View the results** in Debug Console:
    ```
-   http://localhost:3000/debug
+   http://localhost:4000/debug
    ```
    - Click the "Error Log" tab
    - Expand any error to see full details
@@ -97,7 +97,7 @@ ADDITIONAL DATA:
   "method": "GET",
   "pathname": "/api/test-error-logging",
   "searchParams": { "type": "throw" },
-  "referer": "http://localhost:3000/test-error-logging",
+  "referer": "http://localhost:4000/test-error-logging",
   "errorContext": {
     "originalMessage": "Simulated API failure",
     "errorName": "Error",

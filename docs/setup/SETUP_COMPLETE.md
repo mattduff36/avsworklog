@@ -97,7 +97,7 @@ Create or update `.env.local`:
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=http://localhost:4000
 \`\`\`
 
 ### 4. Create First Admin User (3 minutes)
@@ -122,7 +122,7 @@ WHERE id = 'paste-user-id-here';
 npm run dev
 \`\`\`
 
-Open [http://localhost:3000](http://localhost:3000)
+Open [http://localhost:4000](http://localhost:4000)
 
 ### 6. Test the App
 

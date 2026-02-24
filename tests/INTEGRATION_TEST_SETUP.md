@@ -14,7 +14,7 @@ TEST_USER_EMAIL=test@example.com
 TEST_USER_PASSWORD=test_password
 
 # Site URL for API testing
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_SITE_URL=http://localhost:4000
 ```
 
 ## Current Status

@@ -253,7 +253,7 @@ describe('Fleet Module Workflows', () => {
         colour: '#FF0000',
       };
 
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:4000';
       
       try {
         const response = await fetch(`${siteUrl}/api/admin/vehicle-categories`, {
@@ -292,7 +292,7 @@ describe('Fleet Module Workflows', () => {
         colour: '#00FF00',
       };
 
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:4000';
       const response = await fetch(`${siteUrl}/api/admin/vehicle-categories/${testCategoryId}`, {
         method: 'PATCH',
         headers: {
@@ -315,7 +315,7 @@ describe('Fleet Module Workflows', () => {
         return;
       }
 
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:4000';
       const response = await fetch(`${siteUrl}/api/admin/vehicle-categories/${testCategoryId}`, {
         method: 'DELETE',
       });

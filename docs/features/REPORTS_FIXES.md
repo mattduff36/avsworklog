@@ -185,7 +185,7 @@ All issues were in the API route code, not in the database schema. The database 
    ```
 
 2. **Test in browser:**
-   - Navigate to http://localhost:3000/reports
+   - Navigate to http://localhost:4000/reports
    - Log in as admin or manager
    - Verify statistics load
    - Try downloading each report

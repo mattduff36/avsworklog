@@ -165,7 +165,7 @@ Comprehensive automated testing of the **Timesheet** and **Vehicle Inspection** 
 
 **Browser**: Playwright Chromium  
 **Viewport**: Default  
-**Server**: Local development (http://localhost:3000)  
+**Server**: Local development (http://localhost:4000)
 **Test Duration**: ~5 minutes  
 **Actions Performed**: 40+ user interactions  
 

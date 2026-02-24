@@ -30,7 +30,7 @@ async def run_test():
         page = await context.new_page()
         
         # Navigate to your target URL and wait until the network request is committed
-        await page.goto("http://localhost:3000/fleet", wait_until="commit", timeout=10000)
+        await page.goto("http://localhost:4000/fleet", wait_until="commit", timeout=10000)
         
         # Wait for the main page to reach DOMContentLoaded state (optional for stability)
         try:
@@ -47,27 +47,27 @@ async def run_test():
         
         # Interact with the page elements to simulate user flow
         # -> Attempt to navigate to another deprecated fleet or vehicle management route manually to verify redirect and content flash behavior.
-        await page.goto('http://localhost:3000/vehicle-management', timeout=10000)
+        await page.goto('http://localhost:4000/vehicle-management', timeout=10000)
         await asyncio.sleep(3)
         
 
         # -> Attempt to navigate to another deprecated fleet or vehicle management route manually to verify redirect and content flash behavior.
-        await page.goto('http://localhost:3000/fleet/old-route', timeout=10000)
+        await page.goto('http://localhost:4000/fleet/old-route', timeout=10000)
         await asyncio.sleep(3)
         
 
         # -> Attempt to navigate to another deprecated fleet or vehicle management route manually to verify redirect and content flash behavior.
-        await page.goto('http://localhost:3000/fleet/vehicle-history', timeout=10000)
+        await page.goto('http://localhost:4000/fleet/vehicle-history', timeout=10000)
         await asyncio.sleep(3)
         
 
         # -> Navigate to the new consolidated Fleet page to verify its URL, content, and smooth loading without flashes.
-        await page.goto('http://localhost:3000/fleet/new', timeout=10000)
+        await page.goto('http://localhost:4000/fleet/new', timeout=10000)
         await asyncio.sleep(3)
         
 
         # -> Attempt to navigate to the new Vehicle History page directly to verify its URL, content, and smooth loading without flashes.
-        await page.goto('http://localhost:3000/vehicle-history/new', timeout=10000)
+        await page.goto('http://localhost:4000/vehicle-history/new', timeout=10000)
         await asyncio.sleep(3)
         
 

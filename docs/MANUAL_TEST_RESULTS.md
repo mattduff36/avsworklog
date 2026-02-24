@@ -2,7 +2,7 @@
 **Date:** December 17, 2025  
 **Tester:** AI Assistant (Lyra) via Browser Automation  
 **Branch:** `dev/codebase-improvements`  
-**Environment:** Local Development (http://localhost:3000)
+**Environment:** Local Development (http://localhost:4000)
 
 ---
 

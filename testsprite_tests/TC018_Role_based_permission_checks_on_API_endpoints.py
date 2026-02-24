@@ -30,7 +30,7 @@ async def run_test():
         page = await context.new_page()
         
         # Navigate to your target URL and wait until the network request is committed
-        await page.goto("http://localhost:3000/fleet", wait_until="commit", timeout=10000)
+        await page.goto("http://localhost:4000/fleet", wait_until="commit", timeout=10000)
         
         # Wait for the main page to reach DOMContentLoaded state (optional for stability)
         try:
@@ -47,17 +47,17 @@ async def run_test():
         
         # Interact with the page elements to simulate user flow
         # -> Attempt to access vehicle master data API as employee to verify HTTP 403 response
-        await page.goto('http://localhost:3000/vehicle-master-data', timeout=10000)
+        await page.goto('http://localhost:4000/vehicle-master-data', timeout=10000)
         await asyncio.sleep(3)
         
 
         # -> Attempt to modify workshop task comments as unauthorized user to verify HTTP 403 response
-        await page.goto('http://localhost:3000/workshop-tasks/comments', timeout=10000)
+        await page.goto('http://localhost:4000/workshop-tasks/comments', timeout=10000)
         await asyncio.sleep(3)
         
 
         # -> Access timesheet approval API as employee to verify HTTP 403 response
-        await page.goto('http://localhost:3000/timesheets/approval', timeout=10000)
+        await page.goto('http://localhost:4000/timesheets/approval', timeout=10000)
         await asyncio.sleep(3)
         
 

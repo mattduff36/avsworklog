@@ -48,7 +48,7 @@ All employee passwords: `TestPass123!`
 
 ### Login as Manager
 To view and download reports:
-1. Navigate to http://localhost:3000
+1. Navigate to http://localhost:4000
 2. Login with:
    - Email: `manager@avsworklog.test`
    - Password: `TestPass123!`

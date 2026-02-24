@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import path from 'path';
 
-const BASE_URL = process.env.TESTSUITE_BASE_URL || 'http://localhost:3000';
+const BASE_URL = process.env.TESTSUITE_BASE_URL || 'http://localhost:4000';
 const STATE_DIR = path.resolve(__dirname, '../.state');
 
 export default defineConfig({

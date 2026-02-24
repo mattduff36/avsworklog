@@ -13,7 +13,7 @@ This guide explains how to test and verify that the error logging system is work
 
 2. Navigate to the test page:
    ```
-   http://localhost:3000/test-error-logging
+   http://localhost:4000/test-error-logging
    ```
 
 3. Click **"Run All Tests"** button
@@ -22,7 +22,7 @@ This guide explains how to test and verify that the error logging system is work
 
 5. Navigate to the debug console:
    ```
-   http://localhost:3000/debug
+   http://localhost:4000/debug
    ```
 
 6. Click the **"Error Log"** tab
@@ -67,7 +67,7 @@ This will:
 
 1. Make a request to the test endpoint:
    ```bash
-   curl http://localhost:3000/api/test-error-logging?type=throw
+   curl http://localhost:4000/api/test-error-logging?type=throw
    ```
 2. Check `/debug` - you should see the API error logged
 
@@ -75,7 +75,7 @@ This will:
 
 1. Try to access a non-existent resource:
    ```bash
-   curl http://localhost:3000/api/rams/fake-id/email -X POST \
+   curl http://localhost:4000/api/rams/fake-id/email -X POST \
      -H "Content-Type: application/json" \
      -d '{"test": "data"}'
    ```
@@ -119,7 +119,7 @@ Additional Data:
   "method": "GET",
   "pathname": "/api/rams",
   "searchParams": { "type": "throw" },
-  "referer": "http://localhost:3000/test-error-logging",
+  "referer": "http://localhost:4000/test-error-logging",
   "errorContext": {
     "originalMessage": "Simulated API failure",
     "errorName": "Error",
@@ -134,12 +134,12 @@ Uncaught Error: Test error at main.js:42:15
 
 Additional Data:
 {
-  "filename": "http://localhost:3000/_next/static/chunks/main.js",
+  "filename": "http://localhost:4000/_next/static/chunks/main.js",
   "lineno": 42,
   "colno": 15,
   "location": "main.js:42:15",
   "description": "Unhandled JavaScript error thrown at runtime",
-  "pageUrl": "http://localhost:3000/test-error-logging"
+  "pageUrl": "http://localhost:4000/test-error-logging"
 }
 ```
 

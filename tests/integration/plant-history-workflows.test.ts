@@ -170,7 +170,7 @@ describe('Plant History Page Workflows', () => {
         return;
       }
 
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:4000';
       
       try {
         const { data: session } = await supabase.auth.getSession();

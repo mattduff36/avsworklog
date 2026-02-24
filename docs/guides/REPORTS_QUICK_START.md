@@ -47,7 +47,7 @@ Success Rate: 100%
 ```
 
 ### 3. Manual browser test:
-1. Open http://localhost:3000
+1. Open http://localhost:4000
 2. Log in as admin or manager
 3. Navigate to `/reports`
 4. See real-time statistics

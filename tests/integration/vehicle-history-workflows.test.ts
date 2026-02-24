@@ -272,7 +272,7 @@ describe('Vehicle History Page Workflows', () => {
         current_mileage: 999993, // Obviously invalid test value for easy corruption detection
       };
 
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:4000';
       
       try {
         const { data: session } = await supabase.auth.getSession();
@@ -315,7 +315,7 @@ describe('Vehicle History Page Workflows', () => {
         next_service_date: futureDate.toISOString().split('T')[0],
       };
 
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:4000';
       
       try {
         const { data: session } = await supabase.auth.getSession();
@@ -365,7 +365,7 @@ describe('Vehicle History Page Workflows', () => {
       }
 
       // Attempt to retire vehicle (should fail)
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:4000';
       const response = await fetch(`${siteUrl}/api/admin/vehicles/${testVehicleId}`, {
         method: 'DELETE',
       });

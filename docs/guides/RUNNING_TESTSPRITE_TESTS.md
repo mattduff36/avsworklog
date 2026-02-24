@@ -12,7 +12,7 @@
 
 ## Prerequisites
 
-1. **Dev Server Running** on `http://localhost:3000`
+1. **Dev Server Running** on `http://localhost:4000`
    ```bash
    npm run dev
    ```
@@ -32,7 +32,7 @@
 File: `testsprite_tests/tmp/config.json`
 ```json
 {
-  "localEndpoint": "http://localhost:3000/fleet",
+  "localEndpoint": "http://localhost:4000/fleet",
   "loginUser": "admin@mpdee.co.uk",
   "testIds": [],  // Empty = run all tests
   "additionalInstruction": "Focus on testing Features 1-4..."

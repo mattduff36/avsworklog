@@ -137,7 +137,7 @@ describe('Error Details API - Subcategory Tasks', () => {
 
   it('should return error details for subcategory with tasks', async () => {
     const response = await fetch(
-      `http://localhost:3000/api/errors/details/subcategory-tasks?id=${testSubcategoryId}`,
+      `http://localhost:4000/api/errors/details/subcategory-tasks?id=${testSubcategoryId}`,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -182,7 +182,7 @@ describe('Error Details API - Subcategory Tasks', () => {
   it('should return 404 for non-existent subcategory', async () => {
     const fakeId = '00000000-0000-0000-0000-000000000000';
     const response = await fetch(
-      `http://localhost:3000/api/errors/details/subcategory-tasks?id=${fakeId}`,
+      `http://localhost:4000/api/errors/details/subcategory-tasks?id=${fakeId}`,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -197,7 +197,7 @@ describe('Error Details API - Subcategory Tasks', () => {
 
   it('should return 400 when id parameter is missing', async () => {
     const response = await fetch(
-      'http://localhost:3000/api/errors/details/subcategory-tasks',
+      'http://localhost:4000/api/errors/details/subcategory-tasks',
       {
         headers: {
           'Content-Type': 'application/json',
@@ -212,7 +212,7 @@ describe('Error Details API - Subcategory Tasks', () => {
 
   it('should include vehicle information in task items', async () => {
     const response = await fetch(
-      `http://localhost:3000/api/errors/details/subcategory-tasks?id=${testSubcategoryId}`,
+      `http://localhost:4000/api/errors/details/subcategory-tasks?id=${testSubcategoryId}`,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -229,7 +229,7 @@ describe('Error Details API - Subcategory Tasks', () => {
 
   it('should include status breakdown in summary', async () => {
     const response = await fetch(
-      `http://localhost:3000/api/errors/details/subcategory-tasks?id=${testSubcategoryId}`,
+      `http://localhost:4000/api/errors/details/subcategory-tasks?id=${testSubcategoryId}`,
       {
         headers: {
           'Content-Type': 'application/json',

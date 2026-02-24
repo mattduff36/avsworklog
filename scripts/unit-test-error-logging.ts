@@ -21,8 +21,8 @@ class MockRequest {
     this.method = method;
     this.headers = new Map([
       ['user-agent', 'Mozilla/5.0 (Test Browser)'],
-      ['referer', 'http://localhost:3000/test-page'],
-      ['origin', 'http://localhost:3000'],
+      ['referer', 'http://localhost:4000/test-page'],
+      ['origin', 'http://localhost:4000'],
     ]);
   }
 
@@ -82,7 +82,7 @@ console.log('='.repeat(60) + '\n');
 // Test 1: Basic Error Description Generation
 try {
   const error = new Error('Database connection failed');
-  const mockReq = new MockRequest('http://localhost:3000/api/rams?id=123', 'GET');
+  const mockReq = new MockRequest('http://localhost:4000/api/rams?id=123', 'GET');
   const context = extractRequestContext(mockReq);
   const description = generateErrorDescription(error, 'GET /api/rams', context);
   
@@ -117,14 +117,14 @@ try {
 
 // Test 2: Request Context Extraction
 try {
-  const mockReq = new MockRequest('http://localhost:3000/api/messages?type=toolbox&urgent=true', 'POST');
+  const mockReq = new MockRequest('http://localhost:4000/api/messages?type=toolbox&urgent=true', 'POST');
   const context = extractRequestContext(mockReq);
   
   const hasMethod = context.method === 'POST';
   const hasPathname = context.pathname === '/api/messages';
   const hasSearchParams = JSON.stringify(context.searchParams) === JSON.stringify({ type: 'toolbox', urgent: 'true' });
-  const hasReferer = context.referer === 'http://localhost:3000/test-page';
-  const hasOrigin = context.origin === 'http://localhost:3000';
+  const hasReferer = context.referer === 'http://localhost:4000/test-page';
+  const hasOrigin = context.origin === 'http://localhost:4000';
   
   if (hasMethod && hasPathname && hasSearchParams && hasReferer && hasOrigin) {
     tests.push({
@@ -161,7 +161,7 @@ try {
   const results: string[] = [];
   
   for (const error of errorTypes) {
-    const mockReq = new MockRequest('http://localhost:3000/api/test', 'GET');
+    const mockReq = new MockRequest('http://localhost:4000/api/test', 'GET');
     const context = extractRequestContext(mockReq);
     const description = generateErrorDescription(error, 'Test Component', context);
     
@@ -191,12 +191,12 @@ try {
 
 // Test 4: Query Parameters in Description
 try {
-  const mockReq1 = new MockRequest('http://localhost:3000/api/rams', 'GET');
+  const mockReq1 = new MockRequest('http://localhost:4000/api/rams', 'GET');
   const context1 = extractRequestContext(mockReq1);
   const desc1 = generateErrorDescription(new Error('Test'), null, context1);
   const hasNoParams = !desc1.includes('Query params');
   
-  const mockReq2 = new MockRequest('http://localhost:3000/api/rams?id=123&status=active', 'GET');
+  const mockReq2 = new MockRequest('http://localhost:4000/api/rams?id=123&status=active', 'GET');
   const context2 = extractRequestContext(mockReq2);
   const desc2 = generateErrorDescription(new Error('Test'), null, context2);
   const hasParams = desc2.includes('Query params') && desc2.includes('id') && desc2.includes('status');
@@ -227,7 +227,7 @@ try {
 try {
   // Simulate a real RAMS API error
   const error = new Error('RAMS document not found');
-  const mockReq = new MockRequest('http://localhost:3000/api/rams/abc123/email?notify=true', 'POST');
+  const mockReq = new MockRequest('http://localhost:4000/api/rams/abc123/email?notify=true', 'POST');
   const context = extractRequestContext(mockReq);
   const description = generateErrorDescription(error, 'POST /api/rams/[id]/email', context);
   

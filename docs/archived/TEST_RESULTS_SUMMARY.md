@@ -120,7 +120,7 @@ npx tsx scripts/test-all-pages-auth.ts
 ```
 🔒 COMPREHENSIVE AUTHENTICATION TEST
 
-Testing against: http://localhost:3000
+Testing against: http://localhost:4000
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

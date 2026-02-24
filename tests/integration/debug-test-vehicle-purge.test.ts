@@ -100,7 +100,7 @@ describe('Test Vehicle Purge API', () => {
   describe('GET /api/debug/test-vehicles', () => {
     it('should list vehicles matching prefix', async () => {
       const response = await fetch(
-        'http://localhost:3000/api/debug/test-vehicles?prefix=TE57',
+        'http://localhost:4000/api/debug/test-vehicles?prefix=TE57',
         {
           headers: {
             'Content-Type': 'application/json',
@@ -125,7 +125,7 @@ describe('Test Vehicle Purge API', () => {
 
       if (nonTestVehicle) {
         const response = await fetch(
-          'http://localhost:3000/api/debug/test-vehicles',
+          'http://localhost:4000/api/debug/test-vehicles',
           {
             method: 'POST',
             headers: {

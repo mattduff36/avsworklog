@@ -90,7 +90,7 @@ export async function GET(
 
     // Construct absolute logo URL
     const protocol = request.headers.get('x-forwarded-proto') || 'https';
-    const host = request.headers.get('host') || 'localhost:3000';
+    const host = request.headers.get('host') || 'localhost:4000';
     const logoUrl = `${protocol}://${host}/images/logo.png`;
 
     // Generate PDF

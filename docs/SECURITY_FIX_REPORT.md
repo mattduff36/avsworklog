@@ -38,9 +38,9 @@ const protectedPaths = ['/dashboard', '/timesheets', '/inspections', '/reports',
 
 **Security Gap:**
 Any unauthenticated user could navigate to:
-- `http://localhost:3000/absence`
-- `http://localhost:3000/toolbox-talks`
-- `http://localhost:3000/rams`
+- `http://localhost:4000/absence`
+- `http://localhost:4000/toolbox-talks`
+- `http://localhost:4000/rams`
 
 And the middleware would **NOT redirect them to login**, allowing them to potentially view dashboard content.
 
@@ -77,7 +77,7 @@ npx tsx scripts/test-auth-protection.ts
 
 ### Manual Testing (REQUIRED):
 1. **Open an incognito/private browser window**
-2. Navigate to `http://localhost:3000`
+2. Navigate to `http://localhost:4000`
 3. Try to access each route directly:
 
 | Route | Expected Behavior |

@@ -131,7 +131,7 @@ import { Button } from '@/components/ui/button';
 3. Observed loading state
 
 **Expected Results:**
-- ✅ URL changed to `http://localhost:3000/maintenance`
+- ✅ URL changed to `http://localhost:4000/maintenance`
 - ✅ Page title updated
 - ✅ Loading spinner appeared: "Loading maintenance records..."
 - ✅ Red Wrench icon and page header visible
@@ -163,7 +163,7 @@ import { Button } from '@/components/ui/button';
 **Browser Console Errors:**
 ```
 Failed to load resource: the server responded with a status of 500 (Internal Server Error)
-http://localhost:3000/api/maintenance
+http://localhost:4000/api/maintenance
 
 [ERROR] Failed to load maintenance data Error: Internal server error
 at useMaintenance.useQuery (useMaintenance.ts:35:27)
@@ -341,7 +341,7 @@ SELECT COUNT(*) FROM vehicle_maintenance;
 
 2. **Verify API Works** - Test `/api/maintenance` endpoint
    ```bash
-   curl http://localhost:3000/api/maintenance
+   curl http://localhost:4000/api/maintenance
    # Should return JSON with vehicles array
    ```
 

@@ -62,7 +62,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
 # App Configuration
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=http://localhost:4000
 \`\`\`
 
 **Finding your Supabase credentials:**
@@ -93,7 +93,7 @@ You can find the user ID in Authentication > Users table.
 npm run dev
 \`\`\`
 
-Open [http://localhost:3000](http://localhost:3000) and sign in with your admin account.
+Open [http://localhost:4000](http://localhost:4000) and sign in with your admin account.
 
 ## Recent Enhancements
 

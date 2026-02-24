@@ -331,7 +331,7 @@ Priority areas flagged by new `noUnusedParameters: true` rule:
   "lint:fast": "oxlint .",
   "deps:check": "depcheck",
   "build:analyze": "ANALYZE=true npm run build",
-  "test:links": "blc http://localhost:3000 --recursive --follow --ordered --verbose",
+  "test:links": "blc http://localhost:4000 --recursive --follow --ordered --verbose",
   "test:lighthouse": "lhci autorun",
   "audit:all": "npm run lint && npm run lint:fast && npm run deps:check"
 }

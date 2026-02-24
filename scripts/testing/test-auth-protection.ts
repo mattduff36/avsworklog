@@ -20,12 +20,12 @@ const testRoutes = [
 console.log('🔒 AUTHENTICATION PROTECTION TEST\n');
 console.log('To test properly:');
 console.log('1. Open an incognito/private browser window');
-console.log('2. Navigate to http://localhost:3000');
+console.log('2. Navigate to http://localhost:4000');
 console.log('3. Try to access each route below directly\n');
 
 console.log('📋 PROTECTED ROUTES TO TEST:\n');
 testRoutes.forEach(route => {
-  console.log(`   ❌ http://localhost:3000${route}`);
+  console.log(`   ❌ http://localhost:4000${route}`);
   console.log(`      Expected: Redirect to /login?redirect=${route}\n`);
 });
 

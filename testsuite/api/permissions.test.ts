@@ -15,7 +15,7 @@ config({ path: resolve(process.cwd(), '.env.local') });
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const BASE_URL = process.env.TESTSUITE_BASE_URL || 'http://localhost:3000';
+const BASE_URL = process.env.TESTSUITE_BASE_URL || 'http://localhost:4000';
 
 interface TestUsers {
   admin: { email: string; password: string; userId: string };
