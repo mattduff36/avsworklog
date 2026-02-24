@@ -295,7 +295,7 @@ export default function ProjectsManagePage() {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6 max-w-7xl">
+    <div className="space-y-6 max-w-6xl">
       {/* Mobile info banner */}
       <Alert className="md:hidden bg-blue-900/20 border-blue-700/50">
         <Monitor className="h-4 w-4 text-blue-400" />

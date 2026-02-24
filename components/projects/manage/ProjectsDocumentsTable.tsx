@@ -107,7 +107,7 @@ export function ProjectsDocumentsTable({
   const router = useRouter();
 
   return (
-    <div className="hidden md:block rounded-lg border border-border overflow-hidden bg-white dark:bg-slate-900">
+    <div className="hidden md:block rounded-lg border border-border overflow-x-auto bg-white dark:bg-slate-900">
       <Table>
         <TableHeader>
           <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50">

@@ -11,15 +11,15 @@ interface ProjectsManageToolbarProps {
 
 export function ProjectsManageToolbar({ onUploadClick }: ProjectsManageToolbarProps) {
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">
+    <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3 min-w-0">
           <BackButton />
           <div className="min-w-0">
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground truncate">
+            <h1 className="text-3xl font-bold text-foreground mb-2 truncate">
               Manage Projects
             </h1>
-            <p className="text-sm text-muted-foreground hidden sm:block">
+            <p className="text-muted-foreground hidden sm:block">
               Upload, search, and manage project documents
             </p>
           </div>
