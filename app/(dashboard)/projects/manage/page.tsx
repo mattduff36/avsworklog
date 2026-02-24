@@ -69,6 +69,10 @@ export default function ProjectsManagePage() {
   const [sortBy, setSortBy] = useState<NonNullable<ManageDocumentsQuery['sortBy']>>('created_at');
   const [sortDir, setSortDir] = useState<NonNullable<ManageDocumentsQuery['sortDir']>>('desc');
 
+  // Pagination: show N documents, "Show more" loads 30 more
+  const PAGE_SIZE = 30;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
   // Upload modal
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [reuseDoc, setReuseDoc] = useState<{ title: string; description: string; typeId: string } | null>(null);
@@ -92,6 +96,11 @@ export default function ProjectsManagePage() {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // Reset visible count when filters or sort change
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [debouncedSearch, typeFilter, sortBy, sortDir]);
 
   const queryParams: ManageDocumentsQuery = useMemo(() => ({
     q: debouncedSearch || undefined,
@@ -124,8 +133,10 @@ export default function ProjectsManagePage() {
   }, [isManager, isAdmin, authLoading, router]);
 
   // Derived data
-  const documents = docsData?.documents ?? [];
+  const allDocuments = docsData?.documents ?? [];
   const total = docsData?.total ?? 0;
+  const documents = useMemo(() => allDocuments.slice(0, visibleCount), [allDocuments, visibleCount]);
+  const hasMoreDocuments = allDocuments.length > visibleCount;
   const favourites = favsData?.favourites ?? [];
   const documentTypes = useMemo(
     () => (typesData?.types ?? []).filter(t => t.is_active).map(t => ({ id: t.id, name: t.name })),
@@ -414,6 +425,22 @@ export default function ProjectsManagePage() {
             onReuse={handleReuseFromRow}
             onDismissUpload={(id) => setUploadingDocs(prev => prev.filter(d => d.id !== id))}
           />
+
+          {/* Show more */}
+          {hasMoreDocuments && (
+            <div className="flex flex-col items-center gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setVisibleCount(prev => prev + PAGE_SIZE)}
+                className="px-8"
+              >
+                Show More
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Showing {documents.length} of {allDocuments.length} documents
+              </span>
+            </div>
+          )}
         </>
       )}
 
