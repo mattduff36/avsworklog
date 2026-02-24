@@ -110,10 +110,7 @@ CREATE POLICY "Managers can update inspections" ON vehicle_inspections
   FOR UPDATE
   TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE id = auth.uid() AND role IN ('manager', 'admin')
-    )
+    effective_is_manager_admin()
     AND status = 'draft'
     AND plant_id IS NULL
     AND is_hired_plant = FALSE
