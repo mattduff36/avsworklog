@@ -37,8 +37,8 @@ export const ALL_PAGES = [
   
   // Maintenance
   { path: '/maintenance', name: 'Maintenance Overview', requiresAuth: true },
-  { path: '/fleet?tab=vehicles', name: 'Fleet Vehicles', requiresAuth: true },
-  { path: '/fleet?tab=maintenance', name: 'Fleet Maintenance', requiresAuth: true },
+  { path: '/fleet?tab=vans', name: 'Fleet Vans', requiresAuth: true },
+  { path: '/fleet?tab=plant', name: 'Fleet Plant', requiresAuth: true },
   
   // Workshop
   { path: '/workshop-tasks', name: 'Workshop Tasks', requiresAuth: true },

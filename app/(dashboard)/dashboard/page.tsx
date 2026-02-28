@@ -106,7 +106,7 @@ export default function DashboardPage() {
       if (isManager || isAdmin) {
         setUserPermissions(new Set([
           'timesheets', 'inspections', 'plant-inspections', 'rams', 'absence', 'maintenance', 'toolbox-talks', 'workshop-tasks',
-          'approvals', 'actions', 'reports', 'admin-users', 'admin-vehicles'
+          'approvals', 'actions', 'reports', 'admin-users', 'admin-vans'
         ] as ModuleName[]));
         setPermissionsLoading(false);
         return;
@@ -626,6 +626,7 @@ export default function DashboardPage() {
                   'rams': 'rams',
                   'absence': 'absence',
                   'maintenance': 'maintenance',
+                  'fleet': 'maintenance',
                   'workshop': 'workshop-tasks',
                 };
                 

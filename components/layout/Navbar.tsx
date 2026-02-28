@@ -286,7 +286,7 @@ export function Navbar() {
     const [linkPath, linkQuery] = href.split('?');
     
     // Check if pathname matches (handles nested routes consistently)
-    // Match exact path OR nested paths (e.g., /fleet matches /fleet/vehicles/123)
+    // Match exact path OR nested paths (e.g., /fleet matches /fleet/vans/123)
     const pathMatches = pathname === linkPath || pathname.startsWith(linkPath + '/');
     
     if (!pathMatches) return false;
@@ -355,8 +355,8 @@ export function Navbar() {
                 </div>
               </Link>
 
-              {/* Desktop Navigation - Same for all users */}
-              <div className="hidden md:flex md:space-x-4">
+              {/* Desktop Navigation - Icon-only by default, label on hover/active */}
+              <div className="hidden md:flex md:space-x-1">
                 {/* Dashboard */}
                 {dashboardNav.map((item) => {
                   const Icon = item.icon;
@@ -366,37 +366,39 @@ export function Navbar() {
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      title={item.label}
+                      className={`group inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all ${
                         isActive
                           ? `${activeColors.bg} ${activeColors.text}`
                           : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                       }`}
                     >
-                      <Icon className="w-4 h-4 mr-2" />
-                      {item.label}
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      <span className={`overflow-hidden transition-all duration-200 ${
+                        isActive
+                          ? 'ml-2 max-w-[120px] opacity-100'
+                          : 'max-w-0 opacity-0 group-hover:ml-2 group-hover:max-w-[120px] group-hover:opacity-100'
+                      }`}>
+                        {item.label}
+                      </span>
                     </Link>
                   );
                 })}
                 
-                {/* Employee Navigation - Same for all */}
+                {/* Employee Navigation */}
                 {employeeNav.map((item) => {
                   const Icon = item.icon;
                   
-                  // Check if this item has a dropdown and user has access to multiple items
-                  // CRITICAL: Only populate accessibleDropdownItems after mount to prevent hydration mismatch
-                  // When !isMounted, keep empty to ensure server/client render identical link structure
                   const hasDropdown = item.dropdownItems && item.dropdownItems.length > 0;
                   const accessibleDropdownItems = hasDropdown && isMounted
                     ? item.dropdownItems!.filter(dropdownItem => {
                         if (!dropdownItem.module) return true;
                         return userPermissions.has(dropdownItem.module);
                       })
-                    : []; // Always empty before mount to prevent hydration mismatch
+                    : [];
                   const shouldShowDropdown = isMounted && accessibleDropdownItems.length > 1;
                   
-                  // If dropdown should be shown, render dropdown menu
                   if (shouldShowDropdown) {
-                    // Find which dropdown item is active to determine trigger colors
                     const activeDropdownItem = accessibleDropdownItems.find(dropdownItem => 
                       isLinkActive(dropdownItem.href)
                     );
@@ -408,15 +410,26 @@ export function Navbar() {
                     return (
                       <DropdownMenu key={item.href}>
                         <DropdownMenuTrigger
-                          className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                          title={item.label}
+                          className={`group inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all ${
                             isAnyDropdownActive
                               ? `${triggerColors.bg} ${triggerColors.text}`
                               : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                           }`}
                         >
-                          <Icon className="w-4 h-4 mr-2" />
-                          {item.label}
-                          <ChevronDown className="w-3 h-3 ml-1" />
+                          <Icon className="w-4 h-4 flex-shrink-0" />
+                          <span className={`overflow-hidden transition-all duration-200 ${
+                            isAnyDropdownActive
+                              ? 'ml-2 max-w-[120px] opacity-100'
+                              : 'max-w-0 opacity-0 group-hover:ml-2 group-hover:max-w-[120px] group-hover:opacity-100'
+                          }`}>
+                            {item.label}
+                          </span>
+                          <ChevronDown className={`w-3 h-3 flex-shrink-0 overflow-hidden transition-all duration-200 ${
+                            isAnyDropdownActive
+                              ? 'ml-1 max-w-[12px] opacity-100'
+                              : 'max-w-0 opacity-0 group-hover:ml-1 group-hover:max-w-[12px] group-hover:opacity-100'
+                          }`} />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent className="bg-slate-800 border-slate-700">
                           {accessibleDropdownItems.map((dropdownItem) => {
@@ -446,15 +459,10 @@ export function Navbar() {
                     );
                   }
                   
-                  // Otherwise, render as regular link (either no dropdown or only one accessible item)
-                  // CRITICAL: Use item.href consistently until after mount to prevent hydration mismatch
-                  // The finalHref calculation must be identical on server and client
-                  // SAFETY: Validate array is non-empty before accessing by index
                   const finalHref = isMounted && accessibleDropdownItems.length === 1 && accessibleDropdownItems[0]
                     ? accessibleDropdownItems[0].href 
                     : item.href;
                   
-                  // Recalculate isActive based on finalHref to ensure correct styling
                   const isActive = isLinkActive(finalHref);
                   const activeColors = getNavItemActiveColors(finalHref);
                   
@@ -462,14 +470,21 @@ export function Navbar() {
                     <Link
                       key={item.href}
                       href={finalHref}
-                      className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      title={item.label}
+                      className={`group inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all ${
                         isActive
                           ? `${activeColors.bg} ${activeColors.text}`
                           : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                       }`}
                     >
-                      <Icon className="w-4 h-4 mr-2" />
-                      {item.label}
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      <span className={`overflow-hidden transition-all duration-200 ${
+                        isActive
+                          ? 'ml-2 max-w-[120px] opacity-100'
+                          : 'max-w-0 opacity-0 group-hover:ml-2 group-hover:max-w-[120px] group-hover:opacity-100'
+                      }`}>
+                        {item.label}
+                      </span>
                     </Link>
                   );
                 })}

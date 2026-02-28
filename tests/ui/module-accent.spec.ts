@@ -105,8 +105,8 @@ test.describe('Module accent theming', () => {
     await expect(page.locator('nav')).toHaveScreenshot('nav-absence.png');
   });
 
-  test('Maintenance tab uses maintenance accent', async ({ page }) => {
-    await page.goto('/fleet?tab=maintenance');
+  test('Maintenance page uses maintenance accent', async ({ page }) => {
+    await page.goto('/maintenance');
     const vars = await getAccentVars(page);
     expect(vars).not.toBeNull();
     expect(vars!.accent).toBe('maintenance');

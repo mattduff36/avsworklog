@@ -102,7 +102,7 @@ export function MaintenanceTable({
   
   // Handlers with per-vehicle loading state
   const handleRestore = (vehicleId: string, regNumber: string) => {
-    if (confirm(`Restore ${regNumber} to active vehicles?\n\nThis will:\n• Move vehicle back to Active Vehicles tab\n• Restore all maintenance data\n\nContinue?`)) {
+    if (confirm(`Restore ${regNumber} to active vans?\n\nThis will:\n• Move van back to Active Vans tab\n• Restore all maintenance data\n\nContinue?`)) {
       setPendingRestore(prev => new Set(prev).add(vehicleId));
       restoreVehicle.mutate(vehicleId, {
         onSettled: () => {
@@ -117,7 +117,7 @@ export function MaintenanceTable({
   };
   
   const handlePermanentDelete = (vehicleId: string, regNumber: string) => {
-    if (confirm(`⚠️ Permanently remove ${regNumber}?\n\nThis will:\n• Remove from Retired Vehicles tab\n• Preserve all inspection history\n• Cannot be undone\n\nContinue?`)) {
+    if (confirm(`⚠️ Permanently remove ${regNumber}?\n\nThis will:\n• Remove from Retired Vans tab\n• Preserve all inspection history\n• Cannot be undone\n\nContinue?`)) {
       setPendingDelete(prev => new Set(prev).add(vehicleId));
       permanentlyDelete.mutate(vehicleId, {
         onSettled: () => {
@@ -217,10 +217,10 @@ export function MaintenanceTable({
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-white">
-                All Vehicles
+                All Vans
               </CardTitle>
               <CardDescription className="text-muted-foreground">
-                {vehicles.length} vehicle{vehicles.length !== 1 ? 's' : ''} • Click column headers to sort
+                {vehicles.length} van{vehicles.length !== 1 ? 's' : ''} • Click column headers to sort
               </CardDescription>
             </div>
             <Button 
@@ -228,7 +228,7 @@ export function MaintenanceTable({
               onClick={() => setAddVehicleDialogOpen(true)}
             >
               <Plus className="h-4 w-4 mr-2 hidden md:inline" />
-              <span className="hidden md:inline">Add Vehicle</span>
+              <span className="hidden md:inline">Add Van</span>
               <Plus className="h-4 w-4 md:hidden" />
             </Button>
           </div>
@@ -236,19 +236,19 @@ export function MaintenanceTable({
         
         <CardContent className="space-y-4">
           
-          {/* Internal Tabs for Active vs Retired Vehicles */}
+          {/* Internal Tabs for Active vs Retired Vans */}
           <Tabs defaultValue="active" className="w-full">
             <TabsList className="bg-slate-800 border-border">
               <TabsTrigger value="active">
-                Active Vehicles ({vehicles.length})
+                Active Vans ({vehicles.length})
               </TabsTrigger>
               <TabsTrigger value="deleted" className="flex items-center gap-2">
                 <FolderClock className="h-4 w-4" />
-                Retired Vehicles ({retiredData?.count || 0})
+                Retired Vans ({retiredData?.count || 0})
               </TabsTrigger>
             </TabsList>
             
-            {/* Active Vehicles Tab */}
+            {/* Active Vans Tab */}
             <TabsContent value="active" className="space-y-4 mt-4">
               {/* Search Bar and Column Filter */}
               <div className="flex gap-2">
@@ -322,7 +322,7 @@ export function MaintenanceTable({
           {/* Desktop Table View */}
           {vehicles.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              {searchQuery ? 'No vehicles found matching your search.' : 'No vehicles with maintenance records yet.'}
+              {searchQuery ? 'No vans found matching your search.' : 'No vans with maintenance records yet.'}
             </div>
           ) : (
             <div className="hidden md:block border border-slate-700 rounded-lg">
@@ -432,7 +432,7 @@ export function MaintenanceTable({
                         onClick={() => {
                           const vehicleId = vehicle.vehicle_id || vehicle.id;
                           if (vehicleId) {
-                            router.push(`/fleet/vehicles/${vehicleId}/history?fromTab=vehicles`);
+                            router.push(`/fleet/vans/${vehicleId}/history?fromTab=vans`);
                           }
                         }}
                         className="border-slate-700 hover:bg-slate-800/50 cursor-pointer"
@@ -648,7 +648,7 @@ export function MaintenanceTable({
                                 e.stopPropagation();
                                 const vehicleId = vehicle.vehicle_id || vehicle.id;
                                 if (vehicleId) {
-                                  router.push(`/fleet/vehicles/${vehicleId}/history?fromTab=vehicles`);
+                                  router.push(`/fleet/vans/${vehicleId}/history?fromTab=vans`);
                                 }
                               }}
                               className="h-10 w-10 p-0"
@@ -690,13 +690,13 @@ export function MaintenanceTable({
           )}
             </TabsContent>
             
-            {/* Retired Vehicles Tab */}
+            {/* Retired Vans Tab */}
             <TabsContent value="deleted" className="space-y-4 mt-4">
-              {/* Search Bar for Retired Vehicles */}
+              {/* Search Bar for Retired Vans */}
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search retired vehicles by registration..."
+                  placeholder="Search retired vans by registration..."
                   value={retiredSearchQuery}
                   onChange={(e) => setRetiredSearchQuery(e.target.value)}
                   className="pl-11 bg-slate-900/50 border-slate-600 text-white"
@@ -706,16 +706,16 @@ export function MaintenanceTable({
               {retiredLoading ? (
                 <div className="text-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-3" />
-                  <p className="text-muted-foreground">Loading retired vehicles...</p>
+                  <p className="text-muted-foreground">Loading retired vans...</p>
                 </div>
               ) : !retiredData || retiredData.vehicles.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <FolderClock className="h-12 w-12 mx-auto mb-3 text-slate-600" />
-                  <p>No retired vehicles found.</p>
+                  <p>No retired vans found.</p>
                 </div>
               ) : (
                 <>
-                  {/* Desktop Table View for Retired Vehicles */}
+                  {/* Desktop Table View for Retired Vans */}
                   <div className="hidden md:block border border-slate-700 rounded-lg">
                     <Table className="min-w-full">
                       <TableHeader>
@@ -849,7 +849,7 @@ export function MaintenanceTable({
                     </Table>
                   </div>
                   
-                  {/* Mobile Card View for Retired Vehicles */}
+                  {/* Mobile Card View for Retired Vans */}
                   <div className="md:hidden space-y-3">
                     {retiredData.vehicles
                       .filter(vehicle => 

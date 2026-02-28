@@ -42,10 +42,10 @@ interface ExpandingVehicleCardProps {
   vehicle: Vehicle;
   categories: Category[];
   onUpdate: () => void;
-  fromTab?: 'maintenance' | 'plant' | 'vehicles'; // Tab to return to on back navigation
+  fromTab?: 'maintenance' | 'plant' | 'vans' | 'hgvs'; // Tab to return to on back navigation
 }
 
-export function ExpandingVehicleCard({ vehicle, categories, onUpdate, fromTab = 'maintenance' }: ExpandingVehicleCardProps) {
+export function ExpandingVehicleCard({ vehicle, categories, onUpdate, fromTab = 'vans' }: ExpandingVehicleCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   
@@ -98,7 +98,7 @@ export function ExpandingVehicleCard({ vehicle, categories, onUpdate, fromTab = 
 
   const onSubmit = async (data: VehicleEditData) => {
     try {
-      const response = await fetch(`/api/admin/vehicles/${vehicle.id}`, {
+      const response = await fetch(`/api/admin/vans/${vehicle.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -157,7 +157,7 @@ export function ExpandingVehicleCard({ vehicle, categories, onUpdate, fromTab = 
           
           <div className="flex items-center gap-2">
             <Link 
-              href={`/fleet/vehicles/${vehicle.id}/history?fromTab=${fromTab}`}
+              href={`/fleet/vans/${vehicle.id}/history?fromTab=${fromTab}`}
               onClick={(e) => e.stopPropagation()}
             >
               <Button variant="ghost" size="sm" className="gap-2">

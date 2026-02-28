@@ -115,11 +115,11 @@ export const MODULE_PAGES: ModulePage[] = [
     ],
   },
   {
-    module: 'admin-vehicles',
-    displayName: 'Vehicle Management',
+    module: 'admin-vans',
+    displayName: 'Fleet Management',
     subPages: [
-      { value: 'admin-vehicles-list', label: 'Vehicles List' },
-      { value: 'admin-vehicles-history', label: 'Vehicle History' },
+      { value: 'admin-vans-list', label: 'Vans List' },
+      { value: 'admin-vans-history', label: 'Van History' },
     ],
   },
   {
@@ -197,8 +197,8 @@ export function getPageUrl(value: string): string {
     'absence-reasons': '/absence/reasons',
     
     // Maintenance
-    'maintenance-overview': '/fleet/maintenance',
-    'maintenance-schedule': '/fleet/maintenance/schedule',
+    'maintenance-overview': '/maintenance',
+    'maintenance-schedule': '/maintenance',
     
     // Workshop Tasks
     'workshop-tasks-list': '/workshop-tasks',
@@ -227,9 +227,9 @@ export function getPageUrl(value: string): string {
     'admin-users-list': '/admin/users',
     'admin-users-roles': '/admin/roles',
     
-    // Admin - Vehicles
-    'admin-vehicles-list': '/admin/vehicles',
-    'admin-vehicles-new': '/admin/vehicles/new',
+    // Admin - Vans
+    'admin-vans-list': '/admin/vans',
+    'admin-vans-new': '/admin/vans/new',
     
     // Admin - FAQ
     'admin-faq-list': '/admin/faq',

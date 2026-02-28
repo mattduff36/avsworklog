@@ -7,21 +7,9 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Loader2, Wrench, Truck, Settings, Tag, Plus, Edit, Trash2, AlertTriangle, HardHat, ChevronDown } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Wrench, Truck, Settings, Plus, Edit, Trash2, AlertTriangle, HardHat, ChevronDown } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
-
-// Dynamic import for heavy component - loaded only when Maintenance tab is active
-const MaintenanceOverview = dynamic(
-  () => import('@/app/(dashboard)/maintenance/components/MaintenanceOverview').then(mod => ({ default: mod.MaintenanceOverview })),
-  { 
-    loading: () => (
-      <div className="flex items-center justify-center p-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    ),
-    ssr: false
-  }
-);
 
 // Dynamic import for PlantOverview
 const PlantOverview = dynamic(
@@ -53,6 +41,7 @@ const PlantTable = dynamic(
 import { MaintenanceTable } from '@/app/(dashboard)/maintenance/components/MaintenanceTable';
 import { MaintenanceSettings } from '@/app/(dashboard)/maintenance/components/MaintenanceSettings';
 import { VehicleCategoryDialog } from './components/VehicleCategoryDialog';
+import { HgvCategoryDialog } from './components/HgvCategoryDialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -84,6 +73,23 @@ type Category = {
   applies_to?: string[];
 };
 
+type HgvCategory = {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type HgvAsset = {
+  id: string;
+  reg_number: string | null;
+  nickname: string | null;
+  status: string;
+  category_id: string | null;
+  hgv_categories?: { name: string; id: string } | null;
+};
+
 function FleetContent() {
   const searchParams = useSearchParams();
   const router = useNextRouter();
@@ -91,9 +97,8 @@ function FleetContent() {
   const supabase = createClient();
   
   // Initialize to default - useEffect will sync with URL to prevent hydration mismatch
-  const [activeTab, setActiveTab] = useState('maintenance');
+  const [activeTab, setActiveTab] = useState('plant');
   const [hasModulePermission, setHasModulePermission] = useState<boolean | null>(null);
-  const [maintenanceFilter, setMaintenanceFilter] = useState<'both' | 'vehicle' | 'plant'>('both'); // Filter for maintenance overview
   
   // Vehicle Category Dialog States
   const [addCategoryDialogOpen, setAddCategoryDialogOpen] = useState(false);
@@ -102,31 +107,40 @@ function FleetContent() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [deletingCategory, setDeletingCategory] = useState(false);
   
+  // HGV Category Dialog States
+  const [addHgvCategoryDialogOpen, setAddHgvCategoryDialogOpen] = useState(false);
+  const [editHgvCategoryDialogOpen, setEditHgvCategoryDialogOpen] = useState(false);
+  const [deleteHgvCategoryDialogOpen, setDeleteHgvCategoryDialogOpen] = useState(false);
+  const [selectedHgvCategory, setSelectedHgvCategory] = useState<HgvCategory | null>(null);
+  const [deletingHgvCategory, setDeletingHgvCategory] = useState(false);
+  
   // Helper function to validate if user can access a tab
   const canAccessTab = (tab: string, canManage: boolean): boolean => {
-    const restrictedTabs = ['vehicles', 'settings'];
+    const restrictedTabs = ['vans', 'hgvs', 'settings'];
     if (restrictedTabs.includes(tab)) {
       return canManage;
     }
-    return true; // maintenance tab is always accessible
+    return tab === 'plant';
   };
   
   // Validate and set activeTab based on permissions and URL
   useEffect(() => {
-    // Wait for auth to load
     if (authLoading) return;
     
     const canManage = isManager || isAdmin || isSuperAdmin;
-    const requestedTab = searchParams.get('tab') || 'maintenance';
+    const requestedTab = searchParams.get('tab') || 'plant';
     
-    // Validate requested tab against user permissions
+    // Legacy redirect: tab=maintenance now lives on /maintenance
+    if (requestedTab === 'maintenance') {
+      router.replace('/maintenance');
+      return;
+    }
+    
     if (canAccessTab(requestedTab, canManage)) {
       setActiveTab(requestedTab);
     } else {
-      // Redirect to maintenance tab if user doesn't have permission
-      setActiveTab('maintenance');
-      // Update URL to reflect the actual accessible tab
-      router.push('/fleet?tab=maintenance', { scroll: false });
+      setActiveTab('plant');
+      router.push('/fleet?tab=plant', { scroll: false });
     }
   }, [searchParams, authLoading, isManager, isAdmin, isSuperAdmin, router]);
   // Fetch maintenance data
@@ -140,15 +154,20 @@ function FleetContent() {
   
   // State for collapsible category sections
   const [plantCategoriesExpanded, setPlantCategoriesExpanded] = useState(false);
-  const [vehicleCategoriesExpanded, setVehicleCategoriesExpanded] = useState(false);
+  const [vanCategoriesExpanded, setVanCategoriesExpanded] = useState(false);
+  const [hgvCategoriesExpanded, setHgvCategoriesExpanded] = useState(false);
   
-  // State for maintenance search
+  // HGV categories and assets state
+  const [hgvCategories, setHgvCategories] = useState<HgvCategory[]>([]);
+  const [hgvCategoriesLoading, setHgvCategoriesLoading] = useState(false);
+  const [hgvAssets, setHgvAssets] = useState<HgvAsset[]>([]);
+  
   const [searchQuery, setSearchQuery] = useState('');
   
   // Fetch vehicles
   const fetchVehicles = async () => {
     try {
-      const response = await fetch('/api/admin/vehicles');
+      const response = await fetch('/api/admin/vans');
       const data = await response.json();
       if (response.ok) {
         setVehicles(data.vehicles || []);
@@ -170,6 +189,37 @@ function FleetContent() {
       setPlantAssets(data || []);
     } catch (error) {
       logger.error('Failed to fetch plant assets', error, 'FleetPage');
+    }
+  };
+
+  // Fetch HGV categories
+  const fetchHgvCategories = async () => {
+    try {
+      setHgvCategoriesLoading(true);
+      const response = await fetch('/api/admin/hgv-categories');
+      const data = await response.json();
+      if (response.ok) {
+        setHgvCategories(data.categories || []);
+      }
+    } catch (error) {
+      logger.error('Failed to fetch HGV categories', error, 'FleetPage');
+    } finally {
+      setHgvCategoriesLoading(false);
+    }
+  };
+
+  // Fetch HGV assets
+  const fetchHgvAssets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('hgvs')
+        .select('id, reg_number, nickname, status, category_id, hgv_categories(name, id)')
+        .order('reg_number', { ascending: true });
+
+      if (error) throw error;
+      setHgvAssets(data || []);
+    } catch (error) {
+      logger.error('Failed to fetch HGV assets', error, 'FleetPage');
     }
   };
 
@@ -237,13 +287,19 @@ function FleetContent() {
   
   // Fetch data on initial load based on active tab from URL
   useEffect(() => {
-    if (activeTab === 'vehicles') {
+    if (activeTab === 'plant') {
+      if (plantAssets.length === 0) fetchPlantAssets();
+    } else if (activeTab === 'vans') {
       if (vehicles.length === 0) fetchVehicles();
       if (categories.length === 0) fetchCategories();
+    } else if (activeTab === 'hgvs') {
+      if (hgvAssets.length === 0) fetchHgvAssets();
     } else if (activeTab === 'settings') {
       if (categories.length === 0) fetchCategories();
-      if (vehicles.length === 0) fetchVehicles(); // Need vehicles for category counts
-      if (plantAssets.length === 0) fetchPlantAssets(); // Need plant assets for category counts
+      if (vehicles.length === 0) fetchVehicles();
+      if (plantAssets.length === 0) fetchPlantAssets();
+      if (hgvCategories.length === 0) fetchHgvCategories();
+      if (hgvAssets.length === 0) fetchHgvAssets();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
@@ -262,35 +318,34 @@ function FleetContent() {
     router.push(`/fleet?tab=${value}`, { scroll: false });
     
     // Fetch data when switching to tabs
-    if (value === 'vehicles') {
+    if (value === 'plant') {
+      if (plantAssets.length === 0) fetchPlantAssets();
+    } else if (value === 'vans') {
       if (vehicles.length === 0) fetchVehicles();
       if (categories.length === 0) fetchCategories();
+    } else if (value === 'hgvs') {
+      if (hgvAssets.length === 0) fetchHgvAssets();
     } else if (value === 'settings') {
       if (categories.length === 0) fetchCategories();
-      if (vehicles.length === 0) fetchVehicles(); // Need vehicles for category counts
-      if (plantAssets.length === 0) fetchPlantAssets(); // Need plant assets for category counts
+      if (vehicles.length === 0) fetchVehicles();
+      if (plantAssets.length === 0) fetchPlantAssets();
+      if (hgvCategories.length === 0) fetchHgvCategories();
+      if (hgvAssets.length === 0) fetchHgvAssets();
     }
   };
   
-  // Handler for navigating to vehicle or plant history
+  
   const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
-    // Determine if this is a plant asset or vehicle
-    // Check the is_plant flag set by PlantOverview
     const isPlant = vehicle.is_plant === true;
-    
-    // Get the correct asset ID (UUID) - use the vehicle.id (which is the UUID for both vehicles and plant)
-    // For plant: vehicle.vehicle?.id is the plant table UUID
-    // For vehicles: vehicle.vehicle_id is the vehicles table UUID
     const assetId = vehicle.vehicle?.id || vehicle.vehicle_id || vehicle.id;
-    
-    // Navigate to appropriate history page
+
     if (isPlant) {
       router.push(`/fleet/plant/${assetId}/history?fromTab=${activeTab}`);
     } else {
-      router.push(`/fleet/vehicles/${assetId}/history?fromTab=${activeTab}`);
+      router.push(`/fleet/vans/${assetId}/history?fromTab=${activeTab}`);
     }
   };
-  
+
   // Vehicle Category Dialog Handlers
   const openEditCategoryDialog = (category: Category) => {
     setSelectedCategory(category);
@@ -317,12 +372,12 @@ function FleetContent() {
         throw new Error(data.error || 'Failed to delete category');
       }
       
-      toast.success('Vehicle category deleted successfully');
+      toast.success('Category deleted successfully');
       setDeleteCategoryDialogOpen(false);
       setSelectedCategory(null);
       fetchCategories(); // Refresh categories
     } catch (error: any) {
-      console.error('Error deleting vehicle category:', error);
+      console.error('Error deleting category:', error);
       toast.error(error.message || 'Failed to delete category');
     } finally {
       setDeletingCategory(false);
@@ -330,12 +385,54 @@ function FleetContent() {
   };
   
   const handleCategorySuccess = () => {
-    fetchCategories(); // Refresh categories
+    fetchCategories();
+  };
+  
+  // HGV Category Dialog Handlers
+  const openEditHgvCategoryDialog = (category: HgvCategory) => {
+    setSelectedHgvCategory(category);
+    setEditHgvCategoryDialogOpen(true);
+  };
+  
+  const openDeleteHgvCategoryDialog = (category: HgvCategory) => {
+    setSelectedHgvCategory(category);
+    setDeleteHgvCategoryDialogOpen(true);
+  };
+  
+  const handleDeleteHgvCategory = async () => {
+    if (!selectedHgvCategory) return;
+    
+    setDeletingHgvCategory(true);
+    
+    try {
+      const response = await fetch(`/api/admin/hgv-categories/${selectedHgvCategory.id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete HGV category');
+      }
+      
+      toast.success('HGV category deleted successfully');
+      setDeleteHgvCategoryDialogOpen(false);
+      setSelectedHgvCategory(null);
+      fetchHgvCategories();
+    } catch (error: any) {
+      console.error('Error deleting HGV category:', error);
+      toast.error(error.message || 'Failed to delete HGV category');
+    } finally {
+      setDeletingHgvCategory(false);
+    }
+  };
+  
+  const handleHgvCategorySuccess = () => {
+    fetchHgvCategories();
   };
   
   // Check access
   const hasAccess = hasModulePermission;
-  const canManageVehicles = isManager || isAdmin || isSuperAdmin;
+  const canManageFleet = isManager || isAdmin || isSuperAdmin;
   
   // Show loading while auth or permissions are being checked
   if (authLoading || hasModulePermission === null) {
@@ -371,27 +468,27 @@ function FleetContent() {
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Fleet Management</h1>
             <p className="text-muted-foreground">
-              Manage vehicles, maintenance schedules, and fleet operations
+              Manage vans, HGVs, plant machinery, and fleet operations
             </p>
           </div>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
-          <TabsTrigger value="maintenance" className="gap-2">
-            <Wrench className="h-4 w-4" />
-            Maintenance
-          </TabsTrigger>
+        <TabsList className={`grid w-full lg:w-auto lg:inline-grid ${canManageFleet ? 'grid-cols-4' : 'grid-cols-1'}`}>
           <TabsTrigger value="plant" className="gap-2">
             <HardHat className="h-4 w-4" />
             Plant
           </TabsTrigger>
-          {canManageVehicles && (
+          {canManageFleet && (
             <>
-              <TabsTrigger value="vehicles" className="gap-2">
+              <TabsTrigger value="vans" className="gap-2">
                 <Truck className="h-4 w-4" />
-                Vehicles
+                Vans
+              </TabsTrigger>
+              <TabsTrigger value="hgvs" className="gap-2">
+                <Truck className="h-4 w-4" />
+                HGVs
               </TabsTrigger>
               <TabsTrigger value="settings" className="gap-2">
                 <Settings className="h-4 w-4" />
@@ -400,72 +497,6 @@ function FleetContent() {
             </>
           )}
         </TabsList>
-
-        {/* Maintenance Tab */}
-        <TabsContent value="maintenance" className="space-y-6">
-          {maintenanceLoading ? (
-            <div className="flex items-center justify-center min-h-[400px]">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-            </div>
-          ) : maintenanceError ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Wrench className="h-16 w-16 text-red-400 mb-4" />
-                <h2 className="text-2xl font-semibold mb-2">Error Loading Maintenance Data</h2>
-                <p className="text-gray-600 text-center max-w-md">
-                  {maintenanceError?.message || 'Failed to load maintenance records'}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              {/* Filter Buttons - Using Tabs component for consistent styling */}
-              <div className="flex items-center justify-end">
-                <Tabs value={maintenanceFilter} onValueChange={(v) => setMaintenanceFilter(v as 'both' | 'vehicle' | 'plant')}>
-                  <TabsList>
-                    <TabsTrigger value="both" className="gap-2">
-                      <Wrench className="h-4 w-4" />
-                      All Assets
-                    </TabsTrigger>
-                    <TabsTrigger value="vehicle" className="gap-2">
-                      <Truck className="h-4 w-4" />
-                      Vehicles
-                    </TabsTrigger>
-                    <TabsTrigger value="plant" className="gap-2">
-                      <HardHat className="h-4 w-4" />
-                      Plant
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-
-              {(() => {
-                // Filter vehicles based on maintenance filter selection
-                const filteredVehicles = (maintenanceData?.vehicles || []).filter(v => {
-                  if (maintenanceFilter === 'both') return true;
-                  if (maintenanceFilter === 'vehicle') return v.vehicle?.asset_type !== 'plant';
-                  if (maintenanceFilter === 'plant') return v.vehicle?.asset_type === 'plant';
-                  return true;
-                });
-                
-                // Calculate summary based on filtered vehicles
-                const filteredSummary = {
-                  total: filteredVehicles.length,
-                  overdue: filteredVehicles.filter(v => v.overdue_count > 0).length,
-                  due_soon: filteredVehicles.filter(v => v.due_soon_count > 0 && v.overdue_count === 0).length,
-                };
-
-                return (
-                  <MaintenanceOverview 
-                    vehicles={filteredVehicles}
-                    summary={filteredSummary}
-                    onVehicleClick={handleVehicleClick}
-                  />
-                );
-              })()}
-            </>
-          )}
-        </TabsContent>
 
         {/* Plant Tab */}
         <TabsContent value="plant" className="space-y-6">
@@ -483,7 +514,7 @@ function FleetContent() {
                 </p>
               </CardContent>
             </Card>
-          ) : canManageVehicles ? (
+          ) : canManageFleet ? (
             <PlantTable 
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
@@ -496,9 +527,9 @@ function FleetContent() {
           )}
         </TabsContent>
 
-        {/* Vehicles Tab - Admin/Manager only */}
-        {canManageVehicles && (
-          <TabsContent value="vehicles" className="space-y-6">
+        {/* Vans Tab - Admin/Manager only */}
+        {canManageFleet && (
+          <TabsContent value="vans" className="space-y-6">
             {maintenanceLoading ? (
               <div className="flex items-center justify-center min-h-[400px]">
                 <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -507,9 +538,9 @@ function FleetContent() {
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Wrench className="h-16 w-16 text-red-400 mb-4" />
-                  <h2 className="text-2xl font-semibold mb-2">Error Loading Vehicle Data</h2>
+                  <h2 className="text-2xl font-semibold mb-2">Error Loading Van Data</h2>
                   <p className="text-gray-600 text-center max-w-md">
-                    {maintenanceError?.message || 'Failed to load vehicle records'}
+                    {maintenanceError?.message || 'Failed to load van records'}
                   </p>
                 </CardContent>
               </Card>
@@ -524,8 +555,63 @@ function FleetContent() {
           </TabsContent>
         )}
 
+        {/* HGVs Tab - Admin/Manager only */}
+        {canManageFleet && (
+          <TabsContent value="hgvs" className="space-y-6">
+            {hgvAssets.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Truck className="h-16 w-16 text-gray-400 mb-4 opacity-50" />
+                  <h2 className="text-2xl font-semibold mb-2">No HGVs Yet</h2>
+                  <p className="text-gray-600 text-center max-w-md">
+                    HGV assets will appear here once added to the fleet
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {hgvAssets.map((hgv) => (
+                  <Card
+                    key={hgv.id}
+                    className="bg-slate-800/50 border-border hover:bg-slate-800/70 transition-colors cursor-pointer"
+                    onClick={() => router.push(`/fleet/hgvs/${hgv.id}/history?fromTab=hgvs`)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="bg-emerald-500/10 p-3 rounded-lg">
+                            <Truck className="h-5 w-5 text-emerald-400" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-semibold text-white">{hgv.reg_number || 'No Reg'}</h3>
+                            <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
+                              {hgv.nickname && <span>{hgv.nickname}</span>}
+                              {hgv.nickname && hgv.hgv_categories?.name && <span>•</span>}
+                              {hgv.hgv_categories?.name && <span>{hgv.hgv_categories.name}</span>}
+                            </div>
+                          </div>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={
+                            hgv.status === 'active'
+                              ? 'bg-green-500/10 text-green-300 border-green-500/30'
+                              : 'bg-slate-500/10 text-slate-300 border-slate-500/30'
+                          }
+                        >
+                          {hgv.status}
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        )}
+
         {/* Settings Tab - Admin/Manager only */}
-        {canManageVehicles && (
+        {canManageFleet && (
           <TabsContent value="settings" className="space-y-6">
             {/* Van Categories Section - Admin Only */}
             {isAdmin && (
@@ -552,7 +638,7 @@ function FleetContent() {
                             {(() => {
                               // Filter categories that apply to plant
                               const plantCategories = categories.filter(c => 
-                                (c.applies_to || ['vehicle']).includes('plant')
+                                (c.applies_to || ['van']).includes('plant')
                               );
                               return `${plantCategories.length} ${plantCategories.length === 1 ? 'category' : 'categories'}`;
                             })()}
@@ -582,7 +668,7 @@ function FleetContent() {
                       ) : (() => {
                         // Filter categories that apply to plant
                         const plantCategories = categories.filter(c => 
-                          (c.applies_to || ['vehicle']).includes('plant')
+                          (c.applies_to || ['van']).includes('plant')
                         );
                         
                         return plantCategories.length === 0 ? (
@@ -651,13 +737,13 @@ function FleetContent() {
                 <Card className="border-border">
                   <CardHeader 
                     className="cursor-pointer hover:bg-slate-800/30 transition-colors"
-                    onClick={() => setVehicleCategoriesExpanded(!vehicleCategoriesExpanded)}
+                    onClick={() => setVanCategoriesExpanded(!vanCategoriesExpanded)}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3 flex-1">
                         <ChevronDown 
                           className={`h-5 w-5 text-muted-foreground transition-transform ${
-                            vehicleCategoriesExpanded ? 'rotate-180' : ''
+                            vanCategoriesExpanded ? 'rotate-180' : ''
                           }`}
                         />
                         <div>
@@ -668,10 +754,10 @@ function FleetContent() {
                           <CardDescription className="text-muted-foreground">
                             {(() => {
                               // Filter categories that apply to vehicles
-                              const vehicleCategories = categories.filter(c => 
-                                (c.applies_to || ['vehicle']).includes('vehicle')
+                              const vanCategories = categories.filter(c => 
+                                (c.applies_to || ['van']).includes('van')
                               );
-                              return `${vehicleCategories.length} ${vehicleCategories.length === 1 ? 'category' : 'categories'}`;
+                              return `${vanCategories.length} ${vanCategories.length === 1 ? 'category' : 'categories'}`;
                             })()}
                           </CardDescription>
                         </div>
@@ -690,26 +776,26 @@ function FleetContent() {
                     </div>
                   </CardHeader>
                   
-                {vehicleCategoriesExpanded && (
+                {vanCategoriesExpanded && (
                   <CardContent className="pt-6">
                     {categoriesLoading ? (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                       </div>
                     ) : (() => {
-                      // Filter categories that apply to vehicles (not plant-only categories)
-                      const vehicleCategories = categories.filter(c => {
-                        const appliesTo = (c as any).applies_to || ['vehicle'];
-                        return appliesTo.includes('vehicle');
+                      // Filter categories that apply to vans (not plant-only categories)
+                      const vanCategories = categories.filter(c => {
+                        const appliesTo = (c as any).applies_to || ['van'];
+                        return appliesTo.includes('van');
                       });
                       
-                      return vehicleCategories.length === 0 ? (
+                      return vanCategories.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">
-                          No vehicle categories found
+                          No van categories found
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          {vehicleCategories.map((category) => (
+                          {vanCategories.map((category) => (
                             <Card key={category.id} className="bg-slate-800/50 border-border">
                               <CardContent className="p-4">
                                 <div className="flex items-center justify-between">
@@ -729,7 +815,7 @@ function FleetContent() {
                                       <div className="text-2xl font-bold text-blue-400">
                                         {vehicles.filter(v => v.category_id === category.id).length}
                                       </div>
-                                      <p className="text-xs text-muted-foreground">vehicles</p>
+                                      <p className="text-xs text-muted-foreground">vans</p>
                                     </div>
                                     <div className="flex gap-1">
                                       <Button
@@ -762,6 +848,111 @@ function FleetContent() {
                     </CardContent>
                   )}
                 </Card>
+
+                {/* HGV Categories */}
+                <Card className="border-border">
+                  <CardHeader 
+                    className="cursor-pointer hover:bg-slate-800/30 transition-colors"
+                    onClick={() => setHgvCategoriesExpanded(!hgvCategoriesExpanded)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 flex-1">
+                        <ChevronDown 
+                          className={`h-5 w-5 text-muted-foreground transition-transform ${
+                            hgvCategoriesExpanded ? 'rotate-180' : ''
+                          }`}
+                        />
+                        <div>
+                          <CardTitle className="text-white flex items-center gap-2">
+                            <Truck className="h-5 w-5 text-emerald-400" />
+                            HGV Categories
+                          </CardTitle>
+                          <CardDescription className="text-muted-foreground">
+                            {`${hgvCategories.length} ${hgvCategories.length === 1 ? 'category' : 'categories'}`}
+                          </CardDescription>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-700"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAddHgvCategoryDialogOpen(true);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Category
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  
+                  {hgvCategoriesExpanded && (
+                    <CardContent className="pt-6">
+                      {hgvCategoriesLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+                        </div>
+                      ) : hgvCategories.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          No HGV categories found
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {hgvCategories.map((category) => {
+                            const hgvCount = hgvAssets.filter(h => h.category_id === category.id).length;
+                            return (
+                              <Card key={category.id} className="bg-slate-800/50 border-border">
+                                <CardContent className="p-4">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-4 flex-1">
+                                      <div className="bg-emerald-500/10 p-3 rounded-lg">
+                                        <Truck className="h-5 w-5 text-emerald-400" />
+                                      </div>
+                                      <div className="flex-1">
+                                        <h3 className="text-lg font-semibold text-white">{category.name}</h3>
+                                        <p className="text-sm text-muted-foreground mt-1">
+                                          {category.description || 'No description'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                      <div className="text-right">
+                                        <div className="text-2xl font-bold text-emerald-400">
+                                          {hgvCount}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">HGVs</p>
+                                      </div>
+                                      <div className="flex gap-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => openEditHgvCategoryDialog(category)}
+                                          className="text-emerald-400 hover:text-emerald-300 hover:bg-slate-800"
+                                          title="Edit Category"
+                                        >
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => openDeleteHgvCategoryDialog(category)}
+                                          className="text-red-400 hover:text-red-300 hover:bg-slate-800"
+                                          title="Delete Category"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </CardContent>
+                  )}
+                </Card>
               </>
             )}
 
@@ -787,16 +978,80 @@ function FleetContent() {
         onSuccess={handleCategorySuccess}
       />
       
+      {/* HGV Category Dialogs */}
+      <HgvCategoryDialog
+        open={addHgvCategoryDialogOpen}
+        onOpenChange={setAddHgvCategoryDialogOpen}
+        mode="create"
+        onSuccess={handleHgvCategorySuccess}
+      />
+      
+      <HgvCategoryDialog
+        open={editHgvCategoryDialogOpen}
+        onOpenChange={setEditHgvCategoryDialogOpen}
+        mode="edit"
+        category={selectedHgvCategory}
+        onSuccess={handleHgvCategorySuccess}
+      />
+      
+      {/* Delete HGV Category Confirmation Dialog */}
+      <AlertDialog open={deleteHgvCategoryDialogOpen} onOpenChange={setDeleteHgvCategoryDialogOpen}>
+        <AlertDialogContent className="border-border text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Delete HGV Category
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              Are you sure you want to delete this HGV category? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          {selectedHgvCategory && (
+            <div className="bg-slate-800 rounded p-4 space-y-2">
+              <p className="text-sm">
+                <span className="text-muted-foreground">Name:</span>{' '}
+                <span className="text-white font-medium">{selectedHgvCategory.name}</span>
+              </p>
+              {selectedHgvCategory.description && (
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Description:</span>{' '}
+                  <span className="text-white">{selectedHgvCategory.description}</span>
+                </p>
+              )}
+            </div>
+          )}
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              className="border-slate-600 text-white hover:bg-slate-800"
+              disabled={deletingHgvCategory}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteHgvCategory}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deletingHgvCategory}
+            >
+              {deletingHgvCategory && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Category
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Delete Category Confirmation Dialog */}
       <AlertDialog open={deleteCategoryDialogOpen} onOpenChange={setDeleteCategoryDialogOpen}>
         <AlertDialogContent className="border-border text-white">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-red-500" />
-              Delete Vehicle Category
+              Delete Category
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
-              Are you sure you want to delete this vehicle category? This action cannot be undone.
+              Are you sure you want to delete this category? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           

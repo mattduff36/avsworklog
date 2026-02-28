@@ -9,6 +9,7 @@ import {
   CalendarDays,
   Settings,
   HelpCircle,
+  Truck,
   LucideIcon
 } from 'lucide-react';
 
@@ -97,6 +98,16 @@ export const FORM_TYPES: FormType[] = [
     icon: Wrench,
     href: '/maintenance',
     listHref: '/maintenance',
+    color: 'maintenance',
+    enabled: true,
+  },
+  {
+    id: 'fleet',
+    title: 'Fleet',
+    description: 'Manage vans, HGVs and plant',
+    icon: Truck,
+    href: '/fleet',
+    listHref: '/fleet',
     color: 'maintenance',
     enabled: true,
   },

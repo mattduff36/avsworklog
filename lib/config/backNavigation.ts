@@ -38,27 +38,36 @@ export function getParentHref(
   }
   
   // Fleet routes - support fromTab query param
-  if (normalizedPath.match(/^\/fleet\/vehicles\/[^/]+\/history$/)) {
+  if (normalizedPath.match(/^\/fleet\/vans\/[^/]+\/history$/)) {
     const fromTab = searchParams?.get('fromTab');
-    // Validate fromTab to prevent injection
-    const validTabs = ['maintenance', 'plant', 'vehicles', 'settings'];
-    if (fromTab && validTabs.includes(fromTab)) {
+    if (fromTab === 'maintenance') return '/maintenance';
+    const validFleetTabs = ['plant', 'vans', 'hgvs', 'settings'];
+    if (fromTab && validFleetTabs.includes(fromTab)) {
       return `/fleet?tab=${fromTab}`;
     }
-    // Default fallback to vehicles tab
-    return '/fleet?tab=vehicles';
+    return '/fleet?tab=vans';
   }
   
-  // Plant history routes - always return to plant tab
+  // Plant history routes
   if (normalizedPath.match(/^\/fleet\/plant\/[^/]+\/history$/)) {
     const fromTab = searchParams?.get('fromTab');
-    // Validate fromTab to prevent injection
-    const validTabs = ['maintenance', 'plant', 'vehicles', 'settings'];
-    if (fromTab && validTabs.includes(fromTab)) {
+    if (fromTab === 'maintenance') return '/maintenance';
+    const validFleetTabs = ['plant', 'vans', 'hgvs', 'settings'];
+    if (fromTab && validFleetTabs.includes(fromTab)) {
       return `/fleet?tab=${fromTab}`;
     }
-    // Default fallback to plant tab
     return '/fleet?tab=plant';
+  }
+  
+  // HGV history routes
+  if (normalizedPath.match(/^\/fleet\/hgvs\/[^/]+\/history$/)) {
+    const fromTab = searchParams?.get('fromTab');
+    if (fromTab === 'maintenance') return '/maintenance';
+    const validFleetTabs = ['plant', 'vans', 'hgvs', 'settings'];
+    if (fromTab && validFleetTabs.includes(fromTab)) {
+      return `/fleet?tab=${fromTab}`;
+    }
+    return '/fleet?tab=hgvs';
   }
   
   // Inspection routes
@@ -105,7 +114,7 @@ export function getParentHref(
   if (normalizedPath === '/admin/users') {
     return '/dashboard';
   }
-  if (normalizedPath === '/admin/vehicles') {
+  if (normalizedPath === '/admin/vans') {
     return '/dashboard';
   }
   
