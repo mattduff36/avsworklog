@@ -1645,7 +1645,7 @@ export default function WorkshopTasksPage() {
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Workshop Tasks</h1>
             <p className="text-muted-foreground">
-              Track vehicle repairs and workshop work
+              Track van & plant repairs and workshop work
             </p>
           </div>
           <Button
@@ -1661,7 +1661,7 @@ export default function WorkshopTasksPage() {
       {/* Tabs */}
       <Tabs value={assetTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className={`grid w-full ${showSettings ? 'grid-cols-4' : 'grid-cols-3'}`}>
-          <TabsTrigger value="vehicle">Vehicle Tasks</TabsTrigger>
+          <TabsTrigger value="vehicle">Van Tasks</TabsTrigger>
           <TabsTrigger value="plant">Plant Tasks</TabsTrigger>
           <TabsTrigger value="tools" disabled>
             <span className="flex items-center gap-1">
@@ -1698,13 +1698,13 @@ export default function WorkshopTasksPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Vehicle Filter</Label>
+                  <Label>Van Filter</Label>
                   <Select value={vehicleFilter} onValueChange={setVehicleFilter}>
                     <SelectTrigger className="bg-white dark:bg-slate-900 border-border dark:text-slate-100 text-slate-900">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Vehicles</SelectItem>
+                      <SelectItem value="all">All Vans</SelectItem>
                       {vehicles.filter(v => v.asset_type !== 'plant').map((vehicle) => (
                         <SelectItem key={vehicle.id} value={vehicle.id}>
                           {getAssetDisplay(vehicle)}
@@ -1754,7 +1754,7 @@ export default function WorkshopTasksPage() {
             <Card className="">
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Wrench className="h-16 w-16 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">No vehicle workshop tasks yet</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-2">No van workshop tasks yet</h3>
                 <p className="text-muted-foreground mb-4">
                   Create your first workshop task or wait for inspection defects
                 </p>
@@ -3045,13 +3045,13 @@ export default function WorkshopTasksPage() {
               <CardHeader>
                 <CardTitle className="text-white">Category Taxonomy</CardTitle>
                 <CardDescription className="text-muted-foreground">
-                  Manage categories for vehicles or plant machinery
+                  Manage categories for vans or plant machinery
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Tabs value={categoryTaxonomyMode} onValueChange={(v) => setCategoryTaxonomyMode(v as 'vehicle' | 'plant')}>
                   <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="vehicle">Vehicle Categories</TabsTrigger>
+                    <TabsTrigger value="vehicle">Van Categories</TabsTrigger>
                     <TabsTrigger value="plant">Plant Categories</TabsTrigger>
                   </TabsList>
                 </Tabs>
@@ -3087,14 +3087,14 @@ export default function WorkshopTasksPage() {
           <DialogHeader>
             <DialogTitle className="text-foreground text-xl">Create Workshop Task</DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Add a new {assetTab === 'plant' ? 'plant' : 'vehicle'} repair or maintenance task
+              Add a new {assetTab === 'plant' ? 'plant' : 'van'} repair or maintenance task
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="vehicle" className="text-foreground">
-                {assetTab === 'plant' ? 'Plant' : 'Vehicle'} <span className="text-red-500">*</span>
+                {assetTab === 'plant' ? 'Plant' : 'Van'} <span className="text-red-500">*</span>
               </Label>
               <Select value={selectedVehicleId} onValueChange={(value) => {
                 setSelectedVehicleId(value);
@@ -3105,7 +3105,7 @@ export default function WorkshopTasksPage() {
                 }
               }}>
                 <SelectTrigger id="vehicle" className="bg-white dark:bg-slate-800 border-border text-foreground">
-                  <SelectValue placeholder={`Select ${assetTab === 'plant' ? 'plant' : 'vehicle'}`} />
+                  <SelectValue placeholder={`Select ${assetTab === 'plant' ? 'plant' : 'van'}`} />
                 </SelectTrigger>
                 <SelectContent>
                   {vehicles
@@ -3489,7 +3489,7 @@ export default function WorkshopTasksPage() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="edit-vehicle" className="text-foreground">
-                {editingTask?.plant_id ? 'Plant' : 'Vehicle'} <span className="text-red-500">*</span>
+                {editingTask?.plant_id ? 'Plant' : 'Van'} <span className="text-red-500">*</span>
               </Label>
               <Select value={editVehicleId} onValueChange={(value) => {
                 setEditVehicleId(value);
@@ -3520,7 +3520,7 @@ export default function WorkshopTasksPage() {
                 }
               }}>
                 <SelectTrigger id="edit-vehicle" className="bg-white dark:bg-slate-800 border-border text-foreground">
-                  <SelectValue placeholder={editingTask?.plant_id ? "Select plant" : "Select vehicle"} />
+                  <SelectValue placeholder={editingTask?.plant_id ? "Select plant" : "Select van"} />
                 </SelectTrigger>
                 <SelectContent>
                   {(() => {
@@ -3548,7 +3548,7 @@ export default function WorkshopTasksPage() {
                         {otherVehicles.length > 0 && (
                           <SelectGroup>
                             {recentVehicles.length > 0 && (
-                              <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">All {isEditingPlant ? 'Plant' : 'Vehicles'}</SelectLabel>
+                              <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">All {isEditingPlant ? 'Plant' : 'Vans'}</SelectLabel>
                             )}
                             {otherVehicles.map((vehicle) => (
                               <SelectItem key={vehicle.id} value={vehicle.id}>

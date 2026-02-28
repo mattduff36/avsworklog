@@ -75,6 +75,13 @@ describe('Forms Config — Inspection Rename Verification', () => {
     expect(forbidden).toHaveLength(0);
   });
 
+  it('workshop tasks description says "van" not "vehicle"', () => {
+    const wsForm = FORM_TYPES.find(f => f.id === 'workshop');
+    expect(wsForm).toBeDefined();
+    expect(wsForm!.description.toLowerCase()).toContain('van');
+    expect(wsForm!.description.toLowerCase()).not.toMatch(/\bvehicle\b/);
+  });
+
   it('getFormType resolves inspection forms', () => {
     expect(getFormType('inspection')?.href).toBe('/van-inspections');
     expect(getFormType('plant-inspection')?.href).toBe('/plant-inspections');

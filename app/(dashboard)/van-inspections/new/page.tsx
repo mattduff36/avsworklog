@@ -1290,7 +1290,7 @@ function NewInspectionContent() {
         </div>
       )}
 
-      {/* Vehicle Details Card */}
+      {/* Van Details Card */}
       <Card className="">
         <CardHeader className="pb-4">
           <CardTitle className="text-foreground">Inspection Details</CardTitle>
@@ -1328,7 +1328,7 @@ function NewInspectionContent() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="vehicle" className="text-foreground text-base">Vehicle</Label>
+              <Label htmlFor="vehicle" className="text-foreground text-base">Van</Label>
               <Select 
                 value={vehicleId} 
                 disabled={checklistStarted}
@@ -1367,13 +1367,13 @@ function NewInspectionContent() {
                 }}
               >
                 <SelectTrigger id="vehicle" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white" disabled={checklistStarted}>
-                  <SelectValue placeholder="Select a vehicle" />
+                  <SelectValue placeholder="Select a van" />
                 </SelectTrigger>
                 <SelectContent className="border-border max-h-[300px] md:max-h-[400px] dark:text-slate-100 text-slate-900">
                   <SelectItem value="add-new" className="text-avs-yellow font-semibold border-b border-border">
                     <div className="flex items-center gap-2">
                       <Plus className="h-4 w-4" />
-                      Add New Vehicle
+                      Add New Van
                     </div>
                   </SelectItem>
                   {(() => {
@@ -1396,7 +1396,7 @@ function NewInspectionContent() {
                         {otherVehicles.length > 0 && (
                           <SelectGroup>
                             {recentVehicles.length > 0 && (
-                              <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">All Vehicles</SelectLabel>
+                              <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">All Vans</SelectLabel>
                             )}
                             {otherVehicles.map((vehicle) => (
                               <SelectItem key={vehicle.id} value={vehicle.id} className="text-white">
@@ -1496,14 +1496,14 @@ function NewInspectionContent() {
             <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
               <p className="text-sm text-blue-400">
                 <Info className="h-4 w-4 inline mr-2" />
-                Vehicle and week ending are locked once you start filling the checklist. Save or leave the page to unlock.
+                Van and week ending are locked once you start filling the checklist. Save or leave the page to unlock.
               </p>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Safety Check - Only shown when vehicle and week ending are valid and no duplicate exists */}
+      {/* Safety Check - Only shown when van and week ending are valid and no duplicate exists */}
       {vehicleId && weekEnding && !duplicateInspection && !duplicateCheckLoading && (
       <Card className="">
         <CardHeader className="pb-3">
@@ -1894,13 +1894,13 @@ function NewInspectionContent() {
         </div>
       </div>
 
-      {/* Add Vehicle Dialog */}
+      {/* Add Van Dialog */}
       <Dialog open={showAddVehicleDialog} onOpenChange={setShowAddVehicleDialog}>
         <DialogContent className="border-border text-white max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-white text-xl">Add New Vehicle</DialogTitle>
+            <DialogTitle className="text-white text-xl">Add New Van</DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Enter the vehicle registration number and select its category
+              Enter the van registration number and select its category
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1920,7 +1920,7 @@ function NewInspectionContent() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="newVehicleCategory" className="text-foreground">
-                Vehicle Category <span className="text-red-400">*</span>
+                Van Category <span className="text-red-400">*</span>
               </Label>
               <Select 
                 value={newVehicleCategoryId || undefined} 
@@ -1958,7 +1958,7 @@ function NewInspectionContent() {
               disabled={addingVehicle || !newVehicleReg.trim() || !newVehicleCategoryId}
               className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 font-semibold"
             >
-              {addingVehicle ? 'Adding...' : 'Add Vehicle'}
+              {addingVehicle ? 'Adding...' : 'Add Van'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2090,15 +2090,15 @@ function NewInspectionContent() {
             
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-4">
               <p className="text-slate-200">
-                Have you finished using this vehicle for the week?
+                Have you finished using this van for the week?
               </p>
             </div>
             <div className="space-y-2 text-sm text-muted-foreground">
               <p>
-                Vehicle inspections should be submitted <strong className="text-white">weekly</strong> when you&apos;re done using the vehicle.
+                Van inspections should be submitted <strong className="text-white">weekly</strong> when you&apos;re done using the van.
               </p>
               <p className="text-amber-400">
-                Still using this vehicle this week? Select &apos;Save Draft&apos; instead.
+                Still using this van this week? Select &apos;Save Draft&apos; instead.
               </p>
             </div>
           </div>

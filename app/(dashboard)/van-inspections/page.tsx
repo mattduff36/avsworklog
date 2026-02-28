@@ -161,7 +161,7 @@ function InspectionsContent() {
       }
       // 'all' doesn't filter by status
 
-      // Apply vehicle filter
+      // Apply van filter
       const currentVehicleFilter = vehicleFilter || 'all';
       if (currentVehicleFilter !== 'all') {
         query = query.eq('vehicle_id', currentVehicleFilter);
@@ -434,16 +434,16 @@ function InspectionsContent() {
                 </div>
               </div>
 
-              {/* Vehicle Filter */}
+              {/* Van Filter */}
               <div className="flex items-center gap-3">
                 <Truck className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-slate-400 mr-2 whitespace-nowrap">Filter by vehicle:</span>
+                <span className="text-sm text-slate-400 mr-2 whitespace-nowrap">Filter by van:</span>
                 <Select value={vehicleFilter} onValueChange={setVehicleFilter}>
                   <SelectTrigger className="h-9 border-border text-white">
-                    <SelectValue placeholder="All vehicles" />
+                    <SelectValue placeholder="All vans" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Vehicles</SelectItem>
+                    <SelectItem value="all">All Vans</SelectItem>
                     {(() => {
                       const { recentVehicles, otherVehicles } = splitVehiclesByRecent(vehicles, recentVehicleIds);
                       return (
@@ -467,7 +467,7 @@ function InspectionsContent() {
                               <SelectSeparator className="bg-slate-700" />
                               <SelectGroup>
                                 {recentVehicles.length > 0 && (
-                                  <SelectLabel className="">All Vehicles</SelectLabel>
+                                  <SelectLabel className="">All Vans</SelectLabel>
                                 )}
                                 {otherVehicles.map((vehicle) => (
                                   <SelectItem key={vehicle.id} value={vehicle.id}>
@@ -549,7 +549,7 @@ function InspectionsContent() {
                     {getStatusIcon(inspection.status)}
                     <div>
                       <CardTitle className="text-lg text-white">
-                        {inspection.vehicles?.reg_number || 'Unknown Vehicle'}
+                        {inspection.vehicles?.reg_number || 'Unknown Van'}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
                         {isManager && (inspection as any).profile?.full_name && (

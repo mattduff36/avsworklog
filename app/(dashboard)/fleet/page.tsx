@@ -527,7 +527,7 @@ function FleetContent() {
         {/* Settings Tab - Admin/Manager only */}
         {canManageVehicles && (
           <TabsContent value="settings" className="space-y-6">
-            {/* Vehicle Categories Section - Admin Only */}
+            {/* Van Categories Section - Admin Only */}
             {isAdmin && (
               <>
                 {/* Plant Machinery Categories */}
@@ -647,7 +647,7 @@ function FleetContent() {
                   )}
                 </Card>
 
-                {/* Vehicle Categories */}
+                {/* Van Categories */}
                 <Card className="border-border">
                   <CardHeader 
                     className="cursor-pointer hover:bg-slate-800/30 transition-colors"
@@ -663,7 +663,7 @@ function FleetContent() {
                         <div>
                           <CardTitle className="text-white flex items-center gap-2">
                             <Truck className="h-5 w-5" />
-                            Vehicle Categories
+                            Van Categories
                           </CardTitle>
                           <CardDescription className="text-muted-foreground">
                             {(() => {

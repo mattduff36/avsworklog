@@ -489,7 +489,7 @@ export default function ActionsPage() {
                 <div>
                   <CardTitle className="text-foreground">Workshop Tasks</CardTitle>
                   <CardDescription className="text-muted-foreground">
-                    Vehicle &amp; plant repairs and inspection defects
+                    Van &amp; plant repairs and inspection defects
                   </CardDescription>
                 </div>
               </div>
@@ -515,7 +515,7 @@ export default function ActionsPage() {
                 </p>
                 <div className="space-y-1 border-t border-amber-500/20 pt-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Vehicle</span>
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Van</span>
                     <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'pending' && a.vehicle_id !== null).length}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
@@ -534,7 +534,7 @@ export default function ActionsPage() {
                 </p>
                 <div className="space-y-1 border-t border-blue-500/20 pt-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Vehicle</span>
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Van</span>
                     <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'logged' && a.vehicle_id !== null).length}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
@@ -553,7 +553,7 @@ export default function ActionsPage() {
                 </p>
                 <div className="space-y-1 border-t border-green-500/20 pt-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Vehicle</span>
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Van</span>
                     <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'completed' && a.vehicle_id !== null).length}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
@@ -577,7 +577,7 @@ export default function ActionsPage() {
                 <div>
                   <CardTitle className="text-foreground">Maintenance & Service</CardTitle>
                   <CardDescription className="text-muted-foreground">
-                    Scheduled vehicle maintenance &amp; plant LOLER tracking
+                    Scheduled van maintenance &amp; plant LOLER tracking
                   </CardDescription>
                 </div>
               </div>
@@ -603,7 +603,7 @@ export default function ActionsPage() {
                 </p>
                 <div className="space-y-1 border-t border-red-500/20 pt-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Vehicle</span>
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Van</span>
                     <span className="font-medium text-foreground">{vehicleMaintenanceOverdue}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
@@ -622,7 +622,7 @@ export default function ActionsPage() {
                 </p>
                 <div className="space-y-1 border-t border-amber-500/20 pt-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Vehicle</span>
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Van</span>
                     <span className="font-medium text-foreground">{vehicleMaintenanceDueSoon}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
@@ -824,7 +824,7 @@ export default function ActionsPage() {
                             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                               {action.van_inspections && (
                                 <span>
-                                  Vehicle: {action.van_inspections.vehicles?.reg_number || 'N/A'}
+                                  Van: {action.van_inspections.vehicles?.reg_number || 'N/A'}
                                 </span>
                               )}
                               {action.van_inspections?.profiles?.full_name && (
@@ -928,7 +928,7 @@ export default function ActionsPage() {
                             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                               {action.van_inspections && (
                                 <span>
-                                  Vehicle: {action.van_inspections.vehicles?.reg_number || 'N/A'}
+                                  Van: {action.van_inspections.vehicles?.reg_number || 'N/A'}
                                 </span>
                               )}
                               {action.van_inspections?.profiles?.full_name && (

@@ -312,7 +312,7 @@ export function CreateWorkshopTaskDialog({
       const isPlant = selectedVehicle?.asset_type === 'plant';
       const assetIdLabel = isPlant
         ? (selectedVehicle?.plant_id ?? 'Unknown Plant')
-        : (selectedVehicle?.reg_number ?? 'Unknown Vehicle');
+        : (selectedVehicle?.reg_number ?? 'Unknown Asset');
       const taskTitle = alertType 
         ? getTaskContent(alertType, assetIdLabel, '').title
         : `Workshop Task - ${assetIdLabel}`;
@@ -466,14 +466,14 @@ export function CreateWorkshopTaskDialog({
         <DialogHeader>
           <DialogTitle className="text-xl">Create Workshop Task</DialogTitle>
           <DialogDescription>
-            Add a new vehicle repair or maintenance task
+            Add a new van or plant repair or maintenance task
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="vehicle">
-              Vehicle <span className="text-red-500">*</span>
+              Asset <span className="text-red-500">*</span>
             </Label>
             <Select value={selectedVehicleId} onValueChange={(value) => {
               setSelectedVehicleId(value);
@@ -493,7 +493,7 @@ export function CreateWorkshopTaskDialog({
               }
             }}>
               <SelectTrigger id="vehicle">
-                <SelectValue placeholder="Select vehicle" />
+                <SelectValue placeholder="Select van or plant" />
               </SelectTrigger>
               <SelectContent>
                 {(() => {

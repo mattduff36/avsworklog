@@ -103,7 +103,7 @@ export const FORM_TYPES: FormType[] = [
   {
     id: 'workshop',
     title: 'Workshop Tasks',
-    description: 'Vehicle repairs & workshop work',
+    description: 'Van & plant repairs and workshop work',
     icon: Settings,
     href: '/workshop-tasks',
     listHref: '/workshop-tasks',

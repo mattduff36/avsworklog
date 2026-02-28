@@ -1,12 +1,14 @@
 /**
- * Static Guard: No runtime references to vehicle_inspections
+ * Static Guard: No runtime references to vehicle_inspections + stale labels
  *
  * Scans app/, lib/, components/ for forbidden references to the old
- * vehicle_inspections table. Exits with code 1 if any are found.
+ * vehicle_inspections table AND stale "Vehicle" UI labels that should
+ * now say "Van" or "Asset" after the inspections split.
  *
  * Allowlisted patterns:
  * - FK constraint hint names (!vehicle_inspections_*_fkey) are expected
  * - Supabase PostgREST uses original constraint names after table rename
+ * - Fleet/maintenance code correctly uses "Vehicle" for fleet domain entities
  *
  * Usage: node scripts/guards/no-vehicle-inspections.mjs
  */
@@ -28,6 +30,24 @@ const checks = [
     pattern: "Tables\\[.vehicle_inspections.\\]",
     dirs: ['app/', 'lib/', 'components/'],
   },
+  {
+    name: '"Vehicle Tasks" UI label',
+    pattern: 'Vehicle Tasks',
+    dirs: ['app/', 'lib/', 'components/'],
+    glob: '--glob "!*.test.*"',
+  },
+  {
+    name: '"Vehicle Inspection(s)" UI text',
+    pattern: 'Vehicle Inspections?',
+    dirs: ['app/', 'lib/', 'components/'],
+    glob: '--glob "!*.test.*"',
+  },
+  {
+    name: '"Unknown Vehicle" fallback text',
+    pattern: 'Unknown Vehicle',
+    dirs: ['app/', 'lib/', 'components/'],
+    glob: '--glob "!*.test.*"',
+  },
 ];
 
 let failed = false;
@@ -35,8 +55,9 @@ let failed = false;
 for (const check of checks) {
   try {
     const dirs = check.dirs.join(' ');
+    const globFlag = check.glob || '';
     const result = execSync(
-      `rg "${check.pattern}" -l ${dirs} 2>/dev/null || true`,
+      `rg "${check.pattern}" -l ${globFlag} ${dirs} 2>/dev/null || true`,
       { cwd: ROOT, encoding: 'utf-8' }
     ).trim();
 

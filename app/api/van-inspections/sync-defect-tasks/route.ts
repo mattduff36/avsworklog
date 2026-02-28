@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       .eq('id', vehicleId)
       .single();
 
-    const vehicleReg = vehicle?.reg_number || 'Unknown Vehicle';
+    const vehicleReg = vehicle?.reg_number || 'Unknown Van';
 
     // Get preferred taxonomy: Repair → Inspection defects
     const { data: repairCategory } = await supabaseAdmin

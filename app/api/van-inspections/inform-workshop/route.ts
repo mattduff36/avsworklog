@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       .eq('id', vehicleId)
       .single();
 
-    const vehicleReg = vehicle?.reg_number || 'Unknown Vehicle';
+    const vehicleReg = vehicle?.reg_number || 'Unknown Van';
 
     // Infer subcategory from comment keywords
     const subcategoryMatch = inferWorkshopSubcategoryFromComment(trimmedComment);

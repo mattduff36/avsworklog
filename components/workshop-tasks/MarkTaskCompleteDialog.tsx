@@ -231,10 +231,10 @@ export function MarkTaskCompleteDialog({
             <>
               <div className="border-t border-border pt-4">
                 <h4 className="text-sm font-medium text-foreground mb-3">
-                  Update Vehicle Maintenance
+                  Update Asset Maintenance
                 </h4>
                 <p className="text-xs text-muted-foreground mb-4">
-                  Optionally update maintenance records for this vehicle
+                  Optionally update maintenance records for this asset
                 </p>
 
                 <div className="space-y-3">

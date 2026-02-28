@@ -122,7 +122,7 @@ export function WorkshopTaskModal({
         return getAssetDisplay(task.van_inspections.plant);
       }
     }
-    return 'Unknown Vehicle';
+    return 'Unknown Asset';
   };
 
   const getStatusBadge = (status: string) => {
@@ -180,7 +180,7 @@ export function WorkshopTaskModal({
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto border-border">
         <DialogHeader>
           <div className="space-y-4">
-            {/* Header with vehicle */}
+            {/* Header with asset */}
             <div className="flex items-center gap-3">
               {getTaskTypeIcon()}
               <DialogTitle className="text-2xl font-bold text-white">

@@ -737,7 +737,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
                   />
                   <Label htmlFor="template-applies-vehicle" className="cursor-pointer flex items-center gap-2">
                     <Truck className="h-4 w-4 text-blue-400" />
-                    Vehicle Tasks
+                    Van Tasks
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
