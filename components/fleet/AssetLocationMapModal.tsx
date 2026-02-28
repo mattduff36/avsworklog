@@ -226,7 +226,7 @@ export function AssetLocationMapModal({
             </span>
             <span className="flex items-center gap-1.5">
               <span className="inline-block h-3 w-3 rounded-full bg-blue-500 border border-blue-400" />
-              Other vehicles / plant
+              Other vans / plant
             </span>
           </div>
         </DialogHeader>

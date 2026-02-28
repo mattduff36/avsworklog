@@ -475,14 +475,14 @@ export default function UsersAdminPage() {
         <TabsList className="grid w-full max-w-md grid-cols-2 bg-slate-100 dark:bg-slate-800 p-0">
           <TabsTrigger 
             value="users" 
-            className="gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900"
           >
             <User className="h-4 w-4" />
             Users
           </TabsTrigger>
           <TabsTrigger 
             value="roles" 
-            className="gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900"
           >
             <Shield className="h-4 w-4" />
             Roles
@@ -582,7 +582,7 @@ export default function UsersAdminPage() {
                   setFormError('');
                   setAddDialogOpen(true);
                 }}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
               >
                 <UserPlus className="h-4 w-4 mr-2" />
                 Add User
@@ -782,7 +782,7 @@ export default function UsersAdminPage() {
             <Button variant="outline" onClick={() => setAddDialogOpen(false)} className="border-slate-600 text-white hover:bg-slate-800">
               Cancel
             </Button>
-            <Button onClick={handleAddUser} disabled={formLoading} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleAddUser} disabled={formLoading} className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900">
               {formLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -873,7 +873,7 @@ export default function UsersAdminPage() {
             <Button variant="outline" onClick={() => setEditDialogOpen(false)} className="border-slate-600 text-white hover:bg-slate-800">
               Cancel
             </Button>
-            <Button onClick={handleEditUser} disabled={formLoading} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleEditUser} disabled={formLoading} className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900">
               {formLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1168,7 +1168,7 @@ export default function UsersAdminPage() {
                 setTemporaryPassword('');
                 setPasswordCopied(false);
               }}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
             >
               Done
             </Button>

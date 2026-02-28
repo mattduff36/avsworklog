@@ -48,18 +48,18 @@ type VehicleWithCategory = {
   id: string;
   reg_number: string;
   vehicle_type: string;
-  vehicle_categories?: { name: string } | null;
+  van_categories?: { name: string } | null;
 };
 
 type InspectionWithRelations = {
   id: string;
   user_id: string;
-  vehicle_id: string;
+  van_id: string;
   inspection_date: string;
   inspection_end_date: string;
   current_mileage: number | null;
   status: string;
-  vehicles?: VehicleWithCategory;
+  vans?: VehicleWithCategory;
   inspection_items?: InspectionItem[];
 };
 
@@ -72,7 +72,7 @@ type LoggedAction = {
     item_description: string;
   } | null;
   van_inspections?: {
-    vehicle_id: string;
+    van_id: string;
   };
 };
 
@@ -99,7 +99,7 @@ function NewInspectionContent() {
     id: string; 
     reg_number: string; 
     vehicle_type: string;
-    vehicle_categories?: { name: string } | null;
+    van_categories?: { name: string } | null;
   }>>([]);
   const [recentVehicleIds, setRecentVehicleIds] = useState<string[]>([]);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
@@ -163,10 +163,10 @@ function NewInspectionContent() {
   const fetchVehicles = useCallback(async () => {
     try {
       const { data, error } = await supabase
-        .from('vehicles')
+        .from('vans')
         .select(`
           *,
-          vehicle_categories (
+          van_categories (
             name
           )
         `)
@@ -186,7 +186,7 @@ function NewInspectionContent() {
     const fetchCategories = async () => {
       try {
         const { data, error } = await supabase
-          .from('vehicle_categories')
+          .from('van_categories')
           .select('id, name')
           .order('name');
 
@@ -222,11 +222,11 @@ function NewInspectionContent() {
         .from('van_inspections')
         .select(`
           *,
-          vehicles (
+          vans (
             id,
             reg_number,
             vehicle_type,
-            vehicle_categories (name)
+            van_categories (name)
           )
         `)
         .eq('id', id)
@@ -246,8 +246,8 @@ function NewInspectionContent() {
 
       let checklist = INSPECTION_ITEMS;
       const inspectionData = inspection as InspectionWithRelations;
-      if (inspectionData.vehicles?.vehicle_categories?.name || inspectionData.vehicles?.vehicle_type) {
-        const categoryName = inspectionData.vehicles?.vehicle_categories?.name || inspectionData.vehicles?.vehicle_type;
+      if (inspectionData.vans?.van_categories?.name || inspectionData.vans?.vehicle_type) {
+        const categoryName = inspectionData.vans?.van_categories?.name || inspectionData.vans?.vehicle_type;
         checklist = getChecklistForCategory(categoryName);
         setCurrentChecklist(checklist);
       }
@@ -261,7 +261,7 @@ function NewInspectionContent() {
       if (itemsError) throw itemsError;
 
       setExistingInspectionId(id);
-      setVehicleId(inspectionData.vehicles?.id || '');
+      setVehicleId(inspectionData.vans?.id || '');
       setWeekEnding(inspection.inspection_end_date || formatDateISO(getWeekEnding()));
       setCurrentMileage(inspection.current_mileage?.toString() || '');
       setSelectedEmployeeId(inspection.user_id);
@@ -366,7 +366,7 @@ function NewInspectionContent() {
       const { data, error } = await supabase
         .from('van_inspections')
         .select('id, status')
-        .eq('vehicle_id', vehicleIdToCheck)
+        .eq('van_id', vehicleIdToCheck)
         .eq('inspection_end_date', weekEndingToCheck)
         .limit(1);
 
@@ -411,7 +411,7 @@ function NewInspectionContent() {
   // Fetch baseline mileage for sanity checking
   const fetchBaselineMileage = async (selectedVehicleId: string) => {
     try {
-      const response = await fetch(`/api/vehicles/mileage-baseline?vehicleId=${selectedVehicleId}`);
+      const response = await fetch(`/api/vans/mileage-baseline?vehicleId=${selectedVehicleId}`);
       if (response.ok) {
         const data = await response.json();
         setBaselineMileage(data.baselineMileage);
@@ -478,7 +478,7 @@ function NewInspectionContent() {
             day_of_week
           )
         `)
-        .eq('vehicle_id', selectedVehicleId)
+        .eq('van_id', selectedVehicleId)
         .eq('status', 'submitted')
         .order('inspection_date', { ascending: false })
         .limit(1)
@@ -754,7 +754,7 @@ function NewInspectionContent() {
       // Format the registration before saving
       const formattedReg = formatRegistration(newVehicleReg.trim());
       
-      type VehicleInsert = Database['public']['Tables']['vehicles']['Insert'];
+      type VehicleInsert = Database['public']['Tables']['vans']['Insert'];
       const vehicleData: VehicleInsert = {
         reg_number: formattedReg,
         category_id: newVehicleCategoryId,
@@ -763,7 +763,7 @@ function NewInspectionContent() {
       };
 
       const { data: newVehicle, error: vehicleError } = await supabase
-        .from('vehicles')
+        .from('vans')
         .insert(vehicleData)
         .select()
         .single();
@@ -852,7 +852,7 @@ function NewInspectionContent() {
       // Create inspection record
       type InspectionInsert = Database['public']['Tables']['van_inspections']['Insert'];
       const inspectionData: InspectionInsert = {
-        vehicle_id: vehicleId,
+        van_id: vehicleId,
         user_id: selectedEmployeeId, // Use selected employee ID (can be manager's own ID or another employee's)
         inspection_date: formatDateISO(startDate),
         inspection_end_date: weekEnding,
@@ -970,7 +970,7 @@ function NewInspectionContent() {
       if (existingInspectionId) {
         type InspectionUpdate = Database['public']['Tables']['van_inspections']['Update'];
         const inspectionUpdate: InspectionUpdate = {
-          vehicle_id: vehicleId,
+          van_id: vehicleId,
           user_id: selectedEmployeeId,
           inspection_date: formatDateISO(startDate),
           inspection_end_date: weekEnding,
@@ -1085,11 +1085,11 @@ function NewInspectionContent() {
               status,
               description,
               van_inspections!inner (
-                vehicle_id
+                van_id
               )
             `)
             .in('status', ['pending', 'logged'])
-            .eq('van_inspections.vehicle_id', vehicleId);
+            .eq('van_inspections.van_id', vehicleId);
 
           if (pendingActions && pendingActions.length > 0) {
             // Get the inspection items from the previous inspection to match with actions
@@ -1346,7 +1346,7 @@ function NewInspectionContent() {
                     // Update checklist based on vehicle category
                     const selectedVehicle = vehicles.find(v => v.id === value);
                     if (selectedVehicle) {
-                      const categoryName = selectedVehicle.vehicle_categories?.name || selectedVehicle.vehicle_type || '';
+                      const categoryName = selectedVehicle.van_categories?.name || selectedVehicle.vehicle_type || '';
                       const checklist = getChecklistForCategory(categoryName);
                       setCurrentChecklist(checklist);
                     }
@@ -1385,7 +1385,7 @@ function NewInspectionContent() {
                             <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">Recent</SelectLabel>
                             {recentVehicles.map((vehicle) => (
                               <SelectItem key={vehicle.id} value={vehicle.id} className="text-white">
-                                {vehicle.reg_number} - {vehicle.vehicle_categories?.name || vehicle.vehicle_type || 'Uncategorized'}
+                                {vehicle.reg_number} - {vehicle.van_categories?.name || vehicle.vehicle_type || 'Uncategorized'}
                               </SelectItem>
                             ))}
                           </SelectGroup>
@@ -1400,7 +1400,7 @@ function NewInspectionContent() {
                             )}
                             {otherVehicles.map((vehicle) => (
                               <SelectItem key={vehicle.id} value={vehicle.id} className="text-white">
-                                {vehicle.reg_number} - {vehicle.vehicle_categories?.name || vehicle.vehicle_type || 'Uncategorized'}
+                                {vehicle.reg_number} - {vehicle.van_categories?.name || vehicle.vehicle_type || 'Uncategorized'}
                               </SelectItem>
                             ))}
                           </SelectGroup>

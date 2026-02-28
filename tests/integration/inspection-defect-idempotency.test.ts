@@ -32,7 +32,7 @@ describe('Inspection Defect Task Idempotency', () => {
   beforeAll(async () => {
     // Create test vehicle with TE57 prefix (test vehicles only)
     const { data: vehicle } = await supabase
-      .from('vehicles')
+      .from('vans')
       .insert({
         reg_number: 'TE57IDEM',
         status: 'active',
@@ -54,7 +54,7 @@ describe('Inspection Defect Task Idempotency', () => {
     const { data: inspection } = await supabase
       .from('van_inspections')
       .insert({
-        vehicle_id: testVehicleId,
+        van_id: testVehicleId,
         user_id: testUserId,
         inspection_date: '2026-01-13',
         inspection_end_date: '2026-01-19',
@@ -85,10 +85,10 @@ describe('Inspection Defect Task Idempotency', () => {
 
   afterAll(async () => {
     // Clean up in reverse order of dependencies
-    await supabase.from('actions').delete().eq('vehicle_id', testVehicleId);
+    await supabase.from('actions').delete().eq('van_id', testVehicleId);
     await supabase.from('inspection_items').delete().eq('inspection_id', testInspectionId);
     await supabase.from('van_inspections').delete().eq('id', testInspectionId);
-    await supabase.from('vehicles').delete().eq('id', testVehicleId);
+    await supabase.from('vans').delete().eq('id', testVehicleId);
   });
 
   it('should create exactly one task on first sync', async () => {
@@ -186,7 +186,7 @@ describe('Inspection Defect Task Idempotency', () => {
     const { data: lockedTasks } = await supabase
       .from('actions')
       .select('*')
-      .eq('vehicle_id', testVehicleId)
+      .eq('van_id', testVehicleId)
       .eq('action_type', 'inspection_defect')
       .in('status', ['logged', 'on_hold', 'in_progress']);
 
@@ -206,7 +206,7 @@ describe('Inspection Defect Task Idempotency', () => {
     const { data: lockedTasks } = await supabase
       .from('actions')
       .select('*')
-      .eq('vehicle_id', testVehicleId)
+      .eq('van_id', testVehicleId)
       .eq('action_type', 'inspection_defect')
       .in('status', ['logged', 'on_hold', 'in_progress']);
 
@@ -226,7 +226,7 @@ describe('Inspection Defect Task Idempotency', () => {
     const { data: lockedTasks } = await supabase
       .from('actions')
       .select('*')
-      .eq('vehicle_id', testVehicleId)
+      .eq('van_id', testVehicleId)
       .eq('action_type', 'inspection_defect')
       .in('status', ['logged', 'on_hold', 'in_progress']);
 
@@ -246,7 +246,7 @@ describe('Inspection Defect Task Idempotency', () => {
     const { data: lockedTasks } = await supabase
       .from('actions')
       .select('*')
-      .eq('vehicle_id', testVehicleId)
+      .eq('van_id', testVehicleId)
       .eq('action_type', 'inspection_defect')
       .in('status', ['logged', 'on_hold', 'in_progress']);
 
@@ -265,7 +265,7 @@ describe('Inspection Defect Task Idempotency', () => {
     const { data: lockedTasks } = await supabase
       .from('actions')
       .select('*')
-      .eq('vehicle_id', testVehicleId)
+      .eq('van_id', testVehicleId)
       .eq('action_type', 'inspection_defect')
       .in('status', ['logged', 'on_hold', 'in_progress']);
 

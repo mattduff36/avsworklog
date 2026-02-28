@@ -4,7 +4,7 @@ import { logger } from '@/lib/utils/logger';
 
 /**
  * GET /api/maintenance/deleted
- * Returns all archived (deleted) vehicles from vehicle_archive
+ * Returns all archived (deleted) vehicles from van_archive
  */
 export async function GET(request: NextRequest) {
   try {
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     
     // Fetch all archived vehicles ordered by most recently archived first
     const { data: archivedVehicles, error: archiveError } = await supabase
-      .from('vehicle_archive')
+      .from('van_archive')
       .select('*')
       .order('archived_at', { ascending: false });
     
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
       
       return {
         id: archive.id, // Archive record ID
-        vehicle_id: archive.vehicle_id, // Original vehicle ID
+        van_id: archive.van_id, // Original van ID
         reg_number: archive.reg_number,
         nickname: vehicleData?.nickname || null,
         current_mileage: maintenanceData?.current_mileage || null,

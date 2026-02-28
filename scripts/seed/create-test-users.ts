@@ -121,7 +121,7 @@ async function createTestUsers() {
     console.log(`📝 Creating vehicle: ${vehicle.reg_number}`);
     
     const { error } = await supabase
-      .from('vehicles')
+      .from('vans')
       .upsert(vehicle, { onConflict: 'reg_number' });
       
     if (error) {

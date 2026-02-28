@@ -54,7 +54,7 @@ async function seedPlantAssets() {
 
     for (const categoryName of categories) {
       const existing = await client.query(
-        'SELECT id FROM vehicle_categories WHERE name = $1',
+        'SELECT id FROM van_categories WHERE name = $1',
         [categoryName]
       );
 
@@ -62,7 +62,7 @@ async function seedPlantAssets() {
         categoryMap.set(categoryName, existing.rows[0].id);
       } else {
         const result = await client.query(
-          'INSERT INTO vehicle_categories (name, description) VALUES ($1, $2) RETURNING id',
+          'INSERT INTO van_categories (name, description) VALUES ($1, $2) RETURNING id',
           [categoryName, `Plant machinery category: ${categoryName}`]
         );
         categoryMap.set(categoryName, result.rows[0].id);

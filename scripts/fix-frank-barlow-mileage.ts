@@ -30,7 +30,7 @@ async function fixMileage() {
     // 1. Find vehicle with registration FE24 TYV (Frank Barlow)
     console.log('📋 Step 1: Finding vehicle FE24 TYV (Frank Barlow)...');
     const { data: vehicles, error: vehicleError } = await supabase
-      .from('vehicles')
+      .from('vans')
       .select('*')
       .eq('reg_number', 'FE24 TYV');
 
@@ -39,14 +39,14 @@ async function fixMileage() {
       
       // Try without space
       const { data: vehicles2 } = await supabase
-        .from('vehicles')
+        .from('vans')
         .select('*')
         .eq('reg_number', 'FE24TVV');
       
       if (!vehicles2 || vehicles2.length === 0) {
         console.log('❌ Still not found. Listing all FE24 vehicles:');
         const { data: allFE24 } = await supabase
-          .from('vehicles')
+          .from('vans')
           .select('*')
           .ilike('reg_number', 'FE24%');
         
@@ -73,7 +73,7 @@ async function fixMileage() {
     const { data: maintenance } = await supabase
       .from('vehicle_maintenance')
       .select('*')
-      .eq('vehicle_id', vehicle.id)
+      .eq('van_id', vehicle.id)
       .single();
 
     if (!maintenance) {
@@ -90,7 +90,7 @@ async function fixMileage() {
     const { data: inspections } = await supabase
       .from('van_inspections')
       .select('*')
-      .eq('vehicle_id', vehicle.id)
+      .eq('van_id', vehicle.id)
       .order('created_at', { ascending: false });
 
     console.log(`\nFound ${inspections?.length || 0} inspections:`);
@@ -166,7 +166,7 @@ async function fixMileage() {
         last_mileage_update: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
-      .eq('vehicle_id', vehicle.id);
+      .eq('van_id', vehicle.id);
 
     if (updateError) {
       console.log(`❌ Failed to update: ${updateError.message}`);
@@ -179,7 +179,7 @@ async function fixMileage() {
     const { data: updatedMaintenance } = await supabase
       .from('vehicle_maintenance')
       .select('*')
-      .eq('vehicle_id', vehicle.id)
+      .eq('van_id', vehicle.id)
       .single();
 
     console.log('✅ Current maintenance record:');

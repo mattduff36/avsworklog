@@ -98,17 +98,17 @@ describe('Plant Table and Fleet Page Bug Fixes', () => {
 
     it('should filter categories correctly based on assetType', () => {
       const categories = [
-        { id: '1', name: 'Car', applies_to: ['vehicle'] },
-        { id: '2', name: 'Van', applies_to: ['vehicle'] },
+        { id: '1', name: 'Car', applies_to: ['van'] },
+        { id: '2', name: 'Van', applies_to: ['van'] },
         { id: '3', name: 'All plant', applies_to: ['plant'] },
-        { id: '4', name: 'Shared', applies_to: ['vehicle', 'plant'] },
+        { id: '4', name: 'Shared', applies_to: ['van', 'plant'] },
       ];
 
       const assetType = 'plant';
 
       // Simulate the filter logic
       const filteredCategories = categories.filter(category => {
-        const appliesTo = category.applies_to || ['vehicle'];
+        const appliesTo = category.applies_to || ['van'];
         return appliesTo.includes(assetType);
       });
 
@@ -124,14 +124,14 @@ describe('Plant Table and Fleet Page Bug Fixes', () => {
 
     it('should prevent users from selecting incorrect categories for plant', () => {
       const categories = [
-        { id: '1', name: 'Car', applies_to: ['vehicle'] },
+        { id: '1', name: 'Car', applies_to: ['van'] },
         { id: '2', name: 'Excavator', applies_to: ['plant'] },
       ];
 
       const assetType = 'plant';
 
       const availableCategories = categories.filter(c => {
-        const appliesTo = c.applies_to || ['vehicle'];
+        const appliesTo = c.applies_to || ['van'];
         return appliesTo.includes(assetType);
       });
 
@@ -144,10 +144,10 @@ describe('Plant Table and Fleet Page Bug Fixes', () => {
   describe('Bug 3: Fleet page category filtering using incorrect logic', () => {
     it('should filter by applies_to field, not by plant usage', () => {
       const categories = [
-        { id: '1', name: 'Car', applies_to: ['vehicle'] },
-        { id: '2', name: 'Van', applies_to: ['vehicle'] },
+        { id: '1', name: 'Car', applies_to: ['van'] },
+        { id: '2', name: 'Van', applies_to: ['van'] },
         { id: '3', name: 'All plant', applies_to: ['plant'] },
-        { id: '4', name: 'Shared', applies_to: ['vehicle', 'plant'] },
+        { id: '4', name: 'Shared', applies_to: ['van', 'plant'] },
       ];
 
       const plantAssets = [
@@ -160,8 +160,8 @@ describe('Plant Table and Fleet Page Bug Fixes', () => {
 
       // AFTER (correct): Filter by applies_to field
       const correctVehicleCategories = categories.filter(c => {
-        const appliesTo = c.applies_to || ['vehicle'];
-        return appliesTo.includes('vehicle');
+        const appliesTo = c.applies_to || ['van'];
+        return appliesTo.includes('van');
       });
 
       // Incorrect logic would exclude "Shared" category
@@ -178,7 +178,7 @@ describe('Plant Table and Fleet Page Bug Fixes', () => {
 
     it('should show vehicle categories even if plant uses them (shared categories)', () => {
       const categories = [
-        { id: '1', name: 'Shared Category', applies_to: ['vehicle', 'plant'] },
+        { id: '1', name: 'Shared Category', applies_to: ['van', 'plant'] },
       ];
 
       const plantAssets = [
@@ -187,8 +187,8 @@ describe('Plant Table and Fleet Page Bug Fixes', () => {
 
       // Correct logic: Filter by applies_to
       const vehicleCategories = categories.filter(c => {
-        const appliesTo = c.applies_to || ['vehicle'];
-        return appliesTo.includes('vehicle');
+        const appliesTo = c.applies_to || ['van'];
+        return appliesTo.includes('van');
       });
 
       // Should still show the category in vehicle section
@@ -199,12 +199,12 @@ describe('Plant Table and Fleet Page Bug Fixes', () => {
     it('should handle categories without applies_to field (legacy data)', () => {
       const categories = [
         { id: '1', name: 'Legacy Car', applies_to: undefined },
-        { id: '2', name: 'Modern Van', applies_to: ['vehicle'] },
+        { id: '2', name: 'Modern Van', applies_to: ['van'] },
       ];
 
       const vehicleCategories = categories.filter(c => {
-        const appliesTo = (c as any).applies_to || ['vehicle']; // Default to ['vehicle']
-        return appliesTo.includes('vehicle');
+        const appliesTo = (c as any).applies_to || ['van']; // Default to ['van']
+        return appliesTo.includes('van');
       });
 
       // Both should be included (legacy defaults to vehicle)
@@ -213,20 +213,20 @@ describe('Plant Table and Fleet Page Bug Fixes', () => {
 
     it('should correctly separate vehicle and plant categories', () => {
       const categories = [
-        { id: '1', name: 'Car', applies_to: ['vehicle'] },
-        { id: '2', name: 'Van', applies_to: ['vehicle'] },
+        { id: '1', name: 'Car', applies_to: ['van'] },
+        { id: '2', name: 'Van', applies_to: ['van'] },
         { id: '3', name: 'Excavator', applies_to: ['plant'] },
         { id: '4', name: 'Telehandler', applies_to: ['plant'] },
-        { id: '5', name: 'Road Sweeper', applies_to: ['vehicle', 'plant'] },
+        { id: '5', name: 'Road Sweeper', applies_to: ['van', 'plant'] },
       ];
 
       const vehicleCategories = categories.filter(c => {
-        const appliesTo = c.applies_to || ['vehicle'];
-        return appliesTo.includes('vehicle');
+        const appliesTo = c.applies_to || ['van'];
+        return appliesTo.includes('van');
       });
 
       const plantCategories = categories.filter(c => {
-        const appliesTo = c.applies_to || ['vehicle'];
+        const appliesTo = c.applies_to || ['van'];
         return appliesTo.includes('plant');
       });
 
@@ -273,7 +273,7 @@ describe('Plant Table and Fleet Page Bug Fixes', () => {
     it('should handle complete plant creation workflow', () => {
       // 1. Categories with applies_to
       const categories = [
-        { id: '1', name: 'Car', applies_to: ['vehicle'] },
+        { id: '1', name: 'Car', applies_to: ['van'] },
         { id: '2', name: 'Excavator', applies_to: ['plant'] },
       ];
 
@@ -282,7 +282,7 @@ describe('Plant Table and Fleet Page Bug Fixes', () => {
 
       // 3. Filter categories
       const availableCategories = categories.filter(c => {
-        const appliesTo = c.applies_to || ['vehicle'];
+        const appliesTo = c.applies_to || ['van'];
         return appliesTo.includes(dialogAssetType);
       });
 
@@ -293,9 +293,9 @@ describe('Plant Table and Fleet Page Bug Fixes', () => {
 
     it('should handle fleet page category separation correctly', () => {
       const categories = [
-        { id: '1', name: 'Car', applies_to: ['vehicle'] },
+        { id: '1', name: 'Car', applies_to: ['van'] },
         { id: '2', name: 'Excavator', applies_to: ['plant'] },
-        { id: '3', name: 'Shared', applies_to: ['vehicle', 'plant'] },
+        { id: '3', name: 'Shared', applies_to: ['van', 'plant'] },
       ];
 
       // Plant uses shared category
@@ -305,8 +305,8 @@ describe('Plant Table and Fleet Page Bug Fixes', () => {
 
       // Vehicle section should still show shared category
       const vehicleCategories = categories.filter(c => {
-        const appliesTo = c.applies_to || ['vehicle'];
-        return appliesTo.includes('vehicle');
+        const appliesTo = c.applies_to || ['van'];
+        return appliesTo.includes('van');
       });
 
       expect(vehicleCategories).toHaveLength(2);

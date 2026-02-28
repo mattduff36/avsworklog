@@ -48,19 +48,19 @@ describe('Plant Maintenance API Tests', () => {
     it('should have plant_id column in maintenance_history table', async () => {
       const { data, error } = await supabase
         .from('maintenance_history')
-        .select('plant_id, vehicle_id')
+        .select('plant_id, van_id')
         .limit(1);
 
       expect(error).toBeNull();
       // Schema should allow plant_id field
     });
 
-    it('should enforce either vehicle_id OR plant_id constraint', async () => {
+    it('should enforce either van_id OR plant_id constraint', async () => {
       // This constraint is at DB level, testing that queries work correctly
       const { data: vehicleHistory } = await supabase
         .from('maintenance_history')
         .select('*')
-        .not('vehicle_id', 'is', null)
+        .not('van_id', 'is', null)
         .limit(1);
 
       const { data: plantHistory } = await supabase
@@ -114,7 +114,7 @@ describe('Plant Maintenance API Tests', () => {
           current_hours,
           status,
           reg_number,
-          vehicle_categories (
+          van_categories (
             name
           )
         `)
@@ -188,7 +188,7 @@ describe('Plant Maintenance API Tests', () => {
         expect(entry).toHaveProperty('field_name');
         expect(entry).toHaveProperty('comment');
         expect(entry).toHaveProperty('updated_by_name');
-        expect(entry.vehicle_id).toBeNull();
+        expect(entry.van_id).toBeNull();
       }
     });
   });

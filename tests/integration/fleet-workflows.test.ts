@@ -68,7 +68,7 @@ describe('Fleet Module Workflows', () => {
 
     it('should fetch all active vehicles (alternative direct query)', async () => {
       const { data: vehicles, error } = await supabase
-        .from('vehicles')
+        .from('vans')
         .select('*')
         .neq('status', 'deleted')
         .order('nickname');
@@ -81,7 +81,7 @@ describe('Fleet Module Workflows', () => {
     it('should fetch vehicle with maintenance data', async () => {
       // SAFETY: ONLY get test vehicles starting with TE57
       const { data: vehicles } = await supabase
-        .from('vehicles')
+        .from('vans')
         .select('id')
         .ilike('reg_number', 'TE57%')
         .neq('status', 'deleted')
@@ -103,10 +103,10 @@ describe('Fleet Module Workflows', () => {
             reg_number,
             nickname,
             category_id,
-            vehicle_categories(id, name)
+            van_categories(id, name)
           )
         `)
-        .eq('vehicle_id', vehicleId)
+        .eq('van_id', vehicleId)
         .maybeSingle();
 
       if (error) {
@@ -119,7 +119,7 @@ describe('Fleet Module Workflows', () => {
       }
 
       expect(vehicleData).toBeDefined();
-      expect(vehicleData?.vehicle_id).toBe(vehicleId);
+      expect(vehicleData?.van_id).toBe(vehicleId);
       
       // Set testVehicleId for other tests
       testVehicleId = vehicleId;
@@ -135,7 +135,7 @@ describe('Fleet Module Workflows', () => {
       const { data: vmRecord } = await supabase
         .from('vehicle_maintenance')
         .select('id')
-        .eq('vehicle_id', testVehicleId)
+        .eq('van_id', testVehicleId)
         .single();
 
       if (!vmRecord) {
@@ -167,7 +167,7 @@ describe('Fleet Module Workflows', () => {
         .from('actions')
         .select(`
           *,
-          vehicle:vehicles!vehicle_id(id, reg_number, nickname),
+          vehicle:vehicles!van_id(id, reg_number, nickname),
           category:workshop_task_categories(id, name, slug),
           subcategory:workshop_task_subcategories(id, name, slug)
         `)
@@ -201,7 +201,7 @@ describe('Fleet Module Workflows', () => {
         .from('actions')
         .select('*')
         .eq('action_type', 'workshop_task')
-        .eq('vehicle_id', testVehicleId);
+        .eq('van_id', testVehicleId);
 
       expect(error).toBeNull();
       expect(vehicleTasks).toBeDefined();
@@ -238,7 +238,7 @@ describe('Fleet Module Workflows', () => {
 
     it('should fetch all vehicle categories', async () => {
       const { data: categories, error} = await supabase
-        .from('vehicle_categories')
+        .from('van_categories')
         .select('*')
         .order('name');
 

@@ -43,7 +43,7 @@ async function checkHistory() {
     const { rows: history } = await client.query(`
       SELECT *
       FROM maintenance_history
-      WHERE vehicle_id = $1
+      WHERE van_id = $1
       ORDER BY created_at DESC
     `, [vehicleId]);
 

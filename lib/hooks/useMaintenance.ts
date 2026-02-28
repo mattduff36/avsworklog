@@ -118,16 +118,16 @@ export function useCreateMaintenance() {
 
   return useMutation({
     mutationFn: async ({ 
-      vehicle_id, 
+      van_id, 
       data 
     }: { 
-      vehicle_id: string; 
+      van_id: string; 
       data: UpdateMaintenanceRequest 
     }): Promise<MaintenanceUpdateResponse> => {
       const response = await fetch('/api/maintenance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vehicle_id, ...data }),
+        body: JSON.stringify({ van_id, ...data }),
       });
 
       if (!response.ok) {

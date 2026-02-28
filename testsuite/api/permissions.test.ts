@@ -55,7 +55,7 @@ describe('@permissions API Endpoint Access Control', () => {
     const protectedEndpoints = [
       '/api/admin/users',
       '/api/admin/roles',
-      '/api/admin/vehicles',
+      '/api/admin/vans',
       '/api/admin/categories',
       '/api/reports/stats',
     ];

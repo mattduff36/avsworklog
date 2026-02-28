@@ -89,7 +89,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendRemin
 
     // Get vehicle info
     const { data: vehicle, error: vehicleError } = await supabase
-      .from('vehicles')
+      .from('vans')
       .select('id, reg_number, nickname')
       .eq('id', vehicleId)
       .single();

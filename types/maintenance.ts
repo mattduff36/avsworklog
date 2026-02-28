@@ -11,7 +11,7 @@ export interface MaintenanceCategory {
   alert_threshold_days: number | null;
   alert_threshold_miles: number | null;
   alert_threshold_hours: number | null;
-  applies_to: ('vehicle' | 'plant')[];
+  applies_to: ('van' | 'plant')[];
   is_active: boolean;
   sort_order: number;
   created_at: string;
@@ -37,7 +37,7 @@ export interface MaintenanceCategoryWithRecipients extends MaintenanceCategory {
 
 export interface VehicleMaintenance {
   id: string;
-  vehicle_id: string;
+  van_id: string;
   
   // Date-based maintenance
   tax_due_date: string | null;
@@ -121,7 +121,7 @@ export interface VehicleMaintenance {
 
 export interface MaintenanceHistory {
   id: string;
-  vehicle_id: string | null;
+  van_id: string | null;
   plant_id: string | null;
   maintenance_category_id: string | null;
   field_name: string;
@@ -136,7 +136,7 @@ export interface MaintenanceHistory {
 
 export interface VehicleArchive {
   id: string;
-  vehicle_id: string;
+  van_id: string;
   reg_number: string;
   category_id: string | null;
   status: string | null;
@@ -175,7 +175,7 @@ export interface VehicleMaintenanceWithStatus extends VehicleMaintenance {
     category_id: string | null;
     status: string;
     nickname?: string | null;
-    asset_type?: 'vehicle' | 'plant' | 'tool';
+    asset_type?: 'van' | 'plant' | 'tool';
     plant_id?: string | null;
     serial_number?: string | null;
     year?: number | null;
@@ -228,7 +228,7 @@ export interface CreateCategoryRequest {
   alert_threshold_days?: number;
   alert_threshold_miles?: number;
   alert_threshold_hours?: number;
-  applies_to?: ('vehicle' | 'plant')[];
+  applies_to?: ('van' | 'plant')[];
   sort_order?: number;
   responsibility?: CategoryResponsibility;
   show_on_overview?: boolean;
@@ -243,7 +243,7 @@ export interface UpdateCategoryRequest {
   alert_threshold_days?: number;
   alert_threshold_miles?: number;
   alert_threshold_hours?: number;
-  applies_to?: ('vehicle' | 'plant')[];
+  applies_to?: ('van' | 'plant')[];
   is_active?: boolean;
   sort_order?: number;
   responsibility?: CategoryResponsibility;
@@ -253,7 +253,7 @@ export interface UpdateCategoryRequest {
 }
 
 export interface ArchiveVehicleRequest {
-  vehicle_id: string;
+  van_id: string;
   reason: 'Sold' | 'Scrapped' | 'Other';
   comment?: string;
 }
@@ -331,7 +331,7 @@ export interface MaintenanceHistoryResponse {
 
 export interface DeletedVehicle {
   id: string; // Archive record ID
-  vehicle_id: string; // Original vehicle ID
+  van_id: string; // Original van ID
   reg_number: string;
   nickname: string | null;
   current_mileage: number | null;

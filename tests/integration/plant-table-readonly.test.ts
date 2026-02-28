@@ -84,7 +84,7 @@ describe('Plant Table Read-Only Verification', () => {
 
     it('should NOT have plant rows in vehicles table', async () => {
       const { data, error } = await supabase
-        .from('vehicles')
+        .from('vans')
         .select('id')
         .eq('asset_type', 'plant')
         .limit(1);
@@ -263,40 +263,40 @@ describe('Plant Table Read-Only Verification', () => {
       }
     });
 
-    it('should NOT have actions with both vehicle_id and plant_id', async () => {
+    it('should NOT have actions with both van_id and plant_id', async () => {
       const { data, error } = await supabase
         .from('actions')
-        .select('id, vehicle_id, plant_id')
-        .not('vehicle_id', 'is', null)
+        .select('id, van_id, plant_id')
+        .not('van_id', 'is', null)
         .not('plant_id', 'is', null);
 
       expect(error).toBeNull();
       expect(data).toEqual([]);
-      console.log(`✅ No actions have both vehicle_id and plant_id (constraint enforced)`);
+      console.log(`✅ No actions have both van_id and plant_id (constraint enforced)`);
     });
 
-    it('should NOT have maintenance with both vehicle_id and plant_id', async () => {
+    it('should NOT have maintenance with both van_id and plant_id', async () => {
       const { data, error } = await supabase
         .from('vehicle_maintenance')
-        .select('id, vehicle_id, plant_id')
-        .not('vehicle_id', 'is', null)
+        .select('id, van_id, plant_id')
+        .not('van_id', 'is', null)
         .not('plant_id', 'is', null);
 
       expect(error).toBeNull();
       expect(data).toEqual([]);
-      console.log(`✅ No maintenance records have both vehicle_id and plant_id (constraint enforced)`);
+      console.log(`✅ No maintenance records have both van_id and plant_id (constraint enforced)`);
     });
 
-    it('should NOT have inspections with both vehicle_id and plant_id', async () => {
+    it('should NOT have inspections with both van_id and plant_id', async () => {
       const { data, error } = await supabase
         .from('plant_inspections')
-        .select('id, vehicle_id, plant_id')
-        .not('vehicle_id', 'is', null)
+        .select('id, van_id, plant_id')
+        .not('van_id', 'is', null)
         .not('plant_id', 'is', null);
 
       expect(error).toBeNull();
       expect(data).toEqual([]);
-      console.log(`✅ No inspections have both vehicle_id and plant_id (constraint enforced)`);
+      console.log(`✅ No inspections have both van_id and plant_id (constraint enforced)`);
     });
   });
 

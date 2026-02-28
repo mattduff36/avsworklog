@@ -52,7 +52,7 @@ const VAN_CHECKLIST_ITEMS = [
 
 interface Inspection {
   id: string;
-  vehicle_id: string;
+  van_id: string;
   user_id: string;
   status: string;
   inspection_date: string;
@@ -66,7 +66,7 @@ interface Inspection {
   manager_comments: string | null;
   created_at: string;
   updated_at: string;
-  vehicles?: {
+  vans?: {
     reg_number: string;
   };
 }
@@ -89,7 +89,7 @@ async function main() {
       .from('vehicle_inspections')
       .select(`
         *,
-        vehicles (
+        vans (
           reg_number
         )
       `);
@@ -115,7 +115,7 @@ async function main() {
 
       // Check if this is a 26-point checklist (182 items)
       if (items && items.length === 182) {
-        const regNumber = (inspection as any).vehicles?.reg_number || 'Unknown';
+        const regNumber = (inspection as any).vans?.reg_number || 'Unknown';
 
         // Exclude test vehicles
         if (regNumber === 'TE57 VAN' || regNumber === 'TE57 HGV') {
@@ -156,7 +156,7 @@ async function main() {
     let errorCount = 0;
 
     for (const inspection of inspectionsToMigrate) {
-      const regNumber = (inspection as any).vehicles?.reg_number || 'Unknown';
+      const regNumber = (inspection as any).vans?.reg_number || 'Unknown';
       console.log(`\n📝 Migrating: ${regNumber} (${inspection.status}) - ${inspection.id}`);
 
       try {
@@ -249,7 +249,7 @@ async function main() {
         .eq('inspection_id', inspection.id);
 
       if (items && items.length === 182) {
-        const regNumber = (inspection as any).vehicles?.reg_number || 'Unknown';
+        const regNumber = (inspection as any).vans?.reg_number || 'Unknown';
         if (regNumber !== 'TE57 VAN' && regNumber !== 'TE57 HGV') {
           remainingCount++;
           console.log(`   ⚠️  Still has 182 items: ${regNumber} (${inspection.id})`);

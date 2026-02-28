@@ -13,7 +13,7 @@ type ActionInsert = Database['public']['Tables']['actions']['Insert'];
  * TODO: This is a simplified implementation. For full idempotency logic,
  * adapt the complete implementation from /api/inspections/sync-defect-tasks/route.ts
  * Key changes:
- * - Use plant_id instead of vehicle_id
+ * - Use plant_id instead of van linkage
  * - Use plant.plant_id (not reg_number) in task titles
  * - Filter categories by applies_to='plant'
  */
@@ -121,7 +121,6 @@ export async function POST(request: NextRequest) {
       const taskData: ActionInsert = {
         action_type: 'inspection_defect',
         plant_id: plantId,
-        vehicle_id: null,
         title: `Plant ${plantNumber}: ${defect.item_description}`,
         description: `Item ${defect.item_number} - ${defect.item_description}${daysPart}\n\nComment: ${defect.comment}`,
         status: 'pending',

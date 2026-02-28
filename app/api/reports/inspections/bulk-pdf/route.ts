@@ -43,10 +43,10 @@ export async function GET(request: NextRequest) {
       .from('van_inspections')
       .select(`
         *,
-        vehicle:vehicles(
+        vehicle:vans(
           reg_number, 
           vehicle_type,
-          vehicle_categories(name)
+          van_categories(name)
         ),
         profile:profiles!vehicle_inspections_user_id_fkey(full_name)
       `)
@@ -221,10 +221,10 @@ export async function POST(request: NextRequest) {
           .from('van_inspections')
           .select(`
             *,
-            vehicle:vehicles(
+            vehicle:vans(
               reg_number, 
               vehicle_type,
-              vehicle_categories(name)
+              van_categories(name)
             ),
             profile:profiles!vehicle_inspections_user_id_fkey(full_name)
           `)

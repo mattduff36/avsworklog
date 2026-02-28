@@ -44,7 +44,7 @@ export function ProcessTimesheetModal({
           <AlertDialogAction
             onClick={onConfirm}
             disabled={processing}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
           >
             {processing ? 'Processing...' : 'Mark as Processed'}
           </AlertDialogAction>

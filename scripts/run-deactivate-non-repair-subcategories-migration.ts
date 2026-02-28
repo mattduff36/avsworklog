@@ -56,7 +56,7 @@ async function runMigration() {
       SELECT s.name, s.is_active
       FROM workshop_task_subcategories s
       INNER JOIN workshop_task_categories c ON s.category_id = c.id
-      WHERE c.slug = 'repair' AND c.applies_to = 'vehicle'
+      WHERE c.slug = 'repair' AND c.applies_to = 'van'
       ORDER BY s.name
     `);
     for (const sub of repairSubs.rows) {
@@ -71,7 +71,7 @@ async function runMigration() {
       SELECT s.name, s.is_active, c.name AS category_name
       FROM workshop_task_subcategories s
       INNER JOIN workshop_task_categories c ON s.category_id = c.id
-      WHERE NOT (c.slug = 'repair' AND c.applies_to = 'vehicle')
+      WHERE NOT (c.slug = 'repair' AND c.applies_to = 'van')
       ORDER BY c.name, s.name
     `);
     if (nonRepairSubs.rows.length === 0) {

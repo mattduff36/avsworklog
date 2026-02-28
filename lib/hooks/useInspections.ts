@@ -4,7 +4,7 @@ import { VanInspection } from '@/types/inspection';
 import { InspectionStatusFilter } from '@/types/common';
 
 interface InspectionWithVehicle extends VanInspection {
-  vehicles: {
+  vans: {
     reg_number: string;
     vehicle_type: string;
   };
@@ -29,7 +29,7 @@ export function useInspections({ userId, isManager, selectedEmployeeId, statusFi
         .from('van_inspections')
         .select(`
           *,
-          vehicles (
+          vans (
             reg_number,
             vehicle_type
           ),

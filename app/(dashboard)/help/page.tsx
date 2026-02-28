@@ -127,7 +127,7 @@ export default function HelpPage() {
       if (isManager || isAdmin) {
         setUserPermissions(new Set([
           'timesheets', 'inspections', 'rams', 'absence', 'maintenance', 'workshop-tasks',
-          'approvals', 'actions', 'reports', 'admin-users', 'admin-vehicles'
+          'approvals', 'actions', 'reports', 'admin-users', 'admin-vans'
         ] as ModuleName[]));
         return;
       }

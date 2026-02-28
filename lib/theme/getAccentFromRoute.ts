@@ -11,9 +11,9 @@ export type AccentType =
   | 'rams'
   | 'absence'
   | 'maintenance'
+  | 'fleet'
   | 'workshop'
-  | 'reports'
-  | 'brand'; // yellow for Dashboard, Manager/Admin, Help
+  | 'brand'; // yellow for Dashboard, Manager/Admin, Help, Reports
 
 /**
  * Determine the accent color for a given route
@@ -35,12 +35,12 @@ export function getAccentFromRoute(
   if (path.startsWith('/projects')) return 'rams';
   if (path.startsWith('/rams')) return 'rams';
   if (path.startsWith('/absence')) return 'absence';
+  if (path.startsWith('/maintenance')) return 'maintenance';
   if (path.startsWith('/workshop-tasks')) return 'workshop';
-  if (path.startsWith('/reports')) return 'reports';
+  if (path.startsWith('/reports')) return 'brand';
 
-  // Fleet pages → always use maintenance color for consistency
-  // (prevents jarring color changes when switching between tabs)
-  if (path.startsWith('/fleet')) return 'maintenance';
+  // Fleet pages → use fleet accent (rust/brick, distinct from maintenance red)
+  if (path.startsWith('/fleet')) return 'fleet';
 
   // All other routes → brand yellow
   // This includes:

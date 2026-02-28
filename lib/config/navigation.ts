@@ -56,26 +56,17 @@ export const employeeNavItems: NavItem[] = [
   },
   { 
     href: '/van-inspections', 
-    label: 'Inspections', 
+    label: 'Van Inspections', 
     icon: ClipboardCheck, 
     module: 'inspections',
-    category: 'employee',
-    dropdownItems: [
-      {
-        href: '/van-inspections',
-        label: 'Van Inspections',
-        icon: ClipboardCheck,
-        module: 'inspections',
-        category: 'employee'
-      },
-      {
-        href: '/plant-inspections',
-        label: 'Plant Inspections',
-        icon: ClipboardCheck,
-        module: 'plant-inspections',
-        category: 'employee'
-      }
-    ]
+    category: 'employee'
+  },
+  { 
+    href: '/plant-inspections', 
+    label: 'Plant Inspections', 
+    icon: ClipboardCheck, 
+    module: 'plant-inspections',
+    category: 'employee'
   },
   { 
     href: '/projects', 

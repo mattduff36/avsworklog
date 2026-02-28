@@ -22,7 +22,7 @@ type Vehicle = {
   plant_id: string | null;
   nickname: string | null;
   serial_number: string | null;
-  asset_type: 'vehicle' | 'plant' | 'tool';
+  asset_type: 'van' | 'plant' | 'tool';
 };
 
 type Category = {
@@ -31,7 +31,7 @@ type Category = {
   slug: string | null;
   is_active: boolean;
   sort_order: number;
-  applies_to: 'vehicle' | 'plant';
+  applies_to: 'van' | 'plant';
 };
 
 type Subcategory = {
@@ -42,7 +42,7 @@ type Subcategory = {
   is_active: boolean;
   sort_order: number;
   workshop_task_categories?: {
-    applies_to: 'vehicle' | 'plant';
+    applies_to: 'van' | 'plant';
   };
 };
 
@@ -86,18 +86,18 @@ export function CreateWorkshopTaskDialog({
 
   const fetchCurrentMeterReading = useCallback(async (assetId: string) => {
     try {
-      // First, determine asset type by checking both vehicles and plant tables
+      // First, determine asset type by checking both vans and plant tables
       // This is necessary because this function may be called before the vehicles state is populated
       let isPlant = false;
       
-      // Check if it's a vehicle
+      // Check if it's a van
       const { data: vehicleData } = await supabase
-        .from('vehicles')
+        .from('vans')
         .select('id')
         .eq('id', assetId)
         .maybeSingle();
       
-      // If not found in vehicles, check plant table
+      // If not found in vans, check plant table
       if (!vehicleData) {
         const { data: plantData } = await supabase
           .from('plant')
@@ -120,7 +120,7 @@ export function CreateWorkshopTaskDialog({
       const { data, error } = await supabase
         .from('vehicle_maintenance')
         .select(isPlant ? 'current_hours' : 'current_mileage')
-        .eq(isPlant ? 'plant_id' : 'vehicle_id', assetId)
+        .eq(isPlant ? 'plant_id' : 'van_id', assetId)
         .single();
 
       if (error) {
@@ -144,9 +144,9 @@ export function CreateWorkshopTaskDialog({
     if (open) {
       async function fetchVehicles() {
         try {
-          // Fetch vehicles
+          // Fetch vans
           const { data: vehicleData, error: vehicleError } = await supabase
-            .from('vehicles')
+            .from('vans')
             .select('id, reg_number, nickname')
             .eq('status', 'active')
             .order('reg_number');
@@ -169,7 +169,7 @@ export function CreateWorkshopTaskDialog({
               reg_number: v.reg_number,
               plant_id: null,
               nickname: v.nickname,
-              asset_type: 'vehicle' as const
+              asset_type: 'van' as const
             })),
             ...(plantData || []).map(p => ({
               id: p.id,
@@ -182,7 +182,7 @@ export function CreateWorkshopTaskDialog({
 
           setVehicles(combinedVehicles);
         } catch (err) {
-          console.error('Error fetching vehicles:', err);
+          console.error('Error fetching vans:', err);
         }
       }
 
@@ -249,7 +249,7 @@ export function CreateWorkshopTaskDialog({
 
   // Get selected vehicle's asset type
   const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
-  const selectedAssetType = selectedVehicle?.asset_type || 'vehicle';
+  const selectedAssetType = selectedVehicle?.asset_type || 'van';
 
   // Filter categories by selected vehicle's asset type
   const filteredCategories = categories.filter(cat => cat.applies_to === selectedAssetType);
@@ -336,11 +336,11 @@ export function CreateWorkshopTaskDialog({
         taskData.workshop_subcategory_id = null;
       }
 
-      // Set either vehicle_id or plant_id, not both
+      // Set either van_id or plant_id, not both
       if (isPlant) {
         taskData.plant_id = selectedVehicleId;
       } else {
-        taskData.vehicle_id = selectedVehicleId;
+        taskData.van_id = selectedVehicleId;
       }
 
       const { data: newTask, error } = await supabase
@@ -387,16 +387,16 @@ export function CreateWorkshopTaskDialog({
         updateData.current_hours = readingValue;
         updateData.last_hours_update = new Date().toISOString();
       } else {
-        updateData.vehicle_id = selectedVehicleId;
+        updateData.van_id = selectedVehicleId;
         updateData.current_mileage = readingValue;
         updateData.last_mileage_update = new Date().toISOString();
       }
 
       // Use select-then-insert/update instead of upsert (no guaranteed UNIQUE constraint
-      // on vehicle_id/plant_id, which makes ON CONFLICT fail in Postgres).
+      // on van_id/plant_id, which makes ON CONFLICT fail in Postgres).
       let meterReadingUpdated = false;
       try {
-        const idColumn = isPlant ? 'plant_id' : 'vehicle_id';
+        const idColumn = isPlant ? 'plant_id' : 'van_id';
         const { data: existingMaintenance, error: existingMaintenanceError } = await supabase
           .from('vehicle_maintenance')
           .select('id')

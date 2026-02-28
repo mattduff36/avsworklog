@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     // Fetch vehicles matching prefix
     const adminSupabase = getSupabaseAdmin();
     const { data: vehicles, error } = await adminSupabase
-      .from('vehicles')
+      .from('vans')
       .select('id, reg_number, nickname, status')
       .ilike('reg_number', `${prefix}%`)
       .order('reg_number');
@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
 
     // SECURITY: Verify all selected vehicles match the prefix
     const { data: vehiclesToProcess, error: vehicleError } = await adminSupabase
-      .from('vehicles')
+      .from('vans')
       .select('id, reg_number')
       .in('id', vehicle_ids);
 
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
       const { count: inspectionCount } = await adminSupabase
         .from('van_inspections')
         .select('id', { count: 'exact', head: true })
-        .in('vehicle_id', vehicleIds);
+        .in('van_id', vehicleIds);
 
       counts.inspections = inspectionCount || 0;
 
@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
         const { error: deleteError } = await adminSupabase
           .from('van_inspections')
           .delete()
-          .in('vehicle_id', vehicleIds);
+          .in('van_id', vehicleIds);
 
         if (deleteError) {
           throw deleteError;
@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
       const { count: taskCount } = await adminSupabase
         .from('actions')
         .select('id', { count: 'exact', head: true })
-        .in('vehicle_id', vehicleIds)
+        .in('van_id', vehicleIds)
         .in('action_type', ['inspection_defect', 'workshop_vehicle_task']);
 
       counts.workshop_tasks = taskCount || 0;
@@ -205,7 +205,7 @@ export async function POST(request: NextRequest) {
         const { error: deleteError } = await adminSupabase
           .from('actions')
           .delete()
-          .in('vehicle_id', vehicleIds)
+          .in('van_id', vehicleIds)
           .in('action_type', ['inspection_defect', 'workshop_vehicle_task']);
 
         if (deleteError) {
@@ -221,7 +221,7 @@ export async function POST(request: NextRequest) {
       const { data: tasksForAttachments } = await adminSupabase
         .from('actions')
         .select('id')
-        .in('vehicle_id', vehicleIds)
+        .in('van_id', vehicleIds)
         .in('action_type', ['inspection_defect', 'workshop_vehicle_task']);
 
       const taskIdsForAttachments = tasksForAttachments?.map(t => t.id) || [];
@@ -277,14 +277,14 @@ export async function POST(request: NextRequest) {
       const { count: maintenanceCount } = await adminSupabase
         .from('vehicle_maintenance')
         .select('id', { count: 'exact', head: true })
-        .in('vehicle_id', vehicleIds);
+        .in('van_id', vehicleIds);
 
       counts.maintenance_records = maintenanceCount || 0;
 
       const { count: historyCount } = await adminSupabase
         .from('maintenance_history')
         .select('id', { count: 'exact', head: true })
-        .in('vehicle_id', vehicleIds);
+        .in('van_id', vehicleIds);
 
       counts.maintenance_history = historyCount || 0;
 
@@ -294,7 +294,7 @@ export async function POST(request: NextRequest) {
           const { error: historyError } = await adminSupabase
             .from('maintenance_history')
             .delete()
-            .in('vehicle_id', vehicleIds);
+            .in('van_id', vehicleIds);
 
           if (historyError) {
             throw historyError;
@@ -306,7 +306,7 @@ export async function POST(request: NextRequest) {
           const { error: maintenanceError } = await adminSupabase
             .from('vehicle_maintenance')
             .delete()
-            .in('vehicle_id', vehicleIds);
+            .in('van_id', vehicleIds);
 
           if (maintenanceError) {
             throw maintenanceError;
@@ -321,7 +321,7 @@ export async function POST(request: NextRequest) {
       const { count: dvlaCount } = await adminSupabase
         .from('dvla_sync_log')
         .select('id', { count: 'exact', head: true })
-        .in('vehicle_id', vehicleIds);
+        .in('van_id', vehicleIds);
 
       counts.dvla_sync_logs = dvlaCount || 0;
 
@@ -329,7 +329,7 @@ export async function POST(request: NextRequest) {
         const { error: dvlaError } = await adminSupabase
           .from('dvla_sync_log')
           .delete()
-          .in('vehicle_id', vehicleIds);
+          .in('van_id', vehicleIds);
 
         if (dvlaError) {
           throw dvlaError;
@@ -343,7 +343,7 @@ export async function POST(request: NextRequest) {
       const { count: motCount } = await adminSupabase
         .from('mot_test_history')
         .select('id', { count: 'exact', head: true })
-        .in('vehicle_id', vehicleIds);
+        .in('van_id', vehicleIds);
 
       counts.mot_test_history = motCount || 0;
 
@@ -352,7 +352,7 @@ export async function POST(request: NextRequest) {
         const { error: motError } = await adminSupabase
           .from('mot_test_history')
           .delete()
-          .in('vehicle_id', vehicleIds);
+          .in('van_id', vehicleIds);
 
         if (motError) {
           throw motError;
@@ -366,7 +366,7 @@ export async function POST(request: NextRequest) {
       const regNumbers = vehiclesToProcess.map(v => v.reg_number);
 
       const { count: archiveCount } = await adminSupabase
-        .from('vehicle_archive')
+        .from('van_archive')
         .select('id', { count: 'exact', head: true })
         .in('reg_number', regNumbers);
 
@@ -374,7 +374,7 @@ export async function POST(request: NextRequest) {
 
       if (mode === 'execute' && counts.vehicle_archives > 0) {
         const { error: archiveError } = await adminSupabase
-          .from('vehicle_archive')
+          .from('van_archive')
           .delete()
           .in('reg_number', regNumbers);
 
@@ -471,7 +471,7 @@ export async function DELETE(request: NextRequest) {
 
     // SECURITY: Verify all selected vehicles match the prefix
     const { data: vehiclesToProcess, error: vehicleError } = await adminSupabase
-      .from('vehicles')
+      .from('vans')
       .select('id, reg_number, category_id, status')
       .in('id', vehicle_ids);
 
@@ -509,7 +509,7 @@ export async function DELETE(request: NextRequest) {
       for (const vehicle of vehiclesToProcess) {
         // Get full vehicle data for archiving
         const { data: fullVehicle } = await adminSupabase
-          .from('vehicles')
+          .from('vans')
           .select('*, vehicle_maintenance(*)')
           .eq('id', vehicle.id)
           .single();
@@ -517,9 +517,9 @@ export async function DELETE(request: NextRequest) {
         if (fullVehicle) {
           // Archive the vehicle
           const { error: archiveError } = await adminSupabase
-            .from('vehicle_archive')
+            .from('van_archive')
             .insert({
-              vehicle_id: fullVehicle.id,
+              van_id: fullVehicle.id,
               reg_number: fullVehicle.reg_number,
               category_id: fullVehicle.category_id,
               status: fullVehicle.status,
@@ -540,7 +540,7 @@ export async function DELETE(request: NextRequest) {
 
           // Mark vehicle as archived
           const { error: updateError } = await adminSupabase
-            .from('vehicles')
+            .from('vans')
             .update({ status: 'archived' })
             .eq('id', vehicle.id);
 
@@ -578,7 +578,7 @@ export async function DELETE(request: NextRequest) {
       const { data: tasksToDelete } = await adminSupabase
         .from('actions')
         .select('id')
-        .in('vehicle_id', vehicleIds)
+        .in('van_id', vehicleIds)
         .in('action_type', ['inspection_defect', 'workshop_vehicle_task']);
 
       const taskIds = tasksToDelete?.map(t => t.id) || [];
@@ -660,7 +660,7 @@ export async function DELETE(request: NextRequest) {
       const { count: inspectionsCount } = await adminSupabase
         .from('van_inspections')
         .select('id', { count: 'exact', head: true })
-        .in('vehicle_id', vehicleIds);
+        .in('van_id', vehicleIds);
 
       deleteCounts.inspections = inspectionsCount || 0;
 
@@ -668,7 +668,7 @@ export async function DELETE(request: NextRequest) {
         const { error: deleteInspectionsError } = await adminSupabase
           .from('van_inspections')
           .delete()
-          .in('vehicle_id', vehicleIds);
+          .in('van_id', vehicleIds);
 
         if (deleteInspectionsError) {
           throw deleteInspectionsError;
@@ -679,7 +679,7 @@ export async function DELETE(request: NextRequest) {
       const { count: historyCount } = await adminSupabase
         .from('maintenance_history')
         .select('id', { count: 'exact', head: true })
-        .in('vehicle_id', vehicleIds);
+        .in('van_id', vehicleIds);
 
       deleteCounts.maintenance_history = historyCount || 0;
 
@@ -687,7 +687,7 @@ export async function DELETE(request: NextRequest) {
         const { error: deleteHistoryError } = await adminSupabase
           .from('maintenance_history')
           .delete()
-          .in('vehicle_id', vehicleIds);
+          .in('van_id', vehicleIds);
 
         if (deleteHistoryError) {
           throw deleteHistoryError;
@@ -698,7 +698,7 @@ export async function DELETE(request: NextRequest) {
       const { count: dvlaCount } = await adminSupabase
         .from('dvla_sync_log')
         .select('id', { count: 'exact', head: true })
-        .in('vehicle_id', vehicleIds);
+        .in('van_id', vehicleIds);
 
       deleteCounts.dvla_sync_logs = dvlaCount || 0;
 
@@ -706,7 +706,7 @@ export async function DELETE(request: NextRequest) {
         const { error: deleteDvlaError } = await adminSupabase
           .from('dvla_sync_log')
           .delete()
-          .in('vehicle_id', vehicleIds);
+          .in('van_id', vehicleIds);
 
         if (deleteDvlaError) {
           throw deleteDvlaError;
@@ -717,7 +717,7 @@ export async function DELETE(request: NextRequest) {
       const { count: motCount } = await adminSupabase
         .from('mot_test_history')
         .select('id', { count: 'exact', head: true })
-        .in('vehicle_id', vehicleIds);
+        .in('van_id', vehicleIds);
 
       deleteCounts.mot_test_history = motCount || 0;
 
@@ -725,7 +725,7 @@ export async function DELETE(request: NextRequest) {
         const { error: deleteMotError } = await adminSupabase
           .from('mot_test_history')
           .delete()
-          .in('vehicle_id', vehicleIds);
+          .in('van_id', vehicleIds);
 
         if (deleteMotError) {
           throw deleteMotError;
@@ -736,7 +736,7 @@ export async function DELETE(request: NextRequest) {
       const { count: maintenanceRecordCount } = await adminSupabase
         .from('vehicle_maintenance')
         .select('id', { count: 'exact', head: true })
-        .in('vehicle_id', vehicleIds);
+        .in('van_id', vehicleIds);
 
       deleteCounts.vehicle_maintenance = maintenanceRecordCount || 0;
 
@@ -744,7 +744,7 @@ export async function DELETE(request: NextRequest) {
         const { error: deleteMaintenanceError } = await adminSupabase
           .from('vehicle_maintenance')
           .delete()
-          .in('vehicle_id', vehicleIds);
+          .in('van_id', vehicleIds);
 
         if (deleteMaintenanceError) {
           throw deleteMaintenanceError;
@@ -754,7 +754,7 @@ export async function DELETE(request: NextRequest) {
       // 9. Delete vehicle archives
       const regNumbers = vehiclesToProcess.map(v => v.reg_number);
       const { count: archiveCount } = await adminSupabase
-        .from('vehicle_archive')
+        .from('van_archive')
         .select('id', { count: 'exact', head: true })
         .in('reg_number', regNumbers);
 
@@ -762,7 +762,7 @@ export async function DELETE(request: NextRequest) {
 
       if (deleteCounts.vehicle_archives > 0) {
         const { error: deleteArchivesError } = await adminSupabase
-          .from('vehicle_archive')
+          .from('van_archive')
           .delete()
           .in('reg_number', regNumbers);
 
@@ -773,7 +773,7 @@ export async function DELETE(request: NextRequest) {
 
       // 10. Finally, delete the vehicles themselves
       const { error: vehicleDeleteError } = await adminSupabase
-        .from('vehicles')
+        .from('vans')
         .delete()
         .in('id', vehicleIds);
 

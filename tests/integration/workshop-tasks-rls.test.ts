@@ -55,7 +55,7 @@ describe('Workshop Tasks RLS Policies', () => {
 
     // SAFETY: ONLY use test vehicles starting with TE57
     const vehicle = await supabase
-      .from('vehicles')
+      .from('vans')
       .select('id')
       .ilike('reg_number', 'TE57%')
       .eq('status', 'active')
@@ -64,9 +64,9 @@ describe('Workshop Tasks RLS Policies', () => {
     
     // If no TE57 test vehicle exists, create one
     if (!vehicle.data) {
-      const categoryId = (await supabase.from('vehicle_categories').select('id').limit(1).single()).data?.id;
+      const categoryId = (await supabase.from('van_categories').select('id').limit(1).single()).data?.id;
       const newVehicle = await supabase
-        .from('vehicles')
+        .from('vans')
         .insert({
           reg_number: 'TE57WSHP',
           status: 'active',
@@ -96,7 +96,7 @@ describe('Workshop Tasks RLS Policies', () => {
         .from('workshop_task_categories')
         .insert({
           name: 'Test Category',
-          applies_to: 'vehicle',
+          applies_to: 'van',
           is_active: true,
           sort_order: 999,
           created_by: testManagerId,
@@ -112,7 +112,7 @@ describe('Workshop Tasks RLS Policies', () => {
   afterAll(async () => {
     // Cleanup test vehicle if we created it
     if (createdTestVehicle) {
-      await supabase.from('vehicles').delete().eq('id', testVehicleId);
+      await supabase.from('vans').delete().eq('id', testVehicleId);
     }
     
     // Cleanup test data
@@ -142,7 +142,7 @@ describe('Workshop Tasks RLS Policies', () => {
         .from('workshop_task_categories')
         .insert({
           name: 'Manager Test Category',
-          applies_to: 'vehicle',
+          applies_to: 'van',
           is_active: true,
           sort_order: 1000,
           created_by: testManagerId,
@@ -173,7 +173,7 @@ describe('Workshop Tasks RLS Policies', () => {
         .from('workshop_task_categories')
         .insert({
           name: 'Temp Delete Category',
-          applies_to: 'vehicle',
+          applies_to: 'van',
           is_active: true,
           sort_order: 1001,
           created_by: testManagerId,
@@ -196,7 +196,7 @@ describe('Workshop Tasks RLS Policies', () => {
         .from('actions')
         .insert({
           action_type: 'workshop_vehicle_task',
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
           workshop_category_id: testCategoryId,
           workshop_comments: 'Test workshop task for RLS verification',
           title: 'Test Workshop Task',
@@ -211,7 +211,7 @@ describe('Workshop Tasks RLS Policies', () => {
       expect(error).toBeNull();
       expect(data).toBeDefined();
       expect(data!.action_type).toBe('workshop_vehicle_task');
-      expect(data!.vehicle_id).toBe(testVehicleId);
+      expect(data!.van_id).toBe(testVehicleId);
       
       testWorkshopTaskId = data!.id;
     });
@@ -278,7 +278,7 @@ describe('Workshop Tasks RLS Policies', () => {
       const { data: inspection } = await supabase
         .from('van_inspections')
         .insert({
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
           user_id: testManagerId,
           inspection_date: new Date().toISOString().split('T')[0],
           inspection_end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -383,7 +383,7 @@ describe('Workshop Tasks RLS Policies', () => {
 
       expect(error).toBeNull();
       expect(data).toBeDefined();
-      expect(data!.vehicle_id).toBeNull();
+      expect(data!.van_id).toBeNull();
       expect(data!.workshop_category_id).toBeNull();
       expect(data!.workshop_comments).toBeNull();
 
@@ -416,7 +416,7 @@ describe('Workshop Tasks RLS Policies', () => {
         .from('actions')
         .select(`
           *,
-          vehicles (
+          vans (
             id,
             reg_number
           )
@@ -426,8 +426,8 @@ describe('Workshop Tasks RLS Policies', () => {
 
       expect(error).toBeNull();
       expect(data).toBeDefined();
-      expect(data!.vehicles).toBeDefined();
-      expect(data!.vehicles.id).toBe(testVehicleId);
+      expect(data!.vans).toBeDefined();
+      expect(data!.vans.id).toBe(testVehicleId);
     });
   });
 
@@ -451,13 +451,13 @@ describe('Workshop Tasks RLS Policies', () => {
       expect(queryTime).toBeLessThan(500);
     });
 
-    it('should efficiently query by vehicle_id', async () => {
+    it('should efficiently query by van_id', async () => {
       const startTime = Date.now();
       
       const { data, error } = await supabase
         .from('actions')
-        .select('id, vehicle_id, status')
-        .eq('vehicle_id', testVehicleId)
+        .select('id, van_id, status')
+        .eq('van_id', testVehicleId)
         .limit(50);
 
       const queryTime = Date.now() - startTime;
@@ -628,7 +628,7 @@ describe('Workshop Tasks RLS Policies', () => {
         .from('actions')
         .insert({
           action_type: 'workshop_vehicle_task',
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
           workshop_category_id: testCategoryId,
           title: 'Temp task for cascade test',
           priority: 'medium',

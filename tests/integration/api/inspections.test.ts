@@ -11,17 +11,17 @@ describe('Inspections API', () => {
     it('should allow authenticated users to create inspections', () => {
       const inspection = {
         id: 'test-inspection-id',
-        vehicle_id: 'vehicle-id',
+        van_id: 'vehicle-id',
         user_id: 'user-id',
         week_ending: '2024-12-01',
         status: 'draft',
       };
 
       expect(inspection.status).toBe('draft');
-      expect(inspection.vehicle_id).toBeDefined();
+      expect(inspection.van_id).toBeDefined();
     });
 
-    it('should require vehicle_id', () => {
+    it('should require van_id', () => {
       const invalidInspection = {
         id: 'test-id',
         user_id: 'user-id',
@@ -30,13 +30,13 @@ describe('Inspections API', () => {
       };
 
       // In real API, this would return 400
-      expect(invalidInspection).not.toHaveProperty('vehicle_id');
+      expect(invalidInspection).not.toHaveProperty('van_id');
     });
 
     it('should default to draft status', () => {
       const inspection = {
         id: 'test-id',
-        vehicle_id: 'vehicle-id',
+        van_id: 'vehicle-id',
         user_id: 'user-id',
         week_ending: '2024-12-01',
         status: 'draft',
@@ -109,19 +109,19 @@ describe('Inspections API', () => {
 
     it('should prevent duplicate submissions for same vehicle/week', () => {
       const existingInspection = {
-        vehicle_id: 'vehicle-1',
+        van_id: 'vehicle-1',
         week_ending: '2024-12-01',
         status: 'submitted',
       };
 
       const duplicateAttempt = {
-        vehicle_id: 'vehicle-1',
+        van_id: 'vehicle-1',
         week_ending: '2024-12-01',
         status: 'draft',
       };
 
       // In real API, this would check for duplicates and return 409
-      expect(existingInspection.vehicle_id).toBe(duplicateAttempt.vehicle_id);
+      expect(existingInspection.van_id).toBe(duplicateAttempt.van_id);
       expect(existingInspection.week_ending).toBe(duplicateAttempt.week_ending);
     });
   });
@@ -157,7 +157,7 @@ describe('Inspections API', () => {
     it('should generate PDF for truck inspections with 26 items', () => {
       const inspection = {
         id: 'inspection-id',
-        vehicle: { vehicle_categories: { name: 'Truck' } },
+        vehicle: { van_categories: { name: 'Truck' } },
         items: Array.from({ length: 26 * 7 }, (_, i) => ({
           item_number: (i % 26) + 1,
           day_of_week: Math.floor(i / 26) + 1,
@@ -171,7 +171,7 @@ describe('Inspections API', () => {
     it('should generate PDF for van inspections with 14 items', () => {
       const inspection = {
         id: 'inspection-id',
-        vehicle: { vehicle_categories: { name: 'Van' } },
+        vehicle: { van_categories: { name: 'Van' } },
         items: Array.from({ length: 14 * 7 }, (_, i) => ({
           item_number: (i % 14) + 1,
           day_of_week: Math.floor(i / 14) + 1,

@@ -22,9 +22,9 @@ const categorySchema = z.object({
   alert_threshold_days: z.coerce.number().int().positive().optional().nullable(),
   alert_threshold_miles: z.coerce.number().int().positive().optional().nullable(),
   alert_threshold_hours: z.coerce.number().int().positive().optional().nullable(),
-  applies_to: z.array(z.enum(['vehicle', 'plant']))
+  applies_to: z.array(z.enum(['van', 'plant']))
     .min(1, 'Category must apply to at least one asset type')
-    .default(['vehicle']),
+    .default(['van']),
   is_active: z.boolean().optional(),
   responsibility: z.enum(['workshop', 'office']).default('workshop'),
   show_on_overview: z.boolean().default(true),
@@ -65,7 +65,7 @@ describe('CategoryDialog period_value validation', () => {
         name: 'Tax Due Date',
         type: 'date' as const,
         alert_threshold_days: 30,
-        applies_to: ['vehicle' as const],
+        applies_to: ['van' as const],
       };
 
       const result = categorySchema.safeParse(data);
@@ -81,7 +81,7 @@ describe('CategoryDialog period_value validation', () => {
         name: 'Service Due',
         type: 'mileage' as const,
         alert_threshold_miles: 1000,
-        applies_to: ['vehicle' as const],
+        applies_to: ['van' as const],
       };
 
       const result = categorySchema.safeParse(data);
@@ -108,7 +108,7 @@ describe('CategoryDialog period_value validation', () => {
         type: 'date' as const,
         period_value: 0,
         alert_threshold_days: 30,
-        applies_to: ['vehicle' as const],
+        applies_to: ['van' as const],
       };
 
       const result = categorySchema.safeParse(data);
@@ -121,7 +121,7 @@ describe('CategoryDialog period_value validation', () => {
         type: 'date' as const,
         period_value: -6,
         alert_threshold_days: 30,
-        applies_to: ['vehicle' as const],
+        applies_to: ['van' as const],
       };
 
       const result = categorySchema.safeParse(data);
@@ -134,7 +134,7 @@ describe('CategoryDialog period_value validation', () => {
         type: 'date' as const,
         period_value: 6.5,
         alert_threshold_days: 30,
-        applies_to: ['vehicle' as const],
+        applies_to: ['van' as const],
       };
 
       const result = categorySchema.safeParse(data);
@@ -149,7 +149,7 @@ describe('CategoryDialog period_value validation', () => {
         type: 'date' as const,
         period_value: 12,
         alert_threshold_days: 30,
-        applies_to: ['vehicle' as const],
+        applies_to: ['van' as const],
       };
 
       const result = categorySchema.safeParse(data);
@@ -162,7 +162,7 @@ describe('CategoryDialog period_value validation', () => {
         type: 'mileage' as const,
         period_value: 10000,
         alert_threshold_miles: 1000,
-        applies_to: ['vehicle' as const],
+        applies_to: ['van' as const],
       };
 
       const result = categorySchema.safeParse(data);
@@ -189,7 +189,7 @@ describe('CategoryDialog period_value validation', () => {
         name: 'Test Category',
         type: 'date' as const,
         alert_threshold_days: 30,
-        applies_to: ['vehicle' as const],
+        applies_to: ['van' as const],
       };
 
       const result = categorySchema.safeParse(data);
@@ -210,7 +210,7 @@ describe('CategoryDialog period_value validation', () => {
         type: 'mileage' as const,
         period_value: 0,
         alert_threshold_miles: 1000,
-        applies_to: ['vehicle' as const],
+        applies_to: ['van' as const],
       };
 
       const result = categorySchema.safeParse(data);
@@ -231,7 +231,7 @@ describe('CategoryDialog period_value validation', () => {
         name: 'MOT Due Date',
         type: 'date' as const,
         alert_threshold_days: 30,
-        applies_to: ['vehicle' as const],
+        applies_to: ['van' as const],
       };
 
       const result = categorySchema.safeParse(data);
@@ -243,7 +243,7 @@ describe('CategoryDialog period_value validation', () => {
         name: 'MOT Due Date',
         type: 'date' as const,
         period_value: 12,
-        applies_to: ['vehicle' as const],
+        applies_to: ['van' as const],
       };
 
       const result = categorySchema.safeParse(data);
@@ -256,7 +256,7 @@ describe('CategoryDialog period_value validation', () => {
         type: 'date' as const,
         period_value: 12,
         alert_threshold_days: 30,
-        applies_to: ['vehicle' as const],
+        applies_to: ['van' as const],
       };
 
       const result = categorySchema.safeParse(data);
@@ -271,7 +271,7 @@ describe('CategoryDialog period_value validation', () => {
         type: 'date' as const,
         period_value: '12',
         alert_threshold_days: 30,
-        applies_to: ['vehicle' as const],
+        applies_to: ['van' as const],
       };
 
       const result = categorySchema.safeParse(data);
@@ -287,7 +287,7 @@ describe('CategoryDialog period_value validation', () => {
         type: 'mileage' as const,
         period_value: '10000',
         alert_threshold_miles: 1000,
-        applies_to: ['vehicle' as const],
+        applies_to: ['van' as const],
       };
 
       const result = categorySchema.safeParse(data);
@@ -303,7 +303,7 @@ describe('CategoryDialog period_value validation', () => {
         type: 'date' as const,
         period_value: 'abc',
         alert_threshold_days: 30,
-        applies_to: ['vehicle' as const],
+        applies_to: ['van' as const],
       };
 
       const result = categorySchema.safeParse(data);

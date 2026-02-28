@@ -105,7 +105,7 @@ async function runMigrations() {
     }
     
     const plantCategoriesCheck = await client.query(`
-      SELECT name FROM vehicle_categories 
+      SELECT name FROM van_categories 
       WHERE name IN ('Excavation & Earthmoving', 'Loading & Material Handling', 'Compaction, Crushing & Processing', 'Transport & Utility Vehicles', 'Access & Site Support', 'Unclassified')
     `);
     

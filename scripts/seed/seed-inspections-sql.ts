@@ -54,7 +54,7 @@ async function seedInspections() {
   try {
     // First, get users and vehicles
     const { data: users } = await supabase.from('profiles').select('id, full_name').limit(5);
-    const { data: vehicles } = await supabase.from('vehicles').select('id, reg_number').limit(5);
+    const { data: vehicles } = await supabase.from('vans').select('id, reg_number').limit(5);
 
     if (!users || !vehicles || users.length === 0 || vehicles.length === 0) {
       console.error('❌ No users or vehicles found');
@@ -84,7 +84,7 @@ async function seedInspections() {
           .from('van_inspections')
           .insert({
             user_id: user.id,
-            vehicle_id: vehicle.id,
+            van_id: vehicle.id,
             inspection_date: weekStart.toISOString().split('T')[0],
             inspection_end_date: weekEnd.toISOString().split('T')[0],
             current_mileage: Math.floor(50000 + Math.random() * 50000),

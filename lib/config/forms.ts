@@ -108,7 +108,7 @@ export const FORM_TYPES: FormType[] = [
     icon: Truck,
     href: '/fleet',
     listHref: '/fleet',
-    color: 'maintenance',
+    color: 'fleet',
     enabled: true,
   },
   {

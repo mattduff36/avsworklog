@@ -29,7 +29,7 @@ async function fixCompletedTasks() {
         created_by,
         actioned_at,
         workshop_comments,
-        vehicles (
+        vans (
           reg_number,
           nickname
         )
@@ -52,7 +52,7 @@ async function fixCompletedTasks() {
 
     affectedTasks.forEach((task, idx) => {
       console.log(`${idx + 1}. Task ID: ${task.id}`);
-      console.log(`   Vehicle: ${task.vehicles?.reg_number || 'Unknown'}`);
+      console.log(`   Vehicle: ${task.vans?.reg_number || 'Unknown'}`);
       console.log(`   Created: ${new Date(task.created_at).toLocaleString()}`);
       console.log(`   Comments: ${task.workshop_comments || 'None'}`);
       console.log('');

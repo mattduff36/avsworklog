@@ -42,7 +42,7 @@ async function cleanupDraftInspections() {
         id,
         inspection_date,
         inspection_end_date,
-        vehicles (
+        vans (
           reg_number
         )
       `)
@@ -64,7 +64,7 @@ async function cleanupDraftInspections() {
     // Display drafts that will be cleaned
     console.log('📝 Draft inspections that will be reset:\n');
     draftInspections?.forEach((draft: any, index: number) => {
-      const vehicle = draft.vehicles?.reg_number || 'Unknown vehicle';
+      const vehicle = draft.vans?.reg_number || 'Unknown vehicle';
       const dateRange = draft.inspection_end_date 
         ? `${draft.inspection_date} to ${draft.inspection_end_date}`
         : draft.inspection_date;

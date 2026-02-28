@@ -32,16 +32,16 @@ import {
 } from '@/components/ui/alert-dialog';
 
 interface InspectionWithVehicle extends VanInspection {
-  vehicles: {
+  vans: {
     reg_number: string;
-    vehicle_categories: { name: string } | null;
+    van_categories: { name: string } | null;
   };
 }
 
 interface Vehicle {
   id: string;
   reg_number: string;
-  vehicle_categories: { name: string } | null;
+  van_categories: { name: string } | null;
 }
 
 function InspectionsContent() {
@@ -62,7 +62,7 @@ function InspectionsContent() {
     defaultValue: 'all' as InspectionStatusFilter,
     shallow: false,
   });
-  const [vehicleFilter, setVehicleFilter] = useQueryState('vehicle', {
+  const [vehicleFilter, setVehicleFilter] = useQueryState('van', {
     defaultValue: 'all',
     shallow: false,
   });
@@ -94,11 +94,11 @@ function InspectionsContent() {
     const fetchVehicles = async () => {
       try {
         const { data, error } = await supabase
-          .from('vehicles')
+          .from('vans')
           .select(`
             id, 
             reg_number, 
-            vehicle_categories (
+            van_categories (
               name
             )
           `)
@@ -110,7 +110,7 @@ function InspectionsContent() {
         const msg = err instanceof Error ? err.message : String(err);
         const isNetworkErr = msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.toLowerCase().includes('network');
         if (isNetworkErr) {
-          console.warn('Unable to load vehicles (network):', err);
+          console.warn('Unable to load vans (network):', err);
         } else {
           console.error('Error fetching vehicles:', err);
         }
@@ -131,9 +131,9 @@ function InspectionsContent() {
         .from('van_inspections')
         .select(`
           *,
-          vehicles (
+          vans (
             reg_number,
-            vehicle_categories (
+            van_categories (
               name
             )
           ),
@@ -164,7 +164,7 @@ function InspectionsContent() {
       // Apply van filter
       const currentVehicleFilter = vehicleFilter || 'all';
       if (currentVehicleFilter !== 'all') {
-        query = query.eq('vehicle_id', currentVehicleFilter);
+        query = query.eq('van_id', currentVehicleFilter);
       }
 
       const { data, error } = await query;
@@ -329,7 +329,7 @@ function InspectionsContent() {
     e.stopPropagation(); // Prevent card click
     setInspectionToDelete({
       id: inspection.id,
-      vehicleReg: inspection.vehicles?.reg_number || 'Unknown',
+      vehicleReg: inspection.vans?.reg_number || 'Unknown',
       date: formatDate(inspection.inspection_date),
     });
     setDeleteDialogOpen(true);
@@ -456,7 +456,7 @@ function InspectionsContent() {
                                 {recentVehicles.map((vehicle) => (
                                   <SelectItem key={vehicle.id} value={vehicle.id}>
                                     {vehicle.reg_number}
-                                    {vehicle.vehicle_categories?.name && ` (${vehicle.vehicle_categories.name})`}
+                                    {vehicle.van_categories?.name && ` (${vehicle.van_categories.name})`}
                                   </SelectItem>
                                 ))}
                               </SelectGroup>
@@ -472,7 +472,7 @@ function InspectionsContent() {
                                 {otherVehicles.map((vehicle) => (
                                   <SelectItem key={vehicle.id} value={vehicle.id}>
                                     {vehicle.reg_number}
-                                    {vehicle.vehicle_categories?.name && ` (${vehicle.vehicle_categories.name})`}
+                                    {vehicle.van_categories?.name && ` (${vehicle.van_categories.name})`}
                                   </SelectItem>
                                 ))}
                               </SelectGroup>
@@ -549,7 +549,7 @@ function InspectionsContent() {
                     {getStatusIcon(inspection.status)}
                     <div>
                       <CardTitle className="text-lg text-white">
-                        {inspection.vehicles?.reg_number || 'Unknown Van'}
+                        {inspection.vans?.reg_number || 'Unknown Van'}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
                         {isManager && (inspection as any).profile?.full_name && (
@@ -558,7 +558,7 @@ function InspectionsContent() {
                             {' • '}
                           </span>
                         )}
-                        {inspection.vehicles?.vehicle_categories?.name && `${inspection.vehicles.vehicle_categories.name} • `}
+                        {inspection.vans?.van_categories?.name && `${inspection.vans.van_categories.name} • `}
                         {inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
                           ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
                           : formatDate(inspection.inspection_date)

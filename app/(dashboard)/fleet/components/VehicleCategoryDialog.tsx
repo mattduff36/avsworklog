@@ -44,7 +44,7 @@ export function VehicleCategoryDialog({
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [appliesToVehicle, setAppliesToVehicle] = useState(true);
+  const [appliesToVan, setAppliesToVan] = useState(true);
   const [appliesToPlant, setAppliesToPlant] = useState(false);
 
   // Reset form when dialog opens/closes or category changes
@@ -53,13 +53,13 @@ export function VehicleCategoryDialog({
       if (mode === 'edit' && category) {
         setName(category.name);
         setDescription(category.description || '');
-        const appliesTo = category.applies_to || ['vehicle'];
-        setAppliesToVehicle(appliesTo.includes('vehicle'));
+        const appliesTo = category.applies_to || ['van'];
+        setAppliesToVan(appliesTo.includes('van'));
         setAppliesToPlant(appliesTo.includes('plant'));
       } else {
         setName('');
         setDescription('');
-        setAppliesToVehicle(true);
+        setAppliesToVan(true);
         setAppliesToPlant(false);
       }
     }
@@ -73,7 +73,7 @@ export function VehicleCategoryDialog({
       return;
     }
 
-    if (!appliesToVehicle && !appliesToPlant) {
+    if (!appliesToVan && !appliesToPlant) {
       toast.error('Category must apply to at least one asset type');
       return;
     }
@@ -88,7 +88,7 @@ export function VehicleCategoryDialog({
       const method = mode === 'create' ? 'POST' : 'PUT';
 
       const appliesTo: string[] = [];
-      if (appliesToVehicle) appliesTo.push('vehicle');
+      if (appliesToVan) appliesTo.push('van');
       if (appliesToPlant) appliesTo.push('plant');
 
       const response = await fetch(url, {
@@ -108,8 +108,8 @@ export function VehicleCategoryDialog({
 
       toast.success(
         mode === 'create' 
-          ? 'Vehicle category created successfully'
-          : 'Vehicle category updated successfully'
+          ? 'Fleet category created successfully'
+          : 'Fleet category updated successfully'
       );
 
       onOpenChange(false);
@@ -170,15 +170,15 @@ export function VehicleCategoryDialog({
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
                   <Checkbox
-                    id="applies-vehicle"
-                    checked={appliesToVehicle}
-                    onCheckedChange={(checked) => setAppliesToVehicle(checked as boolean)}
+                    id="applies-van"
+                    checked={appliesToVan}
+                    onCheckedChange={(checked) => setAppliesToVan(checked as boolean)}
                     disabled={loading}
                     className="border-slate-600"
                   />
-                  <Label htmlFor="applies-vehicle" className="text-white cursor-pointer flex items-center gap-2">
+                  <Label htmlFor="applies-van" className="text-white cursor-pointer flex items-center gap-2">
                     <Truck className="h-4 w-4 text-blue-400" />
-                    Vehicles
+                    Vans
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -214,7 +214,7 @@ export function VehicleCategoryDialog({
             <Button
               type="submit"
               disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-fleet hover:bg-fleet-dark"
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {mode === 'create' ? 'Create Category' : 'Save Changes'}

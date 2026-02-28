@@ -11,7 +11,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
     it('should demonstrate the type mismatch issue before fix', () => {
       // Before fix: VehicleMaintenanceWithStatus doesn't include is_plant
       const vehicleMaintenanceTypeBefore = {
-        vehicle_id: 'v1',
+        van_id: 'v1',
         overdue_count: 0,
         due_soon_count: 0,
         // is_plant property missing from type ❌
@@ -19,7 +19,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
 
       // PlantOverview creates objects with is_plant
       const plantObjectFromPlantOverview = {
-        vehicle_id: 'p1',
+        van_id: 'p1',
         plant_id: 'P001',
         is_plant: true, // ✅ Set by PlantOverview
         overdue_count: 1,
@@ -37,21 +37,21 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
     it('should show type definition now includes is_plant property', () => {
       // After fix: VehicleMaintenanceWithStatus includes is_plant
       type VehicleMaintenanceWithStatus = {
-        vehicle_id: string;
+        van_id: string;
         is_plant?: boolean; // ✅ Now included in type
         overdue_count: number;
         due_soon_count: number;
       };
 
       const plantAsset: VehicleMaintenanceWithStatus = {
-        vehicle_id: 'p1',
+        van_id: 'p1',
         is_plant: true, // ✅ Type-safe
         overdue_count: 1,
         due_soon_count: 0,
       };
 
       const regularVehicle: VehicleMaintenanceWithStatus = {
-        vehicle_id: 'v1',
+        van_id: 'v1',
         is_plant: false, // ✅ Type-safe
         overdue_count: 0,
         due_soon_count: 0,
@@ -63,7 +63,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
 
     it('should correctly route plant assets to plant history', () => {
       const plantAsset = {
-        vehicle_id: 'plant-uuid-123',
+        van_id: 'plant-uuid-123',
         is_plant: true, // ✅ Now type-safe
         vehicle: {
           id: 'plant-uuid-123',
@@ -71,7 +71,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
       };
 
       const isPlant = plantAsset.is_plant === true;
-      const assetId = plantAsset.vehicle?.id || plantAsset.vehicle_id;
+      const assetId = plantAsset.vehicle?.id || plantAsset.van_id;
       const route = isPlant
         ? `/fleet/plant/${assetId}/history`
         : `/fleet/vehicles/${assetId}/history`;
@@ -82,7 +82,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
 
     it('should correctly route regular vehicles to vehicle history', () => {
       const regularVehicle = {
-        vehicle_id: 'vehicle-uuid-456',
+        van_id: 'vehicle-uuid-456',
         is_plant: false, // ✅ Now type-safe
         vehicle: {
           id: 'vehicle-uuid-456',
@@ -90,7 +90,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
       };
 
       const isPlant = regularVehicle.is_plant === true;
-      const assetId = regularVehicle.vehicle?.id || regularVehicle.vehicle_id;
+      const assetId = regularVehicle.vehicle?.id || regularVehicle.van_id;
       const route = isPlant
         ? `/fleet/plant/${assetId}/history`
         : `/fleet/vehicles/${assetId}/history`;
@@ -104,7 +104,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
     it('should show is_plant was undefined causing routing failure', () => {
       // Simulating PlantOverview setting is_plant
       const plantAssetObject = {
-        vehicle_id: 'p1',
+        van_id: 'p1',
         is_plant: true, // Set by PlantOverview
       };
 
@@ -114,7 +114,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
       // Before fix: Type system doesn't know about is_plant
       // Code accesses vehicle.is_plant, gets undefined if not set
       const vehicleWithoutIsPlant = {
-        vehicle_id: 'v1',
+        van_id: 'v1',
         // is_plant not set
       };
 
@@ -131,14 +131,14 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
     it('should demonstrate navigation failures for plant assets', () => {
       // Plant asset created by PlantOverview
       const plantAsset = {
-        vehicle_id: 'plant-uuid-123',
+        van_id: 'plant-uuid-123',
         is_plant: true,
       };
 
       // Before fix: If type doesn't include is_plant, it might be stripped or ignored
       // Simulating what happens when type doesn't match
       const assetWithoutTypeProperty = {
-        vehicle_id: 'plant-uuid-123',
+        van_id: 'plant-uuid-123',
         // is_plant: true, // ❌ Lost due to type mismatch
       };
 
@@ -158,7 +158,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
   describe('Type safety improvements', () => {
     it('should ensure is_plant property is preserved through type system', () => {
       type VehicleMaintenanceWithStatus = {
-        vehicle_id: string;
+        van_id: string;
         is_plant?: boolean; // ✅ Included in type
         overdue_count: number;
         due_soon_count: number;
@@ -166,7 +166,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
 
       const createPlantAsset = (): VehicleMaintenanceWithStatus => {
         return {
-          vehicle_id: 'p1',
+          van_id: 'p1',
           is_plant: true, // ✅ Type-safe, won't be lost
           overdue_count: 1,
           due_soon_count: 0,
@@ -179,14 +179,14 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
 
     it('should handle undefined is_plant gracefully', () => {
       type VehicleMaintenanceWithStatus = {
-        vehicle_id: string;
+        van_id: string;
         is_plant?: boolean; // Optional
         overdue_count: number;
         due_soon_count: number;
       };
 
       const vehicleWithoutFlag: VehicleMaintenanceWithStatus = {
-        vehicle_id: 'v1',
+        van_id: 'v1',
         // is_plant not set (undefined)
         overdue_count: 0,
         due_soon_count: 0,
@@ -199,14 +199,14 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
 
     it('should support explicit false value for is_plant', () => {
       type VehicleMaintenanceWithStatus = {
-        vehicle_id: string;
+        van_id: string;
         is_plant?: boolean;
         overdue_count: number;
         due_soon_count: number;
       };
 
       const vehicle: VehicleMaintenanceWithStatus = {
-        vehicle_id: 'v1',
+        van_id: 'v1',
         is_plant: false, // Explicitly set to false
         overdue_count: 0,
         due_soon_count: 0,
@@ -228,7 +228,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
       };
 
       const plantMaintenanceWithStatus = {
-        vehicle_id: plant.id,
+        van_id: plant.id,
         plant_id: plant.plant_id,
         is_plant: true, // ✅ Set by PlantOverview
         current_hours: plant.current_hours,
@@ -241,17 +241,17 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
 
     it('should verify Fleet page checks is_plant for routing', () => {
       const vehicles = [
-        { vehicle_id: 'v1', is_plant: false },
-        { vehicle_id: 'p1', is_plant: true },
+        { van_id: 'v1', is_plant: false },
+        { van_id: 'p1', is_plant: true },
       ];
 
       vehicles.forEach((vehicle) => {
         const isPlant = vehicle.is_plant === true;
         const route = isPlant
-          ? `/fleet/plant/${vehicle.vehicle_id}/history`
-          : `/fleet/vehicles/${vehicle.vehicle_id}/history`;
+          ? `/fleet/plant/${vehicle.van_id}/history`
+          : `/fleet/vehicles/${vehicle.van_id}/history`;
 
-        if (vehicle.vehicle_id === 'v1') {
+        if (vehicle.van_id === 'v1') {
           expect(route).toBe('/fleet/vehicles/v1/history');
         } else {
           expect(route).toBe('/fleet/plant/p1/history');
@@ -262,22 +262,22 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
     it('should handle mixed vehicle and plant assets correctly', () => {
       const assets = [
         {
-          vehicle_id: 'vehicle-uuid-1',
+          van_id: 'vehicle-uuid-1',
           is_plant: false,
           vehicle: { id: 'vehicle-uuid-1' },
         },
         {
-          vehicle_id: 'vehicle-uuid-2',
+          van_id: 'vehicle-uuid-2',
           is_plant: false,
           vehicle: { id: 'vehicle-uuid-2' },
         },
         {
-          vehicle_id: 'plant-uuid-1',
+          van_id: 'plant-uuid-1',
           is_plant: true,
           vehicle: { id: 'plant-uuid-1' },
         },
         {
-          vehicle_id: 'plant-uuid-2',
+          van_id: 'plant-uuid-2',
           is_plant: true,
           vehicle: { id: 'plant-uuid-2' },
         },
@@ -285,7 +285,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
 
       const routes = assets.map((asset) => {
         const isPlant = asset.is_plant === true;
-        const assetId = asset.vehicle?.id || asset.vehicle_id;
+        const assetId = asset.vehicle?.id || asset.van_id;
         return isPlant
           ? `/fleet/plant/${assetId}/history`
           : `/fleet/vehicles/${assetId}/history`;
@@ -301,7 +301,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
   describe('Edge cases', () => {
     it('should handle null is_plant value', () => {
       const asset = {
-        vehicle_id: 'v1',
+        van_id: 'v1',
         is_plant: null as any,
       };
 
@@ -311,7 +311,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
 
     it('should handle truthy but non-boolean is_plant values', () => {
       const asset = {
-        vehicle_id: 'p1',
+        van_id: 'p1',
         is_plant: 'true' as any, // String instead of boolean
       };
 
@@ -324,23 +324,23 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
 
     it('should handle missing vehicle property', () => {
       const asset = {
-        vehicle_id: 'v1',
+        van_id: 'v1',
         is_plant: false,
         // vehicle property missing
       };
 
       const isPlant = asset.is_plant === true;
-      const assetId = (asset as any).vehicle?.id || asset.vehicle_id;
+      const assetId = (asset as any).vehicle?.id || asset.van_id;
 
       expect(isPlant).toBe(false);
-      expect(assetId).toBe('v1'); // Falls back to vehicle_id
+      expect(assetId).toBe('v1'); // Falls back to van_id
     });
   });
 
   describe('Type compatibility', () => {
     it('should ensure plant objects from PlantOverview are compatible with VehicleMaintenanceWithStatus', () => {
       type PlantMaintenanceWithStatus = {
-        vehicle_id: string;
+        van_id: string;
         plant_id: string;
         is_plant?: boolean; // ✅ Included
         current_hours: number | null;
@@ -349,14 +349,14 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
       };
 
       type VehicleMaintenanceWithStatus = {
-        vehicle_id: string;
+        van_id: string;
         is_plant?: boolean; // ✅ Now included
         overdue_count: number;
         due_soon_count: number;
       };
 
       const plantObject: PlantMaintenanceWithStatus = {
-        vehicle_id: 'p1',
+        van_id: 'p1',
         plant_id: 'P001',
         is_plant: true,
         current_hours: 1200,
@@ -366,7 +366,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
 
       // Should be assignable to VehicleMaintenanceWithStatus
       const asVehicleMaintenance: Partial<VehicleMaintenanceWithStatus> = {
-        vehicle_id: plantObject.vehicle_id,
+        van_id: plantObject.van_id,
         is_plant: plantObject.is_plant, // ✅ Type-safe now
         overdue_count: plantObject.overdue_count,
         due_soon_count: plantObject.due_soon_count,
@@ -377,7 +377,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
 
     it('should verify handleVehicleClick can accept plant assets', () => {
       type VehicleMaintenanceWithStatus = {
-        vehicle_id: string;
+        van_id: string;
         is_plant?: boolean; // ✅ Included
         vehicle?: {
           id: string;
@@ -386,14 +386,14 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
 
       const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
         const isPlant = vehicle.is_plant === true;
-        const assetId = vehicle.vehicle?.id || vehicle.vehicle_id;
+        const assetId = vehicle.vehicle?.id || vehicle.van_id;
         return isPlant
           ? `/fleet/plant/${assetId}/history`
           : `/fleet/vehicles/${assetId}/history`;
       };
 
       const plantAsset: VehicleMaintenanceWithStatus = {
-        vehicle_id: 'p1',
+        van_id: 'p1',
         is_plant: true, // ✅ Type-safe
         vehicle: { id: 'plant-uuid-123' },
       };

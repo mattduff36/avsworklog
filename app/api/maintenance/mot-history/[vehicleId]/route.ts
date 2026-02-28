@@ -30,7 +30,7 @@ export async function GET(
 
     // Get vehicle registration number
     const { data: vehicle, error: vehicleError } = await supabase
-      .from('vehicles')
+      .from('vans')
       .select('reg_number')
       .eq('id', vehicleId)
       .single();
@@ -61,7 +61,7 @@ export async function GET(
         dvla_sync_status,
         dvla_raw_data
       `)
-      .eq('vehicle_id', vehicleId)
+      .eq('van_id', vehicleId)
       .single() as { data: any; error: any };
 
     if (maintenanceError || !maintenanceData) {

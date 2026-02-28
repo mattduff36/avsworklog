@@ -36,10 +36,10 @@ import { ErrorDetailsResponse } from '@/types/error-details';
 import type { CompletionData } from '@/components/workshop-tasks/MarkTaskCompleteDialog';
 
 type Action = Database['public']['Tables']['actions']['Row'] & {
-  vehicles?: {
+  vans?: {
     reg_number: string;
     nickname: string | null;
-    asset_type?: 'vehicle' | 'plant' | 'tool';
+    asset_type?: 'van' | 'plant' | 'tool';
     plant_id?: string | null;
   };
   workshop_task_categories?: {
@@ -57,7 +57,7 @@ type Vehicle = {
   reg_number: string | null;
   plant_id?: string | null;
   nickname: string | null;
-  asset_type?: 'vehicle' | 'plant' | 'tool';
+  asset_type?: 'van' | 'plant' | 'tool';
 };
 
 type Category = {
@@ -91,7 +91,7 @@ export default function WorkshopTasksPage() {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [plantCategories, setPlantCategories] = useState<Category[]>([]);
   const [plantSubcategories, setPlantSubcategories] = useState<Subcategory[]>([]);
-  const [categoryTaxonomyMode, setCategoryTaxonomyMode] = useState<'vehicle' | 'plant'>('vehicle');
+  const [categoryTaxonomyMode, setCategoryTaxonomyMode] = useState<'van' | 'plant'>('van');
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [vehicleFilter, setVehicleFilter] = useState<string>('all');
@@ -169,7 +169,7 @@ export default function WorkshopTasksPage() {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   
   // Asset tab state (vehicle vs plant vs tools vs settings)
-  const [assetTab, setAssetTab] = useState<'vehicle' | 'plant' | 'tools' | 'settings'>('vehicle');
+  const [assetTab, setAssetTab] = useState<'van' | 'plant' | 'tools' | 'settings'>('van');
   
   // Expandable sections state (Pending and In Progress open by default, Completed closed)
   const [showPending, setShowPending] = useState(true);
@@ -198,14 +198,14 @@ export default function WorkshopTasksPage() {
   // Handle tab changes with filter resets
   const handleTabChange = (newTab: string) => {
     const previousTab = assetTab;
-    setAssetTab(newTab as 'vehicle' | 'plant' | 'tools' | 'settings');
+    setAssetTab(newTab as 'van' | 'plant' | 'tools' | 'settings');
     
     // Reset filters when switching to a different asset type tab (vehicle or plant)
     // This ensures filters are cleared when:
     // 1. Switching directly between vehicle/plant tabs
     // 2. Switching from vehicle/plant to settings/tools and back to the OTHER asset type
     // 3. Any tab change that results in a different asset type being displayed
-    if ((newTab === 'vehicle' || newTab === 'plant') && previousTab !== newTab) {
+    if ((newTab === 'van' || newTab === 'plant') && previousTab !== newTab) {
       setVehicleFilter('all');
       setStatusFilter('all');
     }
@@ -219,7 +219,7 @@ export default function WorkshopTasksPage() {
         .from('actions')
         .select(`
           *,
-          vehicles (
+          vans (
             reg_number,
             nickname
           ),
@@ -257,8 +257,8 @@ export default function WorkshopTasksPage() {
       }
       
       if (vehicleFilter !== 'all') {
-        // Filter by either vehicle_id OR plant_id depending on the filter value
-        query = query.or(`vehicle_id.eq.${vehicleFilter},plant_id.eq.${vehicleFilter}`);
+        // Filter by either van_id OR plant_id depending on the filter value
+        query = query.or(`van_id.eq.${vehicleFilter},plant_id.eq.${vehicleFilter}`);
       }
 
       const { data, error } = await query;
@@ -316,7 +316,7 @@ export default function WorkshopTasksPage() {
       const { data, error } = await supabase
         .from('workshop_task_categories')
         .select('id, name, slug, is_active, sort_order')
-        .eq('applies_to', 'vehicle')
+        .eq('applies_to', 'van')
         .eq('is_active', true)
         .order('name');
 
@@ -357,7 +357,7 @@ export default function WorkshopTasksPage() {
           workshop_task_categories!inner (applies_to)
         `)
         .eq('is_active', true)
-        .eq('workshop_task_categories.applies_to', 'vehicle')
+        .eq('workshop_task_categories.applies_to', 'van')
         .order('name');
 
       if (error) throw error;
@@ -372,7 +372,7 @@ export default function WorkshopTasksPage() {
       const fetchVehiclesInner = async () => {
         try {
           const { data: vehicleData, error: vehicleError } = await supabase
-            .from('vehicles')
+            .from('vans')
             .select('id, reg_number, nickname')
             .eq('status', 'active')
             .order('reg_number');
@@ -393,7 +393,7 @@ export default function WorkshopTasksPage() {
               reg_number: v.reg_number,
               plant_id: null,
               nickname: v.nickname,
-              asset_type: 'vehicle' as const
+              asset_type: 'van' as const
             })),
             ...(plantData || []).map(p => ({
               id: p.id,
@@ -406,7 +406,7 @@ export default function WorkshopTasksPage() {
 
           setVehicles(combinedVehicles);
         } catch (err) {
-          console.error('Error fetching vehicles:', err instanceof Error ? err.message : JSON.stringify(err));
+          console.error('Error fetching vans:', err instanceof Error ? err.message : JSON.stringify(err));
         }
       };
 
@@ -446,17 +446,17 @@ export default function WorkshopTasksPage() {
 
   const fetchCurrentMeterReading = async (vehicleId: string) => {
     try {
-      // Check both vehicles and plant tables to determine asset type
+      // Check both vans and plant tables to determine asset type
       let isPlant = false;
 
-      // Check if it's a vehicle
+      // Check if it's a van
       const { data: vehicleData } = await supabase
-        .from('vehicles')
+        .from('vans')
         .select('id')
         .eq('id', vehicleId)
         .maybeSingle();
 
-      // If not found in vehicles, check plant table
+      // If not found in vans, check plant table
       if (!vehicleData) {
         const { data: plantData } = await supabase
           .from('plant')
@@ -479,7 +479,7 @@ export default function WorkshopTasksPage() {
       const { data, error } = await supabase
         .from('vehicle_maintenance')
         .select(isPlant ? 'current_hours' : 'current_mileage')
-        .eq(isPlant ? 'plant_id' : 'vehicle_id', vehicleId)
+        .eq(isPlant ? 'plant_id' : 'van_id', vehicleId)
         .single();
 
       if (error) {
@@ -560,11 +560,11 @@ export default function WorkshopTasksPage() {
         taskData.workshop_subcategory_id = null;
       }
 
-      // Set either vehicle_id or plant_id, not both
+      // Set either van_id or plant_id, not both
       if (isPlant) {
         taskData.plant_id = selectedVehicleId;
       } else {
-        taskData.vehicle_id = selectedVehicleId;
+        taskData.van_id = selectedVehicleId;
       }
       
       const { data: newTask, error } = await supabase
@@ -603,7 +603,7 @@ export default function WorkshopTasksPage() {
       // Update meter reading in vehicle_maintenance table
       // Use select-then-insert/update instead of upsert (partial unique indexes
       // are incompatible with ON CONFLICT)
-      const idColumn = isPlant ? 'plant_id' : 'vehicle_id';
+      const idColumn = isPlant ? 'plant_id' : 'van_id';
       const { data: existingMaintenance } = await supabase
         .from('vehicle_maintenance')
         .select('id')
@@ -620,7 +620,7 @@ export default function WorkshopTasksPage() {
         meterFields.current_hours = readingValue;
         meterFields.last_hours_update = new Date().toISOString();
       } else {
-        meterFields.vehicle_id = selectedVehicleId;
+        meterFields.van_id = selectedVehicleId;
         meterFields.current_mileage = readingValue;
         meterFields.last_mileage_update = new Date().toISOString();
       }
@@ -966,10 +966,11 @@ export default function WorkshopTasksPage() {
       }
 
       // Step 3: Update maintenance if there are any updates
-      if (data.maintenanceUpdates && completingTask.vehicle_id) {
+      if (data.maintenanceUpdates && completingTask.van_id) {
         try {
+          const maintenanceAssetId = completingTask.van_id;
           const maintenanceResponse = await fetch(
-            `/api/maintenance/by-vehicle/${completingTask.vehicle_id}`,
+            `/api/maintenance/by-vehicle/${maintenanceAssetId}`,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -1108,7 +1109,7 @@ export default function WorkshopTasksPage() {
 
   const handleEditTask = async (task: Action) => {
     setEditingTask(task);
-    setEditVehicleId(task.vehicle_id || task.plant_id || '');
+    setEditVehicleId(task.van_id ?? task.plant_id ?? '');
     setEditCategoryId(task.workshop_category_id || '');
     setEditSubcategoryId(task.workshop_subcategory_id || '');
     setEditComments(task.workshop_comments || '');
@@ -1117,12 +1118,12 @@ export default function WorkshopTasksPage() {
     setInitialEditCategoryId(task.workshop_category_id || '');
     setInitialEditHadSubcategory(!!task.workshop_subcategory_id);
     
-    // Fetch current meter reading (mileage for vehicles, hours for plant)
-    const assetId = task.vehicle_id || task.plant_id;
+    // Fetch current meter reading (mileage for vans, hours for plant)
+    const assetId = task.van_id ?? task.plant_id;
     if (assetId) {
       const isPlantTask = !!task.plant_id;
       const fieldToSelect = isPlantTask ? 'current_hours' : 'current_mileage';
-      const idColumn = isPlantTask ? 'plant_id' : 'vehicle_id';
+      const idColumn = isPlantTask ? 'plant_id' : 'van_id';
       
       try {
         const { data, error } = await supabase
@@ -1246,9 +1247,9 @@ export default function WorkshopTasksPage() {
       // Update the correct asset reference
       if (isPlant) {
         updateData.plant_id = editVehicleId;
-        updateData.vehicle_id = null;
+        updateData.van_id = null;
       } else {
-        updateData.vehicle_id = editVehicleId;
+        updateData.van_id = editVehicleId;
         updateData.plant_id = null;
       }
 
@@ -1262,7 +1263,7 @@ export default function WorkshopTasksPage() {
       // Update meter reading
       // Use select-then-insert/update instead of upsert (partial unique indexes
       // are incompatible with ON CONFLICT)
-      const editIdColumn = isPlant ? 'plant_id' : 'vehicle_id';
+      const editIdColumn = isPlant ? 'plant_id' : 'van_id';
       const { data: existingEditMaintenance } = await supabase
         .from('vehicle_maintenance')
         .select('id')
@@ -1279,7 +1280,7 @@ export default function WorkshopTasksPage() {
         meterUpdateFields.current_hours = mileageValue;
         meterUpdateFields.last_hours_update = new Date().toISOString();
       } else {
-        meterUpdateFields.vehicle_id = editVehicleId;
+        meterUpdateFields.van_id = editVehicleId;
         meterUpdateFields.current_mileage = mileageValue;
         meterUpdateFields.last_mileage_update = new Date().toISOString();
       }
@@ -1375,9 +1376,9 @@ export default function WorkshopTasksPage() {
   };
 
   const getVehicleReg = (task: Action) => {
-    // Check direct vehicle or plant reference
-    if (task.vehicles) {
-      return getAssetDisplay(task.vehicles);
+    // Check direct van or plant reference
+    if (task.vans) {
+      return getAssetDisplay(task.vans);
     } else if (task.plant) {
       return getAssetDisplay(task.plant);
     }
@@ -1571,9 +1572,9 @@ export default function WorkshopTasksPage() {
     if (assetTab === 'plant') {
       // Plant tab: show tasks with plant_id set
       return tasks.filter(t => t.plant_id !== null);
-    } else if (assetTab === 'vehicle') {
-      // Vehicle tab: show tasks with vehicle_id set
-      return tasks.filter(t => t.vehicle_id !== null);
+    } else if (assetTab === 'van') {
+      // Van tab: show tasks with van_id set
+      return tasks.filter(t => t.van_id !== null);
     }
     return tasks;
   };
@@ -1633,7 +1634,7 @@ export default function WorkshopTasksPage() {
       {/* Tabs */}
       <Tabs value={assetTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className={`grid w-full ${showSettings ? 'grid-cols-4' : 'grid-cols-3'}`}>
-          <TabsTrigger value="vehicle">Van Tasks</TabsTrigger>
+          <TabsTrigger value="van">Van Tasks</TabsTrigger>
           <TabsTrigger value="plant">Plant Tasks</TabsTrigger>
           <TabsTrigger value="tools" disabled>
             <span className="flex items-center gap-1">
@@ -1649,7 +1650,7 @@ export default function WorkshopTasksPage() {
           )}
         </TabsList>
 
-        <TabsContent value="vehicle" className="space-y-6">
+        <TabsContent value="van" className="space-y-6">
           {/* Filters */}
           <Card className="">
             <CardContent className="pt-6">
@@ -1830,7 +1831,7 @@ export default function WorkshopTasksPage() {
                                     }}
                                     disabled={isUpdating}
                                     size="sm"
-                                    className="h-9 px-3 text-xs bg-blue-600/80 hover:bg-blue-600 text-white border-0"
+                                    className="h-9 px-3 text-xs bg-workshop/80 hover:bg-workshop text-white border-0"
                                   >
                                     <Clock className="h-3.5 w-3.5 mr-1.5" />
                                     In Progress
@@ -2011,7 +2012,7 @@ export default function WorkshopTasksPage() {
                                       onClick={(e) => { e.stopPropagation(); handleResumeTask(task); }}
                                       disabled={isUpdating}
                                       size="sm"
-                                      className="h-9 px-3 text-xs bg-blue-600/80 hover:bg-blue-600 text-white border-0"
+                                      className="h-9 px-3 text-xs bg-workshop/80 hover:bg-workshop text-white border-0"
                                     >
                                       <Clock className="h-3.5 w-3.5 mr-1.5" />
                                       Resume
@@ -2166,7 +2167,7 @@ export default function WorkshopTasksPage() {
                                     }}
                                     disabled={isUpdating}
                                     size="sm"
-                                    className="h-9 px-3 text-xs transition-all border-0 bg-blue-600 hover:bg-blue-700 text-white"
+                                    className="h-9 px-3 text-xs transition-all border-0 bg-workshop hover:bg-workshop-dark text-white"
                                   >
                                     <Clock className="h-3.5 w-3.5 mr-1.5" />
                                     Resume
@@ -2502,7 +2503,7 @@ export default function WorkshopTasksPage() {
                                     }}
                                     disabled={isUpdating}
                                     size="sm"
-                                    className="h-9 px-3 text-xs bg-blue-600/80 hover:bg-blue-600 text-white border-0"
+                                    className="h-9 px-3 text-xs bg-workshop/80 hover:bg-workshop text-white border-0"
                                   >
                                     <Clock className="h-3.5 w-3.5 mr-1.5" />
                                     In Progress
@@ -2683,7 +2684,7 @@ export default function WorkshopTasksPage() {
                                       onClick={(e) => { e.stopPropagation(); handleResumeTask(task); }}
                                       disabled={isUpdating}
                                       size="sm"
-                                      className="h-9 px-3 text-xs bg-blue-600/80 hover:bg-blue-600 text-white border-0"
+                                      className="h-9 px-3 text-xs bg-workshop/80 hover:bg-workshop text-white border-0"
                                     >
                                       <Clock className="h-3.5 w-3.5 mr-1.5" />
                                       Resume
@@ -2843,7 +2844,7 @@ export default function WorkshopTasksPage() {
                                     }}
                                     disabled={isUpdating}
                                     size="sm"
-                                    className="h-9 px-3 text-xs transition-all border-0 bg-blue-600 hover:bg-blue-700 text-white"
+                                    className="h-9 px-3 text-xs transition-all border-0 bg-workshop hover:bg-workshop-dark text-white"
                                   >
                                     <Clock className="h-3.5 w-3.5 mr-1.5" />
                                     Resume
@@ -3021,9 +3022,9 @@ export default function WorkshopTasksPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Tabs value={categoryTaxonomyMode} onValueChange={(v) => setCategoryTaxonomyMode(v as 'vehicle' | 'plant')}>
+                <Tabs value={categoryTaxonomyMode} onValueChange={(v) => setCategoryTaxonomyMode(v as 'van' | 'plant')}>
                   <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="vehicle">Van Categories</TabsTrigger>
+                    <TabsTrigger value="van">Van Categories</TabsTrigger>
                     <TabsTrigger value="plant">Plant Categories</TabsTrigger>
                   </TabsList>
                 </Tabs>
@@ -3292,7 +3293,7 @@ export default function WorkshopTasksPage() {
             <Button
               onClick={confirmMarkInProgress}
               disabled={!loggedComment.trim() || loggedComment.length > 300}
-              className="bg-blue-500 hover:bg-blue-600 text-white"
+              className="bg-workshop hover:bg-workshop-dark text-white"
             >
               <Clock className="h-4 w-4 mr-2" />
               Mark In Progress
@@ -3439,7 +3440,7 @@ export default function WorkshopTasksPage() {
                 resumeComment.length > 300 || 
                 (resumingTask ? updatingStatus.has(resumingTask.id) : false)
               }
-              className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-workshop hover:bg-workshop-dark text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Clock className="h-4 w-4 mr-2" />
               Resume Task
@@ -3479,7 +3480,7 @@ export default function WorkshopTasksPage() {
                   supabase
                     .from('vehicle_maintenance')
                     .select(fieldToSelect)
-                    .eq(isPlant ? 'plant_id' : 'vehicle_id', value)
+                    .eq(isPlant ? 'plant_id' : 'van_id', value)
                     .single()
                     .then(({ data, error }) => {
                       if (error && error.code !== 'PGRST116') {
@@ -3496,7 +3497,7 @@ export default function WorkshopTasksPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {(() => {
-                    // Filter vehicles/plant based on the task being edited
+                    // Filter vans/plant based on the task being edited
                     const isEditingPlant = !!editingTask?.plant_id;
                     const filteredVehicles = vehicles.filter(v => 
                       isEditingPlant ? v.asset_type === 'plant' : v.asset_type !== 'plant'

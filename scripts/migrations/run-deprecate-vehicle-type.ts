@@ -115,7 +115,7 @@ async function runMigration() {
     const sample = await client.query(`
       SELECT v.reg_number, v.vehicle_type, vc.name as category_name
       FROM vehicles v
-      JOIN vehicle_categories vc ON v.category_id = vc.id
+      JOIN van_categories vc ON v.category_id = vc.id
       LIMIT 5;
     `);
     

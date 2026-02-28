@@ -34,7 +34,7 @@ async function testDraftResave() {
   try {
     // Get test data
     const { data: users } = await supabase.from('profiles').select('id').limit(1);
-    const { data: vehicles } = await supabase.from('vehicles').select('id').eq('status', 'active').limit(1);
+    const { data: vehicles } = await supabase.from('vans').select('id').eq('status', 'active').limit(1);
 
     if (!users || !vehicles) throw new Error('Missing test data');
 
@@ -46,7 +46,7 @@ async function testDraftResave() {
     const { data: inspection, error: createError } = await supabase
       .from('van_inspections')
       .insert({
-        vehicle_id: vehicleId,
+        van_id: vehicleId,
         user_id: userId,
         inspection_date: '2025-11-25',
         inspection_end_date: '2025-12-01',

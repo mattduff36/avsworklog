@@ -34,17 +34,17 @@ async function forceApplyMigration() {
     await client.connect();
     console.log('✅ Connected to database\n');
 
-    // Step 1: Make vehicle_id nullable
-    console.log('📝 Step 1: Making vehicle_id nullable...');
+    // Step 1: Make van_id nullable
+    console.log('📝 Step 1: Making van_id nullable...');
     try {
       await client.query(`
         ALTER TABLE maintenance_history
-        ALTER COLUMN vehicle_id DROP NOT NULL;
+        ALTER COLUMN van_id DROP NOT NULL;
       `);
-      console.log('✅ vehicle_id is now nullable\n');
+      console.log('✅ van_id is now nullable\n');
     } catch (error: any) {
       if (error.message.includes('does not exist')) {
-        console.log('✅ vehicle_id was already nullable\n');
+        console.log('✅ van_id was already nullable\n');
       } else {
         throw error;
       }
@@ -77,8 +77,8 @@ async function forceApplyMigration() {
       await client.query(`
         ALTER TABLE maintenance_history
         ADD CONSTRAINT check_maintenance_history_asset CHECK (
-          (vehicle_id IS NOT NULL AND plant_id IS NULL) OR
-          (vehicle_id IS NULL AND plant_id IS NOT NULL)
+          (van_id IS NOT NULL AND plant_id IS NULL) OR
+          (van_id IS NULL AND plant_id IS NOT NULL)
         );
       `);
       console.log('✅ Check constraint added\n');
@@ -108,7 +108,7 @@ async function forceApplyMigration() {
       FROM information_schema.columns
       WHERE table_schema = 'public'
       AND table_name = 'maintenance_history'
-      AND column_name IN ('vehicle_id', 'plant_id')
+      AND column_name IN ('van_id', 'plant_id')
       ORDER BY column_name;
     `);
 

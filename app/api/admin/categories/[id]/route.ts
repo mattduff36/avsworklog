@@ -60,7 +60,7 @@ export async function PUT(
 
     // Update category
     const { data, error } = await supabase
-      .from('vehicle_categories')
+      .from('van_categories')
       .update(updates)
       .eq('id', categoryId)
       .select()
@@ -122,9 +122,9 @@ export async function DELETE(
 
     const categoryId = (await params).id;
 
-    // Check if category is in use by any vehicles or plant
-    const { data: vehicles } = await supabase
-      .from('vehicles')
+    // Check if category is in use by any vans or plant
+    const { data: vans } = await supabase
+      .from('vans')
       .select('id')
       .eq('category_id', categoryId)
       .limit(1);
@@ -135,10 +135,10 @@ export async function DELETE(
       .eq('category_id', categoryId)
       .limit(1);
 
-    if ((vehicles && vehicles.length > 0) || (plant && plant.length > 0)) {
+    if ((vans && vans.length > 0) || (plant && plant.length > 0)) {
       return NextResponse.json(
         {
-          error: 'Cannot delete category that is assigned to vehicles or plant',
+          error: 'Cannot delete category that is assigned to vans or plant assets',
         },
         { status: 400 }
       );
@@ -146,7 +146,7 @@ export async function DELETE(
 
     // Delete category
     const { error } = await supabase
-      .from('vehicle_categories')
+      .from('van_categories')
       .delete()
       .eq('id', categoryId);
 

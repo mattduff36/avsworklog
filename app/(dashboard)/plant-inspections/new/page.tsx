@@ -43,7 +43,7 @@ type PlantWithCategory = {
   id: string;
   plant_id: string;
   nickname?: string | null;
-  vehicle_categories?: { name: string } | null;
+  van_categories?: { name: string } | null;
 };
 
 type InspectionWithRelations = {
@@ -84,7 +84,7 @@ function NewPlantInspectionContent() {
     id: string; 
     plant_id: string; 
     nickname?: string | null;
-    vehicle_categories?: { name: string } | null;
+    van_categories?: { name: string } | null;
   }>>([]);
   const [selectedPlantId, setSelectedPlantId] = useState('');
   const [inspectionDate, setInspectionDate] = useState('');
@@ -138,7 +138,7 @@ function NewPlantInspectionContent() {
           .from('plant')
           .select(`
             *,
-            vehicle_categories (
+            van_categories (
               name
             )
           `)
@@ -183,7 +183,7 @@ function NewPlantInspectionContent() {
             id,
             plant_id,
             nickname,
-            vehicle_categories (name)
+            van_categories (name)
           )
         `)
         .eq('id', id)
@@ -957,7 +957,7 @@ function NewPlantInspectionContent() {
                     </SelectItem>
                     {plants.map((plant) => (
                       <SelectItem key={plant.id} value={plant.id}>
-                        {plant.plant_id} {plant.nickname ? `- ${plant.nickname}` : ''} ({plant.vehicle_categories?.name || 'Uncategorized'})
+                        {plant.plant_id} {plant.nickname ? `- ${plant.nickname}` : ''} ({plant.van_categories?.name || 'Uncategorized'})
                       </SelectItem>
                     ))}
                   </SelectGroup>

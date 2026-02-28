@@ -46,7 +46,7 @@ async function run() {
     const { rows: baseline } = await client.query(`
       SELECT
         COUNT(*) AS total,
-        COUNT(*) FILTER (WHERE vehicle_id IS NOT NULL AND plant_id IS NULL AND is_hired_plant = FALSE) AS van,
+        COUNT(*) FILTER (WHERE van_id IS NOT NULL AND plant_id IS NULL AND is_hired_plant = FALSE) AS van,
         COUNT(*) FILTER (WHERE plant_id IS NOT NULL OR is_hired_plant = TRUE) AS plant
       FROM vehicle_inspections;
     `);

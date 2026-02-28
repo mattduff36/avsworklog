@@ -33,7 +33,7 @@ interface PlantInspectionWithDetails {
     plant_id: string;
     nickname: string | null;
     serial_number: string | null;
-    vehicle_categories: {
+    van_categories: {
       name: string;
     } | null;
   } | null;
@@ -80,7 +80,7 @@ export default function ViewPlantInspectionPage() {
             plant_id,
             nickname,
             serial_number,
-            vehicle_categories (name)
+            van_categories (name)
           ),
           profiles!plant_inspections_user_id_fkey (full_name)
         `)

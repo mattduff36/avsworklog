@@ -184,17 +184,18 @@ describe('AddVehicleDialog Asset Type State Management Bug Fix', () => {
   describe('Category filtering with assetType', () => {
     it('should filter categories correctly after dialog reopens', () => {
       const categories = [
-        { id: '1', name: 'Car', applies_to: ['vehicle'] },
+        { id: '1', name: 'Car', applies_to: ['van'] },
         { id: '2', name: 'Excavator', applies_to: ['plant'] },
-        { id: '3', name: 'Shared', applies_to: ['vehicle', 'plant'] },
+        { id: '3', name: 'Shared', applies_to: ['van', 'plant'] },
       ];
 
       // First opening: plant dialog
       let assetType: 'vehicle' | 'plant' = 'plant';
       
       let filtered = categories.filter(c => {
-        const appliesTo = c.applies_to || ['vehicle'];
-        return appliesTo.includes(assetType);
+        const appliesTo = c.applies_to || ['van'];
+        const assetTypeForFilter = assetType === 'vehicle' ? 'van' : assetType;
+        return appliesTo.includes(assetTypeForFilter);
       });
 
       // Should show plant and shared categories
@@ -206,8 +207,9 @@ describe('AddVehicleDialog Asset Type State Management Bug Fix', () => {
       assetType = 'vehicle';
 
       filtered = categories.filter(c => {
-        const appliesTo = c.applies_to || ['vehicle'];
-        return appliesTo.includes(assetType);
+        const appliesTo = c.applies_to || ['van'];
+        const assetTypeForFilter = assetType === 'vehicle' ? 'van' : assetType;
+        return appliesTo.includes(assetTypeForFilter);
       });
 
       // Should show vehicle and shared categories

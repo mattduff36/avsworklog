@@ -196,7 +196,7 @@ interface WorkshopAttachmentPDFProps {
   questions: QuestionData[];
   responses: ResponseData[];
   assetName: string | null;
-  assetType: 'vehicle' | 'plant' | null;
+  assetType: 'van' | 'plant' | null;
 }
 
 export function WorkshopAttachmentPDF({
@@ -285,7 +285,7 @@ export function WorkshopAttachmentPDF({
           </View>
           {assetName && (
             <View style={styles.infoRow}>
-              <Text style={styles.label}>{assetType === 'plant' ? 'Plant:' : 'Vehicle:'}</Text>
+              <Text style={styles.label}>{assetType === 'plant' ? 'Plant:' : 'Van:'}</Text>
               <Text style={styles.value}>{assetName}</Text>
             </View>
           )}

@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
         alert_threshold_days: body.type === 'date' ? body.alert_threshold_days : null,
         alert_threshold_miles: body.type === 'mileage' ? body.alert_threshold_miles : null,
         alert_threshold_hours: body.type === 'hours' ? body.alert_threshold_hours : null,
-        applies_to: body.applies_to || ['vehicle'],
+        applies_to: body.applies_to || ['van'],
         sort_order: body.sort_order || 999,
         is_active: true,
         responsibility: body.responsibility || 'workshop',

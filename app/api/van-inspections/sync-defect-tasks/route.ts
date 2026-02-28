@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     // Get vehicle registration for task titles
     const { data: vehicle } = await supabaseAdmin
-      .from('vehicles')
+      .from('vans')
       .select('reg_number')
       .eq('id', vehicleId)
       .single();
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       .from('workshop_task_categories')
       .select('id')
       .eq('name', 'Repair')
-      .eq('applies_to', 'vehicle')
+      .eq('applies_to', 'van')
       .eq('is_active', true)
       .single();
 
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
         .from('workshop_task_categories')
         .select('id')
         .eq('name', 'Other')
-        .eq('applies_to', 'vehicle')
+        .eq('applies_to', 'van')
         .eq('is_active', true)
         .single();
 
@@ -131,9 +131,9 @@ export async function POST(request: NextRequest) {
         description,
         inspection_id,
         inspection_item_id,
-        vehicle_id
+        van_id
       `)
-      .eq('vehicle_id', vehicleId)
+      .eq('van_id', vehicleId)
       .eq('action_type', 'inspection_defect')
       .in('status', ['pending', 'logged', 'on_hold', 'in_progress']);
 
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
         description,
         inspection_id,
         inspection_item_id,
-        vehicle_id
+        van_id
       `)
       .eq('inspection_id', inspectionId)
       .eq('action_type', 'inspection_defect');
@@ -256,7 +256,7 @@ export async function POST(request: NextRequest) {
             title,
             description,
             inspection_item_id: primaryInspectionItemId,
-            vehicle_id: vehicleId,
+            van_id: vehicleId,
             updated_at: new Date().toISOString(),
           };
 
@@ -282,7 +282,7 @@ export async function POST(request: NextRequest) {
           action_type: 'inspection_defect',
           inspection_id: inspectionId,
           inspection_item_id: primaryInspectionItemId,
-          vehicle_id: vehicleId,
+          van_id: vehicleId,
           workshop_subcategory_id: defaultSubcategoryId,
           title,
           description,

@@ -43,11 +43,11 @@ async function addHistoryEntry() {
     // Find CP17 TKO vehicle and maintenance record
     const vehicleQuery = `
       SELECT 
-        v.id as vehicle_id,
+        v.id as van_id,
         v.reg_number,
         vm.*
       FROM vehicles v
-      LEFT JOIN vehicle_maintenance vm ON vm.vehicle_id = v.id
+      LEFT JOIN vehicle_maintenance vm ON vm.van_id = v.id
       WHERE v.reg_number = 'CP17 TKO'
     `;
 
@@ -73,7 +73,7 @@ async function addHistoryEntry() {
     const andy = andyRows.length > 0 ? andyRows[0] : null;
     
     console.log(`📋 Vehicle: ${vehicle.reg_number}`);
-    console.log(`   Vehicle ID: ${vehicle.vehicle_id}`);
+    console.log(`   Vehicle ID: ${vehicle.van_id}`);
     console.log(`   Current next_service_mileage: ${vehicle.next_service_mileage || 'Not set'}`);
     console.log(`   Last updated: ${vehicle.updated_at ? new Date(vehicle.updated_at).toLocaleString() : 'Never'}`);
     console.log(`   User: ${andy ? andy.full_name : 'Unknown'}\n`);
@@ -93,13 +93,13 @@ async function addHistoryEntry() {
     // Check if a recent history entry already exists
     const checkQuery = `
       SELECT id FROM maintenance_history
-      WHERE vehicle_id = $1
+      WHERE van_id = $1
         AND created_at >= NOW() - INTERVAL '1 day'
       ORDER BY created_at DESC
       LIMIT 1
     `;
 
-    const { rows: recentHistory } = await client.query(checkQuery, [vehicle.vehicle_id]);
+    const { rows: recentHistory } = await client.query(checkQuery, [vehicle.van_id]);
 
     if (recentHistory.length > 0) {
       console.log('ℹ️  Recent history entry already exists (within last 24 hours)');
@@ -110,7 +110,7 @@ async function addHistoryEntry() {
     // Insert a history entry for the service date update
     const insertQuery = `
       INSERT INTO maintenance_history (
-        vehicle_id,
+        van_id,
         field_name,
         old_value,
         new_value,
@@ -125,7 +125,7 @@ async function addHistoryEntry() {
 
     // We'll create an entry for the service mileage update
     const { rows: inserted } = await client.query(insertQuery, [
-      vehicle.vehicle_id,
+      vehicle.van_id,
       'next_service_mileage',
       null, // Old value unknown due to bug
       vehicle.next_service_mileage ? vehicle.next_service_mileage.toString() : null,

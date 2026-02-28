@@ -25,7 +25,7 @@ async function cleanup() {
     console.log(`\n📋 Cleaning: ${regNumber}`);
 
     const { data: vehicle } = await supabase
-      .from('vehicles')
+      .from('vans')
       .select('id')
       .eq('reg_number', regNumber)
       .single();
@@ -39,7 +39,7 @@ async function cleanup() {
     const { data: tasks } = await supabase
       .from('actions')
       .select('id')
-      .eq('vehicle_id', vehicle.id)
+      .eq('van_id', vehicle.id)
       .or('description.ilike.%TEST19%,workshop_comments.ilike.%TEST19%,logged_comment.ilike.%TEST19%');
 
     if (tasks && tasks.length > 0) {
@@ -57,7 +57,7 @@ async function cleanup() {
     const { data: inspections } = await supabase
       .from('van_inspections')
       .select('id')
-      .eq('vehicle_id', vehicle.id)
+      .eq('van_id', vehicle.id)
       .gte('inspection_date', '2026-01-19'); // Only recent test inspections
 
     if (inspections && inspections.length > 0) {

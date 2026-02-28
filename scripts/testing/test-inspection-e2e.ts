@@ -69,7 +69,7 @@ async function runE2ETests() {
       .limit(1);
 
     const { data: vehicles } = await supabase
-      .from('vehicles')
+      .from('vans')
       .select('id, reg_number')
       .eq('status', 'active')
       .limit(1);
@@ -97,7 +97,7 @@ async function runE2ETests() {
     const { data: newInspection, error: createError } = await supabase
       .from('van_inspections')
       .insert({
-        vehicle_id: testVehicleId,
+        van_id: testVehicleId,
         user_id: testUserId,
         inspection_date: weekStart.toISOString().split('T')[0],
         inspection_end_date: weekEnding.toISOString().split('T')[0],
@@ -155,7 +155,7 @@ async function runE2ETests() {
     // Simulate loading the draft (like opening /inspections/[id])
     const { data: loadedInspection, error: loadError } = await supabase
       .from('van_inspections')
-      .select('*, vehicles(*)')
+      .select('*, vans(*)')
       .eq('id', testInspectionId)
       .single();
 

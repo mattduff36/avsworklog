@@ -39,7 +39,6 @@ const PlantTable = dynamic(
 
 // Import existing components
 import { MaintenanceTable } from '@/app/(dashboard)/maintenance/components/MaintenanceTable';
-import { MaintenanceSettings } from '@/app/(dashboard)/maintenance/components/MaintenanceSettings';
 import { VehicleCategoryDialog } from './components/VehicleCategoryDialog';
 import { HgvCategoryDialog } from './components/HgvCategoryDialog';
 import {
@@ -63,7 +62,7 @@ type Vehicle = {
   nickname: string | null;
   status: string;
   category_id: string;
-  vehicle_categories?: { name: string; id: string } | null;
+  van_categories?: { name: string; id: string } | null;
 };
 
 type Category = {
@@ -182,7 +181,7 @@ function FleetContent() {
     try {
       const { data, error } = await supabase
         .from('plant')
-        .select('id, plant_id, nickname, status, category_id, vehicle_categories(name, id)')
+        .select('id, plant_id, nickname, status, category_id, van_categories(name, id)')
         .eq('status', 'active');
       
       if (error) throw error;
@@ -337,7 +336,7 @@ function FleetContent() {
   
   const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
     const isPlant = vehicle.is_plant === true;
-    const assetId = vehicle.vehicle?.id || vehicle.vehicle_id || vehicle.id;
+    const assetId = vehicle.van_id ?? vehicle.vehicle?.id ?? vehicle.id;
 
     if (isPlant) {
       router.push(`/fleet/plant/${assetId}/history?fromTab=${activeTab}`);
@@ -636,9 +635,8 @@ function FleetContent() {
                           </CardTitle>
                           <CardDescription className="text-muted-foreground">
                             {(() => {
-                              // Filter categories that apply to plant
                               const plantCategories = categories.filter(c => 
-                                (c.applies_to || ['van']).includes('plant')
+                                (c.applies_to || []).includes('plant')
                               );
                               return `${plantCategories.length} ${plantCategories.length === 1 ? 'category' : 'categories'}`;
                             })()}
@@ -647,7 +645,7 @@ function FleetContent() {
                       </div>
                       <Button
                         size="sm"
-                        className="bg-blue-600 hover:bg-blue-700"
+                        className="bg-fleet hover:bg-fleet-dark"
                         onClick={(e) => {
                           e.stopPropagation();
                           setAddCategoryDialogOpen(true);
@@ -666,9 +664,8 @@ function FleetContent() {
                           <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                         </div>
                       ) : (() => {
-                        // Filter categories that apply to plant
                         const plantCategories = categories.filter(c => 
-                          (c.applies_to || ['van']).includes('plant')
+                          (c.applies_to || []).includes('plant')
                         );
                         
                         return plantCategories.length === 0 ? (
@@ -753,9 +750,8 @@ function FleetContent() {
                           </CardTitle>
                           <CardDescription className="text-muted-foreground">
                             {(() => {
-                              // Filter categories that apply to vehicles
                               const vanCategories = categories.filter(c => 
-                                (c.applies_to || ['van']).includes('van')
+                                (c.applies_to || []).includes('van')
                               );
                               return `${vanCategories.length} ${vanCategories.length === 1 ? 'category' : 'categories'}`;
                             })()}
@@ -764,7 +760,7 @@ function FleetContent() {
                       </div>
                       <Button
                         size="sm"
-                        className="bg-blue-600 hover:bg-blue-700"
+                        className="bg-fleet hover:bg-fleet-dark"
                         onClick={(e) => {
                           e.stopPropagation();
                           setAddCategoryDialogOpen(true);
@@ -783,10 +779,8 @@ function FleetContent() {
                         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                       </div>
                     ) : (() => {
-                      // Filter categories that apply to vans (not plant-only categories)
                       const vanCategories = categories.filter(c => {
-                        const appliesTo = (c as any).applies_to || ['van'];
-                        return appliesTo.includes('van');
+                        return (c.applies_to || []).includes('van');
                       });
                       
                       return vanCategories.length === 0 ? (
@@ -864,7 +858,7 @@ function FleetContent() {
                         />
                         <div>
                           <CardTitle className="text-white flex items-center gap-2">
-                            <Truck className="h-5 w-5 text-emerald-400" />
+                            <Truck className="h-5 w-5" />
                             HGV Categories
                           </CardTitle>
                           <CardDescription className="text-muted-foreground">
@@ -874,7 +868,7 @@ function FleetContent() {
                       </div>
                       <Button
                         size="sm"
-                        className="bg-emerald-600 hover:bg-emerald-700"
+                        className="bg-fleet hover:bg-fleet-dark"
                         onClick={(e) => {
                           e.stopPropagation();
                           setAddHgvCategoryDialogOpen(true);
@@ -956,8 +950,6 @@ function FleetContent() {
               </>
             )}
 
-            {/* Maintenance Categories Section */}
-            <MaintenanceSettings isAdmin={isAdmin} isManager={isManager} />
           </TabsContent>
         )}
       </Tabs>

@@ -125,13 +125,11 @@ test.describe('Module accent theming', () => {
     await expect(page.locator('nav')).toHaveScreenshot('nav-workshop.png');
   });
 
-  test('Reports uses reports accent', async ({ page }) => {
+  test('Reports uses brand accent', async ({ page }) => {
     await page.goto('/reports');
     const vars = await getAccentVars(page);
     expect(vars).not.toBeNull();
-    expect(vars!.accent).toBe('reports');
-    expect(vars!.primary).toBe('150 70% 45%');
-    expect(vars!.primaryForeground).toBe('210 40% 98%');
+    expect(vars!.accent).toBe('brand');
     await expect(page.locator('nav')).toHaveScreenshot('nav-reports.png');
   });
 });

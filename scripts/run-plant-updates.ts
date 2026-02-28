@@ -45,7 +45,7 @@ async function runMigrations() {
     // Check current state before migration
     const plantCount = await client.query(`SELECT COUNT(*) FROM plant`);
     const categoryCount = await client.query(`
-      SELECT COUNT(*) FROM vehicle_categories
+      SELECT COUNT(*) FROM van_categories
     `);
     
     console.log(`📊 Current state:`);
@@ -74,20 +74,20 @@ async function runMigrations() {
     
     const allPlantCategory = await client.query(`
       SELECT id, name 
-      FROM vehicle_categories 
+      FROM van_categories 
       WHERE name = 'All plant'
     `);
     
     const remainingOldCategories = await client.query(`
       SELECT name 
-      FROM vehicle_categories 
+      FROM van_categories 
       WHERE name IN ('Excavator', 'Telehandler', 'Dumper', 'Access & Site Support', 'Unclassified')
     `);
     
     const plantWithNewCategory = await client.query(`
       SELECT COUNT(*) 
       FROM plant p
-      JOIN vehicle_categories vc ON p.category_id = vc.id
+      JOIN van_categories vc ON p.category_id = vc.id
       WHERE vc.name = 'All plant'
     `);
 

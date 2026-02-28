@@ -19,7 +19,7 @@ import type { CompletionUpdateConfig, CompletionFieldValues } from '@/types/work
 export interface TaskForCompletion {
   id: string;
   status: string;
-  vehicle_id: string | null;
+  van_id: string | null;
   workshop_task_categories?: {
     id: string;
     name: string;

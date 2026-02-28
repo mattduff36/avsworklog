@@ -10,7 +10,7 @@ interface Alert {
 }
 
 interface VehicleWithAlerts {
-  vehicle_id?: string;
+  van_id?: string;
   id: string;
   vehicle?: {
     id: string;
@@ -127,7 +127,7 @@ async function taskExistsForAlert(
     const { data, error } = await supabase
       .from('actions')
       .select('id, status')
-      .eq('vehicle_id', vehicleId)
+      .eq('van_id', vehicleId)
       .eq('action_type', 'workshop_vehicle_task')
       .eq('title', title)
       .in('status', ['pending', 'logged', 'on_hold']) // Only check active tasks
@@ -156,7 +156,7 @@ export async function ensureServiceTasksForAlerts(
   }
 
   const supabase = createClient();
-  const vehicleId = vehicle.vehicle_id || vehicle.id;
+  const vehicleId = vehicle.van_id ?? vehicle.id;
   const regNumber = vehicle.vehicle?.reg_number || 'Unknown';
   const createdTaskIds: string[] = [];
 
@@ -191,7 +191,7 @@ export async function ensureServiceTasksForAlerts(
         .from('actions')
         .insert({
           action_type: 'workshop_vehicle_task',
-          vehicle_id: vehicleId,
+          van_id: vehicleId,
           workshop_subcategory_id: subcategoryId,
           title,
           workshop_comments: comments,

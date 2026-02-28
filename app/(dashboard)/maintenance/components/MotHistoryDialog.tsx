@@ -339,14 +339,14 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
             {vehicleNotFound ? (
               <>
                 <AlertTriangle className="h-12 w-12 mx-auto mb-3 text-amber-400 opacity-70" />
-                <p className="text-lg font-medium text-white mb-2">Vehicle Not Found</p>
+                <p className="text-lg font-medium text-white mb-2">Van Not Found</p>
                 <p className="text-sm mb-4">{error}</p>
                 <div className="bg-amber-900/20 border border-amber-700 rounded-lg p-4 max-w-md mx-auto">
                   <p className="text-sm text-amber-300">
                     The registration <span className="font-semibold text-white">{vehicleReg}</span> was not found in the DVLA database.
                   </p>
                   <p className="text-xs text-amber-400 mt-2">
-                    This may be a test vehicle, an invalid registration, or a vehicle not yet registered with DVLA.
+                    This may be a test van, an invalid registration, or a van not yet registered with DVLA.
                   </p>
                 </div>
               </>
@@ -358,7 +358,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                 {existingMotDueDate && !vehicleNotFound && (
                   <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4 max-w-md mx-auto">
                     <p className="text-sm text-blue-300">
-                      This vehicle is likely less than 3 years old and hasn&apos;t required an MOT yet.
+                      This van is likely less than 3 years old and hasn&apos;t required an MOT yet.
                     </p>
                     <p className="text-sm text-white font-medium mt-2">
                       First MOT due: <span className="text-blue-400">{new Date(existingMotDueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
@@ -385,19 +385,19 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
           <div className="text-center py-12 text-muted-foreground">
             <FileText className="h-12 w-12 mx-auto mb-3 opacity-20" />
             <p>No MOT history available</p>
-            <p className="text-sm mt-1">This vehicle may be too new or exempt from MOT testing</p>
+            <p className="text-sm mt-1">This van may be too new or exempt from MOT testing</p>
           </div>
         ) : (
           <div className="space-y-4">
             {/* Current MOT Status Card */}
             {motData.currentStatus.status === 'No MOT History' || motData.currentStatus.status === 'Not Yet Due' || motData.tests.length === 0 ? (
-              // Special card for vehicles with no MOT history (too new)
+              // Special card for vans with no MOT history (too new)
               <div className="bg-gradient-to-r from-slate-800/50 to-slate-700/30 border border-border/50 rounded-lg p-4 md:p-6">
                 <div className="text-center py-4">
                   <AlertTriangle className="h-12 w-12 md:h-16 md:w-16 mx-auto mb-4 text-blue-400 opacity-60" />
                   <h3 className="text-lg md:text-xl font-semibold text-white mb-2">No MOT History</h3>
                   <p className="text-slate-400 mb-4">
-                    This vehicle is too new to have any MOT tests recorded.
+                    This van is too new to have any MOT tests recorded.
                   </p>
                   <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 max-w-md mx-auto">
                     <p className="text-sm text-muted-foreground mb-2">
@@ -410,7 +410,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {motData.firstUsedDate ? 
-                            'New vehicles are exempt from MOT testing for the first 3 years' :
+                            'New vans are exempt from MOT testing for the first 3 years' :
                             'MOT due date from vehicle records'
                           }
                         </p>
@@ -445,7 +445,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                           Date not available
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Vehicle registration date not found in database
+                          Van registration date not found in database
                         </p>
                       </>
                     )}
@@ -453,7 +453,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                 </div>
               </div>
             ) : (
-              // Normal card for vehicles with MOT history
+              // Normal card for vans with MOT history
               <div className="bg-gradient-to-r from-blue-900/30 to-blue-800/20 border border-blue-700/50 rounded-lg p-3 md:p-4">
                 <h3 className="text-base md:text-lg font-semibold text-blue-300 mb-3 flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 md:h-5 md:w-5" />

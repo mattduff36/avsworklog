@@ -56,7 +56,7 @@ async function investigateVehicles() {
 
   // Get all non-TE57 vehicles (real production vehicles)
   const { data: vehicles, error } = await supabase
-    .from('vehicles')
+    .from('vans')
     .select(`
       id,
       reg_number,
@@ -102,7 +102,7 @@ async function investigateVehicles() {
       const { data: inspections } = await supabase
         .from('van_inspections')
         .select('id, current_mileage, inspection_date, status, created_at')
-        .eq('vehicle_id', vehicle.id)
+        .eq('van_id', vehicle.id)
         .not('current_mileage', 'is', null)
         .order('inspection_date', { ascending: false })
         .limit(10);

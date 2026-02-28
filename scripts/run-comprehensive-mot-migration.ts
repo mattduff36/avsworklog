@@ -68,8 +68,8 @@ async function runMigration() {
     console.log('   - Tester comments from MOT tests');
     
     console.log('\n🔧 Helper Functions:');
-    console.log('   - get_latest_mot_test(vehicle_id)');
-    console.log('   - get_latest_passed_mot(vehicle_id)');
+    console.log('   - get_latest_mot_test(van_id)');
+    console.log('   - get_latest_passed_mot(van_id)');
     console.log('   - count_mot_defects_by_type(mot_test_id)');
     
     console.log('\n🔒 Row Level Security:');

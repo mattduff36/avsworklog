@@ -46,7 +46,7 @@ async function backfillMaintenanceHistory() {
     const auditQuery = `
       SELECT 
         al.*,
-        vm.vehicle_id,
+        vm.van_id,
         p.full_name as user_name
       FROM audit_log al
       LEFT JOIN vehicle_maintenance vm ON vm.id = al.record_id
@@ -69,7 +69,7 @@ async function backfillMaintenanceHistory() {
     let skippedCount = 0;
 
     for (const audit of auditEntries) {
-      if (!audit.vehicle_id) {
+      if (!audit.van_id) {
         console.log(`⚠️  Skipping audit entry ${audit.id} - vehicle not found`);
         skippedCount++;
         continue;
@@ -85,7 +85,7 @@ async function backfillMaintenanceHistory() {
         continue;
       }
 
-      console.log(`\n📝 Processing audit entry for vehicle_id: ${audit.vehicle_id}`);
+      console.log(`\n📝 Processing audit entry for van_id: ${audit.van_id}`);
       console.log(`   User: ${audit.user_name || 'Unknown'}`);
       console.log(`   Date: ${new Date(audit.created_at).toLocaleString()}`);
       console.log(`   Fields changed: ${changeKeys.join(', ')}`);
@@ -107,7 +107,7 @@ async function backfillMaintenanceHistory() {
         // Check if history entry already exists
         const checkQuery = `
           SELECT id FROM maintenance_history
-          WHERE vehicle_id = $1
+          WHERE van_id = $1
             AND field_name = $2
             AND old_value = $3
             AND new_value = $4
@@ -116,7 +116,7 @@ async function backfillMaintenanceHistory() {
         `;
 
         const { rows: existing } = await client.query(checkQuery, [
-          audit.vehicle_id,
+          audit.van_id,
           fieldName,
           oldValue,
           newValue,
@@ -133,7 +133,7 @@ async function backfillMaintenanceHistory() {
         // Insert maintenance_history entry
         const insertQuery = `
           INSERT INTO maintenance_history (
-            vehicle_id,
+            van_id,
             field_name,
             old_value,
             new_value,
@@ -148,7 +148,7 @@ async function backfillMaintenanceHistory() {
         const comment = `Backfilled from audit log - Change made via Vehicle Maintenance update`;
 
         await client.query(insertQuery, [
-          audit.vehicle_id,
+          audit.van_id,
           fieldName,
           oldValue,
           newValue,

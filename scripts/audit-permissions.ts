@@ -10,7 +10,7 @@ const url = new URL(cs);
 const ALL_MODULES = [
   'timesheets', 'inspections', 'plant-inspections', 'rams', 'absence',
   'maintenance', 'toolbox-talks', 'workshop-tasks', 'approvals',
-  'actions', 'reports', 'admin-users', 'admin-vehicles',
+  'actions', 'reports', 'admin-users', 'admin-vans',
 ];
 
 async function run() {

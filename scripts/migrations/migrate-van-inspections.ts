@@ -229,12 +229,12 @@ async function migrateVanInspections() {
       .from('vehicle_inspections')
       .select(`
         id,
-        vehicle_id,
+        van_id,
         inspection_date,
         vehicles!inner (
           reg_number,
           vehicle_type,
-          vehicle_categories (name)
+          van_categories (name)
         )
       `)
       .eq('status', 'draft');
@@ -244,7 +244,7 @@ async function migrateVanInspections() {
     // Filter to only Van inspections
     const vanInspections = inspections?.filter(insp => {
       const vehicle = insp.vehicles as any;
-      const categoryName = vehicle?.vehicle_categories?.name || vehicle?.vehicle_type;
+      const categoryName = vehicle?.van_categories?.name || vehicle?.vehicle_type;
       return categoryName === 'Van';
     }) || [];
     

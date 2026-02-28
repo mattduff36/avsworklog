@@ -50,8 +50,8 @@ async function findSubcategoryTasks() {
         title,
         status,
         created_at,
-        vehicle_id,
-        vehicles (
+        van_id,
+        vans (
           reg_number,
           nickname
         )
@@ -73,7 +73,7 @@ async function findSubcategoryTasks() {
     console.log('═'.repeat(80));
 
     tasks.forEach((task, idx) => {
-      const vehicle = task.vehicles as any;
+      const vehicle = task.vans as any;
       console.log(`\n[${idx + 1}] Task ID: ${task.id}`);
       console.log(`    Title: ${task.title}`);
       console.log(`    Status: ${task.status}`);

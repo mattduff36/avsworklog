@@ -62,7 +62,7 @@ async function runMigration() {
     const { rows: serviceCategories } = await client.query(`
       SELECT id, name, completion_updates
       FROM workshop_task_categories
-      WHERE name ILIKE '%service%' AND applies_to = 'vehicle'
+      WHERE name ILIKE '%service%' AND applies_to = 'van'
     `);
 
     if (serviceCategories.length > 0) {

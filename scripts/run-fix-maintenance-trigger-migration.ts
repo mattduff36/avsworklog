@@ -1,8 +1,8 @@
 /**
  * Migration Runner: Fix maintenance trigger for plant inspections
  * 
- * The update_vehicle_maintenance_mileage() trigger only handled vehicle_id.
- * Plant inspections (vehicle_id = NULL, plant_id set) caused a constraint
+ * The update_vehicle_maintenance_mileage() trigger only handled van_id.
+ * Plant inspections (van_id = NULL, plant_id set) caused a constraint
  * violation on check_maintenance_asset. This migration updates the trigger
  * to handle both vehicle and plant inspections.
  * 

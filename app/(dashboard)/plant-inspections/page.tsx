@@ -35,7 +35,7 @@ interface InspectionWithPlant extends PlantInspection {
     plant_id: string;
     nickname: string | null;
     serial_number: string | null;
-    vehicle_categories: { name: string } | null;
+    van_categories: { name: string } | null;
   } | null;
 }
 
@@ -44,7 +44,7 @@ interface Plant {
   plant_id: string;
   nickname: string | null;
   serial_number: string | null;
-  vehicle_categories: { name: string } | null;
+  van_categories: { name: string } | null;
 }
 
 function PlantInspectionsContent() {
@@ -98,7 +98,7 @@ function PlantInspectionsContent() {
             plant_id,
             nickname,
             serial_number,
-            vehicle_categories (
+            van_categories (
               name
             )
           `)
@@ -130,7 +130,7 @@ function PlantInspectionsContent() {
             plant_id,
             nickname,
             serial_number,
-            vehicle_categories (
+            van_categories (
               name
             )
           ),
@@ -406,7 +406,7 @@ function PlantInspectionsContent() {
                       <SelectItem key={plant.id} value={plant.id}>
                         {plant.plant_id}
                         {plant.nickname && ` - ${plant.nickname}`}
-                        {plant.vehicle_categories?.name && ` (${plant.vehicle_categories.name})`}
+                        {plant.van_categories?.name && ` (${plant.van_categories.name})`}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -500,7 +500,7 @@ function PlantInspectionsContent() {
                           </>
                         ) : (
                           <>
-                            {inspection.plant?.vehicle_categories?.name && `${inspection.plant.vehicle_categories.name} • `}
+                            {inspection.plant?.van_categories?.name && `${inspection.plant.van_categories.name} • `}
                           </>
                         )}
                         {inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date

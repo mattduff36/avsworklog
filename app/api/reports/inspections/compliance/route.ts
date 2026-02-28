@@ -60,11 +60,10 @@ export async function GET(request: NextRequest) {
         status,
         submitted_at,
         reviewed_at,
-        vehicle_id,
-        vehicle:vehicles!vehicle_inspections_vehicle_id_fkey (
+        vehicle:vans (
           id,
           reg_number,
-          vehicle_categories (
+          van_categories (
             name
           )
         ),

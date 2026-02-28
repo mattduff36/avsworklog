@@ -44,7 +44,7 @@ async function checkSchema() {
       FROM information_schema.columns
       WHERE table_schema = 'public'
       AND table_name = 'maintenance_history'
-      AND column_name IN ('vehicle_id', 'plant_id')
+      AND column_name IN ('van_id', 'plant_id')
       ORDER BY column_name;
     `);
 
@@ -58,20 +58,20 @@ async function checkSchema() {
 
     // Check if plant_id column exists
     const hasPlantId = columnsResult.rows.some(r => r.column_name === 'plant_id');
-    const vehicleIdRow = columnsResult.rows.find(r => r.column_name === 'vehicle_id');
+    const vehicleIdRow = columnsResult.rows.find(r => r.column_name === 'van_id');
     
     if (!hasPlantId) {
       console.error('❌ PROBLEM: plant_id column does NOT exist!');
       console.log('\n💡 Solution: Run the migration:');
       console.log('   npx tsx scripts/run-maintenance-history-plant-migration.ts\n');
     } else if (vehicleIdRow && vehicleIdRow.is_nullable === 'NO') {
-      console.error('❌ PROBLEM: vehicle_id is still NOT NULL!');
+      console.error('❌ PROBLEM: van_id is still NOT NULL!');
       console.log('\n💡 Solution: The migration needs to be applied.');
-      console.log('   The plant_id column exists but vehicle_id is still NOT NULL.');
+      console.log('   The plant_id column exists but van_id is still NOT NULL.');
       console.log('   This means the migration was partially applied.\n');
     } else {
       console.log('✅ Schema looks correct!');
-      console.log('   - vehicle_id is nullable');
+      console.log('   - van_id is nullable');
       console.log('   - plant_id column exists\n');
     }
 

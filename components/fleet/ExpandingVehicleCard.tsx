@@ -30,7 +30,7 @@ type Vehicle = {
   nickname: string | null;
   status: string;
   category_id: string;
-  vehicle_categories?: { name: string; id: string } | null;
+  van_categories?: { name: string; id: string } | null;
 };
 
 type Category = {
@@ -143,7 +143,7 @@ export function ExpandingVehicleCard({ vehicle, categories, onUpdate, fromTab = 
                 )}
               </h3>
               <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                <span>{vehicle.vehicle_categories?.name || 'No Category'}</span>
+                <span>{vehicle.van_categories?.name || 'No Category'}</span>
                 <span>•</span>
                 <Badge 
                   variant={vehicle.status === 'active' ? 'default' : 'secondary'}

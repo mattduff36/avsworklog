@@ -12,25 +12,28 @@ import { getParentHref } from '@/lib/config/backNavigation';
 import { getAccentFromRoute } from '@/lib/theme/getAccentFromRoute';
 
 describe('Navigation Config — Inspection Rename Verification', () => {
-  it('has Van Inspections dropdown pointing to /van-inspections', () => {
-    const inspectionNav = employeeNavItems.find(n => n.dropdownItems?.length);
-    expect(inspectionNav).toBeDefined();
-    const vanChild = inspectionNav!.dropdownItems!.find(d => d.href === '/van-inspections');
-    expect(vanChild).toBeDefined();
-    expect(vanChild!.label).toBe('Van Inspections');
+  it('has Van Inspections as separate nav item pointing to /van-inspections', () => {
+    const vanNav = employeeNavItems.find(n => n.href === '/van-inspections');
+    expect(vanNav).toBeDefined();
+    expect(vanNav!.label).toBe('Van Inspections');
+    expect(vanNav!.module).toBe('inspections');
   });
 
-  it('has Plant Inspections dropdown pointing to /plant-inspections', () => {
-    const inspectionNav = employeeNavItems.find(n => n.dropdownItems?.length);
-    const plantChild = inspectionNav!.dropdownItems!.find(d => d.href === '/plant-inspections');
-    expect(plantChild).toBeDefined();
-    expect(plantChild!.label).toBe('Plant Inspections');
+  it('has Plant Inspections as separate nav item pointing to /plant-inspections', () => {
+    const plantNav = employeeNavItems.find(n => n.href === '/plant-inspections');
+    expect(plantNav).toBeDefined();
+    expect(plantNav!.label).toBe('Plant Inspections');
+    expect(plantNav!.module).toBe('plant-inspections');
+  });
+
+  it('no nav item uses a dropdown for inspections', () => {
+    const withDropdown = employeeNavItems.filter(n => n.dropdownItems && n.dropdownItems.length > 0);
+    expect(withDropdown).toHaveLength(0);
   });
 
   it('no nav items reference /inspections (old path)', () => {
     const allHrefs = [
       ...employeeNavItems.map(n => n.href),
-      ...employeeNavItems.flatMap(n => n.dropdownItems?.map(d => d.href) || []),
       ...managerNavItems.map(n => n.href),
       ...adminNavItems.map(n => n.href),
       dashboardNavItem.href,
@@ -42,7 +45,6 @@ describe('Navigation Config — Inspection Rename Verification', () => {
   it('no nav labels contain "Vehicle Inspection"', () => {
     const allLabels = [
       ...employeeNavItems.map(n => n.label),
-      ...employeeNavItems.flatMap(n => n.dropdownItems?.map(d => d.label) || []),
       ...managerNavItems.map(n => n.label),
       ...adminNavItems.map(n => n.label),
     ];
@@ -154,6 +156,6 @@ describe('Accent From Route', () => {
   it('other modules return their own accents (regression)', () => {
     expect(getAccentFromRoute('/timesheets')).toBe('timesheets');
     expect(getAccentFromRoute('/dashboard')).toBe('brand');
-    expect(getAccentFromRoute('/fleet')).toBe('maintenance');
+    expect(getAccentFromRoute('/fleet')).toBe('fleet');
   });
 });

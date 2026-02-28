@@ -17,7 +17,7 @@ import PhotoUpload from '@/components/forms/PhotoUpload';
 import { Database } from '@/types/database';
 
 interface InspectionWithDetails extends VanInspection {
-  vehicles: {
+  vans: {
     reg_number: string;
     vehicle_type: string;
   };
@@ -47,7 +47,7 @@ export default function ViewInspectionPage() {
         .from('van_inspections')
         .select(`
           *,
-          vehicles (
+          vans (
             reg_number,
             vehicle_type
           )
@@ -244,7 +244,7 @@ export default function ViewInspectionPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   inspectionId: inspection.id,
-                  vehicleId: inspection.vehicle_id,
+                  vehicleId: inspection.van_id,
                   createdBy: user!.id,
                   defects
                 })
@@ -265,7 +265,7 @@ export default function ViewInspectionPage() {
       }
 
       // Auto-complete actions for resolved items (items that were 'attention' but are now 'ok')
-      if (originalDefectItems.length > 0 && inspection.vehicle_id) {
+      if (originalDefectItems.length > 0 && inspection.van_id) {
         try {
           // Find items that were defects but are now OK
           const resolvedItems = originalDefectItems.filter(originalItem => {
@@ -425,7 +425,7 @@ export default function ViewInspectionPage() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 inspectionId: inspection.id,
-                vehicleId: inspection.vehicle_id,
+                vehicleId: inspection.van_id,
                 createdBy: user!.id,
                 defects
               })
@@ -633,7 +633,7 @@ export default function ViewInspectionPage() {
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-foreground">Van Inspection</h1>
               <p className="text-sm md:text-base text-muted-foreground">
-                {inspection.vehicles?.reg_number} • {
+                {inspection.vans?.reg_number} • {
                   inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
                     ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
                     : formatDate(inspection.inspection_date)
@@ -651,7 +651,7 @@ export default function ViewInspectionPage() {
                   const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
                   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
                   const pdfUrl = `/api/van-inspections/${inspection.id}/pdf`;
-                  const vehicleReg = inspection.vehicles?.reg_number || 'Unknown';
+                  const vehicleReg = inspection.vans?.reg_number || 'Unknown';
                   
                   if (isStandalone || isMobile) {
                     // Use in-app PDF viewer for PWA/mobile

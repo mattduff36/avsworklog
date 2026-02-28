@@ -93,7 +93,7 @@ async function runMigration() {
     for (const category of topLevelCategories) {
       // Check if already exists
       const existingResult = await client.query(
-        `SELECT id FROM workshop_task_categories WHERE slug = $1 AND applies_to = 'vehicle'`,
+        `SELECT id FROM workshop_task_categories WHERE slug = $1 AND applies_to = 'van'`,
         [category.slug]
       );
 

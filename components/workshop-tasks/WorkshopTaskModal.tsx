@@ -34,7 +34,7 @@ type Task = {
   workshop_task_categories?: {
     name: string;
   };
-  vehicles?: {
+  vans?: {
     reg_number: string;
     nickname: string | null;
   };
@@ -97,9 +97,9 @@ export function WorkshopTaskModal({
       return idLabel;
     };
 
-    // Check direct vehicle or plant reference
-    if (task.vehicles) {
-      return getAssetDisplay(task.vehicles);
+    // Check direct van or plant reference
+    if (task.vans) {
+      return getAssetDisplay(task.vans);
     } else if (task.plant) {
       return getAssetDisplay(task.plant);
     }

@@ -6,7 +6,7 @@ describe('Inspection Types Contract', () => {
     it('satisfies the van inspection shape', () => {
       const van: VanInspection = {
         id: 'test-id',
-        vehicle_id: 'vehicle-id',
+        van_id: 'vehicle-id',
         user_id: 'user-id',
         inspection_date: '2026-01-01',
         inspection_end_date: '2026-01-07',
@@ -19,13 +19,13 @@ describe('Inspection Types Contract', () => {
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
       };
-      expect(van.vehicle_id).toBe('vehicle-id');
+      expect(van.van_id).toBe('vehicle-id');
       expect(van.status).toBe('draft');
     });
 
     it('allows submitted status', () => {
       const van: VanInspection = {
-        id: 'id', vehicle_id: 'v', user_id: 'u',
+        id: 'id', van_id: 'v', user_id: 'u',
         inspection_date: '2026-01-01', inspection_end_date: '2026-01-07',
         current_mileage: null, status: 'submitted',
         submitted_at: '2026-01-07T10:00:00Z',
@@ -91,14 +91,14 @@ describe('Inspection Types Contract', () => {
   describe('VehicleInspection (deprecated alias)', () => {
     it('is assignable to VanInspection', () => {
       const v: VehicleInspection = {
-        id: 'id', vehicle_id: 'v', user_id: 'u',
+        id: 'id', van_id: 'v', user_id: 'u',
         inspection_date: '2026-01-01', inspection_end_date: '2026-01-07',
         current_mileage: null, status: 'draft',
         submitted_at: null, reviewed_by: null, reviewed_at: null,
         manager_comments: null, created_at: '', updated_at: '',
       };
       const assignable: VanInspection = v;
-      expect(assignable.vehicle_id).toBe('v');
+      expect(assignable.van_id).toBe('v');
     });
   });
 

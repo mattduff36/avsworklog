@@ -195,11 +195,11 @@ async function findVehicle(client: pg.Client, reg: string, formattedReg: string)
 async function upsertMaintenanceRecord(client: pg.Client, maintenanceData: Record<string, unknown>) {
   const query = `
     INSERT INTO vehicle_maintenance (
-      vehicle_id, current_mileage, last_service_mileage, next_service_mileage,
+      van_id, current_mileage, last_service_mileage, next_service_mileage,
       cambelt_due_mileage, tracker_id, tax_due_date, mot_due_date,
       first_aid_kit_expiry, notes, last_mileage_update
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-    ON CONFLICT (vehicle_id) 
+    ON CONFLICT (van_id) 
     DO UPDATE SET
       current_mileage = EXCLUDED.current_mileage,
       last_service_mileage = EXCLUDED.last_service_mileage,
@@ -216,7 +216,7 @@ async function upsertMaintenanceRecord(client: pg.Client, maintenanceData: Recor
   `;
 
   return await client.query(query, [
-    maintenanceData.vehicle_id,
+    maintenanceData.van_id,
     maintenanceData.current_mileage,
     maintenanceData.last_service_mileage,
     maintenanceData.next_service_mileage,
@@ -234,7 +234,7 @@ async function upsertMaintenanceRecord(client: pg.Client, maintenanceData: Recor
 async function createHistoryEntry(client: pg.Client, vehicleId: string) {
   const query = `
     INSERT INTO maintenance_history (
-      vehicle_id, field_name, new_value, value_type, comment, updated_by_name
+      van_id, field_name, new_value, value_type, comment, updated_by_name
     ) VALUES ($1, $2, $3, $4, $5, $6)
   `;
 
@@ -273,7 +273,7 @@ async function processVehicleRow(client: pg.Client, row: ExcelRow, result: Impor
     const vehicleId = vehicleQuery.rows[0].id;
 
     const maintenanceData = {
-      vehicle_id: vehicleId,
+      van_id: vehicleId,
       current_mileage: parseMileage(row[COLUMN_PRESENT_MILEAGE]),
       last_service_mileage: parseMileage(row[COLUMN_MILES_LAST_SERVICE]),
       next_service_mileage: parseMileage(row[COLUMN_MILES_NEXT_SERVICE]),

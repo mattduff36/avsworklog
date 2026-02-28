@@ -2,7 +2,7 @@ export type InspectionStatus = 'ok' | 'attention' | 'na';
 
 export interface VanInspection {
   id: string;
-  vehicle_id: string;
+  van_id: string;
   user_id: string;
   inspection_date: string;
   inspection_end_date: string;

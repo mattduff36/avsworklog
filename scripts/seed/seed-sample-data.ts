@@ -191,7 +191,7 @@ async function createVehicles() {
     console.log(`📝 Creating vehicle: ${vehicle.reg_number}`);
     
     const { data, error } = await supabase
-      .from('vehicles')
+      .from('vans')
       .upsert(vehicle, { onConflict: 'reg_number' })
       .select()
       .single();
@@ -315,7 +315,7 @@ async function createInspections(employees: any[], vehicles: any[], managerId: s
         const { data: inspection, error: inspectionError } = await supabase
           .from('van_inspections')
           .insert({
-            vehicle_id: vehicle.id,
+            van_id: vehicle.id,
             user_id: employee.id,
             inspection_date: dateRange.start,
             inspection_end_date: dateRange.end,

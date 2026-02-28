@@ -5,11 +5,12 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Wrench, Truck, HardHat } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Loader2, Wrench, Truck, HardHat, Settings } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useMaintenance } from '@/lib/hooks/useMaintenance';
+import { MaintenanceSettings } from '@/app/(dashboard)/maintenance/components/MaintenanceSettings';
 import { createClient } from '@/lib/supabase/client';
 
 const MaintenanceOverview = dynamic(
@@ -31,6 +32,8 @@ function MaintenanceContent() {
 
   const [hasModulePermission, setHasModulePermission] = useState<boolean | null>(null);
   const [maintenanceFilter, setMaintenanceFilter] = useState<'both' | 'van' | 'plant'>('both');
+  const [activeTab, setActiveTab] = useState<'overview' | 'settings'>('overview');
+  const canManage = isManager || isAdmin || isSuperAdmin;
 
   const { data: maintenanceData, isLoading: maintenanceLoading, error: maintenanceError } = useMaintenance();
 
@@ -79,7 +82,7 @@ function MaintenanceContent() {
 
   const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
     const isPlant = vehicle.is_plant === true;
-    const assetId = vehicle.vehicle?.id || vehicle.vehicle_id || vehicle.id;
+    const assetId = vehicle.van_id ?? vehicle.vehicle?.id ?? vehicle.id;
 
     if (isPlant) {
       router.push(`/fleet/plant/${assetId}/history?fromTab=maintenance`);
@@ -91,7 +94,7 @@ function MaintenanceContent() {
   if (authLoading || hasModulePermission === null) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-maintenance" />
       </div>
     );
   }
@@ -126,66 +129,90 @@ function MaintenanceContent() {
         </div>
       </div>
 
-      {maintenanceLoading ? (
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-        </div>
-      ) : maintenanceError ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Wrench className="h-16 w-16 text-red-400 mb-4" />
-            <h2 className="text-2xl font-semibold mb-2">Error Loading Maintenance Data</h2>
-            <p className="text-gray-600 text-center max-w-md">
-              {maintenanceError?.message || 'Failed to load maintenance records'}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* Filter Buttons */}
-          <div className="flex items-center justify-end">
-            <Tabs value={maintenanceFilter} onValueChange={(v) => setMaintenanceFilter(v as 'both' | 'van' | 'plant')}>
-              <TabsList>
-                <TabsTrigger value="both" className="gap-2">
-                  <Wrench className="h-4 w-4" />
-                  All Assets
-                </TabsTrigger>
-                <TabsTrigger value="van" className="gap-2">
-                  <Truck className="h-4 w-4" />
-                  Vans
-                </TabsTrigger>
-                <TabsTrigger value="plant" className="gap-2">
-                  <HardHat className="h-4 w-4" />
-                  Plant
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
+      {/* Page-level tabs: Overview + Settings (managers/admins only) */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'overview' | 'settings')}>
+        {canManage && (
+          <TabsList>
+            <TabsTrigger value="overview" className="gap-2">
+              <Wrench className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="gap-2">
+              <Settings className="h-4 w-4" />
+              Settings
+            </TabsTrigger>
+          </TabsList>
+        )}
 
-          {(() => {
-            const filteredVehicles = (maintenanceData?.vehicles || []).filter(v => {
-              if (maintenanceFilter === 'both') return true;
-              if (maintenanceFilter === 'van') return v.vehicle?.asset_type !== 'plant';
-              if (maintenanceFilter === 'plant') return v.vehicle?.asset_type === 'plant';
-              return true;
-            });
+        <TabsContent value="overview" className="space-y-6 mt-0">
+          {maintenanceLoading ? (
+            <div className="flex items-center justify-center min-h-[400px]">
+              <Loader2 className="h-8 w-8 animate-spin text-maintenance" />
+            </div>
+          ) : maintenanceError ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Wrench className="h-16 w-16 text-red-400 mb-4" />
+                <h2 className="text-2xl font-semibold mb-2">Error Loading Maintenance Data</h2>
+                <p className="text-gray-600 text-center max-w-md">
+                  {maintenanceError?.message || 'Failed to load maintenance records'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Asset type filter */}
+              <div className="flex items-center justify-end">
+                <Tabs value={maintenanceFilter} onValueChange={(v) => setMaintenanceFilter(v as 'both' | 'van' | 'plant')}>
+                  <TabsList>
+                    <TabsTrigger value="both" className="gap-2">
+                      <Wrench className="h-4 w-4" />
+                      All Assets
+                    </TabsTrigger>
+                    <TabsTrigger value="van" className="gap-2">
+                      <Truck className="h-4 w-4" />
+                      Vans
+                    </TabsTrigger>
+                    <TabsTrigger value="plant" className="gap-2">
+                      <HardHat className="h-4 w-4" />
+                      Plant
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
 
-            const filteredSummary = {
-              total: filteredVehicles.length,
-              overdue: filteredVehicles.filter(v => v.overdue_count > 0).length,
-              due_soon: filteredVehicles.filter(v => v.due_soon_count > 0 && v.overdue_count === 0).length,
-            };
+              {(() => {
+                const filteredVehicles = (maintenanceData?.vehicles || []).filter(v => {
+                  if (maintenanceFilter === 'both') return true;
+                  if (maintenanceFilter === 'van') return v.vehicle?.asset_type !== 'plant';
+                  if (maintenanceFilter === 'plant') return v.vehicle?.asset_type === 'plant';
+                  return true;
+                });
 
-            return (
-              <MaintenanceOverview
-                vehicles={filteredVehicles}
-                summary={filteredSummary}
-                onVehicleClick={handleVehicleClick}
-              />
-            );
-          })()}
-        </>
-      )}
+                const filteredSummary = {
+                  total: filteredVehicles.length,
+                  overdue: filteredVehicles.filter(v => v.overdue_count > 0).length,
+                  due_soon: filteredVehicles.filter(v => v.due_soon_count > 0 && v.overdue_count === 0).length,
+                };
+
+                return (
+                  <MaintenanceOverview
+                    vehicles={filteredVehicles}
+                    summary={filteredSummary}
+                    onVehicleClick={handleVehicleClick}
+                  />
+                );
+              })()}
+            </>
+          )}
+        </TabsContent>
+
+        {canManage && (
+          <TabsContent value="settings" className="space-y-6 mt-0">
+            <MaintenanceSettings isAdmin={isAdmin} isManager={isManager} />
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   );
 }
@@ -194,7 +221,7 @@ export default function MaintenancePage() {
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-maintenance" />
       </div>
     }>
       <MaintenanceContent />

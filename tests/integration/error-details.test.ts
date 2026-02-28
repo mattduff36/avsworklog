@@ -43,7 +43,7 @@ describe('Error Details API - Subcategory Tasks', () => {
   beforeAll(async () => {
     // Get or create test vehicle
     const { data: existingVehicle } = await supabase
-      .from('vehicles')
+      .from('vans')
       .select('id')
       .ilike('reg_number', 'TE57ERRTEST')
       .single();
@@ -52,13 +52,13 @@ describe('Error Details API - Subcategory Tasks', () => {
       testVehicleId = existingVehicle.id;
     } else {
       const { data: categories } = await supabase
-        .from('vehicle_categories')
+        .from('van_categories')
         .select('id')
         .limit(1)
         .single();
 
       const { data: newVehicle } = await supabase
-        .from('vehicles')
+        .from('vans')
         .insert({
           reg_number: 'TE57ERRTEST',
           status: 'active',
@@ -107,7 +107,7 @@ describe('Error Details API - Subcategory Tasks', () => {
     const { data: task } = await supabase
       .from('actions')
       .insert({
-        vehicle_id: testVehicleId,
+        van_id: testVehicleId,
         title: 'Test Error Task',
         status: 'pending',
         workshop_category_id: testCategoryId,

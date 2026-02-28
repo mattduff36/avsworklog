@@ -211,7 +211,7 @@ async function runTests() {
     // Test 3.2: All modules have permissions
     const modules = [
       'timesheets', 'inspections', 'rams', 'absence', 'toolbox-talks',
-      'approvals', 'actions', 'reports', 'admin-users', 'admin-vehicles'
+      'approvals', 'actions', 'reports', 'admin-users', 'admin-vans'
     ];
     const modulePermissions = await pgClient.query(`
       SELECT DISTINCT module_name FROM role_permissions

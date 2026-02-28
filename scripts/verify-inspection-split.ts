@@ -71,7 +71,7 @@ async function run() {
 
   // Verify plant rows have no van data
   const { rows: plantVan } = await client.query(
-    `SELECT COUNT(*) AS cnt FROM plant_inspections WHERE vehicle_id IS NOT NULL`
+    `SELECT COUNT(*) AS cnt FROM plant_inspections WHERE van_id IS NOT NULL`
   );
   Number(plantVan[0].cnt) === 0
     ? pass('plant_inspections has no van rows')

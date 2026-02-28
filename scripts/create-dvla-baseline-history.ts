@@ -27,7 +27,7 @@ if (!connectionString) {
 
 interface VehicleWithDvlaData {
   id: string;
-  vehicle_id: string;
+  van_id: string;
   reg_number: string;
   tax_due_date: string | null;
   mot_due_date: string | null;
@@ -56,14 +56,14 @@ async function createBaselineHistory() {
     const vehiclesQuery = `
       SELECT 
         vm.id,
-        vm.vehicle_id,
+        vm.van_id,
         v.reg_number,
         vm.tax_due_date,
         vm.mot_due_date,
         vm.last_dvla_sync,
         vm.dvla_sync_status
       FROM vehicle_maintenance vm
-      JOIN vehicles v ON v.id = vm.vehicle_id
+      JOIN vehicles v ON v.id = vm.van_id
       WHERE vm.last_dvla_sync IS NOT NULL
         AND vm.dvla_sync_status = 'success'
         AND (vm.tax_due_date IS NOT NULL OR vm.mot_due_date IS NOT NULL)
@@ -90,7 +90,7 @@ async function createBaselineHistory() {
       if (vehicle.tax_due_date) {
         const checkTaxQuery = `
           SELECT id FROM maintenance_history
-          WHERE vehicle_id = $1
+          WHERE van_id = $1
             AND field_name = 'tax_due_date'
             AND (
               comment LIKE '%DVLA%'
@@ -101,7 +101,7 @@ async function createBaselineHistory() {
         `;
 
         const { rows: existingTax } = await client.query(checkTaxQuery, [
-          vehicle.vehicle_id,
+          vehicle.van_id,
           syncDate
         ]);
 
@@ -112,13 +112,13 @@ async function createBaselineHistory() {
           // Check if ANY tax_due_date history entry exists within 1 hour of sync
           const checkAnyTaxQuery = `
             SELECT id FROM maintenance_history
-            WHERE vehicle_id = $1
+            WHERE van_id = $1
               AND field_name = 'tax_due_date'
               AND new_value = $2
           `;
           
           const { rows: anyExistingTax } = await client.query(checkAnyTaxQuery, [
-            vehicle.vehicle_id,
+            vehicle.van_id,
             vehicle.tax_due_date
           ]);
 
@@ -129,7 +129,7 @@ async function createBaselineHistory() {
             // Insert baseline history entry
             const insertQuery = `
               INSERT INTO maintenance_history (
-                vehicle_id,
+                van_id,
                 field_name,
                 old_value,
                 new_value,
@@ -145,7 +145,7 @@ async function createBaselineHistory() {
 
             try {
               await client.query(insertQuery, [
-                vehicle.vehicle_id,
+                vehicle.van_id,
                 'tax_due_date',
                 null, // No old value since this is a baseline
                 vehicle.tax_due_date,
@@ -170,7 +170,7 @@ async function createBaselineHistory() {
       if (vehicle.mot_due_date) {
         const checkMotQuery = `
           SELECT id FROM maintenance_history
-          WHERE vehicle_id = $1
+          WHERE van_id = $1
             AND field_name = 'mot_due_date'
             AND (
               comment LIKE '%DVLA%'
@@ -182,7 +182,7 @@ async function createBaselineHistory() {
         `;
 
         const { rows: existingMot } = await client.query(checkMotQuery, [
-          vehicle.vehicle_id,
+          vehicle.van_id,
           syncDate
         ]);
 
@@ -193,13 +193,13 @@ async function createBaselineHistory() {
           // Check if ANY mot_due_date history entry exists with this value
           const checkAnyMotQuery = `
             SELECT id FROM maintenance_history
-            WHERE vehicle_id = $1
+            WHERE van_id = $1
               AND field_name = 'mot_due_date'
               AND new_value = $2
           `;
           
           const { rows: anyExistingMot } = await client.query(checkAnyMotQuery, [
-            vehicle.vehicle_id,
+            vehicle.van_id,
             vehicle.mot_due_date
           ]);
 
@@ -210,7 +210,7 @@ async function createBaselineHistory() {
             // Insert baseline history entry
             const insertQuery = `
               INSERT INTO maintenance_history (
-                vehicle_id,
+                van_id,
                 field_name,
                 old_value,
                 new_value,
@@ -226,7 +226,7 @@ async function createBaselineHistory() {
 
             try {
               await client.query(insertQuery, [
-                vehicle.vehicle_id,
+                vehicle.van_id,
                 'mot_due_date',
                 null, // No old value since this is a baseline
                 vehicle.mot_due_date,

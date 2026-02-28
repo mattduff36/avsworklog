@@ -608,11 +608,11 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
         setSelectedVehicleIds([]);
         setPurgePreview(null);
       } else {
-        toast.error(data.error || 'Failed to fetch test vehicles');
+        toast.error(data.error || 'Failed to fetch test vans');
       }
     } catch (error) {
-      console.error('Error fetching test vehicles:', error);
-      toast.error('Failed to fetch test vehicles');
+      console.error('Error fetching test vans:', error);
+      toast.error('Failed to fetch test vans');
     } finally {
       setLoadingTestVehicles(false);
     }
@@ -620,7 +620,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
   const previewPurge = async () => {
     if (selectedVehicleIds.length === 0) {
-      toast.error('Please select at least one vehicle');
+      toast.error('Please select at least one van');
       return;
     }
 
@@ -655,14 +655,14 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
   const executePurge = async () => {
     if (selectedVehicleIds.length === 0) {
-      toast.error('Please select at least one vehicle');
+      toast.error('Please select at least one van');
       return;
     }
 
     const notificationService = await import('@/lib/services/notification.service');
     const confirmed = await notificationService.notify.confirm({
       title: 'Confirm Purge',
-      description: `This will permanently delete selected records for ${selectedVehicleIds.length} vehicle(s). This cannot be undone.`,
+      description: `This will permanently delete selected records for ${selectedVehicleIds.length} van(s). This cannot be undone.`,
       confirmText: 'Purge Records',
       destructive: true,
     });
@@ -687,7 +687,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
       const data = await response.json();
 
       if (data.success) {
-        toast.success(`Purged records for ${data.affected_vehicles} vehicle(s)`);
+        toast.success(`Purged records for ${data.affected_vehicles} van(s)`);
         setPurgePreview(null);
         fetchTestVehicles(); // Refresh list
       } else {
@@ -703,14 +703,14 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
   const archiveVehicles = async () => {
     if (selectedVehicleIds.length === 0) {
-      toast.error('Please select at least one vehicle');
+      toast.error('Please select at least one van');
       return;
     }
 
     const notificationService = await import('@/lib/services/notification.service');
     const confirmed = await notificationService.notify.confirm({
-      title: 'Archive Vehicles',
-      description: `This will archive ${selectedVehicleIds.length} vehicle(s) (soft delete). The vehicles will be marked as archived and moved to vehicle_archive.`,
+      title: 'Archive Vans',
+      description: `This will archive ${selectedVehicleIds.length} van(s) (soft delete). The vans will be marked as archived and moved to van_archive.`,
       confirmText: 'Archive',
       destructive: false,
     });
@@ -735,20 +735,20 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
       const data = await response.json();
 
       if (data.success) {
-        toast.success(`Archived ${data.archived_count} vehicle(s)`);
+        toast.success(`Archived ${data.archived_count} van(s)`);
         fetchTestVehicles(); // Refresh list
       } else {
         if (data.failed_vehicles && data.failed_vehicles.length > 0) {
           const failedList = data.failed_vehicles.map((v: any) => v.reg_number).join(', ');
           toast.error(`Archived ${data.archived_count} of ${data.total_requested}. Failed: ${failedList}`);
         } else {
-          toast.error(data.error || 'Failed to archive vehicles');
+          toast.error(data.error || 'Failed to archive vans');
         }
         fetchTestVehicles(); // Refresh list even on partial failure
       }
     } catch (error) {
-      console.error('Error archiving vehicles:', error);
-      toast.error('Failed to archive vehicles');
+      console.error('Error archiving vans:', error);
+      toast.error('Failed to archive vans');
     } finally {
       setPurging(false);
     }
@@ -756,14 +756,14 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
   const hardDeleteVehicles = async () => {
     if (selectedVehicleIds.length === 0) {
-      toast.error('Please select at least one vehicle');
+      toast.error('Please select at least one van');
       return;
     }
 
     const notificationService = await import('@/lib/services/notification.service');
     const confirmed = await notificationService.notify.confirm({
-      title: '⚠️ HARD DELETE VEHICLES',
-      description: `This will PERMANENTLY DELETE ${selectedVehicleIds.length} vehicle(s) and ALL associated records from the database. This is IRREVERSIBLE and DANGEROUS. Only use for test data cleanup.`,
+      title: '⚠️ HARD DELETE VANS',
+      description: `This will PERMANENTLY DELETE ${selectedVehicleIds.length} van(s) and ALL associated records from the database. This is IRREVERSIBLE and DANGEROUS. Only use for test data cleanup.`,
       confirmText: 'I understand - DELETE PERMANENTLY',
       destructive: true,
     });
@@ -787,15 +787,15 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
       const data = await response.json();
 
       if (data.success) {
-        toast.success(`Hard deleted ${data.affected_vehicles} vehicle(s) and ${Object.values(data.deleted_counts).reduce((a: number, b: any) => a + Number(b), 0)} total records`);
+        toast.success(`Hard deleted ${data.affected_vehicles} van(s) and ${Object.values(data.deleted_counts).reduce((a: number, b: any) => a + Number(b), 0)} total records`);
         setPurgePreview(null);
         fetchTestVehicles(); // Refresh list
       } else {
-        toast.error(data.error || 'Failed to delete vehicles');
+        toast.error(data.error || 'Failed to delete vans');
       }
     } catch (error) {
-      console.error('Error deleting vehicles:', error);
-      toast.error('Failed to delete vehicles');
+      console.error('Error deleting vans:', error);
+      toast.error('Failed to delete vans');
     } finally {
       setPurging(false);
     }
@@ -945,9 +945,9 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
             <span className="hidden md:inline">DVLA Sync</span>
             <span className="md:hidden data-[state=active]:inline hidden">DVLA</span>
           </TabsTrigger>
-          <TabsTrigger value="test-vehicles" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+          <TabsTrigger value="test-vans" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
             <Car className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden md:inline">Test Vehicles</span>
+            <span className="hidden md:inline">Test Vans</span>
             <span className="md:hidden data-[state=active]:inline hidden">Test</span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
@@ -1645,18 +1645,18 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
           <DVLASyncDebugPanel />
         </TabsContent>
 
-        {/* Test Vehicles Tab */}
-        <TabsContent value="test-vehicles">
+        {/* Test Vans Tab */}
+        <TabsContent value="test-vans">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Car className="h-5 w-5 text-red-500" />
-                    Test Vehicle Cleanup
+                    Test Van Cleanup
                   </CardTitle>
                   <CardDescription>
-                    Manage and purge test vehicle data (TE57 prefix only)
+                    Manage and purge test van data (TE57 prefix only)
                   </CardDescription>
                 </div>
                 <Button
@@ -1678,7 +1678,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
               {/* Prefix Configuration */}
               <div className="space-y-2">
                 <Label htmlFor="vehicle-prefix" className="text-sm font-medium">
-                  Vehicle Registration Prefix
+                  Van Registration Prefix
                 </Label>
                 <div className="flex gap-2">
                   <Input
@@ -1692,20 +1692,20 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                     onClick={fetchTestVehicles}
                     disabled={loadingTestVehicles || !testVehiclePrefix.trim()}
                   >
-                    Load Vehicles
+                    Load Vans
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Only vehicles starting with this prefix can be managed here
+                  Only vans starting with this prefix can be managed here
                 </p>
               </div>
 
-              {/* Vehicle Selection */}
+              {/* Van Selection */}
               {testVehicles.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium">
-                      Select Vehicles ({selectedVehicleIds.length} of {testVehicles.length} selected)
+                      Select Vans ({selectedVehicleIds.length} of {testVehicles.length} selected)
                     </Label>
                     <div className="flex gap-2">
                       <Button
@@ -1775,8 +1775,8 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
               {testVehicles.length === 0 && !loadingTestVehicles && (
                 <div className="text-center py-8 text-muted-foreground">
                   <Car className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>No vehicles found matching prefix &quot;{testVehiclePrefix}&quot;</p>
-                  <p className="text-sm mt-1">Click &quot;Load Vehicles&quot; to search</p>
+                  <p>No vans found matching prefix &quot;{testVehiclePrefix}&quot;</p>
+                  <p className="text-sm mt-1">Click &quot;Load Vans&quot; to search</p>
                 </div>
               )}
 
@@ -1845,7 +1845,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                           className="h-4 w-4 rounded border-2 border-slate-400 dark:border-slate-600 text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 cursor-pointer bg-white dark:bg-slate-800"
                         />
                         <Label htmlFor="purge-archives" className="text-sm font-normal cursor-pointer">
-                          Vehicle Archive Entries
+                          Van Archive Entries
                         </Label>
                       </div>
                     </div>
@@ -1861,7 +1861,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                             Preview: Records to be deleted
                           </h4>
                           <p className="text-sm text-yellow-800 dark:text-yellow-400 mt-1">
-                            {selectedVehicleIds.length} vehicle(s) selected
+                            {selectedVehicleIds.length} van(s) selected
                           </p>
                         </div>
                       </div>
@@ -1907,7 +1907,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
                     <div className="pt-3 border-t">
                       <p className="text-sm font-medium text-muted-foreground mb-3">
-                        Vehicle Actions (records must be purged first):
+                        Van Actions (records must be purged first):
                       </p>
                       <div className="flex gap-2">
                         <Button
@@ -1915,7 +1915,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                           variant="outline"
                           disabled={purging || selectedVehicleIds.length === 0}
                         >
-                          Archive Vehicles
+                          Archive Vans
                         </Button>
                         <Button
                           onClick={hardDeleteVehicles}
@@ -1924,11 +1924,11 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                           className="bg-red-600 hover:bg-red-700"
                         >
                           <AlertTriangle className="h-4 w-4 mr-2" />
-                          Hard Delete Vehicles
+                          Hard Delete Vans
                         </Button>
                       </div>
                       <p className="text-xs text-red-600 dark:text-red-400 mt-2">
-                        ⚠️ Hard Delete permanently removes vehicles from the database
+                        ⚠️ Hard Delete permanently removes vans from the database
                       </p>
                     </div>
                   </div>

@@ -39,7 +39,7 @@ export async function GET(
     
     // Get vehicle info
     const { data: vehicle, error: vehicleError } = await supabase
-      .from('vehicles')
+      .from('vans')
       .select('id, reg_number')
       .eq('id', vehicleId)
       .single();
@@ -80,14 +80,14 @@ export async function GET(
         mot_first_used_date,
         last_mot_api_sync
       `)
-      .eq('vehicle_id', vehicleId)
+      .eq('van_id', vehicleId)
       .single();
     
     // Get history (RLS handles permission check)
     const { data: history, error } = await supabase
       .from('maintenance_history')
       .select('*')
-      .eq('vehicle_id', vehicleId)
+      .eq('van_id', vehicleId)
       .order('created_at', { ascending: false });
     
     if (error) {
@@ -101,7 +101,7 @@ export async function GET(
     // Note: Includes BOTH 'workshop_vehicle_task' (manual) and 'inspection_defect' (from inspections)
     const supabaseServiceRole = getSupabaseServiceRole();
     
-    // First, try to fetch tasks with vehicle_id (workshop_vehicle_task)
+    // First, try to fetch tasks with van_id (workshop_vehicle_task)
     const { data: directTasks, error: directError } = await supabaseServiceRole
       .from('actions')
       .select(`
@@ -122,57 +122,12 @@ export async function GET(
           name
         )
       `)
-      .eq('vehicle_id', vehicleId)
+      .eq('van_id', vehicleId)
       .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
       .order('created_at', { ascending: false });
     
-    // Then, fetch inspection defects via vehicle_inspections relationship
-    const { data: inspectionTasks, error: inspectionError } = await supabaseServiceRole
-      .from('actions')
-      .select(`
-        id,
-        created_at,
-        status,
-        action_type,
-        title,
-        status_history,
-        workshop_comments,
-        description,
-        logged_comment,
-        actioned_comment,
-        actioned_at,
-        logged_at,
-        created_by,
-        workshop_task_categories (
-          name
-        ),
-        van_inspections!inner (
-          vehicle_id
-        )
-      `)
-      .eq('van_inspections.vehicle_id', vehicleId)
-      .eq('action_type', 'inspection_defect')
-      .order('created_at', { ascending: false });
-    
-    // Combine both sources and deduplicate by ID
-    const taskMap = new Map();
-    
-    if (directTasks) {
-      directTasks.forEach(task => taskMap.set(task.id, task));
-    }
-    
-    if (inspectionTasks) {
-      inspectionTasks.forEach(task => {
-        // Remove the vehicle_inspections property before storing
-        const { van_inspections, ...cleanTask } = task as any;
-        if (!taskMap.has(task.id)) {
-          taskMap.set(task.id, cleanTask);
-        }
-      });
-    }
-    
-    const workshopTasks = Array.from(taskMap.values());
-    const workshopError = directError || inspectionError;
+    const workshopTasks = directTasks || [];
+    const workshopError = directError;
     
     if (workshopError) {
       logger.error('Failed to fetch workshop tasks', workshopError);

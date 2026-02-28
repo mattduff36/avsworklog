@@ -47,7 +47,7 @@ export type WithUser<T> = T & {
 };
 
 export type WithVehicle<T> = T & {
-  vehicles: {
+  vans: {
     reg_number: string;
     vehicle_type?: string;
   };

@@ -74,7 +74,7 @@ describe('Plant History Page Workflows', () => {
         .from('plant')
         .select(`
           *,
-          vehicle_categories (
+          van_categories (
             id,
             name
           )

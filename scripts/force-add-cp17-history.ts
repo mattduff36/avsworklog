@@ -30,9 +30,9 @@ async function forceAddHistory() {
 
     // Get vehicle and Andy Hill
     const { rows: vehicles } = await client.query(`
-      SELECT v.id as vehicle_id, v.reg_number, vm.*
+      SELECT v.id as van_id, v.reg_number, vm.*
       FROM vehicles v
-      LEFT JOIN vehicle_maintenance vm ON vm.vehicle_id = v.id
+      LEFT JOIN vehicle_maintenance vm ON vm.van_id = v.id
       WHERE v.reg_number = 'CP17 TKO'
     `);
 
@@ -60,7 +60,7 @@ async function forceAddHistory() {
     // Create the history entry
     const insertQuery = `
       INSERT INTO maintenance_history (
-        vehicle_id,
+        van_id,
         field_name,
         old_value,
         new_value,
@@ -74,7 +74,7 @@ async function forceAddHistory() {
     `;
 
     const { rows: inserted } = await client.query(insertQuery, [
-      vehicle.vehicle_id,
+      vehicle.van_id,
       'next_service_mileage',
       null, // We don't know the old value
       vehicle.next_service_mileage ? vehicle.next_service_mileage.toString() : null,

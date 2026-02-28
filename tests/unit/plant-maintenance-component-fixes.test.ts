@@ -8,15 +8,15 @@ import { describe, it, expect } from 'vitest';
 
 describe('Plant Maintenance Component Bug Fixes', () => {
   describe('Bug 2: isPlantAsset logic fix', () => {
-    it('should correctly identify plant assets using vehicle_id', () => {
+    it('should correctly identify plant assets using van_id', () => {
       const vehicles = [
-        { vehicle_id: 'plant-123', id: 'plant-123', is_plant: true },
-        { vehicle_id: 'vehicle-456', id: 'vehicle-456' },
+        { van_id: 'plant-123', id: 'plant-123', is_plant: true },
+        { van_id: 'vehicle-456', id: 'vehicle-456' },
       ];
 
       // Simulate the fixed isPlantAsset logic
       const isPlantAsset = (vehicleId: string) => {
-        const vehicle = vehicles.find(v => v.vehicle_id === vehicleId || v.id === vehicleId);
+        const vehicle = vehicles.find(v => v.van_id === vehicleId || v.id === vehicleId);
         return vehicle && 'is_plant' in vehicle && vehicle.is_plant === true;
       };
 
@@ -30,34 +30,34 @@ describe('Plant Maintenance Component Bug Fixes', () => {
       ];
 
       const isPlantAsset = (vehicleId: string) => {
-        const vehicle = vehicles.find(v => v.vehicle_id === vehicleId || v.id === vehicleId);
+        const vehicle = vehicles.find(v => v.van_id === vehicleId || v.id === vehicleId);
         return vehicle && 'is_plant' in vehicle && vehicle.is_plant === true;
       };
 
       expect(isPlantAsset('plant-789')).toBe(true);
     });
 
-    it('should handle vehicles with both vehicle_id and id', () => {
+    it('should handle vehicles with both van_id and id', () => {
       const vehicles = [
-        { vehicle_id: 'plant-abc', id: 'plant-abc', is_plant: true },
+        { van_id: 'plant-abc', id: 'plant-abc', is_plant: true },
       ];
 
       const isPlantAsset = (vehicleId: string) => {
-        const vehicle = vehicles.find(v => v.vehicle_id === vehicleId || v.id === vehicleId);
+        const vehicle = vehicles.find(v => v.van_id === vehicleId || v.id === vehicleId);
         return vehicle && 'is_plant' in vehicle && vehicle.is_plant === true;
       };
 
-      // Should match on vehicle_id
+      // Should match on van_id
       expect(isPlantAsset('plant-abc')).toBe(true);
     });
 
     it('should return false for vehicles without is_plant flag', () => {
       const vehicles = [
-        { vehicle_id: 'vehicle-123', id: 'vehicle-123' },
+        { van_id: 'vehicle-123', id: 'vehicle-123' },
       ];
 
       const isPlantAsset = (vehicleId: string) => {
-        const vehicle = vehicles.find(v => v.vehicle_id === vehicleId || v.id === vehicleId);
+        const vehicle = vehicles.find(v => v.van_id === vehicleId || v.id === vehicleId);
         return vehicle && 'is_plant' in vehicle && vehicle.is_plant === true;
       };
 
@@ -66,11 +66,11 @@ describe('Plant Maintenance Component Bug Fixes', () => {
 
     it('should return false for non-existent vehicles', () => {
       const vehicles = [
-        { vehicle_id: 'plant-123', id: 'plant-123', is_plant: true },
+        { van_id: 'plant-123', id: 'plant-123', is_plant: true },
       ];
 
       const isPlantAsset = (vehicleId: string) => {
-        const vehicle = vehicles.find(v => v.vehicle_id === vehicleId || v.id === vehicleId);
+        const vehicle = vehicles.find(v => v.van_id === vehicleId || v.id === vehicleId);
         return vehicle && 'is_plant' in vehicle && vehicle.is_plant === true;
       };
 

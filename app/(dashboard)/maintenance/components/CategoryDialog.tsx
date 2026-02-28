@@ -55,9 +55,9 @@ const createCategorySchema = z.object({
   period_value: z.coerce.number()
     .int('Period must be a whole number')
     .positive('Period must be a positive number'),
-  applies_to: z.array(z.enum(['vehicle', 'plant']))
+  applies_to: z.array(z.enum(['van', 'plant']))
     .min(1, 'Category must apply to at least one asset type')
-    .default(['vehicle']),
+    .default(['van']),
   is_active: z.boolean().optional(),
   // New fields for duty/responsibility
   responsibility: z.enum(['workshop', 'office']).default('workshop'),
@@ -156,7 +156,7 @@ export function CategoryDialog({
         alert_threshold_days: category.alert_threshold_days || undefined,
         alert_threshold_miles: category.alert_threshold_miles || undefined,
         alert_threshold_hours: category.alert_threshold_hours || undefined,
-        applies_to: category.applies_to || ['vehicle'],
+        applies_to: category.applies_to || ['van'],
         is_active: category.is_active,
         responsibility: category.responsibility || 'workshop',
         show_on_overview: category.show_on_overview !== false,
@@ -172,7 +172,7 @@ export function CategoryDialog({
         alert_threshold_days: 30,
         alert_threshold_miles: undefined,
         alert_threshold_hours: undefined,
-        applies_to: ['vehicle'],
+        applies_to: ['van'],
         is_active: true,
         responsibility: 'workshop',
         show_on_overview: true,
@@ -499,13 +499,13 @@ export function CategoryDialog({
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="applies-vehicle"
-                  checked={appliesTo?.includes('vehicle') || false}
+                  checked={appliesTo?.includes('van') || false}
                   onCheckedChange={(checked) => {
-                    const current = appliesTo || []; // ✅ Default to empty, not ['vehicle']
+                    const current = appliesTo || []; // ✅ Default to empty, not ['van']
                     if (checked) {
-                      setValue('applies_to', [...current.filter(a => a !== 'vehicle'), 'vehicle']);
+                      setValue('applies_to', [...current.filter(a => a !== 'van'), 'van']);
                     } else {
-                      setValue('applies_to', current.filter(a => a !== 'vehicle'));
+                      setValue('applies_to', current.filter(a => a !== 'van'));
                     }
                   }}
                   disabled={isSubmitting || selectedType === 'hours'}
@@ -513,7 +513,7 @@ export function CategoryDialog({
                 />
                 <Label htmlFor="applies-vehicle" className="text-white cursor-pointer flex items-center gap-2">
                   <Truck className="h-4 w-4 text-blue-400" />
-                  Vehicles
+                  Vans
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
@@ -521,7 +521,7 @@ export function CategoryDialog({
                   id="applies-plant"
                   checked={appliesTo?.includes('plant') || false}
                   onCheckedChange={(checked) => {
-                    const current = appliesTo || []; // ✅ Default to empty, not ['vehicle']
+                    const current = appliesTo || []; // ✅ Default to empty, not ['van']
                     if (checked) {
                       setValue('applies_to', [...current.filter(a => a !== 'plant'), 'plant']);
                     } else {
@@ -538,7 +538,7 @@ export function CategoryDialog({
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              {selectedType === 'mileage' && 'Mileage-based categories only apply to vehicles.'}
+              {selectedType === 'mileage' && 'Mileage-based categories only apply to vans.'}
               {selectedType === 'hours' && 'Hours-based categories only apply to plant machinery.'}
               {selectedType === 'date' && 'Select which asset types this category applies to (at least one required).'}
             </p>
@@ -758,7 +758,7 @@ export function CategoryDialog({
             <Button
               type="submit"
               disabled={isSubmitting || createMutation.isPending || updateMutation.isPending}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-maintenance hover:bg-maintenance-dark"
             >
               {(isSubmitting || createMutation.isPending || updateMutation.isPending) ? (
                 <>

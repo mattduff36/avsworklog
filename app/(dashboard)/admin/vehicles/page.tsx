@@ -8,7 +8,7 @@ export default function VehiclesRedirect() {
   const router = useRouter();
   
   useEffect(() => {
-    router.replace('/fleet?tab=vehicles');
+    router.replace('/fleet?tab=vans');
   }, [router]);
   
   return (

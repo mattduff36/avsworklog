@@ -25,7 +25,7 @@ interface DeletePlantDialogProps {
     id: string;
     plant_id: string;
     nickname?: string | null;
-    vehicle_categories?: { name: string } | null;
+    van_categories?: { name: string } | null;
   } | null;
   onSuccess?: () => void;
 }
@@ -151,10 +151,10 @@ export function DeletePlantDialog({
                 <span className="text-white">{plant.nickname}</span>
               </p>
             )}
-            {plant.vehicle_categories && (
+            {plant.van_categories && (
               <p className="text-sm">
                 <span className="text-muted-foreground">Category:</span>{' '}
-                <span className="text-white">{plant.vehicle_categories.name}</span>
+                <span className="text-white">{plant.van_categories.name}</span>
               </p>
             )}
           </div>
@@ -203,7 +203,7 @@ export function DeletePlantDialog({
           <Button
             onClick={handleDelete}
             disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-maintenance hover:bg-maintenance-dark"
           >
             {loading ? (
               <>

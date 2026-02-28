@@ -3,7 +3,7 @@
  * 
  * Bug Fix Verification: Plant UUIDs should be routed to plant history endpoint
  * 
- * ISSUE: PlantOverview was creating objects with plant UUIDs in the vehicle_id field,
+ * ISSUE: PlantOverview was creating objects with plant UUIDs in the van_id field,
  * causing MaintenanceOverview to call the vehicle history endpoint with plant UUIDs,
  * resulting in 404 errors.
  * 
@@ -17,7 +17,7 @@ describe('Plant Overview History API Routing Fix', () => {
   it('should include is_plant flag in plant maintenance objects', () => {
     // Simulate PlantOverview output structure
     const plantMaintenanceObject = {
-      vehicle_id: 'plant-uuid-123',
+      van_id: 'plant-uuid-123',
       plant_id: 'plant-uuid-123',
       is_plant: true, // This flag is critical for routing
       vehicle: {
@@ -69,12 +69,12 @@ describe('Plant Overview History API Routing Fix', () => {
 
   it('should correctly identify plant assets from maintenance object', () => {
     const plantObject = {
-      vehicle_id: 'plant-uuid-123',
+      van_id: 'plant-uuid-123',
       is_plant: true,
     };
 
     const vehicleObject = {
-      vehicle_id: 'vehicle-uuid-456',
+      van_id: 'vehicle-uuid-456',
       // No is_plant flag, or explicitly false
     };
 

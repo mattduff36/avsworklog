@@ -28,7 +28,7 @@ async function checkAttachmentHistory() {
         status,
         created_at,
         actioned_at,
-        vehicles (
+        vans (
           reg_number,
           nickname
         )
@@ -135,14 +135,14 @@ async function checkAttachmentHistory() {
         const taskIds = [...new Set(taskAttachments.map(a => a.task_id))];
         const { data: tasks } = await supabase
           .from('actions')
-          .select('id, status, vehicles(reg_number, nickname)')
+          .select('id, status, vans(reg_number, nickname)')
           .in('id', taskIds);
 
         console.log('   Tasks with attachments:');
         taskIds.forEach(taskId => {
           const task = tasks?.find(t => t.id === taskId);
           const attCount = taskAttachments.filter(a => a.task_id === taskId).length;
-          console.log(`   - ${task?.vehicles?.reg_number || 'Unknown'} (${task?.status || 'unknown'}) - ${attCount} attachment(s)`);
+          console.log(`   - ${task?.vans?.reg_number || 'Unknown'} (${task?.status || 'unknown'}) - ${attCount} attachment(s)`);
         });
       }
     }

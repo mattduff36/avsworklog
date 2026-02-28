@@ -33,13 +33,13 @@ describe('Workshop Task Completion with Maintenance Updates', () => {
 
     // Get a vehicle category
     const { data: category } = await supabase
-      .from('vehicle_categories')
+      .from('van_categories')
       .select('id')
       .limit(1)
       .single();
 
     const { data: vehicle, error: vehicleError } = await supabase
-      .from('vehicles')
+      .from('vans')
       .insert({
         reg_number: `TESTCOMP${Date.now()}`,
         category_id: category?.id || null,
@@ -54,7 +54,7 @@ describe('Workshop Task Completion with Maintenance Updates', () => {
       .from('workshop_task_categories')
       .select('id')
       .ilike('name', '%service%')
-      .eq('applies_to', 'vehicle')
+      .eq('applies_to', 'van')
       .single();
     if (categoryError || !serviceCategory) throw new Error(`Failed to find service category: ${categoryError?.message}`);
 
@@ -62,7 +62,7 @@ describe('Workshop Task Completion with Maintenance Updates', () => {
       .from('actions')
       .insert({
         action_type: 'workshop_vehicle_task',
-        vehicle_id: testVehicleId,
+        van_id: testVehicleId,
         workshop_category_id: serviceCategory.id,
         title: 'Test Service Task',
         description: 'Test service work',
@@ -84,9 +84,9 @@ describe('Workshop Task Completion with Maintenance Updates', () => {
       await supabase.from('actions').delete().eq('id', testTaskId);
     }
     if (testVehicleId) {
-      await supabase.from('maintenance_history').delete().eq('vehicle_id', testVehicleId);
-      await supabase.from('vehicle_maintenance').delete().eq('vehicle_id', testVehicleId);
-      await supabase.from('vehicles').delete().eq('id', testVehicleId);
+      await supabase.from('maintenance_history').delete().eq('van_id', testVehicleId);
+      await supabase.from('vehicle_maintenance').delete().eq('van_id', testVehicleId);
+      await supabase.from('vans').delete().eq('id', testVehicleId);
     }
     if (testUserId) {
       await supabase.from('profiles').delete().eq('id', testUserId);
@@ -99,7 +99,7 @@ describe('Workshop Task Completion with Maintenance Updates', () => {
       .from('workshop_task_categories')
       .select('id, name, completion_updates')
       .ilike('name', '%service%')
-      .eq('applies_to', 'vehicle')
+      .eq('applies_to', 'van')
       .single();
 
     expect(serviceCategory).not.toBeNull();

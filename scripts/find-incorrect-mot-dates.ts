@@ -43,7 +43,7 @@ async function findIncorrectMotDates() {
         vm.last_mot_api_sync,
         vm.mot_api_sync_status
       FROM vehicles v
-      LEFT JOIN vehicle_maintenance vm ON v.id = vm.vehicle_id
+      LEFT JOIN vehicle_maintenance vm ON v.id = vm.van_id
       WHERE v.status = 'active'
       ORDER BY v.reg_number
     `);

@@ -33,6 +33,11 @@ describe('Service Task Creation Integration', () => {
   let testVehicleId: string;
   let testCategoryId: string;
   let testSubcategoryId: string;
+  let createdTestVehicle = false;
+  let createdTestCategory = false;
+  let createdTestSubcategory = false;
+  const runPrefix = `IT-SERVICE-${Date.now()}`;
+  const makeTitle = (baseTitle: string) => `${runPrefix} | ${baseTitle}`;
 
   beforeAll(async () => {
     supabase = createClient(supabaseUrl, supabaseKey);
@@ -48,72 +53,151 @@ describe('Service Task Creation Integration', () => {
     }
     testUserId = authData.user.id;
 
-    // Create test vehicle
-    const { data: vehicle, error: vehicleError } = await supabase
-      .from('vehicles')
-      .insert({
-        reg_number: `TEST-${Date.now()}`,
-        status: 'active',
-        category_id: null
-      })
-      .select()
+    // Prefer an existing active test van first.
+    const { data: existingTestVan } = await supabase
+      .from('vans')
+      .select('id')
+      .ilike('reg_number', 'TE57%')
+      .eq('status', 'active')
+      .limit(1)
       .single();
 
-    if (vehicleError || !vehicle) {
-      throw new Error('Failed to create test vehicle');
-    }
-    testVehicleId = vehicle.id;
+    if (existingTestVan?.id) {
+      testVehicleId = existingTestVan.id;
+    } else {
+      // Create a valid test van (category_id is required by current schema).
+      const { data: vanCategory } = await supabase
+        .from('van_categories')
+        .select('id')
+        .limit(1)
+        .single();
 
-    // Create test category and subcategory
+      if (!vanCategory?.id) {
+        throw new Error('Failed to resolve van category for test vehicle creation');
+      }
+
+      const { data: createdVehicle } = await supabase
+        .from('vans')
+        .insert({
+          reg_number: `TE57STC${Date.now().toString().slice(-4)}`,
+          status: 'active',
+          category_id: vanCategory.id,
+        })
+        .select('id')
+        .single();
+
+      if (createdVehicle?.id) {
+        testVehicleId = createdVehicle.id;
+        createdTestVehicle = true;
+      } else {
+        // Fallback for environments where this user cannot create vans.
+        const { data: fallbackVan } = await supabase
+          .from('vans')
+          .select('id')
+          .eq('status', 'active')
+          .limit(1)
+          .single();
+
+        if (!fallbackVan?.id) {
+          throw new Error('Failed to create or select a valid test van');
+        }
+        testVehicleId = fallbackVan.id;
+      }
+    }
+
+    // Use an existing active category/subcategory where possible to avoid RLS write restrictions.
     const { data: category, error: categoryError } = await supabase
       .from('workshop_task_categories')
-      .insert({
-        name: 'Test Maintenance',
-        applies_to: 'vehicle',
-        is_active: true
-      })
-      .select()
+      .select('id')
+      .eq('applies_to', 'van')
+      .eq('is_active', true)
+      .limit(1)
       .single();
 
-    if (categoryError || !category) {
-      throw new Error('Failed to create test category');
+    if (category?.id) {
+      testCategoryId = category.id;
+    } else {
+      const { data: newCategory, error: newCategoryError } = await supabase
+        .from('workshop_task_categories')
+        .insert({
+          name: `${runPrefix}-Category`,
+          applies_to: 'van',
+          is_active: true,
+          created_by: testUserId,
+        })
+        .select('id')
+        .single();
+
+      if (newCategoryError || !newCategory?.id) {
+        throw new Error('Failed to create test category');
+      }
+
+      testCategoryId = newCategory.id;
+      createdTestCategory = true;
     }
-    testCategoryId = category.id;
 
     const { data: subcategory, error: subcategoryError } = await supabase
       .from('workshop_task_subcategories')
-      .insert({
-        category_id: testCategoryId,
-        name: 'Test Service',
-        slug: 'test-service',
-        is_active: true
-      })
-      .select()
+      .select('id')
+      .eq('category_id', testCategoryId)
+      .eq('is_active', true)
+      .limit(1)
       .single();
 
-    if (subcategoryError || !subcategory) {
-      throw new Error('Failed to create test subcategory');
+    if (subcategory?.id) {
+      testSubcategoryId = subcategory.id;
+    } else {
+      const { data: newSubcategory, error: newSubcategoryError } = await supabase
+        .from('workshop_task_subcategories')
+        .insert({
+          category_id: testCategoryId,
+          name: `${runPrefix} Test Service`,
+          slug: `${runPrefix.toLowerCase()}-test-service`,
+          is_active: true,
+        })
+        .select('id')
+        .single();
+
+      if (newSubcategoryError || !newSubcategory?.id) {
+        throw new Error('Failed to create test subcategory');
+      }
+
+      testSubcategoryId = newSubcategory.id;
+      createdTestSubcategory = true;
     }
-    testSubcategoryId = subcategory.id;
   });
 
   afterAll(async () => {
     // Cleanup: Delete test data
     if (testVehicleId) {
-      await supabase.from('actions').delete().eq('vehicle_id', testVehicleId);
-      await supabase.from('vehicles').delete().eq('id', testVehicleId);
+      await supabase
+        .from('actions')
+        .delete()
+        .eq('van_id', testVehicleId)
+        .eq('created_by', testUserId)
+        .eq('action_type', 'workshop_vehicle_task')
+        .ilike('title', `${runPrefix} | %`);
+      if (createdTestVehicle) {
+        await supabase.from('vans').delete().eq('id', testVehicleId);
+      }
     }
-    if (testSubcategoryId) {
+    if (testSubcategoryId && createdTestSubcategory) {
       await supabase.from('workshop_task_subcategories').delete().eq('id', testSubcategoryId);
     }
-    if (testCategoryId) {
+    if (testCategoryId && createdTestCategory) {
       await supabase.from('workshop_task_categories').delete().eq('id', testCategoryId);
     }
   });
 
   beforeEach(async () => {
     // Clean up any tasks created in previous tests
-    await supabase.from('actions').delete().eq('vehicle_id', testVehicleId);
+    await supabase
+      .from('actions')
+      .delete()
+      .eq('van_id', testVehicleId)
+      .eq('created_by', testUserId)
+      .eq('action_type', 'workshop_vehicle_task')
+      .ilike('title', `${runPrefix} | %`);
   });
 
   describe('Task Creation', () => {
@@ -122,9 +206,10 @@ describe('Service Task Creation Integration', () => {
       const tasks = [
         {
           action_type: 'workshop_vehicle_task',
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
+          workshop_category_id: testCategoryId,
           workshop_subcategory_id: testSubcategoryId,
-          title: 'Tax Due - TEST-VEH',
+          title: makeTitle('Tax Due - TEST-VEH'),
           workshop_comments: 'Vehicle tax requires renewal. overdue by 5 days',
           description: 'Vehicle tax requires renewal. overdue by 5 days',
           status: 'pending',
@@ -133,9 +218,10 @@ describe('Service Task Creation Integration', () => {
         },
         {
           action_type: 'workshop_vehicle_task',
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
+          workshop_category_id: testCategoryId,
           workshop_subcategory_id: testSubcategoryId,
-          title: 'MOT Due - TEST-VEH',
+          title: makeTitle('MOT Due - TEST-VEH'),
           workshop_comments: 'MOT test is required. due in 10 days',
           description: 'MOT test is required. due in 10 days',
           status: 'pending',
@@ -156,7 +242,7 @@ describe('Service Task Creation Integration', () => {
       const { data: fetchedTasks } = await supabase
         .from('actions')
         .select('*')
-        .eq('vehicle_id', testVehicleId)
+        .eq('van_id', testVehicleId)
         .eq('action_type', 'workshop_vehicle_task');
 
       expect(fetchedTasks).toHaveLength(2);
@@ -166,9 +252,10 @@ describe('Service Task Creation Integration', () => {
       const tasks = [
         {
           action_type: 'workshop_vehicle_task',
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
+          workshop_category_id: testCategoryId,
           workshop_subcategory_id: testSubcategoryId,
-          title: 'Tax Due - TEST-VEH',
+          title: makeTitle('Tax Due - TEST-VEH'),
           workshop_comments: 'Vehicle tax requires renewal.',
           description: 'Vehicle tax requires renewal.',
           status: 'pending',
@@ -177,9 +264,10 @@ describe('Service Task Creation Integration', () => {
         },
         {
           action_type: 'workshop_vehicle_task',
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
+          workshop_category_id: testCategoryId,
           workshop_subcategory_id: testSubcategoryId,
-          title: 'Service Due - TEST-VEH',
+          title: makeTitle('Service Due - TEST-VEH'),
           workshop_comments: 'Vehicle service is required.',
           description: 'Vehicle service is required.',
           status: 'pending',
@@ -193,7 +281,7 @@ describe('Service Task Creation Integration', () => {
       const { data: fetchedTasks } = await supabase
         .from('actions')
         .select('title, priority')
-        .eq('vehicle_id', testVehicleId)
+        .eq('van_id', testVehicleId)
         .eq('action_type', 'workshop_vehicle_task');
 
       const taxTask = fetchedTasks?.find(t => t.title.includes('Tax'));
@@ -206,9 +294,10 @@ describe('Service Task Creation Integration', () => {
     it('should create deterministic task titles', async () => {
       const task = {
         action_type: 'workshop_vehicle_task',
-        vehicle_id: testVehicleId,
+        van_id: testVehicleId,
+        workshop_category_id: testCategoryId,
         workshop_subcategory_id: testSubcategoryId,
-        title: 'MOT Due - ABC123',
+        title: makeTitle('MOT Due - ABC123'),
         workshop_comments: 'MOT test is required. due in 30 days',
         description: 'MOT test is required. due in 30 days',
         status: 'pending',
@@ -221,9 +310,9 @@ describe('Service Task Creation Integration', () => {
       const { data: tasks } = await supabase
         .from('actions')
         .select('title')
-        .eq('vehicle_id', testVehicleId);
+        .eq('van_id', testVehicleId);
 
-      expect(tasks?.[0]?.title).toBe('MOT Due - ABC123');
+      expect(tasks?.[0]?.title).toBe(makeTitle('MOT Due - ABC123'));
     });
   });
 
@@ -231,9 +320,10 @@ describe('Service Task Creation Integration', () => {
     it('should check for existing tasks by title', async () => {
       const task = {
         action_type: 'workshop_vehicle_task',
-        vehicle_id: testVehicleId,
+        van_id: testVehicleId,
+        workshop_category_id: testCategoryId,
         workshop_subcategory_id: testSubcategoryId,
-        title: 'Tax Due - TEST-VEH',
+        title: makeTitle('Tax Due - TEST-VEH'),
         workshop_comments: 'Vehicle tax requires renewal.',
         description: 'Vehicle tax requires renewal.',
         status: 'pending',
@@ -248,9 +338,9 @@ describe('Service Task Creation Integration', () => {
       const { data: existingTasks } = await supabase
         .from('actions')
         .select('id, status')
-        .eq('vehicle_id', testVehicleId)
+        .eq('van_id', testVehicleId)
         .eq('action_type', 'workshop_vehicle_task')
-        .eq('title', 'Tax Due - TEST-VEH')
+        .eq('title', makeTitle('Tax Due - TEST-VEH'))
         .in('status', ['pending', 'logged', 'on_hold']);
 
       expect(existingTasks).toHaveLength(1);
@@ -260,9 +350,10 @@ describe('Service Task Creation Integration', () => {
     it('should allow creating new task after previous is completed', async () => {
       const task = {
         action_type: 'workshop_vehicle_task',
-        vehicle_id: testVehicleId,
+        van_id: testVehicleId,
+        workshop_category_id: testCategoryId,
         workshop_subcategory_id: testSubcategoryId,
-        title: 'Service Due - TEST-VEH',
+        title: makeTitle('Service Due - TEST-VEH'),
         workshop_comments: 'Vehicle service is required.',
         description: 'Vehicle service is required.',
         status: 'pending',
@@ -292,8 +383,8 @@ describe('Service Task Creation Integration', () => {
       const { data: tasks } = await supabase
         .from('actions')
         .select('status')
-        .eq('vehicle_id', testVehicleId)
-        .eq('title', 'Service Due - TEST-VEH');
+        .eq('van_id', testVehicleId)
+        .eq('title', makeTitle('Service Due - TEST-VEH'));
 
       expect(tasks).toHaveLength(2);
       expect(tasks?.filter(t => t.status === 'completed')).toHaveLength(1);
@@ -304,9 +395,10 @@ describe('Service Task Creation Integration', () => {
       const tasks = [
         {
           action_type: 'workshop_vehicle_task',
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
+          workshop_category_id: testCategoryId,
           workshop_subcategory_id: testSubcategoryId,
-          title: 'Tax Due - TEST-VEH',
+          title: makeTitle('Tax Due - TEST-VEH'),
           workshop_comments: 'Vehicle tax requires renewal.',
           description: 'Vehicle tax requires renewal.',
           status: 'pending',
@@ -315,9 +407,10 @@ describe('Service Task Creation Integration', () => {
         },
         {
           action_type: 'workshop_vehicle_task',
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
+          workshop_category_id: testCategoryId,
           workshop_subcategory_id: testSubcategoryId,
-          title: 'MOT Due - TEST-VEH',
+          title: makeTitle('MOT Due - TEST-VEH'),
           workshop_comments: 'MOT test is required.',
           description: 'MOT test is required.',
           status: 'pending',
@@ -326,9 +419,10 @@ describe('Service Task Creation Integration', () => {
         },
         {
           action_type: 'workshop_vehicle_task',
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
+          workshop_category_id: testCategoryId,
           workshop_subcategory_id: testSubcategoryId,
-          title: 'Service Due - TEST-VEH',
+          title: makeTitle('Service Due - TEST-VEH'),
           workshop_comments: 'Vehicle service is required.',
           description: 'Vehicle service is required.',
           status: 'pending',
@@ -342,13 +436,13 @@ describe('Service Task Creation Integration', () => {
       const { data: fetchedTasks } = await supabase
         .from('actions')
         .select('title')
-        .eq('vehicle_id', testVehicleId);
+        .eq('van_id', testVehicleId);
 
       expect(fetchedTasks).toHaveLength(3);
       expect(fetchedTasks?.map(t => t.title).sort()).toEqual([
-        'MOT Due - TEST-VEH',
-        'Service Due - TEST-VEH',
-        'Tax Due - TEST-VEH'
+        makeTitle('MOT Due - TEST-VEH'),
+        makeTitle('Service Due - TEST-VEH'),
+        makeTitle('Tax Due - TEST-VEH')
       ]);
     });
   });
@@ -358,9 +452,10 @@ describe('Service Task Creation Integration', () => {
       const tasks = [
         {
           action_type: 'workshop_vehicle_task',
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
+          workshop_category_id: testCategoryId,
           workshop_subcategory_id: testSubcategoryId,
-          title: 'Tax Due - TEST-VEH',
+          title: makeTitle('Tax Due - TEST-VEH'),
           workshop_comments: 'Vehicle tax requires renewal. test detail',
           description: 'Vehicle tax requires renewal. test detail',
           status: 'pending',
@@ -369,9 +464,10 @@ describe('Service Task Creation Integration', () => {
         },
         {
           action_type: 'workshop_vehicle_task',
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
+          workshop_category_id: testCategoryId,
           workshop_subcategory_id: testSubcategoryId,
-          title: 'MOT Due - TEST-VEH',
+          title: makeTitle('MOT Due - TEST-VEH'),
           workshop_comments: 'MOT test is required. test detail',
           description: 'MOT test is required. test detail',
           status: 'pending',
@@ -380,9 +476,10 @@ describe('Service Task Creation Integration', () => {
         },
         {
           action_type: 'workshop_vehicle_task',
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
+          workshop_category_id: testCategoryId,
           workshop_subcategory_id: testSubcategoryId,
-          title: 'Service Due - TEST-VEH',
+          title: makeTitle('Service Due - TEST-VEH'),
           workshop_comments: 'Vehicle service is required. test detail',
           description: 'Vehicle service is required. test detail',
           status: 'pending',
@@ -391,9 +488,10 @@ describe('Service Task Creation Integration', () => {
         },
         {
           action_type: 'workshop_vehicle_task',
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
+          workshop_category_id: testCategoryId,
           workshop_subcategory_id: testSubcategoryId,
-          title: 'Cambelt Replacement Due - TEST-VEH',
+          title: makeTitle('Cambelt Replacement Due - TEST-VEH'),
           workshop_comments: 'Cambelt replacement is required. test detail',
           description: 'Cambelt replacement is required. test detail',
           status: 'pending',
@@ -402,9 +500,10 @@ describe('Service Task Creation Integration', () => {
         },
         {
           action_type: 'workshop_vehicle_task',
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
+          workshop_category_id: testCategoryId,
           workshop_subcategory_id: testSubcategoryId,
-          title: 'First Aid Kit Expiry - TEST-VEH',
+          title: makeTitle('First Aid Kit Expiry - TEST-VEH'),
           workshop_comments: 'First aid kit requires replacement. test detail',
           description: 'First aid kit requires replacement. test detail',
           status: 'pending',
@@ -418,17 +517,17 @@ describe('Service Task Creation Integration', () => {
       const { data: fetchedTasks } = await supabase
         .from('actions')
         .select('title, workshop_comments')
-        .eq('vehicle_id', testVehicleId);
+        .eq('van_id', testVehicleId);
 
       expect(fetchedTasks).toHaveLength(5);
       
       // Verify each alert type creates appropriate task
       const titles = fetchedTasks?.map(t => t.title).sort();
-      expect(titles).toContain('Cambelt Replacement Due - TEST-VEH');
-      expect(titles).toContain('First Aid Kit Expiry - TEST-VEH');
-      expect(titles).toContain('MOT Due - TEST-VEH');
-      expect(titles).toContain('Service Due - TEST-VEH');
-      expect(titles).toContain('Tax Due - TEST-VEH');
+      expect(titles).toContain(makeTitle('Cambelt Replacement Due - TEST-VEH'));
+      expect(titles).toContain(makeTitle('First Aid Kit Expiry - TEST-VEH'));
+      expect(titles).toContain(makeTitle('MOT Due - TEST-VEH'));
+      expect(titles).toContain(makeTitle('Service Due - TEST-VEH'));
+      expect(titles).toContain(makeTitle('Tax Due - TEST-VEH'));
     });
   });
 });

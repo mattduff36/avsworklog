@@ -41,7 +41,7 @@ interface TaskRow {
   title: string;
   status: string;
   workshop_comments: string | null;
-  vehicle_id: string | null;
+  van_id: string | null;
   plant_id: string | null;
   workshop_task_categories: { name: string } | null;
 }
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         title,
         status,
         workshop_comments,
-        vehicle_id,
+        van_id,
         plant_id,
         workshop_task_categories (
           name
@@ -130,19 +130,19 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Try to get asset name for context
     let assetName: string | null = null;
-    let assetType: 'vehicle' | 'plant' | null = null;
+    let assetType: 'van' | 'plant' | null = null;
 
-    if (task?.vehicle_id) {
+    if (task?.van_id) {
       const { data: vehicle } = await supabase
-        .from('vehicles')
+        .from('vans')
         .select('reg_number, nickname')
-        .eq('id', task.vehicle_id)
+        .eq('id', task.van_id)
         .single();
       if (vehicle) {
         assetName = (vehicle as { reg_number: string | null; nickname: string | null }).reg_number
           || (vehicle as { reg_number: string | null; nickname: string | null }).nickname
           || null;
-        assetType = 'vehicle';
+        assetType = 'van';
       }
     } else if (task?.plant_id) {
       const { data: plant } = await supabase

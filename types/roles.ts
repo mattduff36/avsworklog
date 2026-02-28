@@ -45,7 +45,7 @@ export type ModuleName =
   | 'actions'
   | 'reports'
   | 'admin-users'
-  | 'admin-vehicles';
+  | 'admin-vans';
 
 export const ALL_MODULES: ModuleName[] = [
   'timesheets',
@@ -60,7 +60,7 @@ export const ALL_MODULES: ModuleName[] = [
   'actions',
   'reports',
   'admin-users',
-  'admin-vehicles',
+  'admin-vans',
 ];
 
 export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
@@ -76,7 +76,7 @@ export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
   'actions': 'Actions',
   'reports': 'Reports',
   'admin-users': 'User Management',
-  'admin-vehicles': 'Vehicle Management',
+  'admin-vans': 'Fleet Management',
 };
 
 export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
@@ -92,7 +92,7 @@ export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
   'actions': 'Manage and track actions',
   'reports': 'View system reports',
   'admin-users': 'Manage user accounts',
-  'admin-vehicles': 'Manage vehicle fleet',
+  'admin-vans': 'Manage fleet assets',
 };
 
 // For API responses

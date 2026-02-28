@@ -37,7 +37,7 @@ async function backfillInspectionActions() {
     const inspectionsQuery = `
       SELECT DISTINCT
         vi.id,
-        vi.vehicle_id,
+        vi.van_id,
         vi.user_id,
         vi.inspection_date,
         v.reg_number,
@@ -45,11 +45,11 @@ async function backfillInspectionActions() {
         COUNT(ii.id) as defect_count
       FROM van_inspections vi
       INNER JOIN inspection_items ii ON vi.id = ii.inspection_id
-      INNER JOIN vehicles v ON vi.vehicle_id = v.id
+      INNER JOIN vehicles v ON vi.van_id = v.id
       LEFT JOIN profiles p ON vi.user_id = p.id
       WHERE vi.status = 'submitted'
         AND ii.status = 'attention'
-      GROUP BY vi.id, vi.vehicle_id, vi.user_id, vi.inspection_date, v.reg_number, p.full_name
+      GROUP BY vi.id, vi.van_id, vi.user_id, vi.inspection_date, v.reg_number, p.full_name
       ORDER BY vi.inspection_date DESC;
     `;
 

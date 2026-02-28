@@ -35,7 +35,7 @@ function buildHiredPlantInspectionData(fields: {
 }) {
   return {
     plant_id: null,
-    vehicle_id: null,
+    van_id: null,
     is_hired_plant: true,
     hired_plant_id_serial: fields.hiredPlantIdSerial.trim(),
     hired_plant_description: fields.hiredPlantDescription.trim(),
@@ -122,7 +122,7 @@ describe('Hired Plant Inspection', () => {
       });
 
       expect(data.plant_id).toBeNull();
-      expect(data.vehicle_id).toBeNull();
+      expect(data.van_id).toBeNull();
       expect(data.is_hired_plant).toBe(true);
       expect(data.hired_plant_id_serial).toBe('SN-12345');
       expect(data.hired_plant_description).toBe('20T Excavator');

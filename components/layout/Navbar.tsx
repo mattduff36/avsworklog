@@ -4,21 +4,15 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { 
   Menu, 
   X, 
   LogOut,
   Bell,
   Bug,
-  ChevronDown,
+  HelpCircle,
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NotificationPanel } from '@/components/messages/NotificationPanel';
 import { SidebarNav } from './SidebarNav';
 import { createClient } from '@/lib/supabase/client';
@@ -43,13 +37,13 @@ function getNavItemActiveColors(href: string): { bg: string; text: string } {
   if (href.startsWith('/timesheets')) {
     return { bg: 'bg-timesheet', text: 'text-white' };
   }
+  // Van Inspections - Orange
+  if (href.startsWith('/van-inspections')) {
+    return { bg: 'bg-inspection', text: 'text-white' };
+  }
   // Plant Inspections - Darker Orange
   if (href.startsWith('/plant-inspections')) {
     return { bg: 'bg-plant-inspection', text: 'text-white' };
-  }
-  // Inspections - Orange
-  if (href.startsWith('/inspections')) {
-    return { bg: 'bg-inspection', text: 'text-white' };
   }
   // Projects (formerly RAMS) - Green
   if (href.startsWith('/projects') || href.startsWith('/rams')) {
@@ -59,17 +53,21 @@ function getNavItemActiveColors(href: string): { bg: string; text: string } {
   if (href.startsWith('/absence')) {
     return { bg: 'bg-absence', text: 'text-white' };
   }
-  // Fleet/Maintenance - Red
-  if (href.startsWith('/fleet') || href.startsWith('/maintenance')) {
+  // Maintenance - Red
+  if (href.startsWith('/maintenance')) {
     return { bg: 'bg-maintenance', text: 'text-white' };
+  }
+  // Fleet - Rust/brick
+  if (href.startsWith('/fleet')) {
+    return { bg: 'bg-fleet', text: 'text-white' };
   }
   // Workshop - Brown/rust
   if (href.startsWith('/workshop')) {
     return { bg: 'bg-workshop', text: 'text-white' };
   }
-  // Reports - Teal
+  // Reports - Brand yellow (management tool)
   if (href.startsWith('/reports')) {
-    return { bg: 'bg-report', text: 'text-white' };
+    return { bg: 'bg-avs-yellow', text: 'text-slate-900' };
   }
   // Default - Brand yellow
   return { bg: 'bg-avs-yellow', text: 'text-slate-900' };
@@ -87,6 +85,10 @@ export function Navbar() {
   const [permissionsLoading, setPermissionsLoading] = useState(true);
   const [hasRAMSAssignments, setHasRAMSAssignments] = useState(false);
   const [isMounted, setIsMounted] = useState(false); // Track client hydration
+  const [isCompact, setIsCompact] = useState(false);
+  const navRef = useRef<HTMLDivElement>(null);
+  const isCompactRef = useRef(false);
+  const expandedWidthRef = useRef(0);
   const supabase = createClient();
 
   // useAuth now provides effective role flags (respecting View As cookie)
@@ -97,6 +99,33 @@ export function Navbar() {
   // Set mounted state after hydration to prevent hydration mismatches
   useEffect(() => {
     setIsMounted(true);
+  }, []);
+
+  // Auto-compact: switch to icon-only when labels would overflow the nav container
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+
+    const check = () => {
+      if (!isCompactRef.current) {
+        if (el.scrollWidth > el.clientWidth + 2) {
+          expandedWidthRef.current = el.scrollWidth;
+          isCompactRef.current = true;
+          setIsCompact(true);
+        }
+      } else {
+        if (el.clientWidth >= expandedWidthRef.current + 16) {
+          isCompactRef.current = false;
+          setIsCompact(false);
+        }
+      }
+    };
+
+    const observer = new ResizeObserver(check);
+    observer.observe(el);
+    check();
+
+    return () => observer.disconnect();
   }, []);
 
   // Fetch user permissions (useAuth flags already respect View As mode)
@@ -342,157 +371,69 @@ export function Navbar() {
         {/* AVS Yellow accent strip */}
         <div className="h-1 bg-gradient-to-r from-avs-yellow via-avs-yellow to-avs-yellow-hover"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              {/* Mobile-only text logo */}
-              <Link 
-                href="/dashboard" 
-                className="md:hidden flex items-center mr-4 group"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <div className="text-xl font-bold text-white group-hover:text-avs-yellow transition-colors">
-                  SQUIRES
-                </div>
-              </Link>
+          <div className="flex items-center h-16">
+            {/* Mobile-only text logo */}
+            <Link 
+              href="/dashboard" 
+              className="md:hidden flex items-center mr-4 group"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <div className="text-xl font-bold text-white group-hover:text-avs-yellow transition-colors">
+                SQUIRES
+              </div>
+            </Link>
 
-              {/* Desktop Navigation - Icon-only by default, label on hover/active */}
-              <div className="hidden md:flex md:space-x-1">
-                {/* Dashboard */}
-                {dashboardNav.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = isLinkActive(item.href);
-                  const activeColors = getNavItemActiveColors(item.href);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      title={item.label}
-                      className={`group inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all ${
-                        isActive
-                          ? `${activeColors.bg} ${activeColors.text}`
-                          : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4 flex-shrink-0" />
-                      <span className={`overflow-hidden transition-all duration-200 ${
-                        isActive
-                          ? 'ml-2 max-w-[120px] opacity-100'
-                          : 'max-w-0 opacity-0 group-hover:ml-2 group-hover:max-w-[120px] group-hover:opacity-100'
-                      }`}>
-                        {item.label}
-                      </span>
-                    </Link>
-                  );
-                })}
-                
-                {/* Employee Navigation */}
-                {employeeNav.map((item) => {
-                  const Icon = item.icon;
-                  
-                  const hasDropdown = item.dropdownItems && item.dropdownItems.length > 0;
-                  const accessibleDropdownItems = hasDropdown && isMounted
-                    ? item.dropdownItems!.filter(dropdownItem => {
-                        if (!dropdownItem.module) return true;
-                        return userPermissions.has(dropdownItem.module);
-                      })
-                    : [];
-                  const shouldShowDropdown = isMounted && accessibleDropdownItems.length > 1;
-                  
-                  if (shouldShowDropdown) {
-                    const activeDropdownItem = accessibleDropdownItems.find(dropdownItem => 
-                      isLinkActive(dropdownItem.href)
-                    );
-                    const isAnyDropdownActive = !!activeDropdownItem;
-                    const triggerColors = activeDropdownItem 
-                      ? getNavItemActiveColors(activeDropdownItem.href)
-                      : { bg: '', text: '' };
-                    
-                    return (
-                      <DropdownMenu key={item.href}>
-                        <DropdownMenuTrigger
-                          title={item.label}
-                          className={`group inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all ${
-                            isAnyDropdownActive
-                              ? `${triggerColors.bg} ${triggerColors.text}`
-                              : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
-                          }`}
-                        >
-                          <Icon className="w-4 h-4 flex-shrink-0" />
-                          <span className={`overflow-hidden transition-all duration-200 ${
-                            isAnyDropdownActive
+            {/* Desktop Navigation - Centered, auto-compacts to icon-only when space is tight */}
+            <div ref={navRef} className="hidden md:flex flex-1 items-center justify-center space-x-1 overflow-hidden">
+              {[...dashboardNav, ...employeeNav.filter(item => item.href !== '/help')].map((item) => {
+                const Icon = item.icon;
+                const isActive = isLinkActive(item.href);
+                const activeColors = getNavItemActiveColors(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    title={item.label}
+                    className={`group inline-flex items-center py-2 font-medium rounded-md transition-all duration-[225ms] ${
+                      isActive
+                        ? `${activeColors.bg} ${activeColors.text} text-sm px-3`
+                        : isCompact
+                          ? 'text-muted-foreground hover:bg-slate-800/50 hover:text-white px-3 text-sm'
+                          : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white text-[8px] hover:text-sm px-2 hover:px-3'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 flex-shrink-0" />
+                    <span className={
+                      isCompact
+                        ? `overflow-hidden whitespace-nowrap transition-all duration-[225ms] ${
+                            isActive
                               ? 'ml-2 max-w-[120px] opacity-100'
                               : 'max-w-0 opacity-0 group-hover:ml-2 group-hover:max-w-[120px] group-hover:opacity-100'
-                          }`}>
-                            {item.label}
-                          </span>
-                          <ChevronDown className={`w-3 h-3 flex-shrink-0 overflow-hidden transition-all duration-200 ${
-                            isAnyDropdownActive
-                              ? 'ml-1 max-w-[12px] opacity-100'
-                              : 'max-w-0 opacity-0 group-hover:ml-1 group-hover:max-w-[12px] group-hover:opacity-100'
-                          }`} />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="bg-slate-800 border-slate-700">
-                          {accessibleDropdownItems.map((dropdownItem) => {
-                            const DropdownIcon = dropdownItem.icon;
-                            const dropdownIsActive = isLinkActive(dropdownItem.href);
-                            const dropdownActiveColors = getNavItemActiveColors(dropdownItem.href);
-                            
-                            return (
-                              <DropdownMenuItem
-                                key={dropdownItem.href}
-                                className={`cursor-pointer ${
-                                  dropdownIsActive
-                                    ? `${dropdownActiveColors.bg} ${dropdownActiveColors.text}`
-                                    : 'text-muted-foreground hover:bg-slate-700 hover:text-white'
-                                }`}
-                                asChild
-                              >
-                                <Link href={dropdownItem.href} className="flex items-center">
-                                  <DropdownIcon className="w-4 h-4 mr-2" />
-                                  {dropdownItem.label}
-                                </Link>
-                              </DropdownMenuItem>
-                            );
-                          })}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    );
-                  }
-                  
-                  const finalHref = isMounted && accessibleDropdownItems.length === 1 && accessibleDropdownItems[0]
-                    ? accessibleDropdownItems[0].href 
-                    : item.href;
-                  
-                  const isActive = isLinkActive(finalHref);
-                  const activeColors = getNavItemActiveColors(finalHref);
-                  
-                  return (
-                    <Link
-                      key={item.href}
-                      href={finalHref}
-                      title={item.label}
-                      className={`group inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all ${
-                        isActive
-                          ? `${activeColors.bg} ${activeColors.text}`
-                          : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4 flex-shrink-0" />
-                      <span className={`overflow-hidden transition-all duration-200 ${
-                        isActive
-                          ? 'ml-2 max-w-[120px] opacity-100'
-                          : 'max-w-0 opacity-0 group-hover:ml-2 group-hover:max-w-[120px] group-hover:opacity-100'
-                      }`}>
-                        {item.label}
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
+                          }`
+                        : 'ml-1.5 whitespace-nowrap'
+                    }>
+                      {item.label}
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
 
             {/* Right side */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 ml-auto">
+              {/* Help link (desktop only) */}
+              <Link
+                href="/help"
+                title="Help"
+                className={`hidden md:inline-flex items-center justify-center rounded-md p-2 text-sm transition-colors ${
+                  isLinkActive('/help')
+                    ? 'bg-avs-yellow text-slate-900'
+                    : 'text-muted-foreground hover:text-white hover:bg-slate-800/50'
+                }`}
+              >
+                <HelpCircle className="w-4 h-4" />
+              </Link>
+
               {/* Notification Bell */}
               <div className="relative">
                 <Button
@@ -511,7 +452,7 @@ export function Navbar() {
                 </Button>
               </div>
 
-              {/* Sign Out button only */}
+              {/* Sign Out button (desktop only) */}
               <div className="hidden md:flex items-center">
                 <Button
                   variant="ghost"
@@ -543,8 +484,8 @@ export function Navbar() {
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-border/50 bg-slate-900/95 backdrop-blur-xl">
             <div className="px-2 pt-2 pb-3 space-y-1">
-              {/* Dashboard */}
-              {dashboardNav.map((item) => {
+              {/* Dashboard + Employee Navigation */}
+              {[...dashboardNav, ...employeeNav].map((item) => {
                 const Icon = item.icon;
                 const isActive = isLinkActive(item.href);
                 const activeColors = getNavItemActiveColors(item.href);
@@ -552,80 +493,6 @@ export function Navbar() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
-                      isActive
-                        ? `${activeColors.bg} ${activeColors.text}`
-                        : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
-                    }`}
-                  >
-                    <Icon className="w-5 h-5 mr-3" />
-                    {item.label}
-                  </Link>
-                );
-              })}
-              
-              {/* Employee Navigation */}
-              {employeeNav.map((item) => {
-                const Icon = item.icon;
-                
-                // Check if this item has a dropdown and user has access to multiple items
-                // CRITICAL: Only populate accessibleDropdownItems after mount to prevent hydration mismatch
-                // When !isMounted, keep empty to ensure server/client render identical link structure
-                const hasDropdown = item.dropdownItems && item.dropdownItems.length > 0;
-                const accessibleDropdownItems = hasDropdown && isMounted
-                  ? item.dropdownItems!.filter(dropdownItem => {
-                      if (!dropdownItem.module) return true;
-                      return userPermissions.has(dropdownItem.module);
-                    })
-                  : []; // Always empty before mount to prevent hydration mismatch
-                const shouldShowDropdown = isMounted && accessibleDropdownItems.length > 1;
-                
-                // If dropdown should be shown in mobile, render each dropdown item
-                if (shouldShowDropdown) {
-                  return (
-                    <div key={item.href}>
-                      {accessibleDropdownItems.map((dropdownItem) => {
-                        const DropdownIcon = dropdownItem.icon;
-                        const dropdownIsActive = isLinkActive(dropdownItem.href);
-                        const dropdownActiveColors = getNavItemActiveColors(dropdownItem.href);
-                        
-                        return (
-                          <Link
-                            key={dropdownItem.href}
-                            href={dropdownItem.href}
-                            onClick={() => setMobileMenuOpen(false)}
-                            className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
-                              dropdownIsActive
-                                ? `${dropdownActiveColors.bg} ${dropdownActiveColors.text}`
-                                : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
-                            }`}
-                          >
-                            <DropdownIcon className="w-5 h-5 mr-3" />
-                            {dropdownItem.label}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  );
-                }
-                
-                // Otherwise, render as regular link
-                // CRITICAL: Use item.href consistently until after mount to prevent hydration mismatch
-                // The finalHref calculation must be identical on server and client
-                // SAFETY: Validate array is non-empty before accessing by index
-                const finalHref = isMounted && accessibleDropdownItems.length === 1 && accessibleDropdownItems[0]
-                  ? accessibleDropdownItems[0].href 
-                  : item.href;
-                
-                // Recalculate isActive based on finalHref to ensure correct styling
-                const isActive = isLinkActive(finalHref);
-                const activeColors = getNavItemActiveColors(finalHref);
-                
-                return (
-                  <Link
-                    key={item.href}
-                    href={finalHref}
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                       isActive

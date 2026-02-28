@@ -91,7 +91,7 @@ async function restoreDeletedItems() {
     const inspectionIdsArray = Array.from(inspectionIds);
     const { data: existingInspections, error: inspectionError } = await supabase
       .from('vehicle_inspections')
-      .select('id, status, vehicles(reg_number)')
+      .select('id, status, vans(reg_number)')
       .in('id', inspectionIdsArray);
 
     if (inspectionError) {
@@ -106,7 +106,7 @@ async function restoreDeletedItems() {
     console.log('📊 Inspections to restore:');
     existingInspections?.forEach((inspection: any, i: number) => {
       const itemCount = itemsToRestore.filter(item => item.inspection_id === inspection.id).length;
-      const vehicle = inspection.vehicles?.reg_number || 'Unknown';
+      const vehicle = inspection.vans?.reg_number || 'Unknown';
       console.log(`   ${i + 1}. ${vehicle} - ${inspection.status} (${itemCount} items)`);
     });
     console.log();

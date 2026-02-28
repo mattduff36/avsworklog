@@ -55,7 +55,7 @@ type Plant = {
   current_hours: number | null;
   status: 'active' | 'inactive' | 'maintenance' | 'retired';
   reg_number: string | null;
-  vehicle_categories?: { name: string } | null;
+  van_categories?: { name: string } | null;
 };
 
 type MaintenanceRecord = {
@@ -345,7 +345,7 @@ export default function PlantHistoryPage({
         .from('plant')
         .select(`
           *,
-          vehicle_categories (
+          van_categories (
             name
           )
         `)
@@ -441,7 +441,7 @@ export default function PlantHistoryPage({
             variant="outline"
             size="sm"
             onClick={() => setEditDialogOpen(true)}
-            className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white"
+            className="border-fleet text-fleet hover:bg-fleet hover:text-white"
           >
             <Edit className="h-4 w-4 mr-2" />
             Edit Plant Record
@@ -479,10 +479,10 @@ export default function PlantHistoryPage({
                     <span className="text-white font-medium">{plant.weight_class}</span>
                   </div>
                 )}
-                {plant.vehicle_categories?.name && (
+                {plant.van_categories?.name && (
                   <div className="flex items-baseline gap-2">
                     <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Category</span>
-                    <span className="text-white font-medium">{plant.vehicle_categories.name}</span>
+                    <span className="text-white font-medium">{plant.van_categories.name}</span>
                   </div>
                 )}
                 {plant.make && (
@@ -801,7 +801,7 @@ export default function PlantHistoryPage({
             id: plant.id,
             plant_id: plant.plant_id,
             nickname: plant.nickname,
-            vehicle_categories: plant.vehicle_categories
+            van_categories: plant.van_categories
           }}
           onSuccess={() => {
             router.push('/fleet?tab=plant');

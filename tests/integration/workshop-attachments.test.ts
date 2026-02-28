@@ -42,7 +42,7 @@ describe('Workshop Task Attachments', () => {
 
     // Get a test vehicle
     const { data: vehicles } = await supabase
-      .from('vehicles')
+      .from('vans')
       .select('id')
       .neq('status', 'deleted')
       .limit(1);
@@ -156,7 +156,7 @@ describe('Workshop Task Attachments', () => {
         .from('actions')
         .insert({
           action_type: 'workshop_vehicle_task',
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
           workshop_subcategory_id: subcategoryId,
           workshop_comments: 'Test task for attachment integration test',
           title: 'Integration Test Task',

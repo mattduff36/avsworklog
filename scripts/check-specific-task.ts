@@ -21,7 +21,7 @@ async function checkTask() {
   try {
     // Find the vehicle first
     const { data: vehicle } = await supabase
-      .from('vehicles')
+      .from('vans')
       .select('id, reg_number, nickname')
       .eq('reg_number', 'YS23 KUN')
       .single();
@@ -53,7 +53,7 @@ async function checkTask() {
           name
         )
       `)
-      .eq('vehicle_id', vehicle.id)
+      .eq('van_id', vehicle.id)
       .eq('status', 'completed')
       .order('created_at', { ascending: false });
 

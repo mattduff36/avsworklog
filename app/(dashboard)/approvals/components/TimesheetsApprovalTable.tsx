@@ -328,7 +328,7 @@ export function TimesheetsApprovalTable({
                           variant="outline"
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); onProcess(ts.id); }}
-                          className="border-blue-300 text-blue-600 hover:bg-blue-500 hover:text-white hover:border-blue-500 active:bg-blue-600 active:scale-95 transition-all h-8 px-2"
+                          className="border-avs-yellow/50 text-avs-yellow hover:bg-avs-yellow hover:text-slate-900 hover:border-avs-yellow active:bg-avs-yellow-hover active:scale-95 transition-all h-8 px-2"
                         >
                           <Package className="h-3.5 w-3.5 mr-1" />
                           Process

@@ -31,21 +31,22 @@ interface AddVehicleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void | Promise<void>; // ✅ Support both sync and async callbacks
-  assetType?: AssetType; // Default to 'vehicle' if not provided
+  assetType?: AssetType; // Default to 'van' if not provided
 }
 
 interface Category {
   id: string;
   name: string;
+  applies_to?: ('van' | 'plant')[];
 }
 
-type AssetType = 'vehicle' | 'plant';
+type AssetType = 'van' | 'plant';
 
 export function AddVehicleDialog({
   open,
   onOpenChange,
   onSuccess,
-  assetType: initialAssetType = 'vehicle', // Default to 'vehicle'
+  assetType: initialAssetType = 'van', // Default to 'van'
 }: AddVehicleDialogProps) {
   const queryClient = useQueryClient();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -68,16 +69,16 @@ export function AddVehicleDialog({
     try {
       const supabase = createClient(); // Create client inside callback
       const { data, error } = await supabase
-        .from('vehicle_categories')
+        .from('van_categories')
         .select('*')
         .order('name');
       
       if (error) throw error;
       
       // ✅ Filter categories based on asset type
-      // Consistent with SELECT dropdown: undefined applies_to defaults to ['vehicle']
+      // Consistent with SELECT dropdown: undefined applies_to defaults to ['van']
       const filtered = (data || []).filter(cat => {
-        const appliesTo = cat.applies_to || ['vehicle']; // ✅ Default to ['vehicle']
+        const appliesTo = cat.applies_to || ['van']; // ✅ Default to ['van']
         return appliesTo.includes(assetType);
       });
       
@@ -107,7 +108,7 @@ export function AddVehicleDialog({
   // Reset form when dialog closes
   useEffect(() => {
     if (!open) {
-      setAssetType(initialAssetType); // Reset to prop value, not hardcoded 'vehicle'
+      setAssetType(initialAssetType); // Reset to prop value, not hardcoded 'van'
       setFormData({
         reg_number: '',
         plant_id: '',
@@ -160,8 +161,8 @@ export function AddVehicleDialog({
     setError('');
     
     // Validate based on asset type
-    if (assetType === 'vehicle' && !formData.reg_number.trim()) {
-      setError('Registration number is required for vehicles');
+    if (assetType === 'van' && !formData.reg_number.trim()) {
+      setError('Registration number is required for vans');
       return;
     }
     
@@ -194,7 +195,7 @@ export function AddVehicleDialog({
         nickname: formData.nickname.trim() || null,
       };
 
-      if (assetType === 'vehicle') {
+      if (assetType === 'van') {
         payload.reg_number = formatRegistration(formData.reg_number);
       } else {
         payload.plant_id = formData.plant_id.trim();
@@ -204,7 +205,7 @@ export function AddVehicleDialog({
         payload.weight_class = formData.weight_class.trim() || null;
       }
       
-      const response = await fetch('/api/admin/vehicles', {
+      const response = await fetch('/api/admin/vans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -213,19 +214,19 @@ export function AddVehicleDialog({
       const data = await response.json();
 
       if (response.ok) {
-        const identifier = assetType === 'vehicle' ? payload.reg_number : formData.plant_id;
+        const identifier = assetType === 'van' ? payload.reg_number : formData.plant_id;
         const syncResult = data.syncResult;
         
         if (assetType === 'plant' || syncResult?.skipped) {
-          toast.success(`${assetType === 'vehicle' ? 'Vehicle' : 'Plant machinery'} added successfully`, {
+          toast.success(`${assetType === 'van' ? 'Van' : 'Plant machinery'} added successfully`, {
             description: `${identifier} has been added to the system.`,
           });
         } else if (syncResult?.success) {
-          toast.success('Vehicle added successfully', {
+          toast.success('Van added successfully', {
             description: `${identifier} has been added with TAX and MOT data synced.`,
           });
         } else {
-          toast.success(`${assetType === 'vehicle' ? 'Vehicle' : 'Plant'} added`, {
+          toast.success(`${assetType === 'van' ? 'Van' : 'Plant'} added`, {
             description: data.message || `${identifier} has been added. ${syncResult?.warning || ''}`,
             duration: 5000,
           });
@@ -279,9 +280,9 @@ export function AddVehicleDialog({
             <Label className="text-white">Asset Type <span className="text-red-400">*</span></Label>
             <Tabs value={assetType} onValueChange={(v) => setAssetType(v as AssetType)}>
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="vehicle" className="flex items-center gap-2">
+                <TabsTrigger value="van" className="flex items-center gap-2">
                   <Truck className="h-4 w-4" />
-                  Vehicle
+                  Van
                 </TabsTrigger>
                 <TabsTrigger value="plant" className="flex items-center gap-2">
                   <HardHat className="h-4 w-4" />
@@ -291,8 +292,8 @@ export function AddVehicleDialog({
             </Tabs>
           </div>
 
-          {/* Vehicle Registration Number */}
-          {assetType === 'vehicle' && (
+          {/* Van Registration Number */}
+          {assetType === 'van' && (
             <div className="space-y-2">
               <Label htmlFor="reg_number" className="text-white">
                 Registration Number <span className="text-red-400">*</span>
@@ -304,7 +305,7 @@ export function AddVehicleDialog({
                 placeholder="e.g., AB12 CDE or A10 ABC"
                 className="bg-input border-border text-white placeholder:text-muted-foreground uppercase"
                 disabled={loading}
-                required={assetType === 'vehicle'}
+                required={assetType === 'van'}
                 maxLength={9}
               />
               <p className="text-xs text-muted-foreground">
@@ -398,8 +399,8 @@ export function AddVehicleDialog({
             </>
           )}
 
-          {/* Nickname (vehicles only - plant has its own above) */}
-          {assetType === 'vehicle' && (
+          {/* Nickname (vans only - plant has its own above) */}
+          {assetType === 'van' && (
             <div className="space-y-2">
               <Label htmlFor="nickname" className="text-white">
                 Nickname <span className="text-slate-400 text-xs">(Optional)</span>
@@ -423,7 +424,7 @@ export function AddVehicleDialog({
           {/* Category */}
           <div className="space-y-2">
             <Label htmlFor="category" className="text-white">
-              Vehicle Category <span className="text-red-400">*</span>
+              {assetType === 'van' ? 'Van' : 'Plant'} Category <span className="text-red-400">*</span>
             </Label>
             <Select
               value={formData.category_id}
@@ -441,7 +442,7 @@ export function AddVehicleDialog({
                   .filter(category => {
                     // ✅ Filter categories based on asset type
                     // Note: fetchCategories already filters, but double-check here for safety
-                    const appliesTo = category.applies_to || ['vehicle'];
+                    const appliesTo = category.applies_to || ['van'];
                     return appliesTo.includes(assetType);
                   })
                   .map((category) => (
@@ -495,18 +496,18 @@ export function AddVehicleDialog({
             </Button>
             <Button
               type="submit"
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-maintenance hover:bg-maintenance-dark"
               disabled={loading}
             >
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {assetType === 'vehicle' ? 'Adding & Syncing...' : 'Adding...'}
+                  {assetType === 'van' ? 'Adding & Syncing...' : 'Adding...'}
                 </>
               ) : (
                 <>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add {assetType === 'vehicle' ? 'Vehicle' : 'Plant'}
+                  Add {assetType === 'van' ? 'Van' : 'Plant'}
                 </>
               )}
             </Button>

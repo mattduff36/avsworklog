@@ -53,7 +53,7 @@ async function checkAllVehicles() {
 
   // Get all non-TE57 vehicles with maintenance data
   const { data: vehicles, error } = await supabase
-    .from('vehicles')
+    .from('vans')
     .select('id, reg_number, nickname, status, vehicle_maintenance(id, current_mileage, updated_at)')
     .not('reg_number', 'ilike', 'TE57%')
     .neq('status', 'deleted')
@@ -89,7 +89,7 @@ async function checkAllVehicles() {
       const { data: inspections } = await supabase
         .from('van_inspections')
         .select('current_mileage, inspection_date, status')
-        .eq('vehicle_id', vehicle.id)
+        .eq('van_id', vehicle.id)
         .not('current_mileage', 'is', null)
         .eq('status', 'submitted')
         .order('inspection_date', { ascending: false })

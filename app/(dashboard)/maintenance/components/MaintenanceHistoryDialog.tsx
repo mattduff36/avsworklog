@@ -324,7 +324,7 @@ export function MaintenanceHistoryDialog({
             <div className="flex-1">
               <DialogTitle className="text-xl md:text-2xl flex items-center gap-2">
                 <HistoryIcon className="h-5 w-5 md:h-6 md:w-6" />
-                <span className="truncate">Maintenance History - {vehicleReg || 'Vehicle'}</span>
+                <span className="truncate">Maintenance History - {vehicleReg || 'Van'}</span>
               </DialogTitle>
               <DialogDescription className="text-slate-400 text-sm">
                 Complete audit trail of all maintenance changes
@@ -333,7 +333,7 @@ export function MaintenanceHistoryDialog({
             <div className="flex gap-2 flex-shrink-0">
               <Button
                 onClick={() => setMotHistoryOpen(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white flex-1 md:flex-initial h-12 md:h-10"
+                className="bg-maintenance hover:bg-maintenance-dark text-white flex-1 md:flex-initial h-12 md:h-10"
                 size="sm"
               >
                 <FileText className="h-5 w-5 mr-2" />

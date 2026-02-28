@@ -58,7 +58,7 @@ async function fixTask() {
     // Get current task details
     const { data: currentTask } = await supabase
       .from('actions')
-      .select('id, title, status, workshop_subcategory_id, vehicle_id, vehicles(reg_number, nickname)')
+      .select('id, title, status, workshop_subcategory_id, van_id, vans(reg_number, nickname)')
       .eq('id', TASK_ID)
       .single();
 

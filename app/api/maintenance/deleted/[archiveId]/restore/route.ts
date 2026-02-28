@@ -32,7 +32,7 @@ export async function PUT(
 
     // Get the archived vehicle data
     const { data: archivedVehicle, error: fetchError } = await supabase
-      .from('vehicle_archive')
+      .from('van_archive')
       .select('*')
       .eq('id', archiveId)
       .single();
@@ -44,21 +44,21 @@ export async function PUT(
       );
     }
 
-    // Check if the vehicle still exists in the vehicles table
+    // Check if the vehicle still exists in the vans table
     const { data: existingVehicle } = await supabase
-      .from('vehicles')
+      .from('vans')
       .select('id, status')
-      .eq('id', archivedVehicle.vehicle_id)
+      .eq('id', archivedVehicle.van_id)
       .single();
 
     if (existingVehicle) {
       // Vehicle exists, just update its status back to active
       const { error: updateError } = await supabase
-        .from('vehicles')
+        .from('vans')
         .update({ 
           status: 'active'
         })
-        .eq('id', archivedVehicle.vehicle_id);
+        .eq('id', archivedVehicle.van_id);
 
       if (updateError) {
         console.error('Failed to restore vehicle status:', updateError);
@@ -69,9 +69,9 @@ export async function PUT(
       const vehicleData = archivedVehicle.vehicle_data as any;
       
       const { error: insertError } = await supabase
-        .from('vehicles')
+        .from('vans')
         .insert({
-          id: archivedVehicle.vehicle_id,
+          id: archivedVehicle.van_id,
           reg_number: archivedVehicle.reg_number,
           category_id: archivedVehicle.category_id,
           status: 'active',
@@ -95,10 +95,10 @@ export async function PUT(
             .from('vehicle_maintenance')
             .upsert({
               ...maintenanceData,
-              vehicle_id: archivedVehicle.vehicle_id,
+              van_id: archivedVehicle.van_id,
               updated_at: new Date().toISOString(),
             }, {
-              onConflict: 'vehicle_id'
+              onConflict: 'van_id'
             });
 
           if (maintenanceError) {
@@ -111,7 +111,7 @@ export async function PUT(
 
     // Optionally remove from archive or mark as restored
     const { error: deleteArchiveError } = await supabase
-      .from('vehicle_archive')
+      .from('van_archive')
       .delete()
       .eq('id', archiveId);
 

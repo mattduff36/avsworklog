@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
     // Note: Cannot order by joined table columns in Supabase
     // Sorting is handled client-side in the MaintenanceTable component
     const { data: vehicles, error: vehiclesError } = await supabase
-      .from('vehicles')
+      .from('vans')
       .select(`
         id,
         reg_number,
@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
               full_name
             )
           `)
-          .eq('vehicle_id', v.id)
+          .eq('van_id', v.id)
           .order('inspection_date', { ascending: false })
           .limit(1);
         
@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
       if (!maintenance) {
         return {
           id: null,
-          vehicle_id: v.id,
+          van_id: v.id,
           vehicle: {
             id: v.id,
             reg_number: v.reg_number,
@@ -281,12 +281,12 @@ export async function POST(request: NextRequest) {
     const userName = profile?.full_name || 'Unknown User';
     
     // Parse request body
-    const body: UpdateMaintenanceRequest & { vehicle_id: string } = await request.json();
+    const body: UpdateMaintenanceRequest & { van_id: string } = await request.json();
     
-    // Validate vehicle_id
-    if (!body.vehicle_id) {
+    // Validate van_id
+    if (!body.van_id) {
       return NextResponse.json(
-        { error: 'vehicle_id is required' },
+        { error: 'van_id is required' },
         { status: 400 }
       );
     }
@@ -303,7 +303,7 @@ export async function POST(request: NextRequest) {
     const { data: existingRecord } = await supabase
       .from('vehicle_maintenance')
       .select('id')
-      .eq('vehicle_id', body.vehicle_id)
+      .eq('van_id', body.van_id)
       .single();
     
     if (existingRecord) {
@@ -315,7 +315,7 @@ export async function POST(request: NextRequest) {
     
     // Create new maintenance record
     const newRecord = {
-      vehicle_id: body.vehicle_id,
+      van_id: body.van_id,
       current_mileage: body.current_mileage || 0,
       tax_due_date: body.tax_due_date || null,
       mot_due_date: body.mot_due_date || null,
@@ -344,7 +344,7 @@ export async function POST(request: NextRequest) {
     
     if (body.tax_due_date) {
       historyEntries.push({
-        vehicle_id: body.vehicle_id,
+        van_id: body.van_id,
         field_name: 'tax_due_date',
         old_value: null,
         new_value: body.tax_due_date,
@@ -357,7 +357,7 @@ export async function POST(request: NextRequest) {
     
     if (body.mot_due_date) {
       historyEntries.push({
-        vehicle_id: body.vehicle_id,
+        van_id: body.van_id,
         field_name: 'mot_due_date',
         old_value: null,
         new_value: body.mot_due_date,
@@ -370,7 +370,7 @@ export async function POST(request: NextRequest) {
     
     if (body.first_aid_kit_expiry) {
       historyEntries.push({
-        vehicle_id: body.vehicle_id,
+        van_id: body.van_id,
         field_name: 'first_aid_kit_expiry',
         old_value: null,
         new_value: body.first_aid_kit_expiry,
@@ -383,7 +383,7 @@ export async function POST(request: NextRequest) {
     
     if (body.next_service_mileage) {
       historyEntries.push({
-        vehicle_id: body.vehicle_id,
+        van_id: body.van_id,
         field_name: 'next_service_mileage',
         old_value: null,
         new_value: body.next_service_mileage.toString(),
@@ -396,7 +396,7 @@ export async function POST(request: NextRequest) {
     
     if (body.cambelt_due_mileage) {
       historyEntries.push({
-        vehicle_id: body.vehicle_id,
+        van_id: body.van_id,
         field_name: 'cambelt_due_mileage',
         old_value: null,
         new_value: body.cambelt_due_mileage.toString(),

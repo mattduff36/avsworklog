@@ -54,8 +54,7 @@ export async function GET(request: NextRequest) {
         title,
         status,
         created_at,
-        vehicle_id,
-        vehicles (
+        vehicles:vans (
           reg_number,
           nickname
         )

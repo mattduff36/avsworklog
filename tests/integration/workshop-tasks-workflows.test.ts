@@ -41,7 +41,7 @@ describe('Workshop Tasks Module Workflows', () => {
 
     // Get a test vehicle
     const { data: vehicles } = await supabase
-      .from('vehicles')
+      .from('vans')
       .select('id')
       .neq('status', 'deleted')
       .limit(1);
@@ -61,11 +61,11 @@ describe('Workshop Tasks Module Workflows', () => {
         .from('actions')
         .select(`
           *,
-          vehicle:vehicles!vehicle_id(id, reg_number, nickname),
+          vehicle:vans!actions_van_id_fkey(id, reg_number, nickname),
           category:workshop_task_categories(id, name, slug),
           subcategory:workshop_task_subcategories(id, name, slug)
         `)
-        .eq('action_type', 'workshop_task')
+        .eq('action_type', 'workshop_vehicle_task')
         .order('created_at', { ascending: false });
 
       expect(error).toBeNull();
@@ -81,7 +81,7 @@ describe('Workshop Tasks Module Workflows', () => {
       const { data: tasks, error } = await supabase
         .from('actions')
         .select('*')
-        .eq('action_type', 'workshop_task')
+        .eq('action_type', 'workshop_vehicle_task')
         .eq('status', 'pending');
 
       expect(error).toBeNull();
@@ -93,7 +93,7 @@ describe('Workshop Tasks Module Workflows', () => {
       const { data: tasks, error } = await supabase
         .from('actions')
         .select('*')
-        .eq('action_type', 'workshop_task')
+        .eq('action_type', 'workshop_vehicle_task')
         .eq('status', 'logged');
 
       expect(error).toBeNull();
@@ -105,7 +105,7 @@ describe('Workshop Tasks Module Workflows', () => {
       const { data: tasks, error } = await supabase
         .from('actions')
         .select('*')
-        .eq('action_type', 'workshop_task')
+        .eq('action_type', 'workshop_vehicle_task')
         .eq('status', 'on_hold');
 
       expect(error).toBeNull();
@@ -117,7 +117,7 @@ describe('Workshop Tasks Module Workflows', () => {
       const { data: tasks, error } = await supabase
         .from('actions')
         .select('*')
-        .eq('action_type', 'workshop_task')
+        .eq('action_type', 'workshop_vehicle_task')
         .eq('status', 'completed');
 
       expect(error).toBeNull();
@@ -134,8 +134,8 @@ describe('Workshop Tasks Module Workflows', () => {
       const { data: tasks, error } = await supabase
         .from('actions')
         .select('*')
-        .eq('action_type', 'workshop_task')
-        .eq('vehicle_id', testVehicleId);
+        .eq('action_type', 'workshop_vehicle_task')
+        .eq('van_id', testVehicleId);
 
       expect(error).toBeNull();
       expect(tasks).toBeDefined();
@@ -161,12 +161,12 @@ describe('Workshop Tasks Module Workflows', () => {
       const { data: newTask, error } = await supabase
         .from('actions')
         .insert({
-          action_type: 'workshop_task',
+          action_type: 'workshop_vehicle_task',
           title: 'Test Workflow Task ' + Date.now(),
           description: 'Testing status workflows',
           status: 'pending',
           priority: 'medium',
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
           workshop_category_id: categories[0].id,
           created_by: testUserId,
         })
@@ -299,12 +299,12 @@ describe('Workshop Tasks Module Workflows', () => {
       const { data: newTask, error: createError } = await supabase
         .from('actions')
         .insert({
-          action_type: 'workshop_task',
+          action_type: 'workshop_vehicle_task',
           title: 'Multi-step Test Task ' + Date.now(),
           description: 'Testing multi-step completion',
           status: 'pending',
           priority: 'high',
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
           workshop_category_id: categories[0].id,
           created_by: testUserId,
         })
@@ -562,12 +562,12 @@ describe('Workshop Tasks Module Workflows', () => {
       }
 
       const newTask = {
-        action_type: 'workshop_task',
+        action_type: 'workshop_vehicle_task',
         title: 'New Workshop Task ' + Date.now(),
         description: 'Test task creation',
         status: 'pending',
         priority: 'medium',
-        vehicle_id: testVehicleId,
+        van_id: testVehicleId,
         workshop_category_id: categories[0].id,
         created_by: testUserId,
       };

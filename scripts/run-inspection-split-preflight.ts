@@ -54,9 +54,9 @@ async function run() {
 
   const { rows: counts } = await client.query(`
     SELECT
-      COUNT(*) FILTER (WHERE vehicle_id IS NOT NULL AND plant_id IS NULL AND is_hired_plant = FALSE) AS van_count,
-      COUNT(*) FILTER (WHERE vehicle_id IS NULL AND plant_id IS NOT NULL AND is_hired_plant = FALSE) AS owned_plant_count,
-      COUNT(*) FILTER (WHERE vehicle_id IS NULL AND plant_id IS NULL AND is_hired_plant = TRUE)      AS hired_plant_count,
+      COUNT(*) FILTER (WHERE van_id IS NOT NULL AND plant_id IS NULL AND is_hired_plant = FALSE) AS van_count,
+      COUNT(*) FILTER (WHERE van_id IS NULL AND plant_id IS NOT NULL AND is_hired_plant = FALSE) AS owned_plant_count,
+      COUNT(*) FILTER (WHERE van_id IS NULL AND plant_id IS NULL AND is_hired_plant = TRUE)      AS hired_plant_count,
       COUNT(*) AS total
     FROM vehicle_inspections;
   `);
@@ -83,12 +83,12 @@ async function run() {
   console.log('═══ 2. DIRTY DATA CHECK ═══');
 
   const { rows: dirty } = await client.query(`
-    SELECT id, vehicle_id, plant_id, is_hired_plant
+    SELECT id, van_id, plant_id, is_hired_plant
     FROM vehicle_inspections
     WHERE NOT (
-      (vehicle_id IS NOT NULL AND plant_id IS NULL AND is_hired_plant = FALSE)
-      OR (vehicle_id IS NULL AND plant_id IS NOT NULL AND is_hired_plant = FALSE)
-      OR (vehicle_id IS NULL AND plant_id IS NULL AND is_hired_plant = TRUE)
+      (van_id IS NOT NULL AND plant_id IS NULL AND is_hired_plant = FALSE)
+      OR (van_id IS NULL AND plant_id IS NOT NULL AND is_hired_plant = FALSE)
+      OR (van_id IS NULL AND plant_id IS NULL AND is_hired_plant = TRUE)
     )
     LIMIT 20;
   `);
@@ -97,7 +97,7 @@ async function run() {
     console.error(`  ❌ FATAL: ${dirty.length} ambiguous rows found (showing up to 20):`);
     dirty.forEach((r) =>
       console.error(
-        `    id=${r.id}  vehicle_id=${r.vehicle_id}  plant_id=${r.plant_id}  is_hired_plant=${r.is_hired_plant}`
+        `    id=${r.id}  van_id=${r.van_id}  plant_id=${r.plant_id}  is_hired_plant=${r.is_hired_plant}`
       )
     );
     hasFatal = true;

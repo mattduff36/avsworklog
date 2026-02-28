@@ -54,7 +54,7 @@ async function checkVehicleMotData() {
         vm.created_at as maintenance_created_at,
         vm.updated_at as maintenance_updated_at
       FROM vehicles v
-      LEFT JOIN vehicle_maintenance vm ON v.id = vm.vehicle_id
+      LEFT JOIN vehicle_maintenance vm ON v.id = vm.van_id
       WHERE REPLACE(UPPER(v.reg_number), ' ', '') = 'FE24TYO'
     `);
 

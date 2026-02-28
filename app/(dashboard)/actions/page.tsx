@@ -16,7 +16,7 @@ import { Database } from '@/types/database';
 import { toast } from 'sonner';
 
 type Action = Database['public']['Tables']['actions']['Row'] & {
-  vehicles?: {
+  vans?: {
     reg_number: string;
   } | null;
   inspection_items?: {
@@ -70,7 +70,7 @@ export default function ActionsPage() {
         .from('actions')
         .select(`
           *,
-          vehicles (
+          vans (
             reg_number
           ),
           inspection_items (
@@ -504,7 +504,7 @@ export default function ActionsPage() {
                 <div className="space-y-1 border-t border-amber-500/20 pt-3">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Van</span>
-                    <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'pending' && a.vehicle_id !== null).length}</span>
+                    <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'pending' && a.van_id !== null).length}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground flex items-center gap-1.5"><Settings className="h-3 w-3" />Plant</span>
@@ -523,7 +523,7 @@ export default function ActionsPage() {
                 <div className="space-y-1 border-t border-blue-500/20 pt-3">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Van</span>
-                    <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'logged' && a.vehicle_id !== null).length}</span>
+                    <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'logged' && a.van_id !== null).length}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground flex items-center gap-1.5"><Settings className="h-3 w-3" />Plant</span>
@@ -542,7 +542,7 @@ export default function ActionsPage() {
                 <div className="space-y-1 border-t border-green-500/20 pt-3">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Van</span>
-                    <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'completed' && a.vehicle_id !== null).length}</span>
+                    <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'completed' && a.van_id !== null).length}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground flex items-center gap-1.5"><Settings className="h-3 w-3" />Plant</span>
@@ -810,9 +810,9 @@ export default function ActionsPage() {
                               <p className="text-sm text-muted-foreground mb-2">{action.description}</p>
                             )}
                             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                              {action.vehicles && (
+                              {action.vans && (
                                 <span>
-                                  Van: {action.vehicles.reg_number || 'N/A'}
+                                  Van: {action.vans.reg_number || 'N/A'}
                                 </span>
                               )}
                               {action.plant && (
@@ -914,9 +914,9 @@ export default function ActionsPage() {
                               </div>
                             )}
                             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                              {action.vehicles && (
+                              {action.vans && (
                                 <span>
-                                  Van: {action.vehicles.reg_number || 'N/A'}
+                                  Van: {action.vans.reg_number || 'N/A'}
                                 </span>
                               )}
                               {action.plant && (

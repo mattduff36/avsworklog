@@ -79,7 +79,6 @@ export async function POST(request: NextRequest) {
     const taskData: ActionInsert = {
       action_type: 'workshop_vehicle_task',
       plant_id: plantId,
-      vehicle_id: null,
       title: `Plant ${plantNumber}: Inspector Comments`,
       description: comments,
       status: 'pending',

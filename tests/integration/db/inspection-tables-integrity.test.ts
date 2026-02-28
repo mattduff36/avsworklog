@@ -81,7 +81,7 @@ describe('Van Inspections Schema Shape', () => {
     if (data && data.length > 0) {
       const row = data[0];
       const expectedColumns = [
-        'id', 'vehicle_id', 'user_id', 'inspection_date',
+        'id', 'van_id', 'user_id', 'inspection_date',
         'inspection_end_date', 'current_mileage', 'status',
         'submitted_at', 'reviewed_by', 'reviewed_at',
         'manager_comments', 'inspector_comments',
@@ -94,11 +94,11 @@ describe('Van Inspections Schema Shape', () => {
     }
   });
 
-  it('rejects drafts for plant rows via constraint (vehicle_id required)', async () => {
+  it('rejects drafts for plant rows via constraint (van_id required)', async () => {
     const { error } = await supabase
       .from('van_inspections')
       .insert({
-        vehicle_id: null,
+        van_id: null,
         user_id: '00000000-0000-0000-0000-000000000000',
         inspection_date: '2099-01-01',
         status: 'draft',

@@ -4,12 +4,12 @@ describe('Admin Vehicles API', () => {
   describe('List Vehicles', () => {
     it('should return all vehicles with categories', () => {
       const vehicles = [
-        { id: 'v1', reg_number: 'AB12 CDE', vehicle_categories: { name: 'Truck' } },
-        { id: 'v2', reg_number: 'FG34 HIJ', vehicle_categories: { name: 'Van' } },
+        { id: 'v1', reg_number: 'AB12 CDE', van_categories: { name: 'Truck' } },
+        { id: 'v2', reg_number: 'FG34 HIJ', van_categories: { name: 'Van' } },
       ];
 
       expect(vehicles).toHaveLength(2);
-      expect(vehicles[0].vehicle_categories.name).toBe('Truck');
+      expect(vehicles[0].van_categories.name).toBe('Truck');
     });
 
     it('should include last inspection data', () => {

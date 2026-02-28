@@ -224,7 +224,7 @@ export function MaintenanceTable({
               </CardDescription>
             </div>
             <Button 
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-maintenance hover:bg-maintenance-dark"
               onClick={() => setAddVehicleDialogOpen(true)}
             >
               <Plus className="h-4 w-4 mr-2 hidden md:inline" />
@@ -428,9 +428,9 @@ export function MaintenanceTable({
                   <TableBody>
                     {sortedVehicles.map((vehicle) => (
                       <TableRow 
-                        key={vehicle.id || vehicle.vehicle_id || vehicle.vehicle?.id}
+                        key={vehicle.van_id ?? vehicle.id ?? vehicle.vehicle?.id}
                         onClick={() => {
-                          const vehicleId = vehicle.vehicle_id || vehicle.id;
+                          const vehicleId = vehicle.van_id ?? vehicle.id;
                           if (vehicleId) {
                             router.push(`/fleet/vans/${vehicleId}/history?fromTab=vans`);
                           }
@@ -513,12 +513,13 @@ export function MaintenanceTable({
           {vehicles.length > 0 && (
             <div className="md:hidden space-y-3">
               {sortedVehicles.map((vehicle) => {
-                const isExpanded = expandedCardId === vehicle.vehicle_id;
+                const cardVehicleId = vehicle.van_id ?? vehicle.id;
+                const isExpanded = expandedCardId === cardVehicleId;
                 
                 return (
                   <Card 
-                    key={vehicle.vehicle_id} 
-                    id={`vehicle-card-${vehicle.vehicle_id}`}
+                    key={cardVehicleId}
+                    id={`vehicle-card-${cardVehicleId}`}
                     className="bg-slate-800 border-slate-700 transition-all duration-200"
                   >
                     <CardContent className="p-4">
@@ -526,10 +527,10 @@ export function MaintenanceTable({
                       <div 
                         onClick={() => {
                           if (!isExpanded) {
-                            setExpandedCardId(vehicle.vehicle_id);
+                            setExpandedCardId(cardVehicleId ?? null);
                             // Scroll to top of card after expansion
                             setTimeout(() => {
-                              const card = document.getElementById(`vehicle-card-${vehicle.vehicle_id}`);
+                              const card = document.getElementById(`vehicle-card-${cardVehicleId}`);
                               if (card) {
                                 const navbarHeight = 68; // Approximate navbar height
                                 const padding = 16;
@@ -646,7 +647,7 @@ export function MaintenanceTable({
                               size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                const vehicleId = vehicle.vehicle_id || vehicle.id;
+                                const vehicleId = vehicle.van_id ?? vehicle.id;
                                 if (vehicleId) {
                                   router.push(`/fleet/vans/${vehicleId}/history?fromTab=vans`);
                                 }
@@ -990,7 +991,7 @@ export function MaintenanceTable({
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         vehicle={selectedVehicle ? {
-          id: selectedVehicle.vehicle_id,
+          id: selectedVehicle.van_id ?? '',
           reg_number: selectedVehicle.vehicle?.reg_number || 'Unknown',
           category: selectedVehicle.vehicle?.category_id ? { name: 'Vehicle' } : null
         } : null}

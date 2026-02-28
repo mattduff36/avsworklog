@@ -97,7 +97,7 @@ export function EditMaintenanceDialog({
   const [isMileageFocused, setIsMileageFocused] = useState(false);
   const dialogContentRef = useRef<HTMLDivElement>(null);
   
-  // Check if this is a new maintenance record (vehicle.id is null for vehicles without maintenance records)
+  // Check if this is a new maintenance record (vehicle.id is null for vans without maintenance records)
   const isNewRecord = !vehicle?.id;
 
   // Initialize form
@@ -162,7 +162,7 @@ export function EditMaintenanceDialog({
     const nicknameChanged = data.nickname?.trim() !== vehicle.vehicle?.nickname;
     if (nicknameChanged && vehicle.vehicle?.id) {
       try {
-        const response = await fetch(`/api/admin/vehicles/${vehicle.vehicle.id}`, {
+        const response = await fetch(`/api/admin/vans/${vehicle.vehicle.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -200,9 +200,13 @@ export function EditMaintenanceDialog({
     };
 
     if (isNewRecord) {
+      const vanId = vehicle.van_id;
+      if (!vanId) {
+        throw new Error('Missing van ID for new maintenance record');
+      }
       // Create new maintenance record
       await createMutation.mutateAsync({ 
-        vehicle_id: vehicle.vehicle_id, 
+        van_id: vanId, 
         data: updates 
       });
     } else {
@@ -237,7 +241,7 @@ export function EditMaintenanceDialog({
       >
         <DialogHeader>
           <DialogTitle className="text-2xl">
-            {isNewRecord ? 'Create' : 'Edit'} {vehicle.vehicle?.asset_type === 'plant' ? 'Plant' : 'Vehicle'} Record - {vehicle.vehicle?.reg_number || vehicle.vehicle?.plant_id}
+            {isNewRecord ? 'Create' : 'Edit'} {vehicle.vehicle?.asset_type === 'plant' ? 'Plant' : 'Van'} Record - {vehicle.vehicle?.reg_number || vehicle.vehicle?.plant_id}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {isNewRecord 
@@ -248,10 +252,10 @@ export function EditMaintenanceDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Vehicle Nickname */}
+          {/* Van/Plant Nickname */}
           <div className="space-y-2">
             <Label htmlFor="nickname" className="text-white">
-              Vehicle Nickname <span className="text-slate-400 text-xs">(Optional)</span>
+              {vehicle.vehicle?.asset_type === 'plant' ? 'Plant' : 'Van'} Nickname <span className="text-slate-400 text-xs">(Optional)</span>
             </Label>
             <Input
               id="nickname"
@@ -302,7 +306,7 @@ export function EditMaintenanceDialog({
             </div>
           )}
 
-          {/* Date-based Maintenance - Show for vehicles, or plant with reg_number */}
+          {/* Date-based Maintenance - Show for vans, or plant with reg_number */}
           {(vehicle.vehicle?.asset_type !== 'plant' || vehicle.vehicle?.reg_number) && (
             <div className="space-y-4">
               <h3 className="font-semibold text-lg border-b border-slate-700 pb-2">
@@ -527,12 +531,13 @@ export function EditMaintenanceDialog({
                 }
                 
                 // Check for open workshop tasks
-                if (vehicle?.vehicle_id) {
+                if (vehicle?.van_id) {
                   try {
+                    const vanId = vehicle.van_id;
                     const { data: openTasks, error: tasksError } = await supabase
                       .from('actions')
                       .select('id, status')
-                      .eq('vehicle_id', vehicle.vehicle_id)
+                      .eq('van_id', vanId)
                       .in('action_type', ['workshop_vehicle_task', 'inspection_defect'])
                       .neq('status', 'completed')
                       .limit(1);
@@ -544,8 +549,8 @@ export function EditMaintenanceDialog({
                     }
                     
                     if (openTasks && openTasks.length > 0) {
-                      toast.error('Cannot retire vehicle with open workshop tasks', {
-                        description: 'Please complete or delete all open tasks before retiring this vehicle.',
+                      toast.error(`Cannot retire ${vehicle.vehicle?.asset_type === 'plant' ? 'plant' : 'van'} with open workshop tasks`, {
+                        description: `Please complete or delete all open tasks before retiring this ${vehicle.vehicle?.asset_type === 'plant' ? 'plant' : 'van'}.`,
                         duration: 5000,
                       });
                       return;
@@ -564,7 +569,7 @@ export function EditMaintenanceDialog({
               disabled={isSubmitting || updateMutation.isPending || createMutation.isPending}
             >
               <Archive className="h-4 w-4 mr-2" />
-              Retire Vehicle
+              Retire {vehicle.vehicle?.asset_type === 'plant' ? 'Plant' : 'Van'}
             </Button>
             <div className="flex gap-2 ml-auto">
               <Button
@@ -579,7 +584,7 @@ export function EditMaintenanceDialog({
               <Button
                 type="submit"
                 disabled={isSubmitting || updateMutation.isPending || createMutation.isPending || commentLength < 10}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-maintenance hover:bg-maintenance-dark"
               >
                 {(isSubmitting || updateMutation.isPending || createMutation.isPending) ? (
                   <>

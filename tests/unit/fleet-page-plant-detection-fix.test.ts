@@ -11,7 +11,7 @@ describe('Fleet Page Plant Detection Logic Bug Fix', () => {
     it('should return boolean true, not string value of plant_id', () => {
       // Simulate vehicle object from PlantOverview
       const plantAsset = {
-        vehicle_id: 'uuid-123',
+        van_id: 'uuid-123',
         plant_id: 'P001', // Human-readable identifier
         is_plant: true, // ✅ Flag set by PlantOverview
         vehicle: {
@@ -55,13 +55,13 @@ describe('Fleet Page Plant Detection Logic Bug Fix', () => {
 
     it('should match MaintenanceOverview pattern', () => {
       const vehicles = [
-        { vehicle_id: 'v1', is_plant: false },
-        { vehicle_id: 'p1', is_plant: true },
+        { van_id: 'v1', is_plant: false },
+        { van_id: 'p1', is_plant: true },
       ];
 
       // MaintenanceOverview pattern (correct)
       const isPlantAsset = (vehicleId: string) => {
-        const vehicle = vehicles.find(v => v.vehicle_id === vehicleId);
+        const vehicle = vehicles.find(v => v.van_id === vehicleId);
         return vehicle && 'is_plant' in vehicle && vehicle.is_plant === true;
       };
 
@@ -192,7 +192,7 @@ describe('Fleet Page Plant Detection Logic Bug Fix', () => {
     it('should route to correct page for regular vehicles', () => {
       const regularVehicle = {
         is_plant: false,
-        vehicle_id: 'uuid-vehicle-456',
+        van_id: 'uuid-vehicle-456',
         vehicle: {
           id: 'uuid-vehicle-456',
           reg_number: 'AB12 CDE',
@@ -200,7 +200,7 @@ describe('Fleet Page Plant Detection Logic Bug Fix', () => {
       };
 
       const isPlant = regularVehicle.is_plant === true;
-      const assetId = regularVehicle.vehicle?.id || regularVehicle.vehicle_id;
+      const assetId = regularVehicle.vehicle?.id || regularVehicle.van_id;
 
       const route = isPlant 
         ? `/fleet/plant/${assetId}/history`
@@ -214,12 +214,12 @@ describe('Fleet Page Plant Detection Logic Bug Fix', () => {
     it('should use same pattern as isPlantAsset in MaintenanceOverview', () => {
       const vehicles = [
         { 
-          vehicle_id: 'v1', 
+          van_id: 'v1', 
           is_plant: false,
           vehicle: { reg_number: 'AB12 CDE' }
         },
         { 
-          vehicle_id: 'p1', 
+          van_id: 'p1', 
           is_plant: true,
           vehicle: { plant_id: 'P001' }
         },
@@ -227,7 +227,7 @@ describe('Fleet Page Plant Detection Logic Bug Fix', () => {
 
       // MaintenanceOverview pattern
       const isPlantAsset = (vehicleId: string) => {
-        const vehicle = vehicles.find(v => v.vehicle_id === vehicleId);
+        const vehicle = vehicles.find(v => v.van_id === vehicleId);
         return vehicle && 'is_plant' in vehicle && vehicle.is_plant === true;
       };
 
@@ -244,7 +244,7 @@ describe('Fleet Page Plant Detection Logic Bug Fix', () => {
 
     it('should be consistent across all components', () => {
       const plantAsset = {
-        vehicle_id: 'uuid-123',
+        van_id: 'uuid-123',
         is_plant: true,
         vehicle: {
           id: 'uuid-123',

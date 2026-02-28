@@ -1,5 +1,5 @@
 /**
- * Fix vehicles that are in vehicle_archive but still showing as active
+ * Fix vehicles that are in van_archive but still showing as active
  * This happened when the archive succeeded but the DELETE failed due to FK constraints
  */
 
@@ -32,14 +32,14 @@ async function fixArchivedVehicles() {
     await client.connect();
     console.log('[INFO] Connected successfully\n');
 
-    // Find vehicles that are in vehicle_archive but not archived in vehicles table
+    // Find vehicles that are in van_archive but not archived in vehicles table
     const findQuery = `
       SELECT 
-        va.vehicle_id,
+        va.van_id,
         va.reg_number,
         v.status as current_status
-      FROM vehicle_archive va
-      INNER JOIN vehicles v ON va.vehicle_id = v.id
+      FROM van_archive va
+      INNER JOIN vehicles v ON va.van_id = v.id
       WHERE v.status != 'archived'
       ORDER BY va.archived_at DESC;
     `;
@@ -54,7 +54,7 @@ async function fixArchivedVehicles() {
 
     console.log(`[INFO] Found ${result.rows.length} vehicle(s) that need to be marked as archived:\n`);
     result.rows.forEach((row, idx) => {
-      console.log(`  ${idx + 1}. ${row.reg_number} (ID: ${row.vehicle_id})`);
+      console.log(`  ${idx + 1}. ${row.reg_number} (ID: ${row.van_id})`);
       console.log(`     Current status: ${row.current_status} (should be 'archived')\n`);
     });
 
@@ -63,9 +63,9 @@ async function fixArchivedVehicles() {
       UPDATE vehicles
       SET status = 'archived'
       WHERE id IN (
-        SELECT va.vehicle_id
-        FROM vehicle_archive va
-        INNER JOIN vehicles v ON va.vehicle_id = v.id
+        SELECT va.van_id
+        FROM van_archive va
+        INNER JOIN vehicles v ON va.van_id = v.id
         WHERE v.status != 'archived'
       )
       RETURNING id, reg_number;

@@ -27,7 +27,7 @@ if (!connectionString) {
 
 interface DvlaSyncLogEntry {
   id: string;
-  vehicle_id: string;
+  van_id: string;
   registration_number: string;
   sync_status: string;
   fields_updated: string[] | null;
@@ -106,7 +106,7 @@ async function backfillFromDvlaSyncLog() {
         // Check if history entry already exists (to avoid duplicates)
         const checkQuery = `
           SELECT id FROM maintenance_history
-          WHERE vehicle_id = $1
+          WHERE van_id = $1
             AND field_name = 'tax_due_date'
             AND (old_value = $2 OR (old_value IS NULL AND $2 IS NULL))
             AND new_value = $3
@@ -114,7 +114,7 @@ async function backfillFromDvlaSyncLog() {
         `;
 
         const { rows: existing } = await client.query(checkQuery, [
-          sync.vehicle_id,
+          sync.van_id,
           sync.tax_due_date_old,
           sync.tax_due_date_new,
           sync.created_at
@@ -127,7 +127,7 @@ async function backfillFromDvlaSyncLog() {
           // Insert maintenance_history entry
           const insertQuery = `
             INSERT INTO maintenance_history (
-              vehicle_id,
+              van_id,
               field_name,
               old_value,
               new_value,
@@ -145,7 +145,7 @@ async function backfillFromDvlaSyncLog() {
 
           try {
             await client.query(insertQuery, [
-              sync.vehicle_id,
+              sync.van_id,
               'tax_due_date',
               sync.tax_due_date_old,
               sync.tax_due_date_new,
@@ -177,7 +177,7 @@ async function backfillFromDvlaSyncLog() {
           // Check if history entry already exists
           const checkQuery = `
             SELECT id FROM maintenance_history
-            WHERE vehicle_id = $1
+            WHERE van_id = $1
               AND field_name = 'mot_due_date'
               AND (old_value = $2 OR (old_value IS NULL AND $2 IS NULL))
               AND new_value = $3
@@ -185,7 +185,7 @@ async function backfillFromDvlaSyncLog() {
           `;
 
           const { rows: existing } = await client.query(checkQuery, [
-            sync.vehicle_id,
+            sync.van_id,
             oldMotDate,
             newMotDate,
             sync.created_at
@@ -200,7 +200,7 @@ async function backfillFromDvlaSyncLog() {
             
             const insertQuery = `
               INSERT INTO maintenance_history (
-                vehicle_id,
+                van_id,
                 field_name,
                 old_value,
                 new_value,
@@ -225,7 +225,7 @@ async function backfillFromDvlaSyncLog() {
 
             try {
               await client.query(insertQuery, [
-                sync.vehicle_id,
+                sync.van_id,
                 'mot_due_date',
                 oldMotDate,
                 newMotDate,

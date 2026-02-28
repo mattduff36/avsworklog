@@ -63,6 +63,10 @@
     --maintenance-primary: 0 84% 60%;
     --maintenance-light: 0 100% 96%;
     --maintenance-dark: 0 84% 45%;
+
+    --fleet-primary: 190 70% 42%;
+    --fleet-light: 190 70% 96%;
+    --fleet-dark: 190 70% 30%;
     
     --workshop-primary: 13 37% 48%;
     --workshop-light: 13 37% 96%;
@@ -149,6 +153,12 @@
     --primary: var(--maintenance-primary);
     --primary-foreground: 210 40% 98%;
     --ring: var(--maintenance-primary);
+  }
+
+  [data-accent="fleet"] {
+    --primary: var(--fleet-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--fleet-primary);
   }
 
   [data-accent="workshop"] {
@@ -275,6 +285,13 @@
   .text-maintenance { color: hsl(var(--maintenance-primary)); }
   .border-maintenance { border-color: hsl(var(--maintenance-primary)); }
   
+  /* Fleet */
+  .bg-fleet { background-color: hsl(var(--fleet-primary)); }
+  .bg-fleet-light { background-color: hsl(var(--fleet-light)); }
+  .bg-fleet-dark { background-color: hsl(var(--fleet-dark)); }
+  .text-fleet { color: hsl(var(--fleet-primary)); }
+  .border-fleet { border-color: hsl(var(--fleet-primary)); }
+
   /* Workshop */
   .bg-workshop { background-color: hsl(var(--workshop-primary)); }
   .bg-workshop-light { background-color: hsl(var(--workshop-light)); }

@@ -46,7 +46,7 @@ type PlantAsset = {
   status: string;
   retired_at: string | null;
   retire_reason: string | null;
-  vehicle_categories?: { name: string; id: string } | null;
+  van_categories?: { name: string; id: string } | null;
 };
 
 type PlantMaintenanceWithStatus = {
@@ -142,7 +142,7 @@ export function PlantTable({
         .from('plant')
         .select(`
           *,
-          vehicle_categories (
+          van_categories (
             id,
             name
           )
@@ -179,7 +179,7 @@ export function PlantTable({
         .from('plant')
         .select(`
           *,
-          vehicle_categories (
+          van_categories (
             id,
             name
           )
@@ -239,7 +239,7 @@ export function PlantTable({
         return multiplier * (a.plant?.serial_number || '').localeCompare(b.plant?.serial_number || '');
       
       case 'category':
-        return multiplier * (a.plant?.vehicle_categories?.name || '').localeCompare(b.plant?.vehicle_categories?.name || '');
+        return multiplier * (a.plant?.van_categories?.name || '').localeCompare(b.plant?.van_categories?.name || '');
       
       case 'current_hours':
         return multiplier * ((a.current_hours || 0) - (b.current_hours || 0));
@@ -368,7 +368,7 @@ export function PlantTable({
               </CardDescription>
             </div>
             <Button 
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-maintenance hover:bg-maintenance-dark"
               onClick={() => setAddVehicleDialogOpen(true)}
             >
               <Plus className="h-4 w-4 mr-2 hidden md:inline" />
@@ -584,7 +584,7 @@ export function PlantTable({
                         {/* Category */}
                         {columnVisibility.category && (
                           <TableCell className="text-muted-foreground">
-                            {asset.plant?.vehicle_categories?.name || 'All plant'}
+                            {asset.plant?.van_categories?.name || 'All plant'}
                           </TableCell>
                         )}
                         
@@ -723,7 +723,7 @@ export function PlantTable({
                             )}
                             <div className="flex items-center justify-between">
                               <span className="text-sm text-muted-foreground">Category:</span>
-                              <span className="text-white">{asset.plant?.vehicle_categories?.name || 'All plant'}</span>
+                              <span className="text-white">{asset.plant?.van_categories?.name || 'All plant'}</span>
                             </div>
                             <div className="flex items-center justify-between">
                               <span className="text-sm text-muted-foreground">Current Hours:</span>
@@ -859,7 +859,7 @@ export function PlantTable({
 
                             {/* Category */}
                             <TableCell className="text-muted-foreground">
-                              {plant.vehicle_categories?.name || '—'}
+                              {plant.van_categories?.name || '—'}
                             </TableCell>
 
                             {/* Retired Date */}
@@ -972,10 +972,10 @@ export function PlantTable({
                                 <span className="text-white">{plant.serial_number}</span>
                               </div>
                             )}
-                            {plant.vehicle_categories?.name && (
+                            {plant.van_categories?.name && (
                               <div className="flex justify-between">
                                 <span className="text-muted-foreground">Category:</span>
-                                <span className="text-white">{plant.vehicle_categories.name}</span>
+                                <span className="text-white">{plant.van_categories.name}</span>
                               </div>
                             )}
                             <div className="flex justify-between">

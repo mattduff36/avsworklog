@@ -11,7 +11,7 @@ describe('Plant Maintenance Type Structure Bug Fixes', () => {
     it('should include all status fields in plant maintenance objects', () => {
       // Simulate PlantOverview output structure after fix
       const plantMaintenanceObject = {
-        vehicle_id: 'plant-uuid-123',
+        van_id: 'plant-uuid-123',
         plant_id: 'P001', // Human-readable identifier
         is_plant: true,
         vehicle: {
@@ -54,7 +54,7 @@ describe('Plant Maintenance Type Structure Bug Fixes', () => {
 
     it('should use alert counts for filtering instead of individual status checks', () => {
       const plantWithoutLOLER = {
-        vehicle_id: 'plant-uuid-456',
+        van_id: 'plant-uuid-456',
         plant_id: 'P002',
         is_plant: true,
         loler_status: { status: 'ok' }, // No LOLER alert
@@ -68,7 +68,7 @@ describe('Plant Maintenance Type Structure Bug Fixes', () => {
       };
 
       const plantWithLOLER = {
-        vehicle_id: 'plant-uuid-789',
+        van_id: 'plant-uuid-789',
         plant_id: 'P003',
         is_plant: true,
         loler_status: { status: 'due_soon', days_until: 10 },
@@ -106,7 +106,7 @@ describe('Plant Maintenance Type Structure Bug Fixes', () => {
 
     it('should handle plant assets with service alerts (future-proofing)', () => {
       const plantWithServiceAlert = {
-        vehicle_id: 'plant-uuid-999',
+        van_id: 'plant-uuid-999',
         plant_id: 'P004',
         is_plant: true,
         loler_status: { status: 'ok' },
@@ -162,7 +162,7 @@ describe('Plant Maintenance Type Structure Bug Fixes', () => {
 
       // Both components should use the same mapping
       const fromOverview = {
-        vehicle_id: plantFromDatabase.id, // UUID for API calls
+        van_id: plantFromDatabase.id, // UUID for API calls
         plant_id: plantFromDatabase.plant_id, // Human-readable for display
       };
 
@@ -175,19 +175,19 @@ describe('Plant Maintenance Type Structure Bug Fixes', () => {
       expect(fromOverview.plant_id).toBe('P999');
     });
 
-    it('should preserve UUID in vehicle_id for API calls', () => {
+    it('should preserve UUID in van_id for API calls', () => {
       const plantFromDatabase = {
         id: 'uuid-plant-123',
         plant_id: 'P001',
       };
 
       const plantMaintenanceObject = {
-        vehicle_id: plantFromDatabase.id, // UUID for API routing
+        van_id: plantFromDatabase.id, // UUID for API routing
         plant_id: plantFromDatabase.plant_id, // Human-readable for display
       };
 
-      // vehicle_id should be UUID (for API calls)
-      expect(plantMaintenanceObject.vehicle_id).toBe('uuid-plant-123');
+      // van_id should be UUID (for API calls)
+      expect(plantMaintenanceObject.van_id).toBe('uuid-plant-123');
       
       // plant_id should be human-readable (for display)
       expect(plantMaintenanceObject.plant_id).toBe('P001');
@@ -223,14 +223,14 @@ describe('Plant Maintenance Type Structure Bug Fixes', () => {
       const vehicles = [
         // Vehicle with alerts
         { 
-          vehicle_id: 'v1',
+          van_id: 'v1',
           overdue_count: 2,
           due_soon_count: 1,
           tax_status: { status: 'overdue' },
         },
         // Plant with LOLER alert
         { 
-          vehicle_id: 'p1',
+          van_id: 'p1',
           is_plant: true,
           overdue_count: 0,
           due_soon_count: 1,
@@ -239,7 +239,7 @@ describe('Plant Maintenance Type Structure Bug Fixes', () => {
         },
         // Vehicle with no alerts
         { 
-          vehicle_id: 'v2',
+          van_id: 'v2',
           overdue_count: 0,
           due_soon_count: 0,
         },
@@ -256,8 +256,8 @@ describe('Plant Maintenance Type Structure Bug Fixes', () => {
       
       // Should return vehicles and plant with alerts
       expect(filtered.length).toBe(2);
-      expect(filtered[0].vehicle_id).toBe('v1');
-      expect(filtered[1].vehicle_id).toBe('p1');
+      expect(filtered[0].van_id).toBe('v1');
+      expect(filtered[1].van_id).toBe('p1');
     });
   });
 });

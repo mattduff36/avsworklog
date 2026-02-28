@@ -103,7 +103,7 @@ export interface OAuthTokenResponse {
 
 export interface MotTestHistoryRow {
   id: string;
-  vehicle_id: string;
+  van_id: string;
   
   // Test identification
   mot_test_number: string;

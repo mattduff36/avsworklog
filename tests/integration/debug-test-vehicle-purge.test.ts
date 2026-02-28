@@ -35,11 +35,11 @@ describe('Test Vehicle Purge API', () => {
   beforeAll(async () => {
     // Create test vehicle
     const { data: vehicle, error: vehicleError } = await supabase
-      .from('vehicles')
+      .from('vans')
       .insert({
         reg_number: TEST_REG,
         status: 'active',
-        category_id: (await supabase.from('vehicle_categories').select('id').limit(1).single()).data?.id,
+        category_id: (await supabase.from('van_categories').select('id').limit(1).single()).data?.id,
       })
       .select('id')
       .single();
@@ -56,7 +56,7 @@ describe('Test Vehicle Purge API', () => {
     const { data: inspection, error: inspectionError } = await supabase
       .from('van_inspections')
       .insert({
-        vehicle_id: testVehicleId,
+        van_id: testVehicleId,
         user_id: (await supabase.from('profiles').select('id').limit(1).single()).data?.id,
         inspection_date: '2026-01-22',
         status: 'submitted',
@@ -76,7 +76,7 @@ describe('Test Vehicle Purge API', () => {
       .from('actions')
       .insert({
         action_type: 'workshop_vehicle_task',
-        vehicle_id: testVehicleId,
+        van_id: testVehicleId,
         title: 'Test Task',
         status: 'pending',
         priority: 'medium',
@@ -94,7 +94,7 @@ describe('Test Vehicle Purge API', () => {
 
   afterAll(async () => {
     // Clean up any remaining test data
-    await supabase.from('vehicles').delete().eq('reg_number', TEST_REG);
+    await supabase.from('vans').delete().eq('reg_number', TEST_REG);
   });
 
   describe('GET /api/debug/test-vehicles', () => {
@@ -117,7 +117,7 @@ describe('Test Vehicle Purge API', () => {
     it('should reject vehicles not matching prefix', async () => {
       // Try to purge a non-TE57 vehicle
       const { data: nonTestVehicle } = await supabase
-        .from('vehicles')
+        .from('vans')
         .select('id')
         .not('reg_number', 'ilike', 'TE57%')
         .limit(1)
@@ -150,12 +150,12 @@ describe('Test Vehicle Purge API', () => {
       const { count: inspectionsBefore } = await supabase
         .from('van_inspections')
         .select('id', { count: 'exact', head: true })
-        .eq('vehicle_id', testVehicleId);
+        .eq('van_id', testVehicleId);
 
       const { count: tasksBefore } = await supabase
         .from('actions')
         .select('id', { count: 'exact', head: true })
-        .eq('vehicle_id', testVehicleId)
+        .eq('van_id', testVehicleId)
         .in('action_type', ['inspection_defect', 'workshop_vehicle_task']);
 
       // Verify test data exists
@@ -189,14 +189,14 @@ describe('Test Vehicle Purge API', () => {
       const { error: inspectionDeleteError } = await supabase
         .from('van_inspections')
         .delete()
-        .eq('vehicle_id', testVehicleId);
+        .eq('van_id', testVehicleId);
 
       expect(inspectionDeleteError).toBeNull();
 
       const { error: taskDeleteError } = await supabase
         .from('actions')
         .delete()
-        .eq('vehicle_id', testVehicleId)
+        .eq('van_id', testVehicleId)
         .in('action_type', ['inspection_defect', 'workshop_vehicle_task']);
 
       expect(taskDeleteError).toBeNull();
@@ -223,7 +223,7 @@ describe('Test Vehicle Purge API', () => {
     it('should archive vehicles (soft delete)', async () => {
       // Verify vehicle exists before archive
       const { data: vehicleBefore } = await supabase
-        .from('vehicles')
+        .from('vans')
         .select('id, status')
         .eq('id', testVehicleId)
         .single();
@@ -233,9 +233,9 @@ describe('Test Vehicle Purge API', () => {
 
       // Archive via service role (simulating API call)
       const { data: archived, error: archiveError } = await supabase
-        .from('vehicle_archive')
+        .from('van_archive')
         .insert({
-          vehicle_id: testVehicleId,
+          van_id: testVehicleId,
           reg_number: TEST_REG,
           archive_reason: 'Test',
           archived_by: (await supabase.from('profiles').select('id').limit(1).single()).data?.id,
@@ -249,13 +249,13 @@ describe('Test Vehicle Purge API', () => {
 
       // Update vehicle status to archived
       await supabase
-        .from('vehicles')
+        .from('vans')
         .update({ status: 'archived' })
         .eq('id', testVehicleId);
 
       // Verify vehicle is marked as archived
       const { data: vehicleAfter } = await supabase
-        .from('vehicles')
+        .from('vans')
         .select('status')
         .eq('id', testVehicleId)
         .single();
@@ -266,7 +266,7 @@ describe('Test Vehicle Purge API', () => {
     it('should reject hard delete for non-prefix vehicles', async () => {
       // Get a non-test vehicle
       const { data: nonTestVehicle } = await supabase
-        .from('vehicles')
+        .from('vans')
         .select('id, reg_number')
         .not('reg_number', 'ilike', 'TE57%')
         .limit(1)
@@ -284,7 +284,7 @@ describe('Test Vehicle Purge API', () => {
       const { error: historyError } = await supabase
         .from('maintenance_history')
         .delete()
-        .eq('vehicle_id', testVehicleId);
+        .eq('van_id', testVehicleId);
 
       expect(historyError).toBeNull();
 
@@ -292,13 +292,13 @@ describe('Test Vehicle Purge API', () => {
       const { error: maintenanceError } = await supabase
         .from('vehicle_maintenance')
         .delete()
-        .eq('vehicle_id', testVehicleId);
+        .eq('van_id', testVehicleId);
 
       expect(maintenanceError).toBeNull();
 
       // 3. Delete vehicle
       const { error: vehicleError } = await supabase
-        .from('vehicles')
+        .from('vans')
         .delete()
         .eq('id', testVehicleId);
 
@@ -306,7 +306,7 @@ describe('Test Vehicle Purge API', () => {
 
       // Verify vehicle is gone
       const { data: vehicleAfter } = await supabase
-        .from('vehicles')
+        .from('vans')
         .select('id')
         .eq('id', testVehicleId)
         .single();

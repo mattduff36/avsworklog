@@ -79,7 +79,7 @@ async function runTests() {
     // Step 2: Get a test vehicle (or create one if none exist)
     log('📋 Step 2: Getting test vehicle...');
     const { data: vehicles, error: vehicleError } = await supabase
-      .from('vehicles')
+      .from('vans')
       .select('id, reg_number, category_id')
       .eq('status', 'active')
       .limit(1);
@@ -94,7 +94,7 @@ async function runTests() {
       
       // Get or create a vehicle category
       const { data: categories } = await supabase
-        .from('vehicle_categories')
+        .from('van_categories')
         .select('id, name')
         .limit(1);
       
@@ -103,7 +103,7 @@ async function runTests() {
       if (!categories || categories.length === 0) {
         // Create a test category
         const { data: newCategory, error: catError } = await supabase
-          .from('vehicle_categories')
+          .from('van_categories')
           .insert({ name: 'Van' })
           .select()
           .single();
@@ -118,7 +118,7 @@ async function runTests() {
       
       // Create test vehicle
       const { data: newVehicle, error: createVehicleError } = await supabase
-        .from('vehicles')
+        .from('vans')
         .insert({
           reg_number: 'TEST 123',
           category_id: categoryId,
@@ -151,7 +151,7 @@ async function runTests() {
     const { data: newInspection, error: createError } = await supabase
       .from('van_inspections')
       .insert({
-        vehicle_id: testVehicleId,
+        van_id: testVehicleId,
         user_id: testUserId,
         inspection_date: weekStart.toISOString().split('T')[0],
         inspection_end_date: weekEnding.toISOString().split('T')[0],

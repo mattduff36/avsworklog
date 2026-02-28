@@ -52,9 +52,9 @@ async function runMigration() {
     // Verify migration
     const verifyResult = await client.query(`
       SELECT name, applies_to, 
-        (SELECT COUNT(*) FROM vehicles WHERE category_id = vehicle_categories.id) as vehicle_count,
-        (SELECT COUNT(*) FROM plant WHERE category_id = vehicle_categories.id) as plant_count
-      FROM vehicle_categories
+        (SELECT COUNT(*) FROM vehicles WHERE category_id = van_categories.id) as vehicle_count,
+        (SELECT COUNT(*) FROM plant WHERE category_id = van_categories.id) as plant_count
+      FROM van_categories
       ORDER BY name
       LIMIT 10;
     `);

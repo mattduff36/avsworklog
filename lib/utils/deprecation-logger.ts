@@ -20,7 +20,7 @@ interface DeprecationContext {
  * logDeprecationWarning({
  *   feature: 'vehicle_type column',
  *   location: 'inspections/page.tsx line 375',
- *   replacement: 'Use vehicle_categories.name instead',
+ *   replacement: 'Use van_categories.name instead',
  *   value: 'Van'
  * });
  */
@@ -56,14 +56,14 @@ export function logDeprecationWarning(context: DeprecationContext): void {
  * const type = getDeprecatedVehicleType(vehicle, 'reports/defects line 91');
  */
 export function getDeprecatedVehicleType(
-  vehicle: { vehicle_type?: string | null; vehicle_categories?: { name: string } | null },
+  vehicle: { vehicle_type?: string | null; van_categories?: { name: string } | null },
   location: string
 ): string | null {
   // Log the deprecation warning
   logDeprecationWarning({
     feature: 'vehicle_type column',
     location,
-    replacement: 'Use vehicle.vehicle_categories?.name instead',
+    replacement: 'Use vehicle.van_categories?.name instead',
     value: vehicle.vehicle_type,
   });
 
@@ -76,17 +76,17 @@ export function getDeprecatedVehicleType(
  * This is the CORRECT way to get vehicle type information
  * 
  * @param vehicle - Vehicle object
- * @returns The category name from vehicle_categories, or 'Uncategorized' as fallback
+ * @returns The category name from van_categories, or 'Uncategorized' as fallback
  * 
  * @example
  * const categoryName = getVehicleCategoryName(vehicle); // Returns 'Van', 'HGV', etc.
  */
 export function getVehicleCategoryName(
-  vehicle: { vehicle_categories?: { name: string } | null; vehicle_type?: string | null }
+  vehicle: { van_categories?: { name: string } | null; vehicle_type?: string | null }
 ): string {
-  // Prefer vehicle_categories.name (the correct source)
-  if (vehicle.vehicle_categories?.name) {
-    return vehicle.vehicle_categories.name;
+  // Prefer van_categories.name (the correct source)
+  if (vehicle.van_categories?.name) {
+    return vehicle.van_categories.name;
   }
 
   // Fallback to vehicle_type ONLY if categories is null (legacy data)

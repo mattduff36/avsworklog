@@ -35,7 +35,7 @@ describe('Inform Workshop Endpoint', () => {
   beforeAll(async () => {
     // Create test vehicle with TE57 prefix (test vehicles only)
     const { data: vehicle } = await supabase
-      .from('vehicles')
+      .from('vans')
       .insert({
         reg_number: 'TE57INFORM',
         status: 'active',
@@ -57,7 +57,7 @@ describe('Inform Workshop Endpoint', () => {
     const { data: inspection } = await supabase
       .from('van_inspections')
       .insert({
-        vehicle_id: testVehicleId,
+        van_id: testVehicleId,
         user_id: testUserId,
         inspection_date: '2026-01-20',
         inspection_end_date: '2026-01-26',
@@ -80,7 +80,7 @@ describe('Inform Workshop Endpoint', () => {
     await supabase.from('van_inspections').delete().eq('id', testInspectionId);
 
     // Clean up vehicle
-    await supabase.from('vehicles').delete().eq('id', testVehicleId);
+    await supabase.from('vans').delete().eq('id', testVehicleId);
   });
 
   describe('Comment Validation', () => {
@@ -104,7 +104,7 @@ describe('Inform Workshop Endpoint', () => {
       const taskData = {
         action_type: 'workshop_vehicle_task',
         inspection_id: testInspectionId,
-        vehicle_id: testVehicleId,
+        van_id: testVehicleId,
         title: `Inspection note - INFORM01`,
         description: 'Inspector notes: Test workshop notification for brake pads worn.',
         workshop_comments: 'Test workshop notification for brake pads worn.',
@@ -133,7 +133,7 @@ describe('Inform Workshop Endpoint', () => {
       const initialTaskData = {
         action_type: 'workshop_vehicle_task',
         inspection_id: testInspectionId,
-        vehicle_id: testVehicleId,
+        van_id: testVehicleId,
         title: `Inspection note - INFORM01`,
         description: 'Initial comment',
         workshop_comments: 'Initial comment',
@@ -190,7 +190,7 @@ describe('Inform Workshop Endpoint', () => {
       const completedTaskData = {
         action_type: 'workshop_vehicle_task',
         inspection_id: testInspectionId,
-        vehicle_id: testVehicleId,
+        van_id: testVehicleId,
         title: `Inspection note - INFORM01`,
         workshop_comments: 'Completed task',
         priority: 'medium',
@@ -228,7 +228,7 @@ describe('Inform Workshop Endpoint', () => {
         .from('workshop_task_categories')
         .select('id, name')
         .eq('name', 'Repair')
-        .eq('applies_to', 'vehicle')
+        .eq('applies_to', 'van')
         .eq('is_active', true)
         .single();
 

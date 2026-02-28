@@ -52,15 +52,15 @@ export function DeleteVehicleDialog({
     try {
       setLoading(true);
 
-      const response = await fetch(`/api/admin/vehicles/${vehicle.id}`, {
+      const response = await fetch(`/api/admin/vans/${vehicle.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason }),
       });
 
       if (response.ok) {
-        toast.success('Vehicle retired successfully', {
-          description: `${vehicle.reg_number} has been moved to Retired Vehicles. Historic data is preserved.`,
+        toast.success('Van retired successfully', {
+          description: `${vehicle.reg_number} has been moved to Retired Vans. Historic data is preserved.`,
         });
 
         // Invalidate queries to refresh data
@@ -74,8 +74,8 @@ export function DeleteVehicleDialog({
         setReason('Sold');
       } else {
         const data = await response.json();
-        setError(data.error || 'Failed to archive vehicle');
-        toast.error('Failed to archive vehicle', {
+        setError(data.error || 'Failed to archive van');
+        toast.error('Failed to archive van', {
           description: data.error || 'Please try again.',
         });
       }
@@ -98,10 +98,10 @@ export function DeleteVehicleDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-blue-500">
             <Archive className="h-5 w-5" />
-            Retire Vehicle
+            Retire Van
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            This will move the vehicle to the &quot;Retired Vehicles&quot; tab. All inspection history and maintenance records will be preserved.
+            This will move the van to the &quot;Retired Vans&quot; tab. All inspection history and maintenance records will be preserved.
           </DialogDescription>
         </DialogHeader>
 
@@ -170,7 +170,7 @@ export function DeleteVehicleDialog({
           <Button
             onClick={handleDelete}
             disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-maintenance hover:bg-maintenance-dark"
           >
             {loading ? (
               <>
@@ -180,7 +180,7 @@ export function DeleteVehicleDialog({
             ) : (
               <>
                 <Archive className="h-4 w-4 mr-2" />
-                Retire Vehicle
+                Retire Van
               </>
             )}
           </Button>

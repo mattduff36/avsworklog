@@ -296,7 +296,7 @@ export function QuickEditPopover({
             <Button
               type="submit"
               size="sm"
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              className="flex-1 bg-maintenance hover:bg-maintenance-dark text-white"
               disabled={loading || comment.length < 10}
             >
               {loading ? (

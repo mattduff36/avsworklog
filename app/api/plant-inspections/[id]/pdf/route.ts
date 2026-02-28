@@ -28,7 +28,7 @@ export async function GET(
           plant_id,
           nickname,
           serial_number,
-          vehicle_categories(name)
+          van_categories(name)
         ),
         profile:profiles!plant_inspections_user_id_fkey(full_name)
       `)
@@ -95,7 +95,7 @@ export async function GET(
             plant_id: inspection.hired_plant_id_serial || 'Unknown',
             nickname: inspection.hired_plant_description || null,
             serial_number: null,
-            vehicle_categories: null,
+            van_categories: null,
             isHired: true,
             hiringCompany: inspection.hired_plant_hiring_company || null,
           }
@@ -103,7 +103,7 @@ export async function GET(
             plant_id: (inspection as any).plant?.plant_id || 'Unknown',
             nickname: (inspection as any).plant?.nickname,
             serial_number: (inspection as any).plant?.serial_number || null,
-            vehicle_categories: (inspection as any).plant?.vehicle_categories,
+            van_categories: (inspection as any).plant?.van_categories,
           },
       operator: {
         full_name: (inspection as any).profile?.full_name || 'Unknown',

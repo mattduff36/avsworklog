@@ -59,9 +59,9 @@ export async function POST(request: NextRequest) {
     let vehiclesToSync: Array<{ id: string; reg_number: string }> = [];
 
     if (syncAll) {
-      // Sync all active vehicles (excluding test vehicles)
+      // Sync all active vans (excluding test vans)
       const { data: vehicles, error } = await supabase
-        .from('vehicles')
+        .from('vans')
         .select('id, reg_number')
         .eq('status', 'active');
 
@@ -72,9 +72,9 @@ export async function POST(request: NextRequest) {
         !TEST_VEHICLES.includes(v.reg_number.replace(/\s+/g, '').toUpperCase())
       );
     } else if (vehicleIds && Array.isArray(vehicleIds)) {
-      // Sync multiple specific vehicles (excluding test vehicles)
+      // Sync multiple specific vans (excluding test vans)
       const { data: vehicles, error } = await supabase
-        .from('vehicles')
+        .from('vans')
         .select('id, reg_number')
         .in('id', vehicleIds);
 
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     } else if (vehicleId) {
       // Sync single vehicle
       const { data: vehicle, error } = await supabase
-        .from('vehicles')
+        .from('vans')
         .select('id, reg_number')
         .eq('id', vehicleId)
         .single();
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
         const { data: existingRecord } = await supabase
           .from('vehicle_maintenance')
           .select('tax_due_date, mot_due_date')
-          .eq('vehicle_id', vehicle.id)
+          .eq('van_id', vehicle.id)
           .single();
 
         const oldTaxDate = existingRecord?.tax_due_date || null;
@@ -263,7 +263,7 @@ export async function POST(request: NextRequest) {
                 console.log(`[INFO] ${vehicle.reg_number}: MOT unchanged (${oldMotDate})`);
               }
             } else if (motRawData?.firstUsedDate && !motExpiryData.motExpiryDate) {
-              // NEW: Calculate first MOT due date for new vehicles (firstUsedDate + 3 years)
+              // NEW: Calculate first MOT due date for new vans (firstUsedDate + 3 years)
               // UK vehicles require their first MOT 3 years after first registration
               const firstUsedDate = new Date(motRawData.firstUsedDate);
               const firstMotDue = new Date(firstUsedDate);
@@ -300,11 +300,11 @@ export async function POST(request: NextRequest) {
         const { error: upsertError } = await supabase
           .from('vehicle_maintenance')
           .upsert({
-            vehicle_id: vehicle.id,
+            van_id: vehicle.id,
             ...updates,
             updated_at: new Date().toISOString(),
           }, {
-            onConflict: 'vehicle_id'
+            onConflict: 'van_id'
           });
 
         if (upsertError) throw upsertError;
@@ -315,7 +315,7 @@ export async function POST(request: NextRequest) {
         await supabase
           .from('dvla_sync_log')
           .insert({
-            vehicle_id: vehicle.id,
+            van_id: vehicle.id,
             registration_number: vehicle.reg_number,
             sync_status: 'success',
             fields_updated: fieldsUpdated,
@@ -346,7 +346,7 @@ export async function POST(request: NextRequest) {
 
         // Log to maintenance_history for visibility in vehicle history page
         const historyEntries: Array<{
-          vehicle_id: string;
+          van_id: string;
           field_name: string;
           old_value: string | null;
           new_value: string | null;
@@ -359,7 +359,7 @@ export async function POST(request: NextRequest) {
         // Add tax_due_date change to history if changed
         if (dvlaData.taxDueDate && oldTaxDate !== dvlaData.taxDueDate) {
           historyEntries.push({
-            vehicle_id: vehicle.id,
+            van_id: vehicle.id,
             field_name: 'tax_due_date',
             old_value: oldTaxDate,
             new_value: dvlaData.taxDueDate,
@@ -375,7 +375,7 @@ export async function POST(request: NextRequest) {
         if (persistedMotDate && oldMotDate !== persistedMotDate) {
           const wasCalculated = fieldsUpdated.some(f => f.includes('calculated'));
           historyEntries.push({
-            vehicle_id: vehicle.id,
+            van_id: vehicle.id,
             field_name: 'mot_due_date',
             old_value: oldMotDate,
             new_value: persistedMotDate,
@@ -419,20 +419,20 @@ export async function POST(request: NextRequest) {
         await supabase
           .from('vehicle_maintenance')
           .upsert({
-            vehicle_id: vehicle.id,
+            van_id: vehicle.id,
             dvla_sync_status: 'error',
             dvla_sync_error: error.message,
             last_dvla_sync: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }, {
-            onConflict: 'vehicle_id'
+            onConflict: 'van_id'
           });
 
         // Log error to audit trail
         await supabase
           .from('dvla_sync_log')
           .insert({
-            vehicle_id: vehicle.id,
+            van_id: vehicle.id,
             registration_number: vehicle.reg_number,
             sync_status: 'error',
             error_message: error.message,

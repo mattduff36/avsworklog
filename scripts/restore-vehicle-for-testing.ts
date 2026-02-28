@@ -41,7 +41,7 @@ async function restoreVehicle() {
         v.status,
         va.id as archive_id
       FROM vehicles v
-      LEFT JOIN vehicle_archive va ON va.vehicle_id = v.id
+      LEFT JOIN van_archive va ON va.van_id = v.id
       WHERE v.reg_number = $1;
     `;
 
@@ -60,11 +60,11 @@ async function restoreVehicle() {
     console.log(`  Current Status: ${vehicle.status}`);
     console.log(`  Archive Record ID: ${vehicle.archive_id || 'None'}\n`);
 
-    // Step 1: Delete from vehicle_archive if exists
+    // Step 1: Delete from van_archive if exists
     if (vehicle.archive_id) {
       console.log('[INFO] Removing archive record...');
       const deleteArchiveQuery = `
-        DELETE FROM vehicle_archive
+        DELETE FROM van_archive
         WHERE id = $1
         RETURNING id, reg_number;
       `;

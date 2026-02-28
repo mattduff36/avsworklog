@@ -254,7 +254,7 @@ describe('Tax Due Date Update Workflow', () => {
 
     it('should create audit trail entry', () => {
       const historyEntry = {
-        vehicle_id: 'vehicle-123',
+        van_id: 'vehicle-123',
         field_name: 'tax_due_date',
         old_value: '2024-12-31',
         new_value: '2025-12-31',

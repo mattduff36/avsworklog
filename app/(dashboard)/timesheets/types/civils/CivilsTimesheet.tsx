@@ -304,7 +304,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       // Query last inspection with vehicle reg
       const { data: lastInspection } = await supabase
         .from('van_inspections')
-        .select('inspection_date, vehicles(reg_number)')
+        .select('inspection_date, vans(reg_number)')
         .eq('user_id', userId)
         .order('inspection_date', { ascending: false })
         .limit(1)
@@ -319,9 +319,9 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
         mostRecentDate = new Date(lastTimesheet.week_ending);
       }
 
-      if (lastInspection?.vehicles && 'reg_number' in lastInspection.vehicles && lastInspection.inspection_date) {
+      if (lastInspection?.vans && 'reg_number' in lastInspection.vans && lastInspection.inspection_date) {
         const inspectionDate = new Date(lastInspection.inspection_date);
-        const vehicleReg = (lastInspection.vehicles as { reg_number: string }).reg_number;
+        const vehicleReg = (lastInspection.vans as { reg_number: string }).reg_number;
         
         if (!mostRecentDate || inspectionDate > mostRecentDate) {
           mostRecentReg = vehicleReg;

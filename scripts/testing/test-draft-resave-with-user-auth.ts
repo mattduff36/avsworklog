@@ -64,7 +64,7 @@ async function testDraftResave() {
     console.log('📝 Step 1: Creating draft inspection (Monday only)...');
     
     const { data: vehicle } = await supabase
-      .from('vehicles')
+      .from('vans')
       .select('id, reg_number')
       .eq('status', 'active')
       .limit(1)
@@ -89,7 +89,7 @@ async function testDraftResave() {
       .from('van_inspections')
       .insert({
         user_id: testUserId,
-        vehicle_id: vehicle.id,
+        van_id: vehicle.id,
         status: 'draft',
         inspection_date: inspectionDate,
         inspection_end_date: inspectionEndDateStr,

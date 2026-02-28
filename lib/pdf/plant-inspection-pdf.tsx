@@ -273,7 +273,7 @@ interface PlantInspectionPDFProps {
     plant_id: string;
     nickname: string | null;
     serial_number?: string | null;
-    vehicle_categories: { name: string } | null;
+    van_categories: { name: string } | null;
     isHired?: boolean;
     hiringCompany?: string | null;
   };
@@ -353,12 +353,12 @@ export function PlantInspectionPDF({
               )}
             </View>
           )}
-          {(plant.vehicle_categories || inspection.current_mileage != null) && (
+          {(plant.van_categories || inspection.current_mileage != null) && (
             <View style={styles.infoRow}>
-              {plant.vehicle_categories && (
+              {plant.van_categories && (
                 <View style={styles.infoBox}>
                   <Text style={styles.label}>CATEGORY</Text>
-                  <Text style={styles.value}>{plant.vehicle_categories.name}</Text>
+                  <Text style={styles.value}>{plant.van_categories.name}</Text>
                 </View>
               )}
               {inspection.current_mileage != null && (

@@ -864,7 +864,7 @@ export default function ViewTimesheetPage() {
                 variant="outline"
                 onClick={() => setShowProcessedDialog(true)}
                 disabled={saving}
-                className="border-blue-300 text-blue-600 hover:bg-blue-500 hover:text-white hover:border-blue-500 active:bg-blue-600 active:scale-95 transition-all"
+                className="border-timesheet/50 text-timesheet hover:bg-timesheet hover:text-white hover:border-timesheet active:bg-timesheet-dark active:scale-95 transition-all"
               >
                 <Package className="h-4 w-4 mr-2" />
                 Mark as Processed
@@ -891,7 +891,7 @@ export default function ViewTimesheetPage() {
             <AlertDialogAction
               onClick={handleMarkAsProcessed}
               disabled={saving}
-              className="bg-blue-600 hover:bg-blue-700 focus:ring-blue-600"
+              className="bg-timesheet hover:bg-timesheet-dark focus:ring-timesheet"
             >
               {saving ? 'Processing...' : 'Mark as Processed'}
             </AlertDialogAction>

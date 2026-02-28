@@ -23,7 +23,7 @@ async function runMigration() {
   console.log('   • maintenance_categories table (configurable thresholds)');
   console.log('   • vehicle_maintenance table (tracks all maintenance)');
   console.log('   • maintenance_history table (audit trail)');
-  console.log('   • vehicle_archive table (soft delete)');
+  console.log('   • van_archive table (soft delete)');
   console.log('   • Auto-mileage update trigger');
   console.log('   • RBAC permissions');
   console.log('   • 5 default maintenance categories\n');
@@ -70,7 +70,7 @@ async function runMigration() {
       { name: 'maintenance_categories', query: "SELECT COUNT(*) as count FROM maintenance_categories" },
       { name: 'vehicle_maintenance', query: "SELECT COUNT(*) as count FROM vehicle_maintenance" },
       { name: 'maintenance_history', query: "SELECT COUNT(*) as count FROM maintenance_history" },
-      { name: 'vehicle_archive', query: "SELECT COUNT(*) as count FROM vehicle_archive" },
+      { name: 'van_archive', query: "SELECT COUNT(*) as count FROM van_archive" },
     ];
 
     for (const { name, query } of verificationQueries) {

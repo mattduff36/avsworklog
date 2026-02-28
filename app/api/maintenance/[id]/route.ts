@@ -51,7 +51,7 @@ export async function PUT(
     // Get current maintenance record
     const { data: currentRecord, error: fetchError } = await supabase
       .from('vehicle_maintenance')
-      .select('*, vehicle:vehicles(id, reg_number)')
+      .select('*, vehicle:vans(id, reg_number)')
       .eq('id', id)
       .single();
     
@@ -231,7 +231,7 @@ export async function PUT(
       await supabase
         .from('maintenance_history')
         .insert({
-          vehicle_id: currentRecord.vehicle_id,
+          van_id: currentRecord.van_id,
           plant_id: currentRecord.plant_id,
           field_name: 'no_changes',
           old_value: null,
@@ -264,7 +264,7 @@ export async function PUT(
     
     // Create history entries for all changed fields
     const historyEntries = changedFields.map(change => ({
-      vehicle_id: currentRecord.vehicle_id,
+      van_id: currentRecord.van_id,
       plant_id: currentRecord.plant_id,
       field_name: change.field_name,
       old_value: change.old_value,

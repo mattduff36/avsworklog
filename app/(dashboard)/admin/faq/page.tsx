@@ -363,11 +363,11 @@ export default function FAQEditorPage() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full max-w-md grid-cols-2 bg-slate-100 dark:bg-slate-800 p-0">
-          <TabsTrigger value="categories" className="gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+          <TabsTrigger value="categories" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
             <FolderOpen className="h-4 w-4" />
             Categories
           </TabsTrigger>
-          <TabsTrigger value="articles" className="gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+          <TabsTrigger value="articles" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
             <FileText className="h-4 w-4" />
             Articles
           </TabsTrigger>
@@ -384,7 +384,7 @@ export default function FAQEditorPage() {
                     Organize FAQ articles into categories
                   </CardDescription>
                 </div>
-                <Button onClick={openAddCategory} className="bg-blue-600 hover:bg-blue-700">
+                <Button onClick={openAddCategory} className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Category
                 </Button>
@@ -484,7 +484,7 @@ export default function FAQEditorPage() {
                   </Select>
                   <Button 
                     onClick={openAddArticle} 
-                    className="bg-blue-600 hover:bg-blue-700"
+                    className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
                     disabled={categories.length === 0}
                   >
                     <Plus className="h-4 w-4 mr-2" />
@@ -625,7 +625,7 @@ export default function FAQEditorPage() {
             <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveCategory} disabled={savingCategory} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleSaveCategory} disabled={savingCategory} className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900">
               {savingCategory ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               {editingCategory ? 'Update' : 'Create'}
             </Button>
@@ -737,7 +737,7 @@ export default function FAQEditorPage() {
             <Button variant="outline" onClick={() => setArticleDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveArticle} disabled={savingArticle} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleSaveArticle} disabled={savingArticle} className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900">
               {savingArticle ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               {editingArticle ? 'Update' : 'Create'}
             </Button>

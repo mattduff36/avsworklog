@@ -285,7 +285,7 @@ export function CategoryRecipientsDialog({
           <Button
             onClick={handleSave}
             disabled={loading || saving}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-maintenance hover:bg-maintenance-dark"
           >
             {saving ? (
               <>

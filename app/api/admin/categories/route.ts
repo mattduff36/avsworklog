@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch categories
     const { data: categories, error } = await supabase
-      .from('vehicle_categories')
+      .from('van_categories')
       .select('*')
       .order('name');
 
@@ -83,11 +83,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validAppliesTo = applies_to && applies_to.length > 0 ? applies_to : ['vehicle'];
+    const validAppliesTo = applies_to && applies_to.length > 0 ? applies_to : ['van'];
 
     // Insert category
     const { data, error } = await supabase
-      .from('vehicle_categories')
+      .from('van_categories')
       .insert({
         name: name.trim(),
         description: description?.trim() || null,

@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     // Get vehicle registration for task title
     const { data: vehicle } = await supabaseAdmin
-      .from('vehicles')
+      .from('vans')
       .select('reg_number')
       .eq('id', vehicleId)
       .single();
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
         .from('workshop_task_categories')
         .select('id')
         .eq('name', 'Repair')
-        .eq('applies_to', 'vehicle')
+        .eq('applies_to', 'van')
         .eq('is_active', true)
         .single();
 
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
         .from('workshop_task_categories')
         .select('id')
         .eq('name', FALLBACK_SUBCATEGORY.primary.categoryName)
-        .eq('applies_to', 'vehicle')
+        .eq('applies_to', 'van')
         .eq('is_active', true)
         .single();
 
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
           .from('workshop_task_categories')
           .select('id')
           .eq('name', FALLBACK_SUBCATEGORY.secondary.categoryName)
-          .eq('applies_to', 'vehicle')
+          .eq('applies_to', 'van')
           .eq('is_active', true)
           .single();
 
@@ -222,7 +222,7 @@ export async function POST(request: NextRequest) {
         .insert({
           action_type: 'workshop_vehicle_task',
           inspection_id: inspectionId,
-          vehicle_id: vehicleId,
+          van_id: vehicleId,
           workshop_subcategory_id: subcategoryId,
           title,
           description,

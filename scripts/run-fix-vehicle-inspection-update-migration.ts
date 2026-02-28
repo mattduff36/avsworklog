@@ -17,7 +17,7 @@ if (!connectionString) {
 }
 
 async function runMigration() {
-  console.log('🚀 Running Vehicle Inspection Update RLS Fix...\n');
+  console.log('🚀 Running Van Inspection Update RLS Fix...\n');
   console.log('This adds WITH CHECK clauses to allow status transitions from draft → submitted.\n');
 
   const url = new URL(connectionString!);
@@ -53,7 +53,7 @@ async function runMigration() {
              pg_get_expr(polqual, polrelid) AS using_expr,
              pg_get_expr(polwithcheck, polrelid) AS with_check_expr
       FROM pg_policy
-      WHERE polrelid = 'vehicle_inspections'::regclass
+      WHERE polrelid = 'van_inspections'::regclass
         AND polname IN ('Employees can update own inspections', 'Managers can update inspections')
       ORDER BY polname
     `);

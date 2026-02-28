@@ -23,7 +23,7 @@ type PlantAsset = {
 };
 
 type PlantMaintenanceWithStatus = {
-  vehicle_id: string;
+  van_id: string;
   plant_id: string; // Human-readable identifier (P001, P002, etc.)
   is_plant?: boolean; // Flag to indicate this is plant machinery, not a vehicle
   vehicle?: PlantAsset;
@@ -56,7 +56,7 @@ export function PlantOverview({ onVehicleClick }: PlantOverviewProps) {
         .from('plant')
         .select(`
           *,
-          vehicle_categories (
+          van_categories (
             id,
             name
           )
@@ -85,7 +85,7 @@ export function PlantOverview({ onVehicleClick }: PlantOverviewProps) {
         const alertCounts = calculateAlertCounts([loler_status]);
         
         return {
-          vehicle_id: plant.id,
+          van_id: plant.id,
           plant_id: plant.plant_id, // Human-readable identifier (P001, P002, etc.)
           is_plant: true, // Flag to indicate this is plant, not vehicle
           vehicle: {

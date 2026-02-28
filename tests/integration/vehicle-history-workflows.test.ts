@@ -13,30 +13,49 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const hasSupabaseCredentials = Boolean(supabaseUrl && supabaseKey);
+const isAllowedSupabaseTarget = Boolean(
+  supabaseUrl &&
+    (supabaseUrl.includes('localhost') ||
+      supabaseUrl.includes('127.0.0.1') ||
+      supabaseUrl.includes('staging'))
+);
+const canRunVehicleHistorySuite = hasSupabaseCredentials && isAllowedSupabaseTarget;
+const describeVehicleHistorySuite = canRunVehicleHistorySuite ? describe : describe.skip;
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing Supabase credentials in .env.local');
-  console.error('NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl ? 'Set' : 'Missing');
-  console.error('NEXT_PUBLIC_SUPABASE_ANON_KEY:', supabaseKey ? 'Set' : 'Missing');
-  throw new Error('Missing required environment variables for integration tests');
+if (!hasSupabaseCredentials) {
+  console.warn('Skipping vehicle-history integration suite: missing Supabase credentials in .env.local');
+  console.warn('NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl ? 'Set' : 'Missing');
+  console.warn('NEXT_PUBLIC_SUPABASE_ANON_KEY:', supabaseKey ? 'Set' : 'Missing');
 }
 
-// SAFETY CHECK: Prevent running against production
-if (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('staging')) {
-  console.error('❌ SAFETY CHECK FAILED');
-  console.error('❌ This test suite should NOT run against production!');
-  console.error(`❌ Current URL: ${supabaseUrl}`);
-  console.error('❌ Tests will be skipped.');
-  process.exit(1);
+if (hasSupabaseCredentials && !isAllowedSupabaseTarget) {
+  console.warn('Skipping vehicle-history integration suite: production-safety gate blocked this Supabase URL');
+  console.warn(`Current URL: ${supabaseUrl}`);
 }
 
-describe('Vehicle History Page Workflows', () => {
+describeVehicleHistorySuite('Vehicle History Page Workflows', () => {
   let supabase: ReturnType<typeof createClient>;
   let testUserId: string;
   let testVehicleId: string;
+  let maintenanceVehicleFk: 'van_id' | 'vehicle_id' = 'van_id';
+  let actionsVehicleFk: 'van_id' | 'vehicle_id' = 'van_id';
+
+  const detectVehicleFk = async (
+    table: 'vehicle_maintenance' | 'actions'
+  ): Promise<'van_id' | 'vehicle_id'> => {
+    const { error: vanIdError } = await supabase.from(table).select('van_id').limit(1);
+    if (!vanIdError) return 'van_id';
+
+    const { error: vehicleIdError } = await supabase.from(table).select('vehicle_id').limit(1);
+    if (!vehicleIdError) return 'vehicle_id';
+
+    // Keep historical default to avoid widening blast radius if schema probing fails.
+    return 'van_id';
+  };
 
   beforeAll(async () => {
-    supabase = createClient(supabaseUrl, supabaseKey);
+    supabase = createClient(supabaseUrl!, supabaseKey!);
     
     // Authenticate as test user
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -49,7 +68,7 @@ describe('Vehicle History Page Workflows', () => {
 
     // SAFETY: ONLY get TE57 test vehicles
     const { data: vehicles } = await supabase
-      .from('vehicles')
+      .from('vans')
       .select('id')
       .ilike('reg_number', 'TE57%')
       .neq('status', 'deleted')
@@ -58,6 +77,9 @@ describe('Vehicle History Page Workflows', () => {
     if (vehicles && vehicles.length > 0) {
       testVehicleId = vehicles[0].id;
     }
+
+    maintenanceVehicleFk = await detectVehicleFk('vehicle_maintenance');
+    actionsVehicleFk = await detectVehicleFk('actions');
   });
 
   afterAll(async () => {
@@ -78,10 +100,10 @@ describe('Vehicle History Page Workflows', () => {
           vehicles!inner(
             id,
             category_id,
-            vehicle_categories(id, name)
+            van_categories(id, name)
           )
         `)
-        .eq('vehicle_id', testVehicleId)
+        .eq(maintenanceVehicleFk, testVehicleId)
         .maybeSingle();
 
       if (!vehicle) {
@@ -91,7 +113,7 @@ describe('Vehicle History Page Workflows', () => {
 
       expect(error).toBeNull();
       expect(vehicle).toBeDefined();
-      expect(vehicle?.vehicle_id).toBe(testVehicleId);
+      expect(vehicle?.[maintenanceVehicleFk]).toBe(testVehicleId);
       expect(vehicle).toHaveProperty('vehicle_reg');
       expect(vehicle).toHaveProperty('vehicle_nickname');
       expect(vehicle).toHaveProperty('current_mileage');
@@ -106,7 +128,7 @@ describe('Vehicle History Page Workflows', () => {
       const { data: vehicle, error } = await supabase
         .from('vehicle_maintenance')
         .select('last_service_mileage, next_service_mileage, mot_due_date, tax_due_date, current_mileage')
-        .eq('vehicle_id', testVehicleId)
+        .eq(maintenanceVehicleFk, testVehicleId)
         .maybeSingle();
 
       expect(error).toBeNull();
@@ -128,7 +150,7 @@ describe('Vehicle History Page Workflows', () => {
           category:workshop_task_categories(id, name, slug),
           subcategory:workshop_task_subcategories(id, name, slug)
         `)
-        .eq('vehicle_id', testVehicleId)
+        .eq(actionsVehicleFk, testVehicleId)
         .in('action_type', ['workshop_task', 'inspection_defect'])
         .order('created_at', { ascending: false });
 
@@ -146,7 +168,7 @@ describe('Vehicle History Page Workflows', () => {
       const { data: workshopTasks, error: workshopError } = await supabase
         .from('actions')
         .select('*')
-        .eq('vehicle_id', testVehicleId)
+        .eq(actionsVehicleFk, testVehicleId)
         .eq('action_type', 'workshop_task');
 
       expect(workshopError).toBeNull();
@@ -155,7 +177,7 @@ describe('Vehicle History Page Workflows', () => {
       const { data: defects, error: defectError } = await supabase
         .from('actions')
         .select('*')
-        .eq('vehicle_id', testVehicleId)
+        .eq(actionsVehicleFk, testVehicleId)
         .eq('action_type', 'inspection_defect');
 
       expect(defectError).toBeNull();
@@ -174,7 +196,7 @@ describe('Vehicle History Page Workflows', () => {
         const { data: tasks, error } = await supabase
           .from('actions')
           .select('*')
-          .eq('vehicle_id', testVehicleId)
+          .eq(actionsVehicleFk, testVehicleId)
           .eq('status', status);
 
         expect(error).toBeNull();
@@ -204,7 +226,7 @@ describe('Vehicle History Page Workflows', () => {
       const { data: tasks, error } = await supabase
         .from('actions')
         .select('*')
-        .eq('vehicle_id', testVehicleId)
+        .eq(actionsVehicleFk, testVehicleId)
         .eq('workshop_category_id', categories[0].id);
 
       expect(error).toBeNull();
@@ -223,7 +245,7 @@ describe('Vehicle History Page Workflows', () => {
       const { data: vehicle, error } = await supabase
         .from('vehicle_maintenance')
         .select('mot_due_date')
-        .eq('vehicle_id', testVehicleId)
+        .eq(maintenanceVehicleFk, testVehicleId)
         .maybeSingle();
 
       // May not have maintenance record, that's OK
@@ -247,7 +269,7 @@ describe('Vehicle History Page Workflows', () => {
       const { data: vehicle, error } = await supabase
         .from('vehicle_maintenance')
         .select('*')
-        .eq('vehicle_id', testVehicleId)
+        .eq(maintenanceVehicleFk, testVehicleId)
         .maybeSingle();
 
       // May return null if no maintenance record exists yet - that's OK
@@ -355,7 +377,7 @@ describe('Vehicle History Page Workflows', () => {
       const { data: openTasks } = await supabase
         .from('actions')
         .select('id')
-        .eq('vehicle_id', testVehicleId)
+        .eq(actionsVehicleFk, testVehicleId)
         .neq('status', 'completed')
         .limit(1);
 
@@ -392,7 +414,7 @@ describe('Vehicle History Page Workflows', () => {
       const { data: tasks } = await supabase
         .from('actions')
         .select('*')
-        .eq('vehicle_id', testVehicleId)
+        .eq(actionsVehicleFk, testVehicleId)
         .limit(1);
 
       if (!tasks || tasks.length === 0) {

@@ -225,7 +225,7 @@ export function OfficeActionDialog({
             size="sm"
             onClick={() => setActiveTab('reminder')}
             className={activeTab === 'reminder' 
-              ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+              ? 'bg-maintenance hover:bg-maintenance-dark text-white' 
               : 'border-border'}
           >
             <Bell className="h-4 w-4 mr-1" />
@@ -276,7 +276,7 @@ export function OfficeActionDialog({
                 <ul className="text-sm space-y-1">
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="h-3 w-3 text-green-500" />
-                    <span>Vehicle: {vehicleDisplay}</span>
+                    <span>Van: {vehicleDisplay}</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="h-3 w-3 text-green-500" />
@@ -300,7 +300,7 @@ export function OfficeActionDialog({
                 <Button
                   onClick={handleSendReminder}
                   disabled={loading}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  className="bg-maintenance hover:bg-maintenance-dark text-white"
                 >
                   {loading ? (
                     <>
@@ -415,7 +415,7 @@ export function OfficeActionDialog({
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="h-3 w-3 text-green-500" />
-                    <span>Vehicle Details (make, colour, etc.)</span>
+                    <span>Van Details (make, colour, etc.)</span>
                   </li>
                 </ul>
               </div>

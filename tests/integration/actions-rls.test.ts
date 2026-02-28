@@ -40,7 +40,7 @@ describe('Actions RLS Policy Fix', () => {
 
     // SAFETY: ONLY use test vehicles starting with TE57
     const vehicle = await supabase
-      .from('vehicles')
+      .from('vans')
       .select('id')
       .ilike('reg_number', 'TE57%')
       .limit(1)
@@ -48,9 +48,9 @@ describe('Actions RLS Policy Fix', () => {
     
     // If no TE57 test vehicle exists, create one
     if (!vehicle.data) {
-      const categoryId = (await supabase.from('vehicle_categories').select('id').limit(1).single()).data?.id;
+      const categoryId = (await supabase.from('van_categories').select('id').limit(1).single()).data?.id;
       const newVehicle = await supabase
-        .from('vehicles')
+        .from('vans')
         .insert({
           reg_number: 'TE57ACTRL',
           status: 'active',
@@ -70,7 +70,7 @@ describe('Actions RLS Policy Fix', () => {
   afterAll(async () => {
     // Clean up test vehicle if we created it
     if (createdTestVehicle) {
-      await supabase.from('vehicles').delete().eq('id', testVehicleId);
+      await supabase.from('vans').delete().eq('id', testVehicleId);
     }
   });
 
@@ -80,7 +80,7 @@ describe('Actions RLS Policy Fix', () => {
     const { data: inspection, error: inspectionError } = await supabase
       .from('van_inspections')
       .insert({
-        vehicle_id: testVehicleId,
+        van_id: testVehicleId,
         user_id: testUserId,
         inspection_date: new Date().toISOString().split('T')[0],
         inspection_end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],

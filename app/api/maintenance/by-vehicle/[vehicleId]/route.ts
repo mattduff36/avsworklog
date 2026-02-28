@@ -36,7 +36,7 @@ export async function POST(
     const userName = profile?.full_name || 'Unknown User';
 
     // Parse request body
-    const body: UpdateMaintenanceRequest & { vehicle_id?: string } =
+    const body: UpdateMaintenanceRequest & { van_id?: string } =
       await request.json();
 
     // Validate comment (mandatory, min 10 characters)
@@ -52,8 +52,8 @@ export async function POST(
     // Check if maintenance record exists for this vehicle
     const { data: existingRecord, error: fetchError } = await supabase
       .from('vehicle_maintenance')
-      .select('id, vehicle_id, current_mileage, tax_due_date, mot_due_date, first_aid_kit_expiry, next_service_mileage, last_service_mileage, cambelt_due_mileage, tracker_id, notes')
-      .eq('vehicle_id', vehicleId)
+      .select('id, van_id, current_mileage, tax_due_date, mot_due_date, first_aid_kit_expiry, next_service_mileage, last_service_mileage, cambelt_due_mileage, tracker_id, notes')
+      .eq('van_id', vehicleId)
       .single();
 
     if (fetchError && fetchError.code !== 'PGRST116') {
@@ -207,7 +207,7 @@ export async function POST(
       const { data: created, error: createError } = await supabase
         .from('vehicle_maintenance')
         .insert({
-          vehicle_id: vehicleId,
+          van_id: vehicleId,
           ...updates,
         })
         .select()
@@ -239,7 +239,7 @@ export async function POST(
     // Create history entries for all changed fields
     if (changedFields.length > 0) {
       const historyEntries = changedFields.map((change) => ({
-        vehicle_id: vehicleId,
+        van_id: vehicleId,
         field_name: change.field_name,
         old_value: change.old_value,
         new_value: change.new_value,
@@ -260,7 +260,7 @@ export async function POST(
     } else {
       // No fields changed, but still create a history entry for the comment
       await supabase.from('maintenance_history').insert({
-        vehicle_id: vehicleId,
+        van_id: vehicleId,
         field_name: 'no_changes',
         old_value: null,
         new_value: null,

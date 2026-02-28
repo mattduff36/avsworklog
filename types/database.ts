@@ -48,11 +48,13 @@ export interface Database {
           updated_at?: string
         }
       }
-      vehicles: {
+      /** @deprecated Renamed to `vans`. This type is kept for reference only. */
+      // vehicles: { ... }
+      vans: {
         Row: {
           id: string
           reg_number: string
-          /** @deprecated Use vehicle_categories relationship instead. Auto-synced from category_id. */
+          /** @deprecated Use van_categories relationship instead. Auto-synced from category_id. */
           vehicle_type: string | null
           category_id: string
           status: string
@@ -78,6 +80,111 @@ export interface Database {
           status?: string
           nickname?: string | null
           created_at?: string
+        }
+      }
+      hgvs: {
+        Row: {
+          id: string
+          reg_number: string
+          category_id: string
+          status: string
+          nickname: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          reg_number: string
+          category_id: string
+          status?: string
+          nickname?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          reg_number?: string
+          category_id?: string
+          status?: string
+          nickname?: string | null
+          created_at?: string
+        }
+      }
+      hgv_categories: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      hgv_inspections: {
+        Row: {
+          id: string
+          hgv_id: string | null
+          user_id: string
+          inspection_date: string
+          inspection_end_date: string | null
+          current_mileage: number | null
+          status: 'draft' | 'submitted'
+          submitted_at: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          manager_comments: string | null
+          inspector_comments: string | null
+          signature_data: string | null
+          signed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          hgv_id?: string | null
+          user_id: string
+          inspection_date: string
+          inspection_end_date?: string | null
+          current_mileage?: number | null
+          status?: 'draft' | 'submitted'
+          submitted_at?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          manager_comments?: string | null
+          inspector_comments?: string | null
+          signature_data?: string | null
+          signed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          hgv_id?: string | null
+          user_id?: string
+          inspection_date?: string
+          inspection_end_date?: string | null
+          current_mileage?: number | null
+          status?: 'draft' | 'submitted'
+          submitted_at?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          manager_comments?: string | null
+          inspector_comments?: string | null
+          signature_data?: string | null
+          signed_at?: string | null
+          created_at?: string
+          updated_at?: string
         }
       }
       plant: {
@@ -148,7 +255,7 @@ export interface Database {
           updated_by?: string | null
         }
       }
-      vehicle_categories: {
+      van_categories: {
         Row: {
           id: string
           name: string
@@ -221,8 +328,9 @@ export interface Database {
       vehicle_maintenance: {
         Row: {
           id: string
-          vehicle_id: string | null
+          van_id: string | null
           plant_id: string | null
+          hgv_id: string | null
           tax_due_date: string | null
           mot_due_date: string | null
           first_aid_kit_expiry: string | null
@@ -244,8 +352,9 @@ export interface Database {
         }
         Insert: {
           id?: string
-          vehicle_id?: string | null
+          van_id?: string | null
           plant_id?: string | null
+          hgv_id?: string | null
           tax_due_date?: string | null
           mot_due_date?: string | null
           first_aid_kit_expiry?: string | null
@@ -267,8 +376,9 @@ export interface Database {
         }
         Update: {
           id?: string
-          vehicle_id?: string | null
+          van_id?: string | null
           plant_id?: string | null
+          hgv_id?: string | null
           tax_due_date?: string | null
           mot_due_date?: string | null
           first_aid_kit_expiry?: string | null
@@ -292,8 +402,9 @@ export interface Database {
       maintenance_history: {
         Row: {
           id: string
-          vehicle_id: string | null
+          van_id: string | null
           plant_id: string | null
+          hgv_id: string | null
           maintenance_category_id: string | null
           field_name: string
           old_value: string | null
@@ -306,8 +417,9 @@ export interface Database {
         }
         Insert: {
           id?: string
-          vehicle_id?: string | null
+          van_id?: string | null
           plant_id?: string | null
+          hgv_id?: string | null
           maintenance_category_id?: string | null
           field_name: string
           old_value?: string | null
@@ -320,8 +432,9 @@ export interface Database {
         }
         Update: {
           id?: string
-          vehicle_id?: string | null
+          van_id?: string | null
           plant_id?: string | null
+          hgv_id?: string | null
           maintenance_category_id?: string | null
           field_name?: string
           old_value?: string | null
@@ -333,10 +446,10 @@ export interface Database {
           created_at?: string
         }
       }
-      vehicle_archive: {
+      van_archive: {
         Row: {
           id: string
-          vehicle_id: string
+          van_id: string
           reg_number: string
           category_id: string | null
           status: string | null
@@ -350,7 +463,7 @@ export interface Database {
         }
         Insert: {
           id?: string
-          vehicle_id: string
+          van_id: string
           reg_number: string
           category_id?: string | null
           status?: string | null
@@ -364,7 +477,7 @@ export interface Database {
         }
         Update: {
           id?: string
-          vehicle_id?: string
+          van_id?: string
           reg_number?: string
           category_id?: string | null
           status?: string | null
@@ -509,7 +622,7 @@ export interface Database {
       van_inspections: {
         Row: {
           id: string
-          vehicle_id: string | null
+          van_id: string | null
           plant_id: string | null
           user_id: string
           inspection_date: string
@@ -532,7 +645,7 @@ export interface Database {
         }
         Insert: {
           id?: string
-          vehicle_id?: string | null
+          van_id?: string | null
           plant_id?: string | null
           user_id: string
           inspection_date: string
@@ -555,7 +668,7 @@ export interface Database {
         }
         Update: {
           id?: string
-          vehicle_id?: string | null
+          van_id?: string | null
           plant_id?: string | null
           user_id?: string
           inspection_date?: string
@@ -744,8 +857,9 @@ export interface Database {
           action_type: 'inspection_defect' | 'workshop_vehicle_task' | 'manager_action'
           inspection_id: string | null
           inspection_item_id: string | null
-          vehicle_id: string | null
+          van_id: string | null
           plant_id: string | null
+          hgv_id: string | null
           workshop_category_id: string | null
           workshop_subcategory_id: string | null
           workshop_comments: string | null
@@ -770,8 +884,9 @@ export interface Database {
           action_type?: 'inspection_defect' | 'workshop_vehicle_task' | 'manager_action'
           inspection_id?: string | null
           inspection_item_id?: string | null
-          vehicle_id?: string | null
+          van_id?: string | null
           plant_id?: string | null
+          hgv_id?: string | null
           workshop_category_id?: string | null
           workshop_comments?: string | null
           title: string
@@ -795,8 +910,9 @@ export interface Database {
           action_type?: 'inspection_defect' | 'workshop_vehicle_task' | 'manager_action'
           inspection_id?: string | null
           inspection_item_id?: string | null
-          vehicle_id?: string | null
+          van_id?: string | null
           plant_id?: string | null
+          hgv_id?: string | null
           workshop_category_id?: string | null
           workshop_comments?: string | null
           title?: string
@@ -819,7 +935,7 @@ export interface Database {
       workshop_task_categories: {
         Row: {
           id: string
-          applies_to: 'vehicle' | 'plant' | 'tools'
+          applies_to: 'van' | 'hgv' | 'plant' | 'tools'
           name: string
           slug: string | null
           is_active: boolean
@@ -835,7 +951,7 @@ export interface Database {
         }
         Insert: {
           id?: string
-          applies_to?: 'vehicle' | 'plant' | 'tools'
+          applies_to?: 'van' | 'hgv' | 'plant' | 'tools'
           name: string
           slug?: string | null
           is_active?: boolean
@@ -851,7 +967,7 @@ export interface Database {
         }
         Update: {
           id?: string
-          applies_to?: 'vehicle' | 'plant' | 'tools'
+          applies_to?: 'van' | 'hgv' | 'plant' | 'tools'
           name?: string
           slug?: string | null
           is_active?: boolean

@@ -94,7 +94,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                 e.stopPropagation();
                 setAddDialogOpen(true);
               }}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-maintenance hover:bg-maintenance-dark"
               disabled={!canModifySettings}
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -145,8 +145,8 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                         
                         <TableCell>
                           <div className="flex gap-1">
-                            {category.applies_to?.includes('vehicle') && (
-                              <Badge variant="outline" className="text-blue-400 border-blue-400/50 font-mono" title="Applies to vehicles">
+                            {category.applies_to?.includes('van') && (
+                              <Badge variant="outline" className="text-blue-400 border-blue-400/50 font-mono" title="Applies to vans">
                                 V
                               </Badge>
                             )}
@@ -278,7 +278,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
             <div className="text-sm text-blue-800 dark:text-blue-200">
               <p className="font-semibold mb-1">About Maintenance Categories</p>
               <p>
-                Categories define what types of maintenance to track. Each category has an alert threshold and can apply to vehicles, plant machinery, or both.
+                Categories define what types of maintenance to track. Each category has an alert threshold and can apply to vans, plant machinery, or both.
               </p>
               <p className="mt-2">
                 <strong>Category Types:</strong>
@@ -289,13 +289,13 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                 <li><strong>Hours-based</strong> (Plant Service) - Alert X engine hours before due</li>
               </ul>
               <p className="mt-2">
-                <strong>Applies To:</strong> Categories can apply to vehicles only, plant only, or both. Hours-based categories typically apply to plant machinery since they track engine operating hours.
+                <strong>Applies To:</strong> Categories can apply to vans only, plant only, or both. Hours-based categories typically apply to plant machinery since they track engine operating hours.
               </p>
               <div className="mt-2 flex items-center gap-4 text-xs">
                 <span className="font-semibold">Key:</span>
                 <span className="flex items-center gap-1">
                   <span className="font-mono px-1.5 py-0.5 rounded border border-blue-400/50 text-blue-400">V</span>
-                  = Vehicle
+                  = Van
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="font-mono px-1.5 py-0.5 rounded border border-purple-400/50 text-purple-400">P</span>

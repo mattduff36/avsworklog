@@ -83,7 +83,7 @@ interface WorkshopTask {
   title?: string;
   description: string;
   workshop_comments?: string | null;
-  vehicle_id?: string;
+  van_id?: string;
   status_history?: StatusHistoryEvent[] | null;
   workshop_task_categories?: { 
     id: string;
@@ -236,7 +236,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   
   // Helper to determine if a vehicle ID corresponds to a plant asset
   const isPlantAsset = useCallback((vehicleId: string) => {
-    const vehicle = vehicles.find(v => v.vehicle_id === vehicleId || v.id === vehicleId);
+    const vehicle = vehicles.find(v => v.van_id === vehicleId || v.id === vehicleId);
     return vehicle && 'is_plant' in vehicle && vehicle.is_plant === true;
   }, [vehicles]);
   
@@ -258,7 +258,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     });
     
     vehiclesWithAlerts.forEach(vehicle => {
-      const vehicleId = vehicle.vehicle_id || vehicle.id;
+      const vehicleId = vehicle.van_id ?? vehicle.id;
       if (vehicleId) {
         // Check if this is a plant asset (has is_plant flag)
         const isPlant = 'is_plant' in vehicle && vehicle.is_plant === true;
@@ -271,15 +271,16 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   const vehiclesWithAlerts: VehicleWithAlerts[] = vehicles.map(vehicle => {
     const alerts: Alert[] = [];
     const isPlant = 'is_plant' in vehicle && vehicle.is_plant === true;
-    const assetType = isPlant ? 'plant' : 'vehicle';
+    const assetType = isPlant ? 'plant' : 'van';
     
     // Helper to check if category applies to this asset
     const categoryApplies = (categoryName: string): boolean => {
       const category = maintenanceCategories.find(
         c => c.name.toLowerCase() === categoryName.toLowerCase()
       );
-      if (!category) return true; // Default to showing if category not found
-      return (category.applies_to || ['vehicle']).includes(assetType);
+      if (!category) return true;
+      if (!category.applies_to || category.applies_to.length === 0) return true;
+      return category.applies_to.includes(assetType);
     };
     
     // Check Tax (only if category applies to this asset type)
@@ -545,7 +546,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       setShowStatusModal(false);
       
       // Refetch vehicle history
-      const vehicleId = selectedTask.vehicle_id;
+      const vehicleId = selectedTask.van_id;
       if (vehicleId) {
         setVehicleHistory(prev => {
           const newHistory = { ...prev };
@@ -588,7 +589,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       toast.success('Task reverted to pending');
       
       // Refetch vehicle history
-      const vehicleId = task.vehicle_id;
+      const vehicleId = task.van_id;
       if (vehicleId) {
         setVehicleHistory(prev => {
           const newHistory = { ...prev };
@@ -613,7 +614,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     if (!completingTask) return;
 
     const taskId = completingTask.id;
-    const vehicleId = completingTask.vehicle_id;
+    const vehicleId = completingTask.van_id;
     const requiresIntermediateStep = completingTask.status === 'pending' || completingTask.status === 'on_hold';
 
     try {
@@ -789,7 +790,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       setShowOnHoldModal(false);
       
       // Refetch vehicle history
-      const vehicleId = onHoldingTask.vehicle_id;
+      const vehicleId = onHoldingTask.van_id;
       if (vehicleId) {
         setVehicleHistory(prev => {
           const newHistory = { ...prev };
@@ -853,7 +854,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       setShowResumeModal(false);
       
       // Refetch vehicle history
-      const vehicleId = resumingTask.vehicle_id;
+      const vehicleId = resumingTask.van_id;
       if (vehicleId) {
         setVehicleHistory(prev => {
           const newHistory = { ...prev };
@@ -919,6 +920,10 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     .sort((a, b) => getMostUrgentSortValue(a) - getMostUrgentSortValue(b));
   
   // Don't show panels if no alerts
+  const isPlantView = vehicles.length > 0 && 'is_plant' in vehicles[0] && vehicles[0].is_plant === true;
+  const assetLabel = isPlantView ? 'plant asset' : 'van';
+  const assetLabelPlural = isPlantView ? 'plant assets' : 'vans';
+
   if (overdueVehicles.length === 0 && dueSoonVehicles.length === 0) {
     return (
       <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
@@ -932,7 +937,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 All Caught Up!
               </h3>
               <p className="text-sm text-green-700 dark:text-green-300">
-                No maintenance items are overdue or due soon. {summary.total} vehicle{summary.total !== 1 ? 's' : ''} being monitored.
+                No maintenance items are overdue or due soon. {summary.total} {summary.total !== 1 ? assetLabelPlural : assetLabel} being monitored.
               </p>
             </div>
           </div>
@@ -942,7 +947,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   }
 
   const renderVehicleCard = (vehicle: VehicleWithAlerts, isOverdue: boolean) => {
-    const vehicleId = vehicle.vehicle_id || vehicle.id;
+    const vehicleId = vehicle.van_id ?? vehicle.id;
     const isExpanded = expandedVehicles.has(vehicleId);
     const historyData = vehicleHistory[vehicleId];
     
@@ -1191,8 +1196,8 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                   return <p className="text-sm text-muted-foreground py-4 text-center">No active workshop task found</p>;
                 }
                 
-                // Ensure task has vehicle_id for handlers
-                const taskWithVehicleId = { ...relatedTask, vehicle_id: vehicleId };
+                // Ensure task has van_id for handlers
+                const taskWithVehicleId = { ...relatedTask, van_id: vehicleId };
                 
                 // Display task details directly
                 return (
@@ -1236,7 +1241,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                               handleMarkInProgress(taskWithVehicleId);
                             }}
                             size="sm"
-                            className="h-9 px-3 text-xs bg-blue-600/80 hover:bg-blue-600 text-white border-0"
+                            className="h-9 px-3 text-xs bg-maintenance/80 hover:bg-maintenance text-white border-0"
                           >
                             <Clock className="h-3.5 w-3.5 mr-1.5" />
                             In Progress
@@ -1328,7 +1333,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                               handleResume(taskWithVehicleId);
                             }}
                             size="sm"
-                            className="h-9 px-3 text-xs transition-all border-0 bg-blue-600 hover:bg-blue-700 text-white"
+                            className="h-9 px-3 text-xs transition-all border-0 bg-maintenance hover:bg-maintenance-dark text-white"
                           >
                             <Play className="h-3.5 w-3.5 mr-1.5" />
                             Resume
@@ -1370,7 +1375,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
               </CardTitle>
             </div>
             <CardDescription className="text-red-700 dark:text-red-300">
-              {overdueVehicles.length} vehicle{overdueVehicles.length !== 1 ? 's' : ''} requiring immediate attention
+              {overdueVehicles.length} {overdueVehicles.length !== 1 ? assetLabelPlural : assetLabel} requiring immediate attention
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -1392,7 +1397,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
               </CardTitle>
             </div>
             <CardDescription className="text-amber-700 dark:text-amber-300">
-              {dueSoonVehicles.length} vehicle{dueSoonVehicles.length !== 1 ? 's' : ''} coming up
+              {dueSoonVehicles.length} {dueSoonVehicles.length !== 1 ? assetLabelPlural : assetLabel} coming up
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -1411,7 +1416,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
             <div className="text-sm text-blue-800 dark:text-blue-200">
               <p className="font-semibold mb-2">About Maintenance Alerts</p>
               <p>
-                This page shows vehicles with <span className="font-medium text-red-600 dark:text-red-400">Overdue</span> or <span className="font-medium text-amber-600 dark:text-amber-400">Due Soon</span> maintenance items. 
+                This page shows vans and plant with <span className="font-medium text-red-600 dark:text-red-400">Overdue</span> or <span className="font-medium text-amber-600 dark:text-amber-400">Due Soon</span> maintenance items. 
                 Items appear here based on the alert thresholds configured in Settings.
               </p>
               
@@ -1517,7 +1522,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
             <Button
               onClick={confirmMarkInProgress}
               disabled={!loggedComment.trim() || loggedComment.length > 300}
-              className="bg-blue-500 hover:bg-blue-600 text-white"
+              className="bg-maintenance hover:bg-maintenance-dark text-white"
             >
               <Clock className="h-4 w-4 mr-2" />
               Mark In Progress
@@ -1626,7 +1631,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
             <Button
               onClick={confirmResume}
               disabled={!resumeComment.trim() || resumeComment.length > 300}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-maintenance hover:bg-maintenance-dark text-white"
             >
               <Play className="h-4 w-4 mr-2" />
               Resume Task

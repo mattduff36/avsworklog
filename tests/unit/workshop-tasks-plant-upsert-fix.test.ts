@@ -19,15 +19,15 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
         tableName: 'vehicle_maintenance',
         constraints: {
           primary_key: 'id',
-          unique_constraints: ['vehicle_id'], // ✅ vehicle_id has UNIQUE
+          unique_constraints: ['van_id'], // ✅ van_id has UNIQUE
           indexes: ['plant_id'], // ❌ plant_id only has INDEX, not UNIQUE
         },
       };
 
       // Upsert attempts
       const vehicleUpsert = {
-        onConflict: 'vehicle_id',
-        willWork: originalSchema.constraints.unique_constraints.includes('vehicle_id'),
+        onConflict: 'van_id',
+        willWork: originalSchema.constraints.unique_constraints.includes('van_id'),
       };
 
       const plantUpsert = {
@@ -45,8 +45,8 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
         uniqueIndexes: [
           {
             name: 'unique_vehicle_maintenance_id',
-            column: 'vehicle_id',
-            partial: 'WHERE vehicle_id IS NOT NULL',
+            column: 'van_id',
+            partial: 'WHERE van_id IS NOT NULL',
           },
           {
             name: 'unique_plant_maintenance',
@@ -58,7 +58,7 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
 
       // Verify both indexes exist
       const hasVehicleUnique = fixedSchema.uniqueIndexes.some(
-        (idx) => idx.column === 'vehicle_id'
+        (idx) => idx.column === 'van_id'
       );
       const hasPlantUnique = fixedSchema.uniqueIndexes.some(
         (idx) => idx.column === 'plant_id'
@@ -71,16 +71,16 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
     it('should handle partial unique indexes correctly', () => {
       // Partial unique indexes allow NULL values while enforcing uniqueness on non-NULL values
       const records = [
-        { id: 1, vehicle_id: 'v1', plant_id: null },
-        { id: 2, vehicle_id: 'v2', plant_id: null },
-        { id: 3, vehicle_id: null, plant_id: 'p1' },
-        { id: 4, vehicle_id: null, plant_id: 'p2' },
+        { id: 1, van_id: 'v1', plant_id: null },
+        { id: 2, van_id: 'v2', plant_id: null },
+        { id: 3, van_id: null, plant_id: 'p1' },
+        { id: 4, van_id: null, plant_id: 'p2' },
       ];
 
       // Check for duplicate vehicle_ids (excluding NULLs)
       const vehicleIds = records
-        .filter((r) => r.vehicle_id !== null)
-        .map((r) => r.vehicle_id);
+        .filter((r) => r.van_id !== null)
+        .map((r) => r.van_id);
       const uniqueVehicleIds = new Set(vehicleIds);
 
       // Check for duplicate plant_ids (excluding NULLs)
@@ -111,19 +111,19 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
         updateData.current_hours = readingValue;
         updateData.last_hours_update = new Date().toISOString();
       } else {
-        updateData.vehicle_id = selectedVehicleId;
+        updateData.van_id = selectedVehicleId;
         updateData.current_mileage = readingValue;
         updateData.last_mileage_update = new Date().toISOString();
       }
 
-      const onConflict = isPlant ? 'plant_id' : 'vehicle_id';
+      const onConflict = isPlant ? 'plant_id' : 'van_id';
 
       // Verify structure
-      expect(updateData.vehicle_id).toBe('vehicle-uuid-123');
+      expect(updateData.van_id).toBe('vehicle-uuid-123');
       expect(updateData.current_mileage).toBe(50000);
       expect(updateData.plant_id).toBeUndefined();
       expect(updateData.current_hours).toBeUndefined();
-      expect(onConflict).toBe('vehicle_id'); // ✅ Has UNIQUE constraint
+      expect(onConflict).toBe('van_id'); // ✅ Has UNIQUE constraint
     });
 
     it('should correctly structure plant maintenance upsert data', () => {
@@ -142,17 +142,17 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
         updateData.current_hours = readingValue;
         updateData.last_hours_update = new Date().toISOString();
       } else {
-        updateData.vehicle_id = selectedVehicleId;
+        updateData.van_id = selectedVehicleId;
         updateData.current_mileage = readingValue;
         updateData.last_mileage_update = new Date().toISOString();
       }
 
-      const onConflict = isPlant ? 'plant_id' : 'vehicle_id';
+      const onConflict = isPlant ? 'plant_id' : 'van_id';
 
       // Verify structure
       expect(updateData.plant_id).toBe('plant-uuid-456');
       expect(updateData.current_hours).toBe(1200);
-      expect(updateData.vehicle_id).toBeUndefined();
+      expect(updateData.van_id).toBeUndefined();
       expect(updateData.current_mileage).toBeUndefined();
       expect(onConflict).toBe('plant_id'); // ✅ Now has UNIQUE constraint (after fix)
     });
@@ -162,17 +162,17 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
     it('should prevent duplicate vehicle maintenance records', () => {
       // Simulate multiple upserts for same vehicle
       const vehicleId = 'v1';
-      const maintenanceRecords: Array<{ vehicle_id: string; current_mileage: number }> = [];
+      const maintenanceRecords: Array<{ van_id: string; current_mileage: number }> = [];
 
       // First upsert
-      maintenanceRecords.push({ vehicle_id: vehicleId, current_mileage: 50000 });
+      maintenanceRecords.push({ van_id: vehicleId, current_mileage: 50000 });
 
       // Second upsert (should update, not insert)
-      const existingIndex = maintenanceRecords.findIndex((r) => r.vehicle_id === vehicleId);
+      const existingIndex = maintenanceRecords.findIndex((r) => r.van_id === vehicleId);
       if (existingIndex >= 0) {
-        maintenanceRecords[existingIndex] = { vehicle_id: vehicleId, current_mileage: 51000 };
+        maintenanceRecords[existingIndex] = { van_id: vehicleId, current_mileage: 51000 };
       } else {
-        maintenanceRecords.push({ vehicle_id: vehicleId, current_mileage: 51000 });
+        maintenanceRecords.push({ van_id: vehicleId, current_mileage: 51000 });
       }
 
       // Should have exactly one record
@@ -203,16 +203,16 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
 
     it('should allow one maintenance record per vehicle and one per plant', () => {
       const maintenanceRecords = [
-        { id: 1, vehicle_id: 'v1', plant_id: null, current_mileage: 50000 },
-        { id: 2, vehicle_id: 'v2', plant_id: null, current_mileage: 60000 },
-        { id: 3, vehicle_id: null, plant_id: 'p1', current_hours: 1200 },
-        { id: 4, vehicle_id: null, plant_id: 'p2', current_hours: 800 },
+        { id: 1, van_id: 'v1', plant_id: null, current_mileage: 50000 },
+        { id: 2, van_id: 'v2', plant_id: null, current_mileage: 60000 },
+        { id: 3, van_id: null, plant_id: 'p1', current_hours: 1200 },
+        { id: 4, van_id: null, plant_id: 'p2', current_hours: 800 },
       ];
 
       // Check no duplicate vehicle_ids
       const vehicleIds = maintenanceRecords
-        .filter((r) => r.vehicle_id !== null)
-        .map((r) => r.vehicle_id);
+        .filter((r) => r.van_id !== null)
+        .map((r) => r.van_id);
       expect(new Set(vehicleIds).size).toBe(vehicleIds.length);
 
       // Check no duplicate plant_ids
@@ -232,15 +232,15 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
       };
 
       const maintenanceUpdate = {
-        vehicle_id: taskData.vehicleId,
+        van_id: taskData.vehicleId,
         current_mileage: taskData.meterReading,
         last_mileage_update: new Date().toISOString(),
       };
 
-      const onConflict = taskData.isPlant ? 'plant_id' : 'vehicle_id';
+      const onConflict = taskData.isPlant ? 'plant_id' : 'van_id';
 
-      expect(onConflict).toBe('vehicle_id');
-      expect(maintenanceUpdate.vehicle_id).toBe('v1');
+      expect(onConflict).toBe('van_id');
+      expect(maintenanceUpdate.van_id).toBe('v1');
       expect(maintenanceUpdate.current_mileage).toBe(50000);
     });
 
@@ -257,7 +257,7 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
         last_hours_update: new Date().toISOString(),
       };
 
-      const onConflict = taskData.isPlant ? 'plant_id' : 'vehicle_id';
+      const onConflict = taskData.isPlant ? 'plant_id' : 'van_id';
 
       expect(onConflict).toBe('plant_id');
       expect(maintenanceUpdate.plant_id).toBe('p1');
@@ -267,7 +267,7 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
     it('should handle editing workshop task and updating meter reading', () => {
       const existingTask = {
         id: 'task-1',
-        vehicle_id: null,
+        van_id: null,
         plant_id: 'p1',
       };
 
@@ -284,7 +284,7 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
         meterUpdateData.last_hours_update = new Date().toISOString();
       }
 
-      const onConflict = isPlant ? 'plant_id' : 'vehicle_id';
+      const onConflict = isPlant ? 'plant_id' : 'van_id';
 
       expect(isPlant).toBe(true);
       expect(onConflict).toBe('plant_id');
@@ -299,7 +299,7 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
         {
           name: 'unique_vehicle_maintenance_id',
           tableName: 'vehicle_maintenance',
-          column: 'vehicle_id',
+          column: 'van_id',
           isUnique: true,
           isPartial: true,
         },
@@ -323,37 +323,37 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
       expect(expectedIndexes.length).toBe(2);
     });
 
-    it('should verify check constraint still enforces either vehicle_id or plant_id', () => {
+    it('should verify check constraint still enforces either van_id or plant_id', () => {
       // The check_maintenance_asset constraint should still exist
       const checkConstraint = {
         name: 'check_maintenance_asset',
         condition:
-          '(vehicle_id IS NOT NULL AND plant_id IS NULL) OR (vehicle_id IS NULL AND plant_id IS NOT NULL)',
+          '(van_id IS NOT NULL AND plant_id IS NULL) OR (van_id IS NULL AND plant_id IS NOT NULL)',
       };
 
       // Valid records
       const validRecords = [
-        { vehicle_id: 'v1', plant_id: null }, // ✅ Only vehicle_id
-        { vehicle_id: null, plant_id: 'p1' }, // ✅ Only plant_id
+        { van_id: 'v1', plant_id: null }, // ✅ Only van_id
+        { van_id: null, plant_id: 'p1' }, // ✅ Only plant_id
       ];
 
       // Invalid records (would be rejected by constraint)
       const invalidRecords = [
-        { vehicle_id: null, plant_id: null }, // ❌ Both NULL
-        { vehicle_id: 'v1', plant_id: 'p1' }, // ❌ Both set
+        { van_id: null, plant_id: null }, // ❌ Both NULL
+        { van_id: 'v1', plant_id: 'p1' }, // ❌ Both set
       ];
 
       validRecords.forEach((record) => {
         const isValid =
-          (record.vehicle_id !== null && record.plant_id === null) ||
-          (record.vehicle_id === null && record.plant_id !== null);
+          (record.van_id !== null && record.plant_id === null) ||
+          (record.van_id === null && record.plant_id !== null);
         expect(isValid).toBe(true);
       });
 
       invalidRecords.forEach((record) => {
         const isValid =
-          (record.vehicle_id !== null && record.plant_id === null) ||
-          (record.vehicle_id === null && record.plant_id !== null);
+          (record.van_id !== null && record.plant_id === null) ||
+          (record.van_id === null && record.plant_id !== null);
         expect(isValid).toBe(false);
       });
 
@@ -408,14 +408,14 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
     it('should handle NULL values correctly with partial indexes', () => {
       // Partial indexes (WHERE column IS NOT NULL) don't enforce uniqueness on NULLs
       const records = [
-        { vehicle_id: 'v1', plant_id: null },
-        { vehicle_id: 'v2', plant_id: null }, // Multiple NULLs allowed
-        { vehicle_id: null, plant_id: 'p1' },
-        { vehicle_id: null, plant_id: 'p2' }, // Multiple NULLs allowed
+        { van_id: 'v1', plant_id: null },
+        { van_id: 'v2', plant_id: null }, // Multiple NULLs allowed
+        { van_id: null, plant_id: 'p1' },
+        { van_id: null, plant_id: 'p2' }, // Multiple NULLs allowed
       ];
 
       // Count NULL values
-      const nullVehicleIds = records.filter((r) => r.vehicle_id === null).length;
+      const nullVehicleIds = records.filter((r) => r.van_id === null).length;
       const nullPlantIds = records.filter((r) => r.plant_id === null).length;
 
       expect(nullVehicleIds).toBeGreaterThan(1); // Multiple NULLs OK
@@ -424,18 +424,18 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
 
     it('should prevent duplicate non-NULL values', () => {
       const records = [
-        { vehicle_id: 'v1', plant_id: null },
-        { vehicle_id: null, plant_id: 'p1' },
+        { van_id: 'v1', plant_id: null },
+        { van_id: null, plant_id: 'p1' },
       ];
 
-      // Attempt to add duplicate vehicle_id
-      const duplicateVehicle = { vehicle_id: 'v1', plant_id: null };
+      // Attempt to add duplicate van_id
+      const duplicateVehicle = { van_id: 'v1', plant_id: null };
       const hasDuplicateVehicle = records.some(
-        (r) => r.vehicle_id === duplicateVehicle.vehicle_id && r.vehicle_id !== null
+        (r) => r.van_id === duplicateVehicle.van_id && r.van_id !== null
       );
 
       // Attempt to add duplicate plant_id
-      const duplicatePlant = { vehicle_id: null, plant_id: 'p1' };
+      const duplicatePlant = { van_id: null, plant_id: 'p1' };
       const hasDuplicatePlant = records.some(
         (r) => r.plant_id === duplicatePlant.plant_id && r.plant_id !== null
       );

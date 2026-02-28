@@ -479,7 +479,7 @@ export function EditPlantRecordDialog({
       if (fieldChanges.length > 0) {
         const historyEntries = fieldChanges.map(change => ({
           plant_id: plant.id,
-          vehicle_id: null,
+          van_id: null,
           field_name: safeMaintenanceHistoryFieldName(change.field_name),
           old_value: change.old_value,
           new_value: change.new_value,
@@ -500,7 +500,7 @@ export function EditPlantRecordDialog({
         // No fields changed, but still log the update attempt with comment
         const { error: historyError } = await supabase.from('maintenance_history').insert({
           plant_id: plant.id,
-          vehicle_id: null,
+          van_id: null,
           field_name: 'no_changes',
           old_value: null,
           new_value: null,
@@ -835,7 +835,7 @@ export function EditPlantRecordDialog({
               <Button
                 type="submit"
                 disabled={isSubmitting || commentLength < 10}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-maintenance hover:bg-maintenance-dark"
               >
                 {isSubmitting ? (
                   <>

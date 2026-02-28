@@ -97,14 +97,14 @@ async function fixMotDate() {
 
     // Check if record exists
     const checkResult = await client.query(
-      'SELECT vehicle_id FROM vehicle_maintenance WHERE vehicle_id = $1',
+      'SELECT van_id FROM vehicle_maintenance WHERE van_id = $1',
       [vehicle.id]
     );
 
     if (checkResult.rows.length === 0) {
       // Insert new record
       console.log('   Creating new maintenance record...');
-      updates.vehicle_id = vehicle.id;
+      updates.van_id = vehicle.id;
       
       const columns = Object.keys(updates).join(', ');
       const placeholders = Object.keys(updates).map((_, i) => `$${i + 1}`).join(', ');
@@ -122,7 +122,7 @@ async function fixMotDate() {
       const values = [...Object.values(updates), vehicle.id];
       
       await client.query(
-        `UPDATE vehicle_maintenance SET ${setClauses} WHERE vehicle_id = $${values.length}`,
+        `UPDATE vehicle_maintenance SET ${setClauses} WHERE van_id = $${values.length}`,
         values
       );
     }

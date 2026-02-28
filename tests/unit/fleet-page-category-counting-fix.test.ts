@@ -4,7 +4,7 @@
  * Bug Fix Verification: Category counts should use ID-based comparison
  * 
  * ISSUE: The code was counting plant assets and vehicles per category by 
- * comparing category names (p.vehicle_categories?.name === category.name),
+ * comparing category names (p.van_categories?.name === category.name),
  * which is fragile and error-prone.
  * 
  * FIX: Changed to use ID-based comparison (p.category_id === category.id),
@@ -21,9 +21,9 @@ describe('Fleet Page Category Counting Fix', () => {
     };
 
     const plantAssets = [
-      { id: 'plant-1', category_id: 'cat-uuid-123', vehicle_categories: { id: 'cat-uuid-123', name: 'Excavators' } },
-      { id: 'plant-2', category_id: 'cat-uuid-123', vehicle_categories: { id: 'cat-uuid-123', name: 'Excavators' } },
-      { id: 'plant-3', category_id: 'cat-uuid-456', vehicle_categories: { id: 'cat-uuid-456', name: 'Telehandlers' } },
+      { id: 'plant-1', category_id: 'cat-uuid-123', van_categories: { id: 'cat-uuid-123', name: 'Excavators' } },
+      { id: 'plant-2', category_id: 'cat-uuid-123', van_categories: { id: 'cat-uuid-123', name: 'Excavators' } },
+      { id: 'plant-3', category_id: 'cat-uuid-456', van_categories: { id: 'cat-uuid-456', name: 'Telehandlers' } },
     ];
 
     // Count using ID (CORRECT - after fix)
@@ -40,9 +40,9 @@ describe('Fleet Page Category Counting Fix', () => {
     };
 
     const vehicles = [
-      { id: 'vehicle-1', category_id: 'cat-uuid-789', vehicle_categories: { id: 'cat-uuid-789', name: 'Vans' } },
-      { id: 'vehicle-2', category_id: 'cat-uuid-789', vehicle_categories: { id: 'cat-uuid-789', name: 'Vans' } },
-      { id: 'vehicle-3', category_id: 'cat-uuid-999', vehicle_categories: { id: 'cat-uuid-999', name: 'Trucks' } },
+      { id: 'vehicle-1', category_id: 'cat-uuid-789', van_categories: { id: 'cat-uuid-789', name: 'Vans' } },
+      { id: 'vehicle-2', category_id: 'cat-uuid-789', van_categories: { id: 'cat-uuid-789', name: 'Vans' } },
+      { id: 'vehicle-3', category_id: 'cat-uuid-999', van_categories: { id: 'cat-uuid-999', name: 'Trucks' } },
     ];
 
     // Count using ID (CORRECT - after fix)
@@ -62,7 +62,7 @@ describe('Fleet Page Category Counting Fix', () => {
       { 
         id: 'plant-1', 
         category_id: 'cat-uuid-123', 
-        vehicle_categories: { 
+        van_categories: { 
           id: 'cat-uuid-123', 
           name: 'Excavators' // Old name in nested object
         } 
@@ -74,7 +74,7 @@ describe('Fleet Page Category Counting Fix', () => {
     expect(countById).toBe(1); // ✅ Correctly counts the asset
 
     // Name-based comparison would fail (the OLD approach)
-    const countByName = plantAssets.filter(p => p.vehicle_categories?.name === category.name).length;
+    const countByName = plantAssets.filter(p => p.van_categories?.name === category.name).length;
     expect(countByName).toBe(0); // ❌ Would incorrectly return 0
   });
 
@@ -88,7 +88,7 @@ describe('Fleet Page Category Counting Fix', () => {
       { 
         id: 'plant-1', 
         category_id: 'cat-uuid-456', 
-        vehicle_categories: { 
+        van_categories: { 
           id: 'cat-uuid-456', 
           name: 'telehandlers' // Different case
         } 
@@ -100,7 +100,7 @@ describe('Fleet Page Category Counting Fix', () => {
     expect(countById).toBe(1); // ✅ Works correctly
 
     // Name comparison would fail due to case sensitivity
-    const countByName = plantAssets.filter(p => p.vehicle_categories?.name === category.name).length;
+    const countByName = plantAssets.filter(p => p.van_categories?.name === category.name).length;
     expect(countByName).toBe(0); // ❌ Would fail
   });
 
@@ -111,9 +111,9 @@ describe('Fleet Page Category Counting Fix', () => {
     };
 
     const plantAssets = [
-      { id: 'plant-1', category_id: 'cat-uuid-123', vehicle_categories: { id: 'cat-uuid-123', name: 'Excavators' } },
-      { id: 'plant-2', category_id: null, vehicle_categories: null }, // No category assigned
-      { id: 'plant-3', category_id: undefined, vehicle_categories: undefined }, // No category
+      { id: 'plant-1', category_id: 'cat-uuid-123', van_categories: { id: 'cat-uuid-123', name: 'Excavators' } },
+      { id: 'plant-2', category_id: null, van_categories: null }, // No category assigned
+      { id: 'plant-3', category_id: undefined, van_categories: undefined }, // No category
     ];
 
     // ID comparison handles null/undefined correctly

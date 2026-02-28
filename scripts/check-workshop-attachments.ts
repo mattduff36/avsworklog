@@ -61,8 +61,8 @@ async function checkAttachments() {
           status,
           action_type,
           created_at,
-          vehicle_id,
-          vehicles (
+          van_id,
+          vans (
             reg_number,
             nickname
           )
@@ -73,7 +73,7 @@ async function checkAttachments() {
         console.log('\nTasks with attachments:');
         tasks.forEach(task => {
           const attCount = attachments.filter(a => a.task_id === task.id).length;
-          console.log(`- ${task.vehicles?.reg_number || 'Unknown'} (${task.status}) - ${attCount} attachment(s)`);
+          console.log(`- ${task.vans?.reg_number || 'Unknown'} (${task.status}) - ${attCount} attachment(s)`);
         });
       }
     } else {

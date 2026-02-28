@@ -43,7 +43,7 @@ export async function createTestVehicle(overrides?: Record<string, unknown>): Pr
   const regNumber = `TST-${RUN_TAG.slice(-6)}`;
 
   const { data, error } = await supabase
-    .from('vehicles')
+    .from('vans')
     .insert({
       reg_number: regNumber,
       nickname: `Test Vehicle ${RUN_TAG}`,
@@ -57,7 +57,7 @@ export async function createTestVehicle(overrides?: Record<string, unknown>): Pr
     throw new Error(`Failed to create test vehicle: ${error?.message || 'no data'}`);
   }
 
-  createdRecords.push({ table: 'vehicles', id: data.id });
+  createdRecords.push({ table: 'vans', id: data.id });
   return data;
 }
 
@@ -78,7 +78,7 @@ export async function createTestWorkshopTask(
   const { data, error } = await supabase
     .from('actions')
     .insert({
-      vehicle_id: vehicleId,
+      van_id: vehicleId,
       created_by: userId,
       action_type: 'workshop_task',
       description: `Test task ${RUN_TAG}`,
@@ -107,7 +107,7 @@ export async function cleanupTestData(): Promise<void> {
       if (record.table === 'vehicles') {
         // Soft-delete test vehicles
         await supabase
-          .from('vehicles')
+          .from('vans')
           .update({ status: 'deleted', deleted_at: new Date().toISOString() })
           .eq('id', record.id);
       } else {

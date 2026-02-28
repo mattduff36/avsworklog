@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
         inspection_item_id,
         inspection_id
       `)
-      .eq('vehicle_id', vehicleId)
+      .eq('van_id', vehicleId)
       .eq('action_type', 'inspection_defect')
       .in('status', ['logged', 'on_hold', 'in_progress']);
 

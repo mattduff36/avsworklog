@@ -35,7 +35,7 @@ export const inspectionItemSchema = z.object({
 });
 
 export const vehicleInspectionFormSchema = z.object({
-  vehicle_id: z.string().uuid('Valid vehicle is required'),
+  van_id: z.string().uuid('Valid vehicle is required'),
   week_ending: z.date(),
   mileage: z.number().nullable(),
   checked_by: z.string().min(1, 'Checked by name is required'),

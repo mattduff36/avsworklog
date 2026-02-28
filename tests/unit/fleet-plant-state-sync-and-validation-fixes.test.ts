@@ -103,9 +103,9 @@ describe('Fleet Page and Category Dialog Bug Fixes', () => {
   describe('Bug 2: applies_to array validation', () => {
     it('should reject empty applies_to array', () => {
       const schema = z.object({
-        applies_to: z.array(z.enum(['vehicle', 'plant']))
+        applies_to: z.array(z.enum(['van', 'plant']))
           .min(1, 'Category must apply to at least one asset type')
-          .default(['vehicle']),
+          .default(['van']),
       });
 
       // Try to create with empty array
@@ -119,12 +119,12 @@ describe('Fleet Page and Category Dialog Bug Fixes', () => {
 
     it('should accept single asset type', () => {
       const schema = z.object({
-        applies_to: z.array(z.enum(['vehicle', 'plant']))
+        applies_to: z.array(z.enum(['van', 'plant']))
           .min(1, 'Category must apply to at least one asset type')
-          .default(['vehicle']),
+          .default(['van']),
       });
 
-      const vehicleOnly = schema.safeParse({ applies_to: ['vehicle'] });
+      const vehicleOnly = schema.safeParse({ applies_to: ['van'] });
       const plantOnly = schema.safeParse({ applies_to: ['plant'] });
 
       expect(vehicleOnly.success).toBe(true);
@@ -133,12 +133,12 @@ describe('Fleet Page and Category Dialog Bug Fixes', () => {
 
     it('should accept both asset types', () => {
       const schema = z.object({
-        applies_to: z.array(z.enum(['vehicle', 'plant']))
+        applies_to: z.array(z.enum(['van', 'plant']))
           .min(1, 'Category must apply to at least one asset type')
-          .default(['vehicle']),
+          .default(['van']),
       });
 
-      const result = schema.safeParse({ applies_to: ['vehicle', 'plant'] });
+      const result = schema.safeParse({ applies_to: ['van', 'plant'] });
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -148,16 +148,16 @@ describe('Fleet Page and Category Dialog Bug Fixes', () => {
 
     it('should default to vehicle when not provided', () => {
       const schema = z.object({
-        applies_to: z.array(z.enum(['vehicle', 'plant']))
+        applies_to: z.array(z.enum(['van', 'plant']))
           .min(1, 'Category must apply to at least one asset type')
-          .default(['vehicle']),
+          .default(['van']),
       });
 
       const result = schema.safeParse({});
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.applies_to).toEqual(['vehicle']);
+        expect(result.data.applies_to).toEqual(['van']);
       }
     });
 
@@ -170,9 +170,9 @@ describe('Fleet Page and Category Dialog Bug Fixes', () => {
 
       const schema = z.object({
         name: z.string(),
-        applies_to: z.array(z.enum(['vehicle', 'plant']))
+        applies_to: z.array(z.enum(['van', 'plant']))
           .min(1, 'Category must apply to at least one asset type')
-          .default(['vehicle']),
+          .default(['van']),
       });
 
       const result = schema.safeParse(userInput);
@@ -184,14 +184,14 @@ describe('Fleet Page and Category Dialog Bug Fixes', () => {
     it('should maintain filtering logic integrity', () => {
       // Simulate filtering logic that relies on applies_to
       const categories = [
-        { id: '1', name: 'Valid', applies_to: ['vehicle'] },
+        { id: '1', name: 'Valid', applies_to: ['van'] },
         { id: '2', name: 'Invalid', applies_to: [] as string[] }, // Should be prevented by validation
       ];
 
       // Filter for vehicle categories
       const vehicleCategories = categories.filter(c => {
-        const appliesTo = c.applies_to.length > 0 ? c.applies_to : ['vehicle'];
-        return appliesTo.includes('vehicle');
+        const appliesTo = c.applies_to.length > 0 ? c.applies_to : ['van'];
+        return appliesTo.includes('van');
       });
 
       // With validation, invalid category should not exist
@@ -210,7 +210,7 @@ describe('Fleet Page and Category Dialog Bug Fixes', () => {
 
     it('should show appropriate error message for empty array', () => {
       const schema = z.object({
-        applies_to: z.array(z.enum(['vehicle', 'plant']))
+        applies_to: z.array(z.enum(['van', 'plant']))
           .min(1, 'Category must apply to at least one asset type'),
       });
 
@@ -229,7 +229,7 @@ describe('Fleet Page and Category Dialog Bug Fixes', () => {
       // Setup: Categories with valid applies_to
       const categories = [
         { id: '1', name: 'Excavator', applies_to: ['plant'] },
-        { id: '2', name: 'Van', applies_to: ['vehicle'] },
+        { id: '2', name: 'Van', applies_to: ['van'] },
       ];
 
       // All categories have at least one applies_to value (validation)
@@ -277,7 +277,7 @@ describe('Fleet Page and Category Dialog Bug Fixes', () => {
       // Step 1: Try to create category with no asset types
       const schema = z.object({
         name: z.string(),
-        applies_to: z.array(z.enum(['vehicle', 'plant']))
+        applies_to: z.array(z.enum(['van', 'plant']))
           .min(1, 'Category must apply to at least one asset type'),
       });
 
@@ -352,7 +352,7 @@ describe('Fleet Page and Category Dialog Bug Fixes', () => {
 
       // Try to create category with no applies_to
       const schema = z.object({
-        applies_to: z.array(z.enum(['vehicle', 'plant'])).min(1),
+        applies_to: z.array(z.enum(['van', 'plant'])).min(1),
       });
 
       const invalid = schema.safeParse({ applies_to: [] });

@@ -12,9 +12,9 @@ describe('AddVehicleDialog Category Filtering Fixes', () => {
   describe('Bug 1: Inconsistent category filtering logic', () => {
     it('should demonstrate inconsistency before fix', () => {
       const categories = [
-        { id: '1', name: 'MOT', applies_to: ['vehicle'] },
+        { id: '1', name: 'MOT', applies_to: ['van'] },
         { id: '2', name: 'LOLER', applies_to: ['plant'] },
-        { id: '3', name: 'Service', applies_to: ['vehicle', 'plant'] },
+        { id: '3', name: 'Service', applies_to: ['van', 'plant'] },
         { id: '4', name: 'Old Category', applies_to: undefined }
       ];
 
@@ -25,7 +25,7 @@ describe('AddVehicleDialog Category Filtering Fixes', () => {
 
       // BEFORE: SELECT dropdown uses || ['vehicle'] (excludes undefined for plant)
       const selectFiltered = categories.filter(cat => {
-        const appliesTo = cat.applies_to || ['vehicle'];
+        const appliesTo = cat.applies_to || ['van'];
         return appliesTo.includes('plant');
       });
 
@@ -41,20 +41,20 @@ describe('AddVehicleDialog Category Filtering Fixes', () => {
 
     it('should show consistent behavior after fix', () => {
       const categories = [
-        { id: '1', name: 'MOT', applies_to: ['vehicle'] },
+        { id: '1', name: 'MOT', applies_to: ['van'] },
         { id: '2', name: 'LOLER', applies_to: ['plant'] },
-        { id: '3', name: 'Service', applies_to: ['vehicle', 'plant'] },
+        { id: '3', name: 'Service', applies_to: ['van', 'plant'] },
         { id: '4', name: 'Old Category', applies_to: undefined }
       ];
 
       // AFTER: Both use || ['vehicle'] (consistent default)
       const fetchFiltered = categories.filter(cat => {
-        const appliesTo = cat.applies_to || ['vehicle'];
+        const appliesTo = cat.applies_to || ['van'];
         return appliesTo.includes('plant');
       });
 
       const selectFiltered = categories.filter(cat => {
-        const appliesTo = cat.applies_to || ['vehicle'];
+        const appliesTo = cat.applies_to || ['van'];
         return appliesTo.includes('plant');
       });
 
@@ -126,17 +126,17 @@ describe('AddVehicleDialog Category Filtering Fixes', () => {
 
   describe('Category filtering with various applies_to values', () => {
     const categories = [
-      { id: '1', name: 'MOT', applies_to: ['vehicle'] },
+      { id: '1', name: 'MOT', applies_to: ['van'] },
       { id: '2', name: 'LOLER', applies_to: ['plant'] },
-      { id: '3', name: 'Service', applies_to: ['vehicle', 'plant'] },
+      { id: '3', name: 'Service', applies_to: ['van', 'plant'] },
       { id: '4', name: 'Old Category', applies_to: undefined },
       { id: '5', name: 'Empty Category', applies_to: [] }
     ];
 
     it('should filter for vehicle asset type', () => {
       const filtered = categories.filter(cat => {
-        const appliesTo = cat.applies_to || ['vehicle'];
-        return appliesTo.includes('vehicle');
+        const appliesTo = cat.applies_to || ['van'];
+        return appliesTo.includes('van');
       });
 
       expect(filtered.map(c => c.id)).toEqual(['1', '3', '4']); // ✅ MOT, Service, Old
@@ -144,7 +144,7 @@ describe('AddVehicleDialog Category Filtering Fixes', () => {
 
     it('should filter for plant asset type', () => {
       const filtered = categories.filter(cat => {
-        const appliesTo = cat.applies_to || ['vehicle'];
+        const appliesTo = cat.applies_to || ['van'];
         return appliesTo.includes('plant');
       });
 
@@ -153,11 +153,11 @@ describe('AddVehicleDialog Category Filtering Fixes', () => {
 
     it('should handle empty applies_to array', () => {
       const emptyCategory = categories.find(c => c.id === '5');
-      const appliesTo = emptyCategory!.applies_to || ['vehicle'];
+      const appliesTo = emptyCategory!.applies_to || ['van'];
       
       // Empty array || ['vehicle'] → [] (empty array is truthy)
       expect(appliesTo).toEqual([]); // ❌ Empty array
-      expect(appliesTo.includes('vehicle')).toBe(false);
+      expect(appliesTo.includes('van')).toBe(false);
       expect(appliesTo.includes('plant')).toBe(false);
       
       // This category won't match any filter (edge case)

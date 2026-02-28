@@ -2,7 +2,7 @@
  * Migration Runner: Add Plant Support to Maintenance History
  * 
  * This script runs the maintenance_history table migration to support plant records.
- * It makes vehicle_id nullable and adds plant_id column with appropriate constraints.
+ * It makes van_id nullable and adds plant_id column with appropriate constraints.
  * 
  * Usage:
  *   npx tsx scripts/run-maintenance-history-plant-migration.ts
@@ -85,19 +85,19 @@ async function runMigration() {
       process.exit(1);
     }
 
-    // Check if vehicle_id is nullable
+    // Check if van_id is nullable
     const nullableCheck = await client.query(`
       SELECT is_nullable
       FROM information_schema.columns
       WHERE table_schema = 'public'
       AND table_name = 'maintenance_history'
-      AND column_name = 'vehicle_id';
+      AND column_name = 'van_id';
     `);
 
     if (nullableCheck.rows[0].is_nullable === 'YES') {
-      console.log('✅ vehicle_id is now nullable\n');
+      console.log('✅ van_id is now nullable\n');
     } else {
-      console.error('❌ vehicle_id is still NOT NULL');
+      console.error('❌ van_id is still NOT NULL');
       process.exit(1);
     }
 

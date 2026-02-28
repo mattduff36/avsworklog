@@ -29,7 +29,7 @@ const QUESTION_TYPES = [
 ] as const;
 
 interface AttachmentManagementPanelProps {
-  taxonomyMode?: 'vehicle' | 'plant';
+  taxonomyMode?: 'van' | 'plant';
 }
 
 export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagementPanelProps) {
@@ -103,7 +103,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
 
   // Filter templates by taxonomy mode if provided
   const filteredTemplates = taxonomyMode 
-    ? templates.filter(t => (t.applies_to || ['vehicle', 'plant']).includes(taxonomyMode))
+    ? templates.filter(t => (t.applies_to || ['van', 'plant']).includes(taxonomyMode))
     : templates;
 
   // Auto-select first template (from filtered templates)
@@ -142,8 +142,8 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
     setTemplateName(template.name);
     setTemplateDescription(template.description || '');
     setTemplateActive(template.is_active);
-    const appliesTo = template.applies_to || ['vehicle', 'plant'];
-    setTemplateAppliesToVehicle(appliesTo.includes('vehicle'));
+    const appliesTo = template.applies_to || ['van', 'plant'];
+    setTemplateAppliesToVehicle(appliesTo.includes('van'));
     setTemplateAppliesToPlant(appliesTo.includes('plant'));
     setShowTemplateDialog(true);
   };
@@ -162,7 +162,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
     setSavingTemplate(true);
     try {
       const appliesTo: string[] = [];
-      if (templateAppliesToVehicle) appliesTo.push('vehicle');
+      if (templateAppliesToVehicle) appliesTo.push('van');
       if (templateAppliesToPlant) appliesTo.push('plant');
 
       if (editingTemplate) {

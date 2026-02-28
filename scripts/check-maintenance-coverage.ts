@@ -40,7 +40,7 @@ async function checkMaintenanceCoverage() {
         v.status,
         CASE WHEN vm.id IS NOT NULL THEN 'Yes' ELSE 'No' END as has_maintenance_record
       FROM vehicles v
-      LEFT JOIN vehicle_maintenance vm ON v.id = vm.vehicle_id
+      LEFT JOIN vehicle_maintenance vm ON v.id = vm.van_id
       WHERE v.reg_number LIKE 'TE57%'
       ORDER BY v.reg_number;
     `);
@@ -54,7 +54,7 @@ async function checkMaintenanceCoverage() {
         COUNT(vm.id) as vehicles_with_maintenance,
         COUNT(v.id) - COUNT(vm.id) as vehicles_without_maintenance
       FROM vehicles v
-      LEFT JOIN vehicle_maintenance vm ON v.id = vm.vehicle_id
+      LEFT JOIN vehicle_maintenance vm ON v.id = vm.van_id
       WHERE v.status = 'active';
     `);
     console.table(statsQuery.rows);
@@ -67,7 +67,7 @@ async function checkMaintenanceCoverage() {
         v.reg_number,
         v.status
       FROM vehicles v
-      LEFT JOIN vehicle_maintenance vm ON v.id = vm.vehicle_id
+      LEFT JOIN vehicle_maintenance vm ON v.id = vm.van_id
       WHERE vm.id IS NULL AND v.status = 'active'
       ORDER BY v.reg_number;
     `);

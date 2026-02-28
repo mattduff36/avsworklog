@@ -67,7 +67,7 @@ async function checkInspectionDefects() {
         COUNT(CASE WHEN ii.status = 'attention' THEN 1 END) as attention,
         COUNT(ii.id) as total_items
       FROM van_inspections vi
-      LEFT JOIN vehicles v ON vi.vehicle_id = v.id
+      LEFT JOIN vehicles v ON vi.van_id = v.id
       LEFT JOIN profiles p ON vi.user_id = p.id
       LEFT JOIN inspection_items ii ON vi.id = ii.inspection_id
       WHERE vi.status = 'submitted'
@@ -111,7 +111,7 @@ async function checkInspectionDefects() {
         COUNT(ii.id) as attention_count
       FROM van_inspections vi
       INNER JOIN inspection_items ii ON vi.id = ii.inspection_id
-      LEFT JOIN vehicles v ON vi.vehicle_id = v.id
+      LEFT JOIN vehicles v ON vi.van_id = v.id
       LEFT JOIN profiles p ON vi.user_id = p.id
       LEFT JOIN actions a ON vi.id = a.inspection_id
       WHERE vi.status = 'submitted'

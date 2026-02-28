@@ -139,7 +139,7 @@ export async function getUserPermissions(
         'actions': true,
         'reports': true,
         'admin-users': true,
-        'admin-vehicles': true,
+        'admin-vans': true,
       };
     }
 

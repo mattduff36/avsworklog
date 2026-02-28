@@ -50,7 +50,7 @@ describe('Plant Table Integration Tests', () => {
 
     // Get a vehicle category for plant
     const { data: category } = await supabase
-      .from('vehicle_categories')
+      .from('van_categories')
       .select('id')
       .limit(1)
       .single();
@@ -135,7 +135,7 @@ describe('Plant Table Integration Tests', () => {
 
     it('should have no plant rows in vehicles table', async () => {
       const { data, error } = await supabase
-        .from('vehicles')
+        .from('vans')
         .select('id, asset_type')
         .eq('asset_type', 'plant');
 
@@ -269,7 +269,7 @@ describe('Plant Table Integration Tests', () => {
         .insert({
           action_type: 'workshop_vehicle_task',
           plant_id: testPlantId,
-          vehicle_id: null,
+          van_id: null,
           workshop_subcategory_id: testWorkshopSubcategoryId,
           workshop_comments: 'Test plant maintenance task for integration testing',
           title: 'Test Plant Task',
@@ -278,12 +278,12 @@ describe('Plant Table Integration Tests', () => {
           priority: 'medium',
           created_by: testManagerId,
         })
-        .select('id, plant_id, vehicle_id')
+        .select('id, plant_id, van_id')
         .single();
 
       expect(error).toBeNull();
       expect(data).toHaveProperty('plant_id', testPlantId);
-      expect(data?.vehicle_id).toBeNull();
+      expect(data?.van_id).toBeNull();
 
       // Clean up
       if (data?.id) {
@@ -315,7 +315,7 @@ describe('Plant Table Integration Tests', () => {
       }
     });
 
-    it('should enforce check constraint for vehicle_id vs plant_id in actions', async () => {
+    it('should enforce check constraint for van_id vs plant_id in actions', async () => {
       if (!testPlantId) {
         console.log('⏭️  Skipping constraint test - no test plant');
         return;
@@ -323,19 +323,19 @@ describe('Plant Table Integration Tests', () => {
 
       // Get a vehicle ID
       const { data: vehicle } = await supabase
-        .from('vehicles')
+        .from('vans')
         .select('id')
         .limit(1)
         .single();
 
       if (!vehicle || !testWorkshopSubcategoryId) return;
 
-      // Try to create action with BOTH vehicle_id and plant_id
+      // Try to create action with BOTH van_id and plant_id
       const { error } = await supabase
         .from('actions')
         .insert({
           action_type: 'workshop_vehicle_task',
-          vehicle_id: vehicle.id,
+          van_id: vehicle.id,
           plant_id: testPlantId,
           workshop_subcategory_id: testWorkshopSubcategoryId,
           workshop_comments: 'This should fail',
@@ -361,7 +361,7 @@ describe('Plant Table Integration Tests', () => {
         .from('vehicle_maintenance')
         .insert({
           plant_id: testPlantId,
-          vehicle_id: null,
+          van_id: null,
           current_hours: 2000,
           last_service_hours: 1900,
           next_service_hours: 2100,
@@ -369,12 +369,12 @@ describe('Plant Table Integration Tests', () => {
           last_updated_at: new Date().toISOString(),
           last_updated_by: testManagerId,
         })
-        .select('id, plant_id, vehicle_id, current_hours')
+        .select('id, plant_id, van_id, current_hours')
         .single();
 
       expect(error).toBeNull();
       expect(data).toHaveProperty('plant_id', testPlantId);
-      expect(data?.vehicle_id).toBeNull();
+      expect(data?.van_id).toBeNull();
       expect(data).toHaveProperty('current_hours', 2000);
 
       // Clean up
@@ -414,7 +414,7 @@ describe('Plant Table Integration Tests', () => {
         .from('plant_inspections')
         .insert({
           plant_id: testPlantId,
-          vehicle_id: null,
+          van_id: null,
           user_id: testManagerId,
           inspection_date: new Date().toISOString(),
           status: 'submitted',
@@ -422,12 +422,12 @@ describe('Plant Table Integration Tests', () => {
           signature_data: 'test-signature',
           signed_at: new Date().toISOString(),
         })
-        .select('id, plant_id, vehicle_id, status')
+        .select('id, plant_id, van_id, status')
         .single();
 
       expect(error).toBeNull();
       expect(data).toHaveProperty('plant_id', testPlantId);
-      expect(data?.vehicle_id).toBeNull();
+      expect(data?.van_id).toBeNull();
       expect(data?.status).toBe('submitted');
 
       // Clean up
@@ -446,7 +446,7 @@ describe('Plant Table Integration Tests', () => {
         .from('plant_inspections')
         .insert({
           plant_id: testPlantId,
-          vehicle_id: null,
+          van_id: null,
           user_id: testManagerId,
           inspection_date: new Date().toISOString(),
           status: 'draft',

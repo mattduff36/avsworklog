@@ -36,10 +36,10 @@ export async function DELETE(
     
     const archiveId = (await params).archiveId;
     
-    // Get archive record before deleting (for logging and vehicle_id)
+    // Get archive record before deleting (for logging and van_id)
     const { data: archive } = await supabase
-      .from('vehicle_archive')
-      .select('vehicle_id, reg_number, archive_reason')
+      .from('van_archive')
+      .select('van_id, reg_number, archive_reason')
       .eq('id', archiveId)
       .single();
     
@@ -54,7 +54,7 @@ export async function DELETE(
     const { data: inspections, error: inspectionError } = await supabase
       .from('van_inspections')
       .select('id')
-      .eq('vehicle_id', archive.vehicle_id)
+      .eq('van_id', archive.van_id)
       .limit(1);
     
     if (inspectionError) {
@@ -65,9 +65,9 @@ export async function DELETE(
     
     // Permanently delete the archived vehicle record
     // Note: This only removes the archive entry. Inspections remain in the database
-    // but will become "orphaned" (vehicle_id still exists but vehicle is not in active or archive tables)
+    // but will become "orphaned" (van_id still exists but vehicle is not in active or archive tables)
     const { error: deleteError } = await supabase
-      .from('vehicle_archive')
+      .from('van_archive')
       .delete()
       .eq('id', archiveId);
     

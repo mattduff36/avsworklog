@@ -110,7 +110,7 @@ describe('Service Task Creation', () => {
       // 3. Verify only one task exists
       
       // In the actual implementation, taskExistsForAlert checks for:
-      // - Same vehicle_id
+      // - Same van_id
       // - Same action_type (workshop_vehicle_task)
       // - Same title (deterministic based on alert type and reg)
       // - Active status (pending, logged, on_hold)

@@ -58,7 +58,7 @@ async function validateDatabaseSchema() {
     // Check plant_id column in maintenance_history
     const { data, error } = await supabase
       .from('maintenance_history')
-      .select('plant_id, vehicle_id')
+      .select('plant_id, van_id')
       .limit(1);
 
     if (error) {
@@ -263,7 +263,7 @@ async function validateMigration() {
     
     const hasPlantIdColumn = content.includes('ADD COLUMN plant_id');
     const hasIndex = content.includes('CREATE INDEX') && content.includes('plant_id');
-    const hasConstraint = content.includes('CHECK') && content.includes('vehicle_id') && content.includes('plant_id');
+    const hasConstraint = content.includes('CHECK') && content.includes('van_id') && content.includes('plant_id');
 
     addResult('Database Migration', 'Add plant_id column', hasPlantIdColumn ? 'PASS' : 'FAIL',
       hasPlantIdColumn ? '✓ Column addition present' : '✗ Column addition missing');
@@ -272,7 +272,7 @@ async function validateMigration() {
       hasIndex ? '✓ Index for plant_id' : '✗ Index missing');
     
     addResult('Database Migration', 'Constraint', hasConstraint ? 'PASS' : 'FAIL',
-      hasConstraint ? '✓ Either vehicle_id OR plant_id constraint' : '✗ Constraint missing');
+      hasConstraint ? '✓ Either van_id OR plant_id constraint' : '✗ Constraint missing');
 
   } catch (error: any) {
     addResult('Database Migration', 'SQL validation', 'FAIL', `Error: ${error.message}`);
