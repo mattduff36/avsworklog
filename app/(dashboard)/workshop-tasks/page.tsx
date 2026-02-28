@@ -36,15 +36,6 @@ import { ErrorDetailsResponse } from '@/types/error-details';
 import type { CompletionData } from '@/components/workshop-tasks/MarkTaskCompleteDialog';
 
 type Action = Database['public']['Tables']['actions']['Row'] & {
-  van_inspections?: {
-    inspection_date: string;
-    vehicles?: {
-      reg_number: string;
-      nickname: string | null;
-      asset_type?: 'vehicle' | 'plant' | 'tool';
-      plant_id?: string | null;
-    };
-  };
   vehicles?: {
     reg_number: string;
     nickname: string | null;
@@ -228,17 +219,6 @@ export default function WorkshopTasksPage() {
         .from('actions')
         .select(`
           *,
-          van_inspections (
-            inspection_date,
-            vehicles (
-              reg_number,
-              nickname
-            ),
-            plant (
-              plant_id,
-              nickname
-            )
-          ),
           vehicles (
             reg_number,
             nickname
@@ -1400,14 +1380,6 @@ export default function WorkshopTasksPage() {
       return getAssetDisplay(task.vehicles);
     } else if (task.plant) {
       return getAssetDisplay(task.plant);
-    } 
-    // Check via inspection
-    else if (task.van_inspections) {
-      if (task.van_inspections.vehicles) {
-        return getAssetDisplay(task.van_inspections.vehicles);
-      } else if (task.van_inspections.plant) {
-        return getAssetDisplay(task.van_inspections.plant);
-      }
     }
     return 'Unknown';
   };

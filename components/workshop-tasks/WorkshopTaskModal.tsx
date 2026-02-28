@@ -34,17 +34,6 @@ type Task = {
   workshop_task_categories?: {
     name: string;
   };
-  van_inspections?: {
-    inspection_date: string;
-    vehicles?: {
-      reg_number: string;
-      nickname: string | null;
-    };
-    plant?: {
-      plant_id: string;
-      nickname: string | null;
-    };
-  };
   vehicles?: {
     reg_number: string;
     nickname: string | null;
@@ -113,14 +102,6 @@ export function WorkshopTaskModal({
       return getAssetDisplay(task.vehicles);
     } else if (task.plant) {
       return getAssetDisplay(task.plant);
-    }
-    // Check via inspection
-    if (task.van_inspections) {
-      if (task.van_inspections.vehicles) {
-        return getAssetDisplay(task.van_inspections.vehicles);
-      } else if (task.van_inspections.plant) {
-        return getAssetDisplay(task.van_inspections.plant);
-      }
     }
     return 'Unknown Asset';
   };

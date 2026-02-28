@@ -16,15 +16,9 @@ import { Database } from '@/types/database';
 import { toast } from 'sonner';
 
 type Action = Database['public']['Tables']['actions']['Row'] & {
-  van_inspections?: {
-    inspection_date: string;
-    vehicles?: {
-      reg_number: string;
-    };
-    profiles?: {
-      full_name: string;
-    };
-  };
+  vehicles?: {
+    reg_number: string;
+  } | null;
   inspection_items?: {
     item_description: string;
     status: string;
@@ -76,14 +70,8 @@ export default function ActionsPage() {
         .from('actions')
         .select(`
           *,
-          van_inspections (
-            inspection_date,
-            vehicles (
-              reg_number
-            ),
-            profiles!vehicle_inspections_user_id_fkey (
-              full_name
-            )
+          vehicles (
+            reg_number
           ),
           inspection_items (
             item_description,
@@ -822,14 +810,14 @@ export default function ActionsPage() {
                               <p className="text-sm text-muted-foreground mb-2">{action.description}</p>
                             )}
                             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                              {action.van_inspections && (
+                              {action.vehicles && (
                                 <span>
-                                  Van: {action.van_inspections.vehicles?.reg_number || 'N/A'}
+                                  Van: {action.vehicles.reg_number || 'N/A'}
                                 </span>
                               )}
-                              {action.van_inspections?.profiles?.full_name && (
+                              {action.plant && (
                                 <span>
-                                  Submitted by: {action.van_inspections.profiles.full_name}
+                                  Plant: {action.plant.plant_id || 'N/A'}
                                 </span>
                               )}
                               {action.inspection_items && (
@@ -926,14 +914,14 @@ export default function ActionsPage() {
                               </div>
                             )}
                             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                              {action.van_inspections && (
+                              {action.vehicles && (
                                 <span>
-                                  Van: {action.van_inspections.vehicles?.reg_number || 'N/A'}
+                                  Van: {action.vehicles.reg_number || 'N/A'}
                                 </span>
                               )}
-                              {action.van_inspections?.profiles?.full_name && (
+                              {action.plant && (
                                 <span>
-                                  Submitted by: {action.van_inspections.profiles.full_name}
+                                  Plant: {action.plant.plant_id || 'N/A'}
                                 </span>
                               )}
                               {action.inspection_items && (
