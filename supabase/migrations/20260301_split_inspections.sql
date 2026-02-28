@@ -155,6 +155,12 @@ ALTER TABLE plant_inspections
 ALTER TABLE plant_inspections
   ADD CONSTRAINT plant_inspections_not_draft CHECK (status <> 'draft');
 
+ALTER TABLE plant_inspections
+  ADD CONSTRAINT plant_inspections_date_range CHECK (inspection_end_date >= inspection_date);
+
+ALTER TABLE plant_inspections
+  ADD CONSTRAINT plant_inspections_max_7_days CHECK ((inspection_end_date - inspection_date) <= 6);
+
 -- =========================================================================
 -- SECTION 7: INDEXES ON plant_inspections
 -- =========================================================================
@@ -335,9 +341,23 @@ CREATE POLICY "Employees can delete own inspection daily hours" ON inspection_da
 -- =========================================================================
 
 CREATE OR REPLACE VIEW vehicle_inspections AS
-  SELECT *, 'van'::text AS inspection_kind FROM van_inspections
+  SELECT
+    id, vehicle_id, user_id, inspection_date, status, submitted_at,
+    reviewed_by, reviewed_at, created_at, updated_at, manager_comments,
+    inspection_end_date, signature_data, signed_at, current_mileage,
+    inspector_comments, plant_id, is_hired_plant, hired_plant_id_serial,
+    hired_plant_description, hired_plant_hiring_company,
+    'van'::text AS inspection_kind
+  FROM van_inspections
   UNION ALL
-  SELECT *, 'plant'::text AS inspection_kind FROM plant_inspections;
+  SELECT
+    id, vehicle_id, user_id, inspection_date, status, submitted_at,
+    reviewed_by, reviewed_at, created_at, updated_at, manager_comments,
+    inspection_end_date, signature_data, signed_at, current_mileage,
+    inspector_comments, plant_id, is_hired_plant, hired_plant_id_serial,
+    hired_plant_description, hired_plant_hiring_company,
+    'plant'::text AS inspection_kind
+  FROM plant_inspections;
 
 COMMENT ON VIEW vehicle_inspections IS 'Temporary compatibility view – remove after code cutover';
 
