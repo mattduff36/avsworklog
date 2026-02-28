@@ -111,7 +111,6 @@ export async function GET() {
 
     await logServerError({
       error: error as Error,
-      request,
       componentName: '/api/messages/pending',
       additionalData: {
         endpoint: '/api/messages/pending',

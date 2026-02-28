@@ -71,6 +71,10 @@ export function MessageBlockingCheck() {
 
       // Fetch pending messages
       const response = await fetch('/api/messages/pending');
+      if (!response.ok) {
+        console.warn(`Pending messages API returned ${response.status}, skipping`);
+        return;
+      }
       const data = await response.json();
 
       if (data.success) {

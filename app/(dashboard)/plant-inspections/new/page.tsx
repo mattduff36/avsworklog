@@ -789,12 +789,14 @@ function NewPlantInspectionContent() {
       router.push('/plant-inspections');
     } catch (err) {
       const errMessage = err instanceof Error ? err.message : String(err);
+      const errCode = (err && typeof err === 'object' && 'code' in err) ? (err as any).code : '';
+      const fullErrStr = errMessage + ' ' + errCode;
       
       const isDuplicateKey =
-        errMessage.includes('duplicate key') ||
-        errMessage.includes('idx_unique_plant_inspection_date') ||
-        errMessage.includes('idx_unique_hired_plant_inspection_date') ||
-        errMessage.includes('23505');
+        fullErrStr.includes('duplicate key') ||
+        fullErrStr.includes('idx_unique_plant_inspection_date') ||
+        fullErrStr.includes('idx_unique_hired_plant_inspection_date') ||
+        errCode === '23505';
 
       if (isDuplicateKey) {
         setError('An inspection for this plant and date already exists. Please select a different plant or date.');
