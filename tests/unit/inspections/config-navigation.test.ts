@@ -1,0 +1,152 @@
+import { describe, it, expect } from 'vitest';
+import {
+  employeeNavItems,
+  managerNavItems,
+  adminNavItems,
+  dashboardNavItem,
+  getFilteredEmployeeNav,
+} from '@/lib/config/navigation';
+import { FORM_TYPES, getEnabledForms, getFormType, getFormTypeByPath } from '@/lib/config/forms';
+import { MODULE_PAGES, getAllPageOptions, getPageUrl } from '@/lib/config/module-pages';
+import { getParentHref } from '@/lib/config/backNavigation';
+import { getAccentFromRoute } from '@/lib/theme/getAccentFromRoute';
+
+describe('Navigation Config — Inspection Rename Verification', () => {
+  it('has Van Inspections dropdown pointing to /van-inspections', () => {
+    const inspectionNav = employeeNavItems.find(n => n.dropdownItems?.length);
+    expect(inspectionNav).toBeDefined();
+    const vanChild = inspectionNav!.dropdownItems!.find(d => d.href === '/van-inspections');
+    expect(vanChild).toBeDefined();
+    expect(vanChild!.label).toBe('Van Inspections');
+  });
+
+  it('has Plant Inspections dropdown pointing to /plant-inspections', () => {
+    const inspectionNav = employeeNavItems.find(n => n.dropdownItems?.length);
+    const plantChild = inspectionNav!.dropdownItems!.find(d => d.href === '/plant-inspections');
+    expect(plantChild).toBeDefined();
+    expect(plantChild!.label).toBe('Plant Inspections');
+  });
+
+  it('no nav items reference /inspections (old path)', () => {
+    const allHrefs = [
+      ...employeeNavItems.map(n => n.href),
+      ...employeeNavItems.flatMap(n => n.dropdownItems?.map(d => d.href) || []),
+      ...managerNavItems.map(n => n.href),
+      ...adminNavItems.map(n => n.href),
+      dashboardNavItem.href,
+    ];
+    const oldPaths = allHrefs.filter(h => h === '/inspections' || h.startsWith('/inspections/'));
+    expect(oldPaths).toHaveLength(0);
+  });
+
+  it('no nav labels contain "Vehicle Inspection"', () => {
+    const allLabels = [
+      ...employeeNavItems.map(n => n.label),
+      ...employeeNavItems.flatMap(n => n.dropdownItems?.map(d => d.label) || []),
+      ...managerNavItems.map(n => n.label),
+      ...adminNavItems.map(n => n.label),
+    ];
+    const forbidden = allLabels.filter(l => /vehicle\s+inspection/i.test(l));
+    expect(forbidden).toHaveLength(0);
+  });
+});
+
+describe('Forms Config — Inspection Rename Verification', () => {
+  it('has Van Inspections form type with /van-inspections href', () => {
+    const vanForm = FORM_TYPES.find(f => f.id === 'inspection');
+    expect(vanForm).toBeDefined();
+    expect(vanForm!.title).toBe('Van Inspections');
+    expect(vanForm!.href).toBe('/van-inspections');
+    expect(vanForm!.listHref).toBe('/van-inspections');
+    expect(vanForm!.enabled).toBe(true);
+  });
+
+  it('has Plant Inspections form type with /plant-inspections href', () => {
+    const plantForm = FORM_TYPES.find(f => f.id === 'plant-inspection');
+    expect(plantForm).toBeDefined();
+    expect(plantForm!.title).toBe('Plant Inspections');
+    expect(plantForm!.href).toBe('/plant-inspections');
+    expect(plantForm!.listHref).toBe('/plant-inspections');
+    expect(plantForm!.enabled).toBe(true);
+  });
+
+  it('no form title contains "Vehicle Inspection"', () => {
+    const forbidden = FORM_TYPES.filter(f => /vehicle\s+inspection/i.test(f.title));
+    expect(forbidden).toHaveLength(0);
+  });
+
+  it('getFormType resolves inspection forms', () => {
+    expect(getFormType('inspection')?.href).toBe('/van-inspections');
+    expect(getFormType('plant-inspection')?.href).toBe('/plant-inspections');
+  });
+
+  it('getFormTypeByPath resolves correctly', () => {
+    expect(getFormTypeByPath('/van-inspections')?.id).toBe('inspection');
+    expect(getFormTypeByPath('/van-inspections/new')?.id).toBe('inspection');
+    expect(getFormTypeByPath('/plant-inspections')?.id).toBe('plant-inspection');
+    expect(getFormTypeByPath('/plant-inspections/new')?.id).toBe('plant-inspection');
+  });
+
+  it('getEnabledForms includes both inspection types', () => {
+    const enabled = getEnabledForms();
+    const ids = enabled.map(f => f.id);
+    expect(ids).toContain('inspection');
+    expect(ids).toContain('plant-inspection');
+  });
+});
+
+describe('Module Pages Config', () => {
+  it('inspection URLs map to /van-inspections', () => {
+    expect(getPageUrl('inspections-list')).toBe('/van-inspections');
+    expect(getPageUrl('inspections-new')).toBe('/van-inspections/new');
+    expect(getPageUrl('inspections-view')).toBe('/van-inspections/[id]');
+  });
+
+  it('module pages include inspections entry', () => {
+    const inspMod = MODULE_PAGES.find(m => m.module === 'inspections');
+    expect(inspMod).toBeDefined();
+    expect(inspMod!.subPages.length).toBeGreaterThan(0);
+  });
+
+  it('getAllPageOptions includes inspection pages', () => {
+    const options = getAllPageOptions();
+    const inspOptions = options.filter(o => o.value.startsWith('inspections-'));
+    expect(inspOptions.length).toBeGreaterThan(0);
+  });
+});
+
+describe('Back Navigation', () => {
+  it('/van-inspections/new goes back to /van-inspections', () => {
+    expect(getParentHref('/van-inspections/new')).toBe('/van-inspections');
+  });
+
+  it('/van-inspections/[id] goes back to /van-inspections', () => {
+    expect(getParentHref('/van-inspections/some-uuid')).toBe('/van-inspections');
+  });
+
+  it('does not reference old /inspections path', () => {
+    const testPaths = [
+      '/van-inspections', '/van-inspections/new', '/van-inspections/abc',
+      '/plant-inspections', '/plant-inspections/new', '/plant-inspections/abc',
+    ];
+    for (const p of testPaths) {
+      const parent = getParentHref(p);
+      expect(parent).not.toBe('/inspections');
+      expect(parent).not.toMatch(/^\/inspections\//);
+    }
+  });
+});
+
+describe('Accent From Route', () => {
+  it('/van-inspections returns inspections accent', () => {
+    expect(getAccentFromRoute('/van-inspections')).toBe('inspections');
+    expect(getAccentFromRoute('/van-inspections/new')).toBe('inspections');
+    expect(getAccentFromRoute('/van-inspections/some-id')).toBe('inspections');
+  });
+
+  it('other modules return their own accents (regression)', () => {
+    expect(getAccentFromRoute('/timesheets')).toBe('timesheets');
+    expect(getAccentFromRoute('/dashboard')).toBe('brand');
+    expect(getAccentFromRoute('/fleet')).toBe('maintenance');
+  });
+});

@@ -37,7 +37,11 @@
     "testsuite:ui": "npx playwright test --config=testsuite/config/playwright.config.ts",
     "testsuite:api": "vitest run --config=testsuite/config/vitest.config.ts",
     "testsuite": "npm run testsuite:api && npm run testsuite:ui",
-    "testsuite:report": "tsx testsuite/runner/report.ts"
+    "testsuite:report": "tsx testsuite/runner/report.ts",
+    "typecheck": "tsc --noEmit",
+    "test:guard:vehicle-inspections": "node scripts/guards/no-vehicle-inspections.mjs",
+    "verify:data-safety": "tsx scripts/verification/verify-inspection-data-safety.ts",
+    "ci:inspections": "npm run typecheck && npm run lint && npm run test:guard:vehicle-inspections && npm run test:run -- tests/unit/inspections && npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

@@ -1,0 +1,330 @@
+{
+  "$schema": "Inspections refactor coverage manifest — maps every affected file to risk and required test layers",
+  "generated": "2026-02-28",
+  "legend": {
+    "risk": "high | medium | low",
+    "layers": ["unit", "integration", "api", "e2e", "db", "static"]
+  },
+  "files": [
+    {
+      "path": "app/(dashboard)/van-inspections/page.tsx",
+      "type": "page",
+      "risk": "high",
+      "layers": ["e2e", "integration"],
+      "description": "Van inspections list with filters, delete, PDF entrypoints"
+    },
+    {
+      "path": "app/(dashboard)/van-inspections/new/page.tsx",
+      "type": "page",
+      "risk": "high",
+      "layers": ["e2e", "integration", "unit"],
+      "description": "Van inspection create/edit/submit/draft form with item writes"
+    },
+    {
+      "path": "app/(dashboard)/van-inspections/[id]/page.tsx",
+      "type": "page",
+      "risk": "high",
+      "layers": ["e2e", "integration"],
+      "description": "Van inspection detail/edit/defect task side-effects"
+    },
+    {
+      "path": "app/(dashboard)/plant-inspections/page.tsx",
+      "type": "page",
+      "risk": "high",
+      "layers": ["e2e", "integration"],
+      "description": "Plant inspections list with filters, delete, PDF entrypoints"
+    },
+    {
+      "path": "app/(dashboard)/plant-inspections/new/page.tsx",
+      "type": "page",
+      "risk": "high",
+      "layers": ["e2e", "integration"],
+      "description": "Plant inspection create/submit with daily-hours writes"
+    },
+    {
+      "path": "app/(dashboard)/plant-inspections/[id]/page.tsx",
+      "type": "page",
+      "risk": "high",
+      "layers": ["e2e", "integration"],
+      "description": "Plant inspection detail/read + defect/workshop behavior"
+    },
+    {
+      "path": "app/api/van-inspections/[id]/delete/route.ts",
+      "type": "api",
+      "risk": "high",
+      "layers": ["api"],
+      "description": "Van delete — manager-only destructive action"
+    },
+    {
+      "path": "app/api/van-inspections/[id]/pdf/route.ts",
+      "type": "api",
+      "risk": "high",
+      "layers": ["api", "e2e"],
+      "description": "Van PDF generation/auth/data joins"
+    },
+    {
+      "path": "app/api/van-inspections/inform-workshop/route.ts",
+      "type": "api",
+      "risk": "high",
+      "layers": ["api"],
+      "description": "Workshop task creation side-effects from van inspections"
+    },
+    {
+      "path": "app/api/van-inspections/sync-defect-tasks/route.ts",
+      "type": "api",
+      "risk": "high",
+      "layers": ["api"],
+      "description": "Van defect sync/idempotency paths"
+    },
+    {
+      "path": "app/api/van-inspections/locked-defects/route.ts",
+      "type": "api",
+      "risk": "high",
+      "layers": ["api"],
+      "description": "Van locked defect resolution"
+    },
+    {
+      "path": "app/api/plant-inspections/[id]/delete/route.ts",
+      "type": "api",
+      "risk": "high",
+      "layers": ["api"],
+      "description": "Plant delete — manager-only, includes hired plant"
+    },
+    {
+      "path": "app/api/plant-inspections/[id]/pdf/route.ts",
+      "type": "api",
+      "risk": "high",
+      "layers": ["api", "e2e"],
+      "description": "Plant PDF generation + daily-hours joins"
+    },
+    {
+      "path": "app/api/plant-inspections/inform-workshop/route.ts",
+      "type": "api",
+      "risk": "high",
+      "layers": ["api"],
+      "description": "Plant workshop task creation (hired-plant guards)"
+    },
+    {
+      "path": "app/api/plant-inspections/sync-defect-tasks/route.ts",
+      "type": "api",
+      "risk": "high",
+      "layers": ["api"],
+      "description": "Plant defect sync behavior"
+    },
+    {
+      "path": "app/api/plant-inspections/locked-defects/route.ts",
+      "type": "api",
+      "risk": "high",
+      "layers": ["api"],
+      "description": "Plant locked defect resolution"
+    },
+    {
+      "path": "supabase/migrations/20260301_split_inspections.sql",
+      "type": "db/migration",
+      "risk": "high",
+      "layers": ["db"],
+      "description": "Table split, constraints, indexes, RLS, triggers"
+    },
+    {
+      "path": "supabase/migrations/20260302_drop_inspection_compatibility_view.sql",
+      "type": "db/migration",
+      "risk": "high",
+      "layers": ["db"],
+      "description": "Compatibility view retirement"
+    },
+    {
+      "path": "scripts/run-inspection-split-preflight.ts",
+      "type": "script",
+      "risk": "high",
+      "layers": ["integration"],
+      "description": "Pre-migration baseline/parity audit"
+    },
+    {
+      "path": "scripts/run-inspection-split-migration.ts",
+      "type": "script",
+      "risk": "high",
+      "layers": ["integration"],
+      "description": "Migration orchestrator and verification"
+    },
+    {
+      "path": "scripts/verify-inspection-split.ts",
+      "type": "script",
+      "risk": "high",
+      "layers": ["integration"],
+      "description": "Post-migration validation"
+    },
+    {
+      "path": "types/database.ts",
+      "type": "types",
+      "risk": "high",
+      "layers": ["static", "unit"],
+      "description": "Table/type contract correctness"
+    },
+    {
+      "path": "lib/hooks/useInspections.ts",
+      "type": "hook",
+      "risk": "medium",
+      "layers": ["unit", "integration"],
+      "description": "Van list query contract"
+    },
+    {
+      "path": "lib/hooks/useRealtime.ts",
+      "type": "hook",
+      "risk": "medium",
+      "layers": ["unit"],
+      "description": "Realtime table/channel subscription on van_inspections"
+    },
+    {
+      "path": "lib/pdf/van-inspection-pdf.tsx",
+      "type": "pdf-utility",
+      "risk": "medium",
+      "layers": ["unit", "api"],
+      "description": "Van PDF render correctness"
+    },
+    {
+      "path": "lib/pdf/plant-inspection-pdf.tsx",
+      "type": "pdf-utility",
+      "risk": "medium",
+      "layers": ["unit", "api"],
+      "description": "Plant PDF render correctness"
+    },
+    {
+      "path": "lib/pdf/inspection-pdf.tsx",
+      "type": "pdf-utility",
+      "risk": "medium",
+      "layers": ["unit"],
+      "description": "Non-van legacy template path (truck/artic)"
+    },
+    {
+      "path": "lib/checklists/vehicle-checklists.ts",
+      "type": "utility",
+      "risk": "medium",
+      "layers": ["unit"],
+      "description": "Table/template checklist branching"
+    },
+    {
+      "path": "lib/checklists/plant-checklists.ts",
+      "type": "utility",
+      "risk": "medium",
+      "layers": ["unit"],
+      "description": "Plant checklist definition (22 items)"
+    },
+    {
+      "path": "lib/config/navigation.ts",
+      "type": "config",
+      "risk": "medium",
+      "layers": ["unit", "e2e"],
+      "description": "Renamed nav links and labels"
+    },
+    {
+      "path": "lib/config/forms.ts",
+      "type": "config",
+      "risk": "medium",
+      "layers": ["unit", "e2e"],
+      "description": "Renamed form titles/routes"
+    },
+    {
+      "path": "lib/config/module-pages.ts",
+      "type": "config",
+      "risk": "medium",
+      "layers": ["unit"],
+      "description": "Inspection URL mapping"
+    },
+    {
+      "path": "lib/config/backNavigation.ts",
+      "type": "config",
+      "risk": "medium",
+      "layers": ["unit"],
+      "description": "Back button routing for inspections"
+    },
+    {
+      "path": "lib/theme/getAccentFromRoute.ts",
+      "type": "utility",
+      "risk": "low",
+      "layers": ["unit"],
+      "description": "Theme accent color for inspection routes"
+    },
+    {
+      "path": "app/api/reports/inspections/bulk-pdf/route.ts",
+      "type": "api",
+      "risk": "medium",
+      "layers": ["api"],
+      "description": "Batch export joins on van_inspections"
+    },
+    {
+      "path": "app/api/reports/inspections/compliance/route.ts",
+      "type": "api",
+      "risk": "medium",
+      "layers": ["api"],
+      "description": "Compliance reporting query integrity"
+    },
+    {
+      "path": "app/api/reports/inspections/defects/route.ts",
+      "type": "api",
+      "risk": "medium",
+      "layers": ["api"],
+      "description": "Defects reporting query integrity"
+    },
+    {
+      "path": "app/api/reports/stats/route.ts",
+      "type": "api",
+      "risk": "medium",
+      "layers": ["api"],
+      "description": "Dashboard/report aggregates"
+    },
+    {
+      "path": "app/api/maintenance/route.ts",
+      "type": "api",
+      "risk": "medium",
+      "layers": ["api"],
+      "description": "Inspection joins in maintenance"
+    },
+    {
+      "path": "app/api/maintenance/history/[vehicleId]/route.ts",
+      "type": "api",
+      "risk": "medium",
+      "layers": ["api"],
+      "description": "Vehicle history inspection regression risk"
+    },
+    {
+      "path": "components/workshop-tasks/WorkshopTaskModal.tsx",
+      "type": "component",
+      "risk": "low",
+      "layers": ["unit"],
+      "description": "Displays van_inspections relationship data"
+    },
+    {
+      "path": "lib/utils/inspectionWorkshopRouting.ts",
+      "type": "utility",
+      "risk": "medium",
+      "layers": ["unit"],
+      "description": "Workshop task categorization from inspection comments"
+    },
+    {
+      "path": "types/inspection.ts",
+      "type": "types",
+      "risk": "medium",
+      "layers": ["static", "unit"],
+      "description": "VanInspection/PlantInspection type interfaces"
+    }
+  ],
+  "static_guards": [
+    {
+      "check": "no-vehicle-inspections-in-runtime",
+      "description": "Fail if from('vehicle_inspections') or Tables['vehicle_inspections'] exists in app/, lib/, components/",
+      "allowlist": ["supabase/migrations/", "scripts/archived/", "scripts/migrations/", "docs/", "tests/"]
+    },
+    {
+      "check": "typecheck",
+      "description": "tsc --noEmit must pass with zero errors"
+    },
+    {
+      "check": "lint",
+      "description": "eslint must pass"
+    },
+    {
+      "check": "build",
+      "description": "next build must succeed with zero errors"
+    }
+  ]
+}
