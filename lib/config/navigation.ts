@@ -55,15 +55,15 @@ export const employeeNavItems: NavItem[] = [
     category: 'employee'
   },
   { 
-    href: '/inspections', 
+    href: '/van-inspections', 
     label: 'Inspections', 
     icon: ClipboardCheck, 
     module: 'inspections',
     category: 'employee',
     dropdownItems: [
       {
-        href: '/inspections',
-        label: 'Vehicle Inspections',
+        href: '/van-inspections',
+        label: 'Van Inspections',
         icon: ClipboardCheck,
         module: 'inspections',
         category: 'employee'

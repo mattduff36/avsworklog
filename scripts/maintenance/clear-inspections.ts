@@ -37,17 +37,29 @@ async function clearInspections() {
     }
     console.log('✅ Deleted all inspection items');
 
-    // Delete vehicle inspections
-    const { error: inspectionsError } = await supabase
-      .from('vehicle_inspections')
+    // Delete van inspections
+    const { error: vanInspectionsError } = await supabase
+      .from('van_inspections')
       .delete()
       .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
 
-    if (inspectionsError) {
-      console.error('❌ Error deleting vehicle inspections:', inspectionsError);
-      throw inspectionsError;
+    if (vanInspectionsError) {
+      console.error('❌ Error deleting van inspections:', vanInspectionsError);
+      throw vanInspectionsError;
     }
-    console.log('✅ Deleted all vehicle inspections');
+    console.log('✅ Deleted all van inspections');
+
+    // Delete plant inspections
+    const { error: plantInspectionsError } = await supabase
+      .from('plant_inspections')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+    if (plantInspectionsError) {
+      console.error('❌ Error deleting plant inspections:', plantInspectionsError);
+      throw plantInspectionsError;
+    }
+    console.log('✅ Deleted all plant inspections');
 
     // Delete actions related to inspections
     const { error: actionsError } = await supabase

@@ -506,7 +506,7 @@ export interface Database {
           updated_at?: string
         }
       }
-      vehicle_inspections: {
+      van_inspections: {
         Row: {
           id: string
           vehicle_id: string | null
@@ -562,6 +562,77 @@ export interface Database {
           inspection_end_date?: string | null
           current_mileage?: number | null
           status?: 'draft' | 'submitted'
+          submitted_at?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          manager_comments?: string | null
+          inspector_comments?: string | null
+          signature_data?: string | null
+          signed_at?: string | null
+          is_hired_plant?: boolean
+          hired_plant_id_serial?: string | null
+          hired_plant_description?: string | null
+          hired_plant_hiring_company?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      plant_inspections: {
+        Row: {
+          id: string
+          vehicle_id: string | null
+          plant_id: string | null
+          user_id: string
+          inspection_date: string
+          inspection_end_date: string | null
+          current_mileage: number | null
+          status: 'submitted'
+          submitted_at: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          manager_comments: string | null
+          inspector_comments: string | null
+          signature_data: string | null
+          signed_at: string | null
+          is_hired_plant: boolean
+          hired_plant_id_serial: string | null
+          hired_plant_description: string | null
+          hired_plant_hiring_company: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          vehicle_id?: string | null
+          plant_id?: string | null
+          user_id: string
+          inspection_date: string
+          inspection_end_date?: string | null
+          current_mileage?: number | null
+          status?: 'submitted'
+          submitted_at?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          manager_comments?: string | null
+          inspector_comments?: string | null
+          signature_data?: string | null
+          signed_at?: string | null
+          is_hired_plant?: boolean
+          hired_plant_id_serial?: string | null
+          hired_plant_description?: string | null
+          hired_plant_hiring_company?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          vehicle_id?: string | null
+          plant_id?: string | null
+          user_id?: string
+          inspection_date?: string
+          inspection_end_date?: string | null
+          current_mileage?: number | null
+          status?: 'submitted'
           submitted_at?: string | null
           reviewed_by?: string | null
           reviewed_at?: string | null

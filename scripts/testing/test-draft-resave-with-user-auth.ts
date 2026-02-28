@@ -86,7 +86,7 @@ async function testDraftResave() {
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
     const { data: inspection, error: createError } = await adminClient
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .insert({
         user_id: testUserId,
         vehicle_id: vehicle.id,
@@ -267,7 +267,7 @@ async function testDraftResave() {
 async function cleanup(client: any, inspectionId: string) {
   console.log('🧹 Cleaning up test data...');
   await client
-    .from('vehicle_inspections')
+    .from('van_inspections')
     .delete()
     .eq('id', inspectionId);
   console.log('✅ Cleanup complete\n');

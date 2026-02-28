@@ -176,7 +176,7 @@ function NewPlantInspectionContent() {
       const userIsManager = (profileData as ProfileWithRole)?.role?.is_manager_admin || false;
 
       const { data: inspection, error: inspectionError } = await supabase
-        .from('vehicle_inspections')
+        .from('plant_inspections')
         .select(`
           *,
           plant (
@@ -327,7 +327,7 @@ function NewPlantInspectionContent() {
           return false;
         }
         query = supabase
-          .from('vehicle_inspections')
+          .from('plant_inspections')
           .select('id, status')
           .eq('is_hired_plant', true)
           .eq('hired_plant_id_serial', hiredPlantIdSerial.trim())
@@ -335,7 +335,7 @@ function NewPlantInspectionContent() {
           .limit(1);
       } else {
         query = supabase
-          .from('vehicle_inspections')
+          .from('plant_inspections')
           .select('id, status')
           .eq('plant_id', plantIdToCheck)
           .eq('inspection_date', dateToCheck)
@@ -565,7 +565,7 @@ function NewPlantInspectionContent() {
     setLoading(true);
 
     try {
-      type InspectionInsert = Database['public']['Tables']['vehicle_inspections']['Insert'];
+      type InspectionInsert = Database['public']['Tables']['plant_inspections']['Insert'];
       const inspectionData: InspectionInsert = {
         plant_id: isHiredPlant ? null : selectedPlantId,
         user_id: selectedEmployeeId,
@@ -605,7 +605,7 @@ function NewPlantInspectionContent() {
         inspection = { id: existingInspectionId };
       } else {
         const { data: newInspection, error: insertError } = await supabase
-          .from('vehicle_inspections')
+          .from('plant_inspections')
           .insert(inspectionData)
           .select()
           .single();
@@ -649,7 +649,7 @@ function NewPlantInspectionContent() {
       }
 
       if (existingInspectionId) {
-        type InspectionUpdate = Database['public']['Tables']['vehicle_inspections']['Update'];
+        type InspectionUpdate = Database['public']['Tables']['plant_inspections']['Update'];
         const inspectionUpdate: InspectionUpdate = {
           plant_id: isHiredPlant ? null : selectedPlantId,
           user_id: selectedEmployeeId,
@@ -668,7 +668,7 @@ function NewPlantInspectionContent() {
         };
 
         const { data: updatedInspection, error: updateError } = await supabase
-          .from('vehicle_inspections')
+          .from('plant_inspections')
           .update(inspectionUpdate)
           .eq('id', existingInspectionId)
           .select();

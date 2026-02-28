@@ -64,9 +64,9 @@ describe('Plant Table Read-Only Verification', () => {
       expect(error).toBeNull();
     });
 
-    it('should have plant_id column in vehicle_inspections table', async () => {
+    it('should have plant_id column in plant_inspections table', async () => {
       const { error } = await supabase
-        .from('vehicle_inspections')
+        .from('plant_inspections')
         .select('id, plant_id')
         .limit(1);
       
@@ -127,7 +127,7 @@ describe('Plant Table Read-Only Verification', () => {
 
     it('should have inspections with plant_id', async () => {
       const { count, error } = await supabase
-        .from('vehicle_inspections')
+        .from('plant_inspections')
         .select('*', { count: 'exact', head: true })
         .not('plant_id', 'is', null);
 
@@ -289,7 +289,7 @@ describe('Plant Table Read-Only Verification', () => {
 
     it('should NOT have inspections with both vehicle_id and plant_id', async () => {
       const { data, error } = await supabase
-        .from('vehicle_inspections')
+        .from('plant_inspections')
         .select('id, vehicle_id, plant_id')
         .not('vehicle_id', 'is', null)
         .not('plant_id', 'is', null);

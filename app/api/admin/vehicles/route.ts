@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
     const vehiclesWithInspector = await Promise.all(
       (vehicles || []).map(async (vehicle) => {
         const { data: inspections } = await supabase
-          .from('vehicle_inspections')
+          .from('van_inspections')
           .select(`
             user_id,
             inspection_date,

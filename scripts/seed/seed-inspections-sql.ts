@@ -49,7 +49,7 @@ const INSPECTION_ITEMS = [
 ];
 
 async function seedInspections() {
-  console.log('🔍 Seeding vehicle inspections using raw SQL...\n');
+  console.log('🔍 Seeding van inspections using raw SQL...\n');
 
   try {
     // First, get users and vehicles
@@ -81,7 +81,7 @@ async function seedInspections() {
         
         // Create inspection
         const { data: inspection, error: inspError } = await supabase
-          .from('vehicle_inspections')
+          .from('van_inspections')
           .insert({
             user_id: user.id,
             vehicle_id: vehicle.id,

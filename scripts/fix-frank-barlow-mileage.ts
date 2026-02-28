@@ -88,7 +88,7 @@ async function fixMileage() {
     // 3. Check all inspections for this vehicle
     console.log('\n📋 Step 3: Checking all inspections...');
     const { data: inspections } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .select('*')
       .eq('vehicle_id', vehicle.id)
       .order('created_at', { ascending: false });
@@ -144,7 +144,7 @@ async function fixMileage() {
       
       for (const insp of suspicious) {
         const { error: deleteError } = await supabase
-          .from('vehicle_inspections')
+          .from('van_inspections')
           .delete()
           .eq('id', insp.id);
         

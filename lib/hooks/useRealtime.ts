@@ -54,6 +54,6 @@ export function useTimesheetRealtime(callback: RealtimeCallback) {
 }
 
 export function useInspectionRealtime(callback: RealtimeCallback) {
-  useRealtimeSubscription('vehicle_inspections', '*', callback);
+  useRealtimeSubscription('van_inspections', '*', callback);
 }
 

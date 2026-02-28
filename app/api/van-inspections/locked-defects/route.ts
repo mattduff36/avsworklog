@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 /**
- * GET /api/inspections/locked-defects?vehicleId=xxx
+ * GET /api/van-inspections/locked-defects?vehicleId=xxx
  * 
  * Returns locked checklist items for a vehicle where existing defect tasks are active.
  * Uses service role to bypass RLS (inspectors can't read actions table).

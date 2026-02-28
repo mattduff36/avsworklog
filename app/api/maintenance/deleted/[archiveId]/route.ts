@@ -52,13 +52,13 @@ export async function DELETE(
     
     // Check if there are inspections for this vehicle
     const { data: inspections, error: inspectionError } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .select('id')
       .eq('vehicle_id', archive.vehicle_id)
       .limit(1);
     
     if (inspectionError) {
-      logger.error('Failed to check vehicle inspections', inspectionError);
+      logger.error('Failed to check van inspections', inspectionError);
     }
     
     const hasInspections = inspections && inspections.length > 0;

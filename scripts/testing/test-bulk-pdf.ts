@@ -33,7 +33,7 @@ async function testBulkPDFGeneration() {
   // Step 1: Check for inspections in the database
   console.log('📊 Step 1: Fetching inspection count...');
   const { data: inspections, error: countError, count } = await supabase
-    .from('vehicle_inspections')
+    .from('van_inspections')
     .select('*', { count: 'exact', head: true })
     .neq('status', 'draft');
 
@@ -53,7 +53,7 @@ async function testBulkPDFGeneration() {
   // Step 2: Fetch a sample date range
   console.log('📅 Step 2: Getting date range for inspections...');
   const { data: dateRange, error: dateError } = await supabase
-    .from('vehicle_inspections')
+    .from('van_inspections')
     .select('inspection_end_date')
     .neq('status', 'draft')
     .order('inspection_end_date', { ascending: true })
@@ -80,7 +80,7 @@ async function testBulkPDFGeneration() {
   // Step 4: Verify inspection items exist
   console.log('📝 Step 4: Checking inspection items...');
   const { data: sampleInspection } = await supabase
-    .from('vehicle_inspections')
+    .from('van_inspections')
     .select(`
       id,
       inspection_items (count)

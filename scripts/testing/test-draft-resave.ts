@@ -44,7 +44,7 @@ async function testDraftResave() {
     // Step 1: Create draft inspection
     console.log('📋 Step 1: Creating draft inspection...');
     const { data: inspection, error: createError } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .insert({
         vehicle_id: vehicleId,
         user_id: userId,
@@ -150,7 +150,7 @@ async function testDraftResave() {
   } finally {
     if (inspectionId) {
       console.log('\n🧹 Cleaning up...');
-      await supabase.from('vehicle_inspections').delete().eq('id', inspectionId);
+      await supabase.from('van_inspections').delete().eq('id', inspectionId);
       console.log('✅ Cleanup complete');
     }
   }

@@ -146,11 +146,11 @@ export async function GET(
         workshop_task_categories (
           name
         ),
-        vehicle_inspections!inner (
+        van_inspections!inner (
           vehicle_id
         )
       `)
-      .eq('vehicle_inspections.vehicle_id', vehicleId)
+      .eq('van_inspections.vehicle_id', vehicleId)
       .eq('action_type', 'inspection_defect')
       .order('created_at', { ascending: false });
     
@@ -164,7 +164,7 @@ export async function GET(
     if (inspectionTasks) {
       inspectionTasks.forEach(task => {
         // Remove the vehicle_inspections property before storing
-        const { vehicle_inspections, ...cleanTask } = task as any;
+        const { van_inspections, ...cleanTask } = task as any;
         if (!taskMap.has(task.id)) {
           taskMap.set(task.id, cleanTask);
         }

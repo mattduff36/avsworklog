@@ -151,9 +151,9 @@ describe('Plant Table Integration Tests', () => {
         .limit(1);
       expect(actionsError).toBeNull();
 
-      // Check vehicle_inspections table
+      // Check plant_inspections table
       const { error: inspectionsError } = await supabase
-        .from('vehicle_inspections')
+        .from('plant_inspections')
         .select('plant_id')
         .limit(1);
       expect(inspectionsError).toBeNull();
@@ -411,7 +411,7 @@ describe('Plant Table Integration Tests', () => {
       }
 
       const { data, error } = await supabase
-        .from('vehicle_inspections')
+        .from('plant_inspections')
         .insert({
           plant_id: testPlantId,
           vehicle_id: null,
@@ -432,7 +432,7 @@ describe('Plant Table Integration Tests', () => {
 
       // Clean up
       if (data?.id) {
-        await supabase.from('vehicle_inspections').delete().eq('id', data.id);
+        await supabase.from('plant_inspections').delete().eq('id', data.id);
       }
     });
 
@@ -443,7 +443,7 @@ describe('Plant Table Integration Tests', () => {
       }
 
       const { data, error } = await supabase
-        .from('vehicle_inspections')
+        .from('plant_inspections')
         .insert({
           plant_id: testPlantId,
           vehicle_id: null,
@@ -492,7 +492,7 @@ describe('Plant Table Integration Tests', () => {
 
     it('should have plant inspections migrated', async () => {
       const { count, error } = await supabase
-        .from('vehicle_inspections')
+        .from('plant_inspections')
         .select('*', { count: 'exact', head: true })
         .not('plant_id', 'is', null);
 

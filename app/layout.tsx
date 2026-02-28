@@ -17,7 +17,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Squires - A&V Squires Plant Co. Ltd.",
-  description: "Digital forms management system for timesheets and vehicle inspections",
+  description: "Digital forms management system for timesheets and van inspections",
   manifest: "/manifest.json",
   icons: {
     apple: [

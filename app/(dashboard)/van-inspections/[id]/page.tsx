@@ -12,11 +12,11 @@ import { Save, Send, Edit2, CheckCircle2, XCircle, AlertCircle, Camera, Download
 import Link from 'next/link';
 import { BackButton } from '@/components/ui/back-button';
 import { formatDate } from '@/lib/utils/date';
-import { InspectionStatus, VehicleInspection, InspectionItem } from '@/types/inspection';
+import { InspectionStatus, VanInspection, InspectionItem } from '@/types/inspection';
 import PhotoUpload from '@/components/forms/PhotoUpload';
 import { Database } from '@/types/database';
 
-interface InspectionWithDetails extends VehicleInspection {
+interface InspectionWithDetails extends VanInspection {
   vehicles: {
     reg_number: string;
     vehicle_type: string;
@@ -44,7 +44,7 @@ export default function ViewInspectionPage() {
       
       // Fetch inspection
       const { data: inspectionData, error: inspectionError } = await supabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .select(`
           *,
           vehicles (
@@ -123,13 +123,13 @@ export default function ViewInspectionPage() {
       });
 
       // Update inspection
-      type InspectionUpdate = Database['public']['Tables']['vehicle_inspections']['Update'];
+      type InspectionUpdate = Database['public']['Tables']['van_inspections']['Update'];
       const inspectionUpdate: InspectionUpdate = {
         updated_at: new Date().toISOString(),
       };
 
       const { error: inspectionError } = await supabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .update(inspectionUpdate)
         .eq('id', inspection.id);
 
@@ -239,7 +239,7 @@ export default function ViewInspectionPage() {
               }));
 
               // Call server endpoint to sync tasks
-              const syncResponse = await fetch('/api/inspections/sync-defect-tasks', {
+              const syncResponse = await fetch('/api/van-inspections/sync-defect-tasks', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -420,7 +420,7 @@ export default function ViewInspectionPage() {
             }));
 
             // Call server endpoint to sync tasks
-            const syncResponse = await fetch('/api/inspections/sync-defect-tasks', {
+            const syncResponse = await fetch('/api/van-inspections/sync-defect-tasks', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -505,7 +505,7 @@ export default function ViewInspectionPage() {
 
       // Update inspection status
       const { error: updateError } = await supabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .update({
           status: 'submitted',
           submitted_at: new Date().toISOString(),
@@ -514,7 +514,7 @@ export default function ViewInspectionPage() {
 
       if (updateError) throw updateError;
 
-      router.push('/inspections');
+      router.push('/van-inspections');
     } catch (err) {
       console.error('Error submitting inspection:', err);
       setError(err instanceof Error ? err.message : 'Failed to submit inspection');
@@ -571,10 +571,10 @@ export default function ViewInspectionPage() {
   if (error && !inspection) {
     return (
       <div className="space-y-6">
-        <Link href="/inspections">
+        <Link href="/van-inspections">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Inspections
+            Back to Van Inspections
           </Button>
         </Link>
         <Card>
@@ -631,7 +631,7 @@ export default function ViewInspectionPage() {
           <div className="flex items-center space-x-3 md:space-x-4">
             <BackButton />
             <div>
-              <h1 className="text-xl md:text-3xl font-bold text-foreground">Vehicle Inspection</h1>
+              <h1 className="text-xl md:text-3xl font-bold text-foreground">Van Inspection</h1>
               <p className="text-sm md:text-base text-muted-foreground">
                 {inspection.vehicles?.reg_number} • {
                   inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
@@ -650,12 +650,12 @@ export default function ViewInspectionPage() {
                   e.preventDefault();
                   const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
                   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                  const pdfUrl = `/api/inspections/${inspection.id}/pdf`;
+                  const pdfUrl = `/api/van-inspections/${inspection.id}/pdf`;
                   const vehicleReg = inspection.vehicles?.reg_number || 'Unknown';
                   
                   if (isStandalone || isMobile) {
                     // Use in-app PDF viewer for PWA/mobile
-                    router.push(`/pdf-viewer?url=${encodeURIComponent(pdfUrl)}&title=${encodeURIComponent(`Inspection-${vehicleReg}`)}&return=${encodeURIComponent(`/inspections/${inspection.id}`)}`);
+                    router.push(`/pdf-viewer?url=${encodeURIComponent(pdfUrl)}&title=${encodeURIComponent(`Inspection-${vehicleReg}`)}&return=${encodeURIComponent(`/van-inspections/${inspection.id}`)}`);
                   } else {
                     // Desktop: Open in new tab
                     window.open(pdfUrl, '_blank');

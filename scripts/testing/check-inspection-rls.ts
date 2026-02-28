@@ -1,5 +1,5 @@
 /**
- * Check RLS policies on vehicle_inspections table
+ * Check RLS policies on van_inspections table
  */
 
 import { config } from 'dotenv';
@@ -18,7 +18,7 @@ if (!connectionString) {
 }
 
 async function checkPolicies() {
-  console.log('🔍 Checking vehicle_inspections RLS policies...\n');
+  console.log('🔍 Checking van_inspections RLS policies...\n');
 
   const url = new URL(connectionString);
   
@@ -41,7 +41,7 @@ async function checkPolicies() {
     const rlsCheck = await client.query(`
       SELECT relrowsecurity as rls_enabled
       FROM pg_class
-      WHERE relname = 'vehicle_inspections';
+      WHERE relname = 'van_inspections';
     `);
 
     console.log('🔒 RLS Status:', rlsCheck.rows[0]?.rls_enabled ? 'ENABLED ✅' : 'DISABLED ⚠️');
@@ -55,7 +55,7 @@ async function checkPolicies() {
         qual,
         with_check
       FROM pg_policies
-      WHERE tablename = 'vehicle_inspections'
+      WHERE tablename = 'van_inspections'
       ORDER BY cmd, policyname;
     `);
 

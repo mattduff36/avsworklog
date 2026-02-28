@@ -37,7 +37,7 @@ async function cleanupDraftInspections() {
     // Step 1: Find all draft inspections
     console.log('📋 Step 1: Finding all draft inspections...');
     const { data: draftInspections, error: fetchError } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .select(`
         id,
         inspection_date,

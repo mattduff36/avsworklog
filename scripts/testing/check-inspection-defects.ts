@@ -33,7 +33,7 @@ async function checkInspectionDefects() {
     console.log('📊 Inspection Statuses:');
     const statusQuery = `
       SELECT status, COUNT(*) as count
-      FROM vehicle_inspections
+      FROM van_inspections
       GROUP BY status
       ORDER BY count DESC;
     `;
@@ -66,7 +66,7 @@ async function checkInspectionDefects() {
         COUNT(CASE WHEN ii.status = 'defect' THEN 1 END) as defects,
         COUNT(CASE WHEN ii.status = 'attention' THEN 1 END) as attention,
         COUNT(ii.id) as total_items
-      FROM vehicle_inspections vi
+      FROM van_inspections vi
       LEFT JOIN vehicles v ON vi.vehicle_id = v.id
       LEFT JOIN profiles p ON vi.user_id = p.id
       LEFT JOIN inspection_items ii ON vi.id = ii.inspection_id
@@ -109,7 +109,7 @@ async function checkInspectionDefects() {
         v.reg_number,
         p.full_name,
         COUNT(ii.id) as attention_count
-      FROM vehicle_inspections vi
+      FROM van_inspections vi
       INNER JOIN inspection_items ii ON vi.id = ii.inspection_id
       LEFT JOIN vehicles v ON vi.vehicle_id = v.id
       LEFT JOIN profiles p ON vi.user_id = p.id

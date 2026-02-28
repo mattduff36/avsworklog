@@ -16,7 +16,7 @@ import { Database } from '@/types/database';
 import { toast } from 'sonner';
 
 type Action = Database['public']['Tables']['actions']['Row'] & {
-  vehicle_inspections?: {
+  van_inspections?: {
     inspection_date: string;
     vehicles?: {
       reg_number: string;
@@ -76,7 +76,7 @@ export default function ActionsPage() {
         .from('actions')
         .select(`
           *,
-          vehicle_inspections (
+          van_inspections (
             inspection_date,
             vehicles (
               reg_number
@@ -822,14 +822,14 @@ export default function ActionsPage() {
                               <p className="text-sm text-muted-foreground mb-2">{action.description}</p>
                             )}
                             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                              {action.vehicle_inspections && (
+                              {action.van_inspections && (
                                 <span>
-                                  Vehicle: {action.vehicle_inspections.vehicles?.reg_number || 'N/A'}
+                                  Vehicle: {action.van_inspections.vehicles?.reg_number || 'N/A'}
                                 </span>
                               )}
-                              {action.vehicle_inspections?.profiles?.full_name && (
+                              {action.van_inspections?.profiles?.full_name && (
                                 <span>
-                                  Submitted by: {action.vehicle_inspections.profiles.full_name}
+                                  Submitted by: {action.van_inspections.profiles.full_name}
                                 </span>
                               )}
                               {action.inspection_items && (
@@ -926,14 +926,14 @@ export default function ActionsPage() {
                               </div>
                             )}
                             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                              {action.vehicle_inspections && (
+                              {action.van_inspections && (
                                 <span>
-                                  Vehicle: {action.vehicle_inspections.vehicles?.reg_number || 'N/A'}
+                                  Vehicle: {action.van_inspections.vehicles?.reg_number || 'N/A'}
                                 </span>
                               )}
-                              {action.vehicle_inspections?.profiles?.full_name && (
+                              {action.van_inspections?.profiles?.full_name && (
                                 <span>
-                                  Submitted by: {action.vehicle_inspections.profiles.full_name}
+                                  Submitted by: {action.van_inspections.profiles.full_name}
                                 </span>
                               )}
                               {action.inspection_items && (

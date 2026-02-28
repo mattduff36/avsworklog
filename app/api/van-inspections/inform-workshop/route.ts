@@ -7,7 +7,7 @@ import {
 } from '@/lib/utils/inspectionWorkshopRouting';
 
 /**
- * POST /api/inspections/inform-workshop
+ * POST /api/van-inspections/inform-workshop
  * 
  * Creates or updates a workshop task from an inspection comment.
  * Idempotent: if a task already exists for this inspection with the same title prefix,

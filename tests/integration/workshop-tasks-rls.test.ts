@@ -276,7 +276,7 @@ describe('Workshop Tasks RLS Policies', () => {
       // Create a test inspection
       // SAFETY: Using 27000 miles instead of 50000 to avoid Frank Barlow incident pattern
       const { data: inspection } = await supabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .insert({
           vehicle_id: testVehicleId,
           user_id: testManagerId,
@@ -309,7 +309,7 @@ describe('Workshop Tasks RLS Policies', () => {
 
       // Cleanup
       await supabase.from('actions').delete().eq('id', defectAction!.id);
-      await supabase.from('vehicle_inspections').delete().eq('id', inspection!.id);
+      await supabase.from('van_inspections').delete().eq('id', inspection!.id);
     });
   });
 

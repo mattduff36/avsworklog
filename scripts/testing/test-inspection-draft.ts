@@ -49,7 +49,7 @@ function logResult(test: string, passed: boolean, message: string) {
 
 async function cleanup(inspectionId?: string) {
   if (inspectionId) {
-    await supabase.from('vehicle_inspections').delete().eq('id', inspectionId);
+    await supabase.from('van_inspections').delete().eq('id', inspectionId);
     console.log(`🧹 Cleaned up inspection ${inspectionId}`);
   }
 }
@@ -149,7 +149,7 @@ async function runTests() {
     weekStart.setDate(weekEnding.getDate() - 6); // Previous Monday
 
     const { data: newInspection, error: createError } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .insert({
         vehicle_id: testVehicleId,
         user_id: testUserId,
@@ -305,7 +305,7 @@ async function runTests() {
     log('📋 Step 10: Testing submission...');
     
     const { error: submitError } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .update({
         status: 'submitted',
         submitted_at: new Date().toISOString(),
@@ -318,7 +318,7 @@ async function runTests() {
 
     // Verify status changed
     const { data: submittedInspection, error: verifyError } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .select('status, submitted_at')
       .eq('id', testInspectionId)
       .single();

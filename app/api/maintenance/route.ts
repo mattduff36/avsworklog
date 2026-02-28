@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
         
         // Get the last inspection for this vehicle
         const { data: inspections } = await supabase
-          .from('vehicle_inspections')
+          .from('van_inspections')
           .select(`
             inspection_date,
             profiles!vehicle_inspections_user_id_fkey (

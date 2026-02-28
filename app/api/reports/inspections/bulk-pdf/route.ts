@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch all non-draft inspections within the date range
     const { data: inspections, error: inspectionsError } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .select(`
         *,
         vehicle:vehicles(
@@ -218,7 +218,7 @@ export async function POST(request: NextRequest) {
 
         // Fetch all non-draft inspections within the date range
         const { data: inspections, error: inspectionsError } = await supabase
-          .from('vehicle_inspections')
+          .from('van_inspections')
           .select(`
             *,
             vehicle:vehicles(

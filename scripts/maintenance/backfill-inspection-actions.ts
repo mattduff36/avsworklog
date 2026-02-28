@@ -43,7 +43,7 @@ async function backfillInspectionActions() {
         v.reg_number,
         p.full_name as inspector_name,
         COUNT(ii.id) as defect_count
-      FROM vehicle_inspections vi
+      FROM van_inspections vi
       INNER JOIN inspection_items ii ON vi.id = ii.inspection_id
       INNER JOIN vehicles v ON vi.vehicle_id = v.id
       LEFT JOIN profiles p ON vi.user_id = p.id

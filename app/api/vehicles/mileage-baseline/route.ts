@@ -10,7 +10,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
  * 
  * Sources (in priority order):
  * 1. vehicle_maintenance.current_mileage (most reliable, auto-updated from inspections)
- * 2. Latest vehicle_inspections.current_mileage (fallback if no maintenance record)
+ * 2. Latest van_inspections.current_mileage (fallback if no maintenance record)
  * 
  * Returns: { baselineMileage: number | null, baselineSource: string, lastUpdated: string | null }
  */
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
 
     // Fallback: Get latest inspection mileage
     const { data: inspections, error: inspectionError } = await supabaseAdmin
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .select('current_mileage, created_at')
       .eq('vehicle_id', vehicleId)
       .not('current_mileage', 'is', null)

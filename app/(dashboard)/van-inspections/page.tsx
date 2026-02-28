@@ -17,7 +17,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, FileText, Truck } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
-import { VehicleInspection } from '@/types/inspection';
+import { VanInspection } from '@/types/inspection';
 import { Employee, InspectionStatusFilter } from '@/types/common';
 import { useQueryState } from 'nuqs';
 import {
@@ -31,7 +31,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-interface InspectionWithVehicle extends VehicleInspection {
+interface InspectionWithVehicle extends VanInspection {
   vehicles: {
     reg_number: string;
     vehicle_categories: { name: string } | null;
@@ -128,7 +128,7 @@ function InspectionsContent() {
     
     try {
       let query = supabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .select(`
           *,
           vehicles (
@@ -139,8 +139,6 @@ function InspectionsContent() {
           ),
           profile:profiles!vehicle_inspections_user_id_fkey(full_name)
         `)
-        .is('plant_id', null)
-        .eq('is_hired_plant', false)
         .order('inspection_date', { ascending: false });
 
       // Filter based on user role and selection
@@ -225,7 +223,7 @@ function InspectionsContent() {
           const status = (payload.new as { status?: string }).status;
           if (status === 'submitted') {
             toast.success('Inspection submitted', {
-              description: 'A vehicle inspection has been submitted.',
+              description: 'A van inspection has been submitted.',
             });
           }
         }
@@ -267,7 +265,7 @@ function InspectionsContent() {
     
     setDownloading(inspectionId);
     try {
-      const response = await fetch(`/api/inspections/${inspectionId}/pdf`);
+      const response = await fetch(`/api/van-inspections/${inspectionId}/pdf`);
       if (!response.ok) {
         const raw = await response.text().catch(() => '');
         const serverMessage = (() => {
@@ -342,7 +340,7 @@ function InspectionsContent() {
 
     setDeleting(true);
     try {
-      const response = await fetch(`/api/inspections/${inspectionToDelete.id}/delete`, {
+      const response = await fetch(`/api/van-inspections/${inspectionToDelete.id}/delete`, {
         method: 'DELETE',
       });
 
@@ -370,12 +368,12 @@ function InspectionsContent() {
       <div className="bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Vehicle Inspections</h1>
+            <h1 className="text-3xl font-bold text-white mb-2">Van Inspections</h1>
             <p className="text-muted-foreground">
               Daily safety check sheets
             </p>
           </div>
-          <Link href="/inspections/new">
+          <Link href="/van-inspections/new">
             <Button className="bg-inspection hover:bg-inspection-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg">
               <Plus className="h-4 w-4 mr-2" />
               New Inspection
@@ -519,9 +517,9 @@ function InspectionsContent() {
             <Clipboard className="h-16 w-16 text-slate-400 mb-4" />
             <h3 className="text-lg font-semibold text-white mb-2">No inspections yet</h3>
             <p className="text-slate-400 mb-4">
-              Create your first vehicle inspection
+              Create your first van inspection
             </p>
-            <Link href="/inspections/new">
+            <Link href="/van-inspections/new">
               <Button className="bg-inspection hover:bg-inspection-dark text-white transition-all duration-200 active:scale-95">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Inspection
@@ -539,9 +537,9 @@ function InspectionsContent() {
               onClick={() => {
                 // Draft inspections open in the new/edit page, others in view page
                 if (inspection.status === 'draft') {
-                  router.push(`/inspections/new?id=${inspection.id}`);
+                  router.push(`/van-inspections/new?id=${inspection.id}`);
                 } else {
-                  router.push(`/inspections/${inspection.id}`);
+                  router.push(`/van-inspections/${inspection.id}`);
                 }
               }}
             >

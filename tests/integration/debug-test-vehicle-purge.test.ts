@@ -54,7 +54,7 @@ describe('Test Vehicle Purge API', () => {
     // SAFETY: Using obviously invalid mileage (999998) so corruption is immediately visible
     // If a real vehicle shows 999998 miles, we know it's test corruption!
     const { data: inspection, error: inspectionError } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .insert({
         vehicle_id: testVehicleId,
         user_id: (await supabase.from('profiles').select('id').limit(1).single()).data?.id,
@@ -148,7 +148,7 @@ describe('Test Vehicle Purge API', () => {
     it('should preview purge counts without deleting', async () => {
       // Count records before preview
       const { count: inspectionsBefore } = await supabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .select('id', { count: 'exact', head: true })
         .eq('vehicle_id', testVehicleId);
 
@@ -171,7 +171,7 @@ describe('Test Vehicle Purge API', () => {
     it('should execute purge and delete records', async () => {
       // Verify test records exist
       const { data: inspectionExists } = await supabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .select('id')
         .eq('id', testInspectionId)
         .single();
@@ -187,7 +187,7 @@ describe('Test Vehicle Purge API', () => {
 
       // Execute purge directly via service role
       const { error: inspectionDeleteError } = await supabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .delete()
         .eq('vehicle_id', testVehicleId);
 
@@ -203,7 +203,7 @@ describe('Test Vehicle Purge API', () => {
 
       // Verify records are deleted
       const { data: inspectionAfter } = await supabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .select('id')
         .eq('id', testInspectionId)
         .single();

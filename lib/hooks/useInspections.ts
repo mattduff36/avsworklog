@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
-import { VehicleInspection } from '@/types/inspection';
+import { VanInspection } from '@/types/inspection';
 import { InspectionStatusFilter } from '@/types/common';
 
-interface InspectionWithVehicle extends VehicleInspection {
+interface InspectionWithVehicle extends VanInspection {
   vehicles: {
     reg_number: string;
     vehicle_type: string;
@@ -26,7 +26,7 @@ export function useInspections({ userId, isManager, selectedEmployeeId, statusFi
       if (!userId) return [];
 
       let query = supabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .select(`
           *,
           vehicles (
@@ -63,7 +63,7 @@ export function useDeleteInspection() {
 
   return useMutation({
     mutationFn: async (inspectionId: string) => {
-      const response = await fetch(`/api/inspections/${inspectionId}/delete`, {
+      const response = await fetch(`/api/van-inspections/${inspectionId}/delete`, {
         method: 'DELETE',
       });
       if (!response.ok) throw new Error('Failed to delete inspection');

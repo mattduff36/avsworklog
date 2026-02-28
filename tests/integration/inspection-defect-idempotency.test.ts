@@ -52,7 +52,7 @@ describe('Inspection Defect Task Idempotency', () => {
 
     // Create test inspection
     const { data: inspection } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .insert({
         vehicle_id: testVehicleId,
         user_id: testUserId,
@@ -87,7 +87,7 @@ describe('Inspection Defect Task Idempotency', () => {
     // Clean up in reverse order of dependencies
     await supabase.from('actions').delete().eq('vehicle_id', testVehicleId);
     await supabase.from('inspection_items').delete().eq('inspection_id', testInspectionId);
-    await supabase.from('vehicle_inspections').delete().eq('id', testInspectionId);
+    await supabase.from('van_inspections').delete().eq('id', testInspectionId);
     await supabase.from('vehicles').delete().eq('id', testVehicleId);
   });
 

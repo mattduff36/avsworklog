@@ -1,6 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
-import { VehicleInspection, InspectionItem, INSPECTION_ITEMS } from '@/types/inspection';
+import { VanInspection, InspectionItem, INSPECTION_ITEMS } from '@/types/inspection';
 import { formatDate } from '@/lib/utils/date';
 
 // Create styles for the PDF matching the scanned form
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
 });
 
 interface InspectionPDFProps {
-  inspection: VehicleInspection;
+  inspection: VanInspection;
   items: InspectionItem[];
   vehicleReg?: string;
   employeeName?: string;
@@ -313,7 +313,7 @@ export function InspectionPDF({ inspection, items, vehicleReg, employeeName }: I
           </Text>
           <Text style={styles.companyPhone}>Telephone: SOUTHWELL (01636) 812227</Text>
           <Text style={styles.registeredNo}>Registered in England No. 1000918</Text>
-          <Text style={styles.pageTitle}>VEHICLE INSPECTION PAD</Text>
+          <Text style={styles.pageTitle}>VAN INSPECTION PAD</Text>
         </View>
 
         {/* Top Info Table */}

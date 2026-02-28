@@ -1,6 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
-import { VehicleInspection, InspectionItem } from '@/types/inspection';
+import { VanInspection, InspectionItem } from '@/types/inspection';
 import { formatDate } from '@/lib/utils/date';
 
 // Create styles for the PDF matching the Van inspection form
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
 });
 
 interface VanInspectionPDFProps {
-  inspection: VehicleInspection;
+  inspection: VanInspection;
   items: InspectionItem[];
   vehicleReg?: string;
   employeeName?: string;

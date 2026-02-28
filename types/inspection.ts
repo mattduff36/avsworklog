@@ -1,6 +1,6 @@
 export type InspectionStatus = 'ok' | 'attention' | 'na';
 
-export interface VehicleInspection {
+export interface VanInspection {
   id: string;
   vehicle_id: string;
   user_id: string;
@@ -14,13 +14,35 @@ export interface VehicleInspection {
   manager_comments: string | null;
   signature_data?: string | null;
   signed_at?: string | null;
-  is_hired_plant?: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlantInspection {
+  id: string;
+  plant_id: string | null;
+  user_id: string;
+  inspection_date: string;
+  inspection_end_date: string | null;
+  current_mileage: number | null;
+  status: 'submitted';
+  submitted_at: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  manager_comments: string | null;
+  inspector_comments?: string | null;
+  signature_data?: string | null;
+  signed_at?: string | null;
+  is_hired_plant: boolean;
   hired_plant_id_serial?: string | null;
   hired_plant_description?: string | null;
   hired_plant_hiring_company?: string | null;
   created_at: string;
   updated_at: string;
 }
+
+/** @deprecated Use VanInspection instead */
+export type VehicleInspection = VanInspection;
 
 export interface InspectionItem {
   id: string;

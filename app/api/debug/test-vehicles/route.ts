@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
     // Count/delete inspections
     if (actions?.inspections) {
       const { count: inspectionCount } = await adminSupabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .select('id', { count: 'exact', head: true })
         .in('vehicle_id', vehicleIds);
 
@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
 
       if (mode === 'execute' && counts.inspections > 0) {
         const { error: deleteError } = await adminSupabase
-          .from('vehicle_inspections')
+          .from('van_inspections')
           .delete()
           .in('vehicle_id', vehicleIds);
 
@@ -658,7 +658,7 @@ export async function DELETE(request: NextRequest) {
 
       // 4. Delete inspections (and dependent rows will cascade)
       const { count: inspectionsCount } = await adminSupabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .select('id', { count: 'exact', head: true })
         .in('vehicle_id', vehicleIds);
 
@@ -666,7 +666,7 @@ export async function DELETE(request: NextRequest) {
 
       if (deleteCounts.inspections > 0) {
         const { error: deleteInspectionsError } = await adminSupabase
-          .from('vehicle_inspections')
+          .from('van_inspections')
           .delete()
           .in('vehicle_id', vehicleIds);
 

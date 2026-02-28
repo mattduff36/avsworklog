@@ -18,11 +18,11 @@ const inspectionId = '1fde5bff-999a-4b59-95f8-679908c2cce1';
   
   // Get inspection
   const { data: inspection, error: inspectionError } = await supabase
-    .from('vehicle_inspections')
+    .from('van_inspections')
     .select(`
       *,
       vehicle:vehicles(reg_number),
-      profile:profiles!vehicle_inspections_user_id_fkey(full_name)
+      profile:profiles!van_inspections_user_id_fkey(full_name)
     `)
     .eq('id', inspectionId)
     .single();

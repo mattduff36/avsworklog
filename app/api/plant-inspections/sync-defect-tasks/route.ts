@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     // Guard: no workshop tasks for hired plant inspections
     const { data: inspectionRecord } = await supabaseAdmin
-      .from('vehicle_inspections')
+      .from('plant_inspections')
       .select('is_hired_plant')
       .eq('id', inspectionId)
       .single();

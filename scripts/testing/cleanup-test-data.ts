@@ -55,14 +55,14 @@ async function cleanup() {
 
     // Delete inspections (items will cascade)
     const { data: inspections } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .select('id')
       .eq('vehicle_id', vehicle.id)
       .gte('inspection_date', '2026-01-19'); // Only recent test inspections
 
     if (inspections && inspections.length > 0) {
       await supabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .delete()
         .in('id', inspections.map(i => i.id));
       

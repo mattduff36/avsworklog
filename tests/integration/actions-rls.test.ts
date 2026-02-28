@@ -78,7 +78,7 @@ describe('Actions RLS Policy Fix', () => {
     // Step 1: Create an inspection
     // SAFETY: Using 26000 miles instead of 50000 to avoid Frank Barlow incident pattern
     const { data: inspection, error: inspectionError } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .insert({
         vehicle_id: testVehicleId,
         user_id: testUserId,
@@ -119,7 +119,7 @@ describe('Actions RLS Policy Fix', () => {
 
     // Step 3: Submit inspection (change status to 'submitted')
     const { error: submitError } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .update({ status: 'submitted', submitted_at: new Date().toISOString() })
       .eq('id', testInspectionId);
 
@@ -161,7 +161,7 @@ describe('Actions RLS Policy Fix', () => {
     // Cleanup
     await supabase.from('actions').delete().eq('id', action!.id);
     await supabase.from('inspection_items').delete().eq('inspection_id', testInspectionId);
-    await supabase.from('vehicle_inspections').delete().eq('id', testInspectionId);
+    await supabase.from('van_inspections').delete().eq('id', testInspectionId);
   });
 
   it('should verify RLS policies use roles table', async () => {

@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     // Build query for inspections with defects
     let query = supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .select(`
         id,
         inspection_date,

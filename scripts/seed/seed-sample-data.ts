@@ -292,7 +292,7 @@ async function createTimesheets(employees: any[], managerId: string) {
 }
 
 async function createInspections(employees: any[], vehicles: any[], managerId: string) {
-  console.log('\n🔍 Creating vehicle inspections for 4 weeks...\n');
+  console.log('\n🔍 Creating van inspections for 4 weeks...\n');
   
   let totalInspections = 0;
   let totalDefects = 0;
@@ -313,7 +313,7 @@ async function createInspections(employees: any[], vehicles: any[], managerId: s
         
         // Create inspection
         const { data: inspection, error: inspectionError } = await supabase
-          .from('vehicle_inspections')
+          .from('van_inspections')
           .insert({
             vehicle_id: vehicle.id,
             user_id: employee.id,

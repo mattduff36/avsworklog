@@ -100,7 +100,7 @@ async function investigateVehicles() {
     if (SUSPICIOUS_MILEAGE.includes(maintenance.current_mileage)) {
       // Get inspection history to find correct mileage
       const { data: inspections } = await supabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .select('id, current_mileage, inspection_date, status, created_at')
         .eq('vehicle_id', vehicle.id)
         .not('current_mileage', 'is', null)

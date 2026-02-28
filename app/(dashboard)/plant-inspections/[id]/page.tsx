@@ -73,7 +73,7 @@ export default function ViewPlantInspectionPage() {
       setError('');
       
       const { data: inspectionData, error: inspectionError } = await supabase
-        .from('vehicle_inspections')
+        .from('plant_inspections')
         .select(`
           *,
           plant (
@@ -82,10 +82,9 @@ export default function ViewPlantInspectionPage() {
             serial_number,
             vehicle_categories (name)
           ),
-          profiles!vehicle_inspections_user_id_fkey (full_name)
+          profiles!plant_inspections_user_id_fkey (full_name)
         `)
         .eq('id', id)
-        .or('plant_id.not.is.null,is_hired_plant.eq.true')
         .single();
 
       if (inspectionError) throw inspectionError;
@@ -168,13 +167,13 @@ export default function ViewPlantInspectionPage() {
     setError('');
 
     try {
-      type InspectionUpdate = Database['public']['Tables']['vehicle_inspections']['Update'];
+      type InspectionUpdate = Database['public']['Tables']['plant_inspections']['Update'];
       const inspectionUpdate: InspectionUpdate = {
         updated_at: new Date().toISOString(),
       };
 
       const { error: inspectionError } = await supabase
-        .from('vehicle_inspections')
+        .from('plant_inspections')
         .update(inspectionUpdate)
         .eq('id', inspection.id);
 
@@ -372,7 +371,7 @@ export default function ViewPlantInspectionPage() {
       await handleSave();
 
       const { error: updateError } = await supabase
-        .from('vehicle_inspections')
+        .from('plant_inspections')
         .update({
           status: 'submitted',
           submitted_at: new Date().toISOString(),

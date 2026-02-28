@@ -26,7 +26,7 @@ export async function GET(
 
     // Fetch inspection with items and employee details
     const { data: inspection, error: inspectionError } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .select(`
         *,
         vehicle:vehicles(
@@ -62,7 +62,7 @@ export async function GET(
       await logServerError({
         error: new Error(`Failed to fetch inspection items: ${itemsError.message}`),
         request,
-        componentName: '/api/inspections/[id]/pdf',
+        componentName: '/api/van-inspections/[id]/pdf',
         additionalData: {
           inspectionId: id,
           supabaseError: {
@@ -133,9 +133,9 @@ export async function GET(
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/api/inspections/[id]/pdf',
+      componentName: '/api/van-inspections/[id]/pdf',
       additionalData: {
-        endpoint: '/api/inspections/[id]/pdf',
+        endpoint: '/api/van-inspections/[id]/pdf',
       },
     });
     return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });

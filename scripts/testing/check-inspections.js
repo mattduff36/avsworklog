@@ -13,7 +13,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 (async () => {
   const { data: inspections } = await supabase
-    .from('vehicle_inspections')
+    .from('van_inspections')
     .select('id, status, created_at')
     .order('created_at', { ascending: false })
     .limit(10);

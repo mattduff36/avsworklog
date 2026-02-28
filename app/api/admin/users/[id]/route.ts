@@ -242,7 +242,12 @@ export async function DELETE(
         .eq('reviewed_by', userId);
 
       await supabaseAdmin
-        .from('vehicle_inspections')
+        .from('van_inspections')
+        .update({ reviewed_by: null })
+        .eq('reviewed_by', userId);
+
+      await supabaseAdmin
+        .from('plant_inspections')
         .update({ reviewed_by: null })
         .eq('reviewed_by', userId);
 
@@ -290,9 +295,14 @@ export async function DELETE(
         .update({ reviewed_by: null })
         .eq('reviewed_by', userId);
 
-      // Set reviewed_by to NULL in vehicle_inspections where this user was the reviewer
+      // Set reviewed_by to NULL in inspections where this user was the reviewer
       await supabaseAdmin
-        .from('vehicle_inspections')
+        .from('van_inspections')
+        .update({ reviewed_by: null })
+        .eq('reviewed_by', userId);
+
+      await supabaseAdmin
+        .from('plant_inspections')
         .update({ reviewed_by: null })
         .eq('reviewed_by', userId);
 
@@ -324,24 +334,45 @@ export async function DELETE(
       .delete()
       .eq('user_id', userId);
 
-    // First get all inspection IDs for this user
-    const { data: userInspections } = await supabaseAdmin
-      .from('vehicle_inspections')
+    // Get all van inspection IDs for this user
+    const { data: userVanInspections } = await supabaseAdmin
+      .from('van_inspections')
       .select('id')
       .eq('user_id', userId);
 
-    // Delete inspection items (must delete before inspections due to FK)
-    if (userInspections && userInspections.length > 0) {
-      const inspectionIds = userInspections.map(i => i.id);
+    // Delete inspection items for van inspections (must delete before inspections due to FK)
+    if (userVanInspections && userVanInspections.length > 0) {
+      const vanInspectionIds = userVanInspections.map(i => i.id);
       await supabaseAdmin
         .from('inspection_items')
         .delete()
-        .in('inspection_id', inspectionIds);
+        .in('inspection_id', vanInspectionIds);
     }
 
-    // Delete vehicle inspections created by this user
+    // Delete van inspections created by this user
     await supabaseAdmin
-      .from('vehicle_inspections')
+      .from('van_inspections')
+      .delete()
+      .eq('user_id', userId);
+
+    // Get all plant inspection IDs for this user
+    const { data: userPlantInspections } = await supabaseAdmin
+      .from('plant_inspections')
+      .select('id')
+      .eq('user_id', userId);
+
+    // Delete inspection items for plant inspections (must delete before inspections due to FK)
+    if (userPlantInspections && userPlantInspections.length > 0) {
+      const plantInspectionIds = userPlantInspections.map(i => i.id);
+      await supabaseAdmin
+        .from('inspection_items')
+        .delete()
+        .in('inspection_id', plantInspectionIds);
+    }
+
+    // Delete plant inspections created by this user
+    await supabaseAdmin
+      .from('plant_inspections')
       .delete()
       .eq('user_id', userId);
 

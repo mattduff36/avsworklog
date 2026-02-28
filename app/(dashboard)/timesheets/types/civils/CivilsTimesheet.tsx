@@ -303,7 +303,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
 
       // Query last inspection with vehicle reg
       const { data: lastInspection } = await supabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .select('inspection_date, vehicles(reg_number)')
         .eq('user_id', userId)
         .order('inspection_date', { ascending: false })

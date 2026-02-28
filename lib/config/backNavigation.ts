@@ -62,11 +62,11 @@ export function getParentHref(
   }
   
   // Inspection routes
-  if (normalizedPath === '/inspections/new') {
-    return '/inspections';
+  if (normalizedPath === '/van-inspections/new') {
+    return '/van-inspections';
   }
-  if (normalizedPath.match(/^\/inspections\/[^/]+$/)) {
-    return '/inspections';
+  if (normalizedPath.match(/^\/van-inspections\/[^/]+$/)) {
+    return '/van-inspections';
   }
   
   // Timesheet routes

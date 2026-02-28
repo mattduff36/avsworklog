@@ -1,5 +1,5 @@
 /**
- * Vehicle Inspection Checklists Configuration
+ * Van Inspection Checklists Configuration
  * 
  * This file defines inspection checklist items for different vehicle categories.
  * To add a new checklist or modify an existing one, update the appropriate array below.

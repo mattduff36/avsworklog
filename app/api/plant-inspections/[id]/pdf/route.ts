@@ -21,7 +21,7 @@ export async function GET(
 
     // Fetch inspection with plant and employee details
     const { data: inspection, error: inspectionError } = await supabase
-      .from('vehicle_inspections')
+      .from('plant_inspections')
       .select(`
         *,
         plant (
@@ -30,10 +30,9 @@ export async function GET(
           serial_number,
           vehicle_categories(name)
         ),
-        profile:profiles!vehicle_inspections_user_id_fkey(full_name)
+        profile:profiles!plant_inspections_user_id_fkey(full_name)
       `)
       .eq('id', id)
-      .or('plant_id.not.is.null,is_hired_plant.eq.true')
       .single();
 
     if (inspectionError || !inspection) {

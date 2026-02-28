@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
 
     // Build query
     let query = supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .select(`
         id,
         inspection_date,

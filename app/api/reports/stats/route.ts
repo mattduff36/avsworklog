@@ -39,8 +39,10 @@ export async function GET(request: NextRequest) {
       monthTimesheetsResult,
       pendingTimesheetsResult,
       activeEmployeesResult,
-      weekInspectionsResult,
-      monthInspectionsResult,
+      weekVanInspectionsResult,
+      monthVanInspectionsResult,
+      weekPlantInspectionsResult,
+      monthPlantInspectionsResult,
     ] = await Promise.all([
       // Total hours this week
       supabase
@@ -70,16 +72,30 @@ export async function GET(request: NextRequest) {
         .select('id, roles!inner(is_manager_admin)', { count: 'exact' })
         .eq('roles.is_manager_admin', false),
       
-      // Inspections completed this week
+      // Van inspections completed this week
       supabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .select('id', { count: 'exact' })
         .gte('inspection_date', startOfWeek.toISOString())
         .lte('inspection_date', endOfWeek.toISOString()),
       
-      // Inspections completed this month
+      // Van inspections completed this month
       supabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
+        .select('id', { count: 'exact' })
+        .gte('inspection_date', startOfMonth.toISOString())
+        .lte('inspection_date', endOfMonth.toISOString()),
+
+      // Plant inspections completed this week
+      supabase
+        .from('plant_inspections')
+        .select('id', { count: 'exact' })
+        .gte('inspection_date', startOfWeek.toISOString())
+        .lte('inspection_date', endOfWeek.toISOString()),
+      
+      // Plant inspections completed this month
+      supabase
+        .from('plant_inspections')
         .select('id', { count: 'exact' })
         .gte('inspection_date', startOfMonth.toISOString())
         .lte('inspection_date', endOfMonth.toISOString()),
@@ -89,12 +105,12 @@ export async function GET(request: NextRequest) {
     const weekHours = weekTimesheetsResult.data?.reduce((sum, t) => sum + (t.total_hours || 0), 0) || 0;
     const monthHours = monthTimesheetsResult.data?.reduce((sum, t) => sum + (t.total_hours || 0), 0) || 0;
 
-    // Get inspection pass/fail statistics for this month
+    // Get inspection pass/fail statistics for this month (van inspections)
     const { data: inspectionItems } = await supabase
       .from('inspection_items')
       .select(`
         status,
-        inspection:vehicle_inspections!inner (
+        inspection:van_inspections!inner (
           inspection_date
         )
       `)
@@ -114,7 +130,7 @@ export async function GET(request: NextRequest) {
       .from('inspection_items')
       .select(`
         id,
-        inspection:vehicle_inspections!inner (
+        inspection:van_inspections!inner (
           inspection_date,
           status
         )
@@ -134,8 +150,8 @@ export async function GET(request: NextRequest) {
         pendingApprovals: pendingTimesheetsResult.count || 0,
       },
       inspections: {
-        weekCompleted: weekInspectionsResult.count || 0,
-        monthCompleted: monthInspectionsResult.count || 0,
+        weekCompleted: (weekVanInspectionsResult.count || 0) + (weekPlantInspectionsResult.count || 0),
+        monthCompleted: (monthVanInspectionsResult.count || 0) + (monthPlantInspectionsResult.count || 0),
         pendingApprovals: 0,
         passRate: parseFloat(passRate),
         outstandingDefects,

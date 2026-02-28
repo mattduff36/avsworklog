@@ -7,7 +7,7 @@ type ActionInsert = Database['public']['Tables']['actions']['Insert'];
 type ActionUpdate = Database['public']['Tables']['actions']['Update'];
 
 /**
- * POST /api/inspections/sync-defect-tasks
+ * POST /api/van-inspections/sync-defect-tasks
  * 
  * Idempotently creates/updates inspection defect tasks.
  * Uses stable signature (inspection_id + item_number + item_description) for deduplication.
@@ -222,7 +222,7 @@ export async function POST(request: NextRequest) {
 
       const commentText = comment ? `\nComment: ${comment}` : '';
       const title = `${vehicleReg} - ${item_description} (${dayRange})`;
-      const description = `Vehicle inspection defect found:\nItem ${item_number} - ${item_description} (${dayRange})${commentText}`;
+      const description = `Van inspection defect found:\nItem ${item_number} - ${item_description} (${dayRange})${commentText}`;
 
       // CRITICAL CHECK: First check if there are ANY active tasks for this defect on this vehicle
       // (across ALL inspections, not just the current one)

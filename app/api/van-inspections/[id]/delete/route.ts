@@ -31,7 +31,7 @@ export async function DELETE(
 
     // Delete inspection (cascade will delete items)
     const { error: deleteError } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .delete()
       .eq('id', inspectionId);
 
@@ -50,9 +50,9 @@ export async function DELETE(
     await logServerError({
       error: error as Error,
       request,
-      componentName: '/api/inspections/[id]/delete',
+      componentName: '/api/van-inspections/[id]/delete',
       additionalData: {
-        endpoint: '/api/inspections/[id]/delete',
+        endpoint: '/api/van-inspections/[id]/delete',
       },
     });
     return NextResponse.json(

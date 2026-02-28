@@ -1797,7 +1797,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                           className="h-4 w-4 rounded border-2 border-slate-400 dark:border-slate-600 text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 cursor-pointer bg-white dark:bg-slate-800"
                         />
                         <Label htmlFor="purge-inspections" className="text-sm font-normal cursor-pointer">
-                          Vehicle Inspections (and items, photos)
+                          Van Inspections (and items, photos)
                         </Label>
                       </div>
                       <div className="flex items-center gap-2">

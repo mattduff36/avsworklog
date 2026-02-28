@@ -1,4 +1,4 @@
-// Check RLS policies for vehicle_inspections
+// Check RLS policies for van_inspections
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import pg from 'pg';
@@ -28,15 +28,15 @@ async function check() {
   await client.connect();
   console.log('Connected to database\n');
   
-  // Check RLS policies on vehicle_inspections
+  // Check RLS policies on van_inspections
   const { rows: policies } = await client.query(`
     SELECT policyname, cmd, qual, with_check
     FROM pg_policies 
-    WHERE tablename = 'vehicle_inspections'
+    WHERE tablename = 'van_inspections'
     ORDER BY policyname;
   `);
   
-  console.log('=== Vehicle Inspections RLS Policies ===\n');
+  console.log('=== Van Inspections RLS Policies ===\n');
   policies.forEach(p => {
     console.log('Policy:', p.policyname);
     console.log('Command:', p.cmd);
@@ -56,7 +56,7 @@ async function check() {
   console.table(columns);
   
   // Total inspections in the database
-  const { rows: count } = await client.query('SELECT COUNT(*) as total FROM vehicle_inspections');
+  const { rows: count } = await client.query('SELECT COUNT(*) as total FROM van_inspections');
   console.log('\nTotal inspections:', count[0].total);
   
   await client.end();

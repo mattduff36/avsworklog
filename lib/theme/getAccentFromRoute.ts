@@ -31,7 +31,7 @@ export function getAccentFromRoute(
 
   // Employee module routes → module colors
   if (path.startsWith('/timesheets')) return 'timesheets';
-  if (path.startsWith('/inspections')) return 'inspections';
+  if (path.startsWith('/van-inspections')) return 'inspections';
   if (path.startsWith('/projects')) return 'rams';
   if (path.startsWith('/rams')) return 'rams';
   if (path.startsWith('/absence')) return 'absence';

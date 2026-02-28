@@ -32,10 +32,9 @@ export async function DELETE(
     // Delete plant inspection (cascade will delete items and daily hours)
     // Include both owned plant (plant_id not null) and hired plant inspections
     const { error: deleteError } = await supabase
-      .from('vehicle_inspections')
+      .from('plant_inspections')
       .delete()
-      .eq('id', inspectionId)
-      .or('plant_id.not.is.null,is_hired_plant.eq.true');
+      .eq('id', inspectionId);
 
     if (deleteError) {
       console.error('Delete error:', deleteError);

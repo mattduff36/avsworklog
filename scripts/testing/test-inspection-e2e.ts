@@ -49,7 +49,7 @@ function logResult(test: string, passed: boolean, message: string) {
 
 async function cleanup(inspectionId?: string) {
   if (inspectionId) {
-    await supabase.from('vehicle_inspections').delete().eq('id', inspectionId);
+    await supabase.from('van_inspections').delete().eq('id', inspectionId);
     console.log(`🧹 Cleaned up inspection ${inspectionId}`);
   }
 }
@@ -95,7 +95,7 @@ async function runE2ETests() {
 
     // Create draft inspection
     const { data: newInspection, error: createError } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .insert({
         vehicle_id: testVehicleId,
         user_id: testUserId,
@@ -154,7 +154,7 @@ async function runE2ETests() {
 
     // Simulate loading the draft (like opening /inspections/[id])
     const { data: loadedInspection, error: loadError } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .select('*, vehicles(*)')
       .eq('id', testInspectionId)
       .single();
@@ -226,7 +226,7 @@ async function runE2ETests() {
 
     // Update inspection timestamp
     const { error: updateError } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', testInspectionId);
 
@@ -290,7 +290,7 @@ async function runE2ETests() {
     log('\n📋 PHASE 5: Submit the inspection');
 
     const { error: submitError } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .update({
         status: 'submitted',
         submitted_at: new Date().toISOString(),
@@ -305,7 +305,7 @@ async function runE2ETests() {
 
     // Verify submission
     const { data: submittedInspection } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .select('status')
       .eq('id', testInspectionId)
       .single();

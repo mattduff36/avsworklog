@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, FileText, Wrench } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
-import { VehicleInspection } from '@/types/inspection';
+import { PlantInspection } from '@/types/inspection';
 import { Employee, InspectionStatusFilter } from '@/types/common';
 import { useQueryState } from 'nuqs';
 import {
@@ -30,7 +30,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-interface InspectionWithPlant extends VehicleInspection {
+interface InspectionWithPlant extends PlantInspection {
   plant: {
     plant_id: string;
     nickname: string | null;
@@ -123,7 +123,7 @@ function PlantInspectionsContent() {
     
     try {
       let query = supabase
-        .from('vehicle_inspections')
+        .from('plant_inspections')
         .select(`
           *,
           plant (
@@ -134,9 +134,8 @@ function PlantInspectionsContent() {
               name
             )
           ),
-          profile:profiles!vehicle_inspections_user_id_fkey(full_name)
+          profile:profiles!plant_inspections_user_id_fkey(full_name)
         `)
-        .or('plant_id.not.is.null,is_hired_plant.eq.true')
         .order('inspection_date', { ascending: false });
 
       // Filter based on user role and selection

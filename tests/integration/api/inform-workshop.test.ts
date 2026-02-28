@@ -1,7 +1,7 @@
 /**
  * Integration Tests: Inform Workshop Endpoint
  * 
- * Tests the POST /api/inspections/inform-workshop endpoint:
+ * Tests the POST /api/van-inspections/inform-workshop endpoint:
  * - Validates authentication
  * - Validates comment length requirements
  * - Creates workshop tasks with correct categorization
@@ -55,7 +55,7 @@ describe('Inform Workshop Endpoint', () => {
 
     // Create test inspection
     const { data: inspection } = await supabase
-      .from('vehicle_inspections')
+      .from('van_inspections')
       .insert({
         vehicle_id: testVehicleId,
         user_id: testUserId,
@@ -77,7 +77,7 @@ describe('Inform Workshop Endpoint', () => {
     }
 
     // Clean up inspection
-    await supabase.from('vehicle_inspections').delete().eq('id', testInspectionId);
+    await supabase.from('van_inspections').delete().eq('id', testInspectionId);
 
     // Clean up vehicle
     await supabase.from('vehicles').delete().eq('id', testVehicleId);

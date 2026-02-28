@@ -179,9 +179,9 @@ export function getPageUrl(value: string): string {
     'timesheets-view': '/timesheets/[id]',
     
     // Inspections
-    'inspections-list': '/inspections',
-    'inspections-new': '/inspections/new',
-    'inspections-view': '/inspections/[id]',
+    'inspections-list': '/van-inspections',
+    'inspections-new': '/van-inspections/new',
+    'inspections-view': '/van-inspections/[id]',
     
     // Projects (formerly RAMS)
     'projects-list': '/projects',

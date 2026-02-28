@@ -65,7 +65,7 @@ export const ALL_MODULES: ModuleName[] = [
 
 export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
   'timesheets': 'Timesheets',
-  'inspections': 'Vehicle Inspections',
+  'inspections': 'Van Inspections',
   'plant-inspections': 'Plant Inspections',
   'rams': 'Projects',
   'absence': 'Absence & Leave',
@@ -81,7 +81,7 @@ export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
 
 export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
   'timesheets': 'Create and submit timesheets',
-  'inspections': 'Perform vehicle inspections',
+  'inspections': 'Perform van inspections',
   'plant-inspections': 'Perform plant machinery inspections',
   'rams': 'Access and sign project documents',
   'absence': 'Request and manage absence',

@@ -71,7 +71,7 @@ type LoggedAction = {
     item_number: number;
     item_description: string;
   } | null;
-  vehicle_inspections?: {
+  van_inspections?: {
     vehicle_id: string;
   };
 };
@@ -219,7 +219,7 @@ function NewInspectionContent() {
       const userIsManager = (profileData as ProfileWithRole)?.role?.is_manager_admin || false;
 
       const { data: inspection, error: inspectionError } = await supabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .select(`
           *,
           vehicles (
@@ -364,7 +364,7 @@ function NewInspectionContent() {
     
     try {
       const { data, error } = await supabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .select('id, status')
         .eq('vehicle_id', vehicleIdToCheck)
         .eq('inspection_end_date', weekEndingToCheck)
@@ -468,7 +468,7 @@ function NewInspectionContent() {
     try {
       // Get the most recent submitted inspection for this vehicle
       const { data: lastInspection, error: inspectionError } = await supabase
-        .from('vehicle_inspections')
+        .from('van_inspections')
         .select(`
           id,
           inspection_items (
@@ -510,7 +510,7 @@ function NewInspectionContent() {
       }
 
       // Load locked defects from server (includes logged, on_hold, in_progress)
-      const response = await fetch(`/api/inspections/locked-defects?vehicleId=${selectedVehicleId}`);
+      const response = await fetch(`/api/van-inspections/locked-defects?vehicleId=${selectedVehicleId}`);
       
       let loggedActionsData: Array<{
         inspection_items: { item_number: number; item_description: string };
@@ -850,7 +850,7 @@ function NewInspectionContent() {
       startDate.setDate(weekEndDate.getDate() - 6); // Go back 6 days to Monday
       
       // Create inspection record
-      type InspectionInsert = Database['public']['Tables']['vehicle_inspections']['Insert'];
+      type InspectionInsert = Database['public']['Tables']['van_inspections']['Insert'];
       const inspectionData: InspectionInsert = {
         vehicle_id: vehicleId,
         user_id: selectedEmployeeId, // Use selected employee ID (can be manager's own ID or another employee's)
@@ -906,7 +906,7 @@ function NewInspectionContent() {
       } else {
         // Create new inspection
         const { data: newInspection, error: insertError } = await supabase
-          .from('vehicle_inspections')
+          .from('van_inspections')
           .insert(inspectionData)
           .select()
           .single();
@@ -968,7 +968,7 @@ function NewInspectionContent() {
       // NOW update the inspection (after items are saved)
       // This is important for existing inspections to avoid RLS issues
       if (existingInspectionId) {
-        type InspectionUpdate = Database['public']['Tables']['vehicle_inspections']['Update'];
+        type InspectionUpdate = Database['public']['Tables']['van_inspections']['Update'];
         const inspectionUpdate: InspectionUpdate = {
           vehicle_id: vehicleId,
           user_id: selectedEmployeeId,
@@ -983,7 +983,7 @@ function NewInspectionContent() {
         };
 
         const { data: updatedInspection, error: updateError } = await supabase
-          .from('vehicle_inspections')
+          .from('van_inspections')
           .update(inspectionUpdate)
           .eq('id', existingInspectionId)
           .select();
@@ -1044,7 +1044,7 @@ function NewInspectionContent() {
 
           // Call server endpoint to sync tasks
           try {
-            const syncResponse = await fetch('/api/inspections/sync-defect-tasks', {
+            const syncResponse = await fetch('/api/van-inspections/sync-defect-tasks', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -1084,12 +1084,12 @@ function NewInspectionContent() {
               inspection_id,
               status,
               description,
-              vehicle_inspections!inner (
+              van_inspections!inner (
                 vehicle_id
               )
             `)
             .in('status', ['pending', 'logged'])
-            .eq('vehicle_inspections.vehicle_id', vehicleId);
+            .eq('van_inspections.vehicle_id', vehicleId);
 
           if (pendingActions && pendingActions.length > 0) {
             // Get the inspection items from the previous inspection to match with actions
@@ -1141,7 +1141,7 @@ function NewInspectionContent() {
         try {
           setCreatingWorkshopTask(true);
           
-          const informResponse = await fetch('/api/inspections/inform-workshop', {
+          const informResponse = await fetch('/api/van-inspections/inform-workshop', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1191,7 +1191,7 @@ function NewInspectionContent() {
       }
 
       // Navigate back to inspections list
-      router.push('/inspections');
+      router.push('/van-inspections');
     } catch (err) {
       console.error('Error saving inspection:', err);
       console.error('Error details:', JSON.stringify(err, null, 2));
@@ -1254,10 +1254,10 @@ function NewInspectionContent() {
       <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-3">
-            <BackButton fallbackHref="/inspections" />
+            <BackButton fallbackHref="/van-inspections" />
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-foreground">
-                {existingInspectionId ? 'Edit Vehicle Inspection' : 'New Vehicle Inspection'}
+                {existingInspectionId ? 'Edit Van Inspection' : 'New Van Inspection'}
               </h1>
               <p className="text-sm text-muted-foreground hidden md:block">
                 {existingInspectionId ? 'Continue editing your draft' : 'Daily safety check'}
