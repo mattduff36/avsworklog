@@ -139,6 +139,8 @@ function InspectionsContent() {
           ),
           profile:profiles!vehicle_inspections_user_id_fkey(full_name)
         `)
+        .is('plant_id', null)
+        .eq('is_hired_plant', false)
         .order('inspection_date', { ascending: false });
 
       // Filter based on user role and selection
