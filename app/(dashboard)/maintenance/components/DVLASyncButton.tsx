@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 interface DVLASyncButtonProps {
   vehicleId: string;
+  assetType?: 'van' | 'hgv' | 'plant';
   registrationNumber: string;
   lastSync?: string | null;
   syncStatus?: 'never' | 'success' | 'error' | 'pending' | null;
@@ -17,6 +18,7 @@ interface DVLASyncButtonProps {
 
 export function DVLASyncButton({
   vehicleId,
+  assetType = 'van',
   registrationNumber,
   lastSync,
   syncStatus,
@@ -52,7 +54,7 @@ export function DVLASyncButton({
       const response = await fetch('/api/maintenance/sync-dvla', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vehicleId }),
+        body: JSON.stringify({ assetId: vehicleId, assetType }),
       });
 
       const data = await response.json();
@@ -97,10 +99,11 @@ export function DVLASyncButton({
       } else {
         throw new Error('Sync failed');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to sync tax & MOT data';
       console.error('DVLA sync error:', error);
       toast.error('Sync Failed', {
-        description: error.message || 'Failed to sync tax & MOT data',
+        description: errorMessage,
       });
     } finally {
       setIsSyncing(false);

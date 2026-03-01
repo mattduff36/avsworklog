@@ -1,25 +1,63 @@
-// API Route: Sync Vehicle Data from DVLA
-// POST /api/maintenance/sync-dvla
-// Syncs vehicle tax and MOT data from DVLA API
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createDVLAApiService } from '@/lib/services/dvla-api';
 import { createMotHistoryService } from '@/lib/services/mot-history-api';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import { formatRegistrationForApi } from '@/lib/utils/registration';
+import {
+  isRoadEligibleRegistration,
+  runFleetDvlaSync,
+  type FleetAssetType,
+  type FleetSyncTarget,
+} from '@/lib/services/fleet-dvla-sync';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/database';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * POST /api/maintenance/sync-dvla
- * Sync vehicle data from DVLA API for one or multiple vehicles
- * 
- * Body:
- * - vehicleId: string (optional) - Sync single vehicle
- * - vehicleIds: string[] (optional) - Sync multiple vehicles
- * - syncAll: boolean (optional) - Sync all active vehicles
- */
+interface SyncRequestBody {
+  vehicleId?: string;
+  vehicleIds?: string[];
+  assetId?: string;
+  assetIds?: string[];
+  assetType?: FleetAssetType;
+  syncAll?: boolean;
+}
+
+function mapTableToAssetType(tableName: 'vans' | 'hgvs' | 'plant'): FleetAssetType {
+  if (tableName === 'hgvs') return 'hgv';
+  if (tableName === 'plant') return 'plant';
+  return 'van';
+}
+
+function filterRoadEligible(targets: FleetSyncTarget[]): FleetSyncTarget[] {
+  return targets.filter((target) => isRoadEligibleRegistration(target.registrationNumber));
+}
+
+async function loadTargetsByTable(
+  supabase: SupabaseClient<Database>,
+  tableName: 'vans' | 'hgvs' | 'plant',
+  options: { ids?: string[]; activeOnly?: boolean }
+): Promise<FleetSyncTarget[]> {
+  let query = supabase.from(tableName).select('id, reg_number');
+  if (options.ids?.length) query = query.in('id', options.ids);
+  if (options.activeOnly) query = query.eq('status', 'active');
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return (data || []).map((row: { id: string; reg_number: string }) => ({
+    assetType: mapTableToAssetType(tableName),
+    assetId: row.id,
+    registrationNumber: row.reg_number,
+  }));
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Internal server error';
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -49,426 +87,79 @@ export async function POST(request: NextRequest) {
     // Check if MOT API is configured (optional, sync will continue if not available)
     const motService = createMotHistoryService();
 
-    const body = await request.json();
-    const { vehicleId, vehicleIds, syncAll } = body;
+    const body = (await request.json()) as SyncRequestBody;
+    const { vehicleId, vehicleIds, assetId, assetIds, assetType, syncAll } = body;
 
-    // Test vehicles to exclude from DVLA sync
-    const TEST_VEHICLES = ['TE57VAN', 'TE57HGV'];
-    
-    // Determine which vehicles to sync
-    let vehiclesToSync: Array<{ id: string; reg_number: string }> = [];
+    const combinedIds = [
+      ...(Array.isArray(vehicleIds) ? vehicleIds : []),
+      ...(Array.isArray(assetIds) ? assetIds : []),
+      ...(vehicleId ? [vehicleId] : []),
+      ...(assetId ? [assetId] : []),
+    ];
+    const requestedIds = Array.from(new Set(combinedIds));
 
+    let targets: FleetSyncTarget[] = [];
     if (syncAll) {
-      // Sync all active vans (excluding test vans)
-      const { data: vehicles, error } = await supabase
-        .from('vans')
-        .select('id, reg_number')
-        .eq('status', 'active');
-
-      if (error) throw error;
-      
-      // Filter out test vehicles
-      vehiclesToSync = (vehicles || []).filter(v => 
-        !TEST_VEHICLES.includes(v.reg_number.replace(/\s+/g, '').toUpperCase())
-      );
-    } else if (vehicleIds && Array.isArray(vehicleIds)) {
-      // Sync multiple specific vans (excluding test vans)
-      const { data: vehicles, error } = await supabase
-        .from('vans')
-        .select('id, reg_number')
-        .in('id', vehicleIds);
-
-      if (error) throw error;
-      
-      // Filter out test vehicles
-      vehiclesToSync = (vehicles || []).filter(v => 
-        !TEST_VEHICLES.includes(v.reg_number.replace(/\s+/g, '').toUpperCase())
-      );
-    } else if (vehicleId) {
-      // Sync single vehicle
-      const { data: vehicle, error } = await supabase
-        .from('vans')
-        .select('id, reg_number')
-        .eq('id', vehicleId)
-        .single();
-
-      if (error) throw error;
-      
-      // Check if it's a test vehicle
-      if (vehicle && !TEST_VEHICLES.includes(vehicle.reg_number.replace(/\s+/g, '').toUpperCase())) {
-        vehiclesToSync = [vehicle];
+      const [vanTargets, hgvTargets, plantTargets] = await Promise.all([
+        loadTargetsByTable(supabase, 'vans', { activeOnly: true }),
+        loadTargetsByTable(supabase, 'hgvs', { activeOnly: true }),
+        loadTargetsByTable(supabase, 'plant', { activeOnly: true }),
+      ]);
+      targets = [...vanTargets, ...hgvTargets, ...plantTargets];
+    } else if (requestedIds.length > 0) {
+      if (assetType) {
+        const tableName = assetType === 'hgv' ? 'hgvs' : assetType === 'plant' ? 'plant' : 'vans';
+        targets = await loadTargetsByTable(supabase, tableName, { ids: requestedIds });
+      } else {
+        const [vanTargets, hgvTargets, plantTargets] = await Promise.all([
+          loadTargetsByTable(supabase, 'vans', { ids: requestedIds }),
+          loadTargetsByTable(supabase, 'hgvs', { ids: requestedIds }),
+          loadTargetsByTable(supabase, 'plant', { ids: requestedIds }),
+        ]);
+        targets = [...vanTargets, ...hgvTargets, ...plantTargets];
       }
     } else {
       return NextResponse.json(
-        { success: false, error: 'No vehicles specified' },
+        { success: false, error: 'No assets specified' },
         { status: 400 }
       );
     }
 
-    if (vehiclesToSync.length === 0) {
+    targets = filterRoadEligible(targets);
+
+    if (targets.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'No vehicles found' },
+        { success: false, error: 'No road-eligible assets found' },
         { status: 404 }
       );
     }
 
-    // Process each vehicle
-    const results = [];
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const vehicle of vehiclesToSync) {
-      const startTime = Date.now();
-      
-      // Remove spaces from registration number for API calls
-      const regNumberNoSpaces = formatRegistrationForApi(vehicle.reg_number);
-      
-      try {
-        // Fetch data from DVLA VES API (tax & vehicle details)
-        console.log(`[INFO] Fetching VES data for ${vehicle.reg_number}`);
-        const dvlaData = await dvlaService.getVehicleData(regNumberNoSpaces);
-        const dvlaResponseTime = Date.now() - startTime;
-        console.log(`[INFO] VES data retrieved for ${vehicle.reg_number}, tax due: ${dvlaData.taxDueDate || 'N/A'}`);
-
-        // Fetch MOT expiry data from MOT History API (if configured)
-        let motExpiryData = null;
-        let motResponseTime = null;
-        let motApiError: string | null = null;
-        if (motService) {
-          try {
-            const motStart = Date.now();
-            motExpiryData = await motService.getMotExpiryData(regNumberNoSpaces);
-            motResponseTime = Date.now() - motStart;
-            console.log(`[INFO] MOT expiry for ${vehicle.reg_number}: ${motExpiryData.motExpiryDate || 'N/A'}`);
-          } catch (motError: any) {
-            // Ensure we always capture a non-empty error message
-            motApiError = motError?.message || motError?.toString() || 'Unknown MOT API error';
-            console.error(`MOT API fetch failed for ${vehicle.reg_number}:`, motApiError);
-            // Continue with DVLA data even if MOT fetch fails
-          }
-        }
-
-        const responseTime = Date.now() - startTime;
-
-        // Get existing maintenance record
-        const { data: existingRecord } = await supabase
-          .from('vehicle_maintenance')
-          .select('tax_due_date, mot_due_date')
-          .eq('van_id', vehicle.id)
-          .single();
-
-        const oldTaxDate = existingRecord?.tax_due_date || null;
-        const oldMotDate = existingRecord?.mot_due_date || null;
-
-        // Prepare update data
-        const updates: any = {
-          dvla_sync_status: 'success',
-          last_dvla_sync: new Date().toISOString(),
-          dvla_sync_error: null,
-          dvla_raw_data: dvlaData.rawData || null,
-          
-          // Store all VES vehicle data
-          ves_make: dvlaData.make || null,
-          ves_colour: dvlaData.colour || null,
-          ves_fuel_type: dvlaData.fuelType || null,
-          ves_year_of_manufacture: dvlaData.yearOfManufacture || null,
-          ves_engine_capacity: dvlaData.engineSize || null,
-          ves_tax_status: dvlaData.taxStatus || null,
-          ves_mot_status: dvlaData.motStatus || null,
-          ves_co2_emissions: dvlaData.co2Emissions || null,
-          ves_euro_status: dvlaData.euroStatus || null,
-          ves_real_driving_emissions: dvlaData.realDrivingEmissions || null,
-          ves_type_approval: dvlaData.typeApproval || null,
-          ves_wheelplan: dvlaData.wheelplan || null,
-          ves_revenue_weight: dvlaData.revenueWeight || null,
-          ves_marked_for_export: dvlaData.markedForExport || false,
-          ves_month_of_first_registration: dvlaData.monthOfFirstRegistration || null,
-          ves_date_of_last_v5c_issued: dvlaData.dateOfLastV5CIssued || null,
-        };
-
-        const fieldsUpdated: string[] = [];
-
-        // Update tax due date if available from DVLA VES
-        if (dvlaData.taxDueDate) {
-          updates.tax_due_date = dvlaData.taxDueDate;
-          if (oldTaxDate !== dvlaData.taxDueDate) {
-            fieldsUpdated.push('tax_due_date');
-            console.log(`[INFO] ${vehicle.reg_number}: Tax updated from ${oldTaxDate} to ${dvlaData.taxDueDate}`);
-          } else {
-            console.log(`[INFO] ${vehicle.reg_number}: Tax unchanged (${oldTaxDate})`);
-          }
-        } else {
-          console.log(`[WARN] ${vehicle.reg_number}: No tax due date from VES API`);
-        }
-
-        // Update MOT due date from MOT History API (if available)
-        if (motService) {
-          if (motApiError) {
-            // MOT API call failed with an error
-            updates.mot_api_sync_status = 'error';
-            updates.last_mot_api_sync = new Date().toISOString();
-            updates.mot_api_sync_error = motApiError;
-            console.log(`[ERROR] ${vehicle.reg_number}: MOT API error: ${motApiError}`);
-            
-            // FALLBACK: Calculate first MOT from DVLA monthOfFirstRegistration for very new vehicles
-            if (motApiError.includes('No MOT history found') && dvlaData.monthOfFirstRegistration) {
-              try {
-                const [year, month] = dvlaData.monthOfFirstRegistration.split('.');
-                if (year && month) {
-                  const firstRegDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-                  const firstMotDue = new Date(firstRegDate);
-                  firstMotDue.setFullYear(firstMotDue.getFullYear() + 3);
-                  
-                  const calculatedMotDue = firstMotDue.toISOString().split('T')[0];
-                  updates.mot_due_date = calculatedMotDue;
-                  updates.mot_expiry_date = calculatedMotDue;
-                  updates.mot_first_used_date = firstRegDate.toISOString().split('T')[0];
-                  
-                  if (oldMotDate !== calculatedMotDue) {
-                    fieldsUpdated.push('mot_due_date (calculated from DVLA)');
-                    console.log(`[INFO] ${vehicle.reg_number}: First MOT due calculated from DVLA: ${calculatedMotDue} (3 years from ${dvlaData.monthOfFirstRegistration})`);
-                  }
-                }
-              } catch (err) {
-                console.error(`[ERROR] Failed to calculate MOT due date from DVLA data:`, err);
-              }
-            }
-          } else if (motExpiryData?.motExpiryDate || motExpiryData?.rawData) {
-            // MOT API succeeded - update vehicle-level data from API
-            const motRawData = motExpiryData.rawData;
-            
-            if (motRawData) {
-              // Store vehicle-level MOT data
-              updates.mot_make = motRawData.make || null;
-              updates.mot_model = motRawData.model || null;
-              updates.mot_fuel_type = motRawData.fuelType || null;
-              updates.mot_primary_colour = motRawData.primaryColour || null;
-              updates.mot_registration = motRawData.registration || null;
-              
-              // Additional fields from MOT API
-              if (motRawData.manufactureYear) updates.mot_year_of_manufacture = parseInt(motRawData.manufactureYear);
-              // BUG FIX: Use firstUsedDate not registrationDate
-              if (motRawData.firstUsedDate) updates.mot_first_used_date = motRawData.firstUsedDate;
-            }
-            
-            // Always update MOT due date if API provides one (overrides manual entries)
-            if (motExpiryData.motExpiryDate) {
-              updates.mot_due_date = motExpiryData.motExpiryDate;
-              updates.mot_expiry_date = motExpiryData.motExpiryDate;
-              
-              if (oldMotDate !== motExpiryData.motExpiryDate) {
-                fieldsUpdated.push('mot_due_date');
-                console.log(`[INFO] ${vehicle.reg_number}: MOT updated from ${oldMotDate} to ${motExpiryData.motExpiryDate}`);
-              } else {
-                console.log(`[INFO] ${vehicle.reg_number}: MOT unchanged (${oldMotDate})`);
-              }
-            } else if (motRawData?.firstUsedDate && !motExpiryData.motExpiryDate) {
-              // NEW: Calculate first MOT due date for new vans (firstUsedDate + 3 years)
-              // UK vehicles require their first MOT 3 years after first registration
-              const firstUsedDate = new Date(motRawData.firstUsedDate);
-              const firstMotDue = new Date(firstUsedDate);
-              firstMotDue.setFullYear(firstMotDue.getFullYear() + 3);
-              
-              const calculatedMotDue = firstMotDue.toISOString().split('T')[0]; // YYYY-MM-DD
-              updates.mot_due_date = calculatedMotDue;
-              updates.mot_expiry_date = calculatedMotDue;
-              
-              if (oldMotDate !== calculatedMotDue) {
-                fieldsUpdated.push('mot_due_date (calculated)');
-                console.log(`[INFO] ${vehicle.reg_number}: First MOT due calculated: ${calculatedMotDue} (3 years from ${motRawData.firstUsedDate})`);
-              }
-            }
-            
-            updates.mot_api_sync_status = 'success';
-            updates.last_mot_api_sync = new Date().toISOString();
-            updates.mot_api_sync_error = null;
-            updates.mot_raw_data = motRawData || null;
-          } else {
-            // MOT API succeeded but returned no data
-            updates.mot_api_sync_status = 'success';
-            updates.last_mot_api_sync = new Date().toISOString();
-            updates.mot_api_sync_error = 'No MOT history found';
-            updates.mot_raw_data = motExpiryData?.rawData || null;
-            console.log(`[WARN] ${vehicle.reg_number}: No MOT expiry date found`);
-          }
-        }
-        
-        console.log(`[INFO] ${vehicle.reg_number}: Fields updated: ${fieldsUpdated.length > 0 ? fieldsUpdated.join(', ') : 'none (data up to date)'}`);
-
-
-        // Upsert vehicle_maintenance record
-        const { error: upsertError } = await supabase
-          .from('vehicle_maintenance')
-          .upsert({
-            van_id: vehicle.id,
-            ...updates,
-            updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'van_id'
-          });
-
-        if (upsertError) throw upsertError;
-
-        // Log sync to audit trail (dvla_sync_log)
-        // Use the actual persisted mot_due_date value (which may be calculated from first registration)
-        const persistedMotDate = updates.mot_due_date || null;
-        await supabase
-          .from('dvla_sync_log')
-          .insert({
-            van_id: vehicle.id,
-            registration_number: vehicle.reg_number,
-            sync_status: 'success',
-            fields_updated: fieldsUpdated,
-            tax_due_date_old: oldTaxDate,
-            tax_due_date_new: dvlaData.taxDueDate,
-            mot_due_date_old: oldMotDate,
-            mot_due_date_new: persistedMotDate,
-            api_provider: `${process.env.DVLA_API_PROVIDER}${motService ? '+MOT' : ''}`,
-            api_response_time_ms: responseTime,
-            raw_response: {
-              dvla: dvlaData.rawData,
-              mot: motExpiryData?.rawData || null,
-            },
-            triggered_by: user.id,
-            trigger_type: syncAll ? 'bulk' : (vehicleIds ? 'bulk' : 'manual'),
-          });
-
-        // Get user profile for history log
-        let updaterName = 'DVLA API Sync';
-        const { data: userProfile } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', user.id)
-          .single();
-        if (userProfile?.full_name) {
-          updaterName = `${userProfile.full_name} (via DVLA Sync)`;
-        }
-
-        // Log to maintenance_history for visibility in vehicle history page
-        const historyEntries: Array<{
-          van_id: string;
-          field_name: string;
-          old_value: string | null;
-          new_value: string | null;
-          value_type: 'date';
-          comment: string;
-          updated_by: string;
-          updated_by_name: string;
-        }> = [];
-
-        // Add tax_due_date change to history if changed
-        if (dvlaData.taxDueDate && oldTaxDate !== dvlaData.taxDueDate) {
-          historyEntries.push({
-            van_id: vehicle.id,
-            field_name: 'tax_due_date',
-            old_value: oldTaxDate,
-            new_value: dvlaData.taxDueDate,
-            value_type: 'date',
-            comment: `Tax due date updated automatically via DVLA API sync for ${vehicle.reg_number}`,
-            updated_by: user.id,
-            updated_by_name: updaterName,
-          });
-        }
-
-        // Add mot_due_date change to history if changed
-        // Use the same persistedMotDate value as logged to dvla_sync_log for consistency
-        if (persistedMotDate && oldMotDate !== persistedMotDate) {
-          const wasCalculated = fieldsUpdated.some(f => f.includes('calculated'));
-          historyEntries.push({
-            van_id: vehicle.id,
-            field_name: 'mot_due_date',
-            old_value: oldMotDate,
-            new_value: persistedMotDate,
-            value_type: 'date',
-            comment: wasCalculated 
-              ? `MOT due date calculated from first registration date via DVLA API sync for ${vehicle.reg_number}`
-              : `MOT due date updated automatically via DVLA/MOT API sync for ${vehicle.reg_number}`,
-            updated_by: user.id,
-            updated_by_name: updaterName,
-          });
-        }
-
-        // Insert history entries if any
-        if (historyEntries.length > 0) {
-          const { error: historyError } = await supabase
-            .from('maintenance_history')
-            .insert(historyEntries);
-
-          if (historyError) {
-            console.error(`[WARN] Failed to create maintenance history for ${vehicle.reg_number}:`, historyError);
-            // Don't fail the sync if history logging fails
-          } else {
-            console.log(`[INFO] ${vehicle.reg_number}: Added ${historyEntries.length} entries to maintenance history`);
-          }
-        }
-
-        results.push({
-          success: true,
-          vehicleId: vehicle.id,
-          registrationNumber: vehicle.reg_number,
-          updatedFields: fieldsUpdated,
-          syncedAt: new Date().toISOString(),
-        });
-
-        successCount++;
-
-      } catch (error: any) {
-        console.error(`DVLA sync failed for ${vehicle.reg_number}:`, error.message);
-
-        // Update status to error
-        await supabase
-          .from('vehicle_maintenance')
-          .upsert({
-            van_id: vehicle.id,
-            dvla_sync_status: 'error',
-            dvla_sync_error: error.message,
-            last_dvla_sync: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'van_id'
-          });
-
-        // Log error to audit trail
-        await supabase
-          .from('dvla_sync_log')
-          .insert({
-            van_id: vehicle.id,
-            registration_number: vehicle.reg_number,
-            sync_status: 'error',
-            error_message: error.message,
-            api_provider: process.env.DVLA_API_PROVIDER,
-            triggered_by: user.id,
-            trigger_type: syncAll ? 'bulk' : (vehicleIds ? 'bulk' : 'manual'),
-          });
-
-        results.push({
-          success: false,
-          vehicleId: vehicle.id,
-          registrationNumber: vehicle.reg_number,
-          errors: [error.message],
-          syncedAt: new Date().toISOString(),
-        });
-
-        failCount++;
-      }
-    }
+    const bulkRequested = Boolean(syncAll || (vehicleIds?.length || 0) > 1 || (assetIds?.length || 0) > 1);
+    const summary = await runFleetDvlaSync({
+      supabase,
+      dvlaService,
+      motService,
+      targets,
+      triggerType: bulkRequested ? 'bulk' : 'manual',
+      triggeredBy: user.id,
+    });
 
     return NextResponse.json({
       success: true,
-      total: vehiclesToSync.length,
-      successful: successCount,
-      failed: failCount,
-      results,
+      total: summary.total,
+      successful: summary.successful,
+      failed: summary.failed,
+      results: summary.results,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     await logServerError(error, {
       endpoint: '/api/maintenance/sync-dvla',
       method: 'POST',
     });
 
     return NextResponse.json(
-      { success: false, error: error.message || 'Internal server error' },
+      { success: false, error: getErrorMessage(error) },
       { status: 500 }
     );
   }

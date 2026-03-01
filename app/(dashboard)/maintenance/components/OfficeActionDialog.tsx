@@ -15,6 +15,7 @@ interface OfficeActionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   vehicleId: string;
+  assetType?: 'van' | 'hgv' | 'plant';
   vehicleReg: string;
   vehicleNickname?: string | null;
   alertType: 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit';
@@ -43,6 +44,7 @@ export function OfficeActionDialog({
   open,
   onOpenChange,
   vehicleId,
+  assetType = 'van',
   vehicleReg,
   vehicleNickname,
   alertType,
@@ -165,7 +167,8 @@ export function OfficeActionDialog({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          vehicleId,
+          assetId: vehicleId,
+          assetType,
         }),
       });
       

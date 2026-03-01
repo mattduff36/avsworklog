@@ -48,12 +48,24 @@ export function DVLASyncDebugPanel() {
       }
 
       const normalizedReg = regNumber.replace(/\s+/g, '').toUpperCase();
-      const vehicle = vehiclesData.vehicles.find((v: { vehicle?: { reg_number?: string }; van_id?: string | null }) => 
-        v.van_id && v.vehicle?.reg_number?.replace(/\s+/g, '').toUpperCase() === normalizedReg
-      );
+      const vehicle = vehiclesData.vehicles.find((v: {
+        vehicle?: { reg_number?: string; asset_type?: 'van' | 'hgv' | 'plant' };
+        van_id?: string | null;
+        hgv_id?: string | null;
+        plant_id?: string | null;
+        id?: string | null;
+      }) => v.vehicle?.reg_number?.replace(/\s+/g, '').toUpperCase() === normalizedReg);
 
       if (!vehicle) {
-        toast.error(`Van ${regNumber} not found in database. Only vans are supported for DVLA sync.`);
+        toast.error(`Asset ${regNumber} not found in database.`);
+        setSyncing(false);
+        return;
+      }
+
+      const assetType = vehicle.vehicle?.asset_type || 'van';
+      const assetId = vehicle.van_id || vehicle.hgv_id || vehicle.plant_id || vehicle.id;
+      if (!assetId) {
+        toast.error(`Found ${regNumber}, but no valid asset ID was resolved`);
         setSyncing(false);
         return;
       }
@@ -61,7 +73,7 @@ export function DVLASyncDebugPanel() {
       const response = await fetch('/api/maintenance/sync-dvla', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vehicleId: vehicle.van_id }),
+        body: JSON.stringify({ assetId, assetType }),
       });
 
       const data = await response.json();
@@ -79,7 +91,7 @@ export function DVLASyncDebugPanel() {
       }
 
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to sync van';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to sync asset';
       console.error('Sync error:', error);
       toast.error(errorMessage);
       setSyncResult({ success: false, message: errorMessage });
@@ -89,19 +101,22 @@ export function DVLASyncDebugPanel() {
   };
 
   const handleBulkSyncClick = async () => {
-    // Get vehicle count first
+      // Get road-eligible asset count first
     try {
       const response = await fetch('/api/maintenance');
       const data = await response.json();
       
       if (data.success) {
-        const activeVehicles = data.vehicles.filter((v: { van_id?: string | null; vehicle?: { status?: string } }) => 
-          v.van_id && (v.vehicle?.status === 'active' || !v.vehicle?.status)
+          const activeVehicles = data.vehicles.filter((v: {
+            vehicle?: { status?: string; reg_number?: string };
+          }) =>
+            (v.vehicle?.status === 'active' || !v.vehicle?.status) &&
+            Boolean(v.vehicle?.reg_number)
         );
         setVehicleCount(activeVehicles.length);
         setShowBulkConfirm(true);
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to get van count');
     }
   };
@@ -128,7 +143,7 @@ export function DVLASyncDebugPanel() {
       toast.success(`Bulk sync complete: ${data.successful}/${data.total} successful`);
 
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to bulk sync vans';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to bulk sync assets';
       console.error('Bulk sync error:', error);
       toast.error(errorMessage);
       setSyncResult({ success: false, message: errorMessage });
@@ -153,7 +168,7 @@ export function DVLASyncDebugPanel() {
         <CardHeader>
           <CardTitle className="text-white">Sync Single Van</CardTitle>
           <CardDescription className="text-muted-foreground">
-            Sync tax & MOT due dates for a specific van by registration number
+            Sync tax & MOT due dates for a specific fleet asset by registration number
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -190,12 +205,12 @@ export function DVLASyncDebugPanel() {
         </CardContent>
       </Card>
 
-      {/* Bulk Sync All Vehicles */}
+      {/* Bulk Sync All Road-Eligible Assets */}
       <Card className="border-border">
         <CardHeader>
-          <CardTitle className="text-white">Bulk Sync All Vans</CardTitle>
+          <CardTitle className="text-white">Bulk Sync All Road Assets</CardTitle>
           <CardDescription className="text-muted-foreground">
-            Sync tax & MOT due dates for all active vans in the database
+            Sync tax & MOT due dates for all active fleet assets with license plates
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -208,12 +223,12 @@ export function DVLASyncDebugPanel() {
             {bulkSyncing ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Syncing All Vans...
+                Syncing All Assets...
               </>
             ) : (
               <>
                 <RefreshCw className="mr-2 h-4 w-4" />
-                Sync All Vans (Tax & MOT Dates)
+                Sync All Assets (Tax & MOT Dates)
               </>
             )}
           </Button>
@@ -247,7 +262,7 @@ export function DVLASyncDebugPanel() {
           <DialogHeader>
             <DialogTitle className="text-xl text-white">Confirm Bulk Sync</DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              This will sync tax & MOT due dates for <strong className="text-white">{vehicleCount} active vans</strong> from GOV.UK APIs.
+              This will sync tax & MOT due dates for <strong className="text-white">{vehicleCount} active road-eligible assets</strong> from GOV.UK APIs.
               <br /><br />
               <strong className="text-white">API Usage:</strong> ~{vehicleCount * 2} API calls (VES + MOT)
               <br />

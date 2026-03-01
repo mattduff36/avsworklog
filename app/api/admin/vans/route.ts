@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { createDVLAApiService } from '@/lib/services/dvla-api';
 import { createMotHistoryService } from '@/lib/services/mot-history-api';
-import { formatRegistrationForStorage, formatRegistrationForApi, validateRegistrationNumber } from '@/lib/utils/registration';
+import { formatRegistrationForStorage, validateRegistrationNumber } from '@/lib/utils/registration';
+import { isRoadEligibleRegistration, runFleetDvlaSync } from '@/lib/services/fleet-dvla-sync';
+import type { Database } from '@/types/database';
 
 function getSupabaseAdmin() {
   return createClient(
@@ -196,13 +199,9 @@ async function syncVanData(
   vanId: string, 
   regNumber: string, 
   userId: string,
-  supabase: any
+  supabase: SupabaseClient<Database>
 ) {
-  const TEST_VEHICLES = ['TE57VAN', 'TE57HGV'];
-  
-  const regNumberNoSpaces = formatRegistrationForApi(regNumber);
-  
-  if (TEST_VEHICLES.includes(regNumberNoSpaces)) {
+  if (!isRoadEligibleRegistration(regNumber)) {
     console.log(`[INFO] Skipping API sync for test van: ${regNumber}`);
     return { 
       success: true, 
@@ -221,200 +220,35 @@ async function syncVanData(
   }
 
   const motService = createMotHistoryService();
-  const startTime = Date.now();
-
   try {
-    console.log(`[INFO] Auto-syncing DVLA data for new van: ${regNumber}`);
-    const dvlaData = await dvlaService.getVehicleData(regNumberNoSpaces);
-    console.log(`[INFO] DVLA data retrieved for ${regNumber}, tax due: ${dvlaData.taxDueDate || 'N/A'}`);
-
-    let motExpiryData = null;
-    let motApiError: string | null = null;
-    if (motService) {
-      try {
-        console.log(`[INFO] Auto-syncing MOT data for new van: ${regNumber}`);
-        motExpiryData = await motService.getMotExpiryData(regNumberNoSpaces);
-        console.log(`[INFO] MOT data retrieved for ${regNumber}, MOT due: ${motExpiryData.motExpiryDate || 'N/A'}`);
-      } catch (motError: any) {
-        motApiError = motError?.message || 'MOT API error';
-        console.error(`[WARN] MOT API failed for ${regNumber}:`, motApiError);
-      }
-    }
-
-    const responseTime = Date.now() - startTime;
-
-    const updates: any = {
-      dvla_sync_status: 'success',
-      last_dvla_sync: new Date().toISOString(),
-      dvla_sync_error: null,
-      dvla_raw_data: dvlaData.rawData || null,
-      
-      ves_make: dvlaData.make || null,
-      ves_colour: dvlaData.colour || null,
-      ves_fuel_type: dvlaData.fuelType || null,
-      ves_year_of_manufacture: dvlaData.yearOfManufacture || null,
-      ves_engine_capacity: dvlaData.engineSize || null,
-      ves_tax_status: dvlaData.taxStatus || null,
-      ves_mot_status: dvlaData.motStatus || null,
-      ves_co2_emissions: dvlaData.co2Emissions || null,
-      ves_euro_status: dvlaData.euroStatus || null,
-      ves_real_driving_emissions: dvlaData.realDrivingEmissions || null,
-      ves_type_approval: dvlaData.typeApproval || null,
-      ves_wheelplan: dvlaData.wheelplan || null,
-      ves_revenue_weight: dvlaData.revenueWeight || null,
-      ves_marked_for_export: dvlaData.markedForExport || false,
-      ves_month_of_first_registration: dvlaData.monthOfFirstRegistration || null,
-      ves_date_of_last_v5c_issued: dvlaData.dateOfLastV5CIssued || null,
-    };
-
-    const fieldsUpdated: string[] = [];
-
-    if (dvlaData.taxDueDate) {
-      updates.tax_due_date = dvlaData.taxDueDate;
-      fieldsUpdated.push('tax_due_date');
-    }
-
-    if (motService) {
-      if (motApiError) {
-        updates.mot_api_sync_status = 'error';
-        updates.last_mot_api_sync = new Date().toISOString();
-        updates.mot_api_sync_error = motApiError;
-        console.log(`[WARN] ${regNumber}: MOT API error: ${motApiError}`);
-        
-        if (motApiError.includes('No MOT history found') && dvlaData.monthOfFirstRegistration) {
-          try {
-            const [year, month] = dvlaData.monthOfFirstRegistration.split('.');
-            if (year && month) {
-              const firstRegDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-              const firstMotDue = new Date(firstRegDate);
-              firstMotDue.setFullYear(firstMotDue.getFullYear() + 3);
-              
-              const calculatedMotDue = firstMotDue.toISOString().split('T')[0];
-              updates.mot_due_date = calculatedMotDue;
-              updates.mot_expiry_date = calculatedMotDue;
-              updates.mot_first_used_date = firstRegDate.toISOString().split('T')[0];
-              fieldsUpdated.push('mot_due_date (calculated from DVLA)');
-              console.log(`[INFO] ${regNumber}: First MOT due calculated from DVLA: ${calculatedMotDue} (3 years from ${dvlaData.monthOfFirstRegistration})`);
-            }
-          } catch (err) {
-            console.error(`[ERROR] Failed to calculate MOT due date from DVLA data:`, err);
-          }
-        }
-      } else if (motExpiryData?.motExpiryDate || motExpiryData?.rawData) {
-        const motRawData = motExpiryData.rawData;
-        
-        if (motRawData) {
-          updates.mot_make = motRawData.make || null;
-          updates.mot_model = motRawData.model || null;
-          updates.mot_fuel_type = motRawData.fuelType || null;
-          updates.mot_primary_colour = motRawData.primaryColour || null;
-          updates.mot_registration = motRawData.registration || null;
-          
-          if (motRawData.manufactureYear) {
-            updates.mot_year_of_manufacture = parseInt(motRawData.manufactureYear);
-          }
-          if (motRawData.firstUsedDate) {
-            updates.mot_first_used_date = motRawData.firstUsedDate;
-          }
-        }
-        
-        if (motExpiryData.motExpiryDate) {
-          updates.mot_due_date = motExpiryData.motExpiryDate;
-          updates.mot_expiry_date = motExpiryData.motExpiryDate;
-          fieldsUpdated.push('mot_due_date');
-        } else if (motRawData?.firstUsedDate) {
-          const firstUsedDate = new Date(motRawData.firstUsedDate);
-          const firstMotDue = new Date(firstUsedDate);
-          firstMotDue.setFullYear(firstMotDue.getFullYear() + 3);
-          
-          const calculatedMotDue = firstMotDue.toISOString().split('T')[0];
-          updates.mot_due_date = calculatedMotDue;
-          updates.mot_expiry_date = calculatedMotDue;
-          fieldsUpdated.push('mot_due_date (calculated from MOT API)');
-          console.log(`[INFO] ${regNumber}: First MOT due calculated from MOT API: ${calculatedMotDue} (3 years from ${motRawData.firstUsedDate})`);
-        }
-        
-        updates.mot_api_sync_status = 'success';
-        updates.last_mot_api_sync = new Date().toISOString();
-        updates.mot_api_sync_error = null;
-        updates.mot_raw_data = motRawData || null;
-      } else {
-        updates.mot_api_sync_status = 'success';
-        updates.last_mot_api_sync = new Date().toISOString();
-        updates.mot_api_sync_error = 'No MOT history found';
-      }
-    }
-
-    console.log(`[INFO] ${regNumber}: Auto-sync completed, fields: ${fieldsUpdated.join(', ') || 'none'}`);
-
-    const { error: upsertError } = await supabase
-      .from('vehicle_maintenance')
-      .upsert({
-        van_id: vanId,
-        ...updates,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'van_id'
-      });
-
-    if (upsertError) {
-      console.error(`[ERROR] Failed to save maintenance data for ${regNumber}:`, upsertError);
-      throw upsertError;
-    }
-
-    await supabase
-      .from('dvla_sync_log')
-      .insert({
-        van_id: vanId,
-        registration_number: regNumber,
-        sync_status: 'success',
-        fields_updated: fieldsUpdated,
-        tax_due_date_new: dvlaData.taxDueDate,
-        mot_due_date_new: motExpiryData?.motExpiryDate || null,
-        api_provider: `${process.env.DVLA_API_PROVIDER}${motService ? '+MOT' : ''}`,
-        api_response_time_ms: responseTime,
-        raw_response: {
-          dvla: dvlaData.rawData,
-          mot: motExpiryData?.rawData || null,
+    const summary = await runFleetDvlaSync({
+      supabase,
+      dvlaService,
+      motService,
+      targets: [
+        {
+          assetType: 'van',
+          assetId: vanId,
+          registrationNumber: regNumber,
         },
-        triggered_by: userId,
-        trigger_type: 'auto_on_create',
-      });
+      ],
+      triggerType: 'auto_on_create',
+      triggeredBy: userId,
+    });
+
+    const row = summary.results[0];
+    if (!row || !row.success) {
+      throw new Error(row?.error || row?.errors?.[0] || 'Unknown auto-sync error');
+    }
 
     return {
       success: true,
-      fieldsUpdated,
-      taxDueDate: dvlaData.taxDueDate || null,
-      motDueDate: motExpiryData?.motExpiryDate || null,
-      responseTime
+      fieldsUpdated: row.updatedFields || [],
+      responseTime: null,
     };
-
-  } catch (error: any) {
-    console.error(`[ERROR] Auto-sync failed for ${regNumber}:`, error.message);
-
-    await supabase
-      .from('vehicle_maintenance')
-      .upsert({
-        van_id: vanId,
-        dvla_sync_status: 'error',
-        dvla_sync_error: error.message,
-        last_dvla_sync: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'van_id'
-      });
-
-    await supabase
-      .from('dvla_sync_log')
-      .insert({
-        van_id: vanId,
-        registration_number: regNumber,
-        sync_status: 'error',
-        error_message: error.message,
-        api_provider: process.env.DVLA_API_PROVIDER,
-        triggered_by: userId,
-        trigger_type: 'auto_on_create',
-      });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown auto-sync error';
+    console.error(`[ERROR] Auto-sync failed for ${regNumber}:`, message);
 
     await logServerError({
       error: error as Error,
@@ -428,7 +262,7 @@ async function syncVanData(
 
     return {
       success: false,
-      error: error.message,
+      error: message,
       warning: 'Could not fetch vehicle data from DVLA/MOT APIs. Please check the registration number or try manual sync later.'
     };
   }

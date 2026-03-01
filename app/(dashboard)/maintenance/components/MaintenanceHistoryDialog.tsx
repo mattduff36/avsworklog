@@ -19,6 +19,7 @@ interface MaintenanceHistoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   vehicleId: string | null;
+  assetType?: 'van' | 'hgv' | 'plant';
   vehicleReg?: string;
   onEditClick?: () => void;
 }
@@ -27,6 +28,7 @@ export function MaintenanceHistoryDialog({
   open,
   onOpenChange,
   vehicleId,
+  assetType = 'van',
   vehicleReg,
   onEditClick
 }: MaintenanceHistoryDialogProps) {
@@ -76,7 +78,7 @@ export function MaintenanceHistoryDialog({
           const response = await fetch('/api/maintenance/sync-dvla', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ vehicleIds: [vehicleId] }),
+            body: JSON.stringify({ assetIds: [vehicleId], assetType }),
           });
           
           const result = await response.json();
@@ -99,7 +101,6 @@ export function MaintenanceHistoryDialog({
       }
     }
   }, [open, vehicleId, vesData, isSyncing]);
-  };
   
   // Group combined items by date (show all changes made together)
   const groupedHistory: Record<string, typeof combinedItems> = {};

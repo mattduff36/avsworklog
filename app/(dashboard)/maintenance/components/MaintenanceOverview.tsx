@@ -132,6 +132,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   const [showOfficeActionDialog, setShowOfficeActionDialog] = useState(false);
   const [officeActionVehicle, setOfficeActionVehicle] = useState<{
     vehicleId: string;
+    assetType: 'van' | 'hgv' | 'plant';
     vehicleReg: string;
     vehicleNickname?: string | null;
     alertType: 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER';
@@ -457,6 +458,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     
     setOfficeActionVehicle({
       vehicleId,
+      assetType: (vehicle.vehicle?.asset_type as 'van' | 'hgv' | 'plant') || 'van',
       vehicleReg: vehicle.vehicle?.reg_number || vehicle.vehicle?.plant_id || 'Unknown',
       vehicleNickname: vehicle.vehicle?.nickname,
       alertType,
@@ -644,7 +646,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         ? latestTask.status_history 
         : [];
 
-      let updatePayload: Record<string, any> = {
+      let updatePayload: Record<string, unknown> = {
         status: 'completed',
         actioned_at: now.toISOString(),
         actioned_comment: data.completedComment,
@@ -1479,6 +1481,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           open={showOfficeActionDialog}
           onOpenChange={setShowOfficeActionDialog}
           vehicleId={officeActionVehicle.vehicleId}
+          assetType={officeActionVehicle.assetType}
           vehicleReg={officeActionVehicle.vehicleReg}
           vehicleNickname={officeActionVehicle.vehicleNickname}
           alertType={officeActionVehicle.alertType}
