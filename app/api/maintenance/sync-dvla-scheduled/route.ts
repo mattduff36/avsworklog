@@ -106,14 +106,13 @@ export async function POST(request: NextRequest) {
       if (row.plant_id) maintenanceMap.set(`plant:${row.plant_id}`, row.last_dvla_sync);
     }
 
-    // Filter vehicles that need syncing (not synced in last 6 days)
-    const sixDaysAgo = new Date();
-    sixDaysAgo.setDate(sixDaysAgo.getDate() - 6);
+    // Filter assets that need syncing (not synced in the last 23 hours)
+    const twentyThreeHoursAgo = new Date(Date.now() - 23 * 60 * 60 * 1000);
 
     const targetsToSync = allTargets.filter((target) => {
       const lastSync = maintenanceMap.get(`${target.assetType}:${target.assetId}`);
       if (!lastSync) return true; // Never synced
-      return new Date(lastSync) < sixDaysAgo; // Synced more than 6 days ago
+      return new Date(lastSync) < twentyThreeHoursAgo; // Synced more than 23 hours ago
     });
 
     console.log(`Scheduled sync: ${targetsToSync.length}/${allTargets.length} assets need syncing`);
