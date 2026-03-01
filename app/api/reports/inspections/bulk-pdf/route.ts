@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
           vehicle_type,
           van_categories(name)
         ),
-        profile:profiles!vehicle_inspections_user_id_fkey(full_name)
+        profile:profiles!van_inspections_user_id_fkey(full_name)
       `)
       .neq('status', 'draft')
       .gte('inspection_end_date', dateFrom)
@@ -226,7 +226,7 @@ export async function POST(request: NextRequest) {
               vehicle_type,
               van_categories(name)
             ),
-            profile:profiles!vehicle_inspections_user_id_fkey(full_name)
+            profile:profiles!van_inspections_user_id_fkey(full_name)
           `)
           .neq('status', 'draft')
           .gte('inspection_end_date', dateFrom)

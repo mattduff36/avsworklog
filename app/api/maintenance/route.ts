@@ -71,87 +71,127 @@ export async function GET(request: NextRequest) {
     const cambeltThreshold = categoryMap.get('cambelt replacement')?.alert_threshold_miles || 5000;
     const firstAidThreshold = categoryMap.get('first aid kit expiry')?.alert_threshold_days || 30;
     
-    // Get all active vehicles with their maintenance data (if any)
-    // Using LEFT JOIN to include vehicles without maintenance records
-    // Note: Cannot order by joined table columns in Supabase
-    // Sorting is handled client-side in the MaintenanceTable component
-    const { data: vehicles, error: vehiclesError } = await supabase
-      .from('vans')
-      .select(`
-        id,
-        reg_number,
-        plant_id,
-        asset_type,
-        serial_number,
-        year,
-        weight_class,
-        category_id,
-        status,
-        nickname,
-        vehicle_type,
-        maintenance:vehicle_maintenance(*)
-      `)
-      .eq('status', 'active');
-    
-    if (vehiclesError) {
-      logger.error('Failed to fetch vehicles with maintenance records', vehiclesError);
-      throw vehiclesError;
+    // ---------------------------------------------------------------
+    // Fetch all three asset tables with their maintenance records
+    // ---------------------------------------------------------------
+
+    const [vansResult, hgvsResult, plantResult] = await Promise.all([
+      supabase
+        .from('vans')
+        .select('id, reg_number, category_id, status, nickname, maintenance:vehicle_maintenance!van_id(*)')
+        .eq('status', 'active'),
+      supabase
+        .from('hgvs')
+        .select('id, reg_number, category_id, status, nickname, maintenance:vehicle_maintenance!hgv_id(*)')
+        .eq('status', 'active'),
+      supabase
+        .from('plant')
+        .select('id, plant_id, reg_number, nickname, serial_number, year, weight_class, category_id, status, maintenance:vehicle_maintenance!plant_id(*)')
+        .eq('status', 'active'),
+    ]);
+
+    if (vansResult.error) { logger.error('Failed to fetch vans', vansResult.error); throw vansResult.error; }
+    if (hgvsResult.error) { logger.error('Failed to fetch hgvs', hgvsResult.error); throw hgvsResult.error; }
+    if (plantResult.error) { logger.error('Failed to fetch plant', plantResult.error); throw plantResult.error; }
+
+    // Tag each asset with its source type
+    type TaggedAsset = { _assetType: 'van' | 'hgv' | 'plant'; [key: string]: any };
+    const taggedAssets: TaggedAsset[] = [
+      ...(vansResult.data || []).map(v => ({ ...v, _assetType: 'van' as const })),
+      ...(hgvsResult.data || []).map(v => ({ ...v, _assetType: 'hgv' as const })),
+      ...(plantResult.data || []).map(v => ({ ...v, _assetType: 'plant' as const })),
+    ];
+
+    // Get last inspector for each asset (batched per inspection table)
+    const vanIds = taggedAssets.filter(a => a._assetType === 'van').map(a => a.id);
+    const hgvIds = taggedAssets.filter(a => a._assetType === 'hgv').map(a => a.id);
+    const plantIds = taggedAssets.filter(a => a._assetType === 'plant').map(a => a.id);
+
+    const lastInspectionMap = new Map<string, { inspector: string | null; date: string | null }>();
+
+    // Van inspections
+    if (vanIds.length > 0) {
+      const { data: vanInsp } = await supabase
+        .from('van_inspections')
+        .select('van_id, inspection_date, profiles!van_inspections_user_id_fkey(full_name)')
+        .in('van_id', vanIds)
+        .order('inspection_date', { ascending: false });
+
+      for (const row of (vanInsp || []) as any[]) {
+        if (row.van_id && !lastInspectionMap.has(row.van_id)) {
+          lastInspectionMap.set(row.van_id, {
+            inspector: row.profiles?.full_name || null,
+            date: row.inspection_date,
+          });
+        }
+      }
     }
-    
-    // Get last inspector for each vehicle
-    const vehiclesWithInspector = await Promise.all(
-      (vehicles || []).map(async (vehicle) => {
-        const v = vehicle as any;
-        
-        // Get the last inspection for this vehicle
-        const { data: inspections } = await supabase
-          .from('van_inspections')
-          .select(`
-            inspection_date,
-            profiles!vehicle_inspections_user_id_fkey (
-              full_name
-            )
-          `)
-          .eq('van_id', v.id)
-          .order('inspection_date', { ascending: false })
-          .limit(1);
-        
-        const lastInspection = inspections?.[0] || null;
-        
-        return {
-          ...v,
-          last_inspector: (lastInspection?.profiles as any)?.full_name || null,
-          last_inspection_date: lastInspection?.inspection_date || null,
-        };
-      })
-    );
-    
-    // Calculate status for each vehicle
-    const vehiclesWithStatus: VehicleMaintenanceWithStatus[] = vehiclesWithInspector.map(vehicle => {
-      const v = vehicle as any;
-      // Get maintenance data (will be null/empty if no maintenance record exists)
-      const maintenance = Array.isArray(v.maintenance) ? v.maintenance[0] : v.maintenance;
-      
-      // If no maintenance record exists, create a placeholder structure
+
+    // HGV inspections
+    if (hgvIds.length > 0) {
+      const { data: hgvInsp } = await supabase
+        .from('hgv_inspections')
+        .select('hgv_id, inspection_date, profiles!hgv_inspections_user_id_fkey(full_name)')
+        .in('hgv_id', hgvIds)
+        .order('inspection_date', { ascending: false });
+
+      for (const row of (hgvInsp || []) as any[]) {
+        if (row.hgv_id && !lastInspectionMap.has(row.hgv_id)) {
+          lastInspectionMap.set(row.hgv_id, {
+            inspector: row.profiles?.full_name || null,
+            date: row.inspection_date,
+          });
+        }
+      }
+    }
+
+    // Plant inspections
+    if (plantIds.length > 0) {
+      const { data: plantInsp } = await supabase
+        .from('plant_inspections')
+        .select('plant_id, inspection_date, profiles!plant_inspections_user_id_fkey(full_name)')
+        .in('plant_id', plantIds)
+        .order('inspection_date', { ascending: false });
+
+      for (const row of (plantInsp || []) as any[]) {
+        if (row.plant_id && !lastInspectionMap.has(row.plant_id)) {
+          lastInspectionMap.set(row.plant_id, {
+            inspector: row.profiles?.full_name || null,
+            date: row.inspection_date,
+          });
+        }
+      }
+    }
+
+    // Calculate status for each asset
+    const vehiclesWithStatus: VehicleMaintenanceWithStatus[] = taggedAssets.map(asset => {
+      const assetType = asset._assetType;
+      const maintenance = Array.isArray(asset.maintenance) ? asset.maintenance[0] : asset.maintenance;
+      const inspInfo = lastInspectionMap.get(asset.id);
+
+      const vehicleObj = {
+        id: asset.id,
+        reg_number: asset.reg_number || null,
+        category_id: asset.category_id || null,
+        status: asset.status,
+        nickname: asset.nickname || null,
+        asset_type: assetType as 'van' | 'hgv' | 'plant',
+        plant_id: asset.plant_id || null,
+        serial_number: asset.serial_number || null,
+        year: asset.year || null,
+        weight_class: asset.weight_class || null,
+      };
+
       if (!maintenance) {
         return {
           id: null,
-          van_id: v.id,
-          vehicle: {
-            id: v.id,
-            reg_number: v.reg_number,
-            plant_id: v.plant_id,
-            asset_type: v.asset_type,
-            serial_number: v.serial_number,
-            year: v.year,
-            weight_class: v.weight_class,
-            category_id: v.category_id,
-            status: v.status,
-            nickname: v.nickname || null,
-            vehicle_type: v.vehicle_type
-          },
-          last_inspector: v.last_inspector,
-          last_inspection_date: v.last_inspection_date,
+          van_id: assetType === 'van' ? asset.id : null,
+          hgv_id: assetType === 'hgv' ? asset.id : null,
+          plant_id: assetType === 'plant' ? asset.id : null,
+          is_plant: assetType === 'plant',
+          vehicle: vehicleObj,
+          last_inspector: inspInfo?.inspector || null,
+          last_inspection_date: inspInfo?.date || null,
           current_mileage: null,
           tax_due_date: null,
           mot_due_date: null,
@@ -175,8 +215,7 @@ export async function GET(request: NextRequest) {
           due_soon_count: 0
         };
       }
-      
-      // Calculate status for each maintenance type
+
       const tax_status = getDateBasedStatus(maintenance.tax_due_date, taxThreshold);
       const mot_status = getDateBasedStatus(maintenance.mot_due_date, motThreshold);
       const service_status = getMileageBasedStatus(
@@ -193,33 +232,17 @@ export async function GET(request: NextRequest) {
         maintenance.first_aid_kit_expiry,
         firstAidThreshold
       );
-      
-      // Calculate counts
+
       const alertCounts = calculateAlertCounts([
-        tax_status,
-        mot_status,
-        service_status,
-        cambelt_status,
-        first_aid_status
+        tax_status, mot_status, service_status, cambelt_status, first_aid_status
       ]);
-      
+
       return {
         ...maintenance,
-        vehicle: {
-          id: v.id,
-          reg_number: v.reg_number,
-          plant_id: v.plant_id,
-          asset_type: v.asset_type,
-          serial_number: v.serial_number,
-          year: v.year,
-          weight_class: v.weight_class,
-          category_id: v.category_id,
-          status: v.status,
-          nickname: v.nickname || null,
-          vehicle_type: v.vehicle_type
-        },
-        last_inspector: v.last_inspector,
-        last_inspection_date: v.last_inspection_date,
+        is_plant: assetType === 'plant',
+        vehicle: vehicleObj,
+        last_inspector: inspInfo?.inspector || null,
+        last_inspection_date: inspInfo?.date || null,
         tax_status,
         mot_status,
         service_status,

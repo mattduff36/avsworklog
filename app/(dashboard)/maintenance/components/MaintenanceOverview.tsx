@@ -271,7 +271,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   const vehiclesWithAlerts: VehicleWithAlerts[] = vehicles.map(vehicle => {
     const alerts: Alert[] = [];
     const isPlant = 'is_plant' in vehicle && vehicle.is_plant === true;
-    const assetType = isPlant ? 'plant' : 'van';
+    const rawAssetType = (vehicle.vehicle?.asset_type || (isPlant ? 'plant' : 'vehicle')).toLowerCase();
     
     // Helper to check if category applies to this asset
     const categoryApplies = (categoryName: string): boolean => {
@@ -280,7 +280,11 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       );
       if (!category) return true;
       if (!category.applies_to || category.applies_to.length === 0) return true;
-      return category.applies_to.includes(assetType);
+      const normalizedAppliesTo = category.applies_to.map(t => t.toLowerCase());
+      if (rawAssetType === 'vehicle' || rawAssetType === 'van') {
+        return normalizedAppliesTo.includes('vehicle') || normalizedAppliesTo.includes('van');
+      }
+      return normalizedAppliesTo.includes(rawAssetType);
     };
     
     // Check Tax (only if category applies to this asset type)

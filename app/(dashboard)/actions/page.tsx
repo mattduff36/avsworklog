@@ -10,13 +10,16 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, CheckCircle2, Clock, Trash2, FileText, Undo2, Wrench, ArrowRight, Info, Settings, Ban, Lightbulb, Bug } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Trash2, FileText, Undo2, Wrench, ArrowRight, Info, Settings, Ban, Lightbulb, Bug, Truck } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Database } from '@/types/database';
 import { toast } from 'sonner';
 
 type Action = Database['public']['Tables']['actions']['Row'] & {
   vans?: {
+    reg_number: string;
+  } | null;
+  hgvs?: {
     reg_number: string;
   } | null;
   inspection_items?: {
@@ -71,6 +74,9 @@ export default function ActionsPage() {
         .select(`
           *,
           vans (
+            reg_number
+          ),
+          hgvs (
             reg_number
           ),
           inspection_items (
@@ -510,6 +516,10 @@ export default function ActionsPage() {
                     <span className="text-muted-foreground flex items-center gap-1.5"><Settings className="h-3 w-3" />Plant</span>
                     <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'pending' && a.plant_id !== null).length}</span>
                   </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Truck className="h-3 w-3" />HGV</span>
+                    <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'pending' && a.hgv_id !== null).length}</span>
+                  </div>
                 </div>
               </div>
               <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
@@ -529,6 +539,10 @@ export default function ActionsPage() {
                     <span className="text-muted-foreground flex items-center gap-1.5"><Settings className="h-3 w-3" />Plant</span>
                     <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'logged' && a.plant_id !== null).length}</span>
                   </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Truck className="h-3 w-3" />HGV</span>
+                    <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'logged' && a.hgv_id !== null).length}</span>
+                  </div>
                 </div>
               </div>
               <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/30">
@@ -547,6 +561,10 @@ export default function ActionsPage() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground flex items-center gap-1.5"><Settings className="h-3 w-3" />Plant</span>
                     <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'completed' && a.plant_id !== null).length}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Truck className="h-3 w-3" />HGV</span>
+                    <span className="font-medium text-foreground">{workshopActions.filter(a => a.status === 'completed' && a.hgv_id !== null).length}</span>
                   </div>
                 </div>
               </div>
@@ -815,6 +833,11 @@ export default function ActionsPage() {
                                   Van: {action.vans.reg_number || 'N/A'}
                                 </span>
                               )}
+                              {action.hgvs && (
+                                <span>
+                                  HGV: {action.hgvs.reg_number || 'N/A'}
+                                </span>
+                              )}
                               {action.plant && (
                                 <span>
                                   Plant: {action.plant.plant_id || 'N/A'}
@@ -917,6 +940,11 @@ export default function ActionsPage() {
                               {action.vans && (
                                 <span>
                                   Van: {action.vans.reg_number || 'N/A'}
+                                </span>
+                              )}
+                              {action.hgvs && (
+                                <span>
+                                  HGV: {action.hgvs.reg_number || 'N/A'}
                                 </span>
                               )}
                               {action.plant && (

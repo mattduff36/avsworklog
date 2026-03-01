@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
           )
         ),
         user_id,
-        inspector:profiles!vehicle_inspections_user_id_fkey (
+        inspector:profiles!van_inspections_user_id_fkey (
           id,
           full_name,
           employee_id

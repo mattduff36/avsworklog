@@ -77,6 +77,12 @@ export function getParentHref(
   if (normalizedPath.match(/^\/van-inspections\/[^/]+$/)) {
     return '/van-inspections';
   }
+  if (normalizedPath === '/hgv-inspections/new') {
+    return '/hgv-inspections';
+  }
+  if (normalizedPath.match(/^\/hgv-inspections\/[^/]+$/)) {
+    return '/hgv-inspections';
+  }
   
   // Timesheet routes
   if (normalizedPath === '/timesheets/new') {

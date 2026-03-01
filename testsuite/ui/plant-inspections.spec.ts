@@ -60,6 +60,20 @@ test.describe('Plant Inspections — Navigation', () => {
     const response = await page.goto('/plant-inspections/new');
     expect(response?.status()).not.toBe(404);
   });
+
+  test('can open an existing plant inspection detail page when list has entries', async ({ page }) => {
+    await page.goto('/plant-inspections');
+    await waitForAppReady(page);
+
+    const detailLink = page.locator('a[href^="/plant-inspections/"]:not([href$="/new"])').first();
+    const hasDetailLink = (await detailLink.count()) > 0;
+    test.skip(!hasDetailLink, 'No plant inspection records available for this environment');
+
+    await detailLink.click();
+    await waitForAppReady(page);
+    await expect(page).toHaveURL(/\/plant-inspections\/.+/, { timeout: 10_000 });
+    await expect(page.locator('body')).toContainText(/inspection|defect|submit|draft/i);
+  });
 });
 
 test.describe('Plant Inspections — Content Verification', () => {
@@ -78,5 +92,22 @@ test.describe('Plant Inspections — Content Verification', () => {
     const headings = await page.locator('h1, h2, h3').allInnerTexts();
     const vehicleHeadings = headings.filter(h => /vehicle\s+inspection/i.test(h));
     expect(vehicleHeadings, 'No headings should say "Vehicle Inspection"').toHaveLength(0);
+  });
+
+  test('new inspection page exposes workflow actions for human users', async ({ page }) => {
+    await page.goto('/plant-inspections/new');
+    await waitForAppReady(page);
+
+    const actionButton = page.getByRole('button', { name: /save|submit|create|start|complete/i });
+    const actionCount = await actionButton.count();
+
+    if (actionCount === 0) {
+      const bodyText = (await page.locator('body').innerText()).toLowerCase();
+      const hasExpectedEmptyState = /(no\s+.*(plant|inspection|asset))|(select\s+.*(plant|asset))/.test(bodyText);
+      expect(hasExpectedEmptyState).toBeTruthy();
+      return;
+    }
+
+    expect(actionCount).toBeGreaterThan(0);
   });
 });

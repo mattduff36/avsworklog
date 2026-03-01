@@ -72,6 +72,16 @@ export const FORM_TYPES: FormType[] = [
     enabled: true,
   },
   {
+    id: 'hgv-inspection',
+    title: 'HGV Inspections',
+    description: 'Daily 26-point safety checklist',
+    icon: ClipboardCheck,
+    href: '/hgv-inspections',
+    listHref: '/hgv-inspections',
+    color: 'inspection',
+    enabled: true,
+  },
+  {
     id: 'rams',
     title: 'Projects',
     description: 'Project documents & compliance',

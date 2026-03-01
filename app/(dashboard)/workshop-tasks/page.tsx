@@ -39,8 +39,12 @@ type Action = Database['public']['Tables']['actions']['Row'] & {
   vans?: {
     reg_number: string;
     nickname: string | null;
-    asset_type?: 'van' | 'plant' | 'tool';
+    asset_type?: 'van' | 'plant' | 'hgv' | 'tool';
     plant_id?: string | null;
+  };
+  hgvs?: {
+    reg_number: string;
+    nickname: string | null;
   };
   workshop_task_categories?: {
     id: string;
@@ -57,7 +61,7 @@ type Vehicle = {
   reg_number: string | null;
   plant_id?: string | null;
   nickname: string | null;
-  asset_type?: 'van' | 'plant' | 'tool';
+  asset_type?: 'van' | 'plant' | 'hgv' | 'tool';
 };
 
 type Category = {
@@ -91,7 +95,9 @@ export default function WorkshopTasksPage() {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [plantCategories, setPlantCategories] = useState<Category[]>([]);
   const [plantSubcategories, setPlantSubcategories] = useState<Subcategory[]>([]);
-  const [categoryTaxonomyMode, setCategoryTaxonomyMode] = useState<'van' | 'plant'>('van');
+  const [hgvCategories, setHgvCategories] = useState<Category[]>([]);
+  const [hgvSubcategories, setHgvSubcategories] = useState<Subcategory[]>([]);
+  const [categoryTaxonomyMode, setCategoryTaxonomyMode] = useState<'van' | 'plant' | 'hgv'>('van');
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [vehicleFilter, setVehicleFilter] = useState<string>('all');
@@ -169,7 +175,7 @@ export default function WorkshopTasksPage() {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   
   // Asset tab state (vehicle vs plant vs tools vs settings)
-  const [assetTab, setAssetTab] = useState<'van' | 'plant' | 'tools' | 'settings'>('van');
+  const [assetTab, setAssetTab] = useState<'van' | 'plant' | 'hgv' | 'tools' | 'settings'>('van');
   
   // Expandable sections state (Pending and In Progress open by default, Completed closed)
   const [showPending, setShowPending] = useState(true);
@@ -198,14 +204,14 @@ export default function WorkshopTasksPage() {
   // Handle tab changes with filter resets
   const handleTabChange = (newTab: string) => {
     const previousTab = assetTab;
-    setAssetTab(newTab as 'van' | 'plant' | 'tools' | 'settings');
+    setAssetTab(newTab as 'van' | 'plant' | 'hgv' | 'tools' | 'settings');
     
     // Reset filters when switching to a different asset type tab (vehicle or plant)
     // This ensures filters are cleared when:
     // 1. Switching directly between vehicle/plant tabs
     // 2. Switching from vehicle/plant to settings/tools and back to the OTHER asset type
     // 3. Any tab change that results in a different asset type being displayed
-    if ((newTab === 'van' || newTab === 'plant') && previousTab !== newTab) {
+    if ((newTab === 'van' || newTab === 'plant' || newTab === 'hgv') && previousTab !== newTab) {
       setVehicleFilter('all');
       setStatusFilter('all');
     }
@@ -220,6 +226,10 @@ export default function WorkshopTasksPage() {
         .select(`
           *,
           vans (
+            reg_number,
+            nickname
+          ),
+          hgvs (
             reg_number,
             nickname
           ),
@@ -257,8 +267,8 @@ export default function WorkshopTasksPage() {
       }
       
       if (vehicleFilter !== 'all') {
-        // Filter by either van_id OR plant_id depending on the filter value
-        query = query.or(`van_id.eq.${vehicleFilter},plant_id.eq.${vehicleFilter}`);
+        // Filter by any supported asset id column.
+        query = query.or(`van_id.eq.${vehicleFilter},plant_id.eq.${vehicleFilter},hgv_id.eq.${vehicleFilter}`);
       }
 
       const { data, error } = await query;
@@ -343,6 +353,22 @@ export default function WorkshopTasksPage() {
     }
   }, [supabase]);
 
+  const fetchHgvCategories = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('workshop_task_categories')
+        .select('id, name, slug, is_active, sort_order')
+        .eq('applies_to', 'hgv')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setHgvCategories(data || []);
+    } catch (err) {
+      console.error('Error fetching hgv categories:', err instanceof Error ? err.message : JSON.stringify(err));
+    }
+  }, [supabase]);
+
   const fetchSubcategories = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -387,6 +413,14 @@ export default function WorkshopTasksPage() {
 
           if (plantError) throw plantError;
 
+          const { data: hgvData, error: hgvError } = await supabase
+            .from('hgvs')
+            .select('id, reg_number, nickname')
+            .eq('status', 'active')
+            .order('reg_number');
+
+          if (hgvError) throw hgvError;
+
           const combinedVehicles = [
             ...(vehicleData || []).map(v => ({
               id: v.id,
@@ -401,6 +435,13 @@ export default function WorkshopTasksPage() {
               plant_id: p.plant_id,
               nickname: p.nickname,
               asset_type: 'plant' as const
+            })),
+            ...(hgvData || []).map(v => ({
+              id: v.id,
+              reg_number: v.reg_number,
+              plant_id: null,
+              nickname: v.nickname,
+              asset_type: 'hgv' as const
             }))
           ];
 
@@ -434,20 +475,47 @@ export default function WorkshopTasksPage() {
         }
       };
 
+      const fetchHgvSubcategoriesInner = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('workshop_task_subcategories')
+            .select(`
+              id,
+              category_id,
+              name,
+              slug,
+              is_active,
+              sort_order,
+              workshop_task_categories!inner (applies_to)
+            `)
+            .eq('is_active', true)
+            .eq('workshop_task_categories.applies_to', 'hgv')
+            .order('name');
+
+          if (error) throw error;
+          setHgvSubcategories(data || []);
+        } catch (err) {
+          console.error('Error fetching hgv subcategories:', err instanceof Error ? err.message : JSON.stringify(err));
+        }
+      };
+
       fetchTasks();
       fetchVehiclesInner();
       fetchCategories();
       fetchPlantCategories();
+      fetchHgvCategories();
       fetchSubcategories();
       fetchPlantSubcategoriesInner();
+      fetchHgvSubcategoriesInner();
       setRecentVehicleIds(getRecentVehicleIds(user.id));
     }
-  }, [user, statusFilter, vehicleFilter, fetchTasks, fetchCategories, fetchPlantCategories, fetchSubcategories, supabase]);
+  }, [user, statusFilter, vehicleFilter, fetchTasks, fetchCategories, fetchPlantCategories, fetchHgvCategories, fetchSubcategories, supabase]);
 
   const fetchCurrentMeterReading = async (vehicleId: string) => {
     try {
-      // Check both vans and plant tables to determine asset type
+      // Check vans, hgvs and plant tables to determine asset type
       let isPlant = false;
+      let isHgv = false;
 
       // Check if it's a van
       const { data: vehicleData } = await supabase
@@ -456,8 +524,17 @@ export default function WorkshopTasksPage() {
         .eq('id', vehicleId)
         .maybeSingle();
 
-      // If not found in vans, check plant table
+      // If not found in vans, check hgvs then plant table
       if (!vehicleData) {
+        const { data: hgvData } = await supabase
+          .from('hgvs')
+          .select('id')
+          .eq('id', vehicleId)
+          .maybeSingle();
+
+        if (hgvData) {
+          isHgv = true;
+        } else {
         const { data: plantData } = await supabase
           .from('plant')
           .select('id')
@@ -472,6 +549,7 @@ export default function WorkshopTasksPage() {
           setMeterReadingType('mileage');
           return;
         }
+        }
       }
 
       setMeterReadingType(isPlant ? 'hours' : 'mileage');
@@ -479,7 +557,7 @@ export default function WorkshopTasksPage() {
       const { data, error } = await supabase
         .from('vehicle_maintenance')
         .select(isPlant ? 'current_hours' : 'current_mileage')
-        .eq(isPlant ? 'plant_id' : 'van_id', vehicleId)
+        .eq(isPlant ? 'plant_id' : (isHgv ? 'hgv_id' : 'van_id'), vehicleId)
         .single();
 
       if (error) {
@@ -499,11 +577,11 @@ export default function WorkshopTasksPage() {
 
   // Filter subcategories by selected category
   const filteredSubcategories = selectedCategoryId
-    ? (assetTab === 'plant' ? plantSubcategories : subcategories).filter(sub => sub.category_id === selectedCategoryId)
+    ? (assetTab === 'plant' ? plantSubcategories : assetTab === 'hgv' ? hgvSubcategories : subcategories).filter(sub => sub.category_id === selectedCategoryId)
     : [];
 
   // Get the correct categories based on current tab
-  const activeCategories = assetTab === 'plant' ? plantCategories : categories;
+  const activeCategories = assetTab === 'plant' ? plantCategories : assetTab === 'hgv' ? hgvCategories : categories;
 
   // Dynamically determine if the selected category has active subcategories
   const categoryHasSubcategories = filteredSubcategories.length > 0;
@@ -539,6 +617,7 @@ export default function WorkshopTasksPage() {
       // Create the workshop task
       const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
       const isPlant = selectedVehicle?.asset_type === 'plant';
+      const isHgv = selectedVehicle?.asset_type === 'hgv';
       const taskTitle = `Workshop Task - ${getAssetIdLabel(selectedVehicle)}`;
       
       // Build task data with correct asset reference
@@ -560,9 +639,11 @@ export default function WorkshopTasksPage() {
         taskData.workshop_subcategory_id = null;
       }
 
-      // Set either van_id or plant_id, not both
+      // Set the matching asset id field
       if (isPlant) {
         taskData.plant_id = selectedVehicleId;
+      } else if (isHgv) {
+        taskData.hgv_id = selectedVehicleId;
       } else {
         taskData.van_id = selectedVehicleId;
       }
@@ -603,7 +684,7 @@ export default function WorkshopTasksPage() {
       // Update meter reading in vehicle_maintenance table
       // Use select-then-insert/update instead of upsert (partial unique indexes
       // are incompatible with ON CONFLICT)
-      const idColumn = isPlant ? 'plant_id' : 'van_id';
+      const idColumn = isPlant ? 'plant_id' : (isHgv ? 'hgv_id' : 'van_id');
       const { data: existingMaintenance } = await supabase
         .from('vehicle_maintenance')
         .select('id')
@@ -619,6 +700,10 @@ export default function WorkshopTasksPage() {
         meterFields.plant_id = selectedVehicleId;
         meterFields.current_hours = readingValue;
         meterFields.last_hours_update = new Date().toISOString();
+      } else if (isHgv) {
+        meterFields.hgv_id = selectedVehicleId;
+        meterFields.current_mileage = readingValue;
+        meterFields.last_mileage_update = new Date().toISOString();
       } else {
         meterFields.van_id = selectedVehicleId;
         meterFields.current_mileage = readingValue;
@@ -966,9 +1051,9 @@ export default function WorkshopTasksPage() {
       }
 
       // Step 3: Update maintenance if there are any updates
-      if (data.maintenanceUpdates && completingTask.van_id) {
+      if (data.maintenanceUpdates && (completingTask.van_id || completingTask.hgv_id)) {
         try {
-          const maintenanceAssetId = completingTask.van_id;
+          const maintenanceAssetId = completingTask.van_id || completingTask.hgv_id;
           const maintenanceResponse = await fetch(
             `/api/maintenance/by-vehicle/${maintenanceAssetId}`,
             {
@@ -1119,11 +1204,12 @@ export default function WorkshopTasksPage() {
     setInitialEditHadSubcategory(!!task.workshop_subcategory_id);
     
     // Fetch current meter reading (mileage for vans, hours for plant)
-    const assetId = task.van_id ?? task.plant_id;
+    const assetId = task.van_id ?? task.hgv_id ?? task.plant_id;
     if (assetId) {
       const isPlantTask = !!task.plant_id;
+      const isHgvTask = !!task.hgv_id;
       const fieldToSelect = isPlantTask ? 'current_hours' : 'current_mileage';
-      const idColumn = isPlantTask ? 'plant_id' : 'van_id';
+      const idColumn = isPlantTask ? 'plant_id' : (isHgvTask ? 'hgv_id' : 'van_id');
       
       try {
         const { data, error } = await supabase
@@ -1188,7 +1274,7 @@ export default function WorkshopTasksPage() {
     }
 
     // Compute whether the current edit category has active subcategories
-    const editSubcategoriesArray = editingTask?.plant_id ? plantSubcategories : subcategories;
+    const editSubcategoriesArray = editingTask?.plant_id ? plantSubcategories : editingTask?.hgv_id ? hgvSubcategories : subcategories;
     const editFilteredSubs = editSubcategoriesArray.filter(s => s.category_id === editCategoryId);
     const editCategoryHasSubcategories = editFilteredSubs.length > 0;
 
@@ -1227,6 +1313,7 @@ export default function WorkshopTasksPage() {
       // Determine if this is a plant or vehicle
       const selectedVehicle = vehicles.find(v => v.id === editVehicleId);
       const isPlant = selectedVehicle?.asset_type === 'plant';
+      const isHgv = selectedVehicle?.asset_type === 'hgv';
 
       // Update the workshop task with correct asset reference
       const updateData: any = {
@@ -1248,9 +1335,15 @@ export default function WorkshopTasksPage() {
       if (isPlant) {
         updateData.plant_id = editVehicleId;
         updateData.van_id = null;
+        updateData.hgv_id = null;
+      } else if (isHgv) {
+        updateData.hgv_id = editVehicleId;
+        updateData.van_id = null;
+        updateData.plant_id = null;
       } else {
         updateData.van_id = editVehicleId;
         updateData.plant_id = null;
+        updateData.hgv_id = null;
       }
 
       const { error } = await supabase
@@ -1263,7 +1356,7 @@ export default function WorkshopTasksPage() {
       // Update meter reading
       // Use select-then-insert/update instead of upsert (partial unique indexes
       // are incompatible with ON CONFLICT)
-      const editIdColumn = isPlant ? 'plant_id' : 'van_id';
+      const editIdColumn = isPlant ? 'plant_id' : (isHgv ? 'hgv_id' : 'van_id');
       const { data: existingEditMaintenance } = await supabase
         .from('vehicle_maintenance')
         .select('id')
@@ -1279,6 +1372,10 @@ export default function WorkshopTasksPage() {
         meterUpdateFields.plant_id = editVehicleId;
         meterUpdateFields.current_hours = mileageValue;
         meterUpdateFields.last_hours_update = new Date().toISOString();
+      } else if (isHgv) {
+        meterUpdateFields.hgv_id = editVehicleId;
+        meterUpdateFields.current_mileage = mileageValue;
+        meterUpdateFields.last_mileage_update = new Date().toISOString();
       } else {
         meterUpdateFields.van_id = editVehicleId;
         meterUpdateFields.current_mileage = mileageValue;
@@ -1572,6 +1669,8 @@ export default function WorkshopTasksPage() {
     if (assetTab === 'plant') {
       // Plant tab: show tasks with plant_id set
       return tasks.filter(t => t.plant_id !== null);
+    } else if (assetTab === 'hgv') {
+      return tasks.filter(t => t.hgv_id !== null);
     } else if (assetTab === 'van') {
       // Van tab: show tasks with van_id set
       return tasks.filter(t => t.van_id !== null);
@@ -1618,7 +1717,7 @@ export default function WorkshopTasksPage() {
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Workshop Tasks</h1>
             <p className="text-muted-foreground">
-              Track van & plant repairs and workshop work
+              Track van, HGV, and plant repairs and workshop work
             </p>
           </div>
           <Button
@@ -1633,8 +1732,9 @@ export default function WorkshopTasksPage() {
 
       {/* Tabs */}
       <Tabs value={assetTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className={`grid w-full ${showSettings ? 'grid-cols-4' : 'grid-cols-3'}`}>
+        <TabsList className={`grid w-full ${showSettings ? 'grid-cols-5' : 'grid-cols-4'}`}>
           <TabsTrigger value="van">Van Tasks</TabsTrigger>
+          <TabsTrigger value="hgv">HGV Tasks</TabsTrigger>
           <TabsTrigger value="plant">Plant Tasks</TabsTrigger>
           <TabsTrigger value="tools" disabled>
             <span className="flex items-center gap-1">
@@ -1831,7 +1931,7 @@ export default function WorkshopTasksPage() {
                                     }}
                                     disabled={isUpdating}
                                     size="sm"
-                                    className="h-9 px-3 text-xs bg-workshop/80 hover:bg-workshop text-white border-0"
+                                    className="h-9 px-3 text-xs bg-blue-600/80 hover:bg-blue-600 text-white border-0"
                                   >
                                     <Clock className="h-3.5 w-3.5 mr-1.5" />
                                     In Progress
@@ -2012,7 +2112,7 @@ export default function WorkshopTasksPage() {
                                       onClick={(e) => { e.stopPropagation(); handleResumeTask(task); }}
                                       disabled={isUpdating}
                                       size="sm"
-                                      className="h-9 px-3 text-xs bg-workshop/80 hover:bg-workshop text-white border-0"
+                                      className="h-9 px-3 text-xs bg-blue-600/80 hover:bg-blue-600 text-white border-0"
                                     >
                                       <Clock className="h-3.5 w-3.5 mr-1.5" />
                                       Resume
@@ -2503,7 +2603,7 @@ export default function WorkshopTasksPage() {
                                     }}
                                     disabled={isUpdating}
                                     size="sm"
-                                    className="h-9 px-3 text-xs bg-workshop/80 hover:bg-workshop text-white border-0"
+                                    className="h-9 px-3 text-xs bg-blue-600/80 hover:bg-blue-600 text-white border-0"
                                   >
                                     <Clock className="h-3.5 w-3.5 mr-1.5" />
                                     In Progress
@@ -2684,7 +2784,7 @@ export default function WorkshopTasksPage() {
                                       onClick={(e) => { e.stopPropagation(); handleResumeTask(task); }}
                                       disabled={isUpdating}
                                       size="sm"
-                                      className="h-9 px-3 text-xs bg-workshop/80 hover:bg-workshop text-white border-0"
+                                      className="h-9 px-3 text-xs bg-blue-600/80 hover:bg-blue-600 text-white border-0"
                                     >
                                       <Clock className="h-3.5 w-3.5 mr-1.5" />
                                       Resume
@@ -2999,6 +3099,651 @@ export default function WorkshopTasksPage() {
           )}
         </TabsContent>
 
+        <TabsContent value="hgv" className="space-y-6">
+          {/* Filters */}
+          <Card className="">
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Status Filter</Label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="bg-white dark:bg-slate-900 border-border dark:text-slate-100 text-slate-900">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="logged">In Progress</SelectItem>
+                      <SelectItem value="on_hold">On Hold</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>HGV Filter</Label>
+                  <Select value={vehicleFilter} onValueChange={setVehicleFilter}>
+                    <SelectTrigger className="bg-white dark:bg-slate-900 border-border dark:text-slate-100 text-slate-900">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All HGVs</SelectItem>
+                      {vehicles.filter(v => v.asset_type === 'hgv').map((vehicle) => (
+                        <SelectItem key={vehicle.id} value={vehicle.id}>
+                          {getAssetDisplay(vehicle)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Statistics */}
+          <div className="grid grid-cols-4 gap-4">
+            <Card className="">
+              <CardHeader className="pb-3">
+                <CardDescription className="text-muted-foreground">Pending</CardDescription>
+                <CardTitle className="text-3xl text-amber-600 dark:text-amber-400">{pendingTasks.length}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card className="">
+              <CardHeader className="pb-3">
+                <CardDescription className="text-muted-foreground">In Progress</CardDescription>
+                <CardTitle className="text-3xl text-blue-600 dark:text-blue-400">{inProgressTasks.length}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card className="">
+              <CardHeader className="pb-3">
+                <CardDescription className="text-muted-foreground">On Hold</CardDescription>
+                <CardTitle className="text-3xl text-purple-600 dark:text-purple-400">{onHoldTasks.length}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card className="">
+              <CardHeader className="pb-3">
+                <CardDescription className="text-muted-foreground">Completed</CardDescription>
+                <CardTitle className="text-3xl text-green-600 dark:text-green-400">{completedTasks.length}</CardTitle>
+              </CardHeader>
+            </Card>
+          </div>
+
+          {/* Tasks List */}
+          {loading ? (
+            <div className="flex items-center justify-center min-h-[400px]">
+              <p className="text-muted-foreground">Loading tasks...</p>
+            </div>
+          ) : tabFilteredTasks.length === 0 ? (
+            <Card className="">
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Wrench className="h-16 w-16 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">No HGV workshop tasks yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Create your first workshop task or wait for inspection defects
+                </p>
+                <Button
+                  onClick={() => setShowAddModal(true)}
+                  className="bg-workshop hover:bg-workshop-dark text-white"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Task
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              {/* Pending Tasks */}
+              {pendingTasks.length > 0 && (
+                <div className="border-2 border-amber-500/30 rounded-lg overflow-hidden bg-amber-500/5">
+                  <button
+                    onClick={() => setShowPending(!showPending)}
+                    className="w-full flex items-center justify-between p-4 bg-amber-500/10 hover:bg-amber-500/20 transition-colors border-b-2 border-amber-500/30"
+                  >
+                    <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5 text-amber-400" />
+                      Pending Tasks ({pendingTasks.length})
+                    </h2>
+                    {showPending ? (
+                      <ChevronUp className="h-5 w-5 text-amber-400" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-amber-400" />
+                    )}
+                  </button>
+                  {showPending && (
+                    <div className="space-y-3 p-4">
+                    {pendingTasks.map((task) => {
+                      const isUpdating = updatingStatus.has(task.id);
+                      return (
+                        <Card
+                          key={task.id}
+                          className="bg-white dark:bg-slate-900 border-border hover:shadow-lg hover:border-workshop/50 transition-all duration-200 cursor-pointer"
+                          onClick={() => handleOpenTaskModal(task)}
+                        >
+                          <CardContent className="pt-6">
+                            <div className="flex flex-col gap-3">
+                              <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                                <div className="flex-1 w-full">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    {getStatusIcon(task.status)}
+                                    <h3 className="font-semibold text-lg text-foreground">
+                                      {getVehicleReg(task)}
+                                    </h3>
+                                    <Badge variant="outline" className="text-xs">
+                                      {getSourceLabel(task)}
+                                    </Badge>
+                                    {taskAttachmentCounts.get(task.id) && taskAttachmentCounts.get(task.id)! > 0 && (
+                                      <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30 text-xs">
+                                        <Paperclip className="h-3 w-3 mr-1" />
+                                        {taskAttachmentCounts.get(task.id)}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap gap-2 mb-2">
+                                    {task.workshop_task_subcategories?.workshop_task_categories && (
+                                      <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30">
+                                        {task.workshop_task_subcategories.workshop_task_categories.name}
+                                      </Badge>
+                                    )}
+                                    {task.workshop_task_subcategories && (
+                                      <Badge variant="outline" className="bg-orange-500/10 text-orange-300 border-orange-500/30">
+                                        {task.workshop_task_subcategories.name}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {task.action_type === 'inspection_defect' && task.description && (
+                                    <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
+                                  )}
+                                  {task.workshop_comments && (
+                                    <p className="text-sm text-muted-foreground mb-2">
+                                      <strong>Notes:</strong> {task.workshop_comments}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
+                                  <Button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenComments(task);
+                                    }}
+                                    disabled={isUpdating}
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800"
+                                  >
+                                    <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                                    Comments
+                                  </Button>
+                                  <Button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleMarkInProgress(task);
+                                    }}
+                                    disabled={isUpdating}
+                                    size="sm"
+                                    className="h-9 px-3 text-xs bg-blue-600/80 hover:bg-blue-600 text-white border-0"
+                                  >
+                                    <Clock className="h-3.5 w-3.5 mr-1.5" />
+                                    In Progress
+                                  </Button>
+                                  <Button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleMarkComplete(task);
+                                    }}
+                                    disabled={isUpdating}
+                                    size="sm"
+                                    className="h-9 px-3 text-xs transition-all border-0 bg-green-600 hover:bg-green-700 text-white"
+                                  >
+                                    <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                                    Complete
+                                  </Button>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between w-full">
+                                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                                  <span>Created: {formatDate(task.created_at)}</span>
+                                </div>
+                                {task.action_type === 'workshop_vehicle_task' && (
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      onClick={(e) => { e.stopPropagation(); handleEditTask(task); }}
+                                      disabled={isUpdating}
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0 text-muted-foreground hover:text-muted-foreground hover:bg-slate-800"
+                                      title="Edit task"
+                                    >
+                                      <Edit className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteTask(task); }}
+                                      disabled={isUpdating}
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0 text-red-500 hover:text-red-400 hover:bg-red-950/50"
+                                      title="Delete task"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* In Progress Tasks */}
+              {inProgressTasks.length > 0 && (
+                <div className="border-2 border-blue-500/30 rounded-lg overflow-hidden bg-blue-500/5">
+                  <button
+                    onClick={() => setShowInProgress(!showInProgress)}
+                    className="w-full flex items-center justify-between p-4 bg-blue-500/10 hover:bg-blue-500/20 transition-colors border-b-2 border-blue-500/30"
+                  >
+                    <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-blue-400" />
+                      In Progress Tasks ({inProgressTasks.length})
+                    </h2>
+                    {showInProgress ? (
+                      <ChevronUp className="h-5 w-5 text-blue-400" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-blue-400" />
+                    )}
+                  </button>
+                  {showInProgress && (
+                    <div className="space-y-3 p-4">
+                    {inProgressTasks.map((task) => {
+                      const isUpdating = updatingStatus.has(task.id);
+                      return (
+                        <Card
+                          key={task.id}
+                          className="bg-white dark:bg-slate-900 border-blue-500/30 dark:border-blue-500/30 hover:shadow-lg hover:border-blue-500/50 transition-all duration-200 cursor-pointer"
+                          onClick={() => handleOpenTaskModal(task)}
+                        >
+                          <CardContent className="pt-6">
+                            <div className="flex flex-col gap-3">
+                              <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                                <div className="flex-1 w-full">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    {getStatusIcon(task.status)}
+                                    <h3 className="font-semibold text-lg text-foreground">
+                                      {getVehicleReg(task)}
+                                    </h3>
+                                    <Badge variant="outline" className="text-xs">
+                                      {getSourceLabel(task)}
+                                    </Badge>
+                                    {taskAttachmentCounts.get(task.id) && taskAttachmentCounts.get(task.id)! > 0 && (
+                                      <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30 text-xs">
+                                        <Paperclip className="h-3 w-3 mr-1" />
+                                        {taskAttachmentCounts.get(task.id)}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap gap-2 mb-2">
+                                    {task.workshop_task_subcategories?.workshop_task_categories && (
+                                      <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30">
+                                        {task.workshop_task_subcategories.workshop_task_categories.name}
+                                      </Badge>
+                                    )}
+                                    {task.workshop_task_subcategories && (
+                                      <Badge variant="outline" className="bg-orange-500/10 text-orange-300 border-orange-500/30">
+                                        {task.workshop_task_subcategories.name}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {task.action_type === 'inspection_defect' && task.description && (
+                                    <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
+                                  )}
+                                  {task.logged_comment && (
+                                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-2">
+                                      <p className="text-sm text-blue-300">
+                                        <strong>Progress Note:</strong> {task.logged_comment}
+                                      </p>
+                                    </div>
+                                  )}
+                                  {task.workshop_comments && (
+                                    <p className="text-sm text-muted-foreground mb-2">
+                                      <strong>Notes:</strong> {task.workshop_comments}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
+                                  <Button
+                                    onClick={(e) => { e.stopPropagation(); handleOpenComments(task); }}
+                                    disabled={isUpdating}
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800"
+                                  >
+                                    <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                                    Comments
+                                  </Button>
+                                  <Button
+                                    onClick={(e) => { e.stopPropagation(); handleUndoLogged(task.id); }}
+                                    variant="outline"
+                                    disabled={isUpdating}
+                                    size="sm"
+                                    className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800"
+                                  >
+                                    <Undo2 className="h-3.5 w-3.5 mr-1.5" />
+                                    Undo
+                                  </Button>
+                                  {task.status === 'logged' && (
+                                    <Button
+                                      onClick={(e) => { e.stopPropagation(); handleMarkOnHold(task); }}
+                                      disabled={isUpdating}
+                                      size="sm"
+                                      className="h-9 px-3 text-xs bg-purple-600/80 hover:bg-purple-600 text-white border-0"
+                                    >
+                                      <Pause className="h-3.5 w-3.5 mr-1.5" />
+                                      On Hold
+                                    </Button>
+                                  )}
+                                  {task.status === 'on_hold' && (
+                                    <Button
+                                      onClick={(e) => { e.stopPropagation(); handleResumeTask(task); }}
+                                      disabled={isUpdating}
+                                      size="sm"
+                                      className="h-9 px-3 text-xs bg-blue-600/80 hover:bg-blue-600 text-white border-0"
+                                    >
+                                      <Clock className="h-3.5 w-3.5 mr-1.5" />
+                                      Resume
+                                    </Button>
+                                  )}
+                                  <Button
+                                    onClick={(e) => { e.stopPropagation(); handleMarkComplete(task); }}
+                                    disabled={isUpdating}
+                                    size="sm"
+                                    className="h-9 px-3 text-xs transition-all border-0 bg-green-600 hover:bg-green-700 text-white"
+                                  >
+                                    <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                                    Complete
+                                  </Button>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between w-full">
+                                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                                  <span>Created: {formatDate(task.created_at)}</span>
+                                  {task.logged_at && (
+                                    <span className="text-blue-400">
+                                      Started: {formatDate(task.logged_at)}
+                                    </span>
+                                  )}
+                                </div>
+                                {task.action_type === 'workshop_vehicle_task' && (
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      onClick={(e) => { e.stopPropagation(); handleEditTask(task); }}
+                                      disabled={isUpdating}
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0 text-muted-foreground hover:text-muted-foreground hover:bg-slate-800"
+                                      title="Edit task"
+                                    >
+                                      <Edit className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* On Hold Tasks */}
+              {onHoldTasks.length > 0 && (
+                <div className="border-2 border-purple-500/30 rounded-lg overflow-hidden bg-purple-500/5">
+                  <button
+                    onClick={() => setShowOnHold(!showOnHold)}
+                    className="w-full flex items-center justify-between p-4 bg-purple-500/10 hover:bg-purple-500/20 transition-colors border-b-2 border-purple-500/30"
+                  >
+                    <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                      <Pause className="h-5 w-5 text-purple-400" />
+                      On Hold Tasks ({onHoldTasks.length})
+                    </h2>
+                    {showOnHold ? (
+                      <ChevronUp className="h-5 w-5 text-purple-400" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-purple-400" />
+                    )}
+                  </button>
+                  {showOnHold && (
+                    <div className="space-y-3 p-4">
+                    {onHoldTasks.map((task) => {
+                      const isUpdating = updatingStatus.has(task.id);
+                      return (
+                        <Card
+                          key={task.id}
+                          className="bg-white dark:bg-slate-900 border-purple-500/30 dark:border-purple-500/30 hover:shadow-lg hover:border-purple-500/50 transition-all duration-200 cursor-pointer"
+                          onClick={() => handleOpenTaskModal(task)}
+                        >
+                          <CardContent className="pt-6">
+                            <div className="flex flex-col gap-3">
+                              <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                                <div className="flex-1 w-full">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    {getStatusIcon(task.status)}
+                                    <h3 className="font-semibold text-lg text-foreground">
+                                      {getVehicleReg(task)}
+                                    </h3>
+                                    <Badge variant="outline" className="text-xs">
+                                      {getSourceLabel(task)}
+                                    </Badge>
+                                    {taskAttachmentCounts.get(task.id) && taskAttachmentCounts.get(task.id)! > 0 && (
+                                      <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30 text-xs">
+                                        <Paperclip className="h-3 w-3 mr-1" />
+                                        {taskAttachmentCounts.get(task.id)}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap gap-2 mb-2">
+                                    {task.workshop_task_subcategories?.workshop_task_categories && (
+                                      <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30">
+                                        {task.workshop_task_subcategories.workshop_task_categories.name}
+                                      </Badge>
+                                    )}
+                                    {task.workshop_task_subcategories && (
+                                      <Badge variant="outline" className="bg-orange-500/10 text-orange-300 border-orange-500/30">
+                                        {task.workshop_task_subcategories.name}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {task.action_type === 'inspection_defect' && task.description && (
+                                    <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
+                                  )}
+                                  {task.logged_comment && (
+                                    <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 mb-2">
+                                      <p className="text-sm text-purple-200 font-medium">Progress Note: {task.logged_comment}</p>
+                                    </div>
+                                  )}
+                                  {task.action_type === 'workshop_vehicle_task' && task.workshop_comments && (
+                                    <p className="text-sm text-muted-foreground">{task.workshop_comments}</p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setCommentsTask(task);
+                                      setShowCommentsDrawer(true);
+                                    }}
+                                    disabled={isUpdating}
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800"
+                                  >
+                                    <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                                    Comments
+                                  </Button>
+                                  <Button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleResumeTask(task);
+                                    }}
+                                    disabled={isUpdating}
+                                    size="sm"
+                                    className="h-9 px-3 text-xs transition-all border-0 bg-workshop hover:bg-workshop-dark text-white"
+                                  >
+                                    <Clock className="h-3.5 w-3.5 mr-1.5" />
+                                    Resume
+                                  </Button>
+                                  <Button
+                                    onClick={(e) => { e.stopPropagation(); handleMarkComplete(task); }}
+                                    disabled={isUpdating}
+                                    size="sm"
+                                    className="h-9 px-3 text-xs transition-all border-0 bg-green-600 hover:bg-green-700 text-white"
+                                  >
+                                    <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                                    Complete
+                                  </Button>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between w-full">
+                                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                                  <span>Created: {formatDate(task.created_at)}</span>
+                                  {task.logged_at && (
+                                    <span>Placed On Hold: {formatDate(task.logged_at)}</span>
+                                  )}
+                                </div>
+                                {task.action_type === 'workshop_vehicle_task' && (
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      onClick={(e) => { e.stopPropagation(); handleEditTask(task); }}
+                                      disabled={isUpdating}
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0 text-muted-foreground hover:text-muted-foreground hover:bg-slate-800"
+                                      title="Edit task"
+                                    >
+                                      <Edit className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteTask(task); }}
+                                      disabled={isUpdating}
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0 text-red-500 hover:text-red-400 hover:bg-red-950/50"
+                                      title="Delete task"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Completed Tasks */}
+              {completedTasks.length > 0 && (
+                <div className="border-2 border-green-500/30 rounded-lg overflow-hidden bg-green-500/5">
+                  <button
+                    onClick={() => setShowCompleted(!showCompleted)}
+                    className="w-full flex items-center justify-between p-4 bg-green-500/10 hover:bg-green-500/20 transition-colors border-b-2 border-green-500/30"
+                  >
+                    <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-green-400" />
+                      Completed Tasks ({completedTasks.length})
+                    </h2>
+                    {showCompleted ? (
+                      <ChevronUp className="h-5 w-5 text-green-400" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-green-400" />
+                    )}
+                  </button>
+                  {showCompleted && (
+                    <div className="space-y-3 p-4">
+                    {completedTasks.map((task) => (
+                      <Card
+                        key={task.id}
+                        className="bg-white dark:bg-slate-900 border-border opacity-70 hover:opacity-90 transition-opacity cursor-pointer"
+                        onClick={() => handleOpenTaskModal(task)}
+                      >
+                        <CardContent className="pt-6">
+                          <div className="flex flex-col items-start gap-4">
+                            <div className="flex-1 space-y-2 w-full">
+                              <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                                <div className="flex-1 w-full">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <CheckCircle2 className="h-5 w-5 text-green-400" />
+                                    <h3 className="font-semibold text-lg text-white">
+                                      {getVehicleReg(task)}
+                                    </h3>
+                                    <Badge variant="outline" className="text-xs">
+                                      {getSourceLabel(task)}
+                                    </Badge>
+                                    {taskAttachmentCounts.get(task.id) && taskAttachmentCounts.get(task.id)! > 0 && (
+                                      <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30 text-xs">
+                                        <Paperclip className="h-3 w-3 mr-1" />
+                                        {taskAttachmentCounts.get(task.id)}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {task.workshop_task_categories && (
+                                    <p className="text-sm text-muted-foreground mb-1">
+                                      <strong>Category:</strong> {task.workshop_task_categories.name}
+                                    </p>
+                                  )}
+                                  {task.action_type === 'inspection_defect' && task.description && (
+                                    <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
+                                  )}
+                                  <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                                    {task.actioned_at && (
+                                      <span className="text-green-400">
+                                        Completed: {formatDate(task.actioned_at)}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
+                                  <Button
+                                    onClick={(e) => { e.stopPropagation(); handleOpenComments(task); }}
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800"
+                                  >
+                                    <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                                    Comments
+                                  </Button>
+                                  <Button
+                                    onClick={(e) => { e.stopPropagation(); handleUndoComplete(task.id); }}
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800"
+                                  >
+                                    <Undo2 className="h-3.5 w-3.5 mr-1.5" />
+                                    Undo
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </TabsContent>
+
         <TabsContent value="tools">
           <Card className="">
             <CardContent className="flex flex-col items-center justify-center py-12">
@@ -3018,13 +3763,14 @@ export default function WorkshopTasksPage() {
               <CardHeader>
                 <CardTitle className="text-white">Category Taxonomy</CardTitle>
                 <CardDescription className="text-muted-foreground">
-                  Manage categories for vans or plant machinery
+                  Manage categories for vans, HGVs, or plant machinery
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Tabs value={categoryTaxonomyMode} onValueChange={(v) => setCategoryTaxonomyMode(v as 'van' | 'plant')}>
-                  <TabsList className="grid w-full grid-cols-2">
+                <Tabs value={categoryTaxonomyMode} onValueChange={(v) => setCategoryTaxonomyMode(v as 'van' | 'plant' | 'hgv')}>
+                  <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="van">Van Categories</TabsTrigger>
+                    <TabsTrigger value="hgv">HGV Categories</TabsTrigger>
                     <TabsTrigger value="plant">Plant Categories</TabsTrigger>
                   </TabsList>
                 </Tabs>
@@ -3032,8 +3778,8 @@ export default function WorkshopTasksPage() {
             </Card>
 
             <CategoryManagementPanel
-              categories={categoryTaxonomyMode === 'plant' ? plantCategories : categories}
-              subcategories={categoryTaxonomyMode === 'plant' ? plantSubcategories : subcategories}
+              categories={categoryTaxonomyMode === 'plant' ? plantCategories : categoryTaxonomyMode === 'hgv' ? hgvCategories : categories}
+              subcategories={categoryTaxonomyMode === 'plant' ? plantSubcategories : categoryTaxonomyMode === 'hgv' ? hgvSubcategories : subcategories}
               onAddCategory={openAddCategoryModal}
               onEditCategory={openEditCategoryModal}
               onDeleteCategory={handleDeleteCategory}
@@ -3060,14 +3806,14 @@ export default function WorkshopTasksPage() {
           <DialogHeader>
             <DialogTitle className="text-foreground text-xl">Create Workshop Task</DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Add a new {assetTab === 'plant' ? 'plant' : 'van'} repair or maintenance task
+              Add a new {assetTab === 'plant' ? 'plant' : assetTab === 'hgv' ? 'HGV' : 'van'} repair or maintenance task
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="vehicle" className="text-foreground">
-                {assetTab === 'plant' ? 'Plant' : 'Van'} <span className="text-red-500">*</span>
+                {assetTab === 'plant' ? 'Plant' : assetTab === 'hgv' ? 'HGV' : 'Van'} <span className="text-red-500">*</span>
               </Label>
               <Select value={selectedVehicleId} onValueChange={(value) => {
                 setSelectedVehicleId(value);
@@ -3078,11 +3824,11 @@ export default function WorkshopTasksPage() {
                 }
               }}>
                 <SelectTrigger id="vehicle" className="bg-white dark:bg-slate-800 border-border text-foreground">
-                  <SelectValue placeholder={`Select ${assetTab === 'plant' ? 'plant' : 'van'}`} />
+                  <SelectValue placeholder={`Select ${assetTab === 'plant' ? 'plant' : assetTab === 'hgv' ? 'HGV' : 'van'}`} />
                 </SelectTrigger>
                 <SelectContent>
                   {vehicles
-                    .filter(v => assetTab === 'plant' ? v.asset_type === 'plant' : v.asset_type !== 'plant')
+                    .filter(v => assetTab === 'plant' ? v.asset_type === 'plant' : assetTab === 'hgv' ? v.asset_type === 'hgv' : v.asset_type === 'van')
                     .map((vehicle) => (
                       <SelectItem key={vehicle.id} value={vehicle.id}>
                         {getAssetDisplay(vehicle)}
@@ -3462,7 +4208,7 @@ export default function WorkshopTasksPage() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="edit-vehicle" className="text-foreground">
-                {editingTask?.plant_id ? 'Plant' : 'Van'} <span className="text-red-500">*</span>
+                {editingTask?.plant_id ? 'Plant' : editingTask?.hgv_id ? 'HGV' : 'Van'} <span className="text-red-500">*</span>
               </Label>
               <Select value={editVehicleId} onValueChange={(value) => {
                 setEditVehicleId(value);
@@ -3475,12 +4221,13 @@ export default function WorkshopTasksPage() {
                   // Fetch current meter reading for the selected vehicle
                   const selectedVehicle = vehicles.find(v => v.id === value);
                   const isPlant = selectedVehicle?.asset_type === 'plant';
+                  const isHgv = selectedVehicle?.asset_type === 'hgv';
                   const fieldToSelect = isPlant ? 'current_hours' : 'current_mileage';
                   
                   supabase
                     .from('vehicle_maintenance')
                     .select(fieldToSelect)
-                    .eq(isPlant ? 'plant_id' : 'van_id', value)
+                    .eq(isPlant ? 'plant_id' : (isHgv ? 'hgv_id' : 'van_id'), value)
                     .single()
                     .then(({ data, error }) => {
                       if (error && error.code !== 'PGRST116') {
@@ -3493,14 +4240,15 @@ export default function WorkshopTasksPage() {
                 }
               }}>
                 <SelectTrigger id="edit-vehicle" className="bg-white dark:bg-slate-800 border-border text-foreground">
-                  <SelectValue placeholder={editingTask?.plant_id ? "Select plant" : "Select van"} />
+                  <SelectValue placeholder={editingTask?.plant_id ? "Select plant" : editingTask?.hgv_id ? "Select HGV" : "Select van"} />
                 </SelectTrigger>
                 <SelectContent>
                   {(() => {
                     // Filter vans/plant based on the task being edited
                     const isEditingPlant = !!editingTask?.plant_id;
+                    const isEditingHgv = !!editingTask?.hgv_id;
                     const filteredVehicles = vehicles.filter(v => 
-                      isEditingPlant ? v.asset_type === 'plant' : v.asset_type !== 'plant'
+                      isEditingPlant ? v.asset_type === 'plant' : isEditingHgv ? v.asset_type === 'hgv' : v.asset_type === 'van'
                     );
                     const { recentVehicles, otherVehicles } = splitVehiclesByRecent(filteredVehicles, recentVehicleIds);
                     return (
@@ -3564,7 +4312,7 @@ export default function WorkshopTasksPage() {
 
             {(() => {
               // Show subcategory picker only when the category has active subcategories
-              const editSubcategoriesArray = editingTask?.plant_id ? plantSubcategories : subcategories;
+              const editSubcategoriesArray = editingTask?.plant_id ? plantSubcategories : editingTask?.hgv_id ? hgvSubcategories : subcategories;
               const editFilteredSubcategories = editSubcategoriesArray.filter(s => s.category_id === editCategoryId);
               if (editFilteredSubcategories.length === 0) return null;
 
@@ -3656,7 +4404,7 @@ export default function WorkshopTasksPage() {
               disabled={(() => {
                 if (submitting || !editVehicleId || !editCategoryId || editComments.length < 10 || !editMileage.trim()) return true;
                 // Dynamic subcategory requirement for Save button
-                const editSubsArr = editingTask?.plant_id ? plantSubcategories : subcategories;
+                const editSubsArr = editingTask?.plant_id ? plantSubcategories : editingTask?.hgv_id ? hgvSubcategories : subcategories;
                 const editHasSubs = editSubsArr.filter(s => s.category_id === editCategoryId).length > 0;
                 const catChanged = editCategoryId !== initialEditCategoryId;
                 const needsSub = editHasSubs && (initialEditHadSubcategory || catChanged);

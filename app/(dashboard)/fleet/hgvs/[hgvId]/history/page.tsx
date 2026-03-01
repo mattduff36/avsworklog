@@ -48,12 +48,7 @@ type Vehicle = {
   reg_number: string | null;
   nickname: string | null;
   status: string;
-  asset_type?: 'van' | 'plant' | 'tool';
-  plant_id?: string | null;
-  serial_number?: string | null;
-  year?: number | null;
-  weight_class?: string | null;
-  vehicle_type?: string | null;
+  category_id: string | null;
 };
 
 type VehicleData = {
@@ -150,6 +145,15 @@ type TaskAttachment = {
     name: string;
     description: string | null;
   } | null;
+};
+
+type HgvInspectionHistoryItem = {
+  id: string;
+  inspection_date: string;
+  submitted_at: string | null;
+  status: string;
+  current_mileage: number | null;
+  profiles: { full_name: string } | null;
 };
 
 function DocumentsTabContent({ hgvId, workshopTasks }: { hgvId: string; workshopTasks: WorkshopTask[] }) {
@@ -344,6 +348,7 @@ export default function HgvHistoryPage({
   const [loading, setLoading] = useState(true);
   const [maintenanceHistory, setMaintenanceHistory] = useState<MaintenanceHistoryEntry[]>([]);
   const [workshopTasks, setWorkshopTasks] = useState<WorkshopTask[]>([]);
+  const [inspections, setInspections] = useState<HgvInspectionHistoryItem[]>([]);
   const [activeTab, setActiveTab] = useState('maintenance');
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [motData, setMotData] = useState<{ tests: Array<{ testDate: string; [key: string]: unknown }> } | null>(null);
@@ -368,10 +373,9 @@ export default function HgvHistoryPage({
 
   const fetchVehicleData = useCallback(async () => {
     try {
-      // Fetch basic vehicle info including plant fields
       const { data: vehicleInfo, error: vehicleError } = await supabase
         .from('hgvs')
-        .select('id, reg_number, nickname, status, asset_type, plant_id, serial_number, year, weight_class, vehicle_type')
+        .select('id, reg_number, nickname, status, category_id')
         .eq('id', resolvedParams.hgvId)
         .single();
 
@@ -415,37 +419,27 @@ export default function HgvHistoryPage({
 
   const fetchMaintenanceRecord = useCallback(async () => {
     try {
-      const response = await fetch('/api/maintenance');
-      
-      // Check if response is ok and has content
-      if (!response.ok) {
-        console.error('Maintenance API error:', response.status, response.statusText);
+      const { data: maintenance, error } = await supabase
+        .from('vehicle_maintenance')
+        .select('*')
+        .eq('hgv_id', resolvedParams.hgvId)
+        .single();
+
+      if (error || !maintenance) {
+        setMaintenanceRecord(null);
         return;
       }
 
-      // Check if response has content
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.error('Maintenance API returned non-JSON response');
-        return;
-      }
-
-      const result = await response.json();
-      
-      if (result.success) {
-        const vehicleMaintenance = result.vehicles.find(
-          (v: VehicleMaintenanceWithStatus) => 
-            v.van_id === resolvedParams.hgvId || v.vehicle?.id === resolvedParams.hgvId
-        );
-        
-        if (vehicleMaintenance) {
-          setMaintenanceRecord(vehicleMaintenance);
-        }
-      }
+      setMaintenanceRecord({
+        ...(maintenance as any),
+        hgv_id: (maintenance as any).hgv_id ?? resolvedParams.hgvId,
+        overdue_count: 0,
+        due_soon_count: 0,
+      } as VehicleMaintenanceWithStatus);
     } catch (error) {
       console.error('Error fetching maintenance record:', error);
     }
-  }, [resolvedParams.hgvId]);
+  }, [supabase, resolvedParams.hgvId]);
 
   const fetchMaintenanceHistory = useCallback(async () => {
     try {
@@ -570,14 +564,38 @@ export default function HgvHistoryPage({
     }
   }, [supabase, resolvedParams.hgvId]);
 
+  const fetchInspections = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('hgv_inspections')
+        .select(`
+          id,
+          inspection_date,
+          submitted_at,
+          status,
+          current_mileage,
+          profiles!hgv_inspections_user_id_fkey(full_name)
+        `)
+        .eq('hgv_id', resolvedParams.hgvId)
+        .order('inspection_date', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setInspections((data || []) as HgvInspectionHistoryItem[]);
+    } catch (error) {
+      console.error('Error fetching hgv inspections:', error);
+    }
+  }, [resolvedParams.hgvId, supabase]);
+
   useEffect(() => {
     if (user && resolvedParams.hgvId) {
       fetchVehicleData();
       fetchMaintenanceRecord();
       fetchMaintenanceHistory();
       fetchWorkshopTasks();
+      fetchInspections();
     }
-  }, [user, resolvedParams.hgvId, fetchVehicleData, fetchMaintenanceRecord, fetchMaintenanceHistory, fetchWorkshopTasks]);
+  }, [user, resolvedParams.hgvId, fetchVehicleData, fetchMaintenanceRecord, fetchMaintenanceHistory, fetchWorkshopTasks, fetchInspections]);
 
   useEffect(() => {
     if (activeTab === 'mot' && !motData && vehicle?.reg_number) {
@@ -689,14 +707,11 @@ export default function HgvHistoryPage({
           <BackButton />
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              {vehicle?.asset_type === 'plant' 
-                ? (vehicle?.plant_id || <Skeleton className="h-8 w-32" />)
-                : (vehicle?.reg_number || <Skeleton className="h-8 w-32" />)
-              }
+              {vehicle?.reg_number || <Skeleton className="h-8 w-32" />}
               {vehicle?.nickname && <span className="text-muted-foreground ml-2">({vehicle.nickname})</span>}
             </h1>
             <p className="text-muted-foreground mt-1">
-              {vehicle?.asset_type === 'plant' ? 'Plant Machinery' : 'HGV'} History & Records
+              HGV History & Records
             </p>
           </div>
         </div>
@@ -708,71 +723,13 @@ export default function HgvHistoryPage({
             className="border-fleet text-fleet hover:bg-fleet hover:text-white"
           >
             <Edit className="h-4 w-4 mr-2" />
-            Edit {vehicle?.asset_type === 'plant' ? 'Plant' : 'HGV'} Record
+            Edit HGV Record
           </Button>
         )}
       </div>
 
-      {/* Vehicle/Plant Data Section */}
-      {vehicle?.asset_type === 'plant' ? (
-        /* Plant Data Card */
-        <Card className="bg-gradient-to-r from-amber-900/20 to-amber-800/10 border-amber-700/30">
-          <CardContent className="pt-6">
-            <div className={`grid gap-6 ${hasMapMatch ? 'grid-cols-1 md:grid-cols-[3fr_2fr]' : 'grid-cols-1'}`}>
-              <div className={hasMapMatch ? 'space-y-2.5 text-sm' : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm'}>
-                {vehicle.plant_id && (
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Plant ID</span>
-                    <span className="text-white font-medium">{vehicle.plant_id}</span>
-                  </div>
-                )}
-                {vehicle.reg_number && (
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Registration</span>
-                    <span className="text-white font-medium">{vehicle.reg_number}</span>
-                  </div>
-                )}
-                {vehicle.vehicle_type && (
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Type</span>
-                    <span className="text-white font-medium">{vehicle.vehicle_type}</span>
-                  </div>
-                )}
-                {vehicle.serial_number && (
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Serial No.</span>
-                    <span className="text-white font-medium">{vehicle.serial_number}</span>
-                  </div>
-                )}
-                {vehicle.year && (
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Year</span>
-                    <span className="text-white font-medium">{vehicle.year}</span>
-                  </div>
-                )}
-                {vehicle.weight_class && (
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Weight Class</span>
-                    <span className="text-white font-medium">{vehicle.weight_class}</span>
-                  </div>
-                )}
-              </div>
-              {/* Map */}
-              <AssetLocationMap
-                plantId={vehicle.plant_id ?? undefined}
-                regNumber={vehicle.reg_number ?? undefined}
-                assetLabel={vehicle.plant_id || vehicle.reg_number || 'Unknown'}
-                className="h-full min-h-[265px]"
-                onMatchResult={setHasMapMatch}
-                onLocationData={setMapLocationData}
-                onClick={() => setMapModalOpen(true)}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        /* Vehicle Data Card (VES/MOT) */
-        vehicleData && (vehicleData.ves_make || vehicleData.mot_make) ? (
+      {/* HGV Data Section (VES/MOT) */}
+      {vehicleData && (vehicleData.ves_make || vehicleData.mot_make) ? (
           <Card className="bg-gradient-to-r from-blue-900/20 to-blue-800/10 border-blue-700/30">
             <CardContent className="pt-6">
               <div className={`grid gap-6 ${hasMapMatch ? 'grid-cols-1 md:grid-cols-[3fr_2fr]' : 'grid-cols-1'}`}>
@@ -859,8 +816,7 @@ export default function HgvHistoryPage({
                 {/* Map */}
                 <AssetLocationMap
                   regNumber={vehicle?.reg_number ?? undefined}
-                  plantId={vehicle?.plant_id ?? undefined}
-                  assetLabel={vehicle?.reg_number || vehicle?.plant_id || 'Unknown'}
+                  assetLabel={vehicle?.reg_number || 'Unknown'}
                   className="h-full min-h-[265px]"
                   onMatchResult={setHasMapMatch}
                   onLocationData={setMapLocationData}
@@ -870,12 +826,10 @@ export default function HgvHistoryPage({
             </CardContent>
           </Card>
         ) : (
-          /* No VES/MOT data – still show map if vehicle exists */
           vehicle && (
             <AssetLocationMap
               regNumber={vehicle.reg_number ?? undefined}
-              plantId={vehicle.plant_id ?? undefined}
-              assetLabel={vehicle.reg_number || vehicle.plant_id || 'Unknown'}
+              assetLabel={vehicle.reg_number || 'Unknown'}
               className="h-[180px] rounded-lg"
               onMatchResult={setHasMapMatch}
               onLocationData={setMapLocationData}
@@ -883,19 +837,19 @@ export default function HgvHistoryPage({
             />
           )
         )
-      )}
+      }
 
       {/* Map Modal */}
       <AssetLocationMapModal
         open={mapModalOpen}
         onOpenChange={setMapModalOpen}
-        assetLabel={vehicle?.reg_number || vehicle?.plant_id || 'Unknown'}
+        assetLabel={vehicle?.reg_number || 'Unknown'}
         location={mapLocationData}
       />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
           <TabsTrigger value="maintenance" className="gap-2">
             <Wrench className="h-4 w-4" />
             History
@@ -907,6 +861,10 @@ export default function HgvHistoryPage({
               MOT
             </TabsTrigger>
           )}
+          <TabsTrigger value="inspections" className="gap-2">
+            <ClipboardCheck className="h-4 w-4" />
+            Inspections
+          </TabsTrigger>
           <TabsTrigger value="documents" className="gap-2">
             <FileText className="h-4 w-4" />
             Documents
@@ -928,143 +886,59 @@ export default function HgvHistoryPage({
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {vehicle?.asset_type === 'plant' ? (
-                    /* Plant-specific fields */
-                    <>
-                      {/* Current Hours */}
-                      <div className="space-y-1">
-                        <span className="text-xs text-slate-400 uppercase tracking-wide">Current Hours</span>
-                        <p className="text-lg font-semibold text-white">
-                          {maintenanceRecord.current_hours ? `${maintenanceRecord.current_hours}h` : 'Not Set'}
-                        </p>
-                      </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">Current Mileage</span>
+                    <p className="text-lg font-semibold text-white">
+                      {formatMileage(maintenanceRecord.current_mileage)}
+                    </p>
+                  </div>
 
-                      {/* Next Service Hours */}
-                      <div className="space-y-1">
-                        <span className="text-xs text-slate-400 uppercase tracking-wide">Next Service</span>
-                        <p className="text-lg font-semibold text-white">
-                          {maintenanceRecord.next_service_hours 
-                            ? `${maintenanceRecord.next_service_hours}h` 
-                            : 'Not Set'}
-                        </p>
-                      </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">Tax Due</span>
+                    <p className="text-lg font-semibold text-white">
+                      {formatMaintenanceDate(maintenanceRecord.tax_due_date)}
+                    </p>
+                  </div>
 
-                      {/* Last Service Hours */}
-                      <div className="space-y-1">
-                        <span className="text-xs text-slate-400 uppercase tracking-wide">Last Service</span>
-                        <p className="text-lg font-semibold text-white">
-                          {maintenanceRecord.last_service_hours 
-                            ? `${maintenanceRecord.last_service_hours}h` 
-                            : 'Not Set'}
-                        </p>
-                      </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">MOT Due</span>
+                    <p className="text-lg font-semibold text-white">
+                      {formatMaintenanceDate(maintenanceRecord.mot_due_date)}
+                    </p>
+                  </div>
 
-                      {/* Show Tax/MOT only if reg_number exists */}
-                      {vehicle?.reg_number && (
-                        <>
-                          {/* Tax Due */}
-                          <div className="space-y-1">
-                            <span className="text-xs text-slate-400 uppercase tracking-wide">Tax Due</span>
-                            <p className="text-lg font-semibold text-white">
-                              {formatMaintenanceDate(maintenanceRecord.tax_due_date)}
-                            </p>
-                          </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">Service Due</span>
+                    <p className="text-lg font-semibold text-white">
+                      {maintenanceRecord.next_service_mileage 
+                        ? `${formatMileage(maintenanceRecord.next_service_mileage)} miles` 
+                        : 'Not Set'}
+                    </p>
+                  </div>
 
-                          {/* MOT Due */}
-                          <div className="space-y-1">
-                            <span className="text-xs text-slate-400 uppercase tracking-wide">MOT Due</span>
-                            <p className="text-lg font-semibold text-white">
-                              {formatMaintenanceDate(maintenanceRecord.mot_due_date)}
-                            </p>
-                          </div>
-                        </>
-                      )}
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">First Aid Kit</span>
+                    <p className="text-lg font-semibold text-white">
+                      {formatMaintenanceDate(maintenanceRecord.first_aid_kit_expiry)}
+                    </p>
+                  </div>
 
-                      {/* Tracker ID */}
-                      {maintenanceRecord.tracker_id && (
-                        <div className="space-y-1">
-                          <span className="text-xs text-slate-400 uppercase tracking-wide">GPS Tracker</span>
-                          <p className="text-lg font-semibold text-white">
-                            {maintenanceRecord.tracker_id}
-                          </p>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    /* Vehicle-specific fields */
-                    <>
-                      {/* Current Mileage */}
-                      <div className="space-y-1">
-                        <span className="text-xs text-slate-400 uppercase tracking-wide">Current Mileage</span>
-                        <p className="text-lg font-semibold text-white">
-                          {formatMileage(maintenanceRecord.current_mileage)}
-                        </p>
-                      </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">Last Service</span>
+                    <p className="text-lg font-semibold text-white">
+                      {maintenanceRecord.last_service_mileage 
+                        ? `${formatMileage(maintenanceRecord.last_service_mileage)} miles` 
+                        : 'Not Set'}
+                    </p>
+                  </div>
 
-                      {/* Tax Due */}
-                      <div className="space-y-1">
-                        <span className="text-xs text-slate-400 uppercase tracking-wide">Tax Due</span>
-                        <p className="text-lg font-semibold text-white">
-                          {formatMaintenanceDate(maintenanceRecord.tax_due_date)}
-                        </p>
-                      </div>
-
-                      {/* MOT Due */}
-                      <div className="space-y-1">
-                        <span className="text-xs text-slate-400 uppercase tracking-wide">MOT Due</span>
-                        <p className="text-lg font-semibold text-white">
-                          {formatMaintenanceDate(maintenanceRecord.mot_due_date)}
-                        </p>
-                      </div>
-
-                      {/* Service Due */}
-                      <div className="space-y-1">
-                        <span className="text-xs text-slate-400 uppercase tracking-wide">Service Due</span>
-                        <p className="text-lg font-semibold text-white">
-                          {maintenanceRecord.next_service_mileage 
-                            ? `${formatMileage(maintenanceRecord.next_service_mileage)} miles` 
-                            : 'Not Set'}
-                        </p>
-                      </div>
-
-                      {/* Cambelt Due */}
-                      <div className="space-y-1">
-                        <span className="text-xs text-slate-400 uppercase tracking-wide">Cambelt Due</span>
-                        <p className="text-lg font-semibold text-white">
-                          {maintenanceRecord.cambelt_due_mileage 
-                            ? `${formatMileage(maintenanceRecord.cambelt_due_mileage)} miles` 
-                            : 'Not Set'}
-                        </p>
-                      </div>
-
-                      {/* First Aid Kit */}
-                      <div className="space-y-1">
-                        <span className="text-xs text-slate-400 uppercase tracking-wide">First Aid Kit</span>
-                        <p className="text-lg font-semibold text-white">
-                          {formatMaintenanceDate(maintenanceRecord.first_aid_kit_expiry)}
-                        </p>
-                      </div>
-
-                      {/* Last Service */}
-                      <div className="space-y-1">
-                        <span className="text-xs text-slate-400 uppercase tracking-wide">Last Service</span>
-                        <p className="text-lg font-semibold text-white">
-                          {maintenanceRecord.last_service_mileage 
-                            ? `${formatMileage(maintenanceRecord.last_service_mileage)} miles` 
-                            : 'Not Set'}
-                        </p>
-                      </div>
-
-                      {/* Tracker ID */}
-                      {maintenanceRecord.tracker_id && (
-                        <div className="space-y-1">
-                          <span className="text-xs text-slate-400 uppercase tracking-wide">GPS Tracker</span>
-                          <p className="text-lg font-semibold text-white">
-                            {maintenanceRecord.tracker_id}
-                          </p>
-                        </div>
-                      )}
-                    </>
+                  {maintenanceRecord.tracker_id && (
+                    <div className="space-y-1">
+                      <span className="text-xs text-slate-400 uppercase tracking-wide">GPS Tracker</span>
+                      <p className="text-lg font-semibold text-white">
+                        {maintenanceRecord.tracker_id}
+                      </p>
+                    </div>
                   )}
                 </div>
               </CardContent>
@@ -1181,6 +1055,46 @@ export default function HgvHistoryPage({
                       </p>
                     </div>
                   )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="inspections" className="space-y-6">
+          <Card className="bg-slate-800/50 border-border">
+            <CardHeader>
+              <CardTitle>HGV Inspection History</CardTitle>
+              <CardDescription>Daily inspection submissions for this HGV</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {inspections.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">No inspections recorded yet.</div>
+              ) : (
+                <div className="space-y-3">
+                  {inspections.map((inspection) => (
+                    <button
+                      key={inspection.id}
+                      type="button"
+                      onClick={() => router.push(`/hgv-inspections/${inspection.id}`)}
+                      className="w-full text-left p-4 rounded-lg border border-border hover:bg-slate-700/40 transition-colors"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-white">
+                            {formatDate(inspection.inspection_date)}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {inspection.profiles?.full_name ? `${inspection.profiles.full_name} • ` : ''}
+                            {inspection.current_mileage != null ? `${inspection.current_mileage.toLocaleString()} miles` : 'Mileage not set'}
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30">
+                          {inspection.status}
+                        </Badge>
+                      </div>
+                    </button>
+                  ))}
                 </div>
               )}
             </CardContent>
@@ -1457,7 +1371,17 @@ export default function HgvHistoryPage({
         <EditMaintenanceDialog
           open={editDialogOpen}
           onOpenChange={setEditDialogOpen}
-          vehicle={maintenanceRecord}
+          vehicle={{
+            ...maintenanceRecord,
+            vehicle: {
+              id: vehicle?.id || resolvedParams.hgvId,
+              reg_number: vehicle?.reg_number || null,
+              category_id: vehicle?.category_id || null,
+              status: vehicle?.status || 'active',
+              nickname: vehicle?.nickname || null,
+              asset_type: 'hgv' as const,
+            },
+          }}
           onSuccess={() => {
             setEditDialogOpen(false);
             fetchMaintenanceRecord();
@@ -1474,6 +1398,8 @@ export default function HgvHistoryPage({
         <DeleteVehicleDialog
           open={deleteDialogOpen}
           onOpenChange={setDeleteDialogOpen}
+          endpoint="hgvs"
+          entityLabel="HGV"
           vehicle={{
             id: vehicle.id,
             reg_number: vehicle.reg_number,

@@ -601,4 +601,178 @@ describe('Workshop Tasks Module Workflows', () => {
       expect(error).toBeNull();
     });
   });
+
+  describe('Multi-asset lifecycle and dedupe edge cases', () => {
+    const createdTaskIds: string[] = [];
+
+    afterAll(async () => {
+      if (createdTaskIds.length === 0) return;
+      await supabase.from('actions').delete().in('id', createdTaskIds);
+    });
+
+    const getCategoryForAsset = async (assetType: 'van' | 'hgv' | 'plant') => {
+      const { data: categories, error } = await supabase
+        .from('workshop_task_categories')
+        .select('id, applies_to')
+        .eq('is_active', true)
+        .eq('applies_to', assetType)
+        .limit(1);
+
+      expect(error).toBeNull();
+      return categories?.[0] || null;
+    };
+
+    const createTaskForAsset = async (
+      assetType: 'van' | 'hgv' | 'plant',
+      assetId: string,
+      categoryId: string,
+      title: string
+    ) => {
+      const payload: Record<string, unknown> = {
+        action_type: 'workshop_vehicle_task',
+        title,
+        description: `Workflow test for ${assetType}`,
+        status: 'pending',
+        priority: 'medium',
+        workshop_category_id: categoryId,
+        created_by: testUserId,
+      };
+
+      if (assetType === 'van') payload.van_id = assetId;
+      if (assetType === 'hgv') payload.hgv_id = assetId;
+      if (assetType === 'plant') payload.plant_id = assetId;
+
+      const { data, error } = await supabase.from('actions').insert(payload).select('id, status').single();
+      expect(error).toBeNull();
+      expect(data).toBeDefined();
+      return data?.id as string;
+    };
+
+    it('creates and transitions a van task through lifecycle states', async () => {
+      if (!testVehicleId) {
+        console.log('No test van available, skipping');
+        return;
+      }
+      const category = await getCategoryForAsset('van');
+      if (!category) {
+        console.log('No active van category, skipping');
+        return;
+      }
+
+      const taskId = await createTaskForAsset(
+        'van',
+        testVehicleId,
+        category.id,
+        `WF Van Task ${Date.now()}`
+      );
+      createdTaskIds.push(taskId);
+
+      const states = ['logged', 'on_hold', 'completed'] as const;
+      for (const status of states) {
+        const { data, error } = await supabase
+          .from('actions')
+          .update({ status })
+          .eq('id', taskId)
+          .select('status')
+          .single();
+        expect(error).toBeNull();
+        expect(data?.status).toBe(status);
+      }
+    });
+
+    it('creates and transitions an HGV task through lifecycle states', async () => {
+      const { data: hgvs } = await supabase.from('hgvs').select('id').limit(1);
+      const hgvId = hgvs?.[0]?.id;
+      if (!hgvId) {
+        console.log('No HGV available, skipping');
+        return;
+      }
+
+      const category = await getCategoryForAsset('hgv');
+      if (!category) {
+        console.log('No active HGV category, skipping');
+        return;
+      }
+
+      const taskId = await createTaskForAsset('hgv', hgvId, category.id, `WF HGV Task ${Date.now()}`);
+      createdTaskIds.push(taskId);
+
+      const { data, error } = await supabase
+        .from('actions')
+        .update({ status: 'logged' })
+        .eq('id', taskId)
+        .select('status, hgv_id')
+        .single();
+
+      expect(error).toBeNull();
+      expect(data?.status).toBe('logged');
+      expect(data?.hgv_id).toBe(hgvId);
+    });
+
+    it('creates and transitions a plant task through lifecycle states', async () => {
+      const { data: plants } = await supabase.from('plant').select('id').limit(1);
+      const plantId = plants?.[0]?.id;
+      if (!plantId) {
+        console.log('No plant asset available, skipping');
+        return;
+      }
+
+      const category = await getCategoryForAsset('plant');
+      if (!category) {
+        console.log('No active plant category, skipping');
+        return;
+      }
+
+      const taskId = await createTaskForAsset(
+        'plant',
+        plantId,
+        category.id,
+        `WF Plant Task ${Date.now()}`
+      );
+      createdTaskIds.push(taskId);
+
+      const { data, error } = await supabase
+        .from('actions')
+        .update({ status: 'on_hold' })
+        .eq('id', taskId)
+        .select('status, plant_id')
+        .single();
+
+      expect(error).toBeNull();
+      expect(data?.status).toBe('on_hold');
+      expect(data?.plant_id).toBe(plantId);
+    });
+
+    it('active-status dedupe query excludes completed tasks', async () => {
+      if (!testVehicleId) {
+        console.log('No test van available, skipping');
+        return;
+      }
+      const category = await getCategoryForAsset('van');
+      if (!category) {
+        console.log('No active van category, skipping');
+        return;
+      }
+
+      const sharedTitle = `WF Dedupe Title ${Date.now()}`;
+      const activeTaskId = await createTaskForAsset('van', testVehicleId, category.id, sharedTitle);
+      createdTaskIds.push(activeTaskId);
+
+      const completedTaskId = await createTaskForAsset('van', testVehicleId, category.id, sharedTitle);
+      createdTaskIds.push(completedTaskId);
+      await supabase.from('actions').update({ status: 'completed' }).eq('id', completedTaskId);
+
+      const { data, error } = await supabase
+        .from('actions')
+        .select('id, status')
+        .eq('van_id', testVehicleId)
+        .eq('title', sharedTitle)
+        .eq('action_type', 'workshop_vehicle_task')
+        .in('status', ['pending', 'logged', 'on_hold']);
+
+      expect(error).toBeNull();
+      expect(data?.length).toBeGreaterThanOrEqual(1);
+      expect(data?.some((row) => row.id === completedTaskId)).toBe(false);
+    });
+  });
 });

@@ -134,6 +134,12 @@ function FleetContent() {
       router.replace('/maintenance');
       return;
     }
+
+    // Legacy redirect: tab=vehicles was renamed to tab=vans
+    if (requestedTab === 'vehicles') {
+      router.replace('/fleet?tab=vans', { scroll: false });
+      return;
+    }
     
     if (canAccessTab(requestedTab, canManage)) {
       setActiveTab(requestedTab);
@@ -160,6 +166,7 @@ function FleetContent() {
   const [hgvCategories, setHgvCategories] = useState<HgvCategory[]>([]);
   const [hgvCategoriesLoading, setHgvCategoriesLoading] = useState(false);
   const [hgvAssets, setHgvAssets] = useState<HgvAsset[]>([]);
+  const [hgvAssetsLoading, setHgvAssetsLoading] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -210,15 +217,19 @@ function FleetContent() {
   // Fetch HGV assets
   const fetchHgvAssets = async () => {
     try {
+      setHgvAssetsLoading(true);
       const { data, error } = await supabase
         .from('hgvs')
         .select('id, reg_number, nickname, status, category_id, hgv_categories(name, id)')
+        .eq('status', 'active')
         .order('reg_number', { ascending: true });
 
       if (error) throw error;
       setHgvAssets(data || []);
     } catch (error) {
       logger.error('Failed to fetch HGV assets', error, 'FleetPage');
+    } finally {
+      setHgvAssetsLoading(false);
     }
   };
 
@@ -335,11 +346,13 @@ function FleetContent() {
   
   
   const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
-    const isPlant = vehicle.is_plant === true;
-    const assetId = vehicle.van_id ?? vehicle.vehicle?.id ?? vehicle.id;
+    const assetType = vehicle.vehicle?.asset_type;
+    const assetId = (vehicle as any).hgv_id ?? vehicle.van_id ?? vehicle.vehicle?.id ?? vehicle.id;
 
-    if (isPlant) {
+    if (assetType === 'plant' || vehicle.is_plant === true) {
       router.push(`/fleet/plant/${assetId}/history?fromTab=${activeTab}`);
+    } else if (assetType === 'hgv') {
+      router.push(`/fleet/hgvs/${assetId}/history?fromTab=${activeTab}`);
     } else {
       router.push(`/fleet/vans/${assetId}/history?fromTab=${activeTab}`);
     }
@@ -545,7 +558,7 @@ function FleetContent() {
               </Card>
             ) : (
               <MaintenanceTable 
-                vehicles={(maintenanceData?.vehicles || []).filter(v => v.vehicle?.asset_type !== 'plant')}
+                vehicles={(maintenanceData?.vehicles || []).filter(v => v.vehicle?.asset_type === 'van')}
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
                 onVehicleAdded={() => {}}
@@ -557,54 +570,27 @@ function FleetContent() {
         {/* HGVs Tab - Admin/Manager only */}
         {canManageFleet && (
           <TabsContent value="hgvs" className="space-y-6">
-            {hgvAssets.length === 0 ? (
+            {maintenanceLoading ? (
+              <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+              </div>
+            ) : maintenanceError ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Truck className="h-16 w-16 text-gray-400 mb-4 opacity-50" />
-                  <h2 className="text-2xl font-semibold mb-2">No HGVs Yet</h2>
+                  <Truck className="h-16 w-16 text-red-400 mb-4" />
+                  <h2 className="text-2xl font-semibold mb-2">Error Loading HGV Data</h2>
                   <p className="text-gray-600 text-center max-w-md">
-                    HGV assets will appear here once added to the fleet
+                    {maintenanceError?.message || 'Failed to load HGV records'}
                   </p>
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
-                {hgvAssets.map((hgv) => (
-                  <Card
-                    key={hgv.id}
-                    className="bg-slate-800/50 border-border hover:bg-slate-800/70 transition-colors cursor-pointer"
-                    onClick={() => router.push(`/fleet/hgvs/${hgv.id}/history?fromTab=hgvs`)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="bg-emerald-500/10 p-3 rounded-lg">
-                            <Truck className="h-5 w-5 text-emerald-400" />
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-semibold text-white">{hgv.reg_number || 'No Reg'}</h3>
-                            <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                              {hgv.nickname && <span>{hgv.nickname}</span>}
-                              {hgv.nickname && hgv.hgv_categories?.name && <span>•</span>}
-                              {hgv.hgv_categories?.name && <span>{hgv.hgv_categories.name}</span>}
-                            </div>
-                          </div>
-                        </div>
-                        <Badge
-                          variant="outline"
-                          className={
-                            hgv.status === 'active'
-                              ? 'bg-green-500/10 text-green-300 border-green-500/30'
-                              : 'bg-slate-500/10 text-slate-300 border-slate-500/30'
-                          }
-                        >
-                          {hgv.status}
-                        </Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              <MaintenanceTable 
+                vehicles={(maintenanceData?.vehicles || []).filter(v => v.vehicle?.asset_type === 'hgv')}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                onVehicleAdded={() => {}}
+              />
             )}
           </TabsContent>
         )}
@@ -751,7 +737,7 @@ function FleetContent() {
                           <CardDescription className="text-muted-foreground">
                             {(() => {
                               const vanCategories = categories.filter(c => 
-                                (c.applies_to || []).includes('van')
+                                (c.applies_to || ['van']).includes('van')
                               );
                               return `${vanCategories.length} ${vanCategories.length === 1 ? 'category' : 'categories'}`;
                             })()}
@@ -780,7 +766,7 @@ function FleetContent() {
                       </div>
                     ) : (() => {
                       const vanCategories = categories.filter(c => {
-                        return (c.applies_to || []).includes('van');
+                        return (c.applies_to || ['van']).includes('van');
                       });
                       
                       return vanCategories.length === 0 ? (

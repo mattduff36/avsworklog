@@ -8,7 +8,7 @@ const cs = process.env.POSTGRES_URL_NON_POOLING!;
 const url = new URL(cs);
 
 const ALL_MODULES = [
-  'timesheets', 'inspections', 'plant-inspections', 'rams', 'absence',
+  'timesheets', 'inspections', 'plant-inspections', 'hgv-inspections', 'rams', 'absence',
   'maintenance', 'toolbox-talks', 'workshop-tasks', 'approvals',
   'actions', 'reports', 'admin-users', 'admin-vans',
 ];

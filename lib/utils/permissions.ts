@@ -130,6 +130,7 @@ export async function getUserPermissions(
         'timesheets': true,
         'inspections': true,
         'plant-inspections': true,
+        'hgv-inspections': true,
         'rams': true,
         'absence': true,
         'maintenance': true,

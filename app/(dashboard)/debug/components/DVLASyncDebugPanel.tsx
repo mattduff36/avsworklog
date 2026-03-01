@@ -48,17 +48,16 @@ export function DVLASyncDebugPanel() {
       }
 
       const normalizedReg = regNumber.replace(/\s+/g, '').toUpperCase();
-      const vehicle = vehiclesData.vehicles.find((v: { vehicle?: { reg_number?: string }; van_id?: string }) => 
-        v.vehicle?.reg_number?.replace(/\s+/g, '').toUpperCase() === normalizedReg
+      const vehicle = vehiclesData.vehicles.find((v: { vehicle?: { reg_number?: string }; van_id?: string | null }) => 
+        v.van_id && v.vehicle?.reg_number?.replace(/\s+/g, '').toUpperCase() === normalizedReg
       );
 
       if (!vehicle) {
-        toast.error(`Van ${regNumber} not found in database`);
+        toast.error(`Van ${regNumber} not found in database. Only vans are supported for DVLA sync.`);
         setSyncing(false);
         return;
       }
 
-      // Now sync that vehicle
       const response = await fetch('/api/maintenance/sync-dvla', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -96,8 +95,8 @@ export function DVLASyncDebugPanel() {
       const data = await response.json();
       
       if (data.success) {
-        const activeVehicles = data.vehicles.filter((v: { vehicle?: { status?: string } }) => 
-          v.vehicle?.status === 'active' || !v.vehicle?.status
+        const activeVehicles = data.vehicles.filter((v: { van_id?: string | null; vehicle?: { status?: string } }) => 
+          v.van_id && (v.vehicle?.status === 'active' || !v.vehicle?.status)
         );
         setVehicleCount(activeVehicles.length);
         setShowBulkConfirm(true);

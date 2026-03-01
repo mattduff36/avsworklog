@@ -22,7 +22,7 @@ type Vehicle = {
   plant_id: string | null;
   nickname: string | null;
   serial_number: string | null;
-  asset_type: 'van' | 'plant' | 'tool';
+  asset_type: 'van' | 'plant' | 'hgv' | 'tool';
 };
 
 type Category = {
@@ -31,7 +31,7 @@ type Category = {
   slug: string | null;
   is_active: boolean;
   sort_order: number;
-  applies_to: 'van' | 'plant';
+  applies_to: 'van' | 'plant' | 'hgv';
 };
 
 type Subcategory = {
@@ -42,7 +42,7 @@ type Subcategory = {
   is_active: boolean;
   sort_order: number;
   workshop_task_categories?: {
-    applies_to: 'van' | 'plant';
+    applies_to: 'van' | 'plant' | 'hgv';
   };
 };
 
@@ -86,7 +86,7 @@ export function CreateWorkshopTaskDialog({
 
   const fetchCurrentMeterReading = useCallback(async (assetId: string) => {
     try {
-      // First, determine asset type by checking both vans and plant tables
+      // First, determine asset type by checking vans, hgvs, and plant tables
       // This is necessary because this function may be called before the vehicles state is populated
       let isPlant = false;
       
@@ -97,8 +97,35 @@ export function CreateWorkshopTaskDialog({
         .eq('id', assetId)
         .maybeSingle();
       
-      // If not found in vans, check plant table
+      // If not found in vans, check hgvs then plant table
       if (!vehicleData) {
+        const { data: hgvData } = await supabase
+          .from('hgvs')
+          .select('id')
+          .eq('id', assetId)
+          .maybeSingle();
+
+        if (hgvData) {
+          isPlant = false;
+          setMeterReadingType('mileage');
+          const { data, error } = await supabase
+            .from('vehicle_maintenance')
+            .select('current_mileage')
+            .eq('hgv_id', assetId)
+            .single();
+
+          if (error) {
+            if (error.code === 'PGRST116') {
+              setCurrentMeterReading(null);
+              return;
+            }
+            throw error;
+          }
+
+          setCurrentMeterReading(data?.current_mileage || null);
+          return;
+        }
+
         const { data: plantData } = await supabase
           .from('plant')
           .select('id')
@@ -153,6 +180,15 @@ export function CreateWorkshopTaskDialog({
 
           if (vehicleError) throw vehicleError;
 
+          // Fetch hgvs
+          const { data: hgvData, error: hgvError } = await supabase
+            .from('hgvs')
+            .select('id, reg_number, nickname')
+            .eq('status', 'active')
+            .order('reg_number');
+
+          if (hgvError) throw hgvError;
+
           // Fetch plant
           const { data: plantData, error: plantError } = await supabase
             .from('plant')
@@ -170,6 +206,13 @@ export function CreateWorkshopTaskDialog({
               plant_id: null,
               nickname: v.nickname,
               asset_type: 'van' as const
+            })),
+            ...(hgvData || []).map(v => ({
+              id: v.id,
+              reg_number: v.reg_number,
+              plant_id: null,
+              nickname: v.nickname,
+              asset_type: 'hgv' as const
             })),
             ...(plantData || []).map(p => ({
               id: p.id,
@@ -336,9 +379,11 @@ export function CreateWorkshopTaskDialog({
         taskData.workshop_subcategory_id = null;
       }
 
-      // Set either van_id or plant_id, not both
+      // Set one asset id field only.
       if (isPlant) {
         taskData.plant_id = selectedVehicleId;
+      } else if (selectedVehicle?.asset_type === 'hgv') {
+        taskData.hgv_id = selectedVehicleId;
       } else {
         taskData.van_id = selectedVehicleId;
       }
@@ -386,6 +431,10 @@ export function CreateWorkshopTaskDialog({
         updateData.plant_id = selectedVehicleId;
         updateData.current_hours = readingValue;
         updateData.last_hours_update = new Date().toISOString();
+      } else if (selectedVehicle?.asset_type === 'hgv') {
+        updateData.hgv_id = selectedVehicleId;
+        updateData.current_mileage = readingValue;
+        updateData.last_mileage_update = new Date().toISOString();
       } else {
         updateData.van_id = selectedVehicleId;
         updateData.current_mileage = readingValue;
@@ -396,7 +445,7 @@ export function CreateWorkshopTaskDialog({
       // on van_id/plant_id, which makes ON CONFLICT fail in Postgres).
       let meterReadingUpdated = false;
       try {
-        const idColumn = isPlant ? 'plant_id' : 'van_id';
+        const idColumn = isPlant ? 'plant_id' : (selectedVehicle?.asset_type === 'hgv' ? 'hgv_id' : 'van_id');
         const { data: existingMaintenance, error: existingMaintenanceError } = await supabase
           .from('vehicle_maintenance')
           .select('id')
@@ -466,7 +515,7 @@ export function CreateWorkshopTaskDialog({
         <DialogHeader>
           <DialogTitle className="text-xl">Create Workshop Task</DialogTitle>
           <DialogDescription>
-            Add a new van or plant repair or maintenance task
+            Add a new van, HGV, or plant repair/maintenance task
           </DialogDescription>
         </DialogHeader>
 
@@ -493,7 +542,7 @@ export function CreateWorkshopTaskDialog({
               }
             }}>
               <SelectTrigger id="vehicle">
-                <SelectValue placeholder="Select van or plant" />
+                <SelectValue placeholder="Select van, HGV, or plant" />
               </SelectTrigger>
               <SelectContent>
                 {(() => {

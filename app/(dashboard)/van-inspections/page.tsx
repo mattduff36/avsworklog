@@ -137,7 +137,7 @@ function InspectionsContent() {
               name
             )
           ),
-          profile:profiles!vehicle_inspections_user_id_fkey(full_name)
+          profile:profiles!van_inspections_user_id_fkey(full_name)
         `)
         .order('inspection_date', { ascending: false });
 

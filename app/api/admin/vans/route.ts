@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
           .select(`
             user_id,
             inspection_date,
-            profiles!vehicle_inspections_user_id_fkey (
+            profiles!van_inspections_user_id_fkey (
               full_name
             )
           `)

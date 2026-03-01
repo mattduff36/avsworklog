@@ -35,6 +35,15 @@ export const MODULE_PAGES: ModulePage[] = [
     ],
   },
   {
+    module: 'hgv-inspections',
+    displayName: MODULE_DISPLAY_NAMES['hgv-inspections'],
+    subPages: [
+      { value: 'hgv-inspections-list', label: 'HGV Inspections List' },
+      { value: 'hgv-inspections-new', label: 'New HGV Inspection' },
+      { value: 'hgv-inspections-view', label: 'View HGV Inspection' },
+    ],
+  },
+  {
     module: 'rams',
     displayName: MODULE_DISPLAY_NAMES.rams,
     subPages: [
@@ -182,6 +191,9 @@ export function getPageUrl(value: string): string {
     'inspections-list': '/van-inspections',
     'inspections-new': '/van-inspections/new',
     'inspections-view': '/van-inspections/[id]',
+    'hgv-inspections-list': '/hgv-inspections',
+    'hgv-inspections-new': '/hgv-inspections/new',
+    'hgv-inspections-view': '/hgv-inspections/[id]',
     
     // Projects (formerly RAMS)
     'projects-list': '/projects',

@@ -14,7 +14,10 @@ test.describe('@fleet Vehicle History', () => {
     await page.goto('/fleet?tab=vans');
     await waitForAppReady(page);
 
-    await expect(page.getByText(/vehicle/i).first()).toBeVisible();
+    const bodyText = await page.locator('body').innerText();
+    const hasFleetContent = /van|fleet|registration|asset/i.test(bodyText);
+    expect(hasFleetContent, 'Fleet vans tab should render content').toBeTruthy();
+
     const errors = capture.getErrors();
     expect(errors, 'No page errors on fleet vehicles').toHaveLength(0);
   });

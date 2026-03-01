@@ -28,26 +28,40 @@ export async function GET(
 
     const { vehicleId } = await params;
 
-    // Get vehicle registration number
-    const { data: vehicle, error: vehicleError } = await supabase
+    // Resolve asset from vans first, then hgvs
+    const { data: van, error: vanError } = await supabase
       .from('vans')
       .select('reg_number')
       .eq('id', vehicleId)
       .single();
 
-    if (vehicleError || !vehicle) {
-      return NextResponse.json(
-        { error: 'Vehicle not found' },
-        { status: 404 }
-      );
+    let assetType: 'van' | 'hgv' = 'van';
+    let registrationNumber: string | null = van?.reg_number ?? null;
+
+    if (vanError || !van) {
+      const { data: hgv, error: hgvError } = await supabase
+        .from('hgvs')
+        .select('reg_number')
+        .eq('id', vehicleId)
+        .single();
+
+      if (hgvError || !hgv) {
+        return NextResponse.json(
+          { error: 'Vehicle not found' },
+          { status: 404 }
+        );
+      }
+
+      assetType = 'hgv';
+      registrationNumber = hgv.reg_number ?? null;
     }
 
     // Check if this is a test vehicle
-    const cleanReg = vehicle.reg_number.replace(/\s+/g, '').toUpperCase();
+    const cleanReg = (registrationNumber || '').replace(/\s+/g, '').toUpperCase();
     const isTestVehicle = TEST_VEHICLES.includes(cleanReg);
 
     // Get MOT history from database (mot_raw_data field)
-    const { data: maintenanceData, error: maintenanceError } = await supabase
+    const maintenanceQuery = supabase
       .from('vehicle_maintenance')
       .select(`
         mot_raw_data, 
@@ -60,9 +74,13 @@ export async function GET(
         ves_month_of_first_registration,
         dvla_sync_status,
         dvla_raw_data
-      `)
-      .eq('van_id', vehicleId)
-      .single() as { data: any; error: any };
+      `);
+
+    const { data: maintenanceData, error: maintenanceError } = await (
+      assetType === 'hgv'
+        ? maintenanceQuery.eq('hgv_id', vehicleId).single()
+        : maintenanceQuery.eq('van_id', vehicleId).single()
+    ) as { data: any; error: any };
 
     if (maintenanceError || !maintenanceData) {
       // No maintenance record exists
@@ -70,7 +88,7 @@ export async function GET(
         return NextResponse.json({
           success: false,
           error: 'No MOT data found',
-          message: `Vehicle registration ${vehicle.reg_number} not found in the DVLA database. This is a test vehicle.`,
+          message: `Vehicle registration ${registrationNumber || vehicleId} not found in the DVLA database. This is a test vehicle.`,
           vehicleNotFound: true,
         }, { status: 404 });
       }
@@ -78,7 +96,7 @@ export async function GET(
       return NextResponse.json({
         success: false,
         error: 'No MOT data found',
-        message: `No MOT history available for ${vehicle.reg_number}. Vehicle data has not been synced yet.`,
+        message: `No MOT history available for ${registrationNumber || vehicleId}. Vehicle data has not been synced yet.`,
         vehicleNotFound: false,
       }, { status: 404 });
     }
@@ -100,16 +118,16 @@ export async function GET(
         maintenanceData.dvla_sync_status === 'error'
       );
       
-      let motDueMessage = `No MOT history available for ${vehicle.reg_number}.`;
+      let motDueMessage = `No MOT history available for ${registrationNumber || vehicleId}.`;
       
       if (vehicleNotFound) {
         if (isTestVehicle) {
-          motDueMessage = `Vehicle registration ${vehicle.reg_number} not found in the DVLA database. This is a test vehicle.`;
+          motDueMessage = `Vehicle registration ${registrationNumber || vehicleId} not found in the DVLA database. This is a test vehicle.`;
         } else {
-          motDueMessage = `Vehicle registration ${vehicle.reg_number} not found in the DVLA database. This may be an invalid registration or a vehicle not yet registered.`;
+          motDueMessage = `Vehicle registration ${registrationNumber || vehicleId} not found in the DVLA database. This may be an invalid registration or a vehicle not yet registered.`;
         }
       } else if (maintenanceData.mot_due_date || maintenanceData.ves_month_of_first_registration) {
-        motDueMessage = `No MOT history available for ${vehicle.reg_number}. This vehicle may be less than 3 years old and not yet required to have an MOT.`;
+        motDueMessage = `No MOT history available for ${registrationNumber || vehicleId}. This vehicle may be less than 3 years old and not yet required to have an MOT.`;
       }
       
       return NextResponse.json({
@@ -150,7 +168,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: {
-        registrationNumber: motHistory.registration || vehicle.reg_number,
+        registrationNumber: motHistory.registration || registrationNumber,
         make: motHistory.make || null,
         model: motHistory.model || null,
         fuelType: motHistory.fuelType || null,

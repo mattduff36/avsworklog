@@ -241,7 +241,7 @@ export function EditMaintenanceDialog({
       >
         <DialogHeader>
           <DialogTitle className="text-2xl">
-            {isNewRecord ? 'Create' : 'Edit'} {vehicle.vehicle?.asset_type === 'plant' ? 'Plant' : 'Van'} Record - {vehicle.vehicle?.reg_number || vehicle.vehicle?.plant_id}
+            {isNewRecord ? 'Create' : 'Edit'} {vehicle.vehicle?.asset_type === 'plant' ? 'Plant' : vehicle.vehicle?.asset_type === 'hgv' ? 'HGV' : 'Van'} Record - {vehicle.vehicle?.reg_number || vehicle.vehicle?.plant_id}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {isNewRecord 
@@ -530,14 +530,15 @@ export function EditMaintenanceDialog({
                   return;
                 }
                 
-                // Check for open workshop tasks
-                if (vehicle?.van_id) {
+                // Check for open workshop tasks across all asset types
+                const assetId = vehicle?.van_id || vehicle?.hgv_id;
+                const assetColumn = vehicle?.van_id ? 'van_id' : vehicle?.hgv_id ? 'hgv_id' : null;
+                if (assetId && assetColumn) {
                   try {
-                    const vanId = vehicle.van_id;
                     const { data: openTasks, error: tasksError } = await supabase
                       .from('actions')
                       .select('id, status')
-                      .eq('van_id', vanId)
+                      .eq(assetColumn, assetId)
                       .in('action_type', ['workshop_vehicle_task', 'inspection_defect'])
                       .neq('status', 'completed')
                       .limit(1);
@@ -548,9 +549,10 @@ export function EditMaintenanceDialog({
                       return;
                     }
                     
+                    const assetLabel = vehicle.vehicle?.asset_type === 'plant' ? 'plant' : vehicle.vehicle?.asset_type === 'hgv' ? 'HGV' : 'van';
                     if (openTasks && openTasks.length > 0) {
-                      toast.error(`Cannot retire ${vehicle.vehicle?.asset_type === 'plant' ? 'plant' : 'van'} with open workshop tasks`, {
-                        description: `Please complete or delete all open tasks before retiring this ${vehicle.vehicle?.asset_type === 'plant' ? 'plant' : 'van'}.`,
+                      toast.error(`Cannot retire ${assetLabel} with open workshop tasks`, {
+                        description: `Please complete or delete all open tasks before retiring this ${assetLabel}.`,
                         duration: 5000,
                       });
                       return;
@@ -569,7 +571,7 @@ export function EditMaintenanceDialog({
               disabled={isSubmitting || updateMutation.isPending || createMutation.isPending}
             >
               <Archive className="h-4 w-4 mr-2" />
-              Retire {vehicle.vehicle?.asset_type === 'plant' ? 'Plant' : 'Van'}
+              Retire {vehicle.vehicle?.asset_type === 'plant' ? 'Plant' : vehicle.vehicle?.asset_type === 'hgv' ? 'HGV' : 'Van'}
             </Button>
             <div className="flex gap-2 ml-auto">
               <Button

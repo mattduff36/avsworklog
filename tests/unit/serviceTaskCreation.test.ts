@@ -1,165 +1,197 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { ensureServiceTasksForAlerts, resetCategoryCache } from '@/lib/utils/serviceTaskCreation';
-import type { AlertType, AlertSeverity } from '@/lib/utils/serviceTaskCreation';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Supabase client is already mocked in tests/setup.ts
+type QueuedResponse = {
+  terminal: 'limit' | 'single';
+  table: string;
+  data: any;
+  error?: any;
+};
+
+type MockState = {
+  queue: QueuedResponse[];
+  fromCalls: string[];
+  insertCalls: Array<{ table: string; payload: any }>;
+};
+
+const { mockState, mockCreateClient } = vi.hoisted(() => {
+  const state: MockState = {
+    queue: [],
+    fromCalls: [],
+    insertCalls: [],
+  };
+
+  const createClient = vi.fn(() => ({
+    from: vi.fn((table: string) => {
+      state.fromCalls.push(table);
+      return createQueryBuilder(table);
+    }),
+  }));
+
+  return { mockState: state, mockCreateClient: createClient };
+});
+
+function nextResponse(terminal: 'limit' | 'single', table: string) {
+  const next = mockState.queue.shift();
+  if (!next) {
+    throw new Error(`Missing queued response for ${terminal}:${table}`);
+  }
+  if (next.terminal !== terminal || next.table !== table) {
+    throw new Error(
+      `Unexpected query sequence. Expected ${next.terminal}:${next.table}, received ${terminal}:${table}`
+    );
+  }
+  return { data: next.data, error: next.error ?? null };
+}
+
+function createQueryBuilder(table: string) {
+  const chain: any = {
+    select: vi.fn(() => chain),
+    ilike: vi.fn(() => chain),
+    eq: vi.fn(() => chain),
+    in: vi.fn(() => chain),
+    limit: vi.fn(async () => nextResponse('limit', table)),
+    single: vi.fn(async () => nextResponse('single', table)),
+    insert: vi.fn((payload: any) => {
+      mockState.insertCalls.push({ table, payload });
+      return chain;
+    }),
+  };
+  return chain;
+}
+
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: mockCreateClient,
+}));
+
+import {
+  ensureServiceTasksForAlerts,
+  getTaskContent,
+  resetCategoryCache,
+  type AlertSeverity,
+  type AlertType,
+} from '@/lib/utils/serviceTaskCreation';
 
 describe('Service Task Creation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetCategoryCache();
+    mockState.queue = [];
+    mockState.fromCalls = [];
+    mockState.insertCalls = [];
   });
 
-  describe('ensureServiceTasksForAlerts', () => {
-    it('should return empty array when no alerts provided', async () => {
-      const vehicle = {
-        id: 'vehicle-1',
-        vehicle: { id: 'vehicle-1', reg_number: 'ABC123' },
-        alerts: []
-      };
+  it('returns deterministic task content by alert type', () => {
+    const tax = getTaskContent('Tax', 'AB12 CDE', 'Overdue by 4 days');
+    const loler = getTaskContent('LOLER', 'PLANT-07', 'Due in 2 days');
 
-      const result = await ensureServiceTasksForAlerts(vehicle, 'user-1');
-      expect(result).toEqual([]);
-    });
-
-    it('should create tasks for each alert type', async () => {
-      const vehicle = {
-        id: 'vehicle-1',
-        vehicle: { id: 'vehicle-1', reg_number: 'ABC123' },
-        alerts: [
-          { type: 'Tax' as AlertType, detail: 'overdue by 5 days', severity: 'overdue' as AlertSeverity },
-          { type: 'MOT' as AlertType, detail: 'due in 10 days', severity: 'due_soon' as AlertSeverity }
-        ]
-      };
-
-      const result = await ensureServiceTasksForAlerts(vehicle, 'user-1');
-      
-      // Should attempt to create tasks (result will be empty in mock, but call was made)
-      expect(Array.isArray(result)).toBe(true);
-    });
-
-    it('should set priority based on severity', async () => {
-      // This test verifies the logic exists, full integration testing would verify actual DB writes
-      const overdueVehicle = {
-        id: 'vehicle-1',
-        vehicle: { id: 'vehicle-1', reg_number: 'ABC123' },
-        alerts: [
-          { type: 'Tax' as AlertType, detail: 'overdue by 5 days', severity: 'overdue' as AlertSeverity }
-        ]
-      };
-
-      const dueSoonVehicle = {
-        id: 'vehicle-2',
-        vehicle: { id: 'vehicle-2', reg_number: 'DEF456' },
-        alerts: [
-          { type: 'MOT' as AlertType, detail: 'due in 10 days', severity: 'due_soon' as AlertSeverity }
-        ]
-      };
-
-      await ensureServiceTasksForAlerts(overdueVehicle, 'user-1');
-      await ensureServiceTasksForAlerts(dueSoonVehicle, 'user-1');
-
-      // In a full integration test, we would verify:
-      // - Overdue tasks get priority: 'high'
-      // - Due soon tasks get priority: 'medium'
-      expect(true).toBe(true); // Placeholder for integration test
-    });
-
-    it('should generate deterministic task titles', async () => {
-      // This verifies the task title generation logic
-      const vehicle = {
-        id: 'vehicle-1',
-        vehicle: { id: 'vehicle-1', reg_number: 'ABC123' },
-        alerts: [
-          { type: 'Service' as AlertType, detail: 'due at 50000 miles', severity: 'due_soon' as AlertSeverity }
-        ]
-      };
-
-      // The title should be deterministic based on alert type and reg number
-      // This allows deduplication to work correctly
-      await ensureServiceTasksForAlerts(vehicle, 'user-1');
-      
-      // In integration tests, we would verify that calling this twice
-      // doesn't create duplicate tasks
-      expect(true).toBe(true); // Placeholder for integration test
-    });
-
-    it('should handle all alert types', async () => {
-      const allAlertTypes: AlertType[] = ['Tax', 'MOT', 'Service', 'Cambelt', 'First Aid Kit'];
-      
-      for (const alertType of allAlertTypes) {
-        const vehicle = {
-          id: `vehicle-${alertType}`,
-          vehicle: { id: `vehicle-${alertType}`, reg_number: 'TEST123' },
-          alerts: [
-            { type: alertType, detail: 'test detail', severity: 'overdue' as AlertSeverity }
-          ]
-        };
-
-        const result = await ensureServiceTasksForAlerts(vehicle, 'user-1');
-        expect(Array.isArray(result)).toBe(true);
-      }
-    });
+    expect(tax.title).toBe('Tax Due - AB12 CDE');
+    expect(tax.comments).toContain('Vehicle tax requires renewal');
+    expect(loler.title).toBe('LOLOR Inspection Due - PLANT-07');
+    expect(loler.comments).toContain('Lifting Operations and Lifting Equipment Regulations');
   });
 
-  describe('Task Deduplication', () => {
-    it('should not create duplicate tasks for the same alert', async () => {
-      // This is an integration test scenario:
-      // 1. Create task for Tax alert
-      // 2. Try to create same task again
-      // 3. Verify only one task exists
-      
-      // In the actual implementation, taskExistsForAlert checks for:
-      // - Same van_id
-      // - Same action_type (workshop_vehicle_task)
-      // - Same title (deterministic based on alert type and reg)
-      // - Active status (pending, logged, on_hold)
-      
-      expect(true).toBe(true); // Placeholder - full test in integration suite
-    });
+  it('returns empty list when vehicle has no alerts', async () => {
+    const result = await ensureServiceTasksForAlerts(
+      { id: 'van-1', vehicle: { id: 'van-1', reg_number: 'AB12 CDE' }, alerts: [] },
+      'user-1'
+    );
 
-    it('should allow creating new task if previous one is completed', async () => {
-      // This verifies that completed tasks don't block new task creation
-      // The deduplication only checks for active statuses:
-      // - pending
-      // - logged  
-      // - on_hold
-      
-      // But NOT:
-      // - completed
-      
-      expect(true).toBe(true); // Placeholder - full test in integration suite
-    });
+    expect(result).toEqual([]);
+    expect(mockState.fromCalls).toHaveLength(0);
   });
 
-  describe('Category Mapping', () => {
-    it('should cache category and subcategory IDs', async () => {
-      // The category cache should:
-      // 1. Find Maintenance category
-      // 2. Find Service subcategory under Maintenance
-      // 3. Cache these for subsequent calls
-      // 4. Use cached values instead of repeated DB queries
-      
-      const vehicle = {
-        id: 'vehicle-1',
-        vehicle: { id: 'vehicle-1', reg_number: 'ABC123' },
-        alerts: [
-          { type: 'Tax' as AlertType, detail: 'test', severity: 'overdue' as AlertSeverity }
-        ]
-      };
+  it('creates one task per alert, mapping severity to priority', async () => {
+    mockState.queue.push(
+      { terminal: 'limit', table: 'workshop_task_categories', data: [{ id: 'cat-maint' }] },
+      { terminal: 'limit', table: 'workshop_task_subcategories', data: [{ id: 'sub-service' }] },
+      { terminal: 'limit', table: 'workshop_task_subcategories', data: [] },
+      { terminal: 'limit', table: 'actions', data: [] },
+      { terminal: 'single', table: 'actions', data: { id: 'task-1' } },
+      { terminal: 'limit', table: 'actions', data: [] },
+      { terminal: 'single', table: 'actions', data: { id: 'task-2' } }
+    );
 
-      // First call should populate cache
-      await ensureServiceTasksForAlerts(vehicle, 'user-1');
-      
-      // Second call should use cache
-      await ensureServiceTasksForAlerts(vehicle, 'user-1');
-      
-      expect(true).toBe(true); // Placeholder - verify in integration tests
-    });
+    const alerts: Array<{ type: AlertType; detail: string; severity: AlertSeverity }> = [
+      { type: 'Tax', detail: 'Overdue by 3 days', severity: 'overdue' },
+      { type: 'MOT', detail: 'Due in 9 days', severity: 'due_soon' },
+    ];
 
-    it('should fallback to uncategorized if maintenance category not found', async () => {
-      // If no Maintenance/Service category exists, should use Uncategorized
-      expect(true).toBe(true); // Placeholder
-    });
+    const createdIds = await ensureServiceTasksForAlerts(
+      { id: 'van-1', vehicle: { id: 'van-1', reg_number: 'AB12 CDE' }, alerts },
+      'manager-1'
+    );
+
+    expect(createdIds).toEqual(['task-1', 'task-2']);
+    expect(mockState.insertCalls).toHaveLength(2);
+    expect(mockState.insertCalls[0].payload.priority).toBe('high');
+    expect(mockState.insertCalls[1].payload.priority).toBe('medium');
+    expect(mockState.insertCalls[0].payload.title).toBe('Tax Due - AB12 CDE');
+    expect(mockState.insertCalls[1].payload.title).toBe('MOT Due - AB12 CDE');
+  });
+
+  it('skips insertion when an active matching task already exists', async () => {
+    mockState.queue.push(
+      { terminal: 'limit', table: 'workshop_task_categories', data: [{ id: 'cat-maint' }] },
+      { terminal: 'limit', table: 'workshop_task_subcategories', data: [{ id: 'sub-service' }] },
+      { terminal: 'limit', table: 'workshop_task_subcategories', data: [] },
+      { terminal: 'limit', table: 'actions', data: [{ id: 'existing-1', status: 'pending' }] }
+    );
+
+    const result = await ensureServiceTasksForAlerts(
+      {
+        id: 'van-1',
+        vehicle: { id: 'van-1', reg_number: 'AB12 CDE' },
+        alerts: [{ type: 'Service', detail: 'Due at 50000', severity: 'due_soon' }],
+      },
+      'manager-1'
+    );
+
+    expect(result).toEqual([]);
+    expect(mockState.insertCalls).toHaveLength(0);
+  });
+
+  it('falls back to uncategorized subcategory when maintenance category is unavailable', async () => {
+    mockState.queue.push(
+      { terminal: 'limit', table: 'workshop_task_categories', data: [] },
+      { terminal: 'limit', table: 'workshop_task_subcategories', data: [{ id: 'sub-uncat' }] },
+      { terminal: 'limit', table: 'actions', data: [] },
+      { terminal: 'single', table: 'actions', data: { id: 'task-3' } }
+    );
+
+    const result = await ensureServiceTasksForAlerts(
+      {
+        id: 'van-2',
+        vehicle: { id: 'van-2', reg_number: 'XY99 ZZZ' },
+        alerts: [{ type: 'First Aid Kit', detail: 'Expired', severity: 'overdue' }],
+      },
+      'manager-1'
+    );
+
+    expect(result).toEqual(['task-3']);
+    expect(mockState.insertCalls[0].payload.workshop_subcategory_id).toBe('sub-uncat');
+  });
+
+  it('caches category lookups across repeated invocations', async () => {
+    mockState.queue.push(
+      { terminal: 'limit', table: 'workshop_task_categories', data: [{ id: 'cat-maint' }] },
+      { terminal: 'limit', table: 'workshop_task_subcategories', data: [{ id: 'sub-service' }] },
+      { terminal: 'limit', table: 'workshop_task_subcategories', data: [] },
+      { terminal: 'limit', table: 'actions', data: [] },
+      { terminal: 'single', table: 'actions', data: { id: 'task-a' } },
+      { terminal: 'limit', table: 'actions', data: [] },
+      { terminal: 'single', table: 'actions', data: { id: 'task-b' } }
+    );
+
+    const vehicle = {
+      id: 'van-1',
+      vehicle: { id: 'van-1', reg_number: 'AB12 CDE' },
+      alerts: [{ type: 'Tax' as AlertType, detail: 'Overdue', severity: 'overdue' as AlertSeverity }],
+    };
+
+    await ensureServiceTasksForAlerts(vehicle, 'user-1');
+    await ensureServiceTasksForAlerts(vehicle, 'user-1');
+
+    const categoryLookups = mockState.fromCalls.filter((table) => table === 'workshop_task_categories');
+    expect(categoryLookups).toHaveLength(1);
   });
 });

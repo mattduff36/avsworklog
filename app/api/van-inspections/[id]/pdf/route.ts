@@ -34,7 +34,7 @@ export async function GET(
           vehicle_type,
           van_categories(name)
         ),
-        profile:profiles!vehicle_inspections_user_id_fkey(full_name)
+        profile:profiles!van_inspections_user_id_fkey(full_name)
       `)
       .eq('id', id)
       .single();

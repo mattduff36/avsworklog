@@ -20,6 +20,8 @@ export interface TaskForCompletion {
   id: string;
   status: string;
   van_id: string | null;
+  hgv_id?: string | null;
+  plant_id?: string | null;
   workshop_task_categories?: {
     id: string;
     name: string;

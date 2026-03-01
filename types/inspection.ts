@@ -41,6 +41,25 @@ export interface PlantInspection {
   updated_at: string;
 }
 
+export interface HgvInspection {
+  id: string;
+  hgv_id: string | null;
+  user_id: string;
+  inspection_date: string;
+  inspection_end_date: string | null;
+  current_mileage: number | null;
+  status: 'submitted';
+  submitted_at: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  manager_comments: string | null;
+  inspector_comments?: string | null;
+  signature_data?: string | null;
+  signed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** @deprecated Use VanInspection instead */
 export type VehicleInspection = VanInspection;
 

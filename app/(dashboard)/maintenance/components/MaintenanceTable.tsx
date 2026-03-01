@@ -430,9 +430,14 @@ export function MaintenanceTable({
                       <TableRow 
                         key={vehicle.van_id ?? vehicle.id ?? vehicle.vehicle?.id}
                         onClick={() => {
-                          const vehicleId = vehicle.van_id ?? vehicle.id;
+                          const assetType = vehicle.vehicle?.asset_type;
+                          const vehicleId = (vehicle as any).hgv_id ?? vehicle.van_id ?? vehicle.id;
                           if (vehicleId) {
-                            router.push(`/fleet/vans/${vehicleId}/history?fromTab=vans`);
+                            if (assetType === 'hgv') {
+                              router.push(`/fleet/hgvs/${vehicleId}/history?fromTab=hgvs`);
+                            } else {
+                              router.push(`/fleet/vans/${vehicleId}/history?fromTab=vans`);
+                            }
                           }
                         }}
                         className="border-slate-700 hover:bg-slate-800/50 cursor-pointer"
@@ -647,9 +652,14 @@ export function MaintenanceTable({
                               size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                const vehicleId = vehicle.van_id ?? vehicle.id;
+                                const assetType = vehicle.vehicle?.asset_type;
+                                const vehicleId = (vehicle as any).hgv_id ?? vehicle.van_id ?? vehicle.id;
                                 if (vehicleId) {
-                                  router.push(`/fleet/vans/${vehicleId}/history?fromTab=vans`);
+                                  if (assetType === 'hgv') {
+                                    router.push(`/fleet/hgvs/${vehicleId}/history?fromTab=hgvs`);
+                                  } else {
+                                    router.push(`/fleet/vans/${vehicleId}/history?fromTab=vans`);
+                                  }
                                 }
                               }}
                               className="h-10 w-10 p-0"

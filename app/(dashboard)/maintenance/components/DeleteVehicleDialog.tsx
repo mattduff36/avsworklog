@@ -26,6 +26,8 @@ interface DeleteVehicleDialogProps {
     category?: { name: string } | null;
   } | null;
   onSuccess?: () => void;
+  endpoint?: 'vans' | 'hgvs';
+  entityLabel?: 'Van' | 'HGV';
 }
 
 type DeleteReason = 'Sold' | 'Scrapped' | 'Other';
@@ -34,7 +36,9 @@ export function DeleteVehicleDialog({
   open,
   onOpenChange,
   vehicle,
-  onSuccess
+  onSuccess,
+  endpoint = 'vans',
+  entityLabel = 'Van',
 }: DeleteVehicleDialogProps) {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
@@ -52,15 +56,17 @@ export function DeleteVehicleDialog({
     try {
       setLoading(true);
 
-      const response = await fetch(`/api/admin/vans/${vehicle.id}`, {
+      const response = await fetch(`/api/admin/${endpoint}/${vehicle.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason }),
       });
 
+      const entityLabelLower = entityLabel.toLowerCase();
+
       if (response.ok) {
-        toast.success('Van retired successfully', {
-          description: `${vehicle.reg_number} has been moved to Retired Vans. Historic data is preserved.`,
+        toast.success(`${entityLabel} retired successfully`, {
+          description: `${vehicle.reg_number} has been retired. Historic data is preserved.`,
         });
 
         // Invalidate queries to refresh data
@@ -74,8 +80,8 @@ export function DeleteVehicleDialog({
         setReason('Sold');
       } else {
         const data = await response.json();
-        setError(data.error || 'Failed to archive van');
-        toast.error('Failed to archive van', {
+        setError(data.error || `Failed to archive ${entityLabelLower}`);
+        toast.error(`Failed to archive ${entityLabelLower}`, {
           description: data.error || 'Please try again.',
         });
       }
@@ -98,10 +104,10 @@ export function DeleteVehicleDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-blue-500">
             <Archive className="h-5 w-5" />
-            Retire Van
+            Retire {entityLabel}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            This will move the van to the &quot;Retired Vans&quot; tab. All inspection history and maintenance records will be preserved.
+            This will archive this {entityLabel.toLowerCase()}. All inspection history and maintenance records will be preserved.
           </DialogDescription>
         </DialogHeader>
 
@@ -180,7 +186,7 @@ export function DeleteVehicleDialog({
             ) : (
               <>
                 <Archive className="h-4 w-4 mr-2" />
-                Retire Van
+                Retire {entityLabel}
               </>
             )}
           </Button>

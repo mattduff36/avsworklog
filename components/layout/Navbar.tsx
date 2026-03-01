@@ -45,6 +45,10 @@ function getNavItemActiveColors(href: string): { bg: string; text: string } {
   if (href.startsWith('/plant-inspections')) {
     return { bg: 'bg-plant-inspection', text: 'text-white' };
   }
+  // HGV Inspections - Orange
+  if (href.startsWith('/hgv-inspections')) {
+    return { bg: 'bg-inspection', text: 'text-white' };
+  }
   // Projects (formerly RAMS) - Green
   if (href.startsWith('/projects') || href.startsWith('/rams')) {
     return { bg: 'bg-rams', text: 'text-white' };
@@ -138,7 +142,7 @@ export function Navbar() {
 
       // Managers and admins have all permissions
       if (isManager || isAdmin) {
-        setUserPermissions(new Set(['timesheets', 'inspections', 'plant-inspections', 'absence', 'rams', 'maintenance', 'workshop-tasks', 'approvals', 'actions', 'reports'] as ModuleName[]));
+        setUserPermissions(new Set(['timesheets', 'inspections', 'plant-inspections', 'hgv-inspections', 'absence', 'rams', 'maintenance', 'workshop-tasks', 'approvals', 'actions', 'reports'] as ModuleName[]));
         setPermissionsLoading(false);
         return;
       }

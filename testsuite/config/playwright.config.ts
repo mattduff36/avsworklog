@@ -61,7 +61,7 @@ export default defineConfig({
     {
       name: 'employee-tests',
       dependencies: ['setup'],
-      testMatch: /inspections-rams-messages\.spec\.ts|van-inspections\.spec\.ts|plant-inspections\.spec\.ts/,
+      testMatch: /inspections-rams-messages\.spec\.ts|van-inspections\.spec\.ts|plant-inspections\.spec\.ts|hgv-inspections\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         storageState: path.join(STATE_DIR, 'storage-state-employee.json'),
@@ -79,6 +79,7 @@ export default defineConfig({
         /inspections-rams-messages\.spec\.ts/,
         /van-inspections\.spec\.ts/,
         /plant-inspections\.spec\.ts/,
+        /hgv-inspections\.spec\.ts/,
         /responsiveness\.spec\.ts/,
       ],
       use: {

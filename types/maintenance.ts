@@ -37,7 +37,9 @@ export interface MaintenanceCategoryWithRecipients extends MaintenanceCategory {
 
 export interface VehicleMaintenance {
   id: string;
-  van_id: string;
+  van_id: string | null;
+  hgv_id?: string | null;
+  plant_id?: string | null;
   
   // Date-based maintenance
   tax_due_date: string | null;
@@ -175,7 +177,7 @@ export interface VehicleMaintenanceWithStatus extends VehicleMaintenance {
     category_id: string | null;
     status: string;
     nickname?: string | null;
-    asset_type?: 'van' | 'plant' | 'tool';
+    asset_type?: 'van' | 'hgv' | 'plant' | 'tool';
     plant_id?: string | null;
     serial_number?: string | null;
     year?: number | null;

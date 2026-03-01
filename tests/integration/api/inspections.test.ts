@@ -1,186 +1,114 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createMockProfile, createMockManager } from '../../utils/factories';
-import { mockSupabaseAuthUser, mockSupabaseQuery, resetAllMocks } from '../../utils/test-helpers';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-describe('Inspections API', () => {
-  beforeEach(() => {
-    resetAllMocks();
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:4000';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+const canAuth =
+  Boolean(SUPABASE_URL) &&
+  Boolean(SUPABASE_ANON_KEY) &&
+  Boolean(process.env.TEST_USER_EMAIL || process.env.TESTSUITE_EMPLOYEE_EMAIL || 'testsuite-employee@squiresapp.test');
+
+const describeWithAuth = canAuth ? describe : describe.skip;
+
+async function jsonRequest(path: string, init?: RequestInit) {
+  const response = await fetch(`${BASE_URL}${path}`, init);
+  const contentType = response.headers.get('content-type') || '';
+  const body = contentType.includes('application/json') ? await response.json() : null;
+  return { response, body };
+}
+
+describe('Inspections API hardening', () => {
+  const unauthRoutes = [
+    { method: 'GET', path: '/api/van-inspections/fake-id/pdf' },
+    { method: 'DELETE', path: '/api/van-inspections/fake-id/delete' },
+    { method: 'GET', path: '/api/van-inspections/locked-defects' },
+    { method: 'POST', path: '/api/van-inspections/inform-workshop', body: {} },
+    { method: 'POST', path: '/api/van-inspections/sync-defect-tasks', body: {} },
+    { method: 'GET', path: '/api/plant-inspections/fake-id/pdf' },
+    { method: 'POST', path: '/api/plant-inspections/inform-workshop', body: {} },
+    { method: 'POST', path: '/api/plant-inspections/sync-defect-tasks', body: {} },
+    { method: 'GET', path: '/api/hgv-inspections/fake-id/pdf' },
+    { method: 'POST', path: '/api/hgv-inspections/inform-workshop', body: {} },
+    { method: 'POST', path: '/api/hgv-inspections/sync-defect-tasks', body: {} },
+  ];
+
+  for (const route of unauthRoutes) {
+    it(`${route.method} ${route.path} rejects unauthenticated access and never 500s`, async () => {
+      const init: RequestInit = { method: route.method };
+      if (route.body) {
+        init.headers = { 'Content-Type': 'application/json' };
+        init.body = JSON.stringify(route.body);
+      }
+
+      const { response, body } = await jsonRequest(route.path, init);
+      expect(response.status).toBeGreaterThanOrEqual(400);
+      expect(response.status).not.toBe(500);
+      expect(response.headers.get('content-type') || '').toContain('application/json');
+      expect(body).toBeTruthy();
+    });
+  }
+});
+
+describeWithAuth('Inspections API payload validation (authenticated)', () => {
+  let supabase: SupabaseClient;
+  let authHeader: Record<string, string>;
+
+  beforeAll(async () => {
+    supabase = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!);
+    const email = process.env.TESTSUITE_EMPLOYEE_EMAIL || process.env.TEST_USER_EMAIL || 'testsuite-employee@squiresapp.test';
+    const password = process.env.TESTSUITE_PASSWORD || process.env.TEST_USER_PASSWORD || 'TestSuite2026!Secure';
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !data.session?.access_token) {
+      throw new Error(`Unable to authenticate test user for inspections API tests: ${error?.message}`);
+    }
+    authHeader = { Authorization: `Bearer ${data.session.access_token}`, 'Content-Type': 'application/json' };
   });
 
-  describe('Create Inspection', () => {
-    it('should allow authenticated users to create inspections', () => {
-      const inspection = {
-        id: 'test-inspection-id',
-        van_id: 'vehicle-id',
-        user_id: 'user-id',
-        week_ending: '2024-12-01',
-        status: 'draft',
-      };
-
-      expect(inspection.status).toBe('draft');
-      expect(inspection.van_id).toBeDefined();
-    });
-
-    it('should require van_id', () => {
-      const invalidInspection = {
-        id: 'test-id',
-        user_id: 'user-id',
-        week_ending: '2024-12-01',
-        status: 'draft',
-      };
-
-      // In real API, this would return 400
-      expect(invalidInspection).not.toHaveProperty('van_id');
-    });
-
-    it('should default to draft status', () => {
-      const inspection = {
-        id: 'test-id',
-        van_id: 'vehicle-id',
-        user_id: 'user-id',
-        week_ending: '2024-12-01',
-        status: 'draft',
-      };
-
-      expect(inspection.status).toBe('draft');
-    });
+  afterAll(async () => {
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
   });
 
-  describe('Inspection Items', () => {
-    it('should create 26-point checklist for trucks', () => {
-      const items = Array.from({ length: 26 }, (_, i) => ({
-        id: `item-${i}`,
-        inspection_id: 'inspection-id',
-        item_number: i + 1,
-        day_of_week: 1,
-        status: 'pass',
-      }));
-
-      expect(items).toHaveLength(26);
-      expect(items[0].item_number).toBe(1);
-      expect(items[25].item_number).toBe(26);
+  it('enforces minimum comment length for inform-workshop route', async () => {
+    const { response, body } = await jsonRequest('/api/van-inspections/inform-workshop', {
+      method: 'POST',
+      headers: authHeader,
+      body: JSON.stringify({
+        inspectionId: 'fake-inspection-id',
+        vehicleId: 'fake-vehicle-id',
+        comment: 'too short',
+      }),
     });
 
-    it('should create 14-point checklist for vans', () => {
-      const items = Array.from({ length: 14 }, (_, i) => ({
-        id: `item-${i}`,
-        inspection_id: 'inspection-id',
-        item_number: i + 1,
-        day_of_week: 1,
-        status: 'pass',
-      }));
-
-      expect(items).toHaveLength(14);
-    });
-
-    it('should support pass/fail/na statuses', () => {
-      const statuses = ['pass', 'fail', 'na'];
-      
-      statuses.forEach((status) => {
-        const item = {
-          id: 'item-id',
-          inspection_id: 'inspection-id',
-          item_number: 1,
-          day_of_week: 1,
-          status,
-        };
-
-        expect(['pass', 'fail', 'na']).toContain(item.status);
-      });
-    });
+    expect([400, 401]).toContain(response.status);
+    if (response.status === 400) {
+      expect(body?.error).toMatch(/at least 10 characters/i);
+    } else {
+      expect(body?.error).toMatch(/unauthorized/i);
+    }
   });
 
-  describe('Inspection Submission', () => {
-    it('should allow submitting draft inspections', () => {
-      const inspection = {
-        id: 'inspection-id',
-        status: 'draft',
-      };
-
-      const submitted = {
-        ...inspection,
-        status: 'submitted',
-        submitted_at: new Date().toISOString(),
-      };
-
-      expect(submitted.status).toBe('submitted');
-      expect(submitted.submitted_at).toBeDefined();
+  it('rejects missing required fields for sync-defect-tasks route', async () => {
+    const { response, body } = await jsonRequest('/api/van-inspections/sync-defect-tasks', {
+      method: 'POST',
+      headers: authHeader,
+      body: JSON.stringify({
+        inspectionId: 'fake-inspection-id',
+        vehicleId: 'fake-vehicle-id',
+        defects: [],
+      }),
     });
 
-    it('should prevent duplicate submissions for same vehicle/week', () => {
-      const existingInspection = {
-        van_id: 'vehicle-1',
-        week_ending: '2024-12-01',
-        status: 'submitted',
-      };
-
-      const duplicateAttempt = {
-        van_id: 'vehicle-1',
-        week_ending: '2024-12-01',
-        status: 'draft',
-      };
-
-      // In real API, this would check for duplicates and return 409
-      expect(existingInspection.van_id).toBe(duplicateAttempt.van_id);
-      expect(existingInspection.week_ending).toBe(duplicateAttempt.week_ending);
-    });
-  });
-
-  describe('Defects and Comments', () => {
-    it('should allow adding comments to failed items', () => {
-      const item = {
-        id: 'item-id',
-        inspection_id: 'inspection-id',
-        item_number: 1,
-        day_of_week: 1,
-        status: 'fail',
-        comments: 'Tyre pressure low on front left',
-      };
-
-      expect(item.status).toBe('fail');
-      expect(item.comments).toBeDefined();
-    });
-
-    it('should track defects across the week', () => {
-      const itemsWithDefect = [
-        { day_of_week: 1, item_number: 9, status: 'fail', comments: 'Tyre issue' },
-        { day_of_week: 2, item_number: 9, status: 'fail', comments: 'Tyre issue persists' },
-        { day_of_week: 3, item_number: 9, status: 'pass', comments: 'Fixed' },
-      ];
-
-      const failedDays = itemsWithDefect.filter(item => item.status === 'fail');
-      expect(failedDays).toHaveLength(2);
-    });
-  });
-
-  describe('PDF Generation', () => {
-    it('should generate PDF for truck inspections with 26 items', () => {
-      const inspection = {
-        id: 'inspection-id',
-        vehicle: { van_categories: { name: 'Truck' } },
-        items: Array.from({ length: 26 * 7 }, (_, i) => ({
-          item_number: (i % 26) + 1,
-          day_of_week: Math.floor(i / 26) + 1,
-          status: 'pass',
-        })),
-      };
-
-      expect(inspection.items).toHaveLength(26 * 7); // 26 items × 7 days
-    });
-
-    it('should generate PDF for van inspections with 14 items', () => {
-      const inspection = {
-        id: 'inspection-id',
-        vehicle: { van_categories: { name: 'Van' } },
-        items: Array.from({ length: 14 * 7 }, (_, i) => ({
-          item_number: (i % 14) + 1,
-          day_of_week: Math.floor(i / 14) + 1,
-          status: 'pass',
-        })),
-      };
-
-      expect(inspection.items).toHaveLength(14 * 7); // 14 items × 7 days
-    });
+    expect([400, 401]).toContain(response.status);
+    if (response.status === 400) {
+      expect(body?.error).toMatch(/Missing required fields/i);
+    } else {
+      expect(body?.error).toMatch(/unauthorized/i);
+    }
   });
 });
 

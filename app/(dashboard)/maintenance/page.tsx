@@ -31,7 +31,7 @@ function MaintenanceContent() {
   const supabase = createClient();
 
   const [hasModulePermission, setHasModulePermission] = useState<boolean | null>(null);
-  const [maintenanceFilter, setMaintenanceFilter] = useState<'both' | 'van' | 'plant'>('both');
+  const [maintenanceFilter, setMaintenanceFilter] = useState<'both' | 'van' | 'hgv' | 'plant'>('both');
   const [activeTab, setActiveTab] = useState<'overview' | 'settings'>('overview');
   const canManage = isManager || isAdmin || isSuperAdmin;
 
@@ -81,11 +81,14 @@ function MaintenanceContent() {
   }, [profile?.id, isManager, isAdmin, isSuperAdmin, supabase]);
 
   const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
-    const isPlant = vehicle.is_plant === true;
-    const assetId = vehicle.van_id ?? vehicle.vehicle?.id ?? vehicle.id;
+    const isPlant = vehicle.is_plant === true || vehicle.vehicle?.asset_type === 'plant';
+    const isHgv = vehicle.vehicle?.asset_type === 'hgv' || !!(vehicle as any).hgv_id;
+    const assetId = (vehicle as any).hgv_id ?? vehicle.van_id ?? vehicle.vehicle?.id ?? vehicle.id;
 
     if (isPlant) {
       router.push(`/fleet/plant/${assetId}/history?fromTab=maintenance`);
+    } else if (isHgv) {
+      router.push(`/fleet/hgvs/${assetId}/history?fromTab=maintenance`);
     } else {
       router.push(`/fleet/vans/${assetId}/history?fromTab=maintenance`);
     }
@@ -163,7 +166,7 @@ function MaintenanceContent() {
             <>
               {/* Asset type filter */}
               <div className="flex items-center justify-end">
-                <Tabs value={maintenanceFilter} onValueChange={(v) => setMaintenanceFilter(v as 'both' | 'van' | 'plant')}>
+                <Tabs value={maintenanceFilter} onValueChange={(v) => setMaintenanceFilter(v as 'both' | 'van' | 'hgv' | 'plant')}>
                   <TabsList>
                     <TabsTrigger value="both" className="gap-2">
                       <Wrench className="h-4 w-4" />
@@ -172,6 +175,10 @@ function MaintenanceContent() {
                     <TabsTrigger value="van" className="gap-2">
                       <Truck className="h-4 w-4" />
                       Vans
+                    </TabsTrigger>
+                    <TabsTrigger value="hgv" className="gap-2">
+                      <Truck className="h-4 w-4" />
+                      HGVs
                     </TabsTrigger>
                     <TabsTrigger value="plant" className="gap-2">
                       <HardHat className="h-4 w-4" />
@@ -184,9 +191,7 @@ function MaintenanceContent() {
               {(() => {
                 const filteredVehicles = (maintenanceData?.vehicles || []).filter(v => {
                   if (maintenanceFilter === 'both') return true;
-                  if (maintenanceFilter === 'van') return v.vehicle?.asset_type !== 'plant';
-                  if (maintenanceFilter === 'plant') return v.vehicle?.asset_type === 'plant';
-                  return true;
+                  return v.vehicle?.asset_type === maintenanceFilter;
                 });
 
                 const filteredSummary = {

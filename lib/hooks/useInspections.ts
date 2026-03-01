@@ -33,7 +33,7 @@ export function useInspections({ userId, isManager, selectedEmployeeId, statusFi
             reg_number,
             vehicle_type
           ),
-          profile:profiles!vehicle_inspections_user_id_fkey(full_name)
+          profile:profiles!van_inspections_user_id_fkey(full_name)
         `)
         .order('inspection_date', { ascending: false });
 

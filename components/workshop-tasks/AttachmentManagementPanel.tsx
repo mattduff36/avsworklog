@@ -29,7 +29,7 @@ const QUESTION_TYPES = [
 ] as const;
 
 interface AttachmentManagementPanelProps {
-  taxonomyMode?: 'van' | 'plant';
+  taxonomyMode?: 'van' | 'plant' | 'hgv';
 }
 
 export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagementPanelProps) {
@@ -48,6 +48,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
   const [templateDescription, setTemplateDescription] = useState('');
   const [templateActive, setTemplateActive] = useState(true);
   const [templateAppliesToVehicle, setTemplateAppliesToVehicle] = useState(true);
+  const [templateAppliesToHgv, setTemplateAppliesToHgv] = useState(true);
   const [templateAppliesToPlant, setTemplateAppliesToPlant] = useState(true);
   const [savingTemplate, setSavingTemplate] = useState(false);
   
@@ -103,7 +104,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
 
   // Filter templates by taxonomy mode if provided
   const filteredTemplates = taxonomyMode 
-    ? templates.filter(t => (t.applies_to || ['van', 'plant']).includes(taxonomyMode))
+    ? templates.filter(t => (t.applies_to || ['van', 'hgv', 'plant']).includes(taxonomyMode))
     : templates;
 
   // Auto-select first template (from filtered templates)
@@ -133,6 +134,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
     setTemplateDescription('');
     setTemplateActive(true);
     setTemplateAppliesToVehicle(true);
+    setTemplateAppliesToHgv(true);
     setTemplateAppliesToPlant(true);
     setShowTemplateDialog(true);
   };
@@ -142,8 +144,9 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
     setTemplateName(template.name);
     setTemplateDescription(template.description || '');
     setTemplateActive(template.is_active);
-    const appliesTo = template.applies_to || ['van', 'plant'];
+    const appliesTo = template.applies_to || ['van', 'hgv', 'plant'];
     setTemplateAppliesToVehicle(appliesTo.includes('van'));
+    setTemplateAppliesToHgv(appliesTo.includes('hgv'));
     setTemplateAppliesToPlant(appliesTo.includes('plant'));
     setShowTemplateDialog(true);
   };
@@ -154,7 +157,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
       return;
     }
 
-    if (!templateAppliesToVehicle && !templateAppliesToPlant) {
+    if (!templateAppliesToVehicle && !templateAppliesToHgv && !templateAppliesToPlant) {
       toast.error('Template must apply to at least one asset type');
       return;
     }
@@ -163,6 +166,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
     try {
       const appliesTo: string[] = [];
       if (templateAppliesToVehicle) appliesTo.push('van');
+      if (templateAppliesToHgv) appliesTo.push('hgv');
       if (templateAppliesToPlant) appliesTo.push('plant');
 
       if (editingTemplate) {
@@ -738,6 +742,18 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
                   <Label htmlFor="template-applies-vehicle" className="cursor-pointer flex items-center gap-2">
                     <Truck className="h-4 w-4 text-blue-400" />
                     Van Tasks
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="template-applies-hgv"
+                    checked={templateAppliesToHgv}
+                    onCheckedChange={(checked) => setTemplateAppliesToHgv(checked as boolean)}
+                    className="border-slate-600"
+                  />
+                  <Label htmlFor="template-applies-hgv" className="cursor-pointer flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-cyan-400" />
+                    HGV Tasks
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
