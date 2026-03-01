@@ -40,6 +40,7 @@ import {
   Smartphone,
   Monitor,
   Car,
+  Truck,
   AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -145,9 +146,10 @@ export default function DebugPage() {
   const [filterComponent, setFilterComponent] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Test vehicle purge states
+  // Test fleet purge states
   const [testVehiclePrefix, setTestVehiclePrefix] = useState('TE57');
-  const [testVehicles, setTestVehicles] = useState<Array<{ id: string; reg_number: string; nickname: string | null; status: string }>>([]);
+  const [fleetTypeFilter, setFleetTypeFilter] = useState<'vans' | 'hgvs' | 'all'>('all');
+  const [testVehicles, setTestVehicles] = useState<Array<{ id: string; reg_number: string; nickname: string | null; status: string; fleet_type: 'van' | 'hgv' }>>([]);
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
   const [loadingTestVehicles, setLoadingTestVehicles] = useState(false);
   const [purgePreview, setPurgePreview] = useState<Record<string, number> | null>(null);
@@ -596,11 +598,11 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
     return String(value);
   };
 
-  // Test vehicle purge functions
+  // Test fleet purge functions
   const fetchTestVehicles = async () => {
     setLoadingTestVehicles(true);
     try {
-      const response = await fetch(`/api/debug/test-vehicles?prefix=${testVehiclePrefix}`);
+      const response = await fetch(`/api/debug/test-vehicles?prefix=${encodeURIComponent(testVehiclePrefix)}&type=${fleetTypeFilter}`);
       const data = await response.json();
 
       if (data.success) {
@@ -608,11 +610,11 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
         setSelectedVehicleIds([]);
         setPurgePreview(null);
       } else {
-        toast.error(data.error || 'Failed to fetch test vans');
+        toast.error(data.error || 'Failed to fetch test fleet');
       }
     } catch (error) {
-      console.error('Error fetching test vans:', error);
-      toast.error('Failed to fetch test vans');
+      console.error('Error fetching test fleet:', error);
+      toast.error('Failed to fetch test fleet');
     } finally {
       setLoadingTestVehicles(false);
     }
@@ -620,31 +622,44 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
   const previewPurge = async () => {
     if (selectedVehicleIds.length === 0) {
-      toast.error('Please select at least one van');
+      toast.error('Please select at least one fleet item');
       return;
+    }
+
+    const byType = { vans: [] as string[], hgvs: [] as string[] };
+    for (const id of selectedVehicleIds) {
+      const v = testVehicles.find(t => t.id === id);
+      if (v?.fleet_type === 'hgv') byType.hgvs.push(id);
+      else byType.vans.push(id);
     }
 
     setPurging(true);
     try {
-      const response = await fetch('/api/debug/test-vehicles', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: 'preview',
-          vehicle_ids: selectedVehicleIds,
-          prefix: testVehiclePrefix,
-          actions: purgeActions,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setPurgePreview(data.counts);
-        toast.success('Preview generated');
-      } else {
-        toast.error(data.error || 'Failed to preview purge');
+      let combinedCounts: Record<string, number> = {};
+      for (const [ft, ids] of Object.entries(byType)) {
+        if (ids.length === 0) continue;
+        const response = await fetch('/api/debug/test-vehicles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: 'preview',
+            vehicle_ids: ids,
+            prefix: testVehiclePrefix,
+            actions: purgeActions,
+            fleet_type: ft,
+          }),
+        });
+        const data = await response.json();
+        if (!data.success) {
+          toast.error(data.error || 'Failed to preview purge');
+          return;
+        }
+        for (const [k, v] of Object.entries(data.counts || {})) {
+          combinedCounts[k] = (combinedCounts[k] || 0) + Number(v);
+        }
       }
+      setPurgePreview(combinedCounts);
+      toast.success('Preview generated');
     } catch (error) {
       console.error('Error previewing purge:', error);
       toast.error('Failed to preview purge');
@@ -655,44 +670,53 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
   const executePurge = async () => {
     if (selectedVehicleIds.length === 0) {
-      toast.error('Please select at least one van');
+      toast.error('Please select at least one fleet item');
       return;
+    }
+
+    const byType = { vans: [] as string[], hgvs: [] as string[] };
+    for (const id of selectedVehicleIds) {
+      const v = testVehicles.find(t => t.id === id);
+      if (v?.fleet_type === 'hgv') byType.hgvs.push(id);
+      else byType.vans.push(id);
     }
 
     const notificationService = await import('@/lib/services/notification.service');
     const confirmed = await notificationService.notify.confirm({
       title: 'Confirm Purge',
-      description: `This will permanently delete selected records for ${selectedVehicleIds.length} van(s). This cannot be undone.`,
+      description: `This will permanently delete selected records for ${selectedVehicleIds.length} fleet item(s). This cannot be undone.`,
       confirmText: 'Purge Records',
       destructive: true,
     });
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     setPurging(true);
     try {
-      const response = await fetch('/api/debug/test-vehicles', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: 'execute',
-          vehicle_ids: selectedVehicleIds,
-          prefix: testVehiclePrefix,
-          actions: purgeActions,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        toast.success(`Purged records for ${data.affected_vehicles} van(s)`);
-        setPurgePreview(null);
-        fetchTestVehicles(); // Refresh list
-      } else {
-        toast.error(data.error || 'Failed to execute purge');
+      let totalAffected = 0;
+      for (const [ft, ids] of Object.entries(byType)) {
+        if (ids.length === 0) continue;
+        const response = await fetch('/api/debug/test-vehicles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: 'execute',
+            vehicle_ids: ids,
+            prefix: testVehiclePrefix,
+            actions: purgeActions,
+            fleet_type: ft,
+          }),
+        });
+        const data = await response.json();
+        if (!data.success) {
+          toast.error(data.error || 'Failed to execute purge');
+          return;
+        }
+        totalAffected += data.affected_vehicles || 0;
       }
+      toast.success(`Purged records for ${totalAffected} fleet item(s)`);
+      setPurgePreview(null);
+      fetchTestVehicles();
     } catch (error) {
       console.error('Error executing purge:', error);
       toast.error('Failed to execute purge');
@@ -702,22 +726,25 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
   };
 
   const archiveVehicles = async () => {
-    if (selectedVehicleIds.length === 0) {
-      toast.error('Please select at least one van');
+    const vanIds = selectedVehicleIds.filter(id => testVehicles.find(t => t.id === id)?.fleet_type === 'van');
+    if (vanIds.length === 0) {
+      toast.error(
+        selectedVehicleIds.length > 0
+          ? 'Archive is only supported for vans. HGVs must be hard deleted.'
+          : 'Please select at least one fleet item'
+      );
       return;
     }
-
+    const hgvCount = selectedVehicleIds.length - vanIds.length;
     const notificationService = await import('@/lib/services/notification.service');
     const confirmed = await notificationService.notify.confirm({
-      title: 'Archive Vans',
-      description: `This will archive ${selectedVehicleIds.length} van(s) (soft delete). The vans will be marked as archived and moved to van_archive.`,
+      title: 'Archive Fleet Items',
+      description: `This will archive ${vanIds.length} van(s) (soft delete). ${hgvCount > 0 ? `${hgvCount} HGV(s) selected will be skipped (use Hard Delete for HGVs). ` : ''}Vans will be marked as archived and moved to van_archive.`,
       confirmText: 'Archive',
       destructive: false,
     });
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     setPurging(true);
     try {
@@ -725,10 +752,11 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          vehicle_ids: selectedVehicleIds,
+          vehicle_ids: vanIds,
           prefix: testVehiclePrefix,
           mode: 'archive',
           archive_reason: 'Test Data Cleanup',
+          fleet_type: 'vans',
         }),
       });
 
@@ -736,19 +764,19 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
       if (data.success) {
         toast.success(`Archived ${data.archived_count} van(s)`);
-        fetchTestVehicles(); // Refresh list
+        fetchTestVehicles();
       } else {
-        if (data.failed_vehicles && data.failed_vehicles.length > 0) {
-          const failedList = data.failed_vehicles.map((v: any) => v.reg_number).join(', ');
+        if (data.failed_vehicles?.length > 0) {
+          const failedList = data.failed_vehicles.map((v: { reg_number: string }) => v.reg_number).join(', ');
           toast.error(`Archived ${data.archived_count} of ${data.total_requested}. Failed: ${failedList}`);
         } else {
-          toast.error(data.error || 'Failed to archive vans');
+          toast.error(data.error || 'Failed to archive');
         }
-        fetchTestVehicles(); // Refresh list even on partial failure
+        fetchTestVehicles();
       }
     } catch (error) {
-      console.error('Error archiving vans:', error);
-      toast.error('Failed to archive vans');
+      console.error('Error archiving:', error);
+      toast.error('Failed to archive');
     } finally {
       setPurging(false);
     }
@@ -756,46 +784,57 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
   const hardDeleteVehicles = async () => {
     if (selectedVehicleIds.length === 0) {
-      toast.error('Please select at least one van');
+      toast.error('Please select at least one fleet item');
       return;
+    }
+
+    const byType = { vans: [] as string[], hgvs: [] as string[] };
+    for (const id of selectedVehicleIds) {
+      const v = testVehicles.find(t => t.id === id);
+      if (v?.fleet_type === 'hgv') byType.hgvs.push(id);
+      else byType.vans.push(id);
     }
 
     const notificationService = await import('@/lib/services/notification.service');
     const confirmed = await notificationService.notify.confirm({
-      title: '⚠️ HARD DELETE VANS',
-      description: `This will PERMANENTLY DELETE ${selectedVehicleIds.length} van(s) and ALL associated records from the database. This is IRREVERSIBLE and DANGEROUS. Only use for test data cleanup.`,
+      title: '⚠️ HARD DELETE FLEET ITEMS',
+      description: `This will PERMANENTLY DELETE ${selectedVehicleIds.length} fleet item(s) and ALL associated records from the database. This is IRREVERSIBLE and DANGEROUS. Only use for test data cleanup.`,
       confirmText: 'I understand - DELETE PERMANENTLY',
       destructive: true,
     });
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     setPurging(true);
     try {
-      const response = await fetch('/api/debug/test-vehicles', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          vehicle_ids: selectedVehicleIds,
-          prefix: testVehiclePrefix,
-          mode: 'hard_delete',
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        toast.success(`Hard deleted ${data.affected_vehicles} van(s) and ${Object.values(data.deleted_counts).reduce((a: number, b: any) => a + Number(b), 0)} total records`);
-        setPurgePreview(null);
-        fetchTestVehicles(); // Refresh list
-      } else {
-        toast.error(data.error || 'Failed to delete vans');
+      let totalAffected = 0;
+      let totalRecords = 0;
+      for (const [ft, ids] of Object.entries(byType)) {
+        if (ids.length === 0) continue;
+        const response = await fetch('/api/debug/test-vehicles', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            vehicle_ids: ids,
+            prefix: testVehiclePrefix,
+            mode: 'hard_delete',
+            fleet_type: ft,
+          }),
+        });
+        const data = await response.json();
+        if (!data.success) {
+          toast.error(data.error || 'Failed to delete');
+          return;
+        }
+        totalAffected += data.affected_vehicles || 0;
+        totalRecords += Object.values(data.deleted_counts || {}).reduce((a: number, b: unknown) => a + Number(b), 0);
       }
+      toast.success(`Hard deleted ${totalAffected} fleet item(s) and ${totalRecords} total records`);
+      setPurgePreview(null);
+      fetchTestVehicles();
     } catch (error) {
-      console.error('Error deleting vans:', error);
-      toast.error('Failed to delete vans');
+      console.error('Error deleting fleet items:', error);
+      toast.error('Failed to delete');
     } finally {
       setPurging(false);
     }
@@ -945,10 +984,10 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
             <span className="hidden md:inline">DVLA Sync</span>
             <span className="md:hidden data-[state=active]:inline hidden">DVLA</span>
           </TabsTrigger>
-          <TabsTrigger value="test-vans" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+          <TabsTrigger value="test-fleet" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
             <Car className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden md:inline">Test Vans</span>
-            <span className="md:hidden data-[state=active]:inline hidden">Test</span>
+            <span className="hidden md:inline">Test Fleet</span>
+            <span className="md:hidden data-[state=active]:inline hidden">Fleet</span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
             <Send className="h-4 w-4 flex-shrink-0" />
@@ -1645,18 +1684,18 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
           <DVLASyncDebugPanel />
         </TabsContent>
 
-        {/* Test Vans Tab */}
-        <TabsContent value="test-vans">
+        {/* Test Fleet Tab */}
+        <TabsContent value="test-fleet">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Car className="h-5 w-5 text-red-500" />
-                    Test Van Cleanup
+                    Test Fleet Cleanup
                   </CardTitle>
                   <CardDescription>
-                    Manage and purge test van data (TE57 prefix only)
+                    Manage and purge test fleet data (vans & HGVs, TE57 prefix)
                   </CardDescription>
                 </div>
                 <Button
@@ -1675,37 +1714,54 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Prefix Configuration */}
-              <div className="space-y-2">
-                <Label htmlFor="vehicle-prefix" className="text-sm font-medium">
-                  Van Registration Prefix
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="vehicle-prefix"
-                    value={testVehiclePrefix}
-                    onChange={(e) => setTestVehiclePrefix(e.target.value.toUpperCase())}
-                    placeholder="TE57"
-                    className="w-32 font-mono"
-                  />
-                  <Button
-                    onClick={fetchTestVehicles}
-                    disabled={loadingTestVehicles || !testVehiclePrefix.trim()}
-                  >
-                    Load Vans
-                  </Button>
+              {/* Prefix & type configuration */}
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-4 items-end">
+                  <div className="space-y-2">
+                    <Label htmlFor="vehicle-prefix" className="text-sm font-medium">
+                      Fleet Registration Prefix
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="vehicle-prefix"
+                        value={testVehiclePrefix}
+                        onChange={(e) => setTestVehiclePrefix(e.target.value.toUpperCase())}
+                        placeholder="TE57"
+                        className="w-32 font-mono"
+                      />
+                      <Button
+                        onClick={fetchTestVehicles}
+                        disabled={loadingTestVehicles || !testVehiclePrefix.trim()}
+                      >
+                        Load Fleet
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Fleet Type</Label>
+                    <Select value={fleetTypeFilter} onValueChange={(v: 'vans' | 'hgvs' | 'all') => setFleetTypeFilter(v)}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All (Vans + HGVs)</SelectItem>
+                        <SelectItem value="vans">Vans only</SelectItem>
+                        <SelectItem value="hgvs">HGVs only</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Only vans starting with this prefix can be managed here
+                  Only fleet items starting with this prefix can be managed here
                 </p>
               </div>
 
-              {/* Van Selection */}
+              {/* Fleet Selection */}
               {testVehicles.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium">
-                      Select Vans ({selectedVehicleIds.length} of {testVehicles.length} selected)
+                      Select Fleet ({selectedVehicleIds.length} of {testVehicles.length} selected)
                     </Label>
                     <div className="flex gap-2">
                       <Button
@@ -1752,7 +1808,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                           className="h-4 w-4 rounded border-2 border-slate-400 dark:border-slate-600 text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 cursor-pointer bg-white dark:bg-slate-800"
                         />
                         <div className="flex-1">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-mono font-semibold">
                               {vehicle.reg_number}
                             </span>
@@ -1761,6 +1817,10 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                                 ({vehicle.nickname})
                               </span>
                             )}
+                            <Badge variant="outline" className="text-xs font-normal gap-0.5">
+                              {vehicle.fleet_type === 'hgv' ? <Truck className="h-3 w-3" /> : <Car className="h-3 w-3" />}
+                              {(vehicle.fleet_type || 'van').toUpperCase()}
+                            </Badge>
                             <Badge variant={vehicle.status === 'active' ? 'default' : 'secondary'} className="text-xs">
                               {vehicle.status}
                             </Badge>
@@ -1775,8 +1835,8 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
               {testVehicles.length === 0 && !loadingTestVehicles && (
                 <div className="text-center py-8 text-muted-foreground">
                   <Car className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>No vans found matching prefix &quot;{testVehiclePrefix}&quot;</p>
-                  <p className="text-sm mt-1">Click &quot;Load Vans&quot; to search</p>
+                  <p>No fleet items found matching prefix &quot;{testVehiclePrefix}&quot;</p>
+                  <p className="text-sm mt-1">Click &quot;Load Fleet&quot; to search</p>
                 </div>
               )}
 
@@ -1797,7 +1857,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                           className="h-4 w-4 rounded border-2 border-slate-400 dark:border-slate-600 text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 cursor-pointer bg-white dark:bg-slate-800"
                         />
                         <Label htmlFor="purge-inspections" className="text-sm font-normal cursor-pointer">
-                          Van Inspections (and items, photos)
+                          Inspections (van/HGV; items, photos)
                         </Label>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1845,7 +1905,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                           className="h-4 w-4 rounded border-2 border-slate-400 dark:border-slate-600 text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 cursor-pointer bg-white dark:bg-slate-800"
                         />
                         <Label htmlFor="purge-archives" className="text-sm font-normal cursor-pointer">
-                          Van Archive Entries
+                          Van Archive Entries (vans only)
                         </Label>
                       </div>
                     </div>
@@ -1861,7 +1921,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                             Preview: Records to be deleted
                           </h4>
                           <p className="text-sm text-yellow-800 dark:text-yellow-400 mt-1">
-                            {selectedVehicleIds.length} van(s) selected
+                            {selectedVehicleIds.length} fleet item(s) selected
                           </p>
                         </div>
                       </div>
@@ -1907,7 +1967,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
                     <div className="pt-3 border-t">
                       <p className="text-sm font-medium text-muted-foreground mb-3">
-                        Van Actions (records must be purged first):
+                        Fleet Actions (records must be purged first):
                       </p>
                       <div className="flex gap-2">
                         <Button
@@ -1915,7 +1975,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                           variant="outline"
                           disabled={purging || selectedVehicleIds.length === 0}
                         >
-                          Archive Vans
+                          Archive Vans (vans only)
                         </Button>
                         <Button
                           onClick={hardDeleteVehicles}
@@ -1924,11 +1984,11 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
                           className="bg-red-600 hover:bg-red-700"
                         >
                           <AlertTriangle className="h-4 w-4 mr-2" />
-                          Hard Delete Vans
+                          Hard Delete Fleet
                         </Button>
                       </div>
                       <p className="text-xs text-red-600 dark:text-red-400 mt-2">
-                        ⚠️ Hard Delete permanently removes vans from the database
+                        ⚠️ Hard Delete permanently removes fleet items from the database
                       </p>
                     </div>
                   </div>
