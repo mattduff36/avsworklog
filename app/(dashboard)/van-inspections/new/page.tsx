@@ -99,6 +99,7 @@ function NewInspectionContent() {
     id: string; 
     reg_number: string; 
     vehicle_type: string;
+    current_mileage?: number | null;
     van_categories?: { name: string } | null;
   }>>([]);
   const [recentVehicleIds, setRecentVehicleIds] = useState<string[]>([]);
@@ -1295,7 +1296,7 @@ function NewInspectionContent() {
         <CardHeader className="pb-4">
           <CardTitle className="text-foreground">Inspection Details</CardTitle>
           <CardDescription className="text-muted-foreground">
-            Week ending: {formatDate(weekEnding)}
+            {weekEnding ? `Week ending: ${formatDate(weekEnding)}` : 'Select a date'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -1320,15 +1321,15 @@ function NewInspectionContent() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Select which employee this inspection is for
-              </p>
             </div>
           )}
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="vehicle" className="text-foreground text-base">Van</Label>
+              <Label htmlFor="vehicle" className="text-foreground text-base flex items-center gap-2">
+                Van
+                <span className="text-red-400">*</span>
+              </Label>
               <Select 
                 value={vehicleId} 
                 disabled={checklistStarted}
@@ -1417,25 +1418,37 @@ function NewInspectionContent() {
                 Week Ending (Sunday)
                 <span className="text-red-400">*</span>
               </Label>
-              <Input
-                id="weekEnding"
-                type="date"
+              <Select
                 value={weekEnding}
-                onChange={(e) => {
-                  const selectedDate = new Date(e.target.value + 'T00:00:00');
-                  if (selectedDate.getDay() !== 0) {
-                    setError('Week ending must be a Sunday');
-                    return;
-                  }
-                  setError('');
-                  setWeekEnding(e.target.value);
-                }}
-                max={formatDateISO(getWeekEnding())}
                 disabled={checklistStarted}
-                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
-                required
-              />
-              <p className="text-xs text-muted-foreground">Select the Sunday that ends the inspection week</p>
+                onValueChange={(value) => {
+                  setError('');
+                  setWeekEnding(value);
+                }}
+              >
+                <SelectTrigger id="weekEnding" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
+                  <SelectValue placeholder="Select a Sunday" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[280px] md:max-h-[280px]">
+                  {(() => {
+                    const sundays: Date[] = [];
+                    const nextSunday = getWeekEnding();
+                    for (let i = 0; i < 12; i++) {
+                      const d = new Date(nextSunday);
+                      d.setDate(d.getDate() - i * 7);
+                      sundays.push(d);
+                    }
+                    return sundays.map((d) => {
+                      const iso = formatDateISO(d);
+                      return (
+                        <SelectItem key={iso} value={iso}>
+                          {formatDate(iso)}
+                        </SelectItem>
+                      );
+                    });
+                  })()}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -1448,7 +1461,10 @@ function NewInspectionContent() {
                 type="number"
                 value={currentMileage}
                 onChange={(e) => handleMileageChange(e.target.value)}
-                placeholder="e.g., 45000"
+                placeholder={(() => {
+                  const sel = vehicles.find(v => v.id === vehicleId);
+                  return sel?.current_mileage ? `e.g. ${sel.current_mileage}` : 'e.g. 45000';
+                })()}
                 min="0"
                 step="1"
                 className={`h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground ${

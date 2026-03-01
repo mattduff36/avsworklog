@@ -84,6 +84,7 @@ function NewPlantInspectionContent() {
     id: string; 
     plant_id: string; 
     nickname?: string | null;
+    current_hours?: number | null;
     van_categories?: { name: string } | null;
   }>>([]);
   const [selectedPlantId, setSelectedPlantId] = useState('');
@@ -863,7 +864,7 @@ function NewPlantInspectionContent() {
                 {existingInspectionId ? 'Edit Plant Inspection' : 'New Plant Inspection'}
               </h1>
               <p className="text-sm text-muted-foreground hidden md:block">
-                Daily plant safety check
+                Daily safety check
               </p>
             </div>
           </div>
@@ -926,7 +927,10 @@ function NewPlantInspectionContent() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="plant" className="text-foreground text-base">Plant</Label>
+              <Label htmlFor="plant" className="text-foreground text-base flex items-center gap-2">
+                Plant
+                <span className="text-red-400">*</span>
+              </Label>
               <Select 
                 value={isHiredPlant ? HIRED_PLANT_SENTINEL : selectedPlantId} 
                 disabled={checklistStarted}
@@ -952,7 +956,7 @@ function NewPlantInspectionContent() {
                 </SelectTrigger>
                 <SelectContent className="border-border max-h-[300px] md:max-h-[400px]">
                   <SelectGroup>
-                    <SelectItem value={HIRED_PLANT_SENTINEL} className="font-semibold text-amber-400">
+                    <SelectItem value={HIRED_PLANT_SENTINEL} className="font-semibold !text-amber-400 focus:!text-amber-400">
                       Hired Plant
                     </SelectItem>
                     {plants.map((plant) => (
@@ -1050,7 +1054,10 @@ function NewPlantInspectionContent() {
               type="number"
               value={currentHours}
               onChange={(e) => setCurrentHours(e.target.value)}
-              placeholder="e.g., 45000"
+              placeholder={(() => {
+                const sel = plants.find(p => p.id === selectedPlantId);
+                return sel?.current_hours ? `e.g. ${sel.current_hours}` : 'e.g. 45000';
+              })()}
               min="0"
               step="1"
               className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground"

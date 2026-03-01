@@ -46,8 +46,9 @@ function NewHgvInspectionContent() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [hgvId, setHgvId] = useState('');
-  const [inspectionDate, setInspectionDate] = useState(formatDateISO(new Date()));
+  const [inspectionDate, setInspectionDate] = useState('');
   const [currentMileage, setCurrentMileage] = useState('');
+  const [latestKnownMileage, setLatestKnownMileage] = useState<number | null>(null);
 
   const [checklistStarted, setChecklistStarted] = useState(false);
   const [inspectionStartMs, setInspectionStartMs] = useState<number | null>(null);
@@ -131,6 +132,22 @@ function NewHgvInspectionContent() {
     }
   };
 
+  const loadLatestMileage = async (selectedHgvId: string) => {
+    try {
+      const { data } = await supabase
+        .from('hgv_inspections')
+        .select('current_mileage')
+        .eq('hgv_id', selectedHgvId)
+        .not('current_mileage', 'is', null)
+        .order('inspection_date', { ascending: false })
+        .limit(1)
+        .single();
+      setLatestKnownMileage(data?.current_mileage ?? null);
+    } catch {
+      setLatestKnownMileage(null);
+    }
+  };
+
   const startInspection = () => {
     if (!hgvId) {
       setError('Please select an HGV first');
@@ -138,6 +155,11 @@ function NewHgvInspectionContent() {
     }
     if (!inspectionDate) {
       setError('Please select an inspection date');
+      return;
+    }
+    const mileageValue = parseInt(currentMileage, 10);
+    if (!currentMileage || Number.isNaN(mileageValue) || mileageValue < 0) {
+      setError('Please enter a valid current mileage');
       return;
     }
     setError('');
@@ -341,7 +363,7 @@ function NewHgvInspectionContent() {
             <BackButton fallbackHref="/hgv-inspections" />
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-foreground">New HGV Inspection</h1>
-              <p className="text-sm text-muted-foreground hidden md:block">Daily 26-point HGV safety check</p>
+              <p className="text-sm text-muted-foreground hidden md:block">Daily safety check</p>
             </div>
           </div>
           {checklistStarted && (
@@ -393,7 +415,10 @@ function NewHgvInspectionContent() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-foreground text-base">HGV</Label>
+              <Label htmlFor="hgv" className="text-foreground text-base flex items-center gap-2">
+                HGV
+                <span className="text-red-400">*</span>
+              </Label>
               <Select
                 value={hgvId}
                 disabled={checklistStarted}
@@ -402,10 +427,14 @@ function NewHgvInspectionContent() {
                   setCheckboxStates({});
                   setComments({});
                   setLoggedDefects(new Map());
-                  if (value) loadLockedDefects(value);
+                  setLatestKnownMileage(null);
+                  if (value) {
+                    loadLockedDefects(value);
+                    loadLatestMileage(value);
+                  }
                 }}
               >
-                <SelectTrigger className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
+                <SelectTrigger id="hgv" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
                   <SelectValue placeholder="Select an HGV" />
                 </SelectTrigger>
                 <SelectContent>
@@ -418,48 +447,63 @@ function NewHgvInspectionContent() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="text-foreground text-base">Inspection Date</Label>
+              <Label htmlFor="inspectionDate" className="text-foreground text-base flex items-center gap-2">
+                Inspection Date
+                <span className="text-red-400">*</span>
+              </Label>
               <Input
+                id="inspectionDate"
                 type="date"
                 value={inspectionDate}
+                onChange={(e) => {
+                  setError('');
+                  setInspectionDate(e.target.value);
+                }}
                 max={formatDateISO(new Date())}
                 disabled={checklistStarted}
-                onChange={(e) => setInspectionDate(e.target.value)}
-                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white"
+                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
+                required
               />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-foreground text-base">Current Mileage</Label>
-            <Input
-              type="number"
-              min="0"
-              step="1"
-              value={currentMileage}
-              onChange={(e) => setCurrentMileage(e.target.value)}
-              placeholder="e.g. 245000"
-              className="h-12 text-base bg-slate-900/50 border-slate-600 text-white"
-            />
-          </div>
-
-          {!checklistStarted ? (
-            <Button
-              onClick={startInspection}
-              disabled={!hgvId || !inspectionDate}
-              className="bg-inspection hover:bg-inspection/90 text-white font-semibold"
-            >
-              <Timer className="h-4 w-4 mr-2" />
-              Start Inspection
-            </Button>
-          ) : (
-            <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-              <p className="text-sm text-blue-400">
-                <Info className="h-4 w-4 inline mr-2" />
-                Inspection started. The submit button unlocks after 10 minutes.
-              </p>
+          <div className="flex items-end gap-4">
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="currentMileage" className="text-foreground text-base flex items-center gap-2">
+                Current Mileage
+                <span className="text-red-400">*</span>
+              </Label>
+              <Input
+                id="currentMileage"
+                type="number"
+                min="0"
+                step="1"
+                value={currentMileage}
+                onChange={(e) => setCurrentMileage(e.target.value)}
+                placeholder={latestKnownMileage ? `e.g. ${latestKnownMileage}` : 'e.g. 245000'}
+                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground"
+                required
+              />
             </div>
-          )}
+
+            {!checklistStarted ? (
+              <Button
+                onClick={startInspection}
+                disabled={!hgvId || !inspectionDate || !currentMileage}
+                className="h-12 bg-inspection hover:bg-inspection/90 text-white font-semibold whitespace-nowrap"
+              >
+                <Timer className="h-4 w-4 mr-2" />
+                Start Inspection
+              </Button>
+            ) : (
+              <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg shrink-0">
+                <p className="text-sm text-blue-400">
+                  <Info className="h-4 w-4 inline mr-2" />
+                  Inspection started. The submit button unlocks after 10 minutes.
+                </p>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
