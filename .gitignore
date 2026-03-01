@@ -50,7 +50,7 @@ next-env.d.ts
 **/public/worker-*.js.map
 build-output.txt
 **/public/fallback-*.js
-.cursor/debug.log
+.cursor/debug*.log
 
 # Lighthouse CI reports (generated artifacts)
 .lighthouseci/
