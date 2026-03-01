@@ -1450,62 +1450,59 @@ function NewInspectionContent() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="mileage" className="text-foreground text-base flex items-center gap-2">
-                Current Mileage
-                <span className="text-red-400">*</span>
-              </Label>
-              <Input
-                id="mileage"
-                type="number"
-                value={currentMileage}
-                onChange={(e) => handleMileageChange(e.target.value)}
-                placeholder={(() => {
-                  const sel = vehicles.find(v => v.id === vehicleId);
-                  return sel?.current_mileage ? `e.g. ${sel.current_mileage}` : 'e.g. 45000';
-                })()}
-                min="0"
-                step="1"
-                className={`h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground ${
-                  mileageWarning?.warning && !mileageConfirmed ? 'border-amber-500' : ''
-                }`}
-                required
-              />
-              {/* Baseline mileage hint */}
-              {baselineMileage !== null && baselineMileageSource !== 'none' && (
-                <p className="text-xs text-muted-foreground">
-                  Last recorded: {formatMileage(baselineMileage)}
-                </p>
-              )}
-              {/* Mileage warning indicator */}
-              {mileageWarning?.warning && !mileageConfirmed && (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm text-amber-400">{mileageWarning.warning}</p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowMileageWarningDialog(true)}
-                        className="mt-2 border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
-                      >
-                        Confirm Mileage is Correct
-                      </Button>
-                    </div>
+          <div className="space-y-2">
+            <Label htmlFor="mileage" className="text-foreground text-base flex items-center gap-2">
+              Current Mileage
+              <span className="text-red-400">*</span>
+            </Label>
+            <Input
+              id="mileage"
+              type="number"
+              value={currentMileage}
+              onChange={(e) => handleMileageChange(e.target.value)}
+              placeholder={(() => {
+                const sel = vehicles.find(v => v.id === vehicleId);
+                return sel?.current_mileage ? `e.g. ${sel.current_mileage}` : 'e.g. 45000';
+              })()}
+              min="0"
+              step="1"
+              className={`h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground ${
+                mileageWarning?.warning && !mileageConfirmed ? 'border-amber-500' : ''
+              }`}
+              required
+            />
+            {baselineMileage !== null && baselineMileageSource !== 'none' && (
+              <p className="text-xs text-muted-foreground">
+                Last recorded: {formatMileage(baselineMileage)}
+              </p>
+            )}
+            {mileageWarning?.warning && !mileageConfirmed && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm text-amber-400">{mileageWarning.warning}</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowMileageWarningDialog(true)}
+                      className="mt-2 border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
+                    >
+                      Confirm Mileage is Correct
+                    </Button>
                   </div>
                 </div>
-              )}
-              {/* Mileage confirmed indicator */}
-              {mileageWarning?.warning && mileageConfirmed && (
-                <p className="text-xs text-green-400 flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3" />
-                  Mileage confirmed
-                </p>
-              )}
-            </div>
+              </div>
+            )}
+            {mileageWarning?.warning && mileageConfirmed && (
+              <p className="text-xs text-green-400 flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3" />
+                Mileage confirmed
+              </p>
+            )}
           </div>
           
           {checklistStarted && (
