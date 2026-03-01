@@ -115,10 +115,10 @@ async function main() {
     const tableCols = colsByTable.get(table_name);
     if (!tableCols) continue; // table might be a view — skip
 
-    // Extract NEW.col and OLD.col references
+    // Extract NEW.col and OLD.col references (case-insensitive: PL/pgSQL allows new/old/New/etc.)
     const refs = new Set<string>();
-    for (const m of fn_body.matchAll(/\b(?:NEW|OLD)\.(\w+)/g)) {
-      refs.add(m[1]);
+    for (const m of fn_body.matchAll(/\b(?:NEW|OLD)\.(\w+)/gi)) {
+      refs.add(m[1].toLowerCase());
     }
 
     for (const col of refs) {
