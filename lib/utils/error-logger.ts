@@ -196,6 +196,13 @@ class ErrorLogger {
         
         // Only log if it looks like an actual error (not React warnings)
         if (!errorMessage.includes('Warning:') && !errorMessage.includes('%c')) {
+          // Capture navigation context to help diagnose stale-bundle issues
+          let navigationEntry: { type?: string; duration?: number } | null = null;
+          try {
+            const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+            if (nav) navigationEntry = { type: nav.type, duration: Math.round(nav.duration) };
+          } catch { /* ignore */ }
+
           this.logError({
             error: new Error(`Console Error: ${errorMessage}`),
             componentName: 'Console Error',
@@ -204,6 +211,13 @@ class ErrorLogger {
               description: 'Error logged via console.error() in application code',
               pageUrl: typeof window !== 'undefined' ? window.location.href : 'N/A',
               callStack: new Error().stack,
+              // Deployment ID baked into running bundle at build time.
+              // If this differs from the latest server deployment, the user is
+              // running a stale bundle (old tab, bfcache, etc.).
+              bundleDeploymentId: process.env.NEXT_PUBLIC_VERCEL_DEPLOYMENT_ID || 'local',
+              // Navigation type: 'navigate' | 'reload' | 'back_forward' | 'prerender'
+              // 'back_forward' = Chrome restored page from bfcache
+              navigationEntry,
               errorHandling: { wasHandled: true, didShowMessage: false } as ErrorHandlingMetadata,
             },
           });

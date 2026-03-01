@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from "@/lib/providers/query-provider";
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
 import { ErrorLoggerInit } from "@/components/ErrorLoggerInit";
+import { DeploymentVersionChecker } from "@/components/DeploymentVersionChecker";
 import "./globals.css";
 
 // Force dynamic rendering to prevent build-time static generation errors
@@ -54,6 +55,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
         <ErrorLoggerInit />
+        <DeploymentVersionChecker />
         <NuqsAdapter>
           <QueryProvider>
             {children}
