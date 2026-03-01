@@ -13,6 +13,7 @@ alwaysApply: true
 - Generate and run migrations yourself.
 - Do not ask the user to run commands unless blocked by missing variables or permissions.
 - Never print or expose secrets from `.env.local`.
+- **ALWAYS** run `npm run db:validate` immediately after any migration that renames/drops a column or table. This catches broken trigger functions before they hit production.
 
 ## 2. Git pushes
 - Push to GitHub only when the user writes exactly: `push to GitHub`.

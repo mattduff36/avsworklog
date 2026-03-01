@@ -3,15 +3,27 @@
 ## TL;DR - Quick Start
 
 ```bash
-# For RAMS feature
-npx tsx scripts/run-rams-migration.ts
-npx tsx scripts/setup-rams-storage.ts
+# Run your migration script
+npx tsx scripts/run-<feature>-migration.ts
 
-# For existing migrations
-npx tsx scripts/run-db-migration.ts
+# ⚠️ ALWAYS run this immediately after — catches broken triggers/columns before deploy
+npm run db:validate
 ```
 
-That's it! **100% automated** - no manual steps needed anywhere!
+Both steps are required. The validate step **exits non-zero** if anything is broken, so it will block a push if you add it to a pre-push hook.
+
+---
+
+## 🚨 Why db:validate Is Mandatory
+
+PostgreSQL trigger functions store column names as plain text. When you rename a column (`vehicle_id → van_id`), **the trigger is not updated automatically** and PostgreSQL won't warn you — the error only appears when a user fires the trigger in production.
+
+`npm run db:validate` catches this by:
+- Scanning every trigger function body for `NEW.col` / `OLD.col` references and checking those columns exist on the trigger's table
+- Checking that all required columns exist on core tables (`van_inspections`, `vehicle_maintenance`, etc.)
+- Verifying critical FK relationships (`plant.category_id → van_categories`, etc.)
+
+**Rule:** If your migration renames a column, renames a table, or drops a column — run `npm run db:validate` before committing.
 
 ---
 

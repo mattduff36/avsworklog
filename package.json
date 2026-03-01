@@ -16,6 +16,7 @@
     "audit:contrast": "tsx scripts/audit-input-contrast.ts",
     "fix:contrast": "tsx scripts/fix-input-contrast.ts",
     "fixerrors": "tsx scripts/fixerrors.ts",
+    "db:validate": "tsx scripts/db-validate.ts",
     "test:contrast": "playwright test contrast.spec.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
