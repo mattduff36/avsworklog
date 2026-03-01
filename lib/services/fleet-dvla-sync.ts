@@ -49,6 +49,15 @@ export const TEST_REGISTRATIONS = new Set(['TE57VAN', 'TE57HGV']);
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === 'string') return error;
+  // Supabase PostgrestError is a plain object with a `message` field
+  if (error && typeof error === 'object' && 'message' in error && typeof (error as Record<string, unknown>).message === 'string') {
+    const e = error as { message: string; code?: string; details?: string; hint?: string };
+    const parts = [e.message];
+    if (e.details) parts.push(`(${e.details})`);
+    if (e.hint) parts.push(`Hint: ${e.hint}`);
+    if (e.code) parts.push(`[${e.code}]`);
+    return parts.join(' ');
+  }
   return 'Unknown sync error';
 }
 
