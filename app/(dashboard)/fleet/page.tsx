@@ -590,6 +590,7 @@ function FleetContent() {
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
                 onVehicleAdded={() => {}}
+                assetLabel="HGV"
               />
             )}
           </TabsContent>

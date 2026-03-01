@@ -50,6 +50,7 @@ interface MaintenanceTableProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onVehicleAdded?: () => void;
+  assetLabel?: 'Van' | 'HGV';
 }
 
 type SortField = 
@@ -78,8 +79,12 @@ export function MaintenanceTable({
   vehicles, 
   searchQuery, 
   onSearchChange,
-  onVehicleAdded
+  onVehicleAdded,
+  assetLabel = 'Van',
 }: MaintenanceTableProps) {
+  const assetLabelLower = assetLabel.toLowerCase();
+  const assetLabelPlural = `${assetLabel}s`;
+  const assetLabelPluralLower = `${assetLabelLower}s`;
   const router = useRouter();
   const { isAdmin, isManager } = useAuth();
   const [sortField, setSortField] = useState<SortField>('reg_number');
@@ -102,7 +107,7 @@ export function MaintenanceTable({
   
   // Handlers with per-vehicle loading state
   const handleRestore = (vehicleId: string, regNumber: string) => {
-    if (confirm(`Restore ${regNumber} to active vans?\n\nThis will:\n• Move van back to Active Vans tab\n• Restore all maintenance data\n\nContinue?`)) {
+    if (confirm(`Restore ${regNumber} to active ${assetLabelPluralLower}?\n\nThis will:\n• Move ${assetLabelLower} back to Active ${assetLabelPlural} tab\n• Restore all maintenance data\n\nContinue?`)) {
       setPendingRestore(prev => new Set(prev).add(vehicleId));
       restoreVehicle.mutate(vehicleId, {
         onSettled: () => {
@@ -117,7 +122,7 @@ export function MaintenanceTable({
   };
   
   const handlePermanentDelete = (vehicleId: string, regNumber: string) => {
-    if (confirm(`⚠️ Permanently remove ${regNumber}?\n\nThis will:\n• Remove from Retired Vans tab\n• Preserve all inspection history\n• Cannot be undone\n\nContinue?`)) {
+    if (confirm(`⚠️ Permanently remove ${regNumber}?\n\nThis will:\n• Remove from Retired ${assetLabelPlural} tab\n• Preserve all inspection history\n• Cannot be undone\n\nContinue?`)) {
       setPendingDelete(prev => new Set(prev).add(vehicleId));
       permanentlyDelete.mutate(vehicleId, {
         onSettled: () => {
@@ -217,10 +222,10 @@ export function MaintenanceTable({
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-white">
-                All Vans
+                All {assetLabelPlural}
               </CardTitle>
               <CardDescription className="text-muted-foreground">
-                {vehicles.length} van{vehicles.length !== 1 ? 's' : ''} • Click column headers to sort
+                {vehicles.length} {assetLabelLower}{vehicles.length !== 1 ? 's' : ''} • Click column headers to sort
               </CardDescription>
             </div>
             <Button 
@@ -228,7 +233,7 @@ export function MaintenanceTable({
               onClick={() => setAddVehicleDialogOpen(true)}
             >
               <Plus className="h-4 w-4 mr-2 hidden md:inline" />
-              <span className="hidden md:inline">Add Van</span>
+              <span className="hidden md:inline">Add {assetLabel}</span>
               <Plus className="h-4 w-4 md:hidden" />
             </Button>
           </div>
@@ -240,11 +245,11 @@ export function MaintenanceTable({
           <Tabs defaultValue="active" className="w-full">
             <TabsList className="bg-slate-800 border-border">
               <TabsTrigger value="active">
-                Active Vans ({vehicles.length})
+                Active {assetLabelPlural} ({vehicles.length})
               </TabsTrigger>
               <TabsTrigger value="deleted" className="flex items-center gap-2">
                 <FolderClock className="h-4 w-4" />
-                Retired Vans ({retiredData?.count || 0})
+                Retired {assetLabelPlural} ({retiredData?.count || 0})
               </TabsTrigger>
             </TabsList>
             
@@ -322,7 +327,7 @@ export function MaintenanceTable({
           {/* Desktop Table View */}
           {vehicles.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              {searchQuery ? 'No vans found matching your search.' : 'No vans with maintenance records yet.'}
+              {searchQuery ? `No ${assetLabelPluralLower} found matching your search.` : `No ${assetLabelPluralLower} with maintenance records yet.`}
             </div>
           ) : (
             <div className="hidden md:block border border-slate-700 rounded-lg">
@@ -707,7 +712,7 @@ export function MaintenanceTable({
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search retired vans by registration..."
+                  placeholder={`Search retired ${assetLabelPluralLower} by registration...`}
                   value={retiredSearchQuery}
                   onChange={(e) => setRetiredSearchQuery(e.target.value)}
                   className="pl-11 bg-slate-900/50 border-slate-600 text-white"
@@ -717,12 +722,12 @@ export function MaintenanceTable({
               {retiredLoading ? (
                 <div className="text-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-3" />
-                  <p className="text-muted-foreground">Loading retired vans...</p>
+                  <p className="text-muted-foreground">Loading retired {assetLabelPluralLower}...</p>
                 </div>
               ) : !retiredData || retiredData.vehicles.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <FolderClock className="h-12 w-12 mx-auto mb-3 text-slate-600" />
-                  <p>No retired vans found.</p>
+                  <p>No retired {assetLabelPluralLower} found.</p>
                 </div>
               ) : (
                 <>
