@@ -1,4 +1,3 @@
-// @ts-nocheck
 import pg from 'pg';
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';

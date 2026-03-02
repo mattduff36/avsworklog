@@ -43,7 +43,7 @@ async function runMigration() {
   }
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new pg.Client({
     host: url.hostname,

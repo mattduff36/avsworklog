@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import pg from 'pg';
@@ -101,9 +100,9 @@ async function runMigration() {
     }
 
     console.log('Plant DELETE policy fix complete!\n');
-  } catch (error) {
+  } catch (err: unknown) {
     console.error('\nMigration failed:');
-    console.error(error);
+    console.error(err);
     process.exit(1);
   } finally {
     await client.end();

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import pg from 'pg';
@@ -54,8 +53,8 @@ async function checkMotColumns() {
       console.log('   None found');
     }
 
-  } catch (error: any) {
-    console.error('❌ Check failed:', error.message);
+  } catch (error: unknown) {
+    console.error('❌ Check failed:', error instanceof Error ? error.message : String(error));
   } finally {
     await client.end();
   }

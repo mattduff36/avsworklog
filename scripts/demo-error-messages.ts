@@ -1,10 +1,10 @@
-// @ts-nocheck
 /**
  * Demonstration of error messages that will be logged
  * Shows what you'll see in the Debug Console
  */
 
-// Mock Request
+export {};
+
 class MockRequest {
   public url: string;
   public method: string;
@@ -25,7 +25,7 @@ class MockRequest {
   }
 }
 
-function extractRequestContext(request: any): Record<string, unknown> {
+function extractRequestContext(request: MockRequest): Record<string, unknown> {
   const url = new URL(request.url);
   return {
     method: request.method,

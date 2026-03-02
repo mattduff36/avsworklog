@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Script to automatically add server-side error logging to all API routes
  * This ensures all API errors are captured in the error_logs table
@@ -40,7 +39,7 @@ async function findAPIRoutes(): Promise<string[]> {
 
 function analyzeFile(content: string): { needsImport: boolean; needsLogging: boolean } {
   const hasImport = content.includes('logServerError');
-  const hasCatchWithoutLogging = /catch\s*\([^)]*\)\s*\{[^}]*console\.error[^}]*\}/s.test(content) &&
+  const hasCatchWithoutLogging = /catch\s*\([^)]*\)\s*\{[^}]*console\.error[^}]*\}/.test(content) &&
                                   !content.includes('logServerError');
   
   return {
@@ -75,7 +74,7 @@ function addImport(content: string): string {
 
 function addErrorLogging(content: string, filePath: string): string {
   // Find catch blocks that have console.error but no logServerError
-  const catchRegex = /catch\s*\(([^)]*)\)\s*\{([^}]*console\.error[^}]*)\}/gs;
+  const catchRegex = /catch\s*\(([^)]*)\)\s*\{([^}]*console\.error[^}]*)\}/g;
   
   let result = content;
   const matches = Array.from(content.matchAll(catchRegex));

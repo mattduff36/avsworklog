@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * AddVehicleDialog Asset Type State Management Bug Fix Test
  * 
@@ -14,9 +13,6 @@ describe('AddVehicleDialog Asset Type State Management Bug Fix', () => {
       
       // Simulate dialog lifecycle
       let assetType = initialAssetType;
-      
-      // Dialog opens
-      const open = true;
       
       // Dialog closes - should reset to initialAssetType
       const onClose = (initialType: string) => {
@@ -48,7 +44,6 @@ describe('AddVehicleDialog Asset Type State Management Bug Fix', () => {
 
     it('should preserve assetType when dialog reopens without closing', () => {
       let assetType = 'plant';
-      const open = true;
       
       // User changes something but doesn't close
       assetType = 'plant';
@@ -62,7 +57,6 @@ describe('AddVehicleDialog Asset Type State Management Bug Fix', () => {
     it('should sync assetType when dialog opens with different prop', () => {
       // First opening: PlantTable passes assetType='plant'
       let assetType: 'vehicle' | 'plant' = 'plant';
-      let open = true;
       
       const syncAssetType = (newType: 'vehicle' | 'plant') => {
         assetType = newType;
@@ -72,11 +66,7 @@ describe('AddVehicleDialog Asset Type State Management Bug Fix', () => {
       syncAssetType('plant');
       expect(assetType).toBe('plant');
       
-      // Dialog closes
-      open = false;
-      
-      // Dialog reopens with vehicle (different component/caller)
-      open = true;
+      // Dialog closes then reopens with vehicle (different component/caller)
       syncAssetType('vehicle');
       
       // Should now be 'vehicle', not stuck on 'plant'
@@ -143,19 +133,13 @@ describe('AddVehicleDialog Asset Type State Management Bug Fix', () => {
     it('should work correctly: PlantTable then regular vehicle add', () => {
       // Scenario 1: Add plant
       let assetType: 'vehicle' | 'plant' = 'plant';
-      let open = true;
 
       // Dialog opens for plant
       assetType = 'plant';
       expect(assetType).toBe('plant');
 
-      // User submits, dialog closes
-      open = false;
-      assetType = 'plant'; // Resets to prop
-
-      // Scenario 2: User navigates to vehicle section and clicks "Add Vehicle"
-      open = true;
-      assetType = 'vehicle'; // New prop value
+      // User submits, dialog closes and reopens for vehicle
+      assetType = 'vehicle';
 
       // Dialog should now be in vehicle mode
       expect(assetType).toBe('vehicle');
@@ -222,7 +206,6 @@ describe('AddVehicleDialog Asset Type State Management Bug Fix', () => {
     it('should prevent category mismatch after reopening', () => {
       // Bug scenario: User opens plant dialog, sees plant categories
       let assetType: 'vehicle' | 'plant' = 'plant';
-      const plantCategories = ['Excavator', 'Telehandler'];
       
       expect(assetType).toBe('plant');
 
@@ -321,6 +304,7 @@ describe('AddVehicleDialog Asset Type State Management Bug Fix', () => {
 
       // Should run once and stabilize, not loop infinitely
       expect(effectRunCount).toBeLessThan(maxRuns);
+      expect(assetType).toBe(initialAssetType);
     });
   });
 });

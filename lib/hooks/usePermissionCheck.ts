@@ -85,10 +85,13 @@ export function usePermissionCheck(moduleName: ModuleName, redirectOnFail = true
           if (error) throw error;
 
           // Check if user has permission for this module
-          const rolePerms = profileData?.role as any;
+          interface RoleWithPerms {
+            role_permissions?: Array<{ module_name: string; enabled: boolean }>;
+          }
+          const rolePerms = profileData?.role as RoleWithPerms | undefined;
           hasModulePermission = rolePerms?.role_permissions?.some(
-            (p: any) => p.module_name === moduleName && p.enabled
-          ) || false;
+            (p) => p.module_name === moduleName && p.enabled
+          ) ?? false;
         }
 
         setHasPermission(hasModulePermission);

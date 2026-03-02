@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Verify error_logs table exists and check permissions
  */
@@ -22,7 +21,7 @@ if (!connectionString) {
 async function verifyTable() {
   console.log('🔍 Verifying error_logs table...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -124,8 +123,8 @@ async function verifyTable() {
 
     console.log('\n✅ Verification complete!');
 
-  } catch (error: any) {
-    console.error('❌ Error:', error.message);
+  } catch (error: unknown) {
+    console.error('❌ Error:', error instanceof Error ? error.message : String(error));
     process.exit(1);
   } finally {
     await client.end();

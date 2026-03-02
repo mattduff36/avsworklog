@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Setup script for Toolbox Talk PDF Storage Bucket
  * Creates the toolbox-talk-pdfs bucket in Supabase Storage with RLS policies
@@ -51,7 +50,7 @@ async function setupToolboxTalkStorage() {
       console.log('✅ Bucket "toolbox-talk-pdfs" already exists');
     } else {
       // Create bucket
-      const { data: bucket, error: createError } = await supabase.storage.createBucket('toolbox-talk-pdfs', {
+      const { error: createError } = await supabase.storage.createBucket('toolbox-talk-pdfs', {
         public: false,
         fileSizeLimit: 10485760, // 10MB in bytes
         allowedMimeTypes: [
@@ -75,7 +74,7 @@ async function setupToolboxTalkStorage() {
     // Now create storage policies using SQL
     console.log('\n🔒 Creating Storage RLS Policies...\n');
 
-    const url = new URL(connectionString);
+    const url = new URL(connectionString!);
     const client = new Client({
       host: url.hostname,
       port: parseInt(url.port) || 5432,
@@ -163,11 +162,12 @@ async function setupToolboxTalkStorage() {
       console.log('✅ Download permissions set (assigned users + managers)');
       console.log('✅ Delete permissions set (managers/admins only)\n');
 
-    } catch (policyError: any) {
+    } catch (policyErr: unknown) {
       console.error('\n⚠️  Warning: Could not create storage policies via SQL');
-      console.error('Error:', policyError.message);
+      const policyMsg = policyErr instanceof Error ? policyErr.message : String(policyErr);
+      console.error('Error:', policyMsg);
       
-      if (policyError.message?.includes('already exists')) {
+      if (policyMsg.includes('already exists')) {
         console.log('\n✅ Policies already exist - no action needed!\n');
       } else {
         console.log('\n📝 Manual policy creation may be required.');
@@ -177,8 +177,8 @@ async function setupToolboxTalkStorage() {
       await client.end();
     }
 
-  } catch (error) {
-    console.error('❌ Error setting up Toolbox Talk PDF storage:', error);
+  } catch (err: unknown) {
+    console.error('❌ Error setting up Toolbox Talk PDF storage:', err instanceof Error ? err.message : err);
     process.exit(1);
   }
 }

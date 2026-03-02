@@ -1,6 +1,5 @@
-// @ts-nocheck
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -10,7 +9,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 describe('Workshop Task Completion with Maintenance Updates', () => {
-  let supabase: ReturnType<typeof createClient>;
+  let supabase: SupabaseClient;
   let testVehicleId: string;
   let testTaskId: string;
   let testUserId: string;
@@ -106,7 +105,7 @@ describe('Workshop Task Completion with Maintenance Updates', () => {
     expect(serviceCategory).not.toBeNull();
     expect(serviceCategory!.completion_updates).not.toBeNull();
     
-    const updates = serviceCategory!.completion_updates as any[];
+    const updates = serviceCategory!.completion_updates as Array<{ target: string; field_name: string; value_type: string; label: string }>;
     expect(Array.isArray(updates)).toBe(true);
     expect(updates.length).toBeGreaterThan(0);
     

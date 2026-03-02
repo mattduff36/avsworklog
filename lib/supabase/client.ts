@@ -3,7 +3,7 @@ import { getViewAsRoleId } from '@/lib/utils/view-as-cookie'
 
 let client: ReturnType<typeof createBrowserClient> | null = null
 
-export function createClient() {
+export function createClient(): ReturnType<typeof createBrowserClient> | null {
   if (client) {
     return client
   }
@@ -11,8 +11,7 @@ export function createClient() {
   // During build/prerendering, environment variables may not be available
   // This is only used in client components, so we can safely skip during build
   if (typeof window === 'undefined') {
-    // Return a dummy client during build/SSR
-    return null as any
+    return null
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -20,7 +19,7 @@ export function createClient() {
 
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error('Supabase environment variables are not set')
-    return null as any
+    return null
   }
 
   client = createBrowserClient(

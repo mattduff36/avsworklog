@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import pg from 'pg';
@@ -47,8 +46,13 @@ async function run() {
   `);
 
   console.log('\n=== PERMISSIONS BY ROLE ===');
-  const permsByRole: Record<string, any[]> = {};
-  for (const p of allPerms) {
+  interface PermRow {
+    role_name: string;
+    module_name: string;
+    enabled: boolean;
+  }
+  const permsByRole: Record<string, PermRow[]> = {};
+  for (const p of allPerms as PermRow[]) {
     if (!permsByRole[p.role_name]) permsByRole[p.role_name] = [];
     permsByRole[p.role_name].push(p);
   }
@@ -90,7 +94,7 @@ async function run() {
     if (role.is_manager_admin) continue; // Managers have all access
 
     const perms = permsByRole[role.name] || [];
-    const missingModules = ALL_MODULES.filter(m => !perms.find((p: any) => p.module_name === m));
+    const missingModules = ALL_MODULES.filter(m => !perms.find(p => p.module_name === m));
 
     if (missingModules.length > 0) {
       const { rows: users } = await client.query(

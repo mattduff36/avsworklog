@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -22,7 +21,7 @@ async function runMigration() {
   console.log('🔒 Running Supabase Linter Security Fixes Migration...\n');
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -108,11 +107,11 @@ async function runMigration() {
 
     console.log(`✅ VERIFICATION: ${policyCount.rows[0].count} RLS policies found for roles/audit_log/error_logs\n`);
 
-  } catch (error: any) {
+  } catch (err: unknown) {
     console.error('\n❌ Migration failed:');
-    console.error(error.message);
+    console.error((err instanceof Error ? err.message : String(err)));
     
-    if (error.message.includes('already exists')) {
+    if ((err instanceof Error ? err.message : String(err)).includes('already exists')) {
       console.log('\n💡 TIP: If policies "already exist", this migration may have been partially run.');
       console.log('   Check the Supabase SQL Editor to verify current state.');
     }

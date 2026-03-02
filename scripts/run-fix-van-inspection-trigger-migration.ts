@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Migration Runner: Fix update_vehicle_maintenance_mileage() for van_id rename
  *
@@ -31,7 +30,7 @@ async function runMigration() {
   const migrationSQL = readFileSync(resolve(process.cwd(), MIGRATION_FILE), 'utf-8');
   console.log(`✅ Loaded migration from: ${MIGRATION_FILE}\n`);
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   const client = new pg.Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,
@@ -72,7 +71,7 @@ async function runMigration() {
   }
 }
 
-runMigration().catch((error) => {
-  console.error('💥 Unexpected error:', error);
+runMigration().catch((err: unknown) => {
+  console.error('💥 Unexpected error:', err);
   process.exit(1);
 });

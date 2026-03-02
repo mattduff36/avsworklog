@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Check RLS policies on van_inspections table
  */
@@ -21,7 +20,7 @@ if (!connectionString) {
 async function checkPolicies() {
   console.log('🔍 Checking van_inspections RLS policies...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -66,10 +65,18 @@ async function checkPolicies() {
     } else {
       console.log(`\n📜 Found ${policiesResult.rows.length} RLS policies:\n`);
       
-      const grouped: Record<string, any[]> = {};
-      policiesResult.rows.forEach(policy => {
-        if (!grouped[policy.cmd]) grouped[policy.cmd] = [];
-        grouped[policy.cmd].push(policy);
+      interface PolicyRow {
+        cmd?: string;
+        policyname?: string;
+        permissive?: string;
+        qual?: string;
+        with_check?: string;
+      }
+      const grouped: Record<string, PolicyRow[]> = {};
+      const rows = policiesResult.rows as PolicyRow[];
+      rows.forEach(policy => {
+        if (!grouped[policy.cmd ?? '']) grouped[policy.cmd ?? ''] = [];
+        grouped[policy.cmd ?? ''].push(policy);
       });
 
       Object.entries(grouped).forEach(([cmd, policies]) => {
@@ -88,7 +95,7 @@ async function checkPolicies() {
     }
 
     // Check for any UPDATE policies
-    const updatePolicies = policiesResult.rows.filter(p => p.cmd === 'UPDATE');
+    const updatePolicies = (policiesResult.rows as { cmd?: string }[]).filter(p => p.cmd === 'UPDATE');
     if (updatePolicies.length === 0) {
       console.log('\n⚠️  WARNING: No UPDATE policies found!');
       console.log('Users will NOT be able to update inspections.');
@@ -96,8 +103,8 @@ async function checkPolicies() {
 
     console.log('\n✅ Check complete');
 
-  } catch (error: any) {
-    console.error('❌ Error:', error.message);
+  } catch (error: unknown) {
+    console.error('❌ Error:', error instanceof Error ? error.message : String(error));
   } finally {
     await client.end();
   }

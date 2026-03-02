@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 
@@ -10,8 +9,8 @@ async function enableLeakedPasswordProtection() {
 
   // Check what env vars we have
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  void process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  void process.env.SUPABASE_SERVICE_ROLE_KEY;
   const accessToken = process.env.SUPABASE_ACCESS_TOKEN;
 
   if (!supabaseUrl) {
@@ -109,8 +108,8 @@ async function enableLeakedPasswordProtection() {
     console.log('   • Existing users unaffected when logging in');
     console.log('   • No action required from current users\n');
 
-  } catch (error: any) {
-    console.error('\n❌ API Error:', error.message);
+  } catch (error: unknown) {
+    console.error('\n❌ API Error:', error instanceof Error ? error.message : String(error));
     console.log('\n📝 Falling back to manual instructions:\n');
     console.log('1. Go to: https://supabase.com/dashboard/project/' + projectRef);
     console.log('2. Click: Authentication → Providers → Email');

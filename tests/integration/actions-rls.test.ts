@@ -1,11 +1,10 @@
-// @ts-nocheck
 /**
  * Test: Actions RLS Policy Fix
  * Verifies that inspections with defects can create actions after RLS fix
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -20,7 +19,7 @@ if (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && 
 }
 
 describe('Actions RLS Policy Fix', () => {
-  let supabase: ReturnType<typeof createClient>;
+  let supabase: SupabaseClient;
   let testUserId: string;
   let testVehicleId: string;
   let testInspectionId: string;
@@ -127,7 +126,7 @@ describe('Actions RLS Policy Fix', () => {
     expect(submitError).toBeNull();
 
     // Step 4: Create action for the defect (THIS IS WHAT WAS FAILING BEFORE)
-    const failedItem = items!.find(item => item.status === 'attention');
+    const failedItem = items!.find((item: { status: string }) => item.status === 'attention');
     
     const { data: action, error: actionError } = await supabase
       .from('actions')
@@ -185,7 +184,7 @@ describe('Actions RLS Policy Fix', () => {
     expect(policies).toBeDefined();
     
     // Check that at least one policy definition includes 'roles' table
-    const policiesUsingRoles = policies?.filter((p: any) => 
+    const policiesUsingRoles = policies?.filter((p: { qual?: string }) =>
       p.qual && (p.qual.includes('roles') || p.qual.includes('is_manager_admin'))
     );
     

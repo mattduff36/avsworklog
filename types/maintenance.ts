@@ -337,6 +337,13 @@ export interface MaintenanceHistoryResponse {
     ves_date_of_last_v5c_issued: string | null;
     tax_due_date: string | null;
     last_dvla_sync: string | null;
+    mot_make?: string | null;
+    mot_model?: string | null;
+    mot_primary_colour?: string | null;
+    mot_year_of_manufacture?: number | null;
+    mot_fuel_type?: string | null;
+    mot_first_used_date?: string | null;
+    mot_due_date?: string | null;
   } | null;
 }
 

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -33,7 +32,7 @@ async function seedPlantAssets() {
 
   console.log(`📦 Loaded ${jsonData.length} plant assets from JSON\n`);
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,

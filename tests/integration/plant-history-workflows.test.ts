@@ -1,11 +1,10 @@
-// @ts-nocheck
 /**
  * Plant History Page Integration Tests
  * Tests all workflows for /fleet/plant/[plantId]/history page
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -32,8 +31,7 @@ if (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && 
 }
 
 describe('Plant History Page Workflows', () => {
-  let supabase: ReturnType<typeof createClient>;
-  let testUserId: string;
+  let supabase: SupabaseClient;
   let testPlantId: string;
 
   beforeAll(async () => {
@@ -46,7 +44,7 @@ describe('Plant History Page Workflows', () => {
     });
 
     if (authError) throw authError;
-    testUserId = authData.user!.id;
+    void authData.user!.id;
 
     // SAFETY: Get a test plant asset (if exists)
     const { data: plantAssets } = await supabase
@@ -156,7 +154,7 @@ describe('Plant History Page Workflows', () => {
   describe('Edit Plant Record Modal', () => {
     it('should have plant_id column in maintenance_history', async () => {
       // Verify the migration was successful
-      const { data, error } = await supabase
+      const { data: _data, error } = await supabase
         .from('maintenance_history')
         .select('plant_id')
         .limit(1);
@@ -219,7 +217,7 @@ describe('Plant History Page Workflows', () => {
       }
 
       // Attempt to retire plant (should fail due to open tasks)
-      const { error: updateError } = await supabase
+      const { error: _updateError } = await supabase
         .from('plant')
         .update({ status: 'retired' })
         .eq('id', testPlantId);
@@ -271,7 +269,7 @@ describe('Plant History Page Workflows', () => {
         return;
       }
 
-      const taskIds = tasks.map(t => t.id);
+      const taskIds = tasks.map((t: { id: string }) => t.id);
 
       const { data: attachments, error } = await supabase
         .from('workshop_task_attachments')

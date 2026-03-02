@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Fleet Config Rename Tests
  *

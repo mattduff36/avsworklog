@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -66,8 +65,8 @@ async function fixSuperAdmin() {
     console.log('✅ Super Admin flag cannot be changed by others');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     
-  } catch (error: any) {
-    console.error('❌ Error:', error.message);
+  } catch (err: unknown) {
+    console.error('❌ Error:', err instanceof Error ? err.message : err);
     process.exit(1);
   } finally {
     await client.end();

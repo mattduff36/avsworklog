@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Fix Message Sender RLS Policy
  * 
@@ -56,9 +55,9 @@ async function runMigration() {
     console.log('   - The "Deleted User" issue in notifications should be fixed');
     console.log('   - RLS security is maintained - users still can\'t see all profiles');
 
-  } catch (error) {
-    console.error('❌ Migration failed:', error);
-    throw error;
+  } catch (err: unknown) {
+    console.error('❌ Migration failed:', err instanceof Error ? err.message : err);
+    throw err;
   } finally {
     await client.end();
   }
@@ -66,8 +65,8 @@ async function runMigration() {
 
 runMigration()
   .then(() => process.exit(0))
-  .catch((error) => {
-    console.error('Fatal error:', error);
+  .catch((err: unknown) => {
+    console.error('Fatal error:', err instanceof Error ? err.message : err);
     process.exit(1);
   });
 

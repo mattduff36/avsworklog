@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Migration Script: Convert Draft Van Inspections from 26-point to 14-point Checklist
  * 
@@ -30,8 +29,8 @@ import * as path from 'path';
 // Load environment variables
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error('❌ Missing required environment variables');
@@ -244,7 +243,7 @@ async function migrateVanInspections() {
     
     // Filter to only Van inspections
     const vanInspections = inspections?.filter(insp => {
-      const vehicle = insp.vehicles as any;
+      const vehicle = insp.vehicles as unknown as { van_categories?: { name: string }; vehicle_type?: string };
       const categoryName = vehicle?.van_categories?.name || vehicle?.vehicle_type;
       return categoryName === 'Van';
     }) || [];
@@ -261,7 +260,7 @@ async function migrateVanInspections() {
     let failed = 0;
     
     for (const inspection of vanInspections) {
-      const vehicle = inspection.vehicles as any;
+      const vehicle = inspection.vehicles as unknown as { reg_number?: string };
       const regNumber = vehicle?.reg_number || 'Unknown';
       
       console.log(`\n🔄 Processing: ${regNumber} (${inspection.id.slice(0, 8)}...)`);

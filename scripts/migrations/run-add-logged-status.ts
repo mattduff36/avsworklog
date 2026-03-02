@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Client } from 'pg';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
@@ -15,7 +14,7 @@ async function runMigration() {
     process.exit(1);
   }
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
 
   const client = new Client({
     host: url.hostname,

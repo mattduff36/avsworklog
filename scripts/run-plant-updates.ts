@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -25,7 +24,7 @@ async function runMigrations() {
   console.log('🚀 Running Plant Table Updates...\n');
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -113,9 +112,9 @@ async function runMigrations() {
     console.log('   - Simplified to single "All plant" category');
     console.log(`   - Updated ${plantCount.rows[0].count} plant records\n`);
 
-  } catch (error) {
+  } catch (err: unknown) {
     console.error('\n❌ Migration failed:');
-    console.error(error);
+    console.error(err);
     process.exit(1);
   } finally {
     await client.end();

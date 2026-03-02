@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * EditPlantRecordDialog User Null Check Fix Test
  * 
@@ -14,7 +13,7 @@ describe('EditPlantRecordDialog User Null Check Fix', () => {
   describe('Bug: Unsafe user?.id in query before null check', () => {
     it('should demonstrate the bug before fix', async () => {
       const logs: string[] = [];
-      const user: { id: string } | null = null; // Simulating auth state transition
+      let user = null as { id: string } | null; // Simulating auth state transition
 
       // BEFORE: Query profile before checking user exists
       const simulateBuggyCode = async () => {
@@ -53,7 +52,7 @@ describe('EditPlantRecordDialog User Null Check Fix', () => {
 
     it('should show correct behavior after fix', async () => {
       const logs: string[] = [];
-      const user: { id: string } | null = null; // Simulating auth state transition
+      let user = null as { id: string } | null; // Simulating auth state transition
 
       // AFTER: Check user exists BEFORE querying
       const simulateFixedCode = async () => {
@@ -137,7 +136,7 @@ describe('EditPlantRecordDialog User Null Check Fix', () => {
 
   describe('Supabase query behavior', () => {
     it('should demonstrate .eq with undefined parameter issue', () => {
-      const queries: Array<{ param: any; valid: boolean }> = [];
+      const queries: Array<{ param: string | null | undefined; valid: boolean }> = [];
 
       // Test various parameter values
       const testValues = [
@@ -147,7 +146,7 @@ describe('EditPlantRecordDialog User Null Check Fix', () => {
         { id: '', expected: false }
       ];
 
-      testValues.forEach(({ id, expected }) => {
+      testValues.forEach(({ id, expected: _expected }) => {
         const isValid = id !== null && id !== undefined && id !== '';
         queries.push({ param: id, valid: isValid });
       });
@@ -272,7 +271,7 @@ describe('EditPlantRecordDialog User Null Check Fix', () => {
     it('should handle profile not found gracefully', async () => {
       const logs: string[] = [];
       const user = { id: 'user-123' };
-      const profile: { full_name?: string } | null = null; // Profile not found
+      let profile = null as { full_name?: string } | null; // Profile not found
 
       if (user) {
         logs.push('Querying profile');
@@ -345,7 +344,7 @@ describe('EditPlantRecordDialog User Null Check Fix', () => {
     });
 
     it('should handle rapid auth transitions', () => {
-      const states: Array<{ user: any; action: string }> = [];
+      const states: Array<{ user: { id: string } | null; action: string }> = [];
 
       // Simulate auth state changes
       let user: { id: string } | null;
@@ -372,7 +371,7 @@ describe('EditPlantRecordDialog User Null Check Fix', () => {
 
   describe('Error prevention', () => {
     it('should prevent TypeError from null user', () => {
-      const user = null;
+      const user = null as { id: string } | null;
 
       // BEFORE: Would throw TypeError
       const beforePattern = () => {
@@ -440,7 +439,7 @@ describe('EditPlantRecordDialog User Null Check Fix', () => {
 
     it('should demonstrate short-circuit evaluation safety', () => {
       const logs: string[] = [];
-      const user: { id: string } | null = null;
+      let user: { id: string } | null = null;
       const changedFields = ['field1'];
 
       // Short-circuit: if first condition false, second not evaluated

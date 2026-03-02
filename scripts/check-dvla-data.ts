@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Check what the DVLA VES API returns for FE24 TYO
  */

@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
@@ -131,7 +130,7 @@ export function EditPlantRecordDialog({
     reset,
     watch,
   } = useForm<EditPlantRecordFormData>({
-    resolver: zodResolver(editPlantRecordSchema),
+    resolver: zodResolver(editPlantRecordSchema) as never,
   });
 
   // Watch comment field for character count

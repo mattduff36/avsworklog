@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * AddVehicleDialog Category Filtering Consistency Fix Test
  * 

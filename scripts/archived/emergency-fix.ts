@@ -1,4 +1,3 @@
-// @ts-nocheck
 import 'dotenv/config';
 import pg from 'pg';
 import { readFileSync } from 'fs';
@@ -26,9 +25,9 @@ async function emergencyFix() {
     console.log('   - NO MORE RECURSION!');
     console.log('\n🔄 REFRESH YOUR BROWSER NOW!');
 
-  } catch (error) {
-    console.error('❌ Error:', error);
-    throw error;
+  } catch (err: unknown) {
+    console.error('❌ Error:', err instanceof Error ? err.message : err);
+    throw err;
   } finally {
     await client.end();
   }

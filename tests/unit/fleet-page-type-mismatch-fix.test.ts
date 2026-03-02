@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Fleet Page Type Mismatch Bug Fix Test
  * 
@@ -28,7 +27,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
       };
 
       // At runtime, accessing is_plant returns undefined for type without the property
-      const isPlantBefore = (vehicleMaintenanceTypeBefore as any).is_plant === true;
+      const isPlantBefore = (vehicleMaintenanceTypeBefore as { is_plant?: boolean }).is_plant === true;
       const isPlantFromPlant = plantObjectFromPlantOverview.is_plant === true;
 
       expect(isPlantBefore).toBe(false); // undefined === true → false
@@ -104,9 +103,9 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
   describe('Runtime behavior before fix', () => {
     it('should show is_plant was undefined causing routing failure', () => {
       // Simulating PlantOverview setting is_plant
-      const plantAssetObject = {
+      void {
         van_id: 'p1',
-        is_plant: true, // Set by PlantOverview
+        is_plant: true,
       };
 
       // But if type doesn't include is_plant, TypeScript won't validate it
@@ -119,7 +118,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
         // is_plant not set
       };
 
-      const isPlantUndefined = (vehicleWithoutIsPlant as any).is_plant === true;
+      const isPlantUndefined = (vehicleWithoutIsPlant as { is_plant?: boolean }).is_plant === true;
       expect(isPlantUndefined).toBe(false); // undefined === true → false
 
       // This caused all plant assets to be routed to vehicle history ❌
@@ -131,7 +130,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
 
     it('should demonstrate navigation failures for plant assets', () => {
       // Plant asset created by PlantOverview
-      const plantAsset = {
+      void {
         van_id: 'plant-uuid-123',
         is_plant: true,
       };
@@ -143,7 +142,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
         // is_plant: true, // ❌ Lost due to type mismatch
       };
 
-      const isPlantLost = (assetWithoutTypeProperty as any).is_plant === true;
+      const isPlantLost = (assetWithoutTypeProperty as { is_plant?: boolean }).is_plant === true;
       expect(isPlantLost).toBe(false); // ❌ Property lost
 
       // Routes to wrong endpoint
@@ -303,7 +302,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
     it('should handle null is_plant value', () => {
       const asset = {
         van_id: 'v1',
-        is_plant: null as any,
+        is_plant: null as unknown as boolean,
       };
 
       const isPlant = asset.is_plant === true;
@@ -313,7 +312,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
     it('should handle truthy but non-boolean is_plant values', () => {
       const asset = {
         van_id: 'p1',
-        is_plant: 'true' as any, // String instead of boolean
+        is_plant: 'true' as unknown as boolean, // String instead of boolean - testing strict equality
       };
 
       // Strict equality check
@@ -331,7 +330,7 @@ describe('Fleet Page Type Mismatch Bug Fix', () => {
       };
 
       const isPlant = asset.is_plant === true;
-      const assetId = (asset as any).vehicle?.id || asset.van_id;
+      const assetId = (asset as { vehicle?: { id?: string } }).vehicle?.id || asset.van_id;
 
       expect(isPlant).toBe(false);
       expect(assetId).toBe('v1'); // Falls back to van_id

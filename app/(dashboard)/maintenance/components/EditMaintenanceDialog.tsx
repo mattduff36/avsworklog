@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
@@ -113,7 +112,7 @@ export function EditMaintenanceDialog({
     reset,
     watch,
   } = useForm<EditMaintenanceFormData>({
-    resolver: zodResolver(editMaintenanceSchema),
+    resolver: zodResolver(editMaintenanceSchema) as never,
   });
 
   // Watch comment field for character count

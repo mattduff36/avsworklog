@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -87,20 +86,21 @@ async function runMigration() {
     console.log('   npx tsx scripts/seed/seed-faq-howto.ts');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const pgErr = err as { message: string; detail?: string; hint?: string };
     console.error('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.error('❌ MIGRATION FAILED');
     console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    console.error('Error:', error.message);
-    if (error.detail) {
-      console.error('Details:', error.detail);
+    console.error('Error:', pgErr.message);
+    if (pgErr.detail) {
+      console.error('Details:', pgErr.detail);
     }
-    if (error.hint) {
-      console.error('Hint:', error.hint);
+    if (pgErr.hint) {
+      console.error('Hint:', pgErr.hint);
     }
     
     // Check if tables already exist (migration was already applied)
-    if (error.message?.includes('already exists')) {
+    if (pgErr.message?.includes('already exists')) {
       console.log('\n✅ Tables already exist - migration was previously applied.\n');
       process.exit(0);
     }

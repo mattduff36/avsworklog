@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createClient } from '@/lib/supabase/server';
 import type { ModuleName, UserPermissions } from '@/types/roles';
 

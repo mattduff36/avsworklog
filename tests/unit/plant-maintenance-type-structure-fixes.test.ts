@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Plant Maintenance Type Structure Bug Fixes Test
  * 
@@ -83,9 +82,9 @@ describe('Plant Maintenance Type Structure Bug Fixes', () => {
       };
 
       // Simulate the fixed filter logic
-      const filterByAlertCounts = (v: any) => {
+      const filterByAlertCounts = (v: { overdue_count?: number; due_soon_count?: number; tax_status?: { status: string } | null; mot_status?: { status: string } | null; service_status?: { status: string } | null; cambelt_status?: { status: string } | null; first_aid_status?: { status: string } | null; loler_status?: { status: string } | null }) => {
         // Check alert counts first (works for both vehicles and plant)
-        if (v.overdue_count > 0 || v.due_soon_count > 0) {
+        if ((v.overdue_count ?? 0) > 0 || (v.due_soon_count ?? 0) > 0) {
           return true;
         }
         
@@ -121,8 +120,8 @@ describe('Plant Maintenance Type Structure Bug Fixes', () => {
       };
 
       // Filter should catch it via alert counts
-      const filterByAlertCounts = (v: any) => {
-        if (v.overdue_count > 0 || v.due_soon_count > 0) {
+      const filterByAlertCounts = (v: { overdue_count?: number; due_soon_count?: number }) => {
+        if ((v.overdue_count ?? 0) > 0 || (v.due_soon_count ?? 0) > 0) {
           return true;
         }
         return false;
@@ -246,8 +245,8 @@ describe('Plant Maintenance Type Structure Bug Fixes', () => {
         },
       ];
 
-      const filterByAlertCounts = (v: any) => {
-        if (v.overdue_count > 0 || v.due_soon_count > 0) {
+      const filterByAlertCounts = (v: { overdue_count?: number; due_soon_count?: number }) => {
+        if ((v.overdue_count ?? 0) > 0 || (v.due_soon_count ?? 0) > 0) {
           return true;
         }
         return false;

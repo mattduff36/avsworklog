@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -109,12 +108,13 @@ async function runMigration() {
     }
 
     console.log('\nAll migrations completed successfully!');
-  } catch (error: any) {
-    console.error('MIGRATION FAILED:', error.message);
-    if (error.detail) console.error('  Detail:', error.detail);
-    if (error.hint) console.error('  Hint:', error.hint);
+  } catch (err: unknown) {
+    const pgErr = err as { message?: string; detail?: string; hint?: string; code?: string };
+    console.error('MIGRATION FAILED:', pgErr.message);
+    if (pgErr.detail) console.error('  Detail:', pgErr.detail);
+    if (pgErr.hint) console.error('  Hint:', pgErr.hint);
 
-    if (error.message?.includes('already exists')) {
+    if (pgErr.message?.includes('already exists')) {
       console.log('Already applied - no action needed!');
       process.exit(0);
     }

@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client';
 
 import { useEffect } from 'react';
@@ -20,7 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Save, Plus, Briefcase, Wrench, Bell, Mail, Eye, Truck, HardHat } from 'lucide-react';
-import type { MaintenanceCategory, CreateCategoryRequest, UpdateCategoryRequest, CategoryResponsibility } from '@/types/maintenance';
+import type { MaintenanceCategory, CreateCategoryRequest, UpdateCategoryRequest } from '@/types/maintenance';
 import { useCreateCategory, useUpdateCategory } from '@/lib/hooks/useMaintenance';
 
 // ============================================================================
@@ -35,9 +34,7 @@ const createCategorySchema = z.object({
     .max(500, 'Description must be less than 500 characters')
     .optional()
     .nullable(),
-  type: z.enum(['date', 'mileage', 'hours'], {
-    required_error: 'Type is required'
-  }),
+  type: z.enum(['date', 'mileage', 'hours']),
   alert_threshold_days: z.coerce.number()
     .int()
     .positive('Must be positive')
@@ -129,7 +126,7 @@ export function CategoryDialog({
     setValue,
     getValues,
   } = useForm<CategoryFormData>({
-    resolver: zodResolver(mode === 'create' ? createCategorySchema : editCategorySchema),
+    resolver: zodResolver(mode === 'create' ? createCategorySchema : editCategorySchema) as never,
     defaultValues: {
       type: 'date',
       is_active: true,
@@ -187,8 +184,8 @@ export function CategoryDialog({
   // Clear opposite threshold and set sensible defaults when type changes
   useEffect(() => {
     if (selectedType === 'date') {
-      setValue('alert_threshold_miles', null);
-      setValue('alert_threshold_hours', null);
+      setValue('alert_threshold_miles', undefined);
+      setValue('alert_threshold_hours', undefined);
       if (!getValues('alert_threshold_days')) {
         setValue('alert_threshold_days', 30);
       }
@@ -196,8 +193,8 @@ export function CategoryDialog({
         setValue('period_value', 12);
       }
     } else if (selectedType === 'mileage') {
-      setValue('alert_threshold_days', null);
-      setValue('alert_threshold_hours', null);
+      setValue('alert_threshold_days', undefined);
+      setValue('alert_threshold_hours', undefined);
       if (!getValues('alert_threshold_miles')) {
         setValue('alert_threshold_miles', 1000);
       }
@@ -205,8 +202,8 @@ export function CategoryDialog({
         setValue('period_value', 10000);
       }
     } else if (selectedType === 'hours') {
-      setValue('alert_threshold_days', null);
-      setValue('alert_threshold_miles', null);
+      setValue('alert_threshold_days', undefined);
+      setValue('alert_threshold_miles', undefined);
       if (!getValues('alert_threshold_hours')) {
         setValue('alert_threshold_hours', 50);
       }
@@ -224,9 +221,9 @@ export function CategoryDialog({
         description: data.description || undefined,
         type: data.type,
         period_value: data.period_value,
-        alert_threshold_days: data.type === 'date' ? data.alert_threshold_days : undefined,
-        alert_threshold_miles: data.type === 'mileage' ? data.alert_threshold_miles : undefined,
-        alert_threshold_hours: data.type === 'hours' ? data.alert_threshold_hours : undefined,
+        alert_threshold_days: data.type === 'date' ? (data.alert_threshold_days ?? undefined) : undefined,
+        alert_threshold_miles: data.type === 'mileage' ? (data.alert_threshold_miles ?? undefined) : undefined,
+        alert_threshold_hours: data.type === 'hours' ? (data.alert_threshold_hours ?? undefined) : undefined,
         applies_to: data.applies_to,
         responsibility: data.responsibility,
         show_on_overview: data.show_on_overview,
@@ -240,9 +237,9 @@ export function CategoryDialog({
         name: data.name,
         description: data.description || undefined,
         period_value: data.period_value,
-        alert_threshold_days: data.type === 'date' ? data.alert_threshold_days : undefined,
-        alert_threshold_miles: data.type === 'mileage' ? data.alert_threshold_miles : undefined,
-        alert_threshold_hours: data.type === 'hours' ? data.alert_threshold_hours : undefined,
+        alert_threshold_days: data.type === 'date' ? (data.alert_threshold_days ?? undefined) : undefined,
+        alert_threshold_miles: data.type === 'mileage' ? (data.alert_threshold_miles ?? undefined) : undefined,
+        alert_threshold_hours: data.type === 'hours' ? (data.alert_threshold_hours ?? undefined) : undefined,
         applies_to: data.applies_to,
         is_active: data.is_active,
         responsibility: data.responsibility,

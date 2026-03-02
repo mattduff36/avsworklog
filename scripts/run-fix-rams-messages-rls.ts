@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -22,7 +21,7 @@ async function runMigration() {
   console.log('🔧 Running RAMS & Messages RLS Fixes Migration...\n');
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -97,17 +96,17 @@ async function runMigration() {
 
     console.log('\n✅ All policies successfully updated!\n');
 
-  } catch (error: any) {
+  } catch (err: unknown) {
     console.error('\n❌ Migration failed:');
-    console.error(error.message);
+    console.error((err instanceof Error ? err.message : String(err)));
     
-    if (error.message.includes('already exists')) {
+    if ((err instanceof Error ? err.message : String(err)).includes('already exists')) {
       console.log('\n💡 TIP: If policies "already exist", this migration may have been partially run.');
       console.log('   The script drops and recreates policies, so this error is unusual.');
       console.log('   Check the Supabase SQL Editor to verify current state.');
     }
     
-    if (error.message.includes('does not exist')) {
+    if ((err instanceof Error ? err.message : String(err)).includes('does not exist')) {
       console.log('\n💡 TIP: Missing table or policy.');
       console.log('   Ensure base tables (rams_assignments, message_recipients) exist.');
       console.log('   Run prerequisite migrations first.');

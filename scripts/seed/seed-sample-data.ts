@@ -1,13 +1,11 @@
-// @ts-nocheck
 import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import { resolve } from 'path';
 
-// Load .env.local
 config({ path: resolve(process.cwd(), '.env.local') });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error('❌ Missing Supabase credentials');
@@ -15,7 +13,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+const supabase = createClient(supabaseUrl!, supabaseServiceKey!, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
@@ -137,7 +135,7 @@ function randomElement<T>(array: T[]): T {
 
 async function createEmployees() {
   console.log('👥 Creating sample employees...\n');
-  const createdUsers: any[] = [];
+  const createdUsers: Array<{ id: string; email: string; full_name: string; employee_id: string; role: string }> = [];
 
   for (const employee of SAMPLE_EMPLOYEES) {
     console.log(`📝 Creating: ${employee.full_name} (${employee.employee_id})`);
@@ -186,7 +184,7 @@ async function createEmployees() {
 
 async function createVehicles() {
   console.log('\n🚗 Creating sample vehicles...\n');
-  const createdVehicles: any[] = [];
+  const createdVehicles: Array<{ id: string; reg_number: string }> = [];
 
   for (const vehicle of SAMPLE_VEHICLES) {
     console.log(`📝 Creating vehicle: ${vehicle.reg_number}`);
@@ -208,7 +206,7 @@ async function createVehicles() {
   return createdVehicles;
 }
 
-async function createTimesheets(employees: any[], managerId: string) {
+async function createTimesheets(employees: Array<{ id: string; full_name: string }>, managerId: string) {
   console.log('\n📅 Creating timesheets for 4 weeks...\n');
   
   let totalTimesheets = 0;
@@ -292,7 +290,7 @@ async function createTimesheets(employees: any[], managerId: string) {
   console.log(`\n   📊 Total: ${totalTimesheets} timesheets, ${totalEntries} entries`);
 }
 
-async function createInspections(employees: any[], vehicles: any[], managerId: string) {
+async function createInspections(employees: Array<{ id: string }>, vehicles: Array<{ id: string; reg_number: string }>, managerId: string) {
   console.log('\n🔍 Creating van inspections for 4 weeks...\n');
   
   let totalInspections = 0;
@@ -457,8 +455,8 @@ async function seedData() {
     console.log('   • Actions - Track defects from inspections');
     console.log('═══════════════════════════════════════════════════\n');
 
-  } catch (error) {
-    console.error('❌ Error seeding data:', error);
+  } catch (err: unknown) {
+    console.error('❌ Error seeding data:', err instanceof Error ? err.message : err);
     process.exit(1);
   }
 }

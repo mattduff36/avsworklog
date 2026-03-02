@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -19,7 +18,7 @@ if (!connectionString) {
 async function runMigration() {
   console.log('🔧 Fixing Workshop Attachment Question Cascade Delete...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -84,9 +83,9 @@ async function runMigration() {
     console.log('   • Associated responses will be automatically cleaned up');
     console.log('   • No more foreign key constraint violations');
 
-  } catch (error: any) {
+  } catch (err: unknown) {
     console.error('\n❌ Migration failed:');
-    console.error(error.message);
+    console.error((err instanceof Error ? err.message : String(err)));
     process.exit(1);
   } finally {
     await client.end();

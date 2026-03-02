@@ -1,11 +1,10 @@
-// @ts-nocheck
 /**
  * Workshop Tasks Module Integration Tests
  * Tests all workflows for /workshop-tasks page including task management and category management
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -23,9 +22,8 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 describe('Workshop Tasks Module Workflows', () => {
-  let supabase: ReturnType<typeof createClient>;
+  let supabase: SupabaseClient;
   let testUserId: string;
-  let testTaskId: string;
   let testVehicleId: string;
 
   beforeAll(async () => {
@@ -74,7 +72,7 @@ describe('Workshop Tasks Module Workflows', () => {
       expect(Array.isArray(tasks)).toBe(true);
 
       if (tasks && tasks.length > 0) {
-        testTaskId = tasks[0].id;
+        void tasks[0].id;
       }
     });
 
@@ -773,7 +771,7 @@ describe('Workshop Tasks Module Workflows', () => {
 
       expect(error).toBeNull();
       expect(data?.length).toBeGreaterThanOrEqual(1);
-      expect(data?.some((row) => row.id === completedTaskId)).toBe(false);
+      expect(data?.some((row: { id: string }) => row.id === completedTaskId)).toBe(false);
     });
   });
 });

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Server-side "View As" helpers for API route handlers.
  *
@@ -77,7 +76,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
       .single();
 
     if (profileError || !profile) return none;
-    const typedProfile = profile as {
+    const typedProfile = profile as unknown as {
       super_admin: boolean | null;
       role: {
         id: string;
@@ -88,13 +87,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
       } | null;
     };
 
-    const actualRole = typedProfile.role as {
-      id: string;
-      name: string;
-      display_name: string;
-      is_manager_admin: boolean;
-      is_super_admin: boolean;
-    } | null;
+    const actualRole = typedProfile.role;
 
     const isActualSuperAdmin =
       typedProfile.super_admin === true || actualRole?.is_super_admin === true;

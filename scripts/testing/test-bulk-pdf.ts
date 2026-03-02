@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Test script for bulk PDF generation
  * 
@@ -33,7 +32,7 @@ async function testBulkPDFGeneration() {
 
   // Step 1: Check for inspections in the database
   console.log('📊 Step 1: Fetching inspection count...');
-  const { data: inspections, error: countError, count } = await supabase
+  const { error: countError, count } = await supabase
     .from('van_inspections')
     .select('*', { count: 'exact', head: true })
     .neq('status', 'draft');
@@ -91,7 +90,7 @@ async function testBulkPDFGeneration() {
     .single();
 
   if (sampleInspection) {
-    const itemCount = (sampleInspection as any).inspection_items?.[0]?.count || 0;
+    const itemCount = (sampleInspection as { inspection_items?: { count?: number }[] }).inspection_items?.[0]?.count || 0;
     console.log(`   ✅ Sample inspection has ${itemCount} items\n`);
   }
 

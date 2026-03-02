@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Test Suite for Timesheet Processed Status Feature
  * Tests database constraints, status transitions, and business logic
@@ -31,11 +30,7 @@ interface TestResult {
 
 class TestRunner {
   private results: TestResult[] = [];
-  private client: pg.Client;
-
-  constructor(client: pg.Client) {
-    this.client = client;
-  }
+  constructor(client: pg.Client) { void client; }
 
   async test(name: string, testFn: () => Promise<void>): Promise<void> {
     const startTime = Date.now();
@@ -95,7 +90,7 @@ async function runTests() {
   console.log('🧪 Running Processed Status Feature Test Suite\n');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,

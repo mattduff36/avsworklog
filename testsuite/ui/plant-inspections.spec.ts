@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * E2E: Plant Inspections Full Workflow
  *

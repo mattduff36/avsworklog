@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Test: Plant Table Read-Only Verification Tests
  * Verifies plant table structure and data integrity without creating records
@@ -6,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -18,7 +17,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 describe('Plant Table Read-Only Verification', () => {
-  let supabase: ReturnType<typeof createClient>;
+  let supabase: SupabaseClient;
 
   beforeAll(() => {
     supabase = createClient(supabaseUrl!, supabaseServiceKey!);
@@ -242,7 +241,7 @@ describe('Plant Table Read-Only Verification', () => {
       expect(error).toBeNull();
       
       if (data) {
-        const plantIds = data.map(p => p.plant_id);
+        const plantIds = data.map((p: { plant_id: string }) => p.plant_id);
         const uniquePlantIds = new Set(plantIds);
         expect(plantIds.length).toBe(uniquePlantIds.size);
         console.log(`✅ All ${plantIds.length} plant_id values are unique`);
@@ -258,7 +257,7 @@ describe('Plant Table Read-Only Verification', () => {
       
       if (data) {
         const validStatuses = ['active', 'inactive', 'maintenance', 'retired'];
-        const allValid = data.every(p => validStatuses.includes(p.status));
+        const allValid = data.every((p: { status: string }) => validStatuses.includes(p.status));
         expect(allValid).toBe(true);
         console.log(`✅ All plant records have valid status values`);
       }

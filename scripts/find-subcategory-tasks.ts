@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Find Tasks Linked to Subcategory
  * 
@@ -74,7 +73,7 @@ async function findSubcategoryTasks() {
     console.log('═'.repeat(80));
 
     tasks.forEach((task, idx) => {
-      const vehicle = task.vans as any;
+      const vehicle = task.vans as { reg_number?: string; nickname?: string } | null;
       console.log(`\n[${idx + 1}] Task ID: ${task.id}`);
       console.log(`    Title: ${task.title}`);
       console.log(`    Status: ${task.status}`);

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import pg from 'pg';
@@ -71,8 +70,8 @@ async function verifyMigration() {
     console.log(`✅ Found ${result.rows.length} plant maintenance categories`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     
-  } catch (error: any) {
-    console.error('❌ Verification failed:', error.message);
+  } catch (error: unknown) {
+    console.error('❌ Verification failed:', error instanceof Error ? error.message : String(error));
     process.exit(1);
   } finally {
     await client.end();

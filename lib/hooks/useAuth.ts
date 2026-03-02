@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -8,6 +7,7 @@ import { Database } from '@/types/database';
 import { getViewAsRoleId } from '@/lib/utils/view-as-cookie';
 
 type Profile = Database['public']['Tables']['profiles']['Row'] & {
+  super_admin?: boolean | null;
   role?: {
     name: string;
     display_name: string;
@@ -33,7 +33,7 @@ const isNetworkFetchError = (err: unknown): boolean => {
     );
   }
   if (typeof err === 'object' && err !== null && 'message' in err) {
-    const msg = String((err as any).message || '');
+    const msg = String((err as { message?: unknown }).message || '');
     return (
       msg.includes('Failed to fetch') ||
       msg.includes('NetworkError') ||

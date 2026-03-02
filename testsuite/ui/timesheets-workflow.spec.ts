@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * @tags @timesheets @critical
  * Tests timesheet page navigation and listing.

@@ -1,12 +1,11 @@
-// @ts-nocheck
 import { vi } from 'vitest';
 
-export const mockSupabaseQuery = (data: any, error: any = null) => ({
+export const mockSupabaseQuery = (data: unknown, error: unknown = null) => ({
   data,
   error,
 });
 
-export const mockSupabaseAuthUser = (user: any) => ({
+export const mockSupabaseAuthUser = (user: unknown) => ({
   data: { user },
   error: null,
 });
@@ -20,7 +19,7 @@ export const mockEmailSend = () => {
 
 export const waitFor = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-export const mockFetch = (response: any, status = 200) => {
+export const mockFetch = (response: unknown, status = 200) => {
   global.fetch = vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,

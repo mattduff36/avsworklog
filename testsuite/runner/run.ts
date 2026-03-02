@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * run.ts — Testsuite CLI runner
  *
@@ -10,7 +9,6 @@
  *   npx tsx testsuite/runner/run.ts --grep "auth"
  */
 import { execSync } from 'child_process';
-import { resolve } from 'path';
 
 const args = process.argv.slice(2);
 const ROOT = process.cwd();

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * @tags @errors
  * NEW TEST — not in original Testsprite set.

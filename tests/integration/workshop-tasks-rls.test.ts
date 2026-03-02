@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Test: Workshop Tasks RLS Policies
  * Verifies that workshop users can access workshop tasks and categories
@@ -6,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -21,7 +20,7 @@ if (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && 
 }
 
 describe('Workshop Tasks RLS Policies', () => {
-  let supabase: ReturnType<typeof createClient>;
+  let supabase: SupabaseClient;
   let testManagerId: string;
   let testEmployeeId: string;
   let testVehicleId: string;
@@ -268,7 +267,7 @@ describe('Workshop Tasks RLS Policies', () => {
       expect(data).toBeDefined();
       
       // All returned actions should be workshop-related
-      data!.forEach(action => {
+      data!.forEach((action: { action_type: string }) => {
         expect(['inspection_defect', 'workshop_vehicle_task']).toContain(action.action_type);
       });
     });
@@ -356,7 +355,7 @@ describe('Workshop Tasks RLS Policies', () => {
       const { error } = await supabase
         .from('actions')
         .insert({
-          action_type: 'invalid_type' as any, // Invalid type
+          action_type: 'invalid_type' as unknown as 'inspection_defect', // Invalid type - testing DB constraint
           title: 'Invalid Action Type',
           description: 'Should fail',
           priority: 'medium',

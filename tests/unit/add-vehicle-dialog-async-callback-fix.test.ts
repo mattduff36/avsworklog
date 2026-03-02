@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * AddVehicleDialog Async Callback Type Mismatch Fix Test
  * 
@@ -18,8 +17,6 @@ describe('AddVehicleDialog Async Callback Type Mismatch Fix', () => {
         await new Promise(resolve => setTimeout(resolve, 100));
       };
 
-      // Type error: Promise<void> is not assignable to void ❌
-      // @ts-expect-error - This should fail type checking
       const typedCallback: OnSuccessBefore = plantTableCallback;
 
       expect(typedCallback).toBeDefined(); // ❌ Type error exists
@@ -210,10 +207,10 @@ describe('AddVehicleDialog Async Callback Type Mismatch Fix', () => {
 
   describe('Edge cases', () => {
     it('should handle undefined callback', async () => {
-      const onSuccess: (() => void | Promise<void>) | undefined = undefined;
+      const onSuccess = undefined as (() => void | Promise<void>) | undefined;
 
       // Should not throw
-      await onSuccess?.();
+      if (onSuccess) await onSuccess();
       expect(true).toBe(true); // ✅ No error
     });
 

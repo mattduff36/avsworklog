@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Setup script for RAMS Storage Bucket
  * Creates the rams-documents bucket in Supabase Storage with RLS policies
@@ -52,7 +51,7 @@ async function setupRAMSStorage() {
       console.log('✅ Bucket "rams-documents" already exists');
     } else {
       // Create bucket
-      const { data: bucket, error: createError } = await supabase.storage.createBucket('rams-documents', {
+      const { error: createError } = await supabase.storage.createBucket('rams-documents', {
         public: false,
         fileSizeLimit: 10485760, // 10MB in bytes
         allowedMimeTypes: [
@@ -76,7 +75,7 @@ async function setupRAMSStorage() {
     // Now create storage policies using SQL
     console.log('\n🔒 Creating Storage RLS Policies...\n');
 
-    const url = new URL(connectionString);
+    const url = new URL(connectionString!);
     const client = new Client({
       host: url.hostname,
       port: parseInt(url.port) || 5432,
@@ -164,11 +163,12 @@ async function setupRAMSStorage() {
       console.log('✅ Download permissions set (assigned users + managers)');
       console.log('✅ Delete permissions set (managers/admins only)\n');
 
-    } catch (policyError: any) {
+    } catch (policyErr: unknown) {
       console.error('\n⚠️  Warning: Could not create storage policies via SQL');
-      console.error('Error:', policyError.message);
+      const policyMsg = policyErr instanceof Error ? policyErr.message : String(policyErr);
+      console.error('Error:', policyMsg);
       
-      if (policyError.message?.includes('already exists')) {
+      if (policyMsg.includes('already exists')) {
         console.log('\n✅ Policies already exist - no action needed!\n');
       } else {
         console.log('\n📝 Manual policy creation may be required.');
@@ -178,8 +178,8 @@ async function setupRAMSStorage() {
       await client.end();
     }
 
-  } catch (error) {
-    console.error('❌ Error setting up RAMS storage:', error);
+  } catch (err: unknown) {
+    console.error('❌ Error setting up RAMS storage:', err instanceof Error ? err.message : err);
     process.exit(1);
   }
 }

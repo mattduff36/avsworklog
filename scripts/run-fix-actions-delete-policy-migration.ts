@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import pg from 'pg';
@@ -101,9 +100,10 @@ async function runMigration() {
     }
 
     console.log('✅ Actions DELETE policy fix complete! Workshop tasks can now be deleted.\n');
-  } catch (error: any) {
+  } catch (err: unknown) {
     // Check if the error is because the policy already exists
-    if (error?.message?.includes('already exists')) {
+    const pgErr = err as { message?: string; detail?: string; hint?: string; code?: string };
+    if (pgErr.message?.includes('already exists')) {
       console.log('✅ Policy already exists - migration was previously applied successfully.\n');
       
       // Verify the policy is correct
@@ -128,7 +128,7 @@ async function runMigration() {
     }
 
     console.error('\n❌ Migration failed:');
-    console.error(error);
+    console.error(err);
     process.exit(1);
   } finally {
     await client.end();

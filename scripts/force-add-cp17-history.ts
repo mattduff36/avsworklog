@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Force add history entry for CP17 TKO - Andy Hill's service update
  */
@@ -97,8 +96,8 @@ async function forceAddHistory() {
     console.log('✨ History entry added! Client should now see it.');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  } catch (error: any) {
-    console.error('❌ Error:', error.message);
+  } catch (error: unknown) {
+    console.error('❌ Error:', error instanceof Error ? error.message : String(error));
   } finally {
     await client.end();
   }

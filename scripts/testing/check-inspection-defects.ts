@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Client } from 'pg';
 import * as dotenv from 'dotenv';
 

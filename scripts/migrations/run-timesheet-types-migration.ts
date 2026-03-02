@@ -1,5 +1,4 @@
 #!/usr/bin/env tsx
-// @ts-nocheck
 /**
  * Run Timesheet Types Migration
  * 
@@ -48,7 +47,7 @@ async function runMigration() {
   console.log(`  (${migrationSQL.split('\n').length} lines)\n`);
 
   // Parse connection string and rebuild with explicit SSL config (Supabase requires SSL)
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
   
   const client = new Client({
     host: url.hostname,
@@ -69,7 +68,7 @@ async function runMigration() {
 
     // Execute migration
     console.log('⏳ Executing migration SQL...');
-    const result = await client.query(migrationSQL);
+    await client.query(migrationSQL);
     console.log('✓ Migration executed\n');
 
     // Verify columns were added

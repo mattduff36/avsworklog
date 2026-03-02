@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// @ts-nocheck
 /**
  * Clear duplicate "Failed to fetch" network errors from error logs
  * These are expected errors when dev server is stopped
@@ -66,17 +65,16 @@ async function clearNetworkErrors() {
     console.log(`✅ Successfully cleared ${errors.length} network error log(s)!`);
     console.log('🎉 Error log is now clean!\n');
 
-  } catch (error) {
-    console.error('❌ Unexpected error:', error);
+  } catch (err: unknown) {
+    console.error('❌ Unexpected error:', err instanceof Error ? err.message : err);
     process.exit(1);
   }
 }
 
-// Run the cleanup
 clearNetworkErrors().then(() => {
   process.exit(0);
-}).catch((error) => {
-  console.error('❌ Fatal error:', error);
+}).catch((err: unknown) => {
+  console.error('❌ Fatal error:', err instanceof Error ? err.message : err);
   process.exit(1);
 });
 

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Shared selectors / locator helpers for the testsuite.
  * Prefer getByRole / getByLabel; fall back to data-testid only when needed.

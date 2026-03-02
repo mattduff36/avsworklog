@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import pg from 'pg';
@@ -55,8 +54,8 @@ async function checkAdminEmails() {
       console.log('  ⚠️  No super admin set');
     }
     
-  } catch (error: any) {
-    console.error('Error:', error.message);
+  } catch (error: unknown) {
+    console.error('Error:', error instanceof Error ? error.message : String(error));
   } finally {
     await client.end();
   }

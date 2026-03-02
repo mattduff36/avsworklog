@@ -1,4 +1,3 @@
-// @ts-nocheck
 // tests/setup.ts
 import { config } from 'dotenv';
 import { resolve } from 'path';

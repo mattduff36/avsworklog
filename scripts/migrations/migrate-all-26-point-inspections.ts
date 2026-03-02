@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Migrate ALL 26-point inspections to 14-point van checklist
  * 
@@ -21,8 +20,8 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 // Handle self-signed certificate in development
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error('❌ Missing required environment variables');
@@ -72,15 +71,6 @@ interface Inspection {
   };
 }
 
-interface InspectionItem {
-  id: string;
-  inspection_id: string;
-  item_number: number;
-  day_of_week: number;
-  status: string;
-  comments: string | null;
-}
-
 async function main() {
   console.log('🔍 Finding inspections with 26-point checklists (182 items)...\n');
 
@@ -116,7 +106,7 @@ async function main() {
 
       // Check if this is a 26-point checklist (182 items)
       if (items && items.length === 182) {
-        const regNumber = (inspection as any).vans?.reg_number || 'Unknown';
+        const regNumber = (inspection as unknown as { vans?: { reg_number: string } }).vans?.reg_number || 'Unknown';
 
         // Exclude test vehicles
         if (regNumber === 'TE57 VAN' || regNumber === 'TE57 HGV') {
@@ -125,7 +115,7 @@ async function main() {
         }
 
         // Check for defects
-        const defects = items.filter((item: any) => 
+        const defects = items.filter((item: { status: string }) => 
           item.status === 'defect' || item.status === 'attention'
         );
 
@@ -157,7 +147,7 @@ async function main() {
     let errorCount = 0;
 
     for (const inspection of inspectionsToMigrate) {
-      const regNumber = (inspection as any).vans?.reg_number || 'Unknown';
+      const regNumber = (inspection as unknown as { vans?: { reg_number: string } }).vans?.reg_number || 'Unknown';
       console.log(`\n📝 Migrating: ${regNumber} (${inspection.status}) - ${inspection.id}`);
 
       try {
@@ -172,7 +162,7 @@ async function main() {
         // For draft inspections, determine which days have data
         const completedDays = new Set<number>();
         if (inspection.status === 'draft' && oldItems) {
-          oldItems.forEach((item: any) => {
+          oldItems.forEach((item: { status: string; day_of_week: number }) => {
             // If any item on a day has been filled, consider that day complete
             if (item.status && item.status !== 'na') {
               completedDays.add(item.day_of_week);
@@ -191,7 +181,7 @@ async function main() {
         console.log(`   ✓ Deleted 182 old items`);
 
         // Create new 14-point van items for all 7 days
-        const newItems: any[] = [];
+        const newItems: { inspection_id: string; item_number: number; item_description: string; day_of_week: number; status: string; comments: null }[] = [];
         
         for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
           VAN_CHECKLIST_ITEMS.forEach((itemDescription, index) => {
@@ -250,7 +240,7 @@ async function main() {
         .eq('inspection_id', inspection.id);
 
       if (items && items.length === 182) {
-        const regNumber = (inspection as any).vans?.reg_number || 'Unknown';
+        const regNumber = (inspection as unknown as { vans?: { reg_number: string } }).vans?.reg_number || 'Unknown';
         if (regNumber !== 'TE57 VAN' && regNumber !== 'TE57 HGV') {
           remainingCount++;
           console.log(`   ⚠️  Still has 182 items: ${regNumber} (${inspection.id})`);

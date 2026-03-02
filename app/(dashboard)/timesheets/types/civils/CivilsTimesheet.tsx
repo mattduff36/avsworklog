@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -12,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User, WifiOff } from 'lucide-react';
+import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User } from 'lucide-react';
 import Link from 'next/link';
 // Removed: getWeekEnding, formatDateISO - no longer needed (week comes from props)
 import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
@@ -271,7 +270,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       
       // Convert to expected format
       const formattedEmployees: Employee[] = allEmployees
-        .map((emp) => ({
+        .map((emp: { id: string; full_name: string | null; employee_id: string | null }) => ({
           id: emp.id,
           full_name: emp.full_name || 'Unnamed User',
           employee_id: emp.employee_id || null,
@@ -396,7 +395,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       
       // Check if user has access and timesheet is draft or rejected
       // Calculate permissions dynamically from current profile state (not stale closure values)
-      const currentIsSuperAdmin = profile?.is_super_admin || profile?.role?.is_super_admin || false;
+      const currentIsSuperAdmin = (profile as { super_admin?: boolean; role?: { is_super_admin?: boolean } } | null)?.super_admin || profile?.role?.is_super_admin || false;
       const currentIsManager = profile?.role?.is_manager_admin || false;
       const currentIsAdmin = profile?.role?.name === 'admin';
       const currentHasElevatedPermissions = currentIsSuperAdmin || currentIsManager || currentIsAdmin;
@@ -434,7 +433,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       
       // Create full week array with all 7 days, preserving all fields
       const fullWeek = Array.from({ length: 7 }, (_, i) => {
-        const existingEntry = entriesData?.find(e => e.day_of_week === i + 1);
+        const existingEntry = entriesData?.find((e: { day_of_week: number }) => e.day_of_week === i + 1);
         if (existingEntry) {
           // Infer didNotWorkReason from remarks for better UX
           let inferredReason: 'Holiday' | 'Sickness' | 'Off Shift' | 'Other' | null = null;

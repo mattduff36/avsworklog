@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * CategoryDialog period_value Validation Tests
  *
@@ -16,7 +15,7 @@ import { z } from 'zod';
 const categorySchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
   description: z.string().max(500).optional().nullable(),
-  type: z.enum(['date', 'mileage', 'hours'], { required_error: 'Type is required' }),
+  type: z.enum(['date', 'mileage', 'hours'] as const),
   period_value: z.coerce.number()
     .int('Period must be a whole number')
     .positive('Period must be a positive number'),

@@ -1,11 +1,9 @@
-// @ts-nocheck
 /**
  * Fix remaining light theme class issues across the codebase
  * Replaces problematic dark: variant patterns with explicit dark colors
  */
 
 import { readFileSync, writeFileSync } from 'fs';
-import { resolve } from 'path';
 import { globSync } from 'glob';
 
 // Patterns to fix (find → replace)

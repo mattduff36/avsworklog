@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Comprehensive Dark Mode Contrast Audit
  * 

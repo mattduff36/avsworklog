@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * @tags @rams @messages @permissions
  * NEW TEST — not in original Testsprite set.

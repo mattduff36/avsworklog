@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * @tags @critical
  * Tests critical pages at desktop, tablet, and mobile viewports.

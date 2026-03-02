@@ -1,5 +1,6 @@
-// @ts-nocheck
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { NextRequest } from 'next/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { POST } from '@/app/api/timesheets/[id]/reject/route';
 import { createMockTimesheet, createMockManager, createMockProfile } from '../../utils/factories';
 import { mockSupabaseAuthUser, mockSupabaseQuery, mockFetch, resetAllMocks } from '../../utils/test-helpers';
@@ -17,14 +18,14 @@ describe('POST /api/timesheets/[id]/reject', () => {
         auth: {
           getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: new Error('Not authenticated') }),
         },
-      } as any);
+      } as unknown as SupabaseClient);
 
       const request = new Request('http://localhost/api/timesheets/test-id/reject', {
         method: 'POST',
         body: JSON.stringify({ comments: 'Test comment' }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ id: 'test-id' }) });
+      const response = await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
       const data = await response.json();
 
       expect(response.status).toBe(401);
@@ -49,14 +50,14 @@ describe('POST /api/timesheets/[id]/reject', () => {
             }),
           }),
         }),
-      } as any);
+      } as unknown as SupabaseClient);
 
       const request = new Request('http://localhost/api/timesheets/test-id/reject', {
         method: 'POST',
         body: JSON.stringify({ comments: 'Test comment' }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ id: 'test-id' }) });
+      const response = await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
       const data = await response.json();
 
       expect(response.status).toBe(403);
@@ -117,14 +118,14 @@ describe('POST /api/timesheets/[id]/reject', () => {
         }),
       };
 
-      vi.mocked(createClient).mockResolvedValueOnce(mockClient as any);
+      vi.mocked(createClient).mockResolvedValueOnce(mockClient as unknown as SupabaseClient);
 
       const request = new Request('http://localhost/api/timesheets/test-id/reject', {
         method: 'POST',
         body: JSON.stringify({ comments: 'Please fix the hours' }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ id: 'test-id' }) });
+      const response = await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
       
       expect(response.status).toBe(200);
     });
@@ -139,14 +140,14 @@ describe('POST /api/timesheets/[id]/reject', () => {
         auth: {
           getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: manager.id })),
         },
-      } as any);
+      } as unknown as SupabaseClient);
 
       const request = new Request('http://localhost/api/timesheets/test-id/reject', {
         method: 'POST',
         body: JSON.stringify({}),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ id: 'test-id' }) });
+      const response = await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
       const data = await response.json();
 
       expect(response.status).toBe(400);
@@ -161,14 +162,14 @@ describe('POST /api/timesheets/[id]/reject', () => {
         auth: {
           getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: manager.id })),
         },
-      } as any);
+      } as unknown as SupabaseClient);
 
       const request = new Request('http://localhost/api/timesheets/test-id/reject', {
         method: 'POST',
         body: JSON.stringify({ comments: '' }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ id: 'test-id' }) });
+      const response = await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
       const data = await response.json();
 
       expect(response.status).toBe(400);
@@ -183,14 +184,14 @@ describe('POST /api/timesheets/[id]/reject', () => {
         auth: {
           getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: manager.id })),
         },
-      } as any);
+      } as unknown as SupabaseClient);
 
       const request = new Request('http://localhost/api/timesheets/test-id/reject', {
         method: 'POST',
         body: JSON.stringify({ comments: '   ' }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ id: 'test-id' }) });
+      const response = await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
       const data = await response.json();
 
       expect(response.status).toBe(400);
@@ -236,14 +237,14 @@ describe('POST /api/timesheets/[id]/reject', () => {
         }),
       };
 
-      vi.mocked(createClient).mockResolvedValueOnce(mockClient as any);
+      vi.mocked(createClient).mockResolvedValueOnce(mockClient as unknown as SupabaseClient);
 
       const request = new Request('http://localhost/api/timesheets/test-id/reject', {
         method: 'POST',
         body: JSON.stringify({ comments: 'Test' }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ id: 'test-id' }) });
+      const response = await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
       const data = await response.json();
 
       expect(response.status).toBe(400);
@@ -307,14 +308,14 @@ describe('POST /api/timesheets/[id]/reject', () => {
         }),
       };
 
-      vi.mocked(createClient).mockResolvedValueOnce(mockClient as any);
+      vi.mocked(createClient).mockResolvedValueOnce(mockClient as unknown as SupabaseClient);
 
       const request = new Request('http://localhost/api/timesheets/test-id/reject', {
         method: 'POST',
         body: JSON.stringify({ comments: 'Please fix the hours' }),
       });
 
-      await POST(request, { params: Promise.resolve({ id: 'test-id' }) });
+      await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
 
       expect(updateMock).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -388,14 +389,14 @@ describe('POST /api/timesheets/[id]/reject', () => {
         }),
       };
 
-      vi.mocked(createClient).mockResolvedValueOnce(mockClient as any);
+      vi.mocked(createClient).mockResolvedValueOnce(mockClient as unknown as SupabaseClient);
 
       const request = new Request('http://localhost/api/timesheets/test-id/reject', {
         method: 'POST',
         body: JSON.stringify({ comments: 'Please fix the hours' }),
       });
 
-      await POST(request, { params: Promise.resolve({ id: 'test-id' }) });
+      await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
 
       expect(messageInsertMock).toHaveBeenCalledWith(
         expect.objectContaining({

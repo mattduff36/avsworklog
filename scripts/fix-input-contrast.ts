@@ -1,5 +1,4 @@
 #!/usr/bin/env tsx
-// @ts-nocheck
 /**
  * Auto-fix script for input/textarea/select contrast issues
  * Uses ts-morph for safe AST-based transformations
@@ -221,8 +220,8 @@ function main() {
         allFixes = allFixes.concat(fixes);
         console.log(`✅ Fixed ${fixes.length} issue(s) in ${file}`);
       }
-    } catch (error) {
-      console.error(`❌ Error processing ${file}:`, error);
+    } catch (err: unknown) {
+      console.error(`❌ Error processing ${file}:`, err);
     }
   }
 

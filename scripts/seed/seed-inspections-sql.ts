@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import { resolve } from 'path';
@@ -148,8 +147,8 @@ async function seedInspections() {
     console.log('\n✅ All inspection data seeded successfully!');
     console.log('🎉 You can now test the daily inspection form!');
 
-  } catch (error) {
-    console.error('\n❌ Seeding failed:', error);
+  } catch (err: unknown) {
+    console.error('\n❌ Seeding failed:', err instanceof Error ? err.message : err);
     process.exit(1);
   }
 }

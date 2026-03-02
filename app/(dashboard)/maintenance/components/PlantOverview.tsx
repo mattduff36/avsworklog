@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -6,10 +5,10 @@ import { createClient } from '@/lib/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { MaintenanceOverview } from './MaintenanceOverview';
 import { getDateBasedStatus, calculateAlertCounts } from '@/lib/utils/maintenanceCalculations';
-import type { MaintenanceItemStatus } from '@/types/maintenance';
+import type { MaintenanceItemStatus, VehicleMaintenanceWithStatus } from '@/types/maintenance';
 
 interface PlantOverviewProps {
-  onVehicleClick?: (vehicle: any) => void;
+  onVehicleClick?: (vehicle: VehicleMaintenanceWithStatus) => void;
 }
 
 type PlantAsset = {
@@ -76,8 +75,8 @@ export function PlantOverview({ onVehicleClick }: PlantOverviewProps) {
       if (maintenanceError) throw maintenanceError;
 
       // Combine plant data with maintenance data and calculate status
-      const combined: PlantMaintenanceWithStatus[] = (plantData || []).map((plant) => {
-        const maintenance = maintenanceData?.find((m) => m.plant_id === plant.id);
+      const combined: PlantMaintenanceWithStatus[] = (plantData || []).map((plant: { id: string; plant_id: string; loler_due_date: string | null; current_hours: number | null }) => {
+        const maintenance = maintenanceData?.find((m: { plant_id: string | null }) => m.plant_id === plant.id);
         
         // Calculate LOLER status (30 day threshold)
         const loler_status = getDateBasedStatus(plant.loler_due_date, 30);
@@ -136,7 +135,7 @@ export function PlantOverview({ onVehicleClick }: PlantOverviewProps) {
 
   return (
     <MaintenanceOverview
-      vehicles={plantAssets}
+      vehicles={plantAssets as unknown as VehicleMaintenanceWithStatus[]}
       summary={summary}
       onVehicleClick={onVehicleClick}
     />

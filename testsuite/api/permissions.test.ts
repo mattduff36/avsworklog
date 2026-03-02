@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * @tags @permissions
  * Converted from: TC018_Role_based_permission_checks_on_API_endpoints.py

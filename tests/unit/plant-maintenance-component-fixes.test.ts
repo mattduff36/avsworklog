@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Plant Maintenance Component Bug Fixes Test
  * 
@@ -26,7 +25,7 @@ describe('Plant Maintenance Component Bug Fixes', () => {
     });
 
     it('should handle vehicles with only id field', () => {
-      const vehicles = [
+      const vehicles: Array<{ id?: string; van_id?: string; is_plant?: boolean }> = [
         { id: 'plant-789', is_plant: true },
       ];
 
@@ -151,7 +150,7 @@ describe('Plant Maintenance Component Bug Fixes', () => {
       // Simulates the behavior where changing supabase client triggers refetch
       let fetchCount = 0;
       
-      const simulateEffect = (deps: unknown[]) => {
+      const simulateEffect = (_deps: unknown[]) => {
         // Effect runs when dependencies change
         fetchCount++;
       };

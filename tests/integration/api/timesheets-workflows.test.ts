@@ -1,6 +1,5 @@
-// @ts-nocheck
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createMockTimesheet, createMockTimesheetEntry, createMockManager } from '../../utils/factories';
+import { createMockTimesheet, createMockTimesheetEntry } from '../../utils/factories';
 import { resetAllMocks } from '../../utils/test-helpers';
 
 describe('Timesheets Complete Workflows', () => {

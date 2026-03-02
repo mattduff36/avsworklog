@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Migration Script: Add DELETE policy for inspection_items
  * 
@@ -45,7 +44,7 @@ async function runMigration() {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
   // Parse connection string and rebuild with explicit SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
   
   const client = new Client({
     host: url.hostname,
@@ -73,7 +72,7 @@ async function runMigration() {
     console.log('🔄 Executing SQL migration...\n');
 
     // Execute the migration
-    const result = await client.query(migrationSQL);
+    await client.query(migrationSQL);
 
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('✅ MIGRATION COMPLETED SUCCESSFULLY!');
@@ -108,20 +107,21 @@ async function runMigration() {
     console.log('   3. Reopening the draft and adding more data (e.g., Tuesday)');
     console.log('   4. Saving again → Should now work without errors! ✨\n');
 
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const pgErr = err as { message: string; detail?: string; hint?: string };
     console.error('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.error('❌ MIGRATION FAILED');
     console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    console.error('Error:', error.message);
-    if (error.detail) {
-      console.error('Details:', error.detail);
+    console.error('Error:', pgErr.message);
+    if (pgErr.detail) {
+      console.error('Details:', pgErr.detail);
     }
-    if (error.hint) {
-      console.error('Hint:', error.hint);
+    if (pgErr.hint) {
+      console.error('Hint:', pgErr.hint);
     }
     
     // Check if policy already exists
-    if (error.message.includes('already exists')) {
+    if (pgErr.message.includes('already exists')) {
       console.log('\n✅ Good news! The DELETE policy already exists.');
       console.log('   The fix may have already been applied.\n');
       console.log('🧪 Try testing the draft inspection re-save functionality.');

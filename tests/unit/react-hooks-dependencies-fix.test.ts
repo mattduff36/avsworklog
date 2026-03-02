@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * React Hooks Dependencies and Supabase Client Creation Fixes Test
  * 
@@ -117,11 +116,9 @@ describe('React Hooks Dependencies and Supabase Client Fixes', () => {
         renderCount++;
         const supabase = `client-${renderCount}`; // New client every render
         
-        // useCallback depends on supabase
-        const fetchData = () => supabase; // New function reference
-        
-        // useEffect depends on fetchData
-        // Effect runs because fetchData changed
+        // useCallback depends on supabase → new function reference each render
+        // useEffect depends on fetchData → runs because fetchData changed
+        void (() => supabase);
         apiCalls.push(renderCount); // API call made
         
         // API call triggers state update → re-render → loop continues
@@ -147,8 +144,8 @@ describe('React Hooks Dependencies and Supabase Client Fixes', () => {
       const simulateRenderCycle = () => {
         renderCount++;
         
-        // useCallback depends on stable supabase
-        const fetchData = () => supabase; // Same function reference
+        // useCallback depends on stable supabase → same function reference
+        void (() => supabase);
         
         // useEffect depends on fetchData
         // Effect only runs on mount because fetchData is stable

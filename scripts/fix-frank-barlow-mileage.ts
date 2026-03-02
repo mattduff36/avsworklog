@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Fix Frank Barlow's vehicle mileage issue
  * This script:
@@ -62,7 +61,7 @@ async function fixMileage() {
       }
     }
 
-    const vehicle = vehicles[0];
+    const vehicle = vehicles![0];
     console.log('✅ Found vehicle:');
     console.log(`   ID: ${vehicle.id}`);
     console.log(`   Registration: ${vehicle.reg_number}`);
@@ -96,7 +95,7 @@ async function fixMileage() {
 
     console.log(`\nFound ${inspections?.length || 0} inspections:`);
     
-    const suspicious: any[] = [];
+    const suspicious: typeof inspections = [];
     inspections?.forEach((insp, i) => {
       const date = new Date(insp.created_at).toLocaleDateString();
       console.log(`   ${i + 1}. ${date} - ${insp.current_mileage} miles - ${insp.status}`);
@@ -200,8 +199,8 @@ async function fixMileage() {
     console.log('against production data. It uses hardcoded test values (50000 miles)');
     console.log('that corrupt real vehicle data.');
     
-  } catch (error) {
-    console.error('\n❌ Fix failed:', error);
+  } catch (err: unknown) {
+    console.error('\n❌ Fix failed:', err);
     process.exit(1);
   }
 }

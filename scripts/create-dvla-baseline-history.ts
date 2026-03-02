@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Create Baseline Maintenance History for DVLA-Synced Data
  * 
@@ -39,7 +38,7 @@ interface VehicleWithDvlaData {
 async function createBaselineHistory() {
   console.log('🔄 Creating Baseline Maintenance History for DVLA-Synced Data...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,
@@ -159,8 +158,8 @@ async function createBaselineHistory() {
 
               console.log(`✅ [${vehicle.reg_number}] tax_due_date: → ${vehicle.tax_due_date} (synced ${syncDateStr})`);
               insertedCount++;
-            } catch (err: any) {
-              console.error(`❌ [${vehicle.reg_number}] Failed to insert tax_due_date baseline: ${err.message}`);
+            } catch (err: unknown) {
+              console.error(`❌ [${vehicle.reg_number}] Failed to insert tax_due_date baseline: ${err instanceof Error ? err.message : String(err)}`);
               errorCount++;
             }
           }
@@ -240,8 +239,8 @@ async function createBaselineHistory() {
 
               console.log(`✅ [${vehicle.reg_number}] mot_due_date: → ${vehicle.mot_due_date} (synced ${syncDateStr})`);
               insertedCount++;
-            } catch (err: any) {
-              console.error(`❌ [${vehicle.reg_number}] Failed to insert mot_due_date baseline: ${err.message}`);
+            } catch (err: unknown) {
+              console.error(`❌ [${vehicle.reg_number}] Failed to insert mot_due_date baseline: ${err instanceof Error ? err.message : String(err)}`);
               errorCount++;
             }
           }
@@ -260,8 +259,8 @@ async function createBaselineHistory() {
     console.log('\n📝 Note: These are "baseline" entries showing the current state.');
     console.log('   Future DVLA syncs will show old → new value changes.\n');
 
-  } catch (error: any) {
-    console.error('\n❌ Baseline creation failed:', error.message);
+  } catch (error: unknown) {
+    console.error('\n❌ Baseline creation failed:', error instanceof Error ? error.message : String(error));
     console.error('\nFull error:', error);
     process.exit(1);
   } finally {

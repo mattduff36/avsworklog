@@ -1,11 +1,10 @@
-// @ts-nocheck
 /**
  * Plant Maintenance API Unit Tests
  * Tests the plant maintenance history API endpoint
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -26,8 +25,7 @@ if (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && 
 }
 
 describe('Plant Maintenance API Tests', () => {
-  let supabase: ReturnType<typeof createClient>;
-  let testUserId: string;
+  let supabase: SupabaseClient;
 
   beforeAll(async () => {
     supabase = createClient(supabaseUrl, supabaseKey);
@@ -38,7 +36,7 @@ describe('Plant Maintenance API Tests', () => {
     });
 
     if (authError) throw authError;
-    testUserId = authData.user!.id;
+    void authData.user!.id;
   });
 
   afterAll(async () => {
@@ -47,7 +45,7 @@ describe('Plant Maintenance API Tests', () => {
 
   describe('Database Schema Validation', () => {
     it('should have plant_id column in maintenance_history table', async () => {
-      const { data, error } = await supabase
+      const { data: _data, error } = await supabase
         .from('maintenance_history')
         .select('plant_id, van_id')
         .limit(1);
@@ -75,7 +73,7 @@ describe('Plant Maintenance API Tests', () => {
     });
 
     it('should have current_hours field in vehicle_maintenance table', async () => {
-      const { data, error } = await supabase
+      const { data: _data2, error } = await supabase
         .from('vehicle_maintenance')
         .select('current_hours, last_service_hours, next_service_hours')
         .limit(1);
@@ -84,7 +82,7 @@ describe('Plant Maintenance API Tests', () => {
     });
 
     it('should have plant_id foreign key in vehicle_maintenance table', async () => {
-      const { data, error } = await supabase
+      const { data: _data3, error } = await supabase
         .from('vehicle_maintenance')
         .select('plant_id')
         .not('plant_id', 'is', null)

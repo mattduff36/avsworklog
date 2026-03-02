@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Script: Check RLS Auth Function Optimization
  * Purpose: Verify that all RLS policies use optimized auth function calls

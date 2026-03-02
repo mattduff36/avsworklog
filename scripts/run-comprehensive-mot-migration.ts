@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import pg from 'pg';
@@ -16,7 +15,7 @@ async function runMigration() {
   }
 
   // Parse connection string
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new pg.Client({
     host: url.hostname,
@@ -79,9 +78,9 @@ async function runMigration() {
     
     console.log('\n✅ Ready to sync MOT data from GOV.UK MOT History API!');
 
-  } catch (error: any) {
-    console.error('❌ Migration failed:', error.message);
-    console.error('\nFull error:', error);
+  } catch (err: unknown) {
+    console.error('❌ Migration failed:', (err instanceof Error ? err.message : String(err)));
+    console.error('\nFull err:', err);
     process.exit(1);
   } finally {
     await client.end();

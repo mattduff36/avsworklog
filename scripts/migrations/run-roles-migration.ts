@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -29,7 +28,7 @@ async function runRolesMigration() {
   console.log('   5. Preserve all existing data and access patterns\n');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,
@@ -142,19 +141,20 @@ async function runRolesMigration() {
     console.log('✨ Ready for Phase 2: Backend APIs & Permission System');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const pgErr = err as { message: string; detail?: string; hint?: string };
     console.error('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.error('❌ MIGRATION FAILED');
     console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    console.error('Error:', error.message);
-    if (error.detail) {
-      console.error('Details:', error.detail);
+    console.error('Error:', pgErr.message);
+    if (pgErr.detail) {
+      console.error('Details:', pgErr.detail);
     }
-    if (error.hint) {
-      console.error('Hint:', error.hint);
+    if (pgErr.hint) {
+      console.error('Hint:', pgErr.hint);
     }
 
-    if (error.message?.includes('already exists')) {
+    if (pgErr.message?.includes('already exists')) {
       console.log('\n✅ Tables already exist - migration may have run previously');
       console.log('To re-run migration, you may need to manually drop tables first.\n');
       process.exit(0);

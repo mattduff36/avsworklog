@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Page, BrowserContext } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';

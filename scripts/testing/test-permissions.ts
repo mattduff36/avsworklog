@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { createClient } from '@supabase/supabase-js';
@@ -43,8 +42,10 @@ async function testPermissions() {
       console.log(`  ${role.display_name} (${role.name})`);
       console.log(`    Manager/Admin: ${role.is_manager_admin ? 'Yes' : 'No'}`);
       
-      const enabledPerms = (role.role_permissions as any[])?.filter(p => p.enabled) || [];
-      const disabledPerms = (role.role_permissions as any[])?.filter(p => !p.enabled) || [];
+      interface RolePerm { enabled?: boolean; module_name?: string }
+      const rolePerms = (role.role_permissions as RolePerm[] | null) ?? [];
+      const enabledPerms = rolePerms.filter(p => p.enabled);
+      const disabledPerms = rolePerms.filter(p => !p.enabled);
       
       if (enabledPerms.length > 0) {
         console.log('    ✅ Enabled Modules:', enabledPerms.map(p => p.module_name).join(', '));
@@ -76,9 +77,14 @@ async function testPermissions() {
       const disabled = perms?.filter(p => !p.enabled) || [];
 
       console.log(`  📦 ${module.toUpperCase()}`);
-      console.log(`     ✅ Accessible by: ${enabled.map((p: any) => p.roles?.display_name || 'Unknown').join(', ')}`);
+      type PermWithRole = { enabled?: boolean; roles?: { display_name?: string } | { display_name?: string }[] };
+      const getDisplayName = (p: PermWithRole) => {
+        const r = Array.isArray(p.roles) ? p.roles[0] : p.roles;
+        return r?.display_name || 'Unknown';
+      };
+      console.log(`     ✅ Accessible by: ${enabled.map(getDisplayName).join(', ')}`);
       if (disabled.length > 0) {
-        console.log(`     ❌ Blocked for: ${disabled.map((p: any) => p.roles?.display_name || 'Unknown').join(', ')}`);
+        console.log(`     ❌ Blocked for: ${disabled.map(getDisplayName).join(', ')}`);
       }
       console.log('');
     }
@@ -95,10 +101,12 @@ async function testPermissions() {
 
     if (absError) throw absError;
 
-    absencePerms?.forEach((perm: any) => {
+    type AbsencePerm = { enabled?: boolean; roles?: { display_name?: string; is_manager_admin?: boolean } | { display_name?: string; is_manager_admin?: boolean }[] };
+    absencePerms?.forEach((perm: AbsencePerm) => {
+      const r = Array.isArray(perm.roles) ? perm.roles[0] : perm.roles;
       const status = perm.enabled ? '✅ HAS ACCESS' : '❌ NO ACCESS';
-      const roleType = perm.roles?.is_manager_admin ? '[ADMIN/MANAGER]' : '[EMPLOYEE]';
-      console.log(`  ${status} ${roleType} ${perm.roles?.display_name}`);
+      const roleType = r?.is_manager_admin ? '[ADMIN/MANAGER]' : '[EMPLOYEE]';
+      console.log(`  ${status} ${roleType} ${r?.display_name}`);
     });
 
     console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -111,8 +119,8 @@ async function testPermissions() {
     console.log('   - Direct URL access should redirect if permission denied');
     console.log('   - Absence module should be DISABLED for employee roles\n');
 
-  } catch (error: any) {
-    console.error('❌ Test failed:', error.message);
+  } catch (error: unknown) {
+    console.error('❌ Test failed:', error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }

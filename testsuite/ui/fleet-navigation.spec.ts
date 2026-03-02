@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * @tags @fleet @critical
  * Tests fleet page tabs, data loading, and legacy redirects.

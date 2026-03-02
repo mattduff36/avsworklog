@@ -1,5 +1,4 @@
 #!/usr/bin/env tsx
-// @ts-nocheck
 /**
  * Sync Notification Preferences Migration Runner
  * 
@@ -27,7 +26,7 @@ if (!POSTGRES_URL) {
 
 async function runMigration() {
   // Parse the connection string
-  const url = new URL(POSTGRES_URL);
+  const url = new URL(POSTGRES_URL!);
   
   const client = new pg.Client({
     host: url.hostname,
@@ -81,11 +80,11 @@ async function runMigration() {
       console.log('\n⚠️  Warning: Some records still have null values');
     }
 
-  } catch (error) {
-    console.error('❌ Error running migration:', error);
-    if (error instanceof Error) {
-      console.error('Error details:', error.message);
-      console.error('Stack trace:', error.stack);
+  } catch (err: unknown) {
+    console.error('❌ Error running migration:', err);
+    if (err instanceof Error) {
+      console.error('Error details:', (err instanceof Error ? err.message : String(err)));
+      console.error('Stack trace:', (err instanceof Error ? err.stack : undefined));
     }
     process.exit(1);
   } finally {
@@ -95,7 +94,7 @@ async function runMigration() {
 }
 
 // Run the migration
-runMigration().catch(error => {
-  console.error('❌ Unhandled error:', error);
+runMigration().catch((err: unknown) => {
+  console.error('❌ Unhandled error:', err);
   process.exit(1);
 });

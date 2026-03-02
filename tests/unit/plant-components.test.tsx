@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Plant Components Unit Tests
  * Tests the plant-specific React components

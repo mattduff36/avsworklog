@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Verify Inspection RLS Policies
  * 
@@ -26,7 +25,7 @@ if (!connectionString) {
 async function verifyPolicies() {
   console.log('🔍 Verifying RLS Policies for inspection_items...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -107,8 +106,8 @@ async function verifyPolicies() {
     console.log('  2. Close app completely');
     console.log('  3. Reopen and login again\n');
 
-  } catch (error: any) {
-    console.error('❌ Error:', error.message);
+  } catch (error: unknown) {
+    console.error('❌ Error:', error instanceof Error ? error.message : String(error));
     process.exit(1);
   } finally {
     await client.end();

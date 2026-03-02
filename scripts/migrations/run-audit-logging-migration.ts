@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Enable Audit Logging Migration
  * Sets up comprehensive audit logging triggers for all key tables
@@ -33,7 +32,7 @@ async function runAuditLoggingMigration() {
   console.log('🔍 Running Audit Logging Migration...\n');
 
   // Parse connection string and rebuild with explicit SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
   
   const client = new Client({
     host: url.hostname,

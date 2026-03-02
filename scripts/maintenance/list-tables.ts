@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import pg from 'pg';
@@ -6,7 +5,11 @@ import pg from 'pg';
 const { Client } = pg;
 config({ path: resolve(process.cwd(), '.env.local') });
 
-const connectionString = process.env.POSTGRES_URL_NON_POOLING!;
+const connectionString = process.env.POSTGRES_URL_NON_POOLING;
+if (!connectionString) {
+  console.error('❌ POSTGRES_URL_NON_POOLING not set');
+  process.exit(1);
+}
 const url = new URL(connectionString);
 
 const client = new Client({

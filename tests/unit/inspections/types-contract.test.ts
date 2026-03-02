@@ -1,6 +1,5 @@
-// @ts-nocheck
 import { describe, it, expect } from 'vitest';
-import type { VanInspection, PlantInspection, InspectionItem, InspectionPhoto, VehicleInspection } from '@/types/inspection';
+import type { VanInspection, PlantInspection, InspectionItem, VehicleInspection } from '@/types/inspection';
 
 describe('Inspection Types Contract', () => {
   describe('VanInspection', () => {

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -25,7 +24,7 @@ const migrations = [
 ];
 
 async function runMigrations() {
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,
@@ -51,12 +50,12 @@ async function runMigrations() {
       try {
         await client.query(sql);
         console.log(`✅ Migration successful: ${migrationPath}`);
-      } catch (error: any) {
+      } catch (err: unknown) {
         // Check if error is due to already existing objects (idempotent migrations)
-        if (error.message.includes('already exists') || error.message.includes('duplicate key')) {
+        if ((err instanceof Error ? err.message : String(err)).includes('already exists') || (err instanceof Error ? err.message : String(err)).includes('duplicate key')) {
           console.log(`⚠️  Migration already applied or objects exist: ${migrationPath}`);
         } else {
-          throw error;
+          throw err;
         }
       }
     }
@@ -115,9 +114,9 @@ async function runMigrations() {
       console.log(`   - ${row.name}`);
     });
 
-  } catch (error) {
+  } catch (err: unknown) {
     console.error('\n❌ Migration failed:');
-    console.error(error);
+    console.error(err);
     process.exit(1);
   } finally {
     await client.end();

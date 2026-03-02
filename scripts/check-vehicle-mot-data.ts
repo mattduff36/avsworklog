@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Check what MOT data is currently stored in the database for FE24 TYO
  */

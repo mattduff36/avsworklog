@@ -1,11 +1,10 @@
-// @ts-nocheck
 /**
  * Plant Table Async Callback Timing Fix Test
  * 
  * Tests for bug fix related to async callback synchronization
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 describe('Plant Table Async Callback Timing Fix', () => {
   describe('Bug: Callback fires before async fetch completes', () => {
@@ -67,7 +66,7 @@ describe('Plant Table Async Callback Timing Fix', () => {
 
   describe('Async state update synchronization', () => {
     it('should ensure state updates before callback fires', async () => {
-      const plantAssets: any[] = [];
+      const plantAssets: Array<{ id: string; plant_id?: string }> = [];
       let callbackReceivedCorrectCount = false;
 
       const fetchPlantData = async () => {
@@ -91,7 +90,7 @@ describe('Plant Table Async Callback Timing Fix', () => {
     });
 
     it('should show stale data issue without await', async () => {
-      const plantAssets: any[] = [];
+      const plantAssets: Array<{ id: string; plant_id?: string }> = [];
       let callbackReceivedStaleCount = false;
 
       const fetchPlantData = async () => {
@@ -245,7 +244,7 @@ describe('Plant Table Async Callback Timing Fix', () => {
         { id: 'p2', plant_id: 'P002' },
       ];
 
-      let localPlantAssets: any[] = [];
+      let localPlantAssets: Array<{ id: string; plant_id?: string }> = [];
       let parentRefreshCalled = false;
       let parentReceivedCorrectCount = false;
 
@@ -286,7 +285,7 @@ describe('Plant Table Async Callback Timing Fix', () => {
       // No callback provided (optional)
       const onSuccess = async () => {
         await fetchPlantData();
-        undefined?.(); // Safe - won't throw
+        (undefined as (() => void) | undefined)?.(); // Safe - won't throw
       };
 
       await onSuccess();

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 
@@ -63,7 +62,7 @@ function scanFile(filePath: string) {
         }
       });
     });
-  } catch (error) {
+  } catch (_err: unknown) {
     // Ignore errors
   }
 }
@@ -87,7 +86,7 @@ function scanDirectory(dir: string) {
         }
       }
     }
-  } catch (error) {
+  } catch (_err: unknown) {
     // Ignore errors
   }
 }

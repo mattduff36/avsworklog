@@ -78,6 +78,10 @@ function toIsoDate(value: Date): string {
   return value.toISOString().split('T')[0];
 }
 
+type VehicleMaintenanceUpsert = Database['public']['Tables']['vehicle_maintenance']['Insert'] & Record<string, unknown>;
+type DvlaSyncLogInsert = Database['public']['Tables']['dvla_sync_log']['Insert'];
+type MaintenanceHistoryInsert = Database['public']['Tables']['maintenance_history']['Insert'];
+
 export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<FleetSyncSummary> {
   const {
     supabase,
@@ -89,7 +93,6 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
     logPrefix = '',
     delayMsBetweenRequests = 0,
   } = options;
-  const db = supabase as unknown as { from: (table: string) => any };
 
   const results: FleetSyncResultRow[] = [];
   let successCount = 0;
@@ -118,14 +121,16 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
         }
       }
 
-      const { data: existingRecord } = await db
+      const { data } = await supabase
         .from('vehicle_maintenance')
         .select('tax_due_date, mot_due_date')
         .eq(fkField, target.assetId)
         .single();
 
-      const oldTaxDate = existingRecord?.tax_due_date || null;
-      const oldMotDate = existingRecord?.mot_due_date || null;
+      type MaintenanceTaxMot = { tax_due_date?: string | null; mot_due_date?: string | null };
+      const existingRecord = data as MaintenanceTaxMot | null;
+      const oldTaxDate = existingRecord?.tax_due_date ?? null;
+      const oldMotDate = existingRecord?.mot_due_date ?? null;
 
       const updates: Record<string, unknown> = {
         dvla_sync_status: 'success',
@@ -230,20 +235,24 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
         }
       }
 
-      const { error: upsertError } = await db
-        .from('vehicle_maintenance')
-        .upsert(
-          {
-            [fkField]: target.assetId,
-            ...updates,
-            updated_at: syncTime,
-          },
-          { onConflict: fkField }
-        );
+      const vmTable = supabase.from('vehicle_maintenance') as unknown as {
+        upsert: (values: VehicleMaintenanceUpsert, opts?: { onConflict?: string }) => Promise<{ error: { message: string } | null }>;
+      };
+      const { error: upsertError } = await vmTable.upsert(
+        {
+          [fkField]: target.assetId,
+          ...updates,
+          updated_at: syncTime,
+        } as VehicleMaintenanceUpsert,
+        { onConflict: fkField }
+      );
       if (upsertError) throw upsertError;
 
-      const persistedMotDate = updates.mot_due_date || null;
-      await db.from('dvla_sync_log').insert({
+      const persistedMotDate = updates.mot_due_date ?? null;
+      const dslTable = supabase.from('dvla_sync_log') as unknown as {
+        insert: (values: DvlaSyncLogInsert) => Promise<{ error: { message: string } | null }>;
+      };
+      await dslTable.insert({
         [fkField]: target.assetId,
         registration_number: target.registrationNumber,
         sync_status: 'success',
@@ -256,15 +265,15 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
         api_response_time_ms: dvlaResponseTime,
         raw_response: {
           dvla: dvlaData.rawData,
-          mot: motExpiryData?.rawData || null,
+          mot: motExpiryData?.rawData ?? null,
         },
         triggered_by: triggeredBy,
         trigger_type: triggerType,
-      });
+      } as DvlaSyncLogInsert);
 
       let updaterName = triggerType === 'automatic' ? 'Scheduled DVLA Sync' : 'DVLA API Sync';
       if (triggeredBy) {
-        const { data: userProfile } = await db
+        const { data: userProfile } = await supabase
           .from('profiles')
           .select('full_name')
           .eq('id', triggeredBy)
@@ -309,9 +318,10 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
       }
 
       if (historyEntries.length > 0) {
-        const { error: historyError } = await db
-          .from('maintenance_history')
-          .insert(historyEntries);
+        const mhTable = supabase.from('maintenance_history') as unknown as {
+          insert: (values: MaintenanceHistoryInsert[]) => Promise<{ error: { message: string } | null }>;
+        };
+        const { error: historyError } = await mhTable.insert(historyEntries as MaintenanceHistoryInsert[]);
         if (historyError) {
           console.error(`${logPrefix}[SYNC] Failed to write maintenance history`, historyError);
         }
@@ -332,26 +342,32 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
       const errorMessage = getErrorMessage(error);
       console.error(`${logPrefix}[SYNC] Failed ${target.registrationNumber}:`, errorMessage);
 
-      await db.from('vehicle_maintenance').upsert(
+      const vmTableErr = supabase.from('vehicle_maintenance') as unknown as {
+        upsert: (values: VehicleMaintenanceUpsert, opts?: { onConflict?: string }) => Promise<{ error: { message: string } | null }>;
+      };
+      await vmTableErr.upsert(
         {
           [fkField]: target.assetId,
           dvla_sync_status: 'error',
           dvla_sync_error: errorMessage,
           last_dvla_sync: syncTime,
           updated_at: syncTime,
-        },
+        } as VehicleMaintenanceUpsert,
         { onConflict: fkField }
       );
 
-      await db.from('dvla_sync_log').insert({
+      const dslTableErr = supabase.from('dvla_sync_log') as unknown as {
+        insert: (values: DvlaSyncLogInsert) => Promise<{ error: { message: string } | null }>;
+      };
+      await dslTableErr.insert({
         [fkField]: target.assetId,
         registration_number: target.registrationNumber,
         sync_status: 'error',
         error_message: errorMessage,
-        api_provider: process.env.DVLA_API_PROVIDER,
+        api_provider: process.env.DVLA_API_PROVIDER ?? undefined,
         triggered_by: triggeredBy,
         trigger_type: triggerType,
-      });
+      } as DvlaSyncLogInsert);
 
       results.push({
         success: false,

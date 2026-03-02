@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -24,7 +23,7 @@ async function runMigration() {
   console.log('to evaluate auth functions once per query instead of per row.\n');
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -99,11 +98,11 @@ async function runMigration() {
     console.log('   2. Monitor query performance improvements');
     console.log('   3. Check Supabase linter dashboard (should clear all warnings)\n');
 
-  } catch (error: any) {
+  } catch (err: unknown) {
     console.error('\n❌ Migration failed:');
-    console.error(error.message);
+    console.error((err instanceof Error ? err.message : String(err)));
     
-    if (error.message.includes('already exists')) {
+    if ((err instanceof Error ? err.message : String(err)).includes('already exists')) {
       console.log('\n💡 TIP: If policies "already exist", the migration may have been partially run.');
       console.log('   Check policy definitions manually or restore from backup.');
     }

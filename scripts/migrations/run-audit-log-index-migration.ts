@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -21,7 +20,7 @@ if (!connectionString) {
 async function runMigration() {
   console.log('Running audit_log index migration...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
 
   const client = new Client({
     host: url.hostname,

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -22,7 +21,7 @@ async function runMigration() {
   console.log('📨 Running Add Notification Type Migration...\n');
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -65,11 +64,11 @@ async function runMigration() {
 
     console.log('\n✅ Migration complete\n');
 
-  } catch (error: any) {
+  } catch (err: unknown) {
     console.error('\n❌ Migration failed:');
-    console.error(error.message);
+    console.error((err instanceof Error ? err.message : String(err)));
     
-    if (error.message.includes('already exists')) {
+    if ((err instanceof Error ? err.message : String(err)).includes('already exists')) {
       console.log('\n💡 TIP: Constraint may already exist. Check if migration was previously run.');
     }
     

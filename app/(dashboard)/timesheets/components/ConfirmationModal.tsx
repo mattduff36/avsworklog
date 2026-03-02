@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client';
 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -26,6 +25,8 @@ interface TimesheetEntry {
   did_not_work: boolean;
   daily_total: number | null;
   remarks: string;
+  night_shift?: boolean;
+  bank_holiday?: boolean;
 }
 
 interface ConfirmationModalProps {
@@ -138,7 +139,7 @@ export function ConfirmationModal({
 
           {/* Warnings (Q9 requirements) */}
           {warnings.length > 0 && (
-            <Alert variant="warning" className="bg-amber-500/10 border-amber-500/50">
+            <Alert className="bg-amber-500/10 border-amber-500/50">
               <AlertTriangle className="h-4 w-4 text-amber-500" />
               <AlertDescription className="text-amber-600 dark:text-amber-400">
                 <p className="font-semibold mb-2">Please Review:</p>

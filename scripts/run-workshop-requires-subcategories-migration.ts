@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Migration Runner: Workshop requires_subcategories toggle
  *
@@ -26,7 +25,7 @@ async function runMigration() {
     throw new Error('POSTGRES_URL_NON_POOLING or POSTGRES_URL not found in environment');
   }
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
 
   const client = new Client({
     host: url.hostname,
@@ -98,8 +97,8 @@ async function runMigration() {
     }
 
     console.log('🎉 Migration complete!');
-  } catch (error) {
-    console.error('❌ Migration failed:', error);
+  } catch (err: unknown) {
+    console.error('❌ Migration failed:', err);
     process.exit(1);
   } finally {
     await client.end();

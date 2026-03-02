@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -60,9 +59,9 @@ async function runMigration() {
       }
     }
 
-  } catch (error) {
-    console.error('❌ Migration failed:', error);
-    throw error;
+  } catch (err: unknown) {
+    console.error('❌ Migration failed:', err instanceof Error ? err.message : err);
+    throw err;
   } finally {
     await client.end();
     console.log('\n🔌 Database connection closed');

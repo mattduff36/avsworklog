@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Check CP17 TKO maintenance history
  */

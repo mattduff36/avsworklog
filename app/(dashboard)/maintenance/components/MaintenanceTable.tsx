@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client';
 
 import { useState } from 'react';
@@ -525,7 +524,7 @@ export function MaintenanceTable({
                         key={vehicle.van_id ?? vehicle.id ?? vehicle.vehicle?.id}
                         onClick={() => {
                           const assetType = vehicle.vehicle?.asset_type;
-                          const vehicleId = (vehicle as any).hgv_id ?? vehicle.van_id ?? vehicle.id;
+                          const vehicleId = vehicle.hgv_id ?? vehicle.van_id ?? vehicle.id;
                           if (vehicleId) {
                             if (assetType === 'hgv') {
                               router.push(`/fleet/hgvs/${vehicleId}/history?fromTab=hgvs`);
@@ -633,7 +632,7 @@ export function MaintenanceTable({
           {vehicles.length > 0 && (
             <div className="md:hidden space-y-3">
               {sortedVehicles.map((vehicle) => {
-                const cardVehicleId = (vehicle as any).hgv_id ?? vehicle.van_id ?? vehicle.id;
+                const cardVehicleId = vehicle.hgv_id ?? vehicle.van_id ?? vehicle.id;
                 const isExpanded = expandedCardId === cardVehicleId;
                 
                 return (
@@ -737,7 +736,7 @@ export function MaintenanceTable({
                             {columnVisibility.service_due && (
                               <div className="flex items-center justify-between">
                                 <span className="text-sm text-muted-foreground">Next Service:</span>
-                                <Badge className={`font-medium ${getStatusColorClass(vehicle.next_service_status?.status || 'not_set')}`}>
+                                <Badge className={`font-medium ${getStatusColorClass(vehicle.service_status?.status || 'not_set')}`}>
                                   {formatMileage(vehicle.next_service_mileage)}
                                 </Badge>
                               </div>
@@ -792,7 +791,7 @@ export function MaintenanceTable({
                               onClick={(e) => {
                                 e.stopPropagation();
                                 const assetType = vehicle.vehicle?.asset_type;
-                                const vehicleId = (vehicle as any).hgv_id ?? vehicle.van_id ?? vehicle.id;
+                                const vehicleId = vehicle.hgv_id ?? vehicle.van_id ?? vehicle.id;
                                 if (vehicleId) {
                                   if (assetType === 'hgv') {
                                     router.push(`/fleet/hgvs/${vehicleId}/history?fromTab=hgvs`);
@@ -1140,8 +1139,8 @@ export function MaintenanceTable({
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         vehicle={selectedVehicle ? {
-          id: selectedVehicle.van_id ?? '',
-          reg_number: selectedVehicle.vehicle?.reg_number || 'Unknown',
+          id: selectedVehicle.van_id ?? selectedVehicle.hgv_id ?? selectedVehicle.vehicle?.id ?? '',
+          reg_number: selectedVehicle.vehicle?.reg_number ?? selectedVehicle.vehicle?.plant_id ?? 'Unknown',
           category: selectedVehicle.vehicle?.category_id ? { name: 'Vehicle' } : null
         } : null}
         onSuccess={() => {

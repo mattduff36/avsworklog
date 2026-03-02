@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import pg from 'pg';
@@ -18,7 +17,7 @@ if (!connectionString) {
 async function testTrigger() {
   console.log('🔍 Testing trigger function...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -56,7 +55,7 @@ async function testTrigger() {
     `);
 
     console.log('📋 Available roles:');
-    roles.forEach((role: any) => {
+    roles.forEach((role: { id?: string; name?: string; display_name?: string }) => {
       console.log(`   - ${role.name} (${role.display_name}): ${role.id}`);
     });
     console.log('\n');
@@ -108,8 +107,8 @@ async function testTrigger() {
       console.log(`   ${constraints[0].definition}`);
     }
 
-  } catch (error: any) {
-    console.error('❌ Error:', error.message);
+  } catch (error: unknown) {
+    console.error('❌ Error:', error instanceof Error ? error.message : String(error));
     process.exit(1);
   } finally {
     await client.end();

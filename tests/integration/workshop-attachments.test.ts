@@ -1,11 +1,10 @@
-// @ts-nocheck
 /**
  * Workshop Task Attachments Integration Tests
  * Tests attachment templates, questions, task attachments, and responses
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -21,7 +20,7 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 describe('Workshop Task Attachments', () => {
-  let supabase: ReturnType<typeof createClient>;
+  let supabase: SupabaseClient;
   let testUserId: string;
   let testTemplateId: string;
   let testQuestionId: string;
@@ -83,7 +82,7 @@ describe('Workshop Task Attachments', () => {
       expect(Array.isArray(templates)).toBe(true);
       
       // Should have the seeded templates
-      const templateNames = templates?.map(t => t.name) || [];
+      const templateNames = templates?.map((t: { name: string }) => t.name) || [];
       expect(templateNames).toContain('Vehicle Van Full Service');
       expect(templateNames).toContain('Vehicle Van Basic Service');
 
@@ -131,7 +130,7 @@ describe('Workshop Task Attachments', () => {
       expect(questions).toBeDefined();
 
       // All questions in service templates should be checkboxes
-      const allCheckbox = questions?.every(q => q.question_type === 'checkbox');
+      const allCheckbox = questions?.every((q: { question_type: string }) => q.question_type === 'checkbox');
       expect(allCheckbox).toBe(true);
     });
   });
@@ -343,7 +342,7 @@ describe('Workshop Task Attachments', () => {
       expect(questions).toBeDefined();
       
       // Verify some key checklist items are present
-      const questionTexts = questions?.map(q => q.question_text) || [];
+      const questionTexts = questions?.map((q: { question_text: string }) => q.question_text) || [];
       expect(questionTexts).toContain('Engine oil replaced');
       expect(questionTexts).toContain('Oil filter replaced');
       expect(questionTexts).toContain('Road test completed');
@@ -377,7 +376,7 @@ describe('Workshop Task Attachments', () => {
       expect(questions).toBeDefined();
       
       // Verify some key checklist items are present
-      const questionTexts = questions?.map(q => q.question_text) || [];
+      const questionTexts = questions?.map((q: { question_text: string }) => q.question_text) || [];
       expect(questionTexts).toContain('Engine oil replaced');
       expect(questionTexts).toContain('Oil filter replaced');
       expect(questionTexts).toContain('Road test completed');

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
-import { Timesheet, TimesheetEntry, DAY_NAMES } from '@/types/timesheet';
+import { Timesheet, DAY_NAMES } from '@/types/timesheet';
 import { formatDate } from '@/lib/utils/date';
 
 // Create styles for the PDF matching the scanned form
@@ -194,9 +194,9 @@ export function TimesheetPDF({ timesheet, employeeName }: TimesheetPDFProps) {
     ? timesheet.id.slice(-5).toUpperCase() 
     : '00000';
 
-  // Helper to format remarks with job number
-  const formatRemarks = (entry: any) => {
-    const jobNumber = (entry as TimesheetEntry & { job_number?: string }).job_number;
+  // Helper to format remarks with job number (entry may be full TimesheetEntry or partial from allDays)
+  const formatRemarks = (entry: { job_number?: string | null; remarks?: string | null }) => {
+    const jobNumber = entry.job_number;
     const remarks = entry.remarks;
     
     if (jobNumber && remarks) {

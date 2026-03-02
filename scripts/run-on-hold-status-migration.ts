@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Migration Runner: Add 'on_hold' status to actions table
  * 
@@ -24,7 +23,7 @@ async function runMigration() {
     throw new Error('POSTGRES_URL_NON_POOLING or POSTGRES_URL not found in environment');
   }
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -48,16 +47,16 @@ async function runMigration() {
     console.log('   ✅ SQL migration complete\n');
 
     console.log('\n✅ Migration completed successfully!\n');
-  } catch (error) {
-    console.error('❌ Migration failed:', error);
-    throw error;
+  } catch (err: unknown) {
+    console.error('❌ Migration failed:', err);
+    throw err;
   } finally {
     await client.end();
   }
 }
 
 // Run migration
-runMigration().catch((error) => {
-  console.error('Fatal error:', error);
+runMigration().catch((err: unknown) => {
+  console.error('Fatal error:', err);
   process.exit(1);
 });

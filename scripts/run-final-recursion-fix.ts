@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -22,7 +21,7 @@ async function runMigration() {
   console.log('🔐 Running Final Profiles Update Recursion Fix Migration...\n');
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -56,9 +55,9 @@ async function runMigration() {
     console.log('   - Created single correct UPDATE policy without recursion');
     console.log('\n🎯 Result: Password change (/change-password) will now work for all users!');
     
-  } catch (error) {
+  } catch (err: unknown) {
     console.error('\n❌ Migration failed:');
-    console.error(error);
+    console.error(err);
     process.exit(1);
   } finally {
     await client.end();
@@ -67,7 +66,7 @@ async function runMigration() {
 }
 
 // Run the migration
-runMigration().catch((error) => {
-  console.error('Fatal error:', error);
+runMigration().catch((err: unknown) => {
+  console.error('Fatal error:', err);
   process.exit(1);
 });

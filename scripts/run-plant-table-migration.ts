@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -22,7 +21,7 @@ async function runMigration() {
   console.log('🚀 Running Plant Table Split Migration...\n');
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -90,9 +89,9 @@ async function runMigration() {
 
     console.log('🎉 Plant table split is complete!\n');
 
-  } catch (error) {
+  } catch (err: unknown) {
     console.error('\n❌ Migration failed:');
-    console.error(error);
+    console.error(err);
     process.exit(1);
   } finally {
     await client.end();

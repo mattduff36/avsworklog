@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Simplify vehicle_inspections status workflow to 'draft' and 'submitted'
  * - Migrates legacy statuses to 'submitted'
@@ -25,7 +24,7 @@ if (!connectionString) {
 async function runMigration() {
   console.log('🚗 Simplifying vehicle_inspections status workflow...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
 
   const client = new Client({
     host: url.hostname,
@@ -67,8 +66,8 @@ async function runMigration() {
     }
 
     console.log('\n🎉 Done! Inspections now use only draft/submitted and submitted records are locked.');
-  } catch (error: any) {
-    console.error('❌ FAILED:', error.message);
+  } catch (err: unknown) {
+    console.error('❌ FAILED:', err instanceof Error ? err.message : err);
     process.exit(1);
   } finally {
     await client.end();

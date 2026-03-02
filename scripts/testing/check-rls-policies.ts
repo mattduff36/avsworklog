@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Check RLS policies for van_inspections
 import { config } from 'dotenv';
 import { resolve } from 'path';

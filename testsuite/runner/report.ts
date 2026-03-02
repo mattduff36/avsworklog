@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * report.ts
  *
@@ -41,7 +40,14 @@ function parsePlaywrightResults(): FailureEntry[] {
   }
 }
 
-function walkPlaywrightSuite(suite: any, failures: FailureEntry[]): void {
+interface PlaywrightSuite {
+  title?: string;
+  file?: string;
+  specs?: Array<{ title: string; file?: string; tests?: Array<{ results?: Array<{ status?: string; error?: { message?: string; snippet?: string } }> }> }>;
+  suites?: PlaywrightSuite[];
+}
+
+function walkPlaywrightSuite(suite: PlaywrightSuite, failures: FailureEntry[]): void {
   for (const spec of suite.specs || []) {
     for (const test of spec.tests || []) {
       for (const result of test.results || []) {

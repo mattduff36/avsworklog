@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Applies-to Enum Tests
  *
@@ -9,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 
 describe('applies_to enum values — van replaces vehicle', () => {
   it('van is a valid applies_to value in maintenance types', async () => {
-    const { MaintenanceCategory } = await import('@/types/maintenance') as any;
+    const { MaintenanceCategory: _MaintenanceCategory } = (await import('@/types/maintenance')) as unknown as { MaintenanceCategory: unknown };
     // Type-level check: the module should export types with 'van' | 'plant'
     // We verify at runtime that the import succeeds (no TS compile errors)
     expect(true).toBe(true);

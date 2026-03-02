@@ -109,9 +109,10 @@ export class MotHistoryService {
       logger.info('MOT History API access token obtained successfully');
       return data.access_token;
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Failed to obtain MOT History API access token', error);
-      throw new Error(`MOT API authentication failed: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`MOT API authentication failed: ${message}`);
     }
   }
 
@@ -151,7 +152,7 @@ export class MotHistoryService {
       logger.info(`MOT history retrieved successfully for ${cleanReg}`);
       return data;
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(`Failed to fetch MOT history for ${cleanReg}`, error);
       throw error;
     }

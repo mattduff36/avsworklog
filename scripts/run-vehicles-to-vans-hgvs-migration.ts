@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -128,10 +127,11 @@ async function run() {
 
     console.log('\nMigration verified successfully!');
 
-  } catch (err: any) {
-    console.error('\nMIGRATION FAILED:', err.message);
-    if (err.detail) console.error('  Detail:', err.detail);
-    if (err.hint) console.error('  Hint:', err.hint);
+  } catch (err: unknown) {
+    const pgErr = err as { message?: string; detail?: string; hint?: string; code?: string };
+    console.error('\nMIGRATION FAILED:', pgErr.message);
+    if (pgErr.detail) console.error('  Detail:', pgErr.detail);
+    if (pgErr.hint) console.error('  Hint:', pgErr.hint);
     process.exit(1);
   } finally {
     await client.end();

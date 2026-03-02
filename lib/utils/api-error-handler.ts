@@ -6,9 +6,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logServerError } from './server-error-logger';
 
-export type APIHandler<T = any> = (
+/** Route handler context - params vary by route (e.g. { params: Promise<{ id: string }> }) */
+export type RouteHandlerContext = { params?: Promise<Record<string, string>> };
+
+export type APIHandler<T = unknown> = (
   request: NextRequest,
-  context?: any
+  context?: RouteHandlerContext
 ) => Promise<NextResponse<T>>;
 
 /**
@@ -17,11 +20,11 @@ export type APIHandler<T = any> = (
  *   export const GET = withErrorHandler(async (request) => { ... }, 'GET /api/route');
  *   export const POST = withErrorHandler(async (request) => { ... }, 'POST /api/route');
  */
-export function withErrorHandler<T = any>(
+export function withErrorHandler<T = unknown>(
   handler: APIHandler<T>,
   componentName: string
 ): APIHandler<T> {
-  return async (request: NextRequest, context?: any): Promise<NextResponse<T>> => {
+  return async (request: NextRequest, context?: RouteHandlerContext): Promise<NextResponse<T>> => {
     try {
       return await handler(request, context);
     } catch (error) {

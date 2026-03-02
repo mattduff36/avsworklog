@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Integration Tests: Inform Workshop Endpoint
  * 
@@ -11,7 +10,6 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from '@/types/database';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -25,7 +23,7 @@ if (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && 
   process.exit(1);
 }
 
-const supabase = createClient<Database>(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 describe('Inform Workshop Endpoint', () => {
   let testVehicleId: string;

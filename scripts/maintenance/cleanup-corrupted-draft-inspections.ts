@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Cleanup script for corrupted draft inspections
  * 
@@ -64,8 +63,8 @@ async function cleanupDraftInspections() {
 
     // Display drafts that will be cleaned
     console.log('📝 Draft inspections that will be reset:\n');
-    draftInspections?.forEach((draft: any, index: number) => {
-      const vehicle = draft.vans?.reg_number || 'Unknown vehicle';
+    draftInspections?.forEach((draft, index: number) => {
+      const vehicle = (draft.vans as unknown as { reg_number: string } | null)?.reg_number || 'Unknown vehicle';
       const dateRange = draft.inspection_end_date 
         ? `${draft.inspection_date} to ${draft.inspection_end_date}`
         : draft.inspection_date;
@@ -139,21 +138,17 @@ async function cleanupDraftInspections() {
     console.log('   - The drafts are now in a clean state (empty)');
     console.log('   - The bug that caused this issue has been fixed\n');
 
-  } catch (error) {
-    console.error('\n❌ Cleanup failed:', error);
-    if (error instanceof Error) {
-      console.error('Error details:', error.message);
-    }
+  } catch (err: unknown) {
+    console.error('\n❌ Cleanup failed:', err instanceof Error ? err.message : err);
     process.exit(1);
   }
 }
 
-// Run cleanup
 cleanupDraftInspections().then(() => {
   console.log('🎉 Script completed successfully!');
   process.exit(0);
-}).catch(error => {
-  console.error('Fatal error:', error);
+}).catch((err: unknown) => {
+  console.error('Fatal error:', err instanceof Error ? err.message : err);
   process.exit(1);
 });
 

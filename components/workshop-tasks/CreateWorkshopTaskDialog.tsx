@@ -51,7 +51,7 @@ interface CreateWorkshopTaskDialogProps {
   onOpenChange: (open: boolean) => void;
   initialVehicleId?: string;
   initialCategoryId?: string;
-  alertType?: 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit';
+  alertType?: 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER';
   onSuccess?: () => void;
 }
 

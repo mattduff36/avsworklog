@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Comprehensive Authentication Test
  * Tests ALL dashboard pages to ensure they require authentication
@@ -91,13 +90,13 @@ async function testRoute(route: string, shouldBeProtected: boolean): Promise<Tes
         error: passed ? undefined : `Expected status 200, got ${status}`
       };
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       route,
       passed: false,
       status: 0,
       redirectsToLogin: false,
-      error: `Request failed: ${error.message}`
+      error: `Request failed: ${error instanceof Error ? error.message : String(error)}`
     };
   }
 }
@@ -148,13 +147,13 @@ async function runTests() {
       if (!passed) {
         results[results.length - 1].error = `Expected redirect to ${expectedRedirect}, got ${location}`;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       results.push({
         route,
         passed: false,
         status: 0,
         redirectsToLogin: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
       console.log(`   ❌ ${route.padEnd(40)} [ERROR]`);
     }

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * URGENT: Rollback and Fix RLS Policy
  * 
@@ -52,9 +51,9 @@ async function runFix() {
     console.log('   - Users can view message sender profiles ✓');
     console.log('   - Admins can view all profiles ✓');
 
-  } catch (error) {
-    console.error('❌ Fix failed:', error);
-    throw error;
+  } catch (err: unknown) {
+    console.error('❌ Fix failed:', err instanceof Error ? err.message : err);
+    throw err;
   } finally {
     await client.end();
   }
@@ -62,8 +61,8 @@ async function runFix() {
 
 runFix()
   .then(() => process.exit(0))
-  .catch((error) => {
-    console.error('Fatal error:', error);
+  .catch((err: unknown) => {
+    console.error('Fatal error:', err instanceof Error ? err.message : err);
     process.exit(1);
   });
 

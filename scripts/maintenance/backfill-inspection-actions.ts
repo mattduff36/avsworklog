@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Client } from 'pg';
 import * as dotenv from 'dotenv';
 
@@ -181,14 +180,14 @@ async function backfillInspectionActions() {
             new Date().toISOString()
           ]);
 
-          const actionId = insertResult.rows[0].id;
+          void insertResult.rows[0].id;
           createdCount++;
         }
 
         console.log(`  ✅ Created ${uniqueDefectCount} action${uniqueDefectCount > 1 ? 's' : ''} for ${inspection.reg_number} (${inspection.inspection_date.toISOString().split('T')[0]})`);
 
-      } catch (error) {
-        console.error(`  ❌ Failed to create action for ${inspection.reg_number}:`, error);
+      } catch (err: unknown) {
+        console.error(`  ❌ Failed to create action for ${inspection.reg_number}:`, err instanceof Error ? err.message : err);
         errorCount++;
       }
     }
@@ -203,8 +202,8 @@ async function backfillInspectionActions() {
 
     console.log('\n✅ Backfill completed successfully!');
 
-  } catch (error) {
-    console.error('❌ Backfill failed:', error);
+  } catch (err: unknown) {
+    console.error('❌ Backfill failed:', err instanceof Error ? err.message : err);
     process.exit(1);
   } finally {
     await client.end();

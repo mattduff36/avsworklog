@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -130,17 +129,18 @@ async function seedFAQ() {
     console.log(`   • ${catCount[0].count} FAQ categories`);
     console.log(`   • ${artCount[0].count} FAQ articles\n`);
 
-  } catch (error: any) {
+  } catch (err: unknown) {
     console.error('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.error('❌ SEED FAILED');
     console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    console.error('Error:', error.message);
-    if (error.detail) {
-      console.error('Details:', error.detail);
+    const msg = err instanceof Error ? err.message : String(err);
+    const detail = (err as { detail?: string }).detail;
+    console.error('Error:', msg);
+    if (detail) {
+      console.error('Details:', detail);
     }
     
-    // Check if tables don't exist
-    if (error.message?.includes('does not exist')) {
+    if (msg.includes('does not exist')) {
       console.log('\n💡 Tip: Run the migration first:');
       console.log('   npx tsx scripts/migrations/run-faq-suggestions-migration.ts\n');
     }

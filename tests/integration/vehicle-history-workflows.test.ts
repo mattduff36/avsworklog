@@ -1,11 +1,10 @@
-// @ts-nocheck
 /**
  * Vehicle History Page Integration Tests
  * Tests all workflows for /fleet/vehicles/[vehicleId]/history page
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -36,8 +35,7 @@ if (hasSupabaseCredentials && !isAllowedSupabaseTarget) {
 }
 
 describeVehicleHistorySuite('Vehicle History Page Workflows', () => {
-  let supabase: ReturnType<typeof createClient>;
-  let testUserId: string;
+  let supabase: SupabaseClient;
   let testVehicleId: string;
   let maintenanceVehicleFk: 'van_id' | 'vehicle_id' = 'van_id';
   let actionsVehicleFk: 'van_id' | 'vehicle_id' = 'van_id';
@@ -65,7 +63,7 @@ describeVehicleHistorySuite('Vehicle History Page Workflows', () => {
     });
 
     if (authError) throw authError;
-    testUserId = authData.user!.id;
+    void authData.user!.id;
 
     // SAFETY: ONLY get TE57 test vehicles
     const { data: vehicles } = await supabase

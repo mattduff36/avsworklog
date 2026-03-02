@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Migration Runner: Fix stale vehicle_categories / vehicle_id references
  *
@@ -32,7 +31,7 @@ async function runMigration() {
   const migrationSQL = readFileSync(resolve(process.cwd(), MIGRATION_FILE), 'utf-8');
   console.log(`✅ Loaded: ${MIGRATION_FILE}\n`);
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   const client = new pg.Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,
@@ -67,7 +66,7 @@ async function runMigration() {
       WHERE table_schema = 'public' AND table_name = 'van_archive'
         AND column_name IN ('van_id', 'vehicle_id')
     `);
-    const archiveCols = r2.rows.map((r: any) => r.column_name);
+    const archiveCols = r2.rows.map((r: { column_name: string }) => r.column_name);
     if (archiveCols.includes('van_id') && !archiveCols.includes('vehicle_id')) {
       console.log('✅ van_archive.vehicle_id — renamed to van_id');
     } else {
@@ -105,4 +104,4 @@ async function runMigration() {
   }
 }
 
-runMigration().catch((e) => { console.error('💥', e); process.exit(1); });
+runMigration().catch((err: unknown) => { console.error('💥', err); process.exit(1); });

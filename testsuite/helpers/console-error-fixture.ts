@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Shared Playwright fixture that captures page errors and severe console messages.
  * Attach to any test tagged @critical to automatically fail on JS exceptions.

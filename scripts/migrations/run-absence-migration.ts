@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -22,7 +21,7 @@ async function runMigration() {
   console.log('🚀 Running Absence & Leave System Migration...\n');
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
   
   const client = new Client({
     host: url.hostname,
@@ -95,10 +94,11 @@ async function runMigration() {
     
     console.log('\n🎉 Absence & Leave System is ready to use!');
 
-  } catch (error: any) {
-    console.error('❌ MIGRATION FAILED:', error.message);
+  } catch (err: unknown) {
+    const pgErr = err as { message: string };
+    console.error('❌ MIGRATION FAILED:', pgErr.message);
     
-    if (error.message?.includes('already exists')) {
+    if (pgErr.message?.includes('already exists')) {
       console.log('\n✅ Migration already applied - no action needed!');
       console.log('The absence system tables are already in place.');
       process.exit(0);

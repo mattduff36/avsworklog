@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Send a sample daily error summary email
  * Run with: npx tsx scripts/send-sample-error-email.ts
@@ -88,14 +87,14 @@ async function sendSampleEmail() {
       process.exit(1);
     }
 
-    const result = await response.json();
+    const result = (await response.json()) as { id: string };
     console.log('✅ Email sent successfully!');
     console.log(`   Email ID: ${result.id}`);
     console.log(`\n📬 Check your inbox at: ${TO_EMAIL}`);
     console.log(`\n💡 Tip: Check spam folder if you don't see it in a few minutes.`);
 
-  } catch (error) {
-    console.error('❌ Error sending email:', error);
+  } catch (err: unknown) {
+    console.error('❌ Error sending email:', err instanceof Error ? err.message : err);
     process.exit(1);
   }
 }

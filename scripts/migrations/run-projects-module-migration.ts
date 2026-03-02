@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Run Projects Module Migration
  * Adds project_document_types and project_favourites tables,
@@ -28,7 +27,7 @@ if (!connectionString) {
 async function runMigration() {
   console.log('Running Projects Module Migration...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
 
   const client = new Client({
     host: url.hostname,
@@ -74,7 +73,7 @@ async function runMigration() {
       ORDER BY table_name
     `);
 
-    tables.forEach((table: any) => {
+    tables.forEach((table: Record<string, string>) => {
       console.log(`  table: ${table.table_name}`);
     });
 
@@ -94,18 +93,19 @@ async function runMigration() {
     `);
 
     console.log('\n  Seeded document types:');
-    types.forEach((t: any) => {
+    types.forEach((t: Record<string, string | boolean>) => {
       console.log(`    - ${t.name} (signature required: ${t.required_signature})`);
     });
 
     console.log('\nDone!\n');
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const pgErr = err as { message: string; detail?: string; hint?: string };
     console.error('\nMIGRATION FAILED');
-    console.error('Error:', error.message);
-    if (error.detail) console.error('Details:', error.detail);
-    if (error.hint) console.error('Hint:', error.hint);
+    console.error('Error:', pgErr.message);
+    if (pgErr.detail) console.error('Details:', pgErr.detail);
+    if (pgErr.hint) console.error('Hint:', pgErr.hint);
 
-    if (error.message?.includes('already exists')) {
+    if (pgErr.message?.includes('already exists')) {
       console.log('\nTables already exist - no action needed!');
       process.exit(0);
     }

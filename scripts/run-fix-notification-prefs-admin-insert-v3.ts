@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Migration Runner: Fix notification_preferences admin insert RLS (v3 - final)
  * 
@@ -25,7 +24,7 @@ async function runMigration() {
   console.log('🔄 Connecting to database...');
   
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -78,9 +77,9 @@ async function runMigration() {
     console.log('\n✅ Migration completed successfully!');
     console.log('   Unified INSERT policy now handles both user and admin inserts.');
 
-  } catch (error) {
-    console.error('❌ Migration failed:', error);
-    throw error;
+  } catch (err: unknown) {
+    console.error('❌ Migration failed:', err);
+    throw err;
   } finally {
     await client.end();
     console.log('\n🔌 Database connection closed');
@@ -93,7 +92,7 @@ runMigration()
     console.log('\n✨ Done!');
     process.exit(0);
   })
-  .catch((error) => {
-    console.error('\n💥 Fatal error:', error);
+  .catch((err: unknown) => {
+    console.error('\n💥 Fatal error:', err);
     process.exit(1);
   });

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Run RAMS Database Migration
  * Creates rams_documents, rams_assignments, and rams_visitor_signatures tables
@@ -33,7 +32,7 @@ async function runRAMSMigration() {
   console.log('🚀 Running RAMS Database Migration...\n');
 
   // Parse connection string and rebuild with explicit SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
   
   const client = new Client({
     host: url.hostname,
@@ -91,7 +90,7 @@ async function runRAMSMigration() {
       ORDER BY table_name
     `);
 
-    tables.forEach((table: any) => {
+    tables.forEach((table: Record<string, string>) => {
       console.log(`   ✅ ${table.table_name}`);
     });
     
@@ -107,20 +106,21 @@ async function runRAMSMigration() {
     console.log('✨ Ready! RAMS feature database is configured');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const pgErr = err as { message: string; detail?: string; hint?: string };
     console.error('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.error('❌ MIGRATION FAILED');
     console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    console.error('Error:', error.message);
-    if (error.detail) {
-      console.error('Details:', error.detail);
+    console.error('Error:', pgErr.message);
+    if (pgErr.detail) {
+      console.error('Details:', pgErr.detail);
     }
-    if (error.hint) {
-      console.error('Hint:', error.hint);
+    if (pgErr.hint) {
+      console.error('Hint:', pgErr.hint);
     }
     
     // Check if tables already exist
-    if (error.message?.includes('already exists')) {
+    if (pgErr.message?.includes('already exists')) {
       console.log('\n✅ Tables already exist - no action needed!');
       console.log('If you need to modify the schema, consider creating an ALTER migration.\n');
       process.exit(0);

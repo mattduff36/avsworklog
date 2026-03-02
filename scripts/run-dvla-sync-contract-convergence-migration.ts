@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Migration Runner: DVLA sync contract convergence
  *
@@ -27,7 +26,7 @@ async function runMigration() {
   const migrationSQL = readFileSync(resolve(process.cwd(), MIGRATION_FILE), 'utf-8');
   console.log(`Loaded: ${MIGRATION_FILE}\n`);
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   const client = new pg.Client({
     host: url.hostname,
     port: parseInt(url.port, 10) || 5432,
@@ -62,7 +61,7 @@ async function runMigration() {
         AND tablename = 'vehicle_maintenance'
         AND indexname IN ('unique_van_maintenance', 'unique_hgv_maintenance', 'unique_plant_maintenance')
     `);
-    if (uniqueIndexes.rowCount < 3) {
+    if ((uniqueIndexes.rowCount ?? 0) < 3) {
       throw new Error('Missing one or more unique maintenance indexes');
     }
 
@@ -75,7 +74,7 @@ async function runMigration() {
   }
 }
 
-runMigration().catch((error) => {
-  console.error('Fatal error:', error);
+runMigration().catch((err: unknown) => {
+  console.error('Fatal error:', err);
   process.exit(1);
 });

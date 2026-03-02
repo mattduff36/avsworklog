@@ -1,4 +1,4 @@
-// @ts-nocheck
+/// <reference types="@testing-library/jest-dom/vitest" />
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MotHistoryDialog } from '@/app/(dashboard)/maintenance/components/MotHistoryDialog';

@@ -1,13 +1,11 @@
-// @ts-nocheck
 import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import { resolve } from 'path';
 
-// Load .env.local
 config({ path: resolve(process.cwd(), '.env.local') });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error('❌ Missing Supabase credentials');
@@ -15,8 +13,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
   process.exit(1);
 }
 
-// Create admin client with service role key
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+const supabase = createClient(supabaseUrl!, supabaseServiceKey!, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
@@ -41,7 +38,7 @@ async function setupStorage() {
     } else {
       // Create the bucket
       console.log('📦 Creating bucket "inspection-photos"...');
-      const { data: bucket, error: createError } = await supabase.storage.createBucket('inspection-photos', {
+      const { error: createError } = await supabase.storage.createBucket('inspection-photos', {
         public: true,
         fileSizeLimit: 5242880, // 5MB
         allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
@@ -66,8 +63,8 @@ async function setupStorage() {
     console.log('   ✓ View photos in the inspection details page');
     console.log('   ✓ Delete photos as needed');
 
-  } catch (error) {
-    console.error('\n❌ Error setting up storage:', error);
+  } catch (err: unknown) {
+    console.error('\n❌ Error setting up storage:', err instanceof Error ? err.message : err);
     process.exit(1);
   }
 }

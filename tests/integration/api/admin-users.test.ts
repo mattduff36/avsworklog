@@ -1,8 +1,6 @@
-// @ts-nocheck
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { GET as GetUsers, POST as CreateUser } from '@/app/api/admin/users/route';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createMockProfile, createMockAdmin, createMockManager } from '../../utils/factories';
-import { mockSupabaseAuthUser, mockSupabaseQuery, resetAllMocks } from '../../utils/test-helpers';
+import { resetAllMocks } from '../../utils/test-helpers';
 
 describe('Admin Users API', () => {
   beforeEach(() => {

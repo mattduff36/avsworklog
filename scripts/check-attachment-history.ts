@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import { resolve } from 'path';
@@ -143,7 +142,7 @@ async function checkAttachmentHistory() {
         taskIds.forEach(taskId => {
           const task = tasks?.find(t => t.id === taskId);
           const attCount = taskAttachments.filter(a => a.task_id === taskId).length;
-          console.log(`   - ${task?.vans?.reg_number || 'Unknown'} (${task?.status || 'unknown'}) - ${attCount} attachment(s)`);
+          console.log(`   - ${(task?.vans as unknown as { reg_number: string } | null)?.reg_number || 'Unknown'} (${task?.status || 'unknown'}) - ${attCount} attachment(s)`);
         });
       }
     }

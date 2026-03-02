@@ -1,5 +1,4 @@
-// @ts-nocheck
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 describe('Projects Module (formerly RAMS)', () => {
   describe('Document Type Management', () => {
@@ -88,8 +87,8 @@ describe('Projects Module (formerly RAMS)', () => {
       };
 
       const isComplete = !readOnlyAssignment.required_signature
-        ? readOnlyAssignment.status === 'read' || readOnlyAssignment.status === 'signed'
-        : readOnlyAssignment.status === 'signed';
+        ? readOnlyAssignment.status === 'read' || (readOnlyAssignment.status as string) === 'signed'
+        : (readOnlyAssignment.status as string) === 'signed';
 
       expect(isComplete).toBe(true);
     });
@@ -101,8 +100,8 @@ describe('Projects Module (formerly RAMS)', () => {
       };
 
       const isComplete = !signatureAssignment.required_signature
-        ? signatureAssignment.status === 'read' || signatureAssignment.status === 'signed'
-        : signatureAssignment.status === 'signed';
+        ? signatureAssignment.status === 'read' || (signatureAssignment.status as string) === 'signed'
+        : (signatureAssignment.status as string) === 'signed';
 
       expect(isComplete).toBe(false);
     });
@@ -323,13 +322,11 @@ describe('Projects Module (formerly RAMS)', () => {
 
   describe('Back Navigation', () => {
     it('should navigate /projects/manage back to /projects', () => {
-      const path = '/projects/manage';
       const parentPath = '/projects';
       expect(parentPath).toBe('/projects');
     });
 
     it('should navigate /projects/settings back to /projects/manage', () => {
-      const path = '/projects/settings';
       const parentPath = '/projects/manage';
       expect(parentPath).toBe('/projects/manage');
     });

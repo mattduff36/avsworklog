@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -21,7 +20,7 @@ if (!connectionString) {
 async function runMigration() {
   console.log('Running plant RLS fix migration...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
 
   const client = new Client({
     host: url.hostname,
@@ -64,11 +63,12 @@ async function runMigration() {
       console.log(`  ${row.cmd.padEnd(8)} ${row.policyname}`);
     }
     console.log('');
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const pgErr = err as { message: string; detail?: string; hint?: string };
     console.error('\nMIGRATION FAILED');
-    console.error('Error:', error.message);
-    if (error.detail) console.error('Details:', error.detail);
-    if (error.hint) console.error('Hint:', error.hint);
+    console.error('Error:', pgErr.message);
+    if (pgErr.detail) console.error('Details:', pgErr.detail);
+    if (pgErr.hint) console.error('Hint:', pgErr.hint);
     process.exit(1);
   } finally {
     await client.end();

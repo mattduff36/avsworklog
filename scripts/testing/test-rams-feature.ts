@@ -1,13 +1,11 @@
-// @ts-nocheck
 /**
  * Comprehensive RAMS Feature Test Suite
  * Tests database, storage, permissions, and functionality
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { Database } from '../types/database';
-import * as fs from 'fs';
-import * as path from 'path';
+// @ts-expect-error legacy database types may not exist
+import type { Database } from '../types/database';
 import * as dotenv from 'dotenv';
 
 // Load environment variables from .env.local
@@ -33,7 +31,7 @@ interface TestResult {
   name: string;
   passed: boolean;
   error?: string;
-  details?: any;
+  details?: unknown;
 }
 
 const results: TestResult[] = [];
@@ -48,7 +46,7 @@ function log(message: string, type: 'info' | 'success' | 'error' | 'warning' = '
   console.log(`${symbols[type]} ${message}`);
 }
 
-function addResult(name: string, passed: boolean, error?: string, details?: any) {
+function addResult(name: string, passed: boolean, error?: string, details?: unknown) {
   results.push({ name, passed, error, details });
   if (passed) {
     log(`${name}: PASSED`, 'success');
@@ -89,8 +87,8 @@ async function test1_CheckTablesExist() {
     if (visitorError) throw new Error(`rams_visitor_signatures table error: ${visitorError.message}`);
 
     addResult('Tables exist', true);
-  } catch (error: any) {
-    addResult('Tables exist', false, error.message);
+  } catch (error: unknown) {
+    addResult('Tables exist', false, error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -109,8 +107,8 @@ async function test2_CheckStorageBucket() {
     }
 
     addResult('Storage bucket exists', true, undefined, { bucket: ramsBucket });
-  } catch (error: any) {
-    addResult('Storage bucket exists', false, error.message);
+  } catch (error: unknown) {
+    addResult('Storage bucket exists', false, error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -129,8 +127,8 @@ async function test3_CheckStoragePolicies() {
       fileCount: data?.length || 0,
       message: 'Service role can access storage'
     });
-  } catch (error: any) {
-    addResult('Storage policies', false, error.message);
+  } catch (error: unknown) {
+    addResult('Storage policies', false, error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -170,8 +168,8 @@ async function test4_CheckRLSPolicies() {
       managerFound: manager.full_name,
       employeeFound: employee?.full_name || 'No employees (OK for admin-only setup)'
     });
-  } catch (error: any) {
-    addResult('RLS policies check', false, error.message);
+  } catch (error: unknown) {
+    addResult('RLS policies check', false, error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -232,8 +230,8 @@ async function test5_CheckExistingDocuments() {
         file_path: d.file_path
       }))
     });
-  } catch (error: any) {
-    addResult('Existing documents check', false, error.message);
+  } catch (error: unknown) {
+    addResult('Existing documents check', false, error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -276,8 +274,8 @@ async function test6_TestDocumentRetrieval() {
       title: doc.title,
       uploaderName: doc.uploader?.full_name
     });
-  } catch (error: any) {
-    addResult('Document retrieval test', false, error.message);
+  } catch (error: unknown) {
+    addResult('Document retrieval test', false, error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -300,8 +298,8 @@ async function test7_TestAssignments() {
     addResult('Assignments test', true, undefined, {
       assignmentCount: assignments?.length || 0
     });
-  } catch (error: any) {
-    addResult('Assignments test', false, error.message);
+  } catch (error: unknown) {
+    addResult('Assignments test', false, error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -334,8 +332,8 @@ async function test8_CheckForeignKeyConstraints() {
       managerCount,
       employeeCount
     });
-  } catch (error: any) {
-    addResult('Foreign key constraints', false, error.message);
+  } catch (error: unknown) {
+    addResult('Foreign key constraints', false, error instanceof Error ? error.message : String(error));
   }
 }
 

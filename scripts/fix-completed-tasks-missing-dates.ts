@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import { resolve } from 'path';
@@ -53,7 +52,8 @@ async function fixCompletedTasks() {
 
     affectedTasks.forEach((task, idx) => {
       console.log(`${idx + 1}. Task ID: ${task.id}`);
-      console.log(`   Vehicle: ${task.vans?.reg_number || 'Unknown'}`);
+      const van = task.vans as { reg_number?: string } | null;
+      console.log(`   Vehicle: ${van?.reg_number || 'Unknown'}`);
       console.log(`   Created: ${new Date(task.created_at).toLocaleString()}`);
       console.log(`   Comments: ${task.workshop_comments || 'None'}`);
       console.log('');
@@ -100,8 +100,8 @@ async function fixCompletedTasks() {
       console.log('   as a reasonable fallback. The actual completion date may have been later.');
     }
 
-  } catch (error) {
-    console.error('❌ Error:', error);
+  } catch (err: unknown) {
+    console.error('❌ Error:', err);
   }
 }
 

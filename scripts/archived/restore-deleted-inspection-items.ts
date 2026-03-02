@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Restore Deleted Inspection Items from Audit Log
  * 
@@ -17,15 +16,15 @@ import { resolve } from 'path';
 
 config({ path: resolve(process.cwd(), '.env.local') });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !serviceRoleKey) {
   console.error('❌ Missing Supabase credentials');
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, serviceRoleKey);
+const supabase = createClient(supabaseUrl!, serviceRoleKey!);
 
 async function restoreDeletedItems() {
   console.log('🔄 Restoring deleted inspection items from audit log...\n');
@@ -55,8 +54,8 @@ async function restoreDeletedItems() {
 
     // Step 2: Parse and prepare items for restoration
     console.log('📝 Step 2: Preparing items for restoration...');
-    const itemsToRestore: any[] = [];
-    const skippedItems: any[] = [];
+    const itemsToRestore: Array<Record<string, unknown>> = [];
+    const skippedItems: Array<Record<string, unknown>> = [];
     const inspectionIds = new Set<string>();
 
     for (const auditEntry of deletedItems) {
@@ -105,9 +104,9 @@ async function restoreDeletedItems() {
 
     // Show inspection details
     console.log('📊 Inspections to restore:');
-    existingInspections?.forEach((inspection: any, i: number) => {
+    existingInspections?.forEach((inspection, i: number) => {
       const itemCount = itemsToRestore.filter(item => item.inspection_id === inspection.id).length;
-      const vehicle = inspection.vans?.reg_number || 'Unknown';
+      const vehicle = (inspection.vans as unknown as { reg_number: string } | null)?.reg_number || 'Unknown';
       console.log(`   ${i + 1}. ${vehicle} - ${inspection.status} (${itemCount} items)`);
     });
     console.log();
@@ -130,7 +129,8 @@ async function restoreDeletedItems() {
     const attentionCount = validItemsToRestore.filter(i => i.status === 'attention').length;
 
     validItemsToRestore.forEach(item => {
-      statusCounts[item.status] = (statusCounts[item.status] || 0) + 1;
+      const st = item.status as string;
+      statusCounts[st] = (statusCounts[st] || 0) + 1;
     });
 
     console.log('📊 Restoration summary:');
@@ -223,10 +223,10 @@ async function restoreDeletedItems() {
     console.log('🎉 The draft inspections have been restored with their original data!');
     console.log('   Users can now continue editing their drafts.\n');
 
-  } catch (error: any) {
-    console.error('❌ Error:', error.message);
-    if (error.stack) {
-      console.error('Stack:', error.stack);
+  } catch (err: unknown) {
+    console.error('❌ Error:', err instanceof Error ? err.message : String(err));
+    if (err instanceof Error && err.stack) {
+      console.error('Stack:', err.stack);
     }
   }
 }

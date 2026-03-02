@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Script to create error_logs table in the database
  * Run this from the project root: npx tsx scripts/run-error-logs-migration.ts
@@ -27,7 +26,7 @@ async function runMigration() {
   console.log('🚀 Running Error Logs Migration...\n');
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
   
   const client = new Client({
     host: url.hostname,
@@ -76,10 +75,11 @@ async function runMigration() {
 
     console.log('\n🎉 Done!');
 
-  } catch (error: any) {
-    console.error('❌ MIGRATION FAILED:', error.message);
+  } catch (err: unknown) {
+    const pgErr = err as { message: string };
+    console.error('❌ MIGRATION FAILED:', pgErr.message);
     
-    if (error.message?.includes('already exists')) {
+    if (pgErr.message?.includes('already exists')) {
       console.log('✅ Already applied - no action needed!');
       process.exit(0);
     }

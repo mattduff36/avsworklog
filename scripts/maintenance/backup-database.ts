@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { writeFileSync } from 'fs';
@@ -6,7 +5,6 @@ import pg from 'pg';
 
 const { Client } = pg;
 
-// Load .env.local
 config({ path: resolve(process.cwd(), '.env.local') });
 
 const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
@@ -21,7 +19,7 @@ async function backupDatabase() {
   console.log('🔒 Starting Full Database Backup...\n');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,
@@ -74,7 +72,7 @@ async function backupDatabase() {
         console.log(`   📦 Backing up: ${table}...`);
         
         // Get table structure
-        const structureResult = await client.query(`
+        await client.query(`
           SELECT column_name, data_type, character_maximum_length, is_nullable, column_default
           FROM information_schema.columns
           WHERE table_schema = 'public' AND table_name = $1
@@ -127,9 +125,10 @@ async function backupDatabase() {
         }
 
         console.log(`   ✅ ${table}: ${rowCount} rows backed up`);
-      } catch (error: any) {
-        console.log(`   ⚠️  ${table}: Table not found or error - ${error.message}`);
-        backupSQL += `-- Table ${table} could not be backed up: ${error.message}\n\n`;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.log(`   ⚠️  ${table}: Table not found or error - ${msg}`);
+        backupSQL += `-- Table ${table} could not be backed up: ${msg}\n\n`;
       }
     }
 
@@ -145,7 +144,7 @@ async function backupDatabase() {
         const result = await client.query(`SELECT COUNT(*) FROM ${table}`);
         const count = result.rows[0].count;
         backupSQL += `-- ${table}: ${count} rows\n`;
-      } catch (error) {
+      } catch (_err: unknown) {
         // Table doesn't exist, skip
       }
     }
@@ -156,7 +155,7 @@ async function backupDatabase() {
     const { mkdirSync } = await import('fs');
     try {
       mkdirSync(resolve(process.cwd(), 'backups'), { recursive: true });
-    } catch (error) {
+    } catch (_err: unknown) {
       // Directory already exists
     }
 
@@ -183,13 +182,14 @@ async function backupDatabase() {
     console.log('⚠️  DO NOT PROCEED WITH MIGRATION UNTIL BACKUP IS VERIFIED');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  } catch (error: any) {
+  } catch (err: unknown) {
     console.error('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.error('❌ BACKUP FAILED');
     console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    console.error('Error:', error.message);
-    if (error.stack) {
-      console.error('Stack:', error.stack);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Error:', msg);
+    if (err instanceof Error && err.stack) {
+      console.error('Stack:', err.stack);
     }
     process.exit(1);
   } finally {

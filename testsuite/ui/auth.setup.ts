@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Auth setup — runs ONCE before all UI tests.
  * Logs in as each role and saves browser storage state to disk.

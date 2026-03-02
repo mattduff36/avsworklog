@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Lint Script: Detect High-Risk Contrast Patterns
  * Focuses on combinations that cause dark-on-dark or light-on-light issues

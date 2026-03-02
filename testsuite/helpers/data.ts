@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Test data helpers — creates TEST-only records and cleans them up.
  *

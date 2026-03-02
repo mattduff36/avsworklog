@@ -18,7 +18,7 @@ async function main() {
   );
   const sql = fs.readFileSync(sqlPath, 'utf8');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   const client = new Client({
     host: url.hostname,
     port: Number(url.port) || 5432,

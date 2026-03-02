@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { describe, it, expect } from 'vitest';
 
 describe('Absence Management API', () => {
@@ -19,22 +18,12 @@ describe('Absence Management API', () => {
     });
 
     it('should calculate working days in absence', () => {
-      const absence = {
-        start_date: '2024-12-02', // Monday
-        end_date: '2024-12-06', // Friday
-      };
-
-      const workingDays = 5; // Mon-Fri
+      const workingDays = 5; // Mon-Fri (Mon Dec 2 - Fri Dec 6)
       expect(workingDays).toBe(5);
     });
 
     it('should exclude weekends from working days', () => {
-      const absence = {
-        start_date: '2024-12-02', // Monday
-        end_date: '2024-12-08', // Sunday (next week)
-      };
-
-      // Mon-Fri (5 days) + Weekend (0 days) + Sat-Sun (0 days) = 5 working days
+      // Mon Dec 2 - Sun Dec 8: Mon-Fri (5 days), Sat-Sun excluded
       const workingDays = 5;
       expect(workingDays).toBe(5);
     });
@@ -102,10 +91,8 @@ describe('Absence Management API', () => {
     });
 
     it('should calculate allowance for part-year employees', () => {
-      const startDate = new Date('2024-07-01'); // Started mid-year
-      const yearEnd = new Date('2024-12-31');
-      
-      const monthsWorked = 6; // July-December
+      // Started mid-year (Jul 1 - Dec 31) = 6 months
+      const monthsWorked = 6;
       const fullYearAllowance = 28;
       const proRataAllowance = (fullYearAllowance / 12) * monthsWorked;
 
@@ -160,10 +147,7 @@ describe('Absence Management API', () => {
     });
 
     it('should identify overlapping absences', () => {
-      const absence1 = { start_date: '2024-12-02', end_date: '2024-12-06' };
-      const absence2 = { start_date: '2024-12-04', end_date: '2024-12-08' };
-
-      // These overlap on Dec 4-6
+      // Absence 1: Dec 2-6, Absence 2: Dec 4-8 — overlap on Dec 4-6
       const overlaps = true; // In real code, would check date ranges
       expect(overlaps).toBe(true);
     });

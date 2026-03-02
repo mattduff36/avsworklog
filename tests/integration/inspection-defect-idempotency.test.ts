@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Integration Tests: Inspection Defect Task Idempotency
  * 
@@ -8,7 +7,6 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from '@/types/database';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -22,7 +20,7 @@ if (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && 
   process.exit(1);
 }
 
-const supabase = createClient<Database>(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 describe('Inspection Defect Task Idempotency', () => {
   let testVehicleId: string;
@@ -109,7 +107,7 @@ describe('Inspection Defect Task Idempotency', () => {
       ],
     };
 
-    const response = await fetch(`${supabaseUrl.replace('supabase.co', 'supabase.co')}/rest/v1/rpc/sync-defect-tasks`, {
+    await fetch(`${supabaseUrl.replace('supabase.co', 'supabase.co')}/rest/v1/rpc/sync-defect-tasks`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -144,24 +142,8 @@ describe('Inspection Defect Task Idempotency', () => {
 
     const beforeCount = beforeTasks?.length || 0;
 
-    // Sync again with modified comment
-    const syncPayload = {
-      inspectionId: testInspectionId,
-      vehicleId: testVehicleId,
-      createdBy: testUserId,
-      defects: [
-        {
-          item_number: 4,
-          item_description: 'Test Item for Idempotency',
-          days: [1, 2, 3],
-          comment: 'UPDATED comment',
-          primaryInspectionItemId: testItemId,
-        },
-      ],
-    };
-
-    // In real implementation, this calls the endpoint
-    // For now, we're testing the database logic matches
+    // In real implementation, a sync-defect-tasks call with updated comment
+    // would be made here. We verify the database logic matches.
 
     // Verify count didn't increase
     const { data: afterTasks } = await supabase

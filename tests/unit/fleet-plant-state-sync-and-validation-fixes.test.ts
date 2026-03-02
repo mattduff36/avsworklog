@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Fleet Page and Category Dialog Bug Fixes Test
  * 
@@ -13,7 +12,7 @@ describe('Fleet Page and Category Dialog Bug Fixes', () => {
     it('should sync plantAssets state when PlantTable adds new assets', () => {
       // Simulate fleet page state
       let plantAssetsCount = 2;
-      const plantAssets = [
+      void [
         { id: '1', plant_id: 'P001', category_id: 'cat-1' },
         { id: '2', plant_id: 'P002', category_id: 'cat-1' },
       ];
@@ -52,7 +51,7 @@ describe('Fleet Page and Category Dialog Bug Fixes', () => {
 
     it('should update category counts after adding plant asset', () => {
       // Simulate category counts based on plantAssets
-      const categories = [{ id: 'cat-1', name: 'Excavator' }];
+      void [{ id: 'cat-1', name: 'Excavator' }];
       
       let plantAssets = [
         { id: '1', category_id: 'cat-1' },
@@ -299,7 +298,7 @@ describe('Fleet Page and Category Dialog Bug Fixes', () => {
       expect(validCategory.success).toBe(true);
 
       // Step 3: Add plant asset and sync counts
-      const plantAssets: any[] = [];
+      const plantAssets: Array<{ id: string; category_id?: string }> = [];
       
       const addPlantAsset = (categoryId: string) => {
         plantAssets.push({ id: 'p1', category_id: categoryId });
@@ -322,7 +321,7 @@ describe('Fleet Page and Category Dialog Bug Fixes', () => {
 
     it('should handle real-world scenario: settings tab with plant management', () => {
       // User opens settings tab
-      const categories = [
+      void [
         { id: 'cat-1', name: 'Excavator', applies_to: ['plant'] },
       ];
 

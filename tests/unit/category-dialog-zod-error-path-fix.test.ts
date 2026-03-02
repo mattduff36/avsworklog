@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * CategoryDialog Zod Validation Error Path Fix Test
  * 

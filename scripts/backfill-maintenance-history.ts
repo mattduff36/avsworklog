@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Backfill Maintenance History from Audit Log
  * 
@@ -29,7 +28,7 @@ if (!connectionString) {
 async function backfillMaintenanceHistory() {
   console.log('🔄 Backfilling Maintenance History from Audit Log...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,
@@ -173,8 +172,8 @@ async function backfillMaintenanceHistory() {
     console.log(`   ⏭️  Entries skipped (already exist): ${skippedCount}`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  } catch (error: any) {
-    console.error('\n❌ Backfill failed:', error.message);
+  } catch (error: unknown) {
+    console.error('\n❌ Backfill failed:', error instanceof Error ? error.message : String(error));
     console.error('\nFull error:', error);
     process.exit(1);
   } finally {

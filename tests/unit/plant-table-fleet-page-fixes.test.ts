@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Plant Table and Fleet Page Bug Fixes Test
  * 
@@ -33,7 +32,7 @@ describe('Plant Table and Fleet Page Bug Fixes', () => {
     it('should handle missing plant object gracefully', () => {
       const plantAssetWithoutPlant = {
         plant_id: 'P002',
-        plant: undefined,
+        plant: undefined as { id: string } | undefined,
         current_hours: 0,
         next_service_hours: null,
       };
@@ -182,9 +181,6 @@ describe('Plant Table and Fleet Page Bug Fixes', () => {
         { id: '1', name: 'Shared Category', applies_to: ['van', 'plant'] },
       ];
 
-      const plantAssets = [
-        { category_id: '1' }, // Plant uses the shared category
-      ];
 
       // Correct logic: Filter by applies_to
       const vehicleCategories = categories.filter(c => {
@@ -204,7 +200,7 @@ describe('Plant Table and Fleet Page Bug Fixes', () => {
       ];
 
       const vehicleCategories = categories.filter(c => {
-        const appliesTo = (c as any).applies_to || ['van']; // Default to ['van']
+        const appliesTo = (c as { applies_to?: string[] }).applies_to || ['van']; // Default to ['van']
         return appliesTo.includes('van');
       });
 
@@ -300,9 +296,6 @@ describe('Plant Table and Fleet Page Bug Fixes', () => {
       ];
 
       // Plant uses shared category
-      const plantAssets = [
-        { category_id: '3' },
-      ];
 
       // Vehicle section should still show shared category
       const vehicleCategories = categories.filter(c => {

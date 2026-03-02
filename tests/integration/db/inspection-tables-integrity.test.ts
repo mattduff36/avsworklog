@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * DB Integrity Tests: Inspection Table Split Verification
  *
@@ -9,7 +8,7 @@
  * Requires: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local
  */
 import { describe, it, expect, beforeAll } from 'vitest';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -25,18 +24,6 @@ beforeAll(() => {
   supabase = createClient(supabaseUrl, supabaseServiceKey);
 });
 
-async function queryRaw(sql: string): Promise<{ rows: Record<string, unknown>[] }> {
-  const { data, error } = await supabase.rpc('exec_sql', { sql_text: sql }).single();
-  if (error) {
-    const { data: fallback, error: fallbackError } = await supabase
-      .from('van_inspections')
-      .select('id')
-      .limit(0);
-    if (fallbackError) throw fallbackError;
-    return { rows: [] };
-  }
-  return data as { rows: Record<string, unknown>[] };
-}
 
 describe('Inspection Tables Existence', () => {
   it('van_inspections table is queryable', async () => {
@@ -176,7 +163,7 @@ describe('Child Tables Reference Integrity', () => {
     expect(error).toBeNull();
 
     if (orphans && orphans.length > 0) {
-      const inspectionIds = [...new Set(orphans.map(o => o.inspection_id))];
+      const inspectionIds = [...new Set(orphans.map((o: { inspection_id: string }) => o.inspection_id))];
 
       for (const inspId of inspectionIds.slice(0, 10)) {
         const { data: vanMatch } = await supabase

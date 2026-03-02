@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { describe, it, expect } from 'vitest';
 
 describe('Authentication', () => {
@@ -66,12 +65,7 @@ describe('Authentication', () => {
 
   describe('Logout', () => {
     it('should clear session on logout', () => {
-      const session = {
-        access_token: 'token-123',
-        refresh_token: 'refresh-456',
-      };
-
-      // After logout
+      // After logout, session should be cleared
       const clearedSession = null;
 
       expect(clearedSession).toBeNull();

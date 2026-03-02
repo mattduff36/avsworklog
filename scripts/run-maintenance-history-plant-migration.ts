@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Migration Runner: Add Plant Support to Maintenance History
  * 
@@ -38,13 +37,13 @@ async function runMigration() {
   try {
     migrationSQL = readFileSync(resolve(process.cwd(), MIGRATION_FILE), 'utf-8');
     console.log(`✅ Loaded migration from: ${MIGRATION_FILE}\n`);
-  } catch (error) {
-    console.error(`❌ Error reading migration file: ${error}`);
+  } catch (err: unknown) {
+    console.error(`❌ Error reading migration file: ${err}`);
     process.exit(1);
   }
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new pg.Client({
     host: url.hostname,
@@ -139,12 +138,12 @@ async function runMigration() {
     console.log('2. Verify maintenance history is created for plant updates');
     console.log('3. Run full test build');
 
-  } catch (error: any) {
-    if (error.message && error.message.includes('already exists')) {
+  } catch (err: unknown) {
+    if ((err instanceof Error ? err.message : String(err)) && (err instanceof Error ? err.message : String(err)).includes('already exists')) {
       console.log('✅ Migration already applied\n');
       console.log('🎉 Database is up to date!');
     } else {
-      console.error('❌ Migration failed:', error);
+      console.error('❌ Migration failed:', err);
       process.exit(1);
     }
   } finally {
@@ -154,7 +153,7 @@ async function runMigration() {
 }
 
 // Run migration
-runMigration().catch(error => {
-  console.error('💥 Unexpected error:', error);
+runMigration().catch((err: unknown) => {
+  console.error('💥 Unexpected error:', err);
   process.exit(1);
 });

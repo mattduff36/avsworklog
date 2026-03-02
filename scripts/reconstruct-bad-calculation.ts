@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Reconstruct how the incorrect date 2026-02-28 was calculated
  */

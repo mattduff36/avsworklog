@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Backfill Maintenance History from DVLA Sync Log
  * 
@@ -45,7 +44,7 @@ interface DvlaSyncLogEntry {
 async function backfillFromDvlaSyncLog() {
   console.log('🔄 Backfilling Maintenance History from DVLA Sync Log...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,
@@ -159,8 +158,8 @@ async function backfillFromDvlaSyncLog() {
 
             console.log(`✅ [${vehicleReg}] tax_due_date: ${sync.tax_due_date_old || 'null'} → ${sync.tax_due_date_new} (${syncDateStr})`);
             insertedCount++;
-          } catch (err: any) {
-            console.error(`❌ [${vehicleReg}] Failed to insert tax_due_date history: ${err.message}`);
+          } catch (err: unknown) {
+            console.error(`❌ [${vehicleReg}] Failed to insert tax_due_date history: ${err instanceof Error ? err.message : String(err)}`);
             errorCount++;
           }
         }
@@ -239,8 +238,8 @@ async function backfillFromDvlaSyncLog() {
 
               console.log(`✅ [${vehicleReg}] mot_due_date: ${oldMotDate || 'null'} → ${newMotDate} (${syncDateStr})`);
               insertedCount++;
-            } catch (err: any) {
-              console.error(`❌ [${vehicleReg}] Failed to insert mot_due_date history: ${err.message}`);
+            } catch (err: unknown) {
+              console.error(`❌ [${vehicleReg}] Failed to insert mot_due_date history: ${err instanceof Error ? err.message : String(err)}`);
               errorCount++;
             }
           }
@@ -257,8 +256,8 @@ async function backfillFromDvlaSyncLog() {
     console.log(`   ❌ Errors: ${errorCount}`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  } catch (error: any) {
-    console.error('\n❌ Backfill failed:', error.message);
+  } catch (error: unknown) {
+    console.error('\n❌ Backfill failed:', error instanceof Error ? error.message : String(error));
     console.error('\nFull error:', error);
     process.exit(1);
   } finally {

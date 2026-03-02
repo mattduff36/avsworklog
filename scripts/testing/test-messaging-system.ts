@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Comprehensive Automated Test Suite for Internal Messaging System
  * Tests: Database schema, API endpoints, message flow, role-based selection
@@ -9,7 +8,7 @@ import 'dotenv/config';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:4000';
+void (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:4000');
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error('❌ Missing required environment variables');
@@ -45,7 +44,7 @@ async function runTests() {
 
   // Test 1: Verify messages table exists
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('messages')
       .select('id')
       .limit(1);
@@ -57,7 +56,7 @@ async function runTests() {
 
   // Test 2: Verify message_recipients table exists
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('message_recipients')
       .select('id')
       .limit(1);
@@ -105,7 +104,7 @@ async function runTests() {
 
   // Test 5: Verify MESSAGE_TYPE enum
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('messages')
       .select('type')
       .limit(0);
@@ -117,7 +116,7 @@ async function runTests() {
 
   // Test 6: Verify MESSAGE_PRIORITY enum
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('messages')
       .select('priority')
       .limit(0);
@@ -129,7 +128,7 @@ async function runTests() {
 
   // Test 7: Verify MESSAGE_RECIPIENT_STATUS enum
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('message_recipients')
       .select('status')
       .limit(0);
@@ -143,7 +142,7 @@ async function runTests() {
 
   // Test 8: Verify foreign key relationships
   try {
-    const { data: messages, error: msgError } = await supabase
+    const { error: msgError } = await supabase
       .from('messages')
       .select(`
         id,
@@ -162,7 +161,7 @@ async function runTests() {
 
   // Test 9: Verify message_recipients relationships
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('message_recipients')
       .select(`
         id,
@@ -334,7 +333,7 @@ async function runTests() {
       .single();
 
     if (employee) {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('message_recipients')
         .select(`
           id,
@@ -371,7 +370,7 @@ async function runTests() {
       const sixtyDaysAgo = new Date();
       sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('message_recipients')
         .select(`
           id,
@@ -404,7 +403,7 @@ async function runTests() {
 
   // Test 17: Query messages for reporting (manager view)
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('messages')
       .select(`
         id,
@@ -437,7 +436,7 @@ async function runTests() {
       .single();
 
     if (messages) {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('message_recipients')
         .select('id, status')
         .eq('message_id', messages.id);
@@ -491,7 +490,7 @@ async function runTests() {
 
   // Test 21: Get all users by role (for recipient selection)
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('profiles')
       .select('id, full_name, role')
       .eq('role', 'employee-civils');
@@ -519,6 +518,7 @@ async function runTests() {
 
   // Test 23: Verify types file exists
   try {
+    // @ts-expect-error testing file existence
     await import('../types/messages');
     logTest('Types file (types/messages.ts) exists', true);
   } catch (error) {
@@ -527,6 +527,7 @@ async function runTests() {
 
   // Test 24: Verify email utility exists
   try {
+    // @ts-expect-error testing file existence
     const emailUtils = await import('../lib/utils/email');
     const hasSendFunction = typeof emailUtils.sendToolboxTalkEmail === 'function';
     logTest('Email utility (sendToolboxTalkEmail) exists', hasSendFunction, 

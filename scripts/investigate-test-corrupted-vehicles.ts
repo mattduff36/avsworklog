@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Investigate and Fix Test-Corrupted Vehicle Records
  * 

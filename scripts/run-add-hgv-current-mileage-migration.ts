@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve, join } from 'path';
 import fs from 'fs';
@@ -20,7 +19,7 @@ async function main() {
   );
   const sql = fs.readFileSync(sqlPath, 'utf8');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   const client = new Client({
     host: url.hostname,
     port: Number(url.port) || 5432,

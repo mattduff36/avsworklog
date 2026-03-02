@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -89,10 +88,10 @@ async function runMigration() {
     }
 
     console.log('\nView-As Effective-Role migration completed successfully!\n');
-  } catch (error: any) {
+  } catch (err: unknown) {
     console.error('\nMigration failed:');
-    console.error(error.message || error);
-    if (error.message?.includes('already exists')) {
+    console.error(err instanceof Error ? err.message : String(err));
+    if ((err instanceof Error ? err.message : String(err))?.includes('already exists')) {
       console.log('\nAlready applied – no action needed!');
       process.exit(0);
     }

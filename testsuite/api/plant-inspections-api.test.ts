@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Plant Inspections API Integration Tests
  *

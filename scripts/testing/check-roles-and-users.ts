@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Check Roles and Users Script
  * 

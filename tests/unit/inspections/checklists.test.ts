@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { describe, it, expect } from 'vitest';
 import {
   getChecklistForCategory,
@@ -43,7 +42,7 @@ describe('Vehicle Checklists', () => {
     it('all items are non-empty strings', () => {
       for (const category of ['Van', 'Truck', 'Artic', 'Trailer']) {
         const items = getChecklistForCategory(category);
-        items.forEach((item, i) => {
+        items.forEach((item, _i) => {
           expect(typeof item).toBe('string');
           expect(item.trim().length).toBeGreaterThan(0);
         });

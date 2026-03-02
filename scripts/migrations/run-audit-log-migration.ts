@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Client } from 'pg';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -39,14 +38,15 @@ async function runMigration() {
     console.log('  - Created policy for system to insert audit logs');
     console.log('\n🎉 Audit log access is now enabled!');
 
-  } catch (error: any) {
-    console.error('❌ Migration failed:', error.message);
+  } catch (err: unknown) {
+    const pgErr = err as { message: string };
+    console.error('❌ Migration failed:', pgErr.message);
     
     // Check for specific errors
-    if (error.message.includes('already exists')) {
+    if (pgErr.message.includes('already exists')) {
       console.log('\n⚠️  Note: Some objects may already exist. This is usually safe to ignore.');
     } else {
-      console.error('\n📋 Full error:', error);
+      console.error('\n📋 Full error:', err);
       process.exit(1);
     }
   } finally {

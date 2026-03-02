@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Comprehensive RBAC Migration Test Suite
  * 
@@ -22,14 +21,14 @@ interface TestResult {
   name: string;
   passed: boolean;
   message: string;
-  details?: any;
+  details?: unknown;
 }
 
 const results: TestResult[] = [];
 let totalTests = 0;
 let passedTests = 0;
 
-function logTest(name: string, passed: boolean, message: string, details?: any) {
+function logTest(name: string, passed: boolean, message: string, details?: unknown) {
   totalTests++;
   if (passed) passedTests++;
   
@@ -330,12 +329,14 @@ async function runTests() {
     );
 
     // Test 6.2: Verify role structure in joined data
-    const hasRoleStructure = profilesWithRole?.[0]?.role && 
-      'name' in profilesWithRole[0].role &&
-      'display_name' in profilesWithRole[0].role;
+    const roleData = profilesWithRole?.[0]?.role;
+    const roleObj = Array.isArray(roleData) ? roleData[0] : roleData;
+    const hasRoleStructure = roleObj && 
+      'name' in (roleObj as unknown as Record<string, unknown>) &&
+      'display_name' in (roleObj as unknown as Record<string, unknown>);
     logTest(
       'Test 6.2',
-      hasRoleStructure,
+      !!hasRoleStructure,
       hasRoleStructure
         ? 'Role structure correct in joined data'
         : 'Role structure incorrect or missing',

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { createClient } from '@supabase/supabase-js';
@@ -137,8 +136,8 @@ async function testUserCreation() {
     console.log('✅ ALL TESTS PASSED!');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  } catch (error: any) {
-    console.error('❌ Test failed:', error.message);
+  } catch (error: unknown) {
+    console.error('❌ Test failed:', error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }

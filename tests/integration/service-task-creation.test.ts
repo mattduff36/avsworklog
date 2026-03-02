@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Integration tests for service task creation from maintenance alerts
  * 
@@ -10,7 +9,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -29,7 +28,7 @@ if (!supabaseUrl || !supabaseKey) {
 // For now, let's create a simpler direct test
 
 describe('Service Task Creation Integration', () => {
-  let supabase: ReturnType<typeof createClient>;
+  let supabase: SupabaseClient;
   let testUserId: string;
   let testVehicleId: string;
   let testCategoryId: string;
@@ -107,7 +106,7 @@ describe('Service Task Creation Integration', () => {
     }
 
     // Use an existing active category/subcategory where possible to avoid RLS write restrictions.
-    const { data: category, error: categoryError } = await supabase
+    const { data: category, error: _categoryError } = await supabase
       .from('workshop_task_categories')
       .select('id')
       .eq('applies_to', 'van')
@@ -137,7 +136,7 @@ describe('Service Task Creation Integration', () => {
       createdTestCategory = true;
     }
 
-    const { data: subcategory, error: subcategoryError } = await supabase
+    const { data: subcategory, error: _subcategoryError } = await supabase
       .from('workshop_task_subcategories')
       .select('id')
       .eq('category_id', testCategoryId)
@@ -285,8 +284,8 @@ describe('Service Task Creation Integration', () => {
         .eq('van_id', testVehicleId)
         .eq('action_type', 'workshop_vehicle_task');
 
-      const taxTask = fetchedTasks?.find(t => t.title.includes('Tax'));
-      const serviceTask = fetchedTasks?.find(t => t.title.includes('Service'));
+      const taxTask = fetchedTasks?.find((t: { title: string }) => t.title.includes('Tax'));
+      const serviceTask = fetchedTasks?.find((t: { title: string }) => t.title.includes('Service'));
 
       expect(taxTask?.priority).toBe('high');
       expect(serviceTask?.priority).toBe('medium');
@@ -388,8 +387,8 @@ describe('Service Task Creation Integration', () => {
         .eq('title', makeTitle('Service Due - TEST-VEH'));
 
       expect(tasks).toHaveLength(2);
-      expect(tasks?.filter(t => t.status === 'completed')).toHaveLength(1);
-      expect(tasks?.filter(t => t.status === 'pending')).toHaveLength(1);
+      expect(tasks?.filter((t: { status: string }) => t.status === 'completed')).toHaveLength(1);
+      expect(tasks?.filter((t: { status: string }) => t.status === 'pending')).toHaveLength(1);
     });
 
     it('should respect different alert types as different tasks', async () => {
@@ -440,7 +439,7 @@ describe('Service Task Creation Integration', () => {
         .eq('van_id', testVehicleId);
 
       expect(fetchedTasks).toHaveLength(3);
-      expect(fetchedTasks?.map(t => t.title).sort()).toEqual([
+      expect(fetchedTasks?.map((t: { title: string }) => t.title).sort()).toEqual([
         makeTitle('MOT Due - TEST-VEH'),
         makeTitle('Service Due - TEST-VEH'),
         makeTitle('Tax Due - TEST-VEH')
@@ -523,7 +522,7 @@ describe('Service Task Creation Integration', () => {
       expect(fetchedTasks).toHaveLength(5);
       
       // Verify each alert type creates appropriate task
-      const titles = fetchedTasks?.map(t => t.title).sort();
+      const titles = fetchedTasks?.map((t: { title: string }) => t.title).sort();
       expect(titles).toContain(makeTitle('Cambelt Replacement Due - TEST-VEH'));
       expect(titles).toContain(makeTitle('First Aid Kit Expiry - TEST-VEH'));
       expect(titles).toContain(makeTitle('MOT Due - TEST-VEH'));

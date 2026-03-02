@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Force Apply: Maintenance History Plant Support Migration
  * 
@@ -43,8 +42,8 @@ async function forceApplyMigration() {
         ALTER COLUMN van_id DROP NOT NULL;
       `);
       console.log('✅ van_id is now nullable\n');
-    } catch (error: any) {
-      if (error.message.includes('does not exist')) {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message.includes('does not exist')) {
         console.log('✅ van_id was already nullable\n');
       } else {
         throw error;
@@ -59,8 +58,8 @@ async function forceApplyMigration() {
         ADD COLUMN plant_id UUID REFERENCES plant(id) ON DELETE CASCADE;
       `);
       console.log('✅ plant_id column added\n');
-    } catch (error: any) {
-      if (error.message.includes('already exists')) {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message.includes('already exists')) {
         console.log('✅ plant_id column already exists\n');
       } else {
         throw error;
@@ -83,8 +82,8 @@ async function forceApplyMigration() {
         );
       `);
       console.log('✅ Check constraint added\n');
-    } catch (error: any) {
-      console.error('❌ Error adding constraint:', error.message);
+    } catch (error: unknown) {
+      console.error('❌ Error adding constraint:', error instanceof Error ? error.message : String(error));
       throw error;
     }
 
@@ -97,8 +96,8 @@ async function forceApplyMigration() {
           WHERE plant_id IS NOT NULL;
       `);
       console.log('✅ Index created\n');
-    } catch (error: any) {
-      console.error('⚠️  Warning: Could not create index:', error.message);
+    } catch (error: unknown) {
+      console.error('⚠️  Warning: Could not create index:', error instanceof Error ? error.message : String(error));
     }
 
     // Verify final state

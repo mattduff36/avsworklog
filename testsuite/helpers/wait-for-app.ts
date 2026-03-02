@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Waits for the SquiresApp to finish its client-side loading/auth check.
  * The app shows "Loading SquiresApp..." while bootstrapping.

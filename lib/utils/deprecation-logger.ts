@@ -9,7 +9,7 @@ interface DeprecationContext {
   feature: string;
   location: string;
   replacement: string;
-  value?: any;
+  value?: unknown;
 }
 
 /**

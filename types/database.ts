@@ -336,6 +336,38 @@ export interface Database {
           hgv_id: string | null
           tax_due_date: string | null
           mot_due_date: string | null
+          dvla_sync_status: string | null
+          last_dvla_sync: string | null
+          dvla_sync_error: string | null
+          dvla_raw_data: Json | null
+          ves_make: string | null
+          ves_colour: string | null
+          ves_fuel_type: string | null
+          ves_year_of_manufacture: number | null
+          ves_engine_capacity: number | null
+          ves_tax_status: string | null
+          ves_mot_status: string | null
+          ves_co2_emissions: number | null
+          ves_euro_status: string | null
+          ves_real_driving_emissions: string | null
+          ves_type_approval: string | null
+          ves_wheelplan: string | null
+          ves_revenue_weight: number | null
+          ves_marked_for_export: boolean | null
+          ves_month_of_first_registration: string | null
+          ves_date_of_last_v5c_issued: string | null
+          mot_api_sync_status: string | null
+          last_mot_api_sync: string | null
+          mot_api_sync_error: string | null
+          mot_raw_data: Json | null
+          mot_make: string | null
+          mot_model: string | null
+          mot_fuel_type: string | null
+          mot_primary_colour: string | null
+          mot_registration: string | null
+          mot_year_of_manufacture: number | null
+          mot_first_used_date: string | null
+          mot_expiry_date: string | null
           first_aid_kit_expiry: string | null
           six_weekly_inspection_due_date: string | null
           fire_extinguisher_due_date: string | null
@@ -363,6 +395,38 @@ export interface Database {
           hgv_id?: string | null
           tax_due_date?: string | null
           mot_due_date?: string | null
+          dvla_sync_status?: string | null
+          last_dvla_sync?: string | null
+          dvla_sync_error?: string | null
+          dvla_raw_data?: Json | null
+          ves_make?: string | null
+          ves_colour?: string | null
+          ves_fuel_type?: string | null
+          ves_year_of_manufacture?: number | null
+          ves_engine_capacity?: number | null
+          ves_tax_status?: string | null
+          ves_mot_status?: string | null
+          ves_co2_emissions?: number | null
+          ves_euro_status?: string | null
+          ves_real_driving_emissions?: string | null
+          ves_type_approval?: string | null
+          ves_wheelplan?: string | null
+          ves_revenue_weight?: number | null
+          ves_marked_for_export?: boolean | null
+          ves_month_of_first_registration?: string | null
+          ves_date_of_last_v5c_issued?: string | null
+          mot_api_sync_status?: string | null
+          last_mot_api_sync?: string | null
+          mot_api_sync_error?: string | null
+          mot_raw_data?: Json | null
+          mot_make?: string | null
+          mot_model?: string | null
+          mot_fuel_type?: string | null
+          mot_primary_colour?: string | null
+          mot_registration?: string | null
+          mot_year_of_manufacture?: number | null
+          mot_first_used_date?: string | null
+          mot_expiry_date?: string | null
           first_aid_kit_expiry?: string | null
           six_weekly_inspection_due_date?: string | null
           fire_extinguisher_due_date?: string | null
@@ -390,6 +454,38 @@ export interface Database {
           hgv_id?: string | null
           tax_due_date?: string | null
           mot_due_date?: string | null
+          dvla_sync_status?: string | null
+          last_dvla_sync?: string | null
+          dvla_sync_error?: string | null
+          dvla_raw_data?: Json | null
+          ves_make?: string | null
+          ves_colour?: string | null
+          ves_fuel_type?: string | null
+          ves_year_of_manufacture?: number | null
+          ves_engine_capacity?: number | null
+          ves_tax_status?: string | null
+          ves_mot_status?: string | null
+          ves_co2_emissions?: number | null
+          ves_euro_status?: string | null
+          ves_real_driving_emissions?: string | null
+          ves_type_approval?: string | null
+          ves_wheelplan?: string | null
+          ves_revenue_weight?: number | null
+          ves_marked_for_export?: boolean | null
+          ves_month_of_first_registration?: string | null
+          ves_date_of_last_v5c_issued?: string | null
+          mot_api_sync_status?: string | null
+          last_mot_api_sync?: string | null
+          mot_api_sync_error?: string | null
+          mot_raw_data?: Json | null
+          mot_make?: string | null
+          mot_model?: string | null
+          mot_fuel_type?: string | null
+          mot_primary_colour?: string | null
+          mot_registration?: string | null
+          mot_year_of_manufacture?: number | null
+          mot_first_used_date?: string | null
+          mot_expiry_date?: string | null
           first_aid_kit_expiry?: string | null
           six_weekly_inspection_due_date?: string | null
           fire_extinguisher_due_date?: string | null
@@ -409,6 +505,68 @@ export interface Database {
           notes?: string | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      dvla_sync_log: {
+        Row: {
+          id: string
+          van_id: string | null
+          plant_id: string | null
+          hgv_id: string | null
+          registration_number: string
+          sync_status: string
+          error_message: string | null
+          fields_updated: string[] | null
+          tax_due_date_old: string | null
+          tax_due_date_new: string | null
+          mot_due_date_old: string | null
+          mot_due_date_new: string | null
+          api_provider: string | null
+          api_response_time_ms: number | null
+          raw_response: Json | null
+          triggered_by: string | null
+          trigger_type: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          van_id?: string | null
+          plant_id?: string | null
+          hgv_id?: string | null
+          registration_number: string
+          sync_status: string
+          error_message?: string | null
+          fields_updated?: string[] | null
+          tax_due_date_old?: string | null
+          tax_due_date_new?: string | null
+          mot_due_date_old?: string | null
+          mot_due_date_new?: string | null
+          api_provider?: string | null
+          api_response_time_ms?: number | null
+          raw_response?: Json | null
+          triggered_by?: string | null
+          trigger_type: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          van_id?: string | null
+          plant_id?: string | null
+          hgv_id?: string | null
+          registration_number?: string
+          sync_status?: string
+          error_message?: string | null
+          fields_updated?: string[] | null
+          tax_due_date_old?: string | null
+          tax_due_date_new?: string | null
+          mot_due_date_old?: string | null
+          mot_due_date_new?: string | null
+          api_provider?: string | null
+          api_response_time_ms?: number | null
+          raw_response?: Json | null
+          triggered_by?: string | null
+          trigger_type?: string
+          created_at?: string
         }
       }
       maintenance_history: {

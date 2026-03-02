@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Plant Maintenance Feature Validation Script
  * Comprehensive checks for all plant parity features
@@ -57,19 +56,19 @@ async function validateDatabaseSchema() {
 
   try {
     // Check plant_id column in maintenance_history
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('maintenance_history')
       .select('plant_id, van_id')
       .limit(1);
 
     if (error) {
-      addResult('Database Schema', 'maintenance_history.plant_id', 'FAIL', `Error: ${error.message}`);
+      addResult('Database Schema', 'maintenance_history.plant_id', 'FAIL', `Error: ${error instanceof Error ? error.message : String(error)}`);
     } else {
       addResult('Database Schema', 'maintenance_history.plant_id', 'PASS', '✓ Column exists and queryable');
     }
 
     // Check hours-based fields in vehicle_maintenance
-    const { data: maintenance, error: maintenanceError } = await supabase
+    const { error: maintenanceError } = await supabase
       .from('vehicle_maintenance')
       .select('current_hours, last_service_hours, next_service_hours, plant_id')
       .limit(1);
@@ -81,7 +80,7 @@ async function validateDatabaseSchema() {
     }
 
     // Check plant table structure
-    const { data: plant, error: plantError } = await supabase
+    const { error: plantError } = await supabase
       .from('plant')
       .select('loler_due_date, loler_last_inspection_date, loler_certificate_number, current_hours')
       .limit(1);
@@ -92,8 +91,8 @@ async function validateDatabaseSchema() {
       addResult('Database Schema', 'plant LOLER fields', 'PASS', '✓ LOLER fields accessible');
     }
 
-  } catch (error: any) {
-    addResult('Database Schema', 'General', 'FAIL', `Validation error: ${error.message}`);
+  } catch (error: unknown) {
+    addResult('Database Schema', 'General', 'FAIL', `Validation error: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -138,8 +137,8 @@ async function validateComponents() {
     addResult('Component Logic', 'EditPlantRecordDialog hours fields', hasHoursFields ? 'PASS' : 'FAIL',
       hasHoursFields ? '✓ Hours-based fields included' : '✗ Hours fields missing');
 
-  } catch (error: any) {
-    addResult('Component Logic', 'File reading', 'FAIL', `Error: ${error.message}`);
+  } catch (error: unknown) {
+    addResult('Component Logic', 'File reading', 'FAIL', `Error: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -168,8 +167,8 @@ async function validateAPI() {
     addResult('API Implementation', 'History retrieval', hasHistory ? 'PASS' : 'FAIL',
       hasHistory ? '✓ Maintenance history included' : '✗ History retrieval missing');
 
-  } catch (error: any) {
-    addResult('API Implementation', 'File reading', 'FAIL', `Error: ${error.message}`);
+  } catch (error: unknown) {
+    addResult('API Implementation', 'File reading', 'FAIL', `Error: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   // Check maintenance API update endpoint
@@ -186,8 +185,8 @@ async function validateAPI() {
     addResult('API Implementation', 'Maintenance update supports hours', hasHoursFields ? 'PASS' : 'FAIL',
       hasHoursFields ? '✓ Hours-based fields handled' : '✗ Hours fields not handled');
 
-  } catch (error: any) {
-    addResult('API Implementation', 'Maintenance API', 'FAIL', `Error: ${error.message}`);
+  } catch (error: unknown) {
+    addResult('API Implementation', 'Maintenance API', 'FAIL', `Error: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -205,8 +204,8 @@ async function validateHooks() {
     addResult('React Hooks', 'Plant API integration', hasPlantApiCall ? 'PASS' : 'FAIL',
       hasPlantApiCall ? '✓ Calls plant history endpoint' : '✗ API call missing');
 
-  } catch (error: any) {
-    addResult('React Hooks', 'Validation', 'FAIL', `Error: ${error.message}`);
+  } catch (error: unknown) {
+    addResult('React Hooks', 'Validation', 'FAIL', `Error: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -226,8 +225,8 @@ async function validateTypes() {
     addResult('Type Definitions', 'UpdateMaintenanceRequest hours', hasHoursInUpdate ? 'PASS' : 'FAIL',
       hasHoursInUpdate ? '✓ Hours fields in update type' : '✗ Hours fields missing');
 
-  } catch (error: any) {
-    addResult('Type Definitions', 'Maintenance types', 'FAIL', `Error: ${error.message}`);
+  } catch (error: unknown) {
+    addResult('Type Definitions', 'Maintenance types', 'FAIL', `Error: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   // Check database types
@@ -240,8 +239,8 @@ async function validateTypes() {
     addResult('Type Definitions', 'Database types.maintenance_history', hasPlantIdInDbTypes ? 'PASS' : 'FAIL',
       hasPlantIdInDbTypes ? '✓ plant_id in DB types' : '✗ plant_id missing from DB types');
 
-  } catch (error: any) {
-    addResult('Type Definitions', 'Database types', 'FAIL', `Error: ${error.message}`);
+  } catch (error: unknown) {
+    addResult('Type Definitions', 'Database types', 'FAIL', `Error: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -275,8 +274,8 @@ async function validateMigration() {
     addResult('Database Migration', 'Constraint', hasConstraint ? 'PASS' : 'FAIL',
       hasConstraint ? '✓ Either van_id OR plant_id constraint' : '✗ Constraint missing');
 
-  } catch (error: any) {
-    addResult('Database Migration', 'SQL validation', 'FAIL', `Error: ${error.message}`);
+  } catch (error: unknown) {
+    addResult('Database Migration', 'SQL validation', 'FAIL', `Error: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -308,8 +307,8 @@ async function validateTests() {
     addResult('Test Coverage', 'Document/attachment tests', hasDocumentTests ? 'PASS' : 'FAIL',
       hasDocumentTests ? '✓ Document tests present' : '✗ Document tests missing');
 
-  } catch (error: any) {
-    addResult('Test Coverage', 'Validation', 'FAIL', `Error: ${error.message}`);
+  } catch (error: unknown) {
+    addResult('Test Coverage', 'Validation', 'FAIL', `Error: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 

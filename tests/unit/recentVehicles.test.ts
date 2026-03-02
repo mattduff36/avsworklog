@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import {
   getRecentVehicleIds,
@@ -42,8 +41,7 @@ describe('Recent Vehicles Utility', () => {
     // Mock window and localStorage for Node environment
     // @ts-expect-error - mocking global window
     global.window = { localStorage: localStorageMock };
-    // @ts-expect-error - also mock global localStorage
-    global.localStorage = localStorageMock;
+    global.localStorage = localStorageMock as unknown as Storage;
   });
 
   afterEach(() => {

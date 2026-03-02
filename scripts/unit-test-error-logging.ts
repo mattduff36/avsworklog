@@ -1,8 +1,9 @@
-// @ts-nocheck
 /**
  * Unit tests for error logging system
  * Tests the core functionality without requiring a running server
  */
+
+export {};
 
 interface TestResult {
   name: string;
@@ -33,7 +34,7 @@ class MockRequest {
 }
 
 // Extract the context generation logic
-function extractRequestContext(request: any): Record<string, unknown> {
+function extractRequestContext(request: MockRequest): Record<string, unknown> {
   const url = new URL(request.url);
   
   return {
@@ -277,7 +278,7 @@ try {
   
   for (const test of tests_client) {
     const hasMessage = test.error.message.length > 0;
-    const hasStack = test.error.stack !== undefined;
+    void test.error.stack;
     
     if (!hasMessage) {
       allFormatted = false;
@@ -319,7 +320,6 @@ tests.forEach(test => {
   }
 });
 
-// Summary
 const passed = tests.filter(t => t.passed).length;
 const failed = tests.filter(t => !t.passed).length;
 const total = tests.length;

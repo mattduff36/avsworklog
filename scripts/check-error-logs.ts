@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Check Error Logs
  * 
@@ -50,8 +49,17 @@ async function checkErrorLogs() {
     console.log('═══════════════════════════════════════════════════════════\n');
 
     // Group errors by type
-    const errorsByType: Record<string, any[]> = {};
-    errors.forEach(err => {
+    interface ErrorLogEntry {
+      timestamp?: string | number | Date;
+      error_message?: string;
+      page_url?: string;
+      component_name?: string;
+      user_id?: string;
+      error_stack?: string;
+      additional_data?: unknown;
+    }
+    const errorsByType: Record<string, ErrorLogEntry[]> = {};
+    errors.forEach((err: ErrorLogEntry & { error_type?: string }) => {
       const type = err.error_type || 'Unknown';
       if (!errorsByType[type]) {
         errorsByType[type] = [];
@@ -66,7 +74,7 @@ async function checkErrorLogs() {
       
       // Show first 3 of each type
       typeErrors.slice(0, 3).forEach((err, idx) => {
-        const date = new Date(err.timestamp);
+        const date = new Date(err.timestamp ?? Date.now());
         const hoursAgo = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60));
         
         console.log(`\n  [${idx + 1}] ${hoursAgo}h ago - ${date.toLocaleString()}`);
@@ -83,7 +91,7 @@ async function checkErrorLogs() {
         if (err.error_stack) {
           const stackLines = err.error_stack.split('\n').slice(0, 3);
           console.log(`      Stack:`);
-          stackLines.forEach(line => {
+          stackLines.forEach((line: string) => {
             console.log(`        ${line.substring(0, 100)}`);
           });
         }

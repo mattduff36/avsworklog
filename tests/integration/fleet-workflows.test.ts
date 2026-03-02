@@ -1,11 +1,10 @@
-// @ts-nocheck
 /**
  * Fleet Module Integration Tests
  * Tests all workflows for /fleet page including vehicles, maintenance, and categories
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -32,8 +31,7 @@ if (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && 
 }
 
 describe('Fleet Module Workflows', () => {
-  let supabase: ReturnType<typeof createClient>;
-  let testUserId: string;
+  let supabase: SupabaseClient;
   let testVehicleId: string;
 
   beforeAll(async () => {
@@ -46,7 +44,7 @@ describe('Fleet Module Workflows', () => {
     });
 
     if (authError) throw authError;
-    testUserId = authData.user!.id;
+    void authData.user!.id;
   });
 
   afterAll(async () => {
@@ -224,7 +222,7 @@ describe('Fleet Module Workflows', () => {
 
       // Calculate overdue/due soon based on service dates
       const today = new Date();
-      const overdueVehicles = vehicles?.filter(v => {
+      const overdueVehicles = vehicles?.filter((v: { mot_expiry_date?: string }) => {
         if (!v.mot_expiry_date) return false;
         const motDate = new Date(v.mot_expiry_date);
         return motDate < today;

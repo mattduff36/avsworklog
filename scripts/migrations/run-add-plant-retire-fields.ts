@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import pg from 'pg';
@@ -15,7 +14,7 @@ if (!connectionString) {
 }
 
 async function run() {
-  const url = new URL(connectionString!);
+  const url = new URL(connectionString as string);
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,
@@ -41,8 +40,9 @@ async function run() {
     console.log(`Backfilled ${res.rowCount} existing retired record(s)`);
 
     console.log('\nMIGRATION COMPLETE');
-  } catch (err: any) {
-    console.error('MIGRATION FAILED:', err.message);
+  } catch (err: unknown) {
+    const pgErr = err as { message: string };
+    console.error('MIGRATION FAILED:', pgErr.message);
     process.exit(1);
   } finally {
     await client.end();

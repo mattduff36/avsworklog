@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -22,7 +21,7 @@ async function runMigration() {
   console.log('🚀 Running Plant Maintenance Categories migration...\n');
 
   // Parse connection string and rebuild with explicit SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -49,7 +48,7 @@ async function runMigration() {
     console.log('📄 Executing migration...\n');
 
     // Execute the migration
-    const result = await client.query(migrationSQL);
+    await client.query(migrationSQL);
 
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('✅ MIGRATION COMPLETED SUCCESSFULLY!');
@@ -68,20 +67,21 @@ async function runMigration() {
     console.log('   3. See "Plant Maintenance Categories" section');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const pgErr = err as { message?: string; detail?: string; hint?: string; code?: string };
     console.error('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.error('❌ MIGRATION FAILED');
     console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    console.error('Error:', error.message);
-    if (error.detail) {
-      console.error('Details:', error.detail);
+    console.error('Error:', pgErr.message);
+    if (pgErr.detail) {
+      console.error('Details:', pgErr.detail);
     }
-    if (error.hint) {
-      console.error('Hint:', error.hint);
+    if (pgErr.hint) {
+      console.error('Hint:', pgErr.hint);
     }
     
     // Check if already exists (OK if migration was already run)
-    if (error.message?.includes('already exists') || error.message?.includes('duplicate key')) {
+    if (pgErr.message?.includes('already exists') || pgErr.message?.includes('duplicate key')) {
       console.log('\n✅ Categories already exist - migration was previously run!\n');
       process.exit(0);
     }

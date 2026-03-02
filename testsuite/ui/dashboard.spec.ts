@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * @tags @admin @critical
  * Tests dashboard page loading. Uses admin storage state.

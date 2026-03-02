@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Migration runner: Add PDF attachment support to Toolbox Talk messages
  * Adds pdf_file_path column to messages table
@@ -26,7 +25,7 @@ if (!connectionString) {
 async function runMigration() {
   console.log('🚀 Running Toolbox Talk PDF Migration...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,
@@ -72,11 +71,12 @@ async function runMigration() {
     console.log('━'.repeat(80));
     console.log('✅ Toolbox Talk messages can now have optional PDF attachments\n');
 
-  } catch (error: any) {
-    if (error.message?.includes('already exists')) {
+  } catch (err: unknown) {
+    const pgErr = err as { message: string };
+    if (pgErr.message?.includes('already exists')) {
       console.log('✅ Column already exists - migration previously completed\n');
     } else {
-      console.error('❌ Migration failed:', error.message);
+      console.error('❌ Migration failed:', pgErr.message);
       process.exit(1);
     }
   } finally {

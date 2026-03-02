@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Quick Database Schema Check: Verify maintenance_history Structure
  * 

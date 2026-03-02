@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * @tags @critical
  * Tests help/FAQ and absence module pages.

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import { resolve } from 'path';
@@ -46,7 +45,7 @@ async function checkAttachments() {
       console.log('Recent attachments:');
       attachments.forEach((att, idx) => {
         console.log(`${idx + 1}. Task ID: ${att.task_id}`);
-        console.log(`   Template: ${att.workshop_attachment_templates?.name || 'Unknown'}`);
+        console.log(`   Template: ${(att.workshop_attachment_templates as unknown as { name: string } | null)?.name || 'Unknown'}`);
         console.log(`   Created: ${new Date(att.created_at).toLocaleString()}`);
         console.log('');
       });
@@ -74,7 +73,7 @@ async function checkAttachments() {
         console.log('\nTasks with attachments:');
         tasks.forEach(task => {
           const attCount = attachments.filter(a => a.task_id === task.id).length;
-          console.log(`- ${task.vans?.reg_number || 'Unknown'} (${task.status}) - ${attCount} attachment(s)`);
+          console.log(`- ${(task.vans as unknown as { reg_number: string } | null)?.reg_number || 'Unknown'} (${task.status}) - ${attCount} attachment(s)`);
         });
       }
     } else {

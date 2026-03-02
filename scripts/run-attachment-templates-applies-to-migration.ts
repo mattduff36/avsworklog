@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -21,7 +20,7 @@ if (!connectionString) {
 async function runMigration() {
   console.log('🚀 Running Attachment Templates applies_to Migration...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -65,9 +64,9 @@ async function runMigration() {
 
     console.log('\n🎉 Attachment templates applies_to migration complete!\n');
 
-  } catch (error) {
+  } catch (err: unknown) {
     console.error('\n❌ Migration failed:');
-    console.error(error);
+    console.error(err);
     process.exit(1);
   } finally {
     await client.end();

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Analyze Production Errors
  * 
@@ -56,7 +55,7 @@ async function analyzeProductionErrors() {
       
       if (err.error_stack) {
         console.log('\nStack Trace:');
-        err.error_stack.split('\n').slice(0, 10).forEach(line => {
+        err.error_stack.split('\n').slice(0, 10).forEach((line: string) => {
           console.log('  ', line);
         });
       }
@@ -85,7 +84,7 @@ async function analyzeProductionErrors() {
       
       if (err.error_stack) {
         console.log('\nStack Trace:');
-        err.error_stack.split('\n').slice(0, 10).forEach(line => {
+        err.error_stack.split('\n').slice(0, 10).forEach((line: string) => {
           console.log('  ', line);
         });
       }

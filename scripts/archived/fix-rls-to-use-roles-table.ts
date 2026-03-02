@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Migration: Fix RLS policies to use the roles table instead of deprecated profiles.role column
 // Run: npx tsx scripts/fix-rls-to-use-roles-table.ts
 
@@ -25,7 +24,7 @@ async function runMigration() {
   console.log('This migration updates all RLS policies to check roles.is_manager_admin');
   console.log('instead of the deprecated profiles.role column.\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -82,14 +81,14 @@ async function runMigration() {
 
     console.log('\n⚠️  Andy should log out and log back in to refresh his session.');
 
-  } catch (error: any) {
-    console.error('❌ Error:', error.message);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('❌ Error:', msg);
     
-    // If policy already exists, that's OK
-    if (error.message.includes('already exists')) {
+    if (msg.includes('already exists')) {
       console.log('Note: Some policies may already exist, which is fine.');
     } else {
-      throw error;
+      throw err;
     }
   } finally {
     await client.end();

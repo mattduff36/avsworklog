@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Comprehensive Test Suite for Reports System
  * 

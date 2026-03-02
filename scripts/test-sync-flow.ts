@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Test the complete sync flow for FE24 TYO to identify where the wrong date comes from
  */
@@ -34,17 +33,18 @@ async function testSyncFlow() {
     console.log('  lastTestDate:', motExpiryData.lastTestDate);
     console.log('  lastTestResult:', motExpiryData.lastTestResult);
     
+    const rawData = motExpiryData.rawData as unknown as Record<string, unknown>;
     console.log('\n  Raw Data Fields:');
-    console.log('    registrationDate:', motExpiryData.rawData.registrationDate);
-    console.log('    manufactureDate:', motExpiryData.rawData.manufactureDate);
-    console.log('    motTestDueDate:', motExpiryData.rawData.motTestDueDate);
-    console.log('    firstUsedDate:', motExpiryData.rawData.firstUsedDate);
-    console.log('    motTests:', motExpiryData.rawData.motTests?.length || 0);
+    console.log('    registrationDate:', rawData.registrationDate);
+    console.log('    manufactureDate:', rawData.manufactureDate);
+    console.log('    motTestDueDate:', rawData.motTestDueDate);
+    console.log('    firstUsedDate:', rawData.firstUsedDate);
+    console.log('    motTests:', (rawData.motTests as unknown[] | undefined)?.length || 0);
     
     // Step 2: Simulate what the sync route would do
     console.log('\n\n🔄 STEP 2: Simulating sync route logic...\n');
     
-    const motRawData = motExpiryData.rawData;
+    const motRawData = rawData as Record<string, string | undefined>;
     let motDueDate: string | null = null;
     let calculationMethod = '';
     
@@ -63,8 +63,7 @@ async function testSyncFlow() {
       console.log('⚠️  Branch B: Calculating from firstUsedDate');
       console.log('   firstUsedDate:', motRawData.firstUsedDate);
       console.log('   Calculated:', motDueDate);
-    } else if (motRawData?.registrationDate) {
-      // This branch doesn't exist in the code, but maybe it should?
+    } else if (motRawData.registrationDate) {
       const regDate = new Date(motRawData.registrationDate);
       const firstMotDue = new Date(regDate);
       firstMotDue.setFullYear(firstMotDue.getFullYear() + 3);
@@ -101,7 +100,7 @@ async function testSyncFlow() {
       console.log('\n💡 ADDITIONAL INSIGHT:');
       console.log('   The MOT API provides registrationDate:', motRawData.registrationDate);
       console.log('   This could be used as a fallback if firstUsedDate is missing.');
-      console.log('   registrationDate + 3 years =', new Date(new Date(motRawData.registrationDate).setFullYear(new Date(motRawData.registrationDate).getFullYear() + 3)).toISOString().split('T')[0]);
+      console.log('   registrationDate + 3 years =', new Date(new Date(motRawData.registrationDate!).setFullYear(new Date(motRawData.registrationDate!).getFullYear() + 3)).toISOString().split('T')[0]);
     }
     
   } catch (error) {

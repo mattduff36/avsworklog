@@ -37,8 +37,9 @@ export class DVLAApiService {
         default:
           throw new Error(`Unsupported provider: ${this.provider}`);
       }
-    } catch (error: any) {
-      throw new Error(`DVLA API Error: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`DVLA API Error: ${message}`);
     }
   }
 
@@ -62,7 +63,7 @@ export class DVLAApiService {
       throw new Error(`API request failed: ${response.status} - ${errorData.message || response.statusText}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     return this.normalizeVESResponse(data);
   }
 
@@ -85,7 +86,7 @@ export class DVLAApiService {
       throw new Error(`API request failed: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     return this.normalizeVehicleSmartResponse(data);
   }
 
@@ -104,7 +105,7 @@ export class DVLAApiService {
       throw new Error(`API request failed: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     return this.normalizeCheckCarDetailsResponse(data);
   }
 
@@ -127,39 +128,49 @@ export class DVLAApiService {
       throw new Error(`API request failed: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     return this.normalizeVehicleDataGlobalResponse(data);
+  }
+
+  private static str(v: unknown): string | null {
+    return typeof v === 'string' ? v : null;
+  }
+  private static num(v: unknown): number | null {
+    return typeof v === 'number' ? v : null;
+  }
+  private static bool(v: unknown): boolean {
+    return v === true;
   }
 
   /**
    * Normalize VES (GOV.UK) response to common format
    * Includes ALL fields returned by VES API for complete vehicle data storage
    */
-  private normalizeVESResponse(data: any): VehicleDataResponse {
+  private normalizeVESResponse(data: Record<string, unknown>): VehicleDataResponse {
     return {
-      registrationNumber: data.registrationNumber,
-      taxStatus: data.taxStatus || null,
-      taxDueDate: data.taxDueDate || null,
-      motStatus: data.motStatus || null,
+      registrationNumber: DVLAApiService.str(data.registrationNumber) ?? '',
+      taxStatus: DVLAApiService.str(data.taxStatus) ?? null,
+      taxDueDate: DVLAApiService.str(data.taxDueDate) ?? null,
+      motStatus: DVLAApiService.str(data.motStatus) ?? null,
       motExpiryDate: null, // VES API doesn't provide MOT expiry date, only status text
-      make: data.make || null,
+      make: DVLAApiService.str(data.make) ?? null,
       model: null, // VES API doesn't provide model
-      colour: data.colour || null,
-      yearOfManufacture: data.yearOfManufacture || null,
-      engineSize: data.engineCapacity || null,
-      fuelType: data.fuelType || null,
-      co2Emissions: data.co2Emissions || null,
-      
+      colour: DVLAApiService.str(data.colour) ?? null,
+      yearOfManufacture: DVLAApiService.num(data.yearOfManufacture) ?? null,
+      engineSize: DVLAApiService.num(data.engineCapacity) ?? null,
+      fuelType: DVLAApiService.str(data.fuelType) ?? null,
+      co2Emissions: DVLAApiService.num(data.co2Emissions) ?? null,
+
       // Additional VES fields for comprehensive vehicle data
-      euroStatus: data.euroStatus || null,
-      realDrivingEmissions: data.realDrivingEmissions || null,
-      typeApproval: data.typeApproval || null,
-      wheelplan: data.wheelplan || null,
-      revenueWeight: data.revenueWeight || null,
-      markedForExport: data.markedForExport || false,
-      monthOfFirstRegistration: data.monthOfFirstRegistration || null,
-      dateOfLastV5CIssued: data.dateOfLastV5CIssued || null,
-      
+      euroStatus: DVLAApiService.str(data.euroStatus) ?? null,
+      realDrivingEmissions: DVLAApiService.str(data.realDrivingEmissions) ?? null,
+      typeApproval: DVLAApiService.str(data.typeApproval) ?? null,
+      wheelplan: DVLAApiService.str(data.wheelplan) ?? null,
+      revenueWeight: DVLAApiService.num(data.revenueWeight) ?? null,
+      markedForExport: DVLAApiService.bool(data.markedForExport),
+      monthOfFirstRegistration: DVLAApiService.str(data.monthOfFirstRegistration) ?? null,
+      dateOfLastV5CIssued: DVLAApiService.str(data.dateOfLastV5CIssued) ?? null,
+
       rawData: data,
     };
   }
@@ -167,20 +178,20 @@ export class DVLAApiService {
   /**
    * Normalize Vehicle Smart response to common format
    */
-  private normalizeVehicleSmartResponse(data: any): VehicleDataResponse {
+  private normalizeVehicleSmartResponse(data: Record<string, unknown>): VehicleDataResponse {
     return {
-      registrationNumber: data.RegistrationNumber || data.registrationNumber,
-      taxStatus: data.TaxStatus || data.taxStatus,
-      taxDueDate: data.TaxDueDate || data.taxDueDate || null,
-      motStatus: data.MotStatus || data.motStatus,
-      motExpiryDate: data.MotExpiryDate || data.motExpiryDate || null,
-      make: data.Make || data.make || null,
-      model: data.Model || data.model || null,
-      colour: data.Colour || data.colour || null,
-      yearOfManufacture: data.YearOfManufacture || data.yearOfManufacture || null,
-      engineSize: data.EngineCapacity || data.engineSize || null,
-      fuelType: data.FuelType || data.fuelType || null,
-      co2Emissions: data.Co2Emissions || data.co2Emissions || null,
+      registrationNumber: DVLAApiService.str(data.RegistrationNumber ?? data.registrationNumber) ?? '',
+      taxStatus: DVLAApiService.str(data.TaxStatus ?? data.taxStatus) ?? null,
+      taxDueDate: DVLAApiService.str(data.TaxDueDate ?? data.taxDueDate) ?? null,
+      motStatus: DVLAApiService.str(data.MotStatus ?? data.motStatus) ?? null,
+      motExpiryDate: DVLAApiService.str(data.MotExpiryDate ?? data.motExpiryDate) ?? null,
+      make: DVLAApiService.str(data.Make ?? data.make) ?? null,
+      model: DVLAApiService.str(data.Model ?? data.model) ?? null,
+      colour: DVLAApiService.str(data.Colour ?? data.colour) ?? null,
+      yearOfManufacture: DVLAApiService.num(data.YearOfManufacture ?? data.yearOfManufacture) ?? null,
+      engineSize: DVLAApiService.num(data.EngineCapacity ?? data.engineSize) ?? null,
+      fuelType: DVLAApiService.str(data.FuelType ?? data.fuelType) ?? null,
+      co2Emissions: DVLAApiService.num(data.Co2Emissions ?? data.co2Emissions) ?? null,
       rawData: data,
     };
   }
@@ -188,20 +199,20 @@ export class DVLAApiService {
   /**
    * Normalize Check Car Details response to common format
    */
-  private normalizeCheckCarDetailsResponse(data: any): VehicleDataResponse {
+  private normalizeCheckCarDetailsResponse(data: Record<string, unknown>): VehicleDataResponse {
     return {
-      registrationNumber: data.vrm || data.registrationMark,
-      taxStatus: data.vehicleTaxStatus || data.taxStatus,
-      taxDueDate: data.vehicleTaxDueDate || data.taxDueDate || null,
-      motStatus: data.motStatus,
-      motExpiryDate: data.motExpiryDate || null,
-      make: data.make || null,
-      model: data.model || null,
-      colour: data.colour || null,
-      yearOfManufacture: data.yearOfManufacture || null,
-      engineSize: data.engineCapacity || null,
-      fuelType: data.fuelType || null,
-      co2Emissions: data.co2Emissions || null,
+      registrationNumber: DVLAApiService.str(data.vrm ?? data.registrationMark) ?? '',
+      taxStatus: DVLAApiService.str(data.vehicleTaxStatus ?? data.taxStatus) ?? null,
+      taxDueDate: DVLAApiService.str(data.vehicleTaxDueDate ?? data.taxDueDate) ?? null,
+      motStatus: DVLAApiService.str(data.motStatus) ?? null,
+      motExpiryDate: DVLAApiService.str(data.motExpiryDate) ?? null,
+      make: DVLAApiService.str(data.make) ?? null,
+      model: DVLAApiService.str(data.model) ?? null,
+      colour: DVLAApiService.str(data.colour) ?? null,
+      yearOfManufacture: DVLAApiService.num(data.yearOfManufacture) ?? null,
+      engineSize: DVLAApiService.num(data.engineCapacity) ?? null,
+      fuelType: DVLAApiService.str(data.fuelType) ?? null,
+      co2Emissions: DVLAApiService.num(data.co2Emissions) ?? null,
       rawData: data,
     };
   }
@@ -209,20 +220,20 @@ export class DVLAApiService {
   /**
    * Normalize Vehicle Data Global response to common format
    */
-  private normalizeVehicleDataGlobalResponse(data: any): VehicleDataResponse {
+  private normalizeVehicleDataGlobalResponse(data: Record<string, unknown>): VehicleDataResponse {
     return {
-      registrationNumber: data.vrm,
-      taxStatus: data.taxStatus,
-      taxDueDate: data.taxDueDate || null,
-      motStatus: data.motStatus,
-      motExpiryDate: data.motExpiryDate || null,
-      make: data.make || null,
-      model: data.model || null,
-      colour: data.colour || null,
-      yearOfManufacture: data.manufactureYear || null,
-      engineSize: data.engineCapacity || null,
-      fuelType: data.fuelType || null,
-      co2Emissions: data.co2Emissions || null,
+      registrationNumber: DVLAApiService.str(data.vrm) ?? '',
+      taxStatus: DVLAApiService.str(data.taxStatus) ?? null,
+      taxDueDate: DVLAApiService.str(data.taxDueDate) ?? null,
+      motStatus: DVLAApiService.str(data.motStatus) ?? null,
+      motExpiryDate: DVLAApiService.str(data.motExpiryDate) ?? null,
+      make: DVLAApiService.str(data.make) ?? null,
+      model: DVLAApiService.str(data.model) ?? null,
+      colour: DVLAApiService.str(data.colour) ?? null,
+      yearOfManufacture: DVLAApiService.num(data.manufactureYear) ?? null,
+      engineSize: DVLAApiService.num(data.engineCapacity) ?? null,
+      fuelType: DVLAApiService.str(data.fuelType) ?? null,
+      co2Emissions: DVLAApiService.num(data.co2Emissions) ?? null,
       rawData: data,
     };
   }

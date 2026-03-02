@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Fix the incorrect MOT due date for FE24 TYO by running a manual sync
  */
@@ -18,7 +17,7 @@ async function fixMotDate() {
     process.exit(1);
   }
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   const client = new pg.Client({
     host: url.hostname,
     port: parseInt(url.port),
@@ -61,13 +60,15 @@ async function fixMotDate() {
 
     const motData = await motService.getMotExpiryData('FE24TYO');
     
+    const rawData = motData.rawData as unknown as Record<string, unknown>;
+
     console.log('\n✅ MOT API Response:');
     console.log('   motExpiryDate:', motData.motExpiryDate);
     console.log('   motStatus:', motData.motStatus);
     console.log('   Raw data fields:');
-    console.log('     registrationDate:', motData.rawData.registrationDate);
-    console.log('     motTestDueDate:', motData.rawData.motTestDueDate);
-    console.log('     firstUsedDate:', motData.rawData.firstUsedDate);
+    console.log('     registrationDate:', rawData.registrationDate);
+    console.log('     motTestDueDate:', rawData.motTestDueDate);
+    console.log('     firstUsedDate:', rawData.firstUsedDate);
 
     if (!motData.motExpiryDate) {
       console.error('\n❌ No MOT expiry date returned from API');
@@ -77,7 +78,7 @@ async function fixMotDate() {
     // Update the database
     console.log('\n💾 Updating database...');
     
-    const updates: any = {
+    const updates: Record<string, unknown> = {
       mot_due_date: motData.motExpiryDate,
       mot_expiry_date: motData.motExpiryDate,
       mot_raw_data: JSON.stringify(motData.rawData),
@@ -87,14 +88,13 @@ async function fixMotDate() {
       updated_at: new Date().toISOString(),
     };
 
-    // Add additional fields from raw data
-    if (motData.rawData.make) updates.mot_make = motData.rawData.make;
-    if (motData.rawData.model) updates.mot_model = motData.rawData.model;
-    if (motData.rawData.fuelType) updates.mot_fuel_type = motData.rawData.fuelType;
-    if (motData.rawData.primaryColour) updates.mot_primary_colour = motData.rawData.primaryColour;
-    if (motData.rawData.registration) updates.mot_registration = motData.rawData.registration;
-    if (motData.rawData.manufactureYear) updates.mot_year_of_manufacture = parseInt(motData.rawData.manufactureYear);
-    if (motData.rawData.registrationDate) updates.mot_first_used_date = motData.rawData.registrationDate;
+    if (rawData.make) updates.mot_make = rawData.make;
+    if (rawData.model) updates.mot_model = rawData.model;
+    if (rawData.fuelType) updates.mot_fuel_type = rawData.fuelType;
+    if (rawData.primaryColour) updates.mot_primary_colour = rawData.primaryColour;
+    if (rawData.registration) updates.mot_registration = rawData.registration;
+    if (rawData.manufactureYear) updates.mot_year_of_manufacture = parseInt(String(rawData.manufactureYear));
+    if (rawData.registrationDate) updates.mot_first_used_date = rawData.registrationDate;
 
     // Check if record exists
     const checkResult = await client.query(
@@ -133,10 +133,10 @@ async function fixMotDate() {
     console.log('   New MOT Due Date:', motData.motExpiryDate, '✅');
     console.log('\n' + '='.repeat(70));
 
-  } catch (error) {
-    console.error('\n❌ Error:', error);
-    if (error instanceof Error && error.stack) {
-      console.error('\nStack trace:', error.stack);
+  } catch (err: unknown) {
+    console.error('\n❌ Error:', err);
+    if (err instanceof Error && (err instanceof Error ? err.stack : undefined)) {
+      console.error('\nStack trace:', (err instanceof Error ? err.stack : undefined));
     }
     process.exit(1);
   } finally {

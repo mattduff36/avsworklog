@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Diagnostic script to check user permissions and role setup
 // Run: npx tsx scripts/diagnose-user-permissions.ts
 
@@ -23,7 +22,7 @@ async function diagnoseUserPermissions() {
   console.log('🔍 Diagnosing User Permissions\n');
   console.log('Checking Andy Hill (andy@avsquires.co.uk)...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -149,8 +148,8 @@ async function diagnoseUserPermissions() {
     console.log('   3. Log back in');
     console.log('   The auth hook caches the profile/role data in the session.');
 
-  } catch (error: any) {
-    console.error('❌ Error:', error.message);
+  } catch (error: unknown) {
+    console.error('❌ Error:', error instanceof Error ? error.message : String(error));
     console.error(error);
   } finally {
     await client.end();

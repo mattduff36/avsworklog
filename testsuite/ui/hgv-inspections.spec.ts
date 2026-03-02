@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * E2E: HGV Inspections Workflow
  *

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -22,7 +21,7 @@ async function runMigration() {
   console.log('🚀 Running Profile Trigger Fix Migration...\n');
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
   
   const client = new Client({
     host: url.hostname,
@@ -78,10 +77,11 @@ async function runMigration() {
       console.log('⚠️  Warning: Trigger not found');
     }
 
-  } catch (error: any) {
-    console.error('❌ MIGRATION FAILED:', error.message);
+  } catch (err: unknown) {
+    const pgErr = err as { message: string };
+    console.error('❌ MIGRATION FAILED:', pgErr.message);
     
-    if (error.message?.includes('already exists')) {
+    if (pgErr.message?.includes('already exists')) {
       console.log('✅ Already applied - no action needed!');
       process.exit(0);
     }

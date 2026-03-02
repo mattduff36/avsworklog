@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Update Vehicle Types Migration
  * Sets all NULL or empty vehicle_type values to 'Van' (except TE57 HGV)
@@ -29,7 +28,7 @@ async function runVehicleTypesUpdate() {
   console.log('🚗 Updating Vehicle Types...\n');
 
   // Parse connection string and rebuild with explicit SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
   
   const client = new Client({
     host: url.hostname,

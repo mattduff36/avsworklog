@@ -1,5 +1,4 @@
 #!/usr/bin/env tsx
-// @ts-nocheck
 /**
  * Static audit script for input/textarea/select contrast issues
  * Scans TSX files for form components with risky class combinations

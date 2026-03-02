@@ -1,9 +1,5 @@
-// @ts-nocheck
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { POST as UploadRAMS } from '@/app/api/rams/upload/route';
-import { POST as AssignRAMS } from '@/app/api/rams/[id]/assign/route';
-import { createMockManager, createMockProfile } from '../../utils/factories';
-import { mockSupabaseAuthUser, mockSupabaseQuery, resetAllMocks } from '../../utils/test-helpers';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { resetAllMocks } from '../../utils/test-helpers';
 
 describe('RAMS API', () => {
   beforeEach(() => {

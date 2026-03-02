@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Fix vehicles that are in van_archive but still showing as active
  * This happened when the archive succeeded but the DELETE failed due to FK constraints
@@ -84,9 +83,9 @@ async function fixArchivedVehicles() {
     console.log('[INFO] Active vehicles list will no longer show these vehicles.');
     console.log('[INFO] They will only appear in the "Deleted Vehicles" tab.');
 
-  } catch (error) {
-    console.error('[ERROR] Failed to fix archived vehicles:', error);
-    throw error;
+  } catch (err: unknown) {
+    console.error('[ERROR] Failed to fix archived vehicles:', err);
+    throw err;
   } finally {
     await client.end();
     console.log('\n[INFO] Database connection closed.');
@@ -99,8 +98,8 @@ fixArchivedVehicles()
     console.log('\n✅ Fix completed successfully');
     process.exit(0);
   })
-  .catch((error) => {
-    console.error('\n❌ Fix failed:', error.message);
+  .catch((err: unknown) => {
+    console.error('\n❌ Fix failed:', (err instanceof Error ? err.message : String(err)));
     process.exit(1);
   });
 

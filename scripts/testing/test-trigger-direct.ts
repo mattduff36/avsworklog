@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import pg from 'pg';
@@ -17,7 +16,7 @@ if (!connectionString) {
 async function testTrigger() {
   console.log('🧪 Testing trigger directly...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -141,10 +140,11 @@ async function testTrigger() {
     console.log('✅ TRIGGER TEST PASSED!');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  } catch (error: any) {
-    console.error('❌ Test failed:', error.message);
-    if (error.detail) console.error('Details:', error.detail);
-    if (error.hint) console.error('Hint:', error.hint);
+  } catch (error: unknown) {
+    const err = error as { message?: string; detail?: string; hint?: string };
+    console.error('❌ Test failed:', err.message ?? String(error));
+    if (err.detail) console.error('Details:', err.detail);
+    if (err.hint) console.error('Hint:', err.hint);
     process.exit(1);
   } finally {
     await client.end();

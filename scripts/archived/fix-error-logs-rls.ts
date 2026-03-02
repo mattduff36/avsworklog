@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Fix error_logs RLS policies to use JWT email instead of auth.users query
  */
@@ -24,7 +23,7 @@ if (!connectionString) {
 async function runMigration() {
   console.log('🚀 Fixing error_logs RLS policies...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -69,8 +68,8 @@ async function runMigration() {
 
     console.log('\n🎉 Done! Error logs should now be accessible.');
 
-  } catch (error: any) {
-    console.error('❌ FAILED:', error.message);
+  } catch (err: unknown) {
+    console.error('❌ FAILED:', err instanceof Error ? err.message : err);
     process.exit(1);
   } finally {
     await client.end();

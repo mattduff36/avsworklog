@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Clear All Error Logs
  * 

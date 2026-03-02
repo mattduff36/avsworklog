@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Run Messages Database Migration
  * Creates messages and message_recipients tables
@@ -33,7 +32,7 @@ async function runMessagesMigration() {
   console.log('🚀 Running Messages System Database Migration...\n');
 
   // Parse connection string and rebuild with explicit SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
   
   const client = new Client({
     host: url.hostname,

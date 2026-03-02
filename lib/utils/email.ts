@@ -154,14 +154,14 @@ export async function sendPasswordEmail(params: SendPasswordEmailParams): Promis
     });
     
     if (!response.ok) {
-      const error = await response.json();
+      const error = (await response.json()) as { message?: string };
       console.error('Resend API error:', error);
       return {
         success: false,
-        error: `Failed to send email: ${error.message || 'Unknown error'}`
+        error: `Failed to send email: ${error.message ?? 'Unknown error'}`
       };
     }
-    
+
     const data = await response.json();
     console.log('Email sent successfully:', data);
     
@@ -169,11 +169,12 @@ export async function sendPasswordEmail(params: SendPasswordEmailParams): Promis
       success: true
     };
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error sending password email:', error);
+    const message = error instanceof Error ? error.message : 'Failed to send email';
     return {
       success: false,
-      error: error.message || 'Failed to send email'
+      error: message
     };
   }
 }
@@ -328,14 +329,14 @@ export async function sendProfileUpdateEmail(params: SendProfileUpdateEmailParam
     });
     
     if (!response.ok) {
-      const error = await response.json();
+      const error = (await response.json()) as { message?: string };
       console.error('Resend API error:', error);
       return {
         success: false,
-        error: `Failed to send email: ${error.message || 'Unknown error'}`
+        error: `Failed to send email: ${error.message ?? 'Unknown error'}`
       };
     }
-    
+
     const data = await response.json();
     console.log('Profile update email sent successfully:', data);
     
@@ -343,11 +344,12 @@ export async function sendProfileUpdateEmail(params: SendProfileUpdateEmailParam
       success: true
     };
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error sending profile update email:', error);
+    const message = error instanceof Error ? error.message : 'Failed to send email';
     return {
       success: false,
-      error: error.message || 'Failed to send email'
+      error: message
     };
   }
 }
@@ -500,11 +502,12 @@ export async function sendToolboxTalkEmail(params: SendToolboxTalkEmailParams): 
       failed
     };
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error sending Toolbox Talk emails:', error);
+    const message = error instanceof Error ? error.message : 'Failed to send emails';
     return {
       success: false,
-      error: error.message || 'Failed to send emails'
+      error: message
     };
   }
 }
@@ -673,11 +676,12 @@ export async function sendMaintenanceReminderEmail(params: SendMaintenanceRemind
       failed
     };
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error sending maintenance reminder emails:', error);
+    const message = error instanceof Error ? error.message : 'Failed to send emails';
     return {
       success: false,
-      error: error.message || 'Failed to send emails'
+      error: message
     };
   }
 }
@@ -777,24 +781,25 @@ export async function sendTimesheetRejectionEmail(params: SendTimesheetRejection
     });
     
     if (!response.ok) {
-      const error = await response.json();
+      const error = (await response.json()) as { message?: string };
       console.error('Resend API error:', error);
       return {
         success: false,
-        error: `Failed to send email: ${error.message || 'Unknown error'}`
+        error: `Failed to send email: ${error.message ?? 'Unknown error'}`
       };
     }
-    
+
     const data = await response.json();
     console.log('Timesheet rejection email sent successfully:', data);
     
     return { success: true };
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error sending timesheet rejection email:', error);
+    const message = error instanceof Error ? error.message : 'Failed to send email';
     return {
       success: false,
-      error: error.message || 'Failed to send email'
+      error: message
     };
   }
 }
@@ -899,24 +904,25 @@ export async function sendTimesheetAdjustmentEmail(params: SendTimesheetAdjustme
     });
     
     if (!response.ok) {
-      const error = await response.json();
+      const error = (await response.json()) as { message?: string };
       console.error('Resend API error:', error);
       return {
         success: false,
-        error: `Failed to send email: ${error.message || 'Unknown error'}`
+        error: `Failed to send email: ${error.message ?? 'Unknown error'}`
       };
     }
-    
+
     const data = await response.json();
     console.log('Timesheet adjustment email sent successfully:', data);
     
     return { success: true };
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error sending timesheet adjustment email:', error);
+    const message = error instanceof Error ? error.message : 'Failed to send email';
     return {
       success: false,
-      error: error.message || 'Failed to send email'
+      error: message
     };
   }
 }
@@ -1083,11 +1089,12 @@ export async function sendErrorReportEmailToAdmins(params: SendErrorReportEmailT
       failed
     };
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error sending error report emails:', error);
+    const message = error instanceof Error ? error.message : 'Failed to send emails';
     return {
       success: false,
-      error: error.message || 'Failed to send emails'
+      error: message
     };
   }
 }
@@ -1127,11 +1134,12 @@ export async function sendTestTimesheetEmails(adminEmail: string): Promise<{
 
     return adjustmentResult;
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error sending test emails:', error);
+    const message = error instanceof Error ? error.message : 'Failed to send test emails';
     return {
       success: false,
-      error: error.message || 'Failed to send test emails'
+      error: message
     };
   }
 }

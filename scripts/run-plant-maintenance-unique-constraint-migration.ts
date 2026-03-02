@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Run Plant Maintenance Unique Constraint Migration
  * 
@@ -92,23 +91,23 @@ async function runMigration() {
     console.log('2. Test workshop task editing for plant assets');
     console.log('3. Verify no duplicate maintenance records are created');
 
-  } catch (error) {
+  } catch (err: unknown) {
     console.error('');
-    console.error('❌ Migration failed:', error);
+    console.error('❌ Migration failed:', err);
     console.error('');
     console.error('Manual fix instructions:');
     console.error('1. Open Supabase Dashboard SQL Editor');
     console.error('2. Copy contents of:');
     console.error('   supabase/migrations/20260204_add_plant_maintenance_unique_constraint.sql');
     console.error('3. Paste and execute in SQL editor');
-    throw error;
+    throw err;
   } finally {
     await client.end();
   }
 }
 
 // Run migration
-runMigration().catch((error) => {
-  console.error('Fatal error:', error);
+runMigration().catch((err: unknown) => {
+  console.error('Fatal error:', err);
   process.exit(1);
 });

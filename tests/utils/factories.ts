@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Timesheet, TimesheetEntry } from '@/types/timesheet';
 
 export const createMockTimesheet = (overrides?: Partial<Timesheet>): Timesheet => ({
@@ -38,7 +37,7 @@ export const createMockTimesheetEntry = (overrides?: Partial<TimesheetEntry>): T
   ...overrides,
 });
 
-export const createMockProfile = (overrides?: any) => ({
+export const createMockProfile = (overrides?: Record<string, unknown>) => ({
   id: 'test-profile-id',
   full_name: 'Test User',
   email: 'test@example.com',
@@ -93,7 +92,7 @@ export const createSuzanneSquires = () =>
 
 // API response format factories (transformed from database schema)
 // These match the shape returned by /api/timesheets/managers
-export const createManagerApiResponse = (overrides?: any) => ({
+export const createManagerApiResponse = (overrides?: Record<string, unknown>) => ({
   id: 'manager-id',
   full_name: 'Test Manager',
   email: 'manager@example.com',

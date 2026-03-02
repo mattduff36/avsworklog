@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Test: Draft Inspection Re-save with User Authentication
  * 
@@ -10,7 +9,7 @@
  * Run: npx tsx scripts/test-draft-resave-with-user-auth.ts
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import { resolve } from 'path';
 
@@ -126,7 +125,7 @@ async function testDraftResave() {
 
     if (mondayError) {
       console.error('❌ Failed to add Monday items:', mondayError);
-      await cleanup(adminClient, testInspectionId);
+      await cleanup(adminClient, testInspectionId!);
       process.exit(1);
     }
 
@@ -137,11 +136,11 @@ async function testDraftResave() {
     const { data: itemsAfterMonday, error: verifyError } = await adminClient
       .from('inspection_items')
       .select('*')
-      .eq('inspection_id', testInspectionId);
+      .eq('inspection_id', testInspectionId!);
 
     if (verifyError) {
       console.error('❌ Failed to verify items:', verifyError);
-      await cleanup(adminClient, testInspectionId);
+      await cleanup(adminClient, testInspectionId!);
       process.exit(1);
     }
 
@@ -156,13 +155,13 @@ async function testDraftResave() {
     const { data: deletedData, error: deleteError } = await adminClient
       .from('inspection_items')
       .delete()
-      .eq('inspection_id', testInspectionId)
+      .eq('inspection_id', testInspectionId!)
       .select();
 
     if (deleteError) {
       console.error('   ❌ DELETE FAILED:', deleteError.message);
       console.log('\n🔴 The DELETE policy may not be working correctly!');
-      await cleanup(adminClient, testInspectionId);
+      await cleanup(adminClient, testInspectionId!);
       process.exit(1);
     }
 
@@ -201,7 +200,7 @@ async function testDraftResave() {
     if (insertError) {
       console.error('   ❌ INSERT FAILED:', insertError.message);
       console.log('\n🔴 DUPLICATE KEY ERROR - The fix did not work!');
-      await cleanup(adminClient, testInspectionId);
+      await cleanup(adminClient, testInspectionId!);
       process.exit(1);
     }
 
@@ -212,7 +211,7 @@ async function testDraftResave() {
     const { data: finalItems } = await adminClient
       .from('inspection_items')
       .select('*')
-      .eq('inspection_id', testInspectionId)
+      .eq('inspection_id', testInspectionId!)
       .order('day_of_week', { ascending: true })
       .order('item_number', { ascending: true });
 
@@ -225,7 +224,7 @@ async function testDraftResave() {
     console.log(`   - Total items: ${finalItems?.length || 0} (expected 28)\n`);
 
     // Cleanup
-    await cleanup(adminClient, testInspectionId);
+    await cleanup(adminClient, testInspectionId!);
 
     // Final verdict
     if (mondayCount === 14 && tuesdayCount === 14 && finalItems?.length === 28) {
@@ -245,13 +244,14 @@ async function testDraftResave() {
       process.exit(1);
     }
 
-  } catch (error: any) {
-    console.error('\n❌ Test failed with error:', error.message);
-    if (error.code) {
-      console.error('   Error code:', error.code);
+  } catch (error: unknown) {
+    const err = error as { message?: string; code?: string; details?: string };
+    console.error('\n❌ Test failed with error:', err.message ?? String(error));
+    if (err.code) {
+      console.error('   Error code:', err.code);
     }
-    if (error.details) {
-      console.error('   Details:', error.details);
+    if (err.details) {
+      console.error('   Details:', err.details);
     }
     
     // Cleanup on error
@@ -265,7 +265,7 @@ async function testDraftResave() {
   }
 }
 
-async function cleanup(client: any, inspectionId: string) {
+async function cleanup(client: SupabaseClient, inspectionId: string) {
   console.log('🧹 Cleaning up test data...');
   await client
     .from('van_inspections')

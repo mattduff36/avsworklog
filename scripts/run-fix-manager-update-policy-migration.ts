@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -20,7 +19,7 @@ if (!connectionString) {
 async function runMigration() {
   console.log('🚀 Running Manager Update Policy Hotfix...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
 
   const client = new Client({
     host: url.hostname,
@@ -70,9 +69,9 @@ async function runMigration() {
 
     console.log('\n✅ All done!');
 
-  } catch (error: any) {
-    console.error('❌ MIGRATION FAILED:', error.message);
-    console.error('\nFull error:', error);
+  } catch (err: unknown) {
+    console.error('❌ MIGRATION FAILED:', (err instanceof Error ? err.message : String(err)));
+    console.error('\nFull err:', err);
     process.exit(1);
   } finally {
     await client.end();

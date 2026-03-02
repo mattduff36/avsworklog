@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Static Guard: No runtime references to vehicle_inspections + stale labels
  *

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { createClient } from '@supabase/supabase-js';
@@ -53,9 +52,10 @@ async function testRAMSAssignment() {
 
     if (profiles && profiles.length > 0) {
       console.log('📋 Employees with RAMS access:');
-      profiles.forEach((profile: any) => {
+      profiles.forEach((profile: { full_name?: string; roles?: { display_name?: string } | { display_name?: string }[]; role_id?: string }) => {
         console.log(`   - ${profile.full_name}`);
-        console.log(`     Role: ${profile.roles?.display_name || 'No Role'}`);
+        const r = Array.isArray(profile.roles) ? profile.roles[0] : profile.roles;
+        console.log(`     Role: ${r?.display_name || 'No Role'}`);
         console.log(`     Role ID: ${profile.role_id}`);
         console.log('');
       });
@@ -75,7 +75,7 @@ async function testRAMSAssignment() {
       console.error('❌ Permissions query error:', permError);
     } else {
       console.log(`✅ Found ${permissions?.length || 0} role(s) with RAMS permission enabled:`);
-      permissions?.forEach((perm: any) => {
+      permissions?.forEach((perm: { roles?: { display_name?: string; name?: string } }) => {
         console.log(`   - ${perm.roles?.display_name || 'Unknown'} (${perm.roles?.name})`);
       });
     }
@@ -84,8 +84,8 @@ async function testRAMSAssignment() {
     console.log('✅ RAMS ASSIGNMENT TEST PASSED!');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  } catch (error: any) {
-    console.error('❌ Test failed:', error.message);
+  } catch (error: unknown) {
+    console.error('❌ Test failed:', error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }

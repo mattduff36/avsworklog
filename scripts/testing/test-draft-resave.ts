@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Test script to reproduce and verify the duplicate key constraint issue
  * 
@@ -59,7 +58,7 @@ async function testDraftResave() {
 
     if (createError || !inspection) throw createError;
     inspectionId = inspection.id;
-    console.log(`✅ Created draft: ${inspectionId.substring(0, 8)}...\n`);
+    console.log(`✅ Created draft: ${inspectionId!.substring(0, 8)}...\n`);
 
     // Step 2: Add Monday items
     console.log('📋 Step 2: Adding Monday items (14 items)...');

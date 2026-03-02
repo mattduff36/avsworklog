@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * End-to-end test for complete inspection draft workflow
  * 
@@ -113,7 +112,7 @@ async function runE2ETests() {
     }
 
     testInspectionId = newInspection.id;
-    logResult('Create draft', true, `Created draft ${testInspectionId.substring(0, 8)}...`);
+    logResult('Create draft', true, `Created draft ${testInspectionId!.substring(0, 8)}...`);
 
     // Add Monday items only (14 items, mixed status)
     const mondayItems = [];
@@ -154,7 +153,7 @@ async function runE2ETests() {
     log('\n📋 PHASE 2: Load draft via "[id]" page and add Tuesday');
 
     // Simulate loading the draft (like opening /inspections/[id])
-    const { data: loadedInspection, error: loadError } = await supabase
+    const { error: loadError } = await supabase
       .from('van_inspections')
       .select('*, vans(*)')
       .eq('id', testInspectionId)

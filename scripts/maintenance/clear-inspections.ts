@@ -1,13 +1,11 @@
-// @ts-nocheck
 import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import { resolve } from 'path';
 
-// Load .env.local
 config({ path: resolve(process.cwd(), '.env.local') });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error('❌ Missing Supabase credentials');
@@ -15,7 +13,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+const supabase = createClient(supabaseUrl!, supabaseServiceKey!, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
@@ -75,8 +73,8 @@ async function clearInspections() {
     console.log('✅ Deleted all inspection-related actions');
 
     console.log('\n✅ All inspection data cleared successfully!');
-  } catch (error) {
-    console.error('❌ Error clearing inspection data:', error);
+  } catch (err: unknown) {
+    console.error('❌ Error clearing inspection data:', err instanceof Error ? err.message : err);
     process.exit(1);
   }
 }

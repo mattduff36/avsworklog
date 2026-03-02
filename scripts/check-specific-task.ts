@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import { resolve } from 'path';
@@ -68,7 +67,7 @@ async function checkTask() {
     for (const task of tasks) {
       console.log('━'.repeat(60));
       console.log(`Task ID: ${task.id}`);
-      console.log(`Category: ${task.workshop_task_categories?.name || 'None'}`);
+      console.log(`Category: ${(task.workshop_task_categories as unknown as { name: string } | null)?.name || 'None'}`);
       console.log(`Type: ${task.action_type}`);
       console.log(`Status: ${task.status}`);
       console.log(`\nComments: ${task.workshop_comments || 'None'}`);
@@ -90,7 +89,7 @@ async function checkTask() {
       console.log(`\nAttachments: ${count || 0}`);
       if (attachments && attachments.length > 0) {
         attachments.forEach((att, idx) => {
-          console.log(`  ${idx + 1}. ${att.workshop_attachment_templates?.name || 'Unknown'} (${new Date(att.created_at).toLocaleString()})`);
+          console.log(`  ${idx + 1}. ${(att.workshop_attachment_templates as unknown as { name: string } | null)?.name || 'Unknown'} (${new Date(att.created_at).toLocaleString()})`);
         });
       }
       console.log('');

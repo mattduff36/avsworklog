@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Fix Actions RLS Policies Migration
  * Updates actions RLS policies to use roles table instead of deprecated profiles.role
@@ -36,7 +35,7 @@ async function runActionsRLSFix() {
   console.log('🎯 Solution: Update policies to use roles table structure\n');
 
   // Parse connection string and rebuild with explicit SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,

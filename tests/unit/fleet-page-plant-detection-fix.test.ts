@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Fleet Page Plant Detection Logic Bug Fix Test
  * 
@@ -22,7 +21,7 @@ describe('Fleet Page Plant Detection Logic Bug Fix', () => {
       };
 
       // BEFORE (incorrect)
-      const incorrectIsPlant = plantAsset.vehicle?.plant_id || plantAsset.vehicle?.asset_type === 'plant';
+      const incorrectIsPlant = plantAsset.vehicle?.plant_id || (plantAsset.vehicle as { asset_type?: string })?.asset_type === 'plant';
       // Result: 'P001' (string) ❌
 
       // AFTER (correct)
@@ -67,7 +66,7 @@ describe('Fleet Page Plant Detection Logic Bug Fix', () => {
       };
 
       // Fleet page pattern (after fix)
-      const isPlant = (vehicle: any) => vehicle.is_plant === true;
+      const isPlant = (vehicle: { is_plant?: boolean }) => vehicle.is_plant === true;
 
       expect(isPlantAsset('v1')).toBe(false);
       expect(isPlantAsset('p1')).toBe(true);
@@ -150,7 +149,7 @@ describe('Fleet Page Plant Detection Logic Bug Fix', () => {
       };
 
       // Check for is_plant flag
-      const isPlant = (vehicleWithoutFlag as any).is_plant === true;
+      const isPlant = (vehicleWithoutFlag as { is_plant?: boolean }).is_plant === true;
 
       // Should be false when flag is missing
       expect(isPlant).toBe(false);
@@ -233,7 +232,7 @@ describe('Fleet Page Plant Detection Logic Bug Fix', () => {
       };
 
       // Fleet page pattern (after fix)
-      const isPlantInFleetPage = (vehicle: any) => vehicle.is_plant === true;
+      const isPlantInFleetPage = (vehicle: { is_plant?: boolean }) => vehicle.is_plant === true;
 
       // Both should check is_plant flag
       expect(isPlantAsset('v1')).toBe(false);

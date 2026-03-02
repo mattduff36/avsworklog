@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Runner: Split vehicle_inspections → van_inspections + plant_inspections
  *
@@ -117,9 +116,9 @@ async function run() {
 
     console.log('\n✅ MIGRATION COMPLETE AND VERIFIED');
 
-  } catch (error: any) {
-    console.error('❌ MIGRATION FAILED:', error.message);
-    if (error.message?.includes('already exists')) {
+  } catch (err: unknown) {
+    console.error('❌ MIGRATION FAILED:', (err instanceof Error ? err.message : String(err)));
+    if ((err instanceof Error ? err.message : String(err))?.includes('already exists')) {
       console.log('ℹ️  Migration may have already been applied');
     }
     process.exit(1);

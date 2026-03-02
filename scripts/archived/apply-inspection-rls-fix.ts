@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Apply the vehicle_inspections RLS policy fix
  * This migration allows users to update their own draft inspections
@@ -32,7 +31,7 @@ async function applyMigration() {
   console.log('🚀 Applying vehicle_inspections RLS policy fix...\n');
 
   // Parse connection string with SSL config (as per MIGRATIONS_GUIDE.md)
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -116,21 +115,23 @@ async function applyMigration() {
     console.log('   3. Make a change and save');
     console.log('   4. Verify: No RLS policy violation error\n');
 
-  } catch (error: any) {
+  } catch (err: unknown) {
     console.error('\n━'.repeat(80));
     console.error('❌ MIGRATION FAILED');
     console.error('━'.repeat(80));
-    console.error('\nError:', error.message);
+    const msg = err instanceof Error ? err.message : String(err);
+    const detail = (err as { detail?: string }).detail;
+    const hint = (err as { hint?: string }).hint;
+    console.error('\nError:', msg);
     
-    if (error.detail) {
-      console.error('Details:', error.detail);
+    if (detail) {
+      console.error('Details:', detail);
     }
-    if (error.hint) {
-      console.error('Hint:', error.hint);
+    if (hint) {
+      console.error('Hint:', hint);
     }
     
-    // Handle "already exists" gracefully (as per MIGRATIONS_GUIDE.md)
-    if (error.message?.includes('already exists')) {
+    if (msg.includes('already exists')) {
       console.log('\n✅ Policy already applied - no action needed!');
       process.exit(0);
     }

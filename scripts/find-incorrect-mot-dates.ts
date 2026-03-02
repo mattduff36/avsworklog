@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Find vehicles that might have incorrect MOT due dates
  * based on their registration plate year
@@ -51,8 +50,25 @@ async function findIncorrectMotDates() {
 
     console.log(`\n📊 Found ${result.rows.length} active vehicles\n`);
 
-    const suspicious: any[] = [];
-    const notSynced: any[] = [];
+    interface SuspiciousVehicle {
+      reg: string;
+      plateYear: number;
+      expectedMotYear: number;
+      actualMotYear: number;
+      motDue: string;
+      yearDiff: number;
+      lastSync?: string;
+      syncStatus?: string;
+    }
+    interface NotSyncedVehicle {
+      reg: string;
+      plateYear: number;
+      expectedMotYear: number;
+      actualMotYear: number;
+      motDue: string;
+    }
+    const suspicious: SuspiciousVehicle[] = [];
+    const notSynced: NotSyncedVehicle[] = [];
 
     for (const vehicle of result.rows) {
       const reg = vehicle.reg_number;

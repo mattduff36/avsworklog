@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -21,7 +20,7 @@ async function runMigration() {
   console.log('This migration cleans up double-wrapped SELECT statements');
   console.log('in the profiles table RLS policies.\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -91,11 +90,11 @@ async function runMigration() {
     console.log('   • Auth function evaluated once per query vs once per row');
     console.log('   • Improved query performance for multi-row results\n');
 
-  } catch (error: any) {
+  } catch (err: unknown) {
     console.error('\n❌ Migration failed:');
-    console.error(error.message);
+    console.error((err instanceof Error ? err.message : String(err)));
     
-    if (error.message.includes('already exists')) {
+    if ((err instanceof Error ? err.message : String(err)).includes('already exists')) {
       console.log('\n💡 Policy may already exist in the desired state');
     }
     

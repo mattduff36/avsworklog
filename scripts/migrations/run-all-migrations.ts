@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -42,7 +41,7 @@ async function runMigrations() {
   console.log(`📋 ${migrations.length} migrations to run\n`);
 
   // Parse connection string and rebuild with explicit SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
   
   const client = new Client({
     host: url.hostname,
@@ -86,15 +85,16 @@ async function runMigrations() {
         
         console.log('✅ Success!\n');
         successCount++;
-      } catch (error: any) {
-        if (error.message?.includes('already exists') || error.code === '42P07' || error.code === '42701') {
+      } catch (err: unknown) {
+        const pgErr = err as { message: string; detail?: string; code?: string };
+        if (pgErr.message?.includes('already exists') || pgErr.code === '42P07' || pgErr.code === '42701') {
           console.log('⏭️  Already applied - skipping\n');
           skipCount++;
         } else {
           console.error('❌ Failed!');
-          console.error('Error:', error.message);
-          if (error.detail) {
-            console.error('Details:', error.detail);
+          console.error('Error:', pgErr.message);
+          if (pgErr.detail) {
+            console.error('Details:', pgErr.detail);
           }
           console.log();
           failCount++;
@@ -119,11 +119,12 @@ async function runMigrations() {
       console.log('   npm run dev\n');
     }
 
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const pgErr = err as { message: string };
     console.error('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.error('❌ CONNECTION FAILED');
     console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    console.error('Error:', error.message);
+    console.error('Error:', pgErr.message);
     process.exit(1);
   } finally {
     await client.end();

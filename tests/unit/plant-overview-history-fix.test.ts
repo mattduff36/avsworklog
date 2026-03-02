@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Plant Overview History API Routing Test
  * 
@@ -80,7 +79,7 @@ describe('Plant Overview History API Routing Fix', () => {
     };
 
     // Simulate the isPlantAsset check
-    const isPlantAsset = (obj: { is_plant?: boolean } | null | undefined) => 
+    const isPlantAsset = (obj: { is_plant?: boolean; [key: string]: unknown } | null | undefined) => 
       obj && 'is_plant' in obj && obj.is_plant === true;
 
     expect(isPlantAsset(plantObject)).toBe(true);

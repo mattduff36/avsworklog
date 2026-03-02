@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import ExcelJS from 'exceljs';
@@ -174,7 +173,7 @@ async function readExcelFile(filePath: string): Promise<ExcelRow[]> {
     headers.forEach((header, index) => {
       if (!header) return;
       const cellValue = normalizeCellValue(row.getCell(index + 1).value);
-      (rowData as Record<string, string | number | Date | null>)[header] = cellValue;
+      (rowData as unknown as Record<string, string | number | Date | null>)[header] = cellValue;
     });
 
     data.push(rowData);
@@ -359,7 +358,7 @@ async function importMaintenanceData() {
   const result: ImportResult = { success: 0, skipped: 0, failed: 0, details: [] };
 
   // Parse connection string
-  const url = new URL(CONNECTION_STRING);
+  const url = new URL(CONNECTION_STRING as string);
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,

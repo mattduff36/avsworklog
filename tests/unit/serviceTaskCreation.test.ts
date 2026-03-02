@@ -1,17 +1,16 @@
-// @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type QueuedResponse = {
   terminal: 'limit' | 'single';
   table: string;
-  data: any;
-  error?: any;
+  data: unknown;
+  error?: unknown;
 };
 
 type MockState = {
   queue: QueuedResponse[];
   fromCalls: string[];
-  insertCalls: Array<{ table: string; payload: any }>;
+  insertCalls: Array<{ table: string; payload: Record<string, unknown> }>;
 };
 
 const { mockState, mockCreateClient } = vi.hoisted(() => {
@@ -44,19 +43,29 @@ function nextResponse(terminal: 'limit' | 'single', table: string) {
   return { data: next.data, error: next.error ?? null };
 }
 
-function createQueryBuilder(table: string) {
-  const chain: any = {
+interface QueryChain {
+  select: ReturnType<typeof vi.fn>;
+  ilike: ReturnType<typeof vi.fn>;
+  eq: ReturnType<typeof vi.fn>;
+  in: ReturnType<typeof vi.fn>;
+  limit: ReturnType<typeof vi.fn>;
+  single: ReturnType<typeof vi.fn>;
+  insert: ReturnType<typeof vi.fn>;
+}
+
+function createQueryBuilder(table: string): QueryChain {
+  const chain = {
     select: vi.fn(() => chain),
     ilike: vi.fn(() => chain),
     eq: vi.fn(() => chain),
     in: vi.fn(() => chain),
     limit: vi.fn(async () => nextResponse('limit', table)),
     single: vi.fn(async () => nextResponse('single', table)),
-    insert: vi.fn((payload: any) => {
+    insert: vi.fn((payload: Record<string, unknown>) => {
       mockState.insertCalls.push({ table, payload });
       return chain;
     }),
-  };
+  } as QueryChain;
   return chain;
 }
 

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Workshop Tasks Plant Maintenance Upsert Bug Fix Test
  * 
@@ -102,7 +101,7 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
       const readingValue = 50000;
       const userId = 'user-123';
 
-      const updateData: Record<string, any> = {
+      const updateData: Record<string, unknown> = {
         last_updated_at: new Date().toISOString(),
         last_updated_by: userId,
       };
@@ -133,7 +132,7 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
       const readingValue = 1200;
       const userId = 'user-123';
 
-      const updateData: Record<string, any> = {
+      const updateData: Record<string, unknown> = {
         last_updated_at: new Date().toISOString(),
         last_updated_by: userId,
       };
@@ -275,7 +274,7 @@ describe('Workshop Tasks Plant Maintenance Upsert Bug Fix', () => {
       const isPlant = existingTask.plant_id !== null;
       const newMeterReading = 1300;
 
-      const meterUpdateData: Record<string, any> = {
+      const meterUpdateData: Record<string, unknown> = {
         last_updated_at: new Date().toISOString(),
       };
 

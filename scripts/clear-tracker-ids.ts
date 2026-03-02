@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Script: Clear all GPS Tracker IDs
  * Purpose: Remove all tracker_id values from vehicle_maintenance table

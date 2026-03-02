@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Add Vehicle Maintenance Audit Trigger Migration
  * Adds audit logging trigger for vehicle_maintenance table
@@ -33,7 +32,7 @@ async function runMigration() {
   console.log('🔍 Running Vehicle Maintenance Audit Trigger Migration...\n');
 
   // Parse connection string and rebuild with explicit SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
   
   const client = new Client({
     host: url.hostname,
@@ -100,15 +99,16 @@ async function runMigration() {
     console.log('   now be logged to audit_log table automatically.');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  } catch (error: any) {
-    console.error('\n❌ Migration failed:', error.message);
+  } catch (err: unknown) {
+    const pgErr = err as { message: string };
+    console.error('\n❌ Migration failed:', pgErr.message);
     
     // Check for common errors
-    if (error.message.includes('already exists')) {
+    if (pgErr.message.includes('already exists')) {
       console.log('\n✅ Trigger already exists - migration was previously run successfully.');
       console.log('   No action needed.\n');
       process.exit(0);
-    } else if (error.message.includes('permission denied')) {
+    } else if (pgErr.message.includes('permission denied')) {
       console.error('\n🔒 Permission error - ensure you are using a connection string');
       console.error('   with sufficient privileges (service role key).\n');
       process.exit(1);
@@ -117,7 +117,7 @@ async function runMigration() {
       console.error('   1. Check your .env.local file has POSTGRES_URL_NON_POOLING');
       console.error('   2. Verify the database user has CREATE TRIGGER permissions');
       console.error('   3. Check the SQL file exists at:', sqlFile);
-      console.error('\nFull error:', error);
+      console.error('\nFull error:', err);
       process.exit(1);
     }
   } finally {

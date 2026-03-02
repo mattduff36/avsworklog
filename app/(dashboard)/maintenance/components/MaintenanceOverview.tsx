@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -20,7 +19,7 @@ import { TaskCommentsDrawer } from '@/components/workshop-tasks/TaskCommentsDraw
 import { MarkTaskCompleteDialog, type CompletionData } from '@/components/workshop-tasks/MarkTaskCompleteDialog';
 import { OfficeActionDialog } from './OfficeActionDialog';
 import { QuickEditPopover } from './QuickEditPopover';
-import { getTaskContent } from '@/lib/utils/serviceTaskCreation';
+import { getTaskContent, type AlertType } from '@/lib/utils/serviceTaskCreation';
 import { appendStatusHistory, buildStatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -120,7 +119,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
   const [createTaskVehicleId, setCreateTaskVehicleId] = useState<string | undefined>();
   const [createTaskCategoryId, setCreateTaskCategoryId] = useState<string | undefined>();
-  const [createTaskAlertType, setCreateTaskAlertType] = useState<'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER' | undefined>();
+  const [createTaskAlertType, setCreateTaskAlertType] = useState<AlertType | undefined>();
   const [maintenanceCategoryId, setMaintenanceCategoryId] = useState<string | undefined>();
   
   // Task Action Modals state
@@ -446,7 +445,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     const activeTasks = tasks.filter(t => t.status !== 'completed');
     
     return vehicle.alerts.some(alert => {
-      const { title } = getTaskContent(alert.type, regNumber, '');
+      const { title } = getTaskContent(alert.type as AlertType, regNumber, '');
       return activeTasks.some(task => task.title === title || task.description?.includes(title));
     });
   };
@@ -456,7 +455,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     // Prefill with Service category if available
     setCreateTaskCategoryId(maintenanceCategoryId);
     // Set the alert type from the first alert (prioritize overdue)
-    const alertType = vehicle.alerts?.[0]?.type as 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER' | undefined;
+    const alertType = vehicle.alerts?.[0]?.type as AlertType | undefined;
     setCreateTaskAlertType(alertType);
     
     setShowCreateTaskDialog(true);
@@ -466,7 +465,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     const alert = vehicle.alerts?.[0];
     if (!alert) return;
     
-    const alertType = alert.type as 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER';
+    const alertType = alert.type as AlertType;
     
     // Get the current due date based on alert type
     let currentDueDate: string | null = null;
@@ -905,7 +904,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     setShowCommentsDrawer(true);
   };
 
-  const toggleVehicle = useCallback(async (vehicleId: string, vehicle?: VehicleMaintenanceWithStatus) => {
+  const toggleVehicle = useCallback(async (vehicleId: string, _vehicle?: VehicleMaintenanceWithStatus) => {
     setExpandedVehicles(prev => {
       const newExpanded = new Set(prev);
       if (newExpanded.has(vehicleId)) {
@@ -1031,7 +1030,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 const relatedTask = historyData?.workshopTasks.find(task => {
                   if (task.status === 'completed') return false;
                   return vehicle.alerts.some(alert => {
-                    const { title } = getTaskContent(alert.type, regNumber, '');
+                    const { title } = getTaskContent(alert.type as AlertType, regNumber, '');
                     return task.title === title || task.description?.includes(title);
                   });
                 });
@@ -1143,7 +1142,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
               ) : !hasExistingTasks ? (
                 // Check if the primary alert is an office responsibility
                 (() => {
-                  const primaryAlertType = vehicle.alerts?.[0]?.type || '';
+                  const primaryAlertType = (vehicle.alerts?.[0]?.type || '') as string;
                   const responsibility = getCategoryResponsibility(primaryAlertType);
                   
                   if (responsibility === 'office') {
@@ -1217,7 +1216,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 const relatedTask = historyData?.workshopTasks.find(task => {
                   if (task.status === 'completed') return false;
                   return vehicle.alerts.some(alert => {
-                    const { title } = getTaskContent(alert.type, regNumber, '');
+                    const { title } = getTaskContent(alert.type as AlertType, regNumber, '');
                     return task.title === title || task.description?.includes(title);
                   });
                 });
@@ -1226,8 +1225,8 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                   return <p className="text-sm text-muted-foreground py-4 text-center">No active workshop task found</p>;
                 }
                 
-                // Ensure task has van_id for handlers
-                const taskWithVehicleId = { ...relatedTask, van_id: vehicleId };
+                // Ensure task has van_id for handlers (TaskForCompletion requires van_id: string | null)
+                const taskWithVehicleId = { ...relatedTask, van_id: vehicleId ?? null };
                 
                 // Display task details directly
                 return (
@@ -1566,7 +1565,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       <MarkTaskCompleteDialog
         open={showCompleteModal}
         onOpenChange={setShowCompleteModal}
-        task={completingTask}
+        task={completingTask ? { ...completingTask, van_id: completingTask.van_id ?? null } : null}
         onConfirm={confirmMarkComplete}
         isSubmitting={completingTask ? updatingStatus.has(completingTask.id) : false}
       />

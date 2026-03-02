@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Fix inspection issues migration runner
 // Fixes:
 // 1. Missing comments column in inspection_items
@@ -33,7 +32,7 @@ async function runMigration() {
   console.log('  4. Update status enum to support both attention and defect\n');
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -58,7 +57,7 @@ async function runMigration() {
     );
 
     console.log('📄 Executing migration...\n');
-    const result = await client.query(migrationSQL);
+    await client.query(migrationSQL);
     
     // Log any notices from the migration
     console.log('✅ MIGRATION COMPLETED!\n');
@@ -136,9 +135,9 @@ async function runMigration() {
       return acc;
     }, {} as Record<string, string[]>);
     
-    Object.entries(groupedPolicies).forEach(([cmd, names]) => {
-      console.log(`   ${cmd}: ${names.length} policies`);
-    });
+    for (const [cmd, policyNames] of Object.entries(groupedPolicies)) {
+      console.log(`   ${cmd}: ${(policyNames as string[]).length} policies`);
+    }
 
     console.log('\n✅ ALL CHECKS PASSED!\n');
     console.log('📝 Summary:');
@@ -147,22 +146,22 @@ async function runMigration() {
     console.log('   - Status supports both "attention" and "defect"');
     console.log('\n🎉 Inspection system is now fully functional!\n');
 
-  } catch (error: any) {
-    console.error('❌ MIGRATION FAILED:', error.message);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('❌ MIGRATION FAILED:', msg);
     
-    // Check for specific errors
-    if (error.message?.includes('already exists')) {
+    if (msg.includes('already exists')) {
       console.log('\n✅ Some objects already exist - this is usually fine');
       console.log('The migration is idempotent and safe to re-run.\n');
       process.exit(0);
     }
     
-    if (error.message?.includes('column') && error.message?.includes('does not exist')) {
+    if (msg.includes('column') && msg.includes('does not exist')) {
       console.error('\n⚠️  Schema mismatch detected');
       console.error('You may need to check your database schema manually.');
     }
     
-    console.error('\nFull error:', error);
+    console.error('\nFull error:', err instanceof Error ? err.message : err);
     process.exit(1);
   } finally {
     await client.end();

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Client } from 'pg';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
@@ -16,7 +15,7 @@ async function runMigration() {
   }
 
   // Parse connection string and rebuild with explicit SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
 
   const client = new Client({
     host: url.hostname,

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Client } from 'pg';
 import * as dotenv from 'dotenv';
 
@@ -37,8 +36,8 @@ async function deleteExistingActions() {
     
     console.log(`✅ Deleted ${deleteResult.rowCount} actions\n`);
 
-  } catch (error) {
-    console.error('❌ Delete failed:', error);
+  } catch (err: unknown) {
+    console.error('❌ Delete failed:', err instanceof Error ? err.message : err);
     process.exit(1);
   } finally {
     await client.end();

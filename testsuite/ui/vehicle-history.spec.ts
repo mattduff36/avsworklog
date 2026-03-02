@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * @tags @fleet
  * Tests vehicle history page tabs and data display.

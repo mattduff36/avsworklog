@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Automated test script for error logging system
  * Tests both client-side and server-side error logging

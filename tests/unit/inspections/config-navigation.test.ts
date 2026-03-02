@@ -1,11 +1,9 @@
-// @ts-nocheck
 import { describe, it, expect } from 'vitest';
 import {
   employeeNavItems,
   managerNavItems,
   adminNavItems,
   dashboardNavItem,
-  getFilteredEmployeeNav,
 } from '@/lib/config/navigation';
 import { FORM_TYPES, getEnabledForms, getFormType, getFormTypeByPath } from '@/lib/config/forms';
 import { MODULE_PAGES, getAllPageOptions, getPageUrl } from '@/lib/config/module-pages';

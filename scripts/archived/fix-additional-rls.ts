@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Fix additional RLS issues from error logs
 // Run: npx tsx scripts/fix-additional-rls.ts
 
@@ -25,7 +24,7 @@ async function runMigration() {
   console.log('  2. Vehicles table - allow users to add vehicles');
   console.log('');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -70,11 +69,12 @@ async function runMigration() {
 
     console.log('\n✅ All RLS policies updated successfully!');
 
-  } catch (error: any) {
-    if (error.message?.includes('already exists')) {
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('already exists')) {
       console.log('✅ Some policies already exist - this is fine');
     } else {
-      console.error('❌ Error:', error.message);
+      console.error('❌ Error:', msg);
       process.exit(1);
     }
   } finally {

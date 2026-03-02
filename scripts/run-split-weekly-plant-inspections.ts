@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Migration Runner: Split Weekly Plant Inspections into Daily
  * 
@@ -35,12 +34,12 @@ async function runMigration() {
   try {
     migrationSQL = readFileSync(resolve(process.cwd(), MIGRATION_FILE), 'utf-8');
     console.log(`Loaded migration from: ${MIGRATION_FILE}\n`);
-  } catch (error) {
-    console.error(`Error reading migration file: ${error}`);
+  } catch (err: unknown) {
+    console.error(`Error reading migration file: ${err}`);
     process.exit(1);
   }
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new pg.Client({
     host: url.hostname,
@@ -101,8 +100,8 @@ async function runMigration() {
     console.log('2. Check that PDFs generate correctly for migrated inspections');
     console.log('3. Verify locked defects still work for migrated actions');
 
-  } catch (error: any) {
-    console.error('Migration failed:', error.message || error);
+  } catch (err: unknown) {
+    console.error('Migration failed:', err instanceof Error ? err.message : String(err));
     process.exit(1);
   } finally {
     await client.end();
@@ -110,7 +109,7 @@ async function runMigration() {
   }
 }
 
-runMigration().catch(error => {
-  console.error('Unexpected error:', error);
+runMigration().catch((err: unknown) => {
+  console.error('Unexpected error:', err);
   process.exit(1);
 });

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import pg from 'pg';
@@ -112,8 +111,8 @@ async function run() {
   try {
     const { rows } = await client.query(`SELECT effective_is_manager_admin() as result`);
     console.log(`effective_is_manager_admin() = ${rows[0].result} (should be false for postgres user)`);
-  } catch (e: any) {
-    console.error(`STILL FAILING: ${e.message}`);
+  } catch (err: unknown) {
+    console.error(`STILL FAILING: ${err instanceof Error ? err.message : String(err)}`);
     process.exit(1);
   }
 
@@ -125,4 +124,4 @@ async function run() {
   console.log('\nHotfix applied successfully!');
 }
 
-run().catch(e => { console.error(e.message); process.exit(1); });
+run().catch((err: unknown) => { console.error(err instanceof Error ? err.message : String(err)); process.exit(1); });

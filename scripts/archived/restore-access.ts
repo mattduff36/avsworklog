@@ -1,4 +1,3 @@
-// @ts-nocheck
 import 'dotenv/config';
 import pg from 'pg';
 import { readFileSync } from 'fs';
@@ -26,9 +25,9 @@ async function restoreAccess() {
     console.log('\n🎉 APP SHOULD BE FULLY WORKING NOW!');
     console.log('\n🔄 HARD REFRESH YOUR BROWSER (Ctrl+F5 / Cmd+Shift+R)');
 
-  } catch (error) {
-    console.error('❌ Error:', error);
-    throw error;
+  } catch (err: unknown) {
+    console.error('❌ Error:', err instanceof Error ? err.message : err);
+    throw err;
   } finally {
     await client.end();
   }

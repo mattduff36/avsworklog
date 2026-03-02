@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import { resolve } from 'path';
@@ -9,8 +8,8 @@ config({ path: resolve(process.cwd(), '.env.local') });
 async function runMigration() {
   console.log('🔄 Running migration: add-day-of-week-column.sql\n');
   
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !supabaseServiceKey) {
     console.error('❌ Missing Supabase credentials in .env.local');
@@ -52,7 +51,7 @@ async function runMigration() {
       console.log(`🔨 [${i + 1}/${statements.length}] Executing: ${preview}...`);
       
       try {
-        const { data, error } = await supabase.rpc('exec', { sql: statement });
+        const { error } = await supabase.rpc('exec', { sql: statement });
         
         if (error) {
           // Check if it's a "column already exists" error
@@ -65,9 +64,10 @@ async function runMigration() {
         } else {
           console.log(`   ✅ Success`);
         }
-      } catch (error: any) {
-        console.error(`   ❌ Error:`, error.message);
-        throw error;
+      } catch (err: unknown) {
+        const pgErr = err as { message: string };
+        console.error(`   ❌ Error:`, pgErr.message);
+        throw err;
       }
     }
     

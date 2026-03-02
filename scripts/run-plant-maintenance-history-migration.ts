@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -22,7 +21,7 @@ async function runMigration() {
   console.log('🚀 Running Plant Maintenance History Migration...\n');
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -76,10 +75,10 @@ async function runMigration() {
       console.log('✅ Index "idx_maintenance_history_plant_id" created successfully');
     }
 
-  } catch (error: any) {
-    console.error('❌ MIGRATION FAILED:', error.message);
+  } catch (err: unknown) {
+    console.error('❌ MIGRATION FAILED:', (err instanceof Error ? err.message : String(err)));
     
-    if (error.message?.includes('already exists')) {
+    if ((err instanceof Error ? err.message : String(err))?.includes('already exists')) {
       console.log('✅ Already applied - no action needed!');
       process.exit(0);
     }

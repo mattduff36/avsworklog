@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Migration Runner: Add Unique Index for Plant Inspections
  * 
@@ -36,12 +35,12 @@ async function runMigration() {
   try {
     migrationSQL = readFileSync(resolve(process.cwd(), MIGRATION_FILE), 'utf-8');
     console.log(`Loaded migration from: ${MIGRATION_FILE}\n`);
-  } catch (error) {
-    console.error(`Error reading migration file: ${error}`);
+  } catch (err: unknown) {
+    console.error(`Error reading migration file: ${err}`);
     process.exit(1);
   }
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new pg.Client({
     host: url.hostname,
@@ -97,11 +96,11 @@ async function runMigration() {
 
     console.log('\nMigration completed successfully!');
 
-  } catch (error: any) {
-    if (error.message?.includes('already exists')) {
+  } catch (err: unknown) {
+    if ((err instanceof Error ? err.message : String(err))?.includes('already exists')) {
       console.log('Index already exists. Database is up to date.');
     } else {
-      console.error('Migration failed:', error.message || error);
+      console.error('Migration failed:', err instanceof Error ? err.message : String(err));
       process.exit(1);
     }
   } finally {
@@ -110,7 +109,7 @@ async function runMigration() {
   }
 }
 
-runMigration().catch(error => {
-  console.error('Unexpected error:', error);
+runMigration().catch((err: unknown) => {
+  console.error('Unexpected error:', err);
   process.exit(1);
 });

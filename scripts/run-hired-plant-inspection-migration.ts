@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -20,7 +19,7 @@ if (!connectionString) {
 async function runMigration() {
   console.log('🚀 Running Hired Plant Inspection Support Migration...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
 
   const client = new Client({
     host: url.hostname,
@@ -97,15 +96,15 @@ async function runMigration() {
       });
     }
 
-  } catch (error: any) {
-    console.error('❌ MIGRATION FAILED:', error.message);
+  } catch (err: unknown) {
+    console.error('❌ MIGRATION FAILED:', (err instanceof Error ? err.message : String(err)));
 
-    if (error.message?.includes('already exists')) {
+    if ((err instanceof Error ? err.message : String(err))?.includes('already exists')) {
       console.log('✅ Already applied - no action needed!');
       process.exit(0);
     }
 
-    console.error('\nFull error:', error);
+    console.error('\nFull err:', err);
     process.exit(1);
   } finally {
     await client.end();

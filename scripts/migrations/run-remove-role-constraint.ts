@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -21,7 +20,7 @@ if (!connectionString) {
 async function runMigration() {
   console.log('🚀 Removing role field CHECK constraint...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
   
   const client = new Client({
     host: url.hostname,
@@ -58,10 +57,11 @@ async function runMigration() {
       console.log(`   Profiles with NULL role: ${result.rows[0].profiles_with_null_role}\n`);
     }
 
-  } catch (error: any) {
-    console.error('❌ MIGRATION FAILED:', error.message);
+  } catch (err: unknown) {
+    const pgErr = err as { message: string };
+    console.error('❌ MIGRATION FAILED:', pgErr.message);
     
-    if (error.message?.includes('does not exist')) {
+    if (pgErr.message?.includes('does not exist')) {
       console.log('✅ Constraint already removed - no action needed!');
       process.exit(0);
     }

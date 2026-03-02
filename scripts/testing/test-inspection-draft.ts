@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Test script for inspection draft functionality
  * 

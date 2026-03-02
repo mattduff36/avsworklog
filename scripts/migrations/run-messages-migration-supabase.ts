@@ -1,10 +1,9 @@
-// @ts-nocheck
 /**
  * Messages Migration - Supabase REST API Method
  * Bypasses SSL certificate issues by using Supabase client
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import fs from 'fs/promises';
 import path from 'path';
 import 'dotenv/config';
@@ -91,7 +90,7 @@ async function runMigration() {
   }
 }
 
-async function verifyTables(supabase: ReturnType<typeof createClient>) {
+async function verifyTables(supabase: SupabaseClient) {
   console.log('🔍 Verifying tables...');
   
   try {

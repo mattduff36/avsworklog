@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Migration Runner: Add inspector_comments column to vehicle_inspections
  * 
@@ -24,7 +23,7 @@ async function runMigration() {
     throw new Error('POSTGRES_URL_NON_POOLING or POSTGRES_URL not found in environment');
   }
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
   
   const client = new Client({
     host: url.hostname,

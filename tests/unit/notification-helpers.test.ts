@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { describe, it, expect } from 'vitest';
 import { resolveNotificationToOpen } from '@/lib/utils/notification-helpers';
 import type { NotificationItem } from '@/types/messages';

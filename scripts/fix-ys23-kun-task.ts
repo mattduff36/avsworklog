@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Fix YS23 KUN Task
  * 
@@ -101,8 +100,8 @@ async function fixTask() {
     console.log('🎉 Task is now completed and assigned to "Service" subcategory');
     console.log('You can now delete the "Basic Service" subcategory!');
 
-  } catch (error) {
-    console.error('Fatal error:', error);
+  } catch (err: unknown) {
+    console.error('Fatal error:', err);
     process.exit(1);
   }
 }
@@ -112,7 +111,7 @@ fixTask()
     console.log('\nComplete.');
     process.exit(0);
   })
-  .catch((error) => {
-    console.error('Fatal error:', error);
+  .catch((err: unknown) => {
+    console.error('Fatal error:', err);
     process.exit(1);
   });

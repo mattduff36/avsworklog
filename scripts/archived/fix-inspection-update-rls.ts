@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Fix vehicle_inspections UPDATE RLS policy to allow draft updates
  */
@@ -23,7 +22,7 @@ if (!connectionString) {
 async function runMigration() {
   console.log('🚀 Fixing vehicle_inspections UPDATE policy...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -68,8 +67,8 @@ async function runMigration() {
 
     console.log('\n🎉 Done! Employees can now update draft inspections.');
 
-  } catch (error: any) {
-    console.error('❌ FAILED:', error.message);
+  } catch (err: unknown) {
+    console.error('❌ FAILED:', err instanceof Error ? err.message : err);
     process.exit(1);
   } finally {
     await client.end();

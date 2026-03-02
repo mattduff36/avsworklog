@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -26,7 +25,7 @@ async function runMigration() {
   console.log('   • Creates index for tracker_id lookups\n');
 
   // Parse connection string and rebuild with explicit SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString as string);
   
   const client = new Client({
     host: url.hostname,
@@ -59,9 +58,10 @@ async function runMigration() {
     console.log('   1. Run: npm run import-maintenance (to re-import with tracker IDs)');
     console.log('   2. Test the updated maintenance form\n');
 
-  } catch (error: any) {
-    console.error('\n❌ Migration failed:', error.message);
-    console.error('Details:', error);
+  } catch (err: unknown) {
+    const pgErr = err as { message: string };
+    console.error('\n❌ Migration failed:', pgErr.message);
+    console.error('Details:', err);
     process.exit(1);
   } finally {
     await client.end();

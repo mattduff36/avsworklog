@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Reports Inspections API Integration Tests
  *

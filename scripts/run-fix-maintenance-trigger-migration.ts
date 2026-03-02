@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Migration Runner: Fix maintenance trigger for plant inspections
  * 
@@ -36,12 +35,12 @@ async function runMigration() {
   try {
     migrationSQL = readFileSync(resolve(process.cwd(), MIGRATION_FILE), 'utf-8');
     console.log(`✅ Loaded migration from: ${MIGRATION_FILE}\n`);
-  } catch (error) {
-    console.error(`❌ Error reading migration file: ${error}`);
+  } catch (err: unknown) {
+    console.error(`❌ Error reading migration file: ${err}`);
     process.exit(1);
   }
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
 
   const client = new pg.Client({
     host: url.hostname,
@@ -76,8 +75,8 @@ async function runMigration() {
       process.exit(1);
     }
 
-  } catch (error: any) {
-    console.error('❌ Migration failed:', error);
+  } catch (err: unknown) {
+    console.error('❌ Migration failed:', err);
     process.exit(1);
   } finally {
     await client.end();
@@ -85,7 +84,7 @@ async function runMigration() {
   }
 }
 
-runMigration().catch(error => {
-  console.error('💥 Unexpected error:', error);
+runMigration().catch((err: unknown) => {
+  console.error('💥 Unexpected error:', err);
   process.exit(1);
 });

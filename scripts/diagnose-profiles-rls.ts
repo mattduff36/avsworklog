@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import pg from 'pg';
@@ -56,8 +55,8 @@ async function run() {
   try {
     const { rows } = await client.query(`SELECT effective_is_manager_admin() as result`);
     console.log(`effective_is_manager_admin() = ${rows[0].result}`);
-  } catch (e: any) {
-    console.log(`effective_is_manager_admin() FAILED: ${e.message}`);
+  } catch (e: unknown) {
+    console.log(`effective_is_manager_admin() FAILED: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   // 5. Test the profiles SELECT with RLS enabled (as authenticated user simulation)
@@ -67,8 +66,8 @@ async function run() {
     const { rows } = await client.query(`SELECT count(*) as c FROM profiles`);
     console.log(`Profiles count (as authenticated): ${rows[0].c}`);
     await client.query(`RESET ROLE`);
-  } catch (e: any) {
-    console.log(`Profiles query as authenticated FAILED: ${e.message}`);
+  } catch (e: unknown) {
+    console.log(`Profiles query as authenticated FAILED: ${e instanceof Error ? e.message : String(e)}`);
     await client.query(`RESET ROLE`).catch(() => {});
   }
 
@@ -76,4 +75,4 @@ async function run() {
   console.log('\nDone');
 }
 
-run().catch(e => { console.error(e.message); process.exit(1); });
+run().catch(e => { console.error(e instanceof Error ? e.message : String(e)); process.exit(1); });

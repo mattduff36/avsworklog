@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Add Manual History Entry for CP17 TKO
  * 
@@ -27,7 +26,7 @@ if (!connectionString) {
 async function addHistoryEntry() {
   console.log('🔄 Adding manual history entry for CP17 TKO...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,
@@ -150,8 +149,8 @@ async function addHistoryEntry() {
     console.log('   The client should now see this change in the history modal.');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  } catch (error: any) {
-    console.error('\n❌ Failed to add history entry:', error.message);
+  } catch (error: unknown) {
+    console.error('\n❌ Failed to add history entry:', error instanceof Error ? error.message : String(error));
     console.error('\nFull error:', error);
     process.exit(1);
   } finally {

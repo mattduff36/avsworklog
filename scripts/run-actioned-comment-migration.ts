@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -22,7 +21,7 @@ async function runMigration() {
   console.log('🚀 Running Actioned Comment Migration...\n');
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -71,18 +70,19 @@ async function runMigration() {
       console.log('⚠️  Warning: Could not verify column creation\n');
     }
 
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const pgErr = err as { message?: string; detail?: string; hint?: string; code?: string };
     console.error('\n❌ Migration failed:');
-    console.error('Error:', error.message);
-    if (error.detail) {
-      console.error('Details:', error.detail);
+    console.error('Error:', pgErr.message);
+    if (pgErr.detail) {
+      console.error('Details:', pgErr.detail);
     }
-    if (error.hint) {
-      console.error('Hint:', error.hint);
+    if (pgErr.hint) {
+      console.error('Hint:', pgErr.hint);
     }
     
     // Check if column already exists
-    if (error.message?.includes('already exists') || error.message?.includes('duplicate')) {
+    if (pgErr.message?.includes('already exists') || pgErr.message?.includes('duplicate')) {
       console.log('\n✅ Column already exists - no action needed!\n');
       process.exit(0);
     }

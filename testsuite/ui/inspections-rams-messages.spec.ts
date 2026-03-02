@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * @tags @inspections @rams @messages
  * Tests page loading for inspections, RAMS, and messages.

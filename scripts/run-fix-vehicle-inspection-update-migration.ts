@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -73,9 +72,9 @@ async function runMigration() {
 
     console.log('\n✅ All done!');
 
-  } catch (error: any) {
-    console.error('❌ MIGRATION FAILED:', error.message);
-    console.error('\nFull error:', error);
+  } catch (err: unknown) {
+    console.error('❌ MIGRATION FAILED:', (err instanceof Error ? err.message : String(err)));
+    console.error('\nFull err:', err);
     process.exit(1);
   } finally {
     await client.end();

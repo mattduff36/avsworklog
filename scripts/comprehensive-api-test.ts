@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Comprehensive API Test Suite
  * Tests all DVLA VES and MOT History API integrations
@@ -18,17 +17,17 @@ interface TestResult {
   status: 'PASS' | 'FAIL' | 'SKIP';
   message: string;
   duration?: number;
-  error?: any;
+  error?: unknown;
 }
 
 const results: TestResult[] = [];
 
-function logTest(name: string, status: 'PASS' | 'FAIL' | 'SKIP', message: string, duration?: number, error?: any) {
+function logTest(name: string, status: 'PASS' | 'FAIL' | 'SKIP', message: string, duration?: number, error?: unknown) {
   results.push({ name, status, message, duration, error });
   const icon = status === 'PASS' ? '✅' : status === 'FAIL' ? '❌' : '⏭️';
   console.log(`${icon} ${name}: ${message}${duration ? ` (${duration}ms)` : ''}`);
   if (error) {
-    console.log(`   Error: ${error.message || error}`);
+    console.log(`   Error: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -37,8 +36,8 @@ async function runTest(name: string, testFn: () => Promise<void>) {
   try {
     await testFn();
     logTest(name, 'PASS', 'Success', Date.now() - start);
-  } catch (error: any) {
-    logTest(name, 'FAIL', error.message || 'Unknown error', Date.now() - start, error);
+  } catch (error: unknown) {
+    logTest(name, 'FAIL', error instanceof Error ? error.message : 'Unknown error', Date.now() - start, error);
   }
 }
 
@@ -83,7 +82,7 @@ async function main() {
   console.log('\n' + '═'.repeat(80) + '\n');
 
   // Test vehicles
-  const testVehicles = [
+  void [
     { reg: 'VO23UKG', description: 'Valid vehicle with history' },
     { reg: 'BC21YZU', description: 'Valid vehicle' },
     { reg: 'TE57VAN', description: 'Test vehicle (excluded)' },
@@ -126,10 +125,11 @@ async function main() {
       try {
         await dvlaService!.getVehicleData('INVALID123');
         throw new Error('Should have thrown error for invalid registration');
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Accept any error - could be 400, 404, or other error codes
-        if (error.message.includes('Should have thrown')) throw error;
-        console.log(`   → Correctly handles invalid registration (${error.message.substring(0, 50)}...)`);
+        const msg = error instanceof Error ? error.message : String(error);
+        if (msg.includes('Should have thrown')) throw error;
+        console.log(`   → Correctly handles invalid registration (${msg.substring(0, 50)}...)`);
       }
     });
 
@@ -158,7 +158,7 @@ async function main() {
 
     // Test 6: OAuth token acquisition
     await runTest('MOT-001: OAuth token acquisition', async () => {
-      const token = await (motService as any).getAccessToken();
+      const token = await (motService as unknown as { getAccessToken: () => Promise<string> }).getAccessToken();
       if (!token) throw new Error('Failed to acquire access token');
       console.log(`   → Token acquired: ${token.substring(0, 20)}...`);
     });
@@ -210,8 +210,9 @@ async function main() {
       try {
         await motService!.getMotHistory('AB73XYZ');
         console.log('   → Vehicle found (has MOT history)');
-      } catch (error: any) {
-        if (error.message.includes('not found') || error.message.includes('No MOT history')) {
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        if (msg.includes('not found') || msg.includes('No MOT history')) {
           console.log('   → Correctly handles unknown vehicle');
         } else {
           throw error;
@@ -224,23 +225,25 @@ async function main() {
       try {
         await motService!.getMotHistory('INVALID123');
         console.log('   → API accepted registration (might be valid format)');
-      } catch (error: any) {
-        if (error.message.includes('not found') || error.message.includes('No MOT history')) {
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        if (msg.includes('not found') || msg.includes('No MOT history')) {
           console.log('   → Correctly handles invalid/unknown registration');
         } else {
-          throw new Error(`Unexpected error: ${error.message}`);
+          throw new Error(`Unexpected error: ${msg}`);
         }
       }
     });
 
     // Test 12: Token caching
     await runTest('MOT-007: OAuth token caching', async () => {
+      const motWithToken = motService as unknown as { getAccessToken: () => Promise<string> };
       const start1 = Date.now();
-      await (motService as any).getAccessToken();
+      await motWithToken.getAccessToken();
       const time1 = Date.now() - start1;
 
       const start2 = Date.now();
-      await (motService as any).getAccessToken();
+      await motWithToken.getAccessToken();
       const time2 = Date.now() - start2;
 
       if (time2 > time1 * 0.5) {
@@ -293,8 +296,8 @@ async function main() {
       const results = await Promise.all(
         regs.map(async reg => {
           const [dvla, mot] = await Promise.all([
-            dvlaService!.getVehicleData(reg).catch(e => null),
-            motService!.getMotExpiryData(reg).catch(e => null),
+            dvlaService!.getVehicleData(reg).catch(_e => null),
+            motService!.getMotExpiryData(reg).catch(_e => null),
           ]);
           return { reg, dvla, mot };
         })
@@ -336,7 +339,7 @@ async function main() {
       try {
         await dvlaService!.getVehicleData('');
         console.log('   → API accepted empty registration (unexpected but non-fatal)');
-      } catch (error: any) {
+      } catch {
         console.log('   → Correctly rejects empty registration');
       }
     });
@@ -346,7 +349,7 @@ async function main() {
       try {
         await dvlaService!.getVehicleData('A');
         console.log('   → API accepted single character (unexpected but non-fatal)');
-      } catch (error: any) {
+      } catch {
         console.log('   → Correctly rejects malformed registration');
       }
     });
@@ -358,7 +361,7 @@ async function main() {
       try {
         await motService!.getMotHistory('');
         console.log('   → API accepted empty registration (unexpected but non-fatal)');
-      } catch (error: any) {
+      } catch {
         console.log('   → Correctly rejects empty registration');
       }
     });
@@ -368,7 +371,7 @@ async function main() {
       try {
         await motService!.getMotHistory('A');
         console.log('   → API accepted single character (unexpected but non-fatal)');
-      } catch (error: any) {
+      } catch {
         console.log('   → Correctly rejects malformed registration');
       }
     });
@@ -397,7 +400,7 @@ async function main() {
     results.filter(r => r.status === 'FAIL').forEach(r => {
       console.log(`   ${r.name}: ${r.message}`);
       if (r.error) {
-        console.log(`   ${r.error.stack || r.error}`);
+        console.log(`   ${r.error instanceof Error ? r.error.stack : String(r.error)}`);
       }
     });
   }

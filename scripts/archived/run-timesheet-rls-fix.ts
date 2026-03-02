@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -22,7 +21,7 @@ async function runMigration() {
   console.log('🚀 Running Timesheet RLS Policy Fix Migration...\n');
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   
   const client = new Client({
     host: url.hostname,
@@ -83,19 +82,20 @@ async function runMigration() {
     console.log('   - Edit and submit timesheets for any employee');
     console.log('   - Manage all timesheet entries');
 
-  } catch (error: any) {
-    console.error('❌ MIGRATION FAILED:', error.message);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('❌ MIGRATION FAILED:', msg);
     
-    if (error.message?.includes('already exists')) {
+    if (msg.includes('already exists')) {
       console.log('✅ Policy already exists - this is fine!');
       console.log('   The migration will update existing policies.');
     }
     
-    if (error.message?.includes('does not exist')) {
+    if (msg.includes('does not exist')) {
       console.log('⚠️  Some policies may not exist yet - this is expected on first run.');
     }
     
-    console.error('\nFull error:', error);
+    console.error('\nFull error:', err instanceof Error ? err.message : err);
     process.exit(1);
   } finally {
     await client.end();
