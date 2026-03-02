@@ -126,6 +126,7 @@ export function CategoryDialog({
     reset,
     watch,
     setValue,
+    getValues,
   } = useForm<CategoryFormData>({
     resolver: zodResolver(mode === 'create' ? createCategorySchema : editCategorySchema),
     defaultValues: {
@@ -187,34 +188,33 @@ export function CategoryDialog({
     if (selectedType === 'date') {
       setValue('alert_threshold_miles', null);
       setValue('alert_threshold_hours', null);
-      if (!watch('alert_threshold_days')) {
+      if (!getValues('alert_threshold_days')) {
         setValue('alert_threshold_days', 30);
       }
-      if (!watch('period_value')) {
+      if (!getValues('period_value')) {
         setValue('period_value', 12);
       }
     } else if (selectedType === 'mileage') {
       setValue('alert_threshold_days', null);
       setValue('alert_threshold_hours', null);
-      if (!watch('alert_threshold_miles')) {
+      if (!getValues('alert_threshold_miles')) {
         setValue('alert_threshold_miles', 1000);
       }
-      if (!watch('period_value')) {
+      if (!getValues('period_value')) {
         setValue('period_value', 10000);
       }
     } else if (selectedType === 'hours') {
       setValue('alert_threshold_days', null);
       setValue('alert_threshold_miles', null);
-      if (!watch('alert_threshold_hours')) {
+      if (!getValues('alert_threshold_hours')) {
         setValue('alert_threshold_hours', 50);
       }
-      if (!watch('period_value')) {
+      if (!getValues('period_value')) {
         setValue('period_value', 250);
       }
-      // Hours-based categories are for plant machinery
       setValue('applies_to', ['plant']);
     }
-  }, [selectedType, setValue, watch]);
+  }, [selectedType, setValue, getValues]);
 
   const onSubmit = async (data: CategoryFormData) => {
     if (mode === 'create') {

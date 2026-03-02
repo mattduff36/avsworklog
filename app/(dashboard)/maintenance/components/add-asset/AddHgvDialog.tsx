@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,7 @@ const INITIAL_STATE: HgvFormState = {
 };
 
 export function AddHgvDialog({ open, onOpenChange, onSuccess }: AddHgvDialogProps) {
+  const queryClient = useQueryClient();
   const [categories, setCategories] = useState<HgvCategoryOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingCategories, setIsFetchingCategories] = useState(false);
@@ -138,6 +140,7 @@ export function AddHgvDialog({ open, onOpenChange, onSuccess }: AddHgvDialogProp
         throw new Error(getErrorMessage(maintenanceData.error, 'HGV created, but maintenance setup failed'));
       }
 
+      queryClient.invalidateQueries({ queryKey: ['maintenance'] });
       toast.success('HGV added successfully');
       await onSuccess?.();
       onOpenChange(false);

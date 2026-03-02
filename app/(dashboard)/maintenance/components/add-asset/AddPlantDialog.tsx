@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ interface AddPlantDialogProps {
 }
 
 export function AddPlantDialog({ open, onOpenChange, onSuccess }: AddPlantDialogProps) {
+  const queryClient = useQueryClient();
   const [categories, setCategories] = useState<VehicleCategoryOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingCategories, setIsFetchingCategories] = useState(false);
@@ -105,6 +107,7 @@ export function AddPlantDialog({ open, onOpenChange, onSuccess }: AddPlantDialog
       const data = await response.json();
       if (!response.ok) throw new Error(getErrorMessage(data.error, 'Failed to create plant'));
 
+      queryClient.invalidateQueries({ queryKey: ['maintenance'] });
       toast.success('Plant asset added successfully');
       await onSuccess?.();
       onOpenChange(false);
