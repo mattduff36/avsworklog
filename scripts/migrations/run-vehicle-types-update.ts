@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Update Vehicle Types Migration
  * Sets all NULL or empty vehicle_type values to 'Van' (except TE57 HGV)

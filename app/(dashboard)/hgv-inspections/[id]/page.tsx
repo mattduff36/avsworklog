@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { BackButton } from '@/components/ui/back-button';
@@ -31,7 +31,6 @@ interface HgvInspectionDetails {
 
 export default function ViewHgvInspectionPage() {
   const params = useParams();
-  const router = useRouter();
   const supabase = createClient();
   const { user, isManager, loading: authLoading } = useAuth();
 

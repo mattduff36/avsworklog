@@ -95,6 +95,7 @@ export interface GetAllNotificationPreferencesResponse {
 export interface AdminUpdatePreferenceRequest {
   user_id: string;
   module_key: NotificationModuleKey;
+  enabled?: boolean;
   notify_in_app?: boolean;
   notify_email?: boolean;
 }

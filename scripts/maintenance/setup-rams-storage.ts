@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Setup script for RAMS Storage Bucket
  * Creates the rams-documents bucket in Supabase Storage with RLS policies

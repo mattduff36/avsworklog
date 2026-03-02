@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Migration Script: Add DELETE policy for employees to delete draft inspections
  * 

@@ -9,7 +9,7 @@ import { ALL_MODULES } from '@/types/roles';
  * GET /api/admin/roles
  * List all roles with user counts
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -42,7 +42,24 @@ export async function GET() {
     }
 
     // Format response - count only enabled permissions
-    const formattedRoles: RoleWithUserCount[] = roles.map((role: any) => ({
+    interface RolePermissionRow {
+      enabled: boolean;
+    }
+
+    interface RoleRow {
+      id: string;
+      name: string;
+      display_name: string;
+      description: string | null;
+      is_super_admin: boolean;
+      is_manager_admin: boolean;
+      created_at: string;
+      updated_at: string;
+      profiles?: Array<{ count: number }>;
+      role_permissions?: RolePermissionRow[];
+    }
+
+    const formattedRoles: RoleWithUserCount[] = (roles as RoleRow[]).map((role) => ({
       id: role.id,
       name: role.name,
       display_name: role.display_name,
@@ -51,8 +68,8 @@ export async function GET() {
       is_manager_admin: role.is_manager_admin,
       created_at: role.created_at,
       updated_at: role.updated_at,
-      user_count: role.profiles[0]?.count || 0,
-      permission_count: role.role_permissions?.filter((p: any) => p.enabled).length || 0,
+      user_count: role.profiles?.[0]?.count || 0,
+      permission_count: role.role_permissions?.filter((permission) => permission.enabled).length || 0,
     }));
 
     const response: GetRolesResponse = {
@@ -99,7 +116,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden - Manager/Admin access required' }, { status: 403 });
     }
 
-    const body: CreateRoleRequest = await request.json();
+    const body = (await request.json()) as CreateRoleRequest & { timesheet_type?: string };
 
     // Validate required fields
     if (!body.name || !body.display_name) {

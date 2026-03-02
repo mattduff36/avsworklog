@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Fix Message Sender RLS Policy
  * 

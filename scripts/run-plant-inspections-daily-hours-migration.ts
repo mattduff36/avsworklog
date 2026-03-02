@@ -25,7 +25,7 @@ async function runMigration() {
   console.log('🚀 Running Plant Inspections Daily Hours Migration\n');
   
   // Check for database connection string
-  const connectionString = process.env.POSTGRES_URL_NON_POOLING;
+  const connectionString: string | undefined = process.env.POSTGRES_URL_NON_POOLING;
   if (!connectionString) {
     console.error('❌ Error: POSTGRES_URL_NON_POOLING not found in .env.local');
     console.error('Please add your database connection string to .env.local');
@@ -37,8 +37,8 @@ async function runMigration() {
   try {
     migrationSQL = readFileSync(resolve(process.cwd(), MIGRATION_FILE), 'utf-8');
     console.log(`✅ Loaded migration from: ${MIGRATION_FILE}\n`);
-  } catch (error) {
-    console.error(`❌ Error reading migration file: ${error}`);
+  } catch (err: unknown) {
+    console.error(`❌ Error reading migration file: ${err}`);
     process.exit(1);
   }
 
@@ -50,10 +50,10 @@ async function runMigration() {
     port: parseInt(url.port) || 5432,
     database: url.pathname.slice(1),
     user: url.username,
-    password: url.password,
+    password: url.password ? decodeURIComponent(url.password) : undefined,
     ssl: {
-      rejectUnauthorized: false
-    }
+      rejectUnauthorized: false,
+    },
   });
 
   try {
@@ -67,7 +67,7 @@ async function runMigration() {
 
     // Verify table was created
     console.log('🔍 Verifying table creation...');
-    const result = await client.query(`
+    const result = await client.query<{ table_exists: boolean }>(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 
         WHERE table_schema = 'public' 
@@ -75,25 +75,25 @@ async function runMigration() {
       ) as table_exists;
     `);
 
-    if (result.rows[0].table_exists) {
+    if (result.rows[0]?.table_exists) {
       console.log('✅ inspection_daily_hours table exists\n');
 
       // Check column count
-      const columnsResult = await client.query(`
+      const columnsResult = await client.query<{ column_count: string }>(`
         SELECT COUNT(*) as column_count
         FROM information_schema.columns
         WHERE table_schema = 'public'
         AND table_name = 'inspection_daily_hours';
       `);
-      console.log(`✅ Table has ${columnsResult.rows[0].column_count} columns\n`);
+      console.log(`✅ Table has ${columnsResult.rows[0]?.column_count} columns\n`);
 
       // Check RLS policies
-      const rlsResult = await client.query(`
+      const rlsResult = await client.query<{ policy_count: string }>(`
         SELECT COUNT(*) as policy_count
         FROM pg_policies
         WHERE tablename = 'inspection_daily_hours';
       `);
-      console.log(`✅ Table has ${rlsResult.rows[0].policy_count} RLS policies\n`);
+      console.log(`✅ Table has ${rlsResult.rows[0]?.policy_count} RLS policies\n`);
 
       console.log('🎉 Migration completed successfully!');
       console.log('\nNext steps:');
@@ -105,12 +105,13 @@ async function runMigration() {
       process.exit(1);
     }
 
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error(String(err));
     if (error.message && error.message.includes('already exists')) {
       console.log('✅ Migration already applied (table exists)\n');
       console.log('🎉 Database is up to date!');
     } else {
-      console.error('❌ Migration failed:', error);
+      console.error('❌ Migration failed:', err);
       process.exit(1);
     }
   } finally {
@@ -120,7 +121,7 @@ async function runMigration() {
 }
 
 // Run migration
-runMigration().catch(error => {
-  console.error('💥 Unexpected error:', error);
+runMigration().catch((err: unknown) => {
+  console.error('💥 Unexpected error:', err);
   process.exit(1);
 });

@@ -52,6 +52,19 @@ function applyAlphaToHSL(color: string): string {
   return 'hsl(215 16% 47% / 0.15)'; // slate-600 with 15% opacity
 }
 
+function isExpectedNetworkError(error: unknown): boolean {
+  if (!navigator.onLine) return true;
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('failed to fetch') ||
+    message.includes('networkerror') ||
+    message.includes('network request failed') ||
+    message.includes('load failed')
+  );
+}
+
 export default function DashboardPage() {
   const { profile, isManager, isAdmin, isActualSuperAdmin, isViewingAs, effectiveRole } = useAuth();
   const formTypes = getEnabledForms();
@@ -539,6 +552,12 @@ export default function DashboardPage() {
     
     try {
       setRamsLoading(true);
+      if (!navigator.onLine) {
+        setHasRAMSAssignments(false);
+        setPendingRAMSCount(0);
+        return;
+      }
+
       // Get total count of all assignments
       const { count: totalCount, error: totalError } = await supabase
         .from('rams_assignments')
@@ -558,7 +577,11 @@ export default function DashboardPage() {
       if (pendingError) throw pendingError;
       setPendingRAMSCount(pendingCount || 0);
     } catch (error) {
-      console.error('Error fetching RAMS assignments:', error);
+      if (!isExpectedNetworkError(error)) {
+        console.warn('Unexpected error fetching RAMS assignments:', error);
+      }
+      setHasRAMSAssignments(false);
+      setPendingRAMSCount(0);
     } finally {
       setRamsLoading(false);
     }

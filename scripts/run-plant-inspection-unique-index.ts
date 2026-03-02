@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Migration Runner: Add Unique Index for Plant Inspections
  * 

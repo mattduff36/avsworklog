@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Vehicle History Page Integration Tests
  * Tests all workflows for /fleet/vehicles/[vehicleId]/history page

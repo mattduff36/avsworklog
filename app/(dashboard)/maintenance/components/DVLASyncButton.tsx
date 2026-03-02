@@ -181,7 +181,7 @@ export function DVLASyncButton({
       variant={variant}
       size={size}
       onClick={handleSync}
-      disabled={isSyncing || isRateLimited}
+      disabled={(isSyncing || isRateLimited) ?? false}
       className={`${isRateLimited ? 'text-muted-foreground' : getStatusColor()} hover:bg-slate-800`}
       title={getTooltipText()}
     >

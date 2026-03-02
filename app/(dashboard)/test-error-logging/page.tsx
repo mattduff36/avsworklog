@@ -27,7 +27,7 @@ export default function TestErrorLoggingPage() {
   const testPromiseRejection = () => {
     addResult('Testing promise rejection...');
     Promise.reject(new Error('Test promise rejection: Async operation failed'))
-      .catch(error => {
+      .catch(_error => {
         addResult('✅ Promise rejection logged');
         toast.error('Promise rejection logged! Check /debug');
       });
@@ -59,8 +59,8 @@ export default function TestErrorLoggingPage() {
       } else {
         addResult(`❌ No error occurred: ${data.message}`);
       }
-    } catch (error) {
-      addResult(`✅ Fetch error caught: ${error instanceof Error ? error.message : 'Unknown'}`);
+    } catch (_error) {
+      addResult(`✅ Fetch error caught: ${_error instanceof Error ? _error.message : 'Unknown'}`);
       toast.error('Server error logged! Check /debug');
     }
   };
@@ -74,14 +74,14 @@ export default function TestErrorLoggingPage() {
         body: JSON.stringify({ test: 'data' })
       });
       
-      const data = await response.json();
+      await response.json();
       addResult(`✅ API call completed with status ${response.status}`);
       
       if (!response.ok) {
         toast.info('Real API error logged with context!');
       }
-    } catch (error) {
-      addResult(`✅ API error: ${error instanceof Error ? error.message : 'Unknown'}`);
+    } catch (_error) {
+      addResult(`✅ API error: ${_error instanceof Error ? _error.message : 'Unknown'}`);
       toast.error('API error logged! Check /debug');
     }
   };

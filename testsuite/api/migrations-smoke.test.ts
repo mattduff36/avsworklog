@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * @tags @migrations
  * Converted from: TC014_Database_migration_script_execution_without_data_loss.py

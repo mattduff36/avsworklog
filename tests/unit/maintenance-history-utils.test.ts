@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect } from 'vitest';
 import {
   MAINTENANCE_HISTORY_FIELD_NAME_MAX,

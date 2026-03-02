@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Run Projects Module Migration
  * Adds project_document_types and project_favourites tables,

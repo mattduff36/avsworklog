@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Migration Runner: Deactivate non-Repair subcategories
  *

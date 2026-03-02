@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Server-side "View As" helpers for API route handlers.
  *

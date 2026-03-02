@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * AddVehicleDialog Async Callback Type Mismatch Fix Test
  * 

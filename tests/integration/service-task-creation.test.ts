@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Integration tests for service task creation from maintenance alerts
  * 

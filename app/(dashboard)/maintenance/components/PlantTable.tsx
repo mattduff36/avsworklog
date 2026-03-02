@@ -161,8 +161,8 @@ export function PlantTable({
       if (maintenanceError) throw maintenanceError;
 
       // Combine plant data with maintenance data
-      const combined: PlantMaintenanceWithStatus[] = (plantData || []).map((plant) => {
-        const maintenance = maintenanceData?.find((m) => m.plant_id === plant.id);
+      const combined: PlantMaintenanceWithStatus[] = (plantData || []).map((plant: PlantAsset) => {
+        const maintenance = maintenanceData?.find((m: { plant_id: string | null }) => m.plant_id === plant.id);
         
         return {
           plant_id: plant.plant_id, // Human-readable identifier (P001, P002, etc.)

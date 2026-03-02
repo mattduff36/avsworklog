@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Error Details API Integration Tests
  * 

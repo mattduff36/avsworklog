@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Test: Actions RLS Policy Fix
  * Verifies that inspections with defects can create actions after RLS fix

@@ -92,12 +92,16 @@ export default function ViewTimesheetPage() {
 
       if (entriesError) throw entriesError;
 
+      const typedEntries = (entriesData || []) as TimesheetEntry[];
+
       // Create full week array (all 7 days)
       const fullWeek = Array.from({ length: 7 }, (_, i) => {
-        const existingEntry = entriesData?.find(e => e.day_of_week === i + 1);
+        const existingEntry = typedEntries.find((entry: TimesheetEntry) => entry.day_of_week === i + 1);
         return existingEntry || {
           day_of_week: i + 1,
           timesheet_id: id,
+          job_number: null,
+          did_not_work: false,
           time_started: null,
           time_finished: null,
           working_in_yard: false,
@@ -134,7 +138,7 @@ export default function ViewTimesheetPage() {
     }
   }, [params.id, authLoading, fetchTimesheet]);
 
-  const updateEntry = (dayIndex: number, field: string, value: string | boolean | number) => {
+  const updateEntry = (dayIndex: number, field: string, value: string | boolean | number | null) => {
     const newEntries = [...entries];
     newEntries[dayIndex] = {
       ...newEntries[dayIndex],
@@ -944,7 +948,7 @@ export default function ViewTimesheetPage() {
           open={showAdjustmentModal}
           onClose={() => setShowAdjustmentModal(false)}
           onConfirm={handleAdjust}
-          employeeName={timesheet.profile?.full_name || 'Employee'}
+          employeeName={(timesheet as Timesheet & { profile?: { full_name?: string | null } }).profile?.full_name || 'Employee'}
           weekEnding={formatDate(timesheet.week_ending)}
         />
       )}

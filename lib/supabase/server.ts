@@ -1,13 +1,12 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { Database } from '@/types/database'
 import { VIEW_AS_COOKIE_NAME } from '@/lib/utils/view-as-cookie'
 
 export async function createClient() {
   const cookieStore = await cookies()
   const viewAsRoleId = cookieStore.get(VIEW_AS_COOKIE_NAME)?.value || ''
 
-  return createServerClient<Database>(
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {

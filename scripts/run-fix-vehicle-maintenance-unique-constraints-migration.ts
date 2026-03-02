@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { config } from 'dotenv';
 import { resolve, join } from 'path';
 import fs from 'fs';

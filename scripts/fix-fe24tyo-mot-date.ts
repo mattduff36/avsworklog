@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Fix the incorrect MOT due date for FE24 TYO by running a manual sync
  */

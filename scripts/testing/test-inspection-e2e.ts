@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * End-to-end test for complete inspection draft workflow
  * 

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
 import type {
-  VehicleMaintenance,
   VehicleMaintenanceWithStatus,
   MaintenanceCategory,
   MaintenanceListResponse,
@@ -15,11 +14,57 @@ import {
   calculateAlertCounts
 } from '@/lib/utils/maintenanceCalculations';
 
+interface InspectionProfile {
+  full_name: string | null;
+}
+
+interface VanInspectionRow {
+  van_id: string | null;
+  inspection_date: string | null;
+  profiles: InspectionProfile | null;
+}
+
+interface HgvInspectionRow {
+  hgv_id: string | null;
+  inspection_date: string | null;
+  profiles: InspectionProfile | null;
+}
+
+interface PlantInspectionRow {
+  plant_id: string | null;
+  inspection_date: string | null;
+  profiles: InspectionProfile | null;
+}
+
+interface MaintenanceRow {
+  id: string;
+  van_id: string | null;
+  hgv_id: string | null;
+  plant_id: string | null;
+  current_mileage: number | null;
+  tax_due_date: string | null;
+  mot_due_date: string | null;
+  next_service_mileage: number | null;
+  last_service_mileage: number | null;
+  cambelt_due_mileage: number | null;
+  tracker_id: string | null;
+  first_aid_kit_expiry: string | null;
+  six_weekly_inspection_due_date: string | null;
+  fire_extinguisher_due_date: string | null;
+  taco_calibration_due_date: string | null;
+  created_at: string;
+  updated_at: string;
+  last_updated_by: string | null;
+  last_updated_at: string;
+  last_mileage_update: string | null;
+  notes: string | null;
+}
+
 /**
  * GET /api/maintenance
  * Returns all vehicle maintenance records with calculated status
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // Auth check
     const supabase = await createClient();
@@ -98,7 +143,19 @@ export async function GET(request: NextRequest) {
     if (plantResult.error) { logger.error('Failed to fetch plant', plantResult.error); throw plantResult.error; }
 
     // Tag each asset with its source type
-    type TaggedAsset = { _assetType: 'van' | 'hgv' | 'plant'; [key: string]: any };
+    interface TaggedAsset {
+      _assetType: 'van' | 'hgv' | 'plant';
+      id: string;
+      reg_number: string | null;
+      category_id: string | null;
+      status: string;
+      nickname: string | null;
+      plant_id?: string | null;
+      serial_number?: string | null;
+      year?: number | null;
+      weight_class?: string | null;
+      maintenance?: Record<string, unknown>[] | Record<string, unknown> | null;
+    }
     const taggedAssets: TaggedAsset[] = [
       ...(vansResult.data || []).map(v => ({ ...v, _assetType: 'van' as const })),
       ...(hgvsResult.data || []).map(v => ({ ...v, _assetType: 'hgv' as const })),
@@ -120,7 +177,7 @@ export async function GET(request: NextRequest) {
         .in('van_id', vanIds)
         .order('inspection_date', { ascending: false });
 
-      for (const row of (vanInsp || []) as any[]) {
+      for (const row of ((vanInsp || []) as unknown as VanInspectionRow[])) {
         if (row.van_id && !lastInspectionMap.has(row.van_id)) {
           lastInspectionMap.set(row.van_id, {
             inspector: row.profiles?.full_name || null,
@@ -138,7 +195,7 @@ export async function GET(request: NextRequest) {
         .in('hgv_id', hgvIds)
         .order('inspection_date', { ascending: false });
 
-      for (const row of (hgvInsp || []) as any[]) {
+      for (const row of ((hgvInsp || []) as unknown as HgvInspectionRow[])) {
         if (row.hgv_id && !lastInspectionMap.has(row.hgv_id)) {
           lastInspectionMap.set(row.hgv_id, {
             inspector: row.profiles?.full_name || null,
@@ -156,7 +213,7 @@ export async function GET(request: NextRequest) {
         .in('plant_id', plantIds)
         .order('inspection_date', { ascending: false });
 
-      for (const row of (plantInsp || []) as any[]) {
+      for (const row of ((plantInsp || []) as unknown as PlantInspectionRow[])) {
         if (row.plant_id && !lastInspectionMap.has(row.plant_id)) {
           lastInspectionMap.set(row.plant_id, {
             inspector: row.profiles?.full_name || null,
@@ -167,9 +224,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Calculate status for each asset
-    const vehiclesWithStatus: VehicleMaintenanceWithStatus[] = taggedAssets.map(asset => {
+    const vehiclesWithStatus = taggedAssets.map(asset => {
       const assetType = asset._assetType;
-      const maintenance = Array.isArray(asset.maintenance) ? asset.maintenance[0] : asset.maintenance;
+      const maintenance = (
+        Array.isArray(asset.maintenance) ? asset.maintenance[0] : asset.maintenance
+      ) as MaintenanceRow | null;
       const inspInfo = lastInspectionMap.get(asset.id);
 
       const vehicleObj = {
@@ -187,7 +246,8 @@ export async function GET(request: NextRequest) {
 
       if (!maintenance) {
         return {
-          id: null,
+          // Use a stable synthetic id for assets with no maintenance row yet.
+          id: asset.id,
           van_id: assetType === 'van' ? asset.id : null,
           hgv_id: assetType === 'hgv' ? asset.id : null,
           plant_id: assetType === 'plant' ? asset.id : null,
@@ -199,7 +259,7 @@ export async function GET(request: NextRequest) {
           tax_due_date: null,
           mot_due_date: null,
           next_service_mileage: null,
-          miles_last_service: null,
+          last_service_mileage: null,
           cambelt_due_mileage: null,
           tracker_id: null,
           first_aid_kit_expiry: null,
@@ -282,7 +342,7 @@ export async function GET(request: NextRequest) {
         overdue_count: alertCounts.overdue,
         due_soon_count: alertCounts.due_soon
       };
-    });
+    }) as VehicleMaintenanceWithStatus[];
     
     // Calculate summary
     const summary = {
@@ -299,10 +359,11 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json(response);
     
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('GET /api/maintenance failed', error, 'MaintenanceAPI');
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error', details: errorMessage },
       { status: 500 }
     );
   }
@@ -539,16 +600,16 @@ export async function POST(request: NextRequest) {
     
     const response: MaintenanceUpdateResponse = {
       success: true,
-      maintenance: createdMaintenance,
-      message: 'Maintenance record created successfully'
+      maintenance: createdMaintenance
     };
     
     return NextResponse.json(response);
     
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('POST /api/maintenance failed', error, 'MaintenanceAPI');
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error', details: errorMessage },
       { status: 500 }
     );
   }

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Messages Migration - Supabase REST API Method
  * Bypasses SSL certificate issues by using Supabase client

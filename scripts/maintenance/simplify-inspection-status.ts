@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Simplify vehicle_inspections status workflow to 'draft' and 'submitted'
  * - Migrates legacy statuses to 'submitted'

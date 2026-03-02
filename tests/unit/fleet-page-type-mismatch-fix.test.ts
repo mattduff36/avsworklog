@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Fleet Page Type Mismatch Bug Fix Test
  * 

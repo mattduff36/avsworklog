@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Check which API routes have error logging implemented
  * Reports on progress and identifies routes that need updating

@@ -4,6 +4,20 @@ import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { GetReportsResponse, MessageReportData } from '@/types/messages';
 
+interface ProfileShape {
+  id?: string;
+  full_name?: string | null;
+  role?: string | null;
+  employee_id?: string | null;
+}
+
+function pickProfile(
+  profile: ProfileShape | ProfileShape[] | null | undefined
+): ProfileShape | null {
+  if (!profile) return null;
+  return Array.isArray(profile) ? profile[0] ?? null : profile;
+}
+
 /**
  * GET /api/messages/reports
  * Fetch Toolbox Talk reporting data for managers/admins
@@ -110,9 +124,17 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      const totalAssigned = recipients?.length || 0;
-      const totalSigned = recipients?.filter(r => r.status === 'SIGNED').length || 0;
-      const totalPending = recipients?.filter(r => r.status === 'PENDING' || r.status === 'SHOWN').length || 0;
+      const normalizedRecipients =
+        (recipients ?? []).map((recipient) => ({
+          ...recipient,
+          user: pickProfile(recipient.user as ProfileShape | ProfileShape[] | null),
+        }));
+
+      const totalAssigned = normalizedRecipients.length;
+      const totalSigned = normalizedRecipients.filter((r) => r.status === 'SIGNED').length;
+      const totalPending = normalizedRecipients.filter(
+        (r) => r.status === 'PENDING' || r.status === 'SHOWN'
+      ).length;
       const complianceRate = totalAssigned > 0 ? Math.round((totalSigned / totalAssigned) * 100) : 0;
 
       // Apply status filter at the report level
@@ -123,12 +145,35 @@ export async function GET(request: NextRequest) {
         continue; // Skip if fully signed
       }
 
+      const sender = pickProfile(message.sender as ProfileShape | ProfileShape[] | null);
       reportsData.push({
         message: {
           ...message,
-          sender_name: message.sender?.full_name || 'Deleted User'
+          created_via: 'api',
+          pdf_file_path: null,
+          sender: sender
+            ? {
+                id: sender.id ?? '',
+                full_name: sender.full_name ?? 'Deleted User',
+                role: sender.role ?? 'unknown',
+              }
+            : null,
         },
-        recipients: recipients || [],
+        recipients: normalizedRecipients.map((recipient) => ({
+          ...recipient,
+          message_id: message.id,
+          first_shown_at: null,
+          cleared_from_inbox_at: null,
+          signature_data: null,
+          updated_at: recipient.created_at,
+          user: recipient.user
+            ? {
+                full_name: recipient.user.full_name ?? 'Unknown',
+                role: recipient.user.role ?? 'unknown',
+                employee_id: recipient.user.employee_id ?? null,
+              }
+            : null,
+        })),
         total_assigned: totalAssigned,
         total_signed: totalSigned,
         total_pending: totalPending,

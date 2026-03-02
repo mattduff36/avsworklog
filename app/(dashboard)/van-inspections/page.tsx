@@ -445,7 +445,7 @@ function InspectionsContent() {
                   <SelectContent>
                     <SelectItem value="all">All Vans</SelectItem>
                     {(() => {
-                      const { recentVehicles, otherVehicles } = splitVehiclesByRecent(vehicles, recentVehicleIds);
+                      const { recentVehicles, otherVehicles } = splitVehiclesByRecent(vehicles as Array<Vehicle & Record<string, unknown>>, recentVehicleIds);
                       return (
                         <>
                           {recentVehicles.length > 0 && (
@@ -453,7 +453,7 @@ function InspectionsContent() {
                               <SelectSeparator className="bg-slate-700" />
                               <SelectGroup>
                                 <SelectLabel className="">Recent</SelectLabel>
-                                {recentVehicles.map((vehicle) => (
+                                {recentVehicles.map((vehicle: Vehicle) => (
                                   <SelectItem key={vehicle.id} value={vehicle.id}>
                                     {vehicle.reg_number}
                                     {vehicle.van_categories?.name && ` (${vehicle.van_categories.name})`}
@@ -469,7 +469,7 @@ function InspectionsContent() {
                                 {recentVehicles.length > 0 && (
                                   <SelectLabel className="">All Vans</SelectLabel>
                                 )}
-                                {otherVehicles.map((vehicle) => (
+                                {otherVehicles.map((vehicle: Vehicle) => (
                                   <SelectItem key={vehicle.id} value={vehicle.id}>
                                     {vehicle.reg_number}
                                     {vehicle.van_categories?.name && ` (${vehicle.van_categories.name})`}
@@ -530,7 +530,9 @@ function InspectionsContent() {
       ) : (
         <>
           <div className="grid gap-4">
-            {inspections.slice(0, displayCount).map((inspection) => (
+            {inspections.slice(0, displayCount).map((inspection) => {
+              const inspectionStatus = inspection.status as string;
+              return (
             <Card 
               key={inspection.id} 
               className="border-border hover:shadow-lg hover:border-inspection/50 transition-all duration-200 cursor-pointer"
@@ -589,13 +591,13 @@ function InspectionsContent() {
                       ? `Submitted ${formatDate(inspection.submitted_at)}`
                       : 'Not yet submitted'}
                   </div>
-                  {inspection.status === 'rejected' && inspection.manager_comments && (
+                  {inspectionStatus === 'rejected' && inspection.manager_comments && (
                     <div className="text-red-600 text-xs">
                       See manager comments
                     </div>
                   )}
                   {/* Download PDF Button for Approved/Pending */}
-                  {(inspection.status === 'approved' || inspection.status === 'submitted') && (
+                  {(inspectionStatus === 'approved' || inspectionStatus === 'submitted') && (
                     <Button
                       onClick={(e) => handleDownloadPDF(e, inspection.id)}
                       disabled={downloading === inspection.id}
@@ -610,7 +612,8 @@ function InspectionsContent() {
                 </div>
               </CardContent>
             </Card>
-            ))}
+              );
+            })}
           </div>
 
           {/* Show More Button */}

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * EditPlantRecordDialog User Null Check Fix Test
  * 

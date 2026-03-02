@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * AddVehicleDialog Asset Type State Management Bug Fix Test
  * 

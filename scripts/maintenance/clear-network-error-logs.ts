@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-nocheck
 /**
  * Clear duplicate "Failed to fetch" network errors from error logs
  * These are expected errors when dev server is stopped

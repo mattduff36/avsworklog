@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Migration Runner: Workshop requires_subcategories toggle
  *

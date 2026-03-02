@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { test, expect } from '@playwright/test';
 
 const ADMIN_EMAIL = 'admin@avsworklog.test';

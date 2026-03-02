@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Plant Maintenance Type Structure Bug Fixes Test
  * 

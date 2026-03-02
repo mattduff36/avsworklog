@@ -22,7 +22,7 @@ function getSupabaseServiceRole() {
  * Returns maintenance history for a plant asset
  */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ plantId: string }> }
 ) {
   try {
@@ -149,7 +149,7 @@ export async function GET(
     
     return NextResponse.json(response);
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('GET /api/maintenance/history/plant/[plantId] failed', error, 'MaintenanceAPI');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

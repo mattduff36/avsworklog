@@ -7,7 +7,6 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Loader2, Wrench, Truck, Settings, Plus, Edit, Trash2, AlertTriangle, HardHat, ChevronDown } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
 
@@ -150,7 +149,6 @@ function FleetContent() {
   const [hgvCategories, setHgvCategories] = useState<HgvCategory[]>([]);
   const [hgvCategoriesLoading, setHgvCategoriesLoading] = useState(false);
   const [hgvAssets, setHgvAssets] = useState<HgvAsset[]>([]);
-  const [hgvAssetsLoading, setHgvAssetsLoading] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -201,7 +199,6 @@ function FleetContent() {
   // Fetch HGV assets
   const fetchHgvAssets = async () => {
     try {
-      setHgvAssetsLoading(true);
       const { data, error } = await supabase
         .from('hgvs')
         .select('id, reg_number, nickname, status, category_id, hgv_categories(name, id)')
@@ -212,8 +209,6 @@ function FleetContent() {
       setHgvAssets(data || []);
     } catch (error) {
       logger.error('Failed to fetch HGV assets', error, 'FleetPage');
-    } finally {
-      setHgvAssetsLoading(false);
     }
   };
 

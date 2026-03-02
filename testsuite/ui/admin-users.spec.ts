@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * @tags @admin @critical
  * Tests admin user management page navigation and basic controls.

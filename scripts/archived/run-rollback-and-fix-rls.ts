@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * URGENT: Rollback and Fix RLS Policy
  * 

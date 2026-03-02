@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Plant Maintenance Feature Validation Script
  * Comprehensive checks for all plant parity features

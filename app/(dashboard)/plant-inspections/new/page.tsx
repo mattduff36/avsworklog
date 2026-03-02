@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -58,16 +58,6 @@ type InspectionWithRelations = {
   inspection_items?: InspectionItem[];
 };
 
-type LoggedAction = {
-  id: string;
-  status: string;
-  logged_comment: string | null;
-  inspection_items?: {
-    item_number: number;
-    item_description: string;
-  } | null;
-};
-
 type ProfileWithRole = {
   role?: {
     is_manager_admin?: boolean;
@@ -106,7 +96,7 @@ function NewPlantInspectionContent() {
   loadingRef.current = loading;
   const [error, setError] = useState('');
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
-  const [signature, setSignature] = useState<string | null>(null);
+  const [, setSignature] = useState<string | null>(null);
   const [showConfirmSubmitDialog, setShowConfirmSubmitDialog] = useState(false);
   const [existingInspectionId, setExistingInspectionId] = useState<string | null>(null);
   
@@ -126,7 +116,7 @@ function NewPlantInspectionContent() {
   // End of inspection comment + inform workshop states
   const [inspectorComments, setInspectorComments] = useState('');
   const [informWorkshop, setInformWorkshop] = useState(false);
-  const [creatingWorkshopTask, setCreatingWorkshopTask] = useState(false);
+  const [, setCreatingWorkshopTask] = useState(false);
 
   // Hired plant states
   const HIRED_PLANT_SENTINEL = '__hired__';
@@ -282,13 +272,18 @@ function NewPlantInspectionContent() {
 
           if (error) throw error;
 
-          const formattedEmployees: Employee[] = (profiles || [])
+          const typedProfiles = (profiles || []) as Array<{
+            id: string;
+            full_name: string | null;
+            employee_id: string | null;
+          }>;
+          const formattedEmployees: Employee[] = typedProfiles
             .map((emp) => ({
               id: emp.id,
               full_name: emp.full_name || 'Unnamed User',
               employee_id: emp.employee_id || null,
             }))
-            .sort((a, b) => a.full_name.localeCompare(b.full_name));
+            .sort((a: Employee, b: Employee) => a.full_name.localeCompare(b.full_name));
           
           setEmployees(formattedEmployees);
           
@@ -611,7 +606,7 @@ function NewPlantInspectionContent() {
         hired_plant_hiring_company: isHiredPlant ? hiredPlantHiringCompany.trim() : null,
       };
 
-      let inspection: InspectionWithRelations;
+      let inspection: { id: string };
 
       if (existingInspectionId) {
         const { data: existingItems, error: fetchError } = await supabase
@@ -794,7 +789,7 @@ function NewPlantInspectionContent() {
           });
 
           if (informResponse.ok) {
-            const result = await informResponse.json();
+            await informResponse.json();
             toast.success('Workshop task created');
           } else {
             const errorData = await informResponse.json();

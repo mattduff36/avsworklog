@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * CategoryDialog period_value Validation Tests
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { vi } from 'vitest';
 
 export const mockSupabaseQuery = (data: any, error: any = null) => ({

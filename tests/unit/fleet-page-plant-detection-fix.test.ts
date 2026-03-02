@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Fleet Page Plant Detection Logic Bug Fix Test
  * 

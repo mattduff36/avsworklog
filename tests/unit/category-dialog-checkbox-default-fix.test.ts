@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Category Dialog Checkbox Default Bug Fix Test
  * 

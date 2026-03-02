@@ -62,7 +62,7 @@ export async function GET(
     return NextResponse.json(response);
 
   } catch (error) {
-    console.error(`Error in GET /api/admin/roles/${params.id}:`, error);
+    console.error('Error in GET /api/admin/roles/[id]:', error);
 
     await logServerError({
       error: error as Error,
@@ -102,7 +102,11 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden - Manager/Admin access required' }, { status: 403 });
     }
 
-    const body: UpdateRoleRequest = await request.json();
+    const body = (await request.json()) as UpdateRoleRequest & {
+      name?: string;
+      is_manager_admin?: boolean;
+      timesheet_type?: string;
+    };
 
     // Check if role exists and is not super admin
     const { data: existingRole, error: fetchError } = await supabase
@@ -141,7 +145,7 @@ export async function PATCH(
     }
 
     // Update the role
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (body.name !== undefined) updateData.name = body.name;
     if (body.display_name !== undefined) updateData.display_name = body.display_name;
     if (body.description !== undefined) updateData.description = body.description;
@@ -165,7 +169,7 @@ export async function PATCH(
     });
 
   } catch (error) {
-    console.error(`Error in PATCH /api/admin/roles/${params.id}:`, error);
+    console.error('Error in PATCH /api/admin/roles/[id]:', error);
 
     await logServerError({
       error: error as Error,
@@ -253,7 +257,7 @@ export async function DELETE(
     });
 
   } catch (error) {
-    console.error(`Error in DELETE /api/admin/roles/${params.id}:`, error);
+    console.error('Error in DELETE /api/admin/roles/[id]:', error);
 
     await logServerError({
       error: error as Error,

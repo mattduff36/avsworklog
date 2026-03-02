@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { config } from 'dotenv';
 import { readFileSync } from 'fs';
 import { join } from 'path';

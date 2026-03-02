@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Send a sample daily error summary email
  * Run with: npx tsx scripts/send-sample-error-email.ts

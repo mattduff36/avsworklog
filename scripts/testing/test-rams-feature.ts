@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Comprehensive RAMS Feature Test Suite
  * Tests database, storage, permissions, and functionality

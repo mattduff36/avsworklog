@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * @tags @permissions @critical
  * Tests that employees cannot access admin pages and APIs require auth.

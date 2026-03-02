@@ -146,8 +146,6 @@ export async function POST(request: NextRequest) {
           console.log(`${emailAdminIds.length} admins opted in for email notifications`);
 
           // Create in-app notifications for opted-in admins
-          let notificationMessageId: string | null = null;
-
           if (inAppAdminIds.length > 0) {
             try {
               // Create message
@@ -181,8 +179,6 @@ ${additional_context ? `**Additional Context:**\n${JSON.stringify(additional_con
                 console.error('Error creating message:', messageError);
                 throw messageError;
               }
-
-              notificationMessageId = message.id;
 
               // Create recipient entries for opted-in admins only
               const recipientRecords = inAppAdminIds.map(adminId => ({

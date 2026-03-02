@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, FileText, Download, CheckCircle2, Mail, ExternalLink, AlertCircle } from 'lucide-react';
-import Link from 'next/link';
 import { BackButton } from '@/components/ui/back-button';
 import { SignRAMSModal } from '@/components/rams/SignRAMSModal';
 import { toast } from 'sonner';
@@ -251,7 +250,7 @@ export default function ReadRAMSPage() {
       
       // Use in-app PDF viewer for PWA/mobile to ensure back navigation works
       if (isStandalone || isMobile) {
-        const viewerUrl = `/pdf-viewer?url=${encodeURIComponent(fileUrl)}&title=${encodeURIComponent(ramsDocument.title)}&return=${encodeURIComponent(`/projects/${documentId}/read`)}`;
+        const viewerUrl = `/pdf-viewer?url=${encodeURIComponent(fileUrl)}&title=${encodeURIComponent(ramsDocument?.title ?? '')}&return=${encodeURIComponent(`/projects/${documentId}/read`)}`;
         router.push(viewerUrl);
         
         // Record action

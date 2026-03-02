@@ -8,7 +8,7 @@ import { logServerError } from '@/lib/utils/server-error-logger';
  * Sets cleared_from_inbox_at timestamp for all user's message_recipients
  * Does not delete the actual data (for admin/audit purposes)
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
 

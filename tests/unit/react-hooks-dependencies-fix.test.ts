@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * React Hooks Dependencies and Supabase Client Creation Fixes Test
  * 

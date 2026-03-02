@@ -23,6 +23,10 @@ interface InspectionWithDetails extends VanInspection {
   };
 }
 
+interface InspectionItemWithDay extends InspectionItem {
+  day_of_week: number | null;
+}
+
 export default function ViewInspectionPage() {
   const router = useRouter();
   const params = useParams();
@@ -30,8 +34,8 @@ export default function ViewInspectionPage() {
   const supabase = createClient();
   
   const [inspection, setInspection] = useState<InspectionWithDetails | null>(null);
-  const [items, setItems] = useState<InspectionItem[]>([]);
-  const [originalDefectItems, setOriginalDefectItems] = useState<InspectionItem[]>([]); // Track original defects for auto-completion
+  const [items, setItems] = useState<InspectionItemWithDay[]>([]);
+  const [originalDefectItems, setOriginalDefectItems] = useState<InspectionItemWithDay[]>([]); // Track original defects for auto-completion
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -75,10 +79,11 @@ export default function ViewInspectionPage() {
 
       if (itemsError) throw itemsError;
 
-      setItems(itemsData || []);
+      const typedItems = (itemsData || []) as InspectionItemWithDay[];
+      setItems(typedItems);
       
       // Track original defect items for auto-completion when resolved
-      const defectItems = (itemsData || []).filter(item => item.status === 'attention');
+      const defectItems = typedItems.filter((item: InspectionItemWithDay) => item.status === 'attention');
       setOriginalDefectItems(defectItems);
       
       // Enable editing only for draft inspections
@@ -157,14 +162,16 @@ export default function ViewInspectionPage() {
       // Only insert items that have been explicitly set (non-null status)
       type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
       const itemsToInsert: InspectionItemInsert[] = items
-        .filter(item => item.status) // Only save items with a status set
+        .filter((item: InspectionItemWithDay): item is InspectionItemWithDay & { day_of_week: number } =>
+          Boolean(item.status) && item.day_of_week !== null
+        )
         .map(item => ({
           inspection_id: inspection.id,
           item_number: item.item_number,
           item_description: item.item_description,
-          day_of_week: item.day_of_week,
+          day_of_week: item.day_of_week as number,
           status: item.status,
-          comments: item.comments || null,
+          comments: item.comments ?? null,
         }));
 
       console.log('[Mobile Debug] Items to insert:', {
@@ -222,7 +229,7 @@ export default function ViewInspectionPage() {
                   });
                 }
                 const group = groupedDefects.get(key)!;
-                group.days.push(item.day_of_week);
+                if (item.day_of_week !== null) group.days.push(item.day_of_week);
                 group.item_ids.push(item.id);
                 if (item.comments) {
                   group.comments.push(item.comments);
@@ -268,9 +275,9 @@ export default function ViewInspectionPage() {
       if (originalDefectItems.length > 0 && inspection.van_id) {
         try {
           // Find items that were defects but are now OK
-          const resolvedItems = originalDefectItems.filter(originalItem => {
+          const resolvedItems = originalDefectItems.filter((originalItem: InspectionItemWithDay) => {
             const currentItem = itemsToInsert.find(
-              item => item.item_number === originalItem.item_number && 
+              (item: InspectionItemInsert) => item.item_number === originalItem.item_number && 
                       item.day_of_week === originalItem.day_of_week
             );
             // Item is resolved if it's now 'ok' or 'na', or if it's been removed
@@ -292,7 +299,7 @@ export default function ViewInspectionPage() {
               // Match resolved items with their actions and complete them
               for (const resolvedItem of resolvedItems) {
                 const matchingAction = pendingActions.find(
-                  action => action.inspection_item_id === resolvedItem.id
+                  (action: { inspection_item_id: string | null }) => action.inspection_item_id === resolvedItem.id
                 );
 
                 if (matchingAction) {
@@ -334,7 +341,7 @@ export default function ViewInspectionPage() {
       
       // Log to error logger if available
       if (typeof window !== 'undefined' && (window as Window & { errorLogger?: { logError: (opts: unknown) => void } }).errorLogger) {
-        (window as Window & { errorLogger: { logError: (opts: unknown) => void } }).errorLogger.logError({
+        (window as unknown as Window & { errorLogger: { logError: (opts: unknown) => void } }).errorLogger.logError({
           error: err,
           componentName: 'InspectionEditPage - handleSave',
           additionalData: {
@@ -377,8 +384,9 @@ export default function ViewInspectionPage() {
         .eq('inspection_id', inspection.id);
 
       // Auto-create/update actions for defects via server endpoint
-      if (savedItems && savedItems.length > 0) {
-        const failedItems = savedItems.filter(item => item.status === 'attention');
+      const typedSavedItems = (savedItems || []) as InspectionItemWithDay[];
+      if (typedSavedItems.length > 0) {
+        const failedItems = typedSavedItems.filter((item: InspectionItemWithDay) => item.status === 'attention');
         
         if (failedItems.length > 0) {
           try {
@@ -391,7 +399,7 @@ export default function ViewInspectionPage() {
               item_ids: string[];
             }>();
 
-            failedItems.forEach((item: any) => {
+            failedItems.forEach((item: InspectionItemWithDay) => {
               const key = `${item.item_number}-${item.item_description}`;
               if (!groupedDefects.has(key)) {
                 groupedDefects.set(key, {
@@ -403,7 +411,7 @@ export default function ViewInspectionPage() {
                 });
               }
               const group = groupedDefects.get(key)!;
-              group.days.push(item.day_of_week);
+              if (item.day_of_week !== null) group.days.push(item.day_of_week);
               group.item_ids.push(item.id);
               if (item.comments) {
                 group.comments.push(item.comments);
@@ -453,9 +461,9 @@ export default function ViewInspectionPage() {
           .eq('status', 'attention');
 
         if (originalDefectItems && originalDefectItems.length > 0) {
-          const resolvedItems = originalDefectItems.filter(originalItem => {
-            const currentItem = savedItems?.find(
-              item => item.item_number === originalItem.item_number && 
+          const resolvedItems = originalDefectItems.filter((originalItem: InspectionItemWithDay) => {
+            const currentItem = typedSavedItems.find(
+              (item: InspectionItemWithDay) => item.item_number === originalItem.item_number && 
                       item.day_of_week === originalItem.day_of_week
             );
             // Item is resolved if it's now 'ok' or 'na', or if it's been removed
@@ -473,7 +481,7 @@ export default function ViewInspectionPage() {
             if (pendingActions && pendingActions.length > 0) {
               for (const resolvedItem of resolvedItems) {
                 const matchingAction = pendingActions.find(
-                  action => action.inspection_item_id === resolvedItem.id
+                  (action: { inspection_item_id: string | null }) => action.inspection_item_id === resolvedItem.id
                 );
 
                 if (matchingAction) {
@@ -593,8 +601,6 @@ export default function ViewInspectionPage() {
 
   const defectCount = items.filter(item => item.status === 'attention').length;
   const okCount = items.filter(item => item.status === 'ok').length;
-  const naCount = items.filter(item => item.status === 'na').length;
-
   // Check if this is a weekly inspection (has day_of_week data)
   const isWeeklyInspection = items.length > 0 && items[0].day_of_week !== null;
 

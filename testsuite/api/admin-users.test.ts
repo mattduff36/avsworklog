@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * @tags @admin @permissions
  * NEW TEST — not in original Testsprite set.

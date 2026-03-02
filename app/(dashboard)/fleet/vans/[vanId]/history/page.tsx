@@ -152,7 +152,7 @@ type TaskAttachment = {
   } | null;
 };
 
-function DocumentsTabContent({ vanId, workshopTasks }: { vanId: string; workshopTasks: WorkshopTask[] }) {
+function DocumentsTabContent({ vanId: _vanId, workshopTasks }: { vanId: string; workshopTasks: WorkshopTask[] }) {
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -346,7 +346,25 @@ export default function VanHistoryPage({
   const [workshopTasks, setWorkshopTasks] = useState<WorkshopTask[]>([]);
   const [activeTab, setActiveTab] = useState('maintenance');
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [motData, setMotData] = useState<{ tests: Array<{ testDate: string; [key: string]: unknown }> } | null>(null);
+  const [motData, setMotData] = useState<{
+    currentStatus?: {
+      expiryDate?: string | null;
+      status?: string | null;
+      daysRemaining?: number | null;
+      lastTestDate?: string | null;
+    } | null;
+    tests: Array<{
+      motTestNumber?: string;
+      testResult?: string;
+      completedDate?: string;
+      expiryDate?: string;
+      odometerValue?: number;
+      odometerUnit?: string;
+      testStationName?: string;
+      testStationPcode?: string;
+      defects?: Array<{ type: string; text: string; locationLateral?: string }>;
+    }>;
+  } | null>(null);
   const [motLoading, setMotLoading] = useState(false);
   const [expandedTestId, setExpandedTestId] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -539,7 +557,7 @@ export default function VanHistoryPage({
       let tasksWithProfiles = data || [];
       if (data && data.length > 0) {
         const userIds = new Set<string>();
-        data.forEach(task => {
+        data.forEach((task: WorkshopTask) => {
           if (task.created_by) userIds.add(task.created_by);
           if (task.logged_by) userIds.add(task.logged_by);
           if (task.actioned_by) userIds.add(task.actioned_by);
@@ -551,9 +569,9 @@ export default function VanHistoryPage({
             .select('id, full_name')
             .in('id', Array.from(userIds));
           
-          const profileMap = new Map((profiles || []).map(p => [p.id, p.full_name]));
+          const profileMap = new Map((profiles || []).map((p: { id: string; full_name: string }) => [p.id, p.full_name]));
           
-          tasksWithProfiles = data.map(task => ({
+          tasksWithProfiles = data.map((task: WorkshopTask) => ({
             ...task,
             profiles_created: task.created_by ? { full_name: profileMap.get(task.created_by) || null } : null,
             profiles_logged: task.logged_by ? { full_name: profileMap.get(task.logged_by) || null } : null,
@@ -599,18 +617,6 @@ export default function VanHistoryPage({
       fetchMotHistory();
     }
   }, [activeTab, motData, vehicle?.reg_number, resolvedParams.vanId]);
-
-  const toggleTaskExpansion = (taskId: string) => {
-    setExpandedTasks(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(taskId)) {
-        newSet.delete(taskId);
-      } else {
-        newSet.add(taskId);
-      }
-      return newSet;
-    });
-  };
 
   const getDefectColor = (type: string) => {
     switch (type) {
@@ -1120,7 +1126,7 @@ export default function VanHistoryPage({
               ) : (
                 <div className="space-y-4">
                   {/* Workshop Tasks */}
-                  {showWorkshopTasks && workshopTasks.map((task) => (
+                  {showWorkshopTasks && workshopTasks.map((task: WorkshopTask) => (
                     <WorkshopTaskHistoryCard
                       key={task.id}
                       task={task}
@@ -1141,7 +1147,7 @@ export default function VanHistoryPage({
                   ))}
 
                   {/* Maintenance History Entries */}
-                  {showRecordUpdates && maintenanceHistory.map((entry) => (
+                  {showRecordUpdates && maintenanceHistory.map((entry: MaintenanceHistoryEntry) => (
                     <Card key={entry.id} className="bg-slate-800/50 border-slate-700 border-l-4 border-l-blue-500">
                       <CardContent className="pt-6">
                         <div className="flex items-start gap-3">
@@ -1255,15 +1261,15 @@ export default function VanHistoryPage({
                     <div className="space-y-3">
                       <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Test History</h3>
                       
-                      {motData.tests.map((test: { motTestNumber: string; testResult: string; completedDate: string; expiryDate?: string; odometerValue?: number; odometerUnit?: string; testStationName?: string; testStationPcode?: string; defects?: Array<{ type: string; text: string; locationLateral?: string }> }) => {
+                      {motData.tests.map((test: { motTestNumber?: string; testResult?: string; completedDate?: string; expiryDate?: string; odometerValue?: number; odometerUnit?: string; testStationName?: string; testStationPcode?: string; defects?: Array<{ type: string; text: string; locationLateral?: string }> }, idx: number) => {
                         const defects = Array.isArray(test.defects) ? test.defects : [];
                         const defectCounts = countDefectsByType(defects);
-                        const isExpanded = expandedTestId === test.motTestNumber;
+                        const isExpanded = expandedTestId === (test.motTestNumber ?? '');
                         const isPassed = test.testResult === 'PASSED';
                         
                         return (
                           <Card 
-                            key={test.motTestNumber}
+                            key={test.motTestNumber ?? `test-${idx}`}
                             className={`${
                               isPassed 
                                 ? 'bg-gradient-to-r from-green-900/20 to-green-800/10 border-green-700/30' 
@@ -1281,7 +1287,7 @@ export default function VanHistoryPage({
                                   )}
                                   <div>
                                     <h4 className="text-lg font-semibold text-white flex items-center gap-2">
-                                      {test.testResult}
+                                      {test.testResult ?? 'Unknown'}
                                       <span className="text-sm text-slate-400 font-normal">
                                         {formatDate(test.completedDate)}
                                       </span>
@@ -1326,7 +1332,7 @@ export default function VanHistoryPage({
                                 )}
                                 <div className="flex items-center gap-2">
                                   <span className="text-muted-foreground">Test Number:</span>
-                                  <span className="text-white font-medium text-xs">{test.motTestNumber}</span>
+                                  <span className="text-white font-medium text-xs">{test.motTestNumber ?? 'N/A'}</span>
                                 </div>
                               </div>
 
@@ -1336,7 +1342,7 @@ export default function VanHistoryPage({
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => setExpandedTestId(isExpanded ? null : test.motTestNumber)}
+                                    onClick={() => setExpandedTestId(isExpanded ? null : (test.motTestNumber ?? null))}
                                     className="w-full text-blue-400 hover:text-blue-300 hover:bg-slate-800"
                                   >
                                     {isExpanded ? (
@@ -1476,7 +1482,7 @@ export default function VanHistoryPage({
           onOpenChange={setDeleteDialogOpen}
           vehicle={{
             id: vehicle.id,
-            reg_number: vehicle.reg_number,
+            reg_number: vehicle.reg_number ?? '',
             category: null
           }}
           onSuccess={() => {

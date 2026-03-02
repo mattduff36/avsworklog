@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
 import type {
-  UpdateMaintenanceRequest,
-  MaintenanceUpdateResponse
+  UpdateMaintenanceRequest
 } from '@/types/maintenance';
 
 /**
@@ -63,7 +62,7 @@ export async function PUT(
     }
     
     // Build update object (only include provided fields)
-    const updates: Record<string, any> = {
+    const updates: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
       last_updated_by: user.id
     };
@@ -334,7 +333,7 @@ export async function PUT(
       // Don't fail the request if history fails, just log it
     }
     
-    const response: MaintenanceUpdateResponse = {
+    const response = {
       success: true,
       maintenance: updatedMaintenance,
       history_entry: historyData
@@ -342,10 +341,11 @@ export async function PUT(
     
     return NextResponse.json(response);
     
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('PUT /api/maintenance/[id] failed', error, 'MaintenanceAPI');
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error', details: errorMessage },
       { status: 500 }
     );
   }
@@ -356,7 +356,7 @@ export async function PUT(
  * Delete a maintenance record (note: typically we use archive instead)
  */
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -386,7 +386,7 @@ export async function DELETE(
     
     return NextResponse.json({ success: true });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('DELETE /api/maintenance/[id] failed', error, 'MaintenanceAPI');
     return NextResponse.json(
       { error: 'Internal server error' },

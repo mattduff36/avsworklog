@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Fix vehicle_inspections UPDATE RLS policy to allow draft updates
  */

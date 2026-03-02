@@ -77,7 +77,7 @@ export function AddVehicleDialog({
       
       // ✅ Filter categories based on asset type
       // Consistent with SELECT dropdown: undefined applies_to defaults to ['van']
-      const filtered = (data || []).filter(cat => {
+      const filtered = (data || []).filter((cat: { applies_to?: ('van' | 'plant')[] }) => {
         const appliesTo = cat.applies_to || ['van']; // ✅ Default to ['van']
         return appliesTo.includes(assetType);
       });

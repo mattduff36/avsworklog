@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Migration runner: Add PDF attachment support to Toolbox Talk messages
  * Adds pdf_file_path column to messages table

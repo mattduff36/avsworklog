@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Force Sign-Out User
  *

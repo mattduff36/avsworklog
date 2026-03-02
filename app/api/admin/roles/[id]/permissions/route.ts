@@ -101,7 +101,7 @@ export async function PUT(
     });
 
   } catch (error) {
-    console.error(`Error in PUT /api/admin/roles/${params.id}/permissions:`, error);
+    console.error('Error in PUT /api/admin/roles/[id]/permissions:', error);
 
     await logServerError({
       error: error as Error,

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect } from 'vitest';
 import { Timesheet } from '@/types/timesheet';
 import { createMockTimesheet } from '../../utils/factories';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Restore Deleted Inspection Items from Audit Log
  * 

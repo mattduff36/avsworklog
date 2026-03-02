@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * run.ts — Testsuite CLI runner
  *

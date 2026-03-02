@@ -5,6 +5,17 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { ToolboxTalkExportDocument } from '@/lib/pdf/ToolboxTalkExportDocument';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
+interface SenderProfileShape {
+  full_name?: string | null;
+}
+
+function pickSenderProfile(
+  sender: SenderProfileShape | SenderProfileShape[] | null | undefined
+): SenderProfileShape | null {
+  if (!sender) return null;
+  return Array.isArray(sender) ? sender[0] ?? null : sender;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -94,23 +105,41 @@ export async function GET(
     const logoUrl = `${protocol}://${host}/images/logo.png`;
 
     // Generate PDF
+    const messageSender = pickSenderProfile(
+      message.sender as SenderProfileShape | SenderProfileShape[] | null
+    );
     const pdfDocument = ToolboxTalkExportDocument({
       message: {
         id: message.id,
         subject: message.subject,
         body: message.body,
         created_at: message.created_at,
-        sender_name: message.sender?.full_name || 'Unknown',
+        sender_name: messageSender?.full_name ?? 'Unknown',
         pdf_file_path: message.pdf_file_path,
       },
-      recipients: recipients || [],
+      recipients: (recipients || []).map((recipient) => {
+        const recipientUser = Array.isArray(recipient.user) ? recipient.user[0] : recipient.user;
+        return {
+          id: recipient.id,
+          status: recipient.status === 'SIGNED' ? 'SIGNED' : 'PENDING',
+          signed_at: recipient.signed_at,
+          signature_data: recipient.signature_data,
+          user: recipientUser
+            ? {
+                full_name: recipientUser.full_name || 'Unknown',
+                role: recipientUser.role || 'unknown',
+                employee_id: recipientUser.employee_id,
+              }
+            : null,
+        };
+      }),
       logoUrl,
     });
 
     const pdfBuffer = await renderToBuffer(pdfDocument);
 
     // Return PDF
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(pdfBuffer as unknown as BodyInit, {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="Toolbox_Talk_${message.subject.replace(/[^a-z0-9]/gi, '_')}_Report.pdf"`,

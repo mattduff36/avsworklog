@@ -67,7 +67,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendRemin
     }
 
     // Check if user is manager/admin
-    const roleData = senderProfile.role as { name: string; is_manager_admin: boolean } | null;
+    const roleRaw = senderProfile.role as
+      | { name?: string; is_manager_admin?: boolean }
+      | Array<{ name?: string; is_manager_admin?: boolean }>
+      | null;
+    const roleData = Array.isArray(roleRaw) ? roleRaw[0] : roleRaw;
     if (!roleData?.is_manager_admin && roleData?.name !== 'admin' && roleData?.name !== 'manager') {
       return NextResponse.json({ 
         success: false, 
@@ -135,7 +139,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendRemin
 
     // If no recipients configured, send to all managers/admins
     if (recipientUserIds.length === 0) {
-      const { data: managers, error: managersError } = await supabase
+      const { data: _managers, error: _managersError } = await supabase
         .from('profiles')
         .select('id')
         .eq('roles.is_manager_admin', true);
@@ -147,7 +151,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendRemin
         .or('role.name.eq.admin,role.name.eq.manager,role.is_manager_admin.eq.true');
 
       if (adminProfiles && adminProfiles.length > 0) {
-        recipientUserIds.push(...adminProfiles.map((p: any) => p.id));
+        recipientUserIds.push(...adminProfiles.map((profile) => profile.id));
       }
     }
 

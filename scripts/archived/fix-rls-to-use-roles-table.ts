@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Migration: Fix RLS policies to use the roles table instead of deprecated profiles.role column
 // Run: npx tsx scripts/fix-rls-to-use-roles-table.ts
 

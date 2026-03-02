@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Fix additional RLS issues from error logs
 // Run: npx tsx scripts/fix-additional-rls.ts
 

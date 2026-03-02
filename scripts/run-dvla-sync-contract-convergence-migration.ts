@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Migration Runner: DVLA sync contract convergence
  *

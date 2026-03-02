@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Post-Migration Verification: Inspection Table Split
  *

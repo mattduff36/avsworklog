@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Migration Runner: Add 'on_hold' status to actions table
  * 

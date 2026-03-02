@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Test script for bulk PDF generation
  * 

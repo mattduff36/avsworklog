@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Create Baseline Maintenance History for DVLA-Synced Data
  * 

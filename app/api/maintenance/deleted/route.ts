@@ -6,7 +6,7 @@ import { logger } from '@/lib/utils/logger';
  * GET /api/maintenance/deleted
  * Returns all archived (deleted) vehicles from van_archive
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // Auth check
     const supabase = await createClient();
@@ -47,8 +47,8 @@ export async function GET(request: NextRequest) {
     // Transform archived data for UI
     const deletedVehicles = (archivedVehicles || []).map(archive => {
       // Extract fields from archived JSONB data
-      const vehicleData = archive.vehicle_data as any;
-      const maintenanceData = archive.maintenance_data as any;
+      const vehicleData = archive.vehicle_data as Record<string, unknown> | null;
+      const maintenanceData = archive.maintenance_data as Record<string, unknown> | null;
       
       return {
         id: archive.id, // Archive record ID
@@ -71,10 +71,11 @@ export async function GET(request: NextRequest) {
       count: deletedVehicles.length
     });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('GET /api/maintenance/deleted failed', error, 'DeletedMaintenanceAPI');
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error', details: errorMessage },
       { status: 500 }
     );
   }

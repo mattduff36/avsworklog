@@ -282,7 +282,7 @@ export interface MaintenanceListResponse {
 export interface MaintenanceUpdateResponse {
   success: boolean;
   maintenance: VehicleMaintenance;
-  history_entry: MaintenanceHistory;
+  history_entry?: MaintenanceHistory;
 }
 
 export interface CategoriesListResponse {

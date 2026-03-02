@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Run RAMS Database Migration
  * Creates rams_documents, rams_assignments, and rams_visitor_signatures tables

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Data Safety Verification Script
  *

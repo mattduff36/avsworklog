@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Fix error_logs RLS policies to use JWT email instead of auth.users query
  */

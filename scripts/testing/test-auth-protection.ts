@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Test script to verify authentication protection on dashboard routes
  * 

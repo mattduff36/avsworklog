@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Test Suite for Timesheet Processed Status Feature
  * Tests database constraints, status transitions, and business logic

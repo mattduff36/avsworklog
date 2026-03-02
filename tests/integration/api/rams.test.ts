@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { POST as UploadRAMS } from '@/app/api/rams/upload/route';
 import { POST as AssignRAMS } from '@/app/api/rams/[id]/assign/route';

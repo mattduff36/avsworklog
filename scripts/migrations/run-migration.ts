@@ -8,8 +8,8 @@ const { Client } = pg;
 // Load .env.local
 config({ path: resolve(process.cwd(), '.env.local') });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl: string | undefined = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey: string | undefined = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !serviceRoleKey) {
   console.error('❌ Missing Supabase credentials');
@@ -26,7 +26,7 @@ async function runMigration() {
 
   const client = new Client({
     connectionString,
-    ssl: { rejectUnauthorized: false }
+    ssl: { rejectUnauthorized: false },
   });
 
   try {
@@ -66,16 +66,18 @@ async function runMigration() {
     console.log('   • Timesheet: http://localhost:4000/timesheets/new');
     console.log('   • Van Inspection: http://localhost:4000/van-inspections/new\n');
 
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    const pgError = err as { detail?: string; hint?: string };
     console.error('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.error('❌ MIGRATION FAILED');
     console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     console.error('Error:', error.message);
-    if (error.detail) {
-      console.error('Details:', error.detail);
+    if (pgError.detail) {
+      console.error('Details:', pgError.detail);
     }
-    if (error.hint) {
-      console.error('Hint:', error.hint);
+    if (pgError.hint) {
+      console.error('Hint:', pgError.hint);
     }
     console.log('\n📝 You can run the migration manually:');
     console.log('   1. Go to: https://supabase.com/dashboard/project/lrhufzqfzeutgvudcowy');
@@ -88,5 +90,8 @@ async function runMigration() {
   }
 }
 
-runMigration().catch(console.error);
+runMigration().catch((err: unknown) => {
+  console.error(err);
+  process.exit(1);
+});
 

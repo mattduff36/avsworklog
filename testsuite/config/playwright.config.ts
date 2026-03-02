@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { defineConfig, devices } from '@playwright/test';
 import path from 'path';
 

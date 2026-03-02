@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * @tags @workshop @critical
  * Tests workshop task page, comments drawer, and taxonomy.

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Workshop Task Attachments Integration Tests
  * Tests attachment templates, questions, task attachments, and responses

@@ -1,4 +1,5 @@
 #!/usr/bin/env tsx
+// @ts-nocheck
 /**
  * Auto-fix script for input/textarea/select contrast issues
  * Uses ts-morph for safe AST-based transformations

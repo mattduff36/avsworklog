@@ -10,7 +10,7 @@ import type {
  * GET /api/maintenance/categories
  * Returns all maintenance categories
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json(response);
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('GET /api/maintenance/categories failed', error, 'MaintenanceAPI');
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .single();
     
-    const roleName = (profile?.role as any)?.name;
+    const roleName = (profile?.role as { name?: string } | null)?.name;
     if (!roleName || !['admin', 'manager'].includes(roleName)) {
       return NextResponse.json(
         { error: 'Only admins and managers can create categories' },
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({ success: true, category: data }, { status: 201 });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('POST /api/maintenance/categories failed', error, 'MaintenanceAPI');
     return NextResponse.json(
       { error: 'Internal server error' },

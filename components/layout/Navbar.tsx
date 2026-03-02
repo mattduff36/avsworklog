@@ -95,6 +95,19 @@ function getNavItemIconColor(href: string): string {
   return 'text-avs-yellow';
 }
 
+function isExpectedNetworkError(error: unknown): boolean {
+  if (!navigator.onLine) return true;
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('failed to fetch') ||
+    message.includes('networkerror') ||
+    message.includes('network request failed') ||
+    message.includes('load failed')
+  );
+}
+
 export function Navbar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -229,6 +242,11 @@ export function Navbar() {
       if (!profile?.id) return;
       
       try {
+        if (!navigator.onLine) {
+          setHasRAMSAssignments(false);
+          return;
+        }
+
         const { count } = await supabase
           .from('rams_assignments')
           .select('*', { count: 'exact', head: true })
@@ -236,7 +254,9 @@ export function Navbar() {
         
         setHasRAMSAssignments((count || 0) > 0);
       } catch (error) {
-        console.error('Error fetching RAMS assignments:', error);
+        if (!isExpectedNetworkError(error)) {
+          console.warn('Unexpected error fetching RAMS assignments:', error);
+        }
         setHasRAMSAssignments(false);
       }
     }

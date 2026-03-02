@@ -8,7 +8,8 @@ const { Client } = pg;
 // Load .env.local
 config({ path: resolve(process.cwd(), '.env.local') });
 
-const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
+const connectionString: string | undefined =
+  process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
 const sqlFile = 'supabase/migrations/20260127_fix_profiles_update_policy_v3.sql';
 
 if (!connectionString) {
@@ -17,21 +18,21 @@ if (!connectionString) {
   process.exit(1);
 }
 
-async function runMigration() {
+async function runMigration(conn: string) {
   console.log('🔐 Running Profiles Update Policy Fix Migration...\n');
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(conn);
   
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,
     database: url.pathname.slice(1),
     user: url.username,
-    password: url.password,
+    password: url.password ? decodeURIComponent(url.password) : undefined,
     ssl: {
-      rejectUnauthorized: false
-    }
+      rejectUnauthorized: false,
+    },
   });
 
   try {
@@ -66,7 +67,11 @@ async function runMigration() {
     console.log('   • Profile updates work for all users\n');
 
     // Verify policy exists
-    const policyCheck = await client.query(`
+    const policyCheck = await client.query<{
+      policyname: string;
+      has_using: boolean;
+      has_with_check: boolean;
+    }>(`
       SELECT 
         policyname,
         qual IS NOT NULL as has_using,
@@ -78,7 +83,7 @@ async function runMigration() {
     `);
 
     if (policyCheck.rows.length > 0) {
-      const policy = policyCheck.rows[0];
+      const policy = policyCheck.rows[0]!;
       console.log('✅ VERIFICATION: Policy "Users can update own profile" exists');
       console.log(`   ✓ Has USING clause: ${policy.has_using}`);
       console.log(`   ✓ Has WITH CHECK clause: ${policy.has_with_check}`);
@@ -91,10 +96,11 @@ async function runMigration() {
     console.log('   2. Verify users can update their own profiles');
     console.log('   3. Confirm admins can still update any profile\n');
 
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error(String(err));
     console.error('\n❌ Migration failed:');
     console.error(error.message);
-    
+
     if (error.message.includes('already exists')) {
       console.log('\n💡 TIP: Policy already exists - this is fine if migration was run before.');
       console.log('   The migration will still update it correctly.');
@@ -107,4 +113,7 @@ async function runMigration() {
   }
 }
 
-runMigration();
+runMigration(connectionString).catch((err: unknown) => {
+  console.error(err);
+  process.exit(1);
+});

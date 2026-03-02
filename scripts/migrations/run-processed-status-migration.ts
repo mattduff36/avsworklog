@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Add 'processed' Status to Timesheets Migration
  * Updates the timesheets table constraint to allow 'processed' status

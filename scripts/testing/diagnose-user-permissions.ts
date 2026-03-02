@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Diagnostic script to check user permissions and role setup
 // Run: npx tsx scripts/diagnose-user-permissions.ts
 

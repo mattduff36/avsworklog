@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -458,7 +458,9 @@ function PlantInspectionsContent() {
       ) : (
         <>
           <div className="grid gap-4">
-            {inspections.slice(0, displayCount).map((inspection) => (
+            {inspections.slice(0, displayCount).map((inspection) => {
+              const inspectionStatus = inspection.status as string;
+              return (
             <Card 
               key={inspection.id} 
               className="border-border hover:shadow-lg hover:border-plant-inspection/50 transition-all duration-200 cursor-pointer"
@@ -533,12 +535,12 @@ function PlantInspectionsContent() {
                       ? `Submitted ${formatDate(inspection.submitted_at)}`
                       : 'Not yet submitted'}
                   </div>
-                  {inspection.status === 'rejected' && inspection.manager_comments && (
+                  {inspectionStatus === 'rejected' && inspection.manager_comments && (
                     <div className="text-red-600 text-xs">
                       See manager comments
                     </div>
                   )}
-                  {(inspection.status === 'approved' || inspection.status === 'submitted') && (
+                  {(inspectionStatus === 'approved' || inspectionStatus === 'submitted') && (
                     <Button
                       onClick={(e) => handleDownloadPDF(e, inspection.id)}
                       disabled={downloading === inspection.id}
@@ -553,7 +555,8 @@ function PlantInspectionsContent() {
                 </div>
               </CardContent>
             </Card>
-            ))}
+              );
+            })}
           </div>
 
           {/* Show More Button */}

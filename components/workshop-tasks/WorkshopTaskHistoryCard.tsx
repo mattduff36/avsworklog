@@ -10,7 +10,6 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { WorkshopTaskTimeline } from '@/components/workshop-tasks/WorkshopTaskTimeline';
-import { StatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
 
 type WorkshopTaskComment = {
   id: string;
@@ -34,7 +33,7 @@ type WorkshopTaskData = {
   logged_comment: string | null;
   actioned_at: string | null;
   actioned_comment: string | null;
-  status_history?: StatusHistoryEvent[] | null;
+  status_history?: unknown[] | null;
   workshop_task_categories?: {
     id: string;
     name: string;

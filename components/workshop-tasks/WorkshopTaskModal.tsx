@@ -18,29 +18,21 @@ import { formatDate } from '@/lib/utils/date';
 import { WorkshopTaskTimeline } from '@/components/workshop-tasks/WorkshopTaskTimeline';
 import { TaskAttachmentsSection } from '@/components/workshop-tasks/TaskAttachmentsSection';
 import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
+import type { Database } from '@/types/database';
 
-type Task = {
-  id: string;
-  status: string;
-  action_type: string;
-  created_at: string;
-  workshop_comments: string | null;
-  logged_at: string | null;
-  logged_comment: string | null;
-  actioned_at: string | null;
-  actioned_comment: string | null;
-  status_history?: any[] | null;
+type Task = Database['public']['Tables']['actions']['Row'] & {
+  status_history?: unknown[] | null;
   workshop_task_categories?: {
     name: string;
-  };
+  } | null;
   vans?: {
     reg_number: string;
     nickname: string | null;
-  };
+  } | null;
   plant?: {
     plant_id: string;
     nickname: string | null;
-  };
+  } | null;
 };
 
 interface WorkshopTaskModalProps {

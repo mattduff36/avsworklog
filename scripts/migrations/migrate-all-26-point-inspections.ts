@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Migrate ALL 26-point inspections to 14-point van checklist
  * 

@@ -8,7 +8,8 @@ const { Client } = pg;
 // Load .env.local
 config({ path: resolve(process.cwd(), '.env.local') });
 
-const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
+const connectionString: string | undefined =
+  process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
 const sqlFile = 'supabase/migrations/20260114_workshop_task_comments.sql';
 
 if (!connectionString) {
@@ -17,21 +18,21 @@ if (!connectionString) {
   process.exit(1);
 }
 
-async function runMigration() {
+async function runMigration(conn: string) {
   console.log('🚀 Running Workshop Task Comments Migration...\n');
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(conn);
   
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,
     database: url.pathname.slice(1),
     user: url.username,
-    password: url.password,
+    password: url.password ? decodeURIComponent(url.password) : undefined,
     ssl: {
-      rejectUnauthorized: false
-    }
+      rejectUnauthorized: false,
+    },
   });
 
   try {
@@ -57,7 +58,7 @@ async function runMigration() {
 
     // Backfill existing workshop_comments as initial comments
     console.log('📝 Backfilling existing workshop_comments as initial comments...');
-    const backfillResult = await client.query(`
+    const backfillResult = await client.query<{ id: string }>(`
       INSERT INTO workshop_task_comments (task_id, author_id, body, created_at)
       SELECT 
         id as task_id,
@@ -75,9 +76,9 @@ async function runMigration() {
 
     console.log(`   - Backfilled ${backfillResult.rowCount || 0} initial comments\n`);
 
-  } catch (error) {
+  } catch (err: unknown) {
     console.error('\n❌ Migration failed:');
-    console.error(error);
+    console.error(err);
     process.exit(1);
   } finally {
     await client.end();
@@ -85,4 +86,7 @@ async function runMigration() {
   }
 }
 
-runMigration();
+runMigration(connectionString).catch((err: unknown) => {
+  console.error(err);
+  process.exit(1);
+});

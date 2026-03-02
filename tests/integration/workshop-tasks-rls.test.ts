@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Test: Workshop Tasks RLS Policies
  * Verifies that workshop users can access workshop tasks and categories

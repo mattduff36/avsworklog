@@ -18,6 +18,19 @@ function getSupabaseAdmin() {
   );
 }
 
+interface ProfileChangeEntry {
+  old: string;
+  new: string;
+}
+
+interface ProfileChanges {
+  email?: ProfileChangeEntry;
+  full_name?: ProfileChangeEntry;
+  phone_number?: ProfileChangeEntry;
+  employee_id?: ProfileChangeEntry;
+  role?: ProfileChangeEntry;
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -76,7 +89,7 @@ export async function PUT(
     const existingEmail = existingAuthUser?.user?.email || '';
 
     // Track changes for email notification
-    const changes: any = {};
+    const changes: ProfileChanges = {};
     if (email && email !== existingEmail) {
       changes.email = { old: existingEmail, new: email };
     }
@@ -264,13 +277,16 @@ export async function DELETE(
       // Disable the auth user (ban until far future) instead of deleting
       // This prevents cascade deletion of profile while making account inaccessible
       const farFuture = new Date('2099-12-31').toISOString();
-      const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      const banPayload = {
         banned_until: farFuture,
         user_metadata: {
           ...userProfile,
           deleted_at: new Date().toISOString(),
           account_status: 'deleted'
         }
+      } as unknown as Parameters<typeof supabaseAdmin.auth.admin.updateUserById>[1];
+      const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        ...banPayload
       });
 
       if (banError) {

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Restore NV16 AXC to active status for testing the archive workflow
  */

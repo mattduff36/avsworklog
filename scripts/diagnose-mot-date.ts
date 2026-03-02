@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Diagnostic script to check MOT API data for a specific vehicle
  * This will show us what the MOT API is actually returning

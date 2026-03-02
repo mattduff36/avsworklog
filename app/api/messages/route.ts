@@ -248,7 +248,7 @@ export async function POST(request: NextRequest) {
           // Send emails (with batching handled inside the function)
           const emailResult = await sendToolboxTalkEmail({
             to: recipientEmails,
-            senderName: profile.full_name,
+            senderName: profile.full_name || 'Unknown User',
             subject
           });
 

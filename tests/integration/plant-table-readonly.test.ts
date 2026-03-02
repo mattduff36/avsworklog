@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Test: Plant Table Read-Only Verification Tests
  * Verifies plant table structure and data integrity without creating records

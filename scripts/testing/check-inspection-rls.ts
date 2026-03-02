@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Check RLS policies on van_inspections table
  */

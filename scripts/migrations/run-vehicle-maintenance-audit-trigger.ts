@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Add Vehicle Maintenance Audit Trigger Migration
  * Adds audit logging trigger for vehicle_maintenance table

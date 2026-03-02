@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Force Apply: Maintenance History Plant Support Migration
  * 

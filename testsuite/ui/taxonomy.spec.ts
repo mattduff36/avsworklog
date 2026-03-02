@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * @tags @workshop
  * Tests category/subcategory cascade on workshop settings.

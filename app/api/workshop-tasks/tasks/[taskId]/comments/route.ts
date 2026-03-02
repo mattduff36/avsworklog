@@ -28,6 +28,25 @@ type Comment = {
 
 type TimelineItem = StatusEvent | Comment;
 
+interface StatusHistoryEvent {
+  id?: string;
+  created_at?: string;
+  status?: string;
+  author_id?: string;
+  author_name?: string;
+  body?: string;
+}
+
+interface ProfileShape {
+  id: string;
+  full_name: string;
+}
+
+function pickProfile(profile: ProfileShape | ProfileShape[] | null | undefined): ProfileShape | null {
+  if (!profile) return null;
+  return Array.isArray(profile) ? profile[0] ?? null : profile;
+}
+
 /**
  * GET /api/workshop-tasks/tasks/:taskId/comments
  * Returns unified timeline: status events + comments
@@ -126,7 +145,7 @@ export async function GET(
       body: string;
       created_at: string;
       author_id: string;
-      profiles: { id: string; full_name: string } | null;
+      profiles: ProfileShape | ProfileShape[] | null;
     }>;
 
     if (commentsError) {
@@ -136,10 +155,12 @@ export async function GET(
     // Build timeline items array
     const timelineItems: TimelineItem[] = [];
 
-    const statusHistory = Array.isArray(typedTask.status_history) ? typedTask.status_history : [];
+    const statusHistory: StatusHistoryEvent[] = Array.isArray(typedTask.status_history)
+      ? (typedTask.status_history as StatusHistoryEvent[])
+      : [];
     const historyAuthorIds = [...new Set(
       statusHistory
-        .map((event: any) => event?.author_id)
+        .map((event) => event?.author_id)
         .filter(Boolean)
     )];
 
@@ -214,7 +235,12 @@ export async function GET(
           id: comment.id,
           type: 'comment',
           created_at: comment.created_at,
-          author: comment.profiles ? { id: comment.profiles.id, full_name: comment.profiles.full_name } : null,
+          author: pickProfile(comment.profiles)
+            ? {
+                id: pickProfile(comment.profiles)?.id ?? '',
+                full_name: pickProfile(comment.profiles)?.full_name ?? 'Unknown',
+              }
+            : null,
           body: comment.body,
           can_edit: comment.author_id === user.id,
           can_delete: comment.author_id === user.id,
@@ -339,7 +365,7 @@ export async function POST(
       id: string;
       body: string;
       created_at: string;
-      profiles: { id: string; full_name: string } | null;
+      profiles: ProfileShape | ProfileShape[] | null;
     } | null;
 
     if (insertError) {
@@ -352,10 +378,12 @@ export async function POST(
         id: typedComment?.id || '',
         type: 'comment',
         created_at: typedComment?.created_at,
-        author: typedComment?.profiles ? {
-          id: typedComment.profiles.id,
-          full_name: typedComment.profiles.full_name,
-        } : null,
+        author: pickProfile(typedComment?.profiles)
+          ? {
+              id: pickProfile(typedComment?.profiles)?.id ?? '',
+              full_name: pickProfile(typedComment?.profiles)?.full_name ?? 'Unknown',
+            }
+          : null,
         body: typedComment?.body || '',
         can_edit: true,
         can_delete: true,

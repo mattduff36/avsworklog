@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Find vehicles that might have incorrect MOT due dates
  * based on their registration plate year

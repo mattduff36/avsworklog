@@ -10,8 +10,43 @@ export const dynamic = 'force-dynamic';
 // Test vehicles that are excluded from DVLA sync
 const TEST_VEHICLES = ['TE57VAN', 'TE57HGV'];
 
+interface MotTestRecord {
+  completedDate?: string;
+  testResult?: string;
+  expiryDate?: string;
+  odometerValue?: number | string | null;
+  odometerUnit?: string | null;
+  testStationName?: string | null;
+  testStationPcode?: string | null;
+  defects?: unknown[];
+  motTestNumber?: string;
+}
+
+interface MotHistoryRecord {
+  registration?: string;
+  make?: string | null;
+  model?: string | null;
+  fuelType?: string | null;
+  primaryColour?: string | null;
+  firstUsedDate?: string | null;
+  registrationDate?: string | null;
+  motTestDueDate?: string | null;
+  motTests?: MotTestRecord[];
+}
+
+interface MaintenanceRecord {
+  mot_raw_data?: MotHistoryRecord | null;
+  dvla_raw_data?: unknown;
+  ves_month_of_first_registration?: string | null;
+  mot_first_used_date?: string | null;
+  mot_api_sync_status?: string | null;
+  dvla_sync_status?: string | null;
+  mot_due_date?: string | null;
+  mot_expiry_date?: string | null;
+}
+
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ vehicleId: string }> }
 ) {
   try {
@@ -80,7 +115,7 @@ export async function GET(
       assetType === 'hgv'
         ? maintenanceQuery.eq('hgv_id', vehicleId).single()
         : maintenanceQuery.eq('van_id', vehicleId).single()
-    ) as { data: any; error: any };
+    ) as { data: MaintenanceRecord | null; error: unknown };
 
     if (maintenanceError || !maintenanceData) {
       // No maintenance record exists
@@ -139,12 +174,13 @@ export async function GET(
     }
 
     // Transform the stored data to match UI expectations
-    const sortedTests = (motHistory.motTests || []).sort((a: any, b: any) => 
-      new Date(b.completedDate).getTime() - new Date(a.completedDate).getTime()
+    const sortedTests = (motHistory.motTests || []).sort(
+      (a, b) =>
+        new Date(b.completedDate ?? '').getTime() - new Date(a.completedDate ?? '').getTime()
     );
 
     // Calculate MOT expiry status and days remaining
-    const latestPassedTest = sortedTests.find((test: any) => test.testResult === 'PASSED');
+    const latestPassedTest = sortedTests.find((test) => test.testResult === 'PASSED');
     const motExpiryDate = maintenanceData.mot_expiry_date || latestPassedTest?.expiryDate || motHistory.motTestDueDate || null;
     let motStatus = 'Unknown';
     let daysRemaining = null;
@@ -182,7 +218,7 @@ export async function GET(
           lastTestResult: lastTest?.testResult || null,
           motExpiryDate: motExpiryDate, // For backward compatibility
         },
-        tests: sortedTests.map((test: any) => {
+        tests: sortedTests.map((test) => {
           const rawOdometer = test.odometerValue;
           const odometerValue =
             rawOdometer === null || rawOdometer === undefined || rawOdometer === ''
@@ -210,10 +246,11 @@ export async function GET(
       },
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('MOT history route error:', error);
     return NextResponse.json(
-      { error: 'Internal server error', message: error.message },
+      { error: 'Internal server error', message: errorMessage },
       { status: 500 }
     );
   }

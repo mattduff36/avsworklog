@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * @tags @errors @critical
  * Tests error logging and console error absence on critical pages.

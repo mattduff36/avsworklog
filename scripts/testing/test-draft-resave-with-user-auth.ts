@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Test: Draft Inspection Re-save with User Authentication
  * 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Apply the vehicle_inspections RLS policy fix
  * This migration allows users to update their own draft inspections

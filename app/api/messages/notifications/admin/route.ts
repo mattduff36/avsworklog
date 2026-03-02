@@ -4,10 +4,43 @@ import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { GetNotificationsResponse, NotificationItem } from '@/types/messages';
 
+interface SenderShape {
+  full_name?: string | null;
+}
+
+interface MessageShape {
+  type?: NotificationItem['type'];
+  priority?: NotificationItem['priority'];
+  subject?: string | null;
+  body?: string | null;
+  sender_id?: string | null;
+  created_at?: string | null;
+  sender?: SenderShape | SenderShape[] | null;
+}
+
+interface RecipientShape {
+  id?: string;
+  message_id?: string;
+  status?: NotificationItem['status'];
+  signed_at?: string | null;
+  first_shown_at?: string | null;
+  messages?: MessageShape | MessageShape[] | null;
+}
+
 function normalizeError(error: unknown): Error {
   if (error instanceof Error) return error;
   if (typeof error === 'string') return new Error(error);
   return new Error('Unknown error');
+}
+
+function pickMessage(messages: RecipientShape['messages']): MessageShape | null {
+  if (!messages) return null;
+  return Array.isArray(messages) ? messages[0] ?? null : messages;
+}
+
+function pickSender(sender: MessageShape['sender']): SenderShape | null {
+  if (!sender) return null;
+  return Array.isArray(sender) ? sender[0] ?? null : sender;
 }
 
 /**
@@ -97,20 +130,29 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform to NotificationItem format
-    const notifications: NotificationItem[] = recipients?.map(item => ({
-      id: item.id,
-      message_id: item.message_id,
-      type: item.messages.type,
-      priority: item.messages.priority,
-      subject: item.messages.subject,
-      body: item.messages.body,
-      sender_name: item.messages.sender?.full_name || 'Deleted User',
-      sender_id: item.messages.sender_id,
-      status: item.status,
-      created_at: item.messages.created_at,
-      signed_at: item.signed_at,
-      first_shown_at: item.first_shown_at
-    })) || [];
+    const notifications: NotificationItem[] = (recipients ?? [])
+      .map((rawItem) => {
+        const item = rawItem as RecipientShape;
+        const message = pickMessage(item.messages);
+        if (!message?.type || !message.priority || !message.created_at) return null;
+
+        const sender = pickSender(message.sender);
+        return {
+          id: item.id ?? '',
+          message_id: item.message_id ?? '',
+          type: message.type,
+          priority: message.priority,
+          subject: message.subject ?? '',
+          body: message.body ?? '',
+          sender_name: sender?.full_name ?? 'Deleted User',
+          sender_id: message.sender_id ?? null,
+          status: item.status ?? 'PENDING',
+          created_at: message.created_at,
+          signed_at: item.signed_at ?? null,
+          first_shown_at: item.first_shown_at ?? null,
+        };
+      })
+      .filter((item): item is NotificationItem => item !== null);
 
     // Count unread (PENDING status)
     const unread_count = notifications.filter(n => n.status === 'PENDING').length;

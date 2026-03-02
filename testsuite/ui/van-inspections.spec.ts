@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * E2E: Van Inspections Full Workflow
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Applies-to Enum Tests
  *

@@ -29,19 +29,28 @@ const AttachmentManagementPanel = dynamic(() => import('@/components/workshop-ta
 const MarkTaskCompleteDialog = dynamic(() => import('@/components/workshop-tasks/MarkTaskCompleteDialog').then(m => ({ default: m.MarkTaskCompleteDialog })), { ssr: false });
 const ErrorDetailsModal = dynamic(() => import('@/components/ui/error-details-modal').then(m => ({ default: m.ErrorDetailsModal })), { ssr: false });
 
-import { appendStatusHistory, buildStatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
+import {
+  appendStatusHistory,
+  buildStatusHistoryEvent,
+} from '@/lib/utils/workshopTaskStatusHistory';
 import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
 import { showErrorWithDetails, fetchErrorDetails } from '@/lib/utils/error-details';
 import { ErrorDetailsResponse } from '@/types/error-details';
 import type { CompletionData } from '@/components/workshop-tasks/MarkTaskCompleteDialog';
+import type { CompletionUpdateConfig } from '@/types/workshop-completion';
 
 type Action = Database['public']['Tables']['actions']['Row'] & {
+  status_history?: unknown[] | null;
   vans?: {
     reg_number: string;
     nickname: string | null;
     asset_type?: 'van' | 'plant' | 'hgv' | 'tool';
     plant_id?: string | null;
-  };
+  } | null;
+  plant?: {
+    plant_id: string;
+    nickname: string | null;
+  } | null;
   hgvs?: {
     reg_number: string;
     nickname: string | null;
@@ -49,8 +58,15 @@ type Action = Database['public']['Tables']['actions']['Row'] & {
   workshop_task_categories?: {
     id: string;
     name: string;
-    completion_updates?: any[] | null;
-  };
+    completion_updates?: CompletionUpdateConfig[] | null;
+  } | null;
+  workshop_task_subcategories?: {
+    id: string;
+    name: string;
+    workshop_task_categories?: {
+      name: string;
+    } | null;
+  } | null;
   profiles_created?: {
     full_name: string | null;
   } | null;
@@ -58,7 +74,7 @@ type Action = Database['public']['Tables']['actions']['Row'] & {
 
 type Vehicle = {
   id: string;
-  reg_number: string | null;
+  reg_number: string;
   plant_id?: string | null;
   nickname: string | null;
   asset_type?: 'van' | 'plant' | 'hgv' | 'tool';
@@ -172,7 +188,6 @@ export default function WorkshopTasksPage() {
   const [subcategoryMode, setSubcategoryMode] = useState<'create' | 'edit'>('create');
   const [selectedCategoryForSubcategory, setSelectedCategoryForSubcategory] = useState<Category | null>(null);
   const [editingSubcategory, setEditingSubcategory] = useState<Subcategory | null>(null);
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   
   // Asset tab state (vehicle vs plant vs tools vs settings)
   const [assetTab, setAssetTab] = useState<'van' | 'plant' | 'hgv' | 'tools' | 'settings'>('van');
@@ -276,7 +291,7 @@ export default function WorkshopTasksPage() {
       if (error) throw error;
 
       const createdByIds = Array.from(
-        new Set((data || []).map(task => task.created_by).filter(Boolean))
+        new Set((data || []).map((task: Action) => task.created_by).filter(Boolean))
       );
       let profileMap = new Map<string, { full_name: string | null }>();
       if (createdByIds.length > 0) {
@@ -285,11 +300,11 @@ export default function WorkshopTasksPage() {
           .select('id, full_name')
           .in('id', createdByIds);
         profileMap = new Map(
-          (profiles || []).map(profile => [profile.id, { full_name: profile.full_name }])
+          (profiles || []).map((profile: { id: string; full_name: string | null }) => [profile.id, { full_name: profile.full_name }])
         );
       }
 
-      const tasksWithProfiles = (data || []).map(task => ({
+      const tasksWithProfiles = (data || []).map((task: Action) => ({
         ...task,
         profiles_created: task.created_by
           ? profileMap.get(task.created_by) || null
@@ -300,14 +315,14 @@ export default function WorkshopTasksPage() {
 
       // Fetch attachment counts for all tasks
       if (tasksWithProfiles.length > 0) {
-        const taskIds = tasksWithProfiles.map(t => t.id);
+        const taskIds = tasksWithProfiles.map((t: Action) => t.id);
         const { data: attachmentData } = await supabase
           .from('workshop_task_attachments')
           .select('task_id')
           .in('task_id', taskIds);
 
         const counts = new Map<string, number>();
-        (attachmentData || []).forEach(att => {
+        (attachmentData || []).forEach((att: { task_id: string }) => {
           counts.set(att.task_id, (counts.get(att.task_id) || 0) + 1);
         });
         setTaskAttachmentCounts(counts);
@@ -422,23 +437,23 @@ export default function WorkshopTasksPage() {
           if (hgvError) throw hgvError;
 
           const combinedVehicles = [
-            ...(vehicleData || []).map(v => ({
+            ...(vehicleData || []).map((v: { id: string; reg_number: string | null; nickname: string | null }) => ({
               id: v.id,
-              reg_number: v.reg_number,
+              reg_number: v.reg_number ?? '',
               plant_id: null,
               nickname: v.nickname,
               asset_type: 'van' as const
             })),
-            ...(plantData || []).map(p => ({
+            ...(plantData || []).map((p: { id: string; plant_id: string; nickname: string | null }) => ({
               id: p.id,
-              reg_number: null,
+              reg_number: '',
               plant_id: p.plant_id,
               nickname: p.nickname,
               asset_type: 'plant' as const
             })),
-            ...(hgvData || []).map(v => ({
+            ...(hgvData || []).map((v: { id: string; reg_number: string | null; nickname: string | null }) => ({
               id: v.id,
-              reg_number: v.reg_number,
+              reg_number: v.reg_number ?? '',
               plant_id: null,
               nickname: v.nickname,
               asset_type: 'hgv' as const
@@ -1417,28 +1432,6 @@ export default function WorkshopTasksPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const styles = {
-      pending: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-      logged: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      on_hold: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-      completed: 'bg-green-500/20 text-green-400 border-green-500/30',
-    };
-
-    const labels = {
-      pending: 'Pending',
-      logged: 'In Progress',
-      on_hold: 'On Hold',
-      completed: 'Completed',
-    };
-
-    return (
-      <Badge variant="outline" className={styles[status as keyof typeof styles] || styles.pending}>
-        {labels[status as keyof typeof labels] || status}
-      </Badge>
-    );
-  };
-
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
@@ -1624,7 +1617,7 @@ export default function WorkshopTasksPage() {
               
               try {
                 const details = await fetchErrorDetails('subcategory-tasks', { id: subcategoryId });
-                setErrorDetails(details);
+                setErrorDetails(details as ErrorDetailsResponse<unknown>);
               } catch (err) {
                 console.error('Failed to fetch error details:', err);
                 const errorMessage = err instanceof Error ? err.message : 'Failed to load details';
@@ -1651,17 +1644,6 @@ export default function WorkshopTasksPage() {
       // console.error('Error deleting subcategory:', error);
       toast.error(errorMessage);
     }
-  };
-
-
-  const toggleCategoryExpansion = (categoryId: string) => {
-    const newExpanded = new Set(expandedCategories);
-    if (newExpanded.has(categoryId)) {
-      newExpanded.delete(categoryId);
-    } else {
-      newExpanded.add(categoryId);
-    }
-    setExpandedCategories(newExpanded);
   };
 
   // Filter tasks by asset type based on current tab
@@ -4229,7 +4211,8 @@ export default function WorkshopTasksPage() {
                     .select(fieldToSelect)
                     .eq(isPlant ? 'plant_id' : (isHgv ? 'hgv_id' : 'van_id'), value)
                     .single()
-                    .then(({ data, error }) => {
+                    .then((result: { data: Record<string, number | null> | null; error: { code?: string } | null }) => {
+                      const { data, error } = result;
                       if (error && error.code !== 'PGRST116') {
                         console.error('Error fetching meter reading:', error);
                       }
@@ -4538,27 +4521,27 @@ export default function WorkshopTasksPage() {
         task={modalTask}
         onEdit={(task) => {
           setShowTaskModal(false);
-          handleEditTask(task);
+          handleEditTask(task as Action);
         }}
         onDelete={(task) => {
           setShowTaskModal(false);
-          handleDeleteTask(task);
+          handleDeleteTask(task as Action);
         }}
         onMarkInProgress={(task) => {
           setShowTaskModal(false);
-          handleMarkInProgress(task);
+          handleMarkInProgress(task as Action);
         }}
         onMarkComplete={(task) => {
           setShowTaskModal(false);
-          handleMarkComplete(task);
+          handleMarkComplete(task as Action);
         }}
         onMarkOnHold={(task) => {
           setShowTaskModal(false);
-          handleMarkOnHold(task);
+          handleMarkOnHold(task as Action);
         }}
         onResume={(task) => {
           setShowTaskModal(false);
-          handleResumeTask(task);
+          handleResumeTask(task as Action);
         }}
         isUpdating={modalTask ? updatingStatus.has(modalTask.id) : false}
       />

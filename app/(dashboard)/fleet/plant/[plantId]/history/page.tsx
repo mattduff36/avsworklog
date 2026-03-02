@@ -15,7 +15,6 @@ import {
   MessageSquare,
   Calendar,
   AlertTriangle,
-  HardHat,
   Loader2,
   Edit,
   Paperclip,
@@ -124,7 +123,7 @@ type TaskAttachment = {
   } | null;
 };
 
-function DocumentsTabContent({ plantId, workshopTasks }: { plantId: string; workshopTasks: WorkshopTask[] }) {
+function DocumentsTabContent({ plantId: _plantId, workshopTasks }: { plantId: string; workshopTasks: WorkshopTask[] }) {
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -334,7 +333,7 @@ export default function PlantHistoryPage({
 
   // Fetch comments for all workshop tasks
   const { comments: taskComments } = useWorkshopTaskComments({
-    taskIds: workshopTasks.map(t => t.id),
+    taskIds: workshopTasks.map((t: WorkshopTask) => t.id),
     enabled: workshopTasks.length > 0
   });
 
@@ -648,7 +647,7 @@ export default function PlantHistoryPage({
               ) : (
                 <div className="space-y-4">
                   {/* Workshop Tasks */}
-                  {showWorkshopTasks && workshopTasks.map((task) => (
+                  {showWorkshopTasks && workshopTasks.map((task: WorkshopTask) => (
                     <WorkshopTaskHistoryCard
                       key={task.id}
                       task={task}
@@ -669,7 +668,7 @@ export default function PlantHistoryPage({
                   ))}
 
                   {/* Maintenance History Entries */}
-                  {showRecordUpdates && maintenanceHistory.map((entry) => (
+                  {showRecordUpdates && maintenanceHistory.map((entry: MaintenanceHistoryEntry) => (
                     <Card key={entry.id} className="bg-slate-800/50 border-slate-700 border-l-4 border-l-blue-500">
                       <CardContent className="pt-6">
                         <div className="flex items-start gap-3">

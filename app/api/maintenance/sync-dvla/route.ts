@@ -153,9 +153,14 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: unknown) {
-    await logServerError(error, {
-      endpoint: '/api/maintenance/sync-dvla',
-      method: 'POST',
+    await logServerError({
+      error: error instanceof Error ? error : String(error),
+      request,
+      componentName: '/api/maintenance/sync-dvla',
+      additionalData: {
+        endpoint: '/api/maintenance/sync-dvla',
+        method: 'POST',
+      },
     });
 
     return NextResponse.json(

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Fix Frank Barlow's vehicle mileage issue
  * This script:

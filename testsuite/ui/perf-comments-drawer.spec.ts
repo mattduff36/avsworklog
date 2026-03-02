@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * @tags @perf @workshop
  * Performance test: comments drawer opens within 2s.

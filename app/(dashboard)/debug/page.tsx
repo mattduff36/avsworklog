@@ -16,14 +16,12 @@ import {
   Bug,
   Database,
   Users,
-  FileText,
   ShieldAlert,
   RefreshCw,
   Loader2,
   CheckCircle2,
   XCircle,
   Clock,
-  Package,
   History,
   Edit,
   Trash,
@@ -161,22 +159,6 @@ export default function DebugPage() {
     attachments: true,
     archives: true,
   });
-
-  // Notification settings states
-  const [notificationUsers, setNotificationUsers] = useState<Array<{
-    user_id: string;
-    full_name: string;
-    role_name: string;
-    preferences: Array<{
-      module_key: string;
-      enabled: boolean;
-      notify_in_app: boolean;
-      notify_email: boolean;
-    }>;
-  }>>([]);
-  const [loadingNotificationUsers, setLoadingNotificationUsers] = useState(false);
-  const [notificationSearchQuery, setNotificationSearchQuery] = useState('');
-  const [savingNotificationPref, setSavingNotificationPref] = useState<string | null>(null);
 
   // Check if user is superadmin and viewing as actual role
   useEffect(() => {
@@ -339,7 +321,7 @@ export default function DebugPage() {
 
       if (errorData) {
         // Fetch user names for all unique user IDs
-        const uniqueUserIds = [...new Set(errorData.map(e => e.user_id).filter(Boolean))];
+        const uniqueUserIds = [...new Set(errorData.map((e: { user_id: string | null }) => e.user_id).filter(Boolean))];
         const { data: profilesData } = await supabase
           .from('profiles')
           .select('id, full_name')
@@ -347,11 +329,11 @@ export default function DebugPage() {
 
         // Create a map of user_id -> full_name
         const userIdToName = new Map(
-          profilesData?.map(p => [p.id, p.full_name]) || []
+          profilesData?.map((p: { id: string; full_name: string }) => [p.id, p.full_name]) || []
         );
 
         // Add user names to error logs
-        const enrichedErrorData = errorData.map(log => ({
+        const enrichedErrorData = errorData.map((log: ErrorLogEntry) => ({
           ...log,
           user_name: log.user_id ? userIdToName.get(log.user_id) || null : null,
         }));
@@ -890,7 +872,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
   const uniqueErrorTypes = Array.from(new Set(errorLogs.map(log => log.error_type))).sort();
   
   // Get unique components for filter dropdown (excluding null)
-  const uniqueComponents = Array.from(new Set(errorLogs.map(log => log.component_name).filter(Boolean))).sort();
+  const uniqueComponents = Array.from(new Set(errorLogs.map(log => log.component_name).filter((c): c is string => c != null))).sort();
 
   if (loading) {
     return (
@@ -2075,10 +2057,11 @@ function NotificationSettingsDebugPanel() {
       const user = users.find(u => u.user_id === userId);
       const currentPref = user?.preferences.find(p => p.module_key === moduleKey);
       
-      // Prepare data with both fields
+      // Prepare data with both fields and enabled
       const updateData = {
         user_id: userId,
         module_key: moduleKey,
+        enabled: currentPref?.enabled ?? true,
         notify_in_app: field === 'notify_in_app' ? value : (currentPref?.notify_in_app ?? true),
         notify_email: field === 'notify_email' ? value : (currentPref?.notify_email ?? true),
       };
@@ -2099,9 +2082,10 @@ function NotificationSettingsDebugPanel() {
               p.module_key === moduleKey ? { ...p, [field]: value } : p
             );
             // If preference doesn't exist, add it
-            if (!prefs.find(p => p.module_key === moduleKey)) {
+            if (!prefs.find((p: { module_key: string }) => p.module_key === moduleKey)) {
               prefs.push({
                 module_key: moduleKey,
+                enabled: true,
                 notify_in_app: updateData.notify_in_app,
                 notify_email: updateData.notify_email,
               });
@@ -2164,10 +2148,11 @@ function NotificationSettingsDebugPanel() {
         const user = users.find(u => u.user_id === userId);
         const currentPref = user?.preferences.find(p => p.module_key === moduleKey);
         
-        // Prepare data with both fields
+        // Prepare data with both fields and enabled
         const updateData = {
           user_id: userId,
           module_key: moduleKey,
+          enabled: currentPref?.enabled ?? true,
           notify_in_app: field === 'notify_in_app' ? value : (currentPref?.notify_in_app ?? true),
           notify_email: field === 'notify_email' ? value : (currentPref?.notify_email ?? true),
         };

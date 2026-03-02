@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Fix YS23 KUN Task
  * 

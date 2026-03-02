@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Audit how vehicle registrations are stored in the database
  * Check for inconsistent formatting

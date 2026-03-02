@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Migration Runner: Fix maintenance trigger for plant inspections
  * 

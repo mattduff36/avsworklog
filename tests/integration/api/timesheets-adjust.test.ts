@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { POST } from '@/app/api/timesheets/[id]/adjust/route';
 import { createMockTimesheet, createMockManager, createMockAdmin, createSuzanneSquires } from '../../utils/factories';

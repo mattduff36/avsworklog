@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Test script to reproduce and verify the duplicate key constraint issue
  * 

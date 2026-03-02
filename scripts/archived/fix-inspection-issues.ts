@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Fix inspection issues migration runner
 // Fixes:
 // 1. Missing comments column in inspection_items

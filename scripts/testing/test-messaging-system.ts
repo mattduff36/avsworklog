@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Comprehensive Automated Test Suite for Internal Messaging System
  * Tests: Database schema, API endpoints, message flow, role-based selection

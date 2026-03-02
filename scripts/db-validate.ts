@@ -28,7 +28,7 @@ import pg from 'pg';
 
 config({ path: resolve(process.cwd(), '.env.local') });
 
-const connectionString = process.env.POSTGRES_URL_NON_POOLING;
+const connectionString: string | undefined = process.env.POSTGRES_URL_NON_POOLING;
 if (!connectionString) {
   console.error('❌ POSTGRES_URL_NON_POOLING not found in .env.local');
   process.exit(1);
@@ -40,7 +40,7 @@ const client = new pg.Client({
   port: parseInt(url.port) || 5432,
   database: url.pathname.slice(1),
   user: url.username,
-  password: url.password,
+  password: url.password ? decodeURIComponent(url.password) : undefined,
   ssl: { rejectUnauthorized: false },
 });
 
@@ -251,7 +251,7 @@ async function main() {
   }
 }
 
-main().catch((err) => {
+main().catch((err: unknown) => {
   console.error('💥 Unexpected error:', err);
   process.exit(1);
 });

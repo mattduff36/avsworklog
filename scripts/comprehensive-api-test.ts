@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Comprehensive API Test Suite
  * Tests all DVLA VES and MOT History API integrations

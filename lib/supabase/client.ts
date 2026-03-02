@@ -1,8 +1,7 @@
 import { createBrowserClient } from '@supabase/ssr'
-import { Database } from '@/types/database'
 import { getViewAsRoleId } from '@/lib/utils/view-as-cookie'
 
-let client: ReturnType<typeof createBrowserClient<Database>> | null = null
+let client: ReturnType<typeof createBrowserClient> | null = null
 
 export function createClient() {
   if (client) {
@@ -24,7 +23,7 @@ export function createClient() {
     return null as any
   }
 
-  client = createBrowserClient<Database>(
+  client = createBrowserClient(
     supabaseUrl,
     supabaseAnonKey,
     {

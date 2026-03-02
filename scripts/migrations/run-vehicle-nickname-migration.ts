@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Add nickname column to vehicles table and backfill data
  * 

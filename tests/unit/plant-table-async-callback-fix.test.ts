@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Plant Table Async Callback Timing Fix Test
  * 

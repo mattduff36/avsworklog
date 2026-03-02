@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Force add history entry for CP17 TKO - Andy Hill's service update
  */

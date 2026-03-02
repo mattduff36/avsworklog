@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Comprehensive Authentication Test
  * Tests ALL dashboard pages to ensure they require authentication

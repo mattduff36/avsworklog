@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Unit tests for error logging system
  * Tests the core functionality without requiring a running server

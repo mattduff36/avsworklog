@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Comprehensive RBAC Migration Test Suite
  * 

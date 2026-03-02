@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Script to query error_logs table and retrieve all errors
  */

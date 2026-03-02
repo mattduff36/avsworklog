@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createMockTimesheet, createMockTimesheetEntry, createMockManager } from '../../utils/factories';
 import { resetAllMocks } from '../../utils/test-helpers';

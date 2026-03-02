@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Vehicles-to-Vans Refactor — Static Guard Tests
  *

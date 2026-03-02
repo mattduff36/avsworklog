@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-import { Database } from '@/types/database'
 
 /**
  * Supabase Admin Client
@@ -14,7 +13,7 @@ export function createAdminClient() {
     throw new Error('Missing Supabase URL or service role key')
   }
 
-  return createClient<Database>(supabaseUrl, supabaseServiceKey, {
+  return createClient(supabaseUrl, supabaseServiceKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false

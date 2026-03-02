@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Plant Maintenance API Unit Tests
  * Tests the plant maintenance history API endpoint

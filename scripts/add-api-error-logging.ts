@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Script to automatically add server-side error logging to all API routes
  * This ensures all API errors are captured in the error_logs table

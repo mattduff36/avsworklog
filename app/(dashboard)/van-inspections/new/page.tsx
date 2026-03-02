@@ -16,8 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus, Check, WifiOff, Camera, AlertTriangle } from 'lucide-react';
-import Link from 'next/link';
+import { Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus, Check, Camera, AlertTriangle } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
 import { formatDateISO, formatDate, getWeekEnding } from '@/lib/utils/date';
 import { INSPECTION_ITEMS, InspectionStatus, getChecklistForCategory } from '@/types/inspection';
@@ -121,7 +120,7 @@ function NewInspectionContent() {
   loadingRef.current = loading;
   const [error, setError] = useState('');
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
-  const [signature, setSignature] = useState<string | null>(null);
+  const [, setSignature] = useState<string | null>(null);
   const [showConfirmSubmitDialog, setShowConfirmSubmitDialog] = useState(false);
   const [savingDraftFromConfirm, setSavingDraftFromConfirm] = useState(false);
   const [showAddVehicleDialog, setShowAddVehicleDialog] = useState(false);
@@ -151,7 +150,7 @@ function NewInspectionContent() {
   
   // Mileage sanity check states
   const [baselineMileage, setBaselineMileage] = useState<number | null>(null);
-  const [baselineMileageSource, setBaselineMileageSource] = useState<string>('none');
+  const [, setBaselineMileageSource] = useState<string>('none');
   const [mileageWarning, setMileageWarning] = useState<MileageSanityResult | null>(null);
   const [mileageConfirmed, setMileageConfirmed] = useState(false);
   const [showMileageWarningDialog, setShowMileageWarningDialog] = useState(false);
@@ -162,7 +161,7 @@ function NewInspectionContent() {
   // End of inspection comment + inform workshop states
   const [inspectorComments, setInspectorComments] = useState('');
   const [informWorkshop, setInformWorkshop] = useState(false);
-  const [creatingWorkshopTask, setCreatingWorkshopTask] = useState(false);
+  const [, setCreatingWorkshopTask] = useState(false);
 
   const fetchVehicles = useCallback(async () => {
     try {
@@ -319,7 +318,11 @@ function NewInspectionContent() {
 
           if (error) throw error;
 
-          const allEmployees = profiles || [];
+          const allEmployees = (profiles || []) as Array<{
+            id: string;
+            full_name: string | null;
+            employee_id: string | null;
+          }>;
           
           const formattedEmployees: Employee[] = allEmployees
             .map((emp) => ({
@@ -327,7 +330,7 @@ function NewInspectionContent() {
               full_name: emp.full_name || 'Unnamed User',
               employee_id: emp.employee_id || null,
             }))
-            .sort((a, b) => a.full_name.localeCompare(b.full_name));
+            .sort((a: Employee, b: Employee) => a.full_name.localeCompare(b.full_name));
           
           setEmployees(formattedEmployees);
           
@@ -506,7 +509,8 @@ function NewInspectionContent() {
                 days: []
               });
             }
-            defectsMap.get(key).days.push(item.day_of_week);
+            const defectEntry = defectsMap.get(key);
+            if (defectEntry) defectEntry.days.push(item.day_of_week);
           }
         });
 
@@ -732,9 +736,10 @@ function NewInspectionContent() {
     const defectsWithoutComments: string[] = [];
     let firstDefectWithoutCommentKey: string | null = null;
     Object.entries(checkboxStates).forEach(([key, status]) => {
-      if (status === 'attention' && !comments[key]) {
-        if (!firstDefectWithoutCommentKey) firstDefectWithoutCommentKey = key;
-        const [dayOfWeek, itemNumber] = key.split('-').map(Number);
+      const keyStr = String(key);
+      if (status === 'attention' && !comments[keyStr]) {
+        if (!firstDefectWithoutCommentKey) firstDefectWithoutCommentKey = keyStr;
+        const [dayOfWeek, itemNumber] = keyStr.split('-').map(Number);
         const dayName = DAY_NAMES[dayOfWeek - 1] || `Day ${dayOfWeek}`;
         const itemName = currentChecklist[itemNumber - 1] || `Item ${itemNumber}`;
         defectsWithoutComments.push(`${itemName} (${dayName})`);
@@ -747,9 +752,11 @@ function NewInspectionContent() {
         description: `Please add comments for: ${defectsWithoutComments.slice(0, 3).join(', ')}${defectsWithoutComments.length > 3 ? '...' : ''}`,
       });
       setShowConfirmSubmitDialog(false);
-      if (firstDefectWithoutCommentKey) {
-        const [dayOfWeek] = firstDefectWithoutCommentKey.split('-').map(Number);
-        openDayAndScrollToChecklistTarget(dayOfWeek, `[data-comment-input="${firstDefectWithoutCommentKey}"]`);
+      const keyToScroll: string = firstDefectWithoutCommentKey ?? '';
+      if (keyToScroll) {
+        const parts = keyToScroll.split('-');
+        const dayOfWeek = parts.length >= 1 ? Number(parts[0]) : 1;
+        openDayAndScrollToChecklistTarget(dayOfWeek, `[data-comment-input="${keyToScroll}"]`);
       }
       return;
     }
@@ -909,7 +916,7 @@ function NewInspectionContent() {
         inspector_comments: inspectorComments.trim() || null,
       };
 
-      let inspection: InspectionWithRelations;
+      let inspection: { id: string };
 
       // Update existing draft or create new inspection
       if (existingInspectionId) {
@@ -1141,7 +1148,7 @@ function NewInspectionContent() {
             const { data: previousInspectionItems } = await supabase
               .from('inspection_items')
               .select('id, item_number, item_description')
-              .in('id', pendingActions.map(a => a.inspection_item_id).filter(Boolean));
+              .in('id', pendingActions.map((action: { inspection_item_id: string | null }) => action.inspection_item_id).filter(Boolean));
 
             // For each resolved item, find matching action and complete it
             for (const [key, resolutionComment] of resolvedItems.entries()) {
@@ -1151,11 +1158,11 @@ function NewInspectionContent() {
 
               // Find matching action
               const matchingItem = previousInspectionItems?.find(
-                item => item.item_number === itemNum && item.item_description === itemDesc
+                (item: { id: string; item_number: number; item_description: string }) => item.item_number === itemNum && item.item_description === itemDesc
               );
 
               if (matchingItem) {
-                const matchingAction = pendingActions.find(a => a.inspection_item_id === matchingItem.id);
+                const matchingAction = pendingActions.find((action: { inspection_item_id: string | null; description: string | null; id: string }) => action.inspection_item_id === matchingItem.id);
 
                 if (matchingAction) {
                   // Complete the action with resolution comment
@@ -1596,7 +1603,7 @@ function NewInspectionContent() {
               })}
             </TabsList>
 
-            {DAY_NAMES.map((day, dayIndex) => (
+            {DAY_NAMES.map((_day, dayIndex) => (
               <TabsContent key={dayIndex} value={dayIndex.toString()} className="mt-0">
                 {/* Mark All Pass Button - Mobile */}
                 <div className="md:hidden mb-4 hidden">
@@ -1618,12 +1625,9 @@ function NewInspectionContent() {
                     const dayOfWeek = dayIndex + 1;
                     const key = `${dayOfWeek}-${itemNumber}`;
                     const currentStatus = checkboxStates[key];
-                    const hasDefectComment = currentStatus === 'attention' && comments[key];
-                    
                     // Check if this item has a logged action (read-only)
                     const loggedKey = `${itemNumber}-${item}`;
                     const isLogged = loggedDefects.has(loggedKey);
-                    const loggedInfo = loggedDefects.get(loggedKey);
               
               return (
                 <div key={itemNumber} data-checklist-item={key} className={`bg-slate-900/30 border rounded-lg p-4 space-y-3 ${

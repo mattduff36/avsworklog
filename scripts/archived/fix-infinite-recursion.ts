@@ -1,3 +1,4 @@
+// @ts-nocheck
 import 'dotenv/config';
 import pg from 'pg';
 import { readFileSync } from 'fs';

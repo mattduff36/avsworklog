@@ -17,12 +17,12 @@ const eslintConfig = [
       sonarjs,
     },
     rules: {
-      // Keep SonarJS enabled while reducing noise during staged refactors.
-      "sonarjs/cognitive-complexity": ["warn", 60],
-      "sonarjs/no-duplicate-string": "warn",
-      "sonarjs/no-identical-functions": "warn",
-      "@typescript-eslint/no-explicit-any": "warn",
-      "react-hooks/set-state-in-effect": "off",
+      // Keep only narrowly-scoped local overrides here.
+    },
+  },
+  {
+    linterOptions: {
+      reportUnusedDisableDirectives: "error",
     },
   },
   {
@@ -31,6 +31,8 @@ const eslintConfig = [
       ".next/**",
       "out/**",
       "build/**",
+      "docs/reports/**",
+      "testsuite/reports/**",
       "next-env.d.ts",
       "public/sw.js",
       "public/sw-custom.js",

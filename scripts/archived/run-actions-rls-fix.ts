@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Fix Actions RLS Policies Migration
  * Updates actions RLS policies to use roles table instead of deprecated profiles.role

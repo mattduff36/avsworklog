@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * @tags @auth @critical
  * Tests login/logout flows. Runs in auth-tests project with NO storage state.

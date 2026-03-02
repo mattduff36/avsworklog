@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -317,9 +317,10 @@ function NewHgvInspectionContent() {
         throw insertItemsError;
       }
 
-      const failedItems = (insertedItems || []).filter(item => item.status === 'attention');
+      type InsertedItem = { id: string; item_number: number; item_description: string; day_of_week: number | null; status: InspectionStatus; comments: string | null };
+      const failedItems = (insertedItems || []).filter((item: InsertedItem) => item.status === 'attention');
       if (failedItems.length > 0) {
-        const defects = failedItems.map(item => ({
+        const defects = failedItems.map((item: InsertedItem) => ({
           item_number: item.item_number,
           item_description: item.item_description,
           dayOfWeek: item.day_of_week,

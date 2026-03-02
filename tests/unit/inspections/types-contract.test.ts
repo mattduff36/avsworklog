@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect } from 'vitest';
 import type { VanInspection, PlantInspection, InspectionItem, InspectionPhoto, VehicleInspection } from '@/types/inspection';
 

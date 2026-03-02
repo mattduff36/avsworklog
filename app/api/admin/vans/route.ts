@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getEffectiveRole } from '@/lib/utils/view-as';
@@ -10,17 +9,16 @@ import { formatRegistrationForStorage, validateRegistrationNumber } from '@/lib/
 import { isRoadEligibleRegistration, runFleetDvlaSync } from '@/lib/services/fleet-dvla-sync';
 import type { Database } from '@/types/database';
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  );
+interface ProfileNameShape {
+  full_name?: string | null;
+}
+
+function pickProfileName(
+  profile: ProfileNameShape | ProfileNameShape[] | null | undefined
+): string | null {
+  if (!profile) return null;
+  const profileEntry = Array.isArray(profile) ? profile[0] ?? null : profile;
+  return profileEntry?.full_name ?? null;
 }
 
 // GET - List all vans with category and last inspector info
@@ -74,7 +72,9 @@ export async function GET(request: NextRequest) {
 
         return {
           ...vehicle,
-          last_inspector: lastInspection?.profiles?.full_name || null,
+          last_inspector: pickProfileName(
+            lastInspection?.profiles as ProfileNameShape | ProfileNameShape[] | null
+          ),
           last_inspection_date: lastInspection?.inspection_date || null,
         };
       })

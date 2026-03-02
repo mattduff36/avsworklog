@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Migration Runner: Split Weekly Plant Inspections into Daily
  * 

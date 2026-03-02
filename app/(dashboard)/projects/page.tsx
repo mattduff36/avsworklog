@@ -1,14 +1,12 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { Database } from '@/types/database';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Loader2, Search, FileText, CheckCircle2, Clock, Settings, Plus, UserPlus } from 'lucide-react';
+import { Loader2, Search, FileText, CheckCircle2, Clock, Settings, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { formatFileSize } from '@/lib/utils/file-validation';
@@ -51,8 +49,6 @@ export default function RAMSPage() {
   const [visitorSignModalOpen, setVisitorSignModalOpen] = useState(false);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [selectedDocumentTitle, setSelectedDocumentTitle] = useState<string>('');
-
-  const supabase = createClient();
 
   const fetchDocuments = useCallback(async () => {
     setLoading(true);

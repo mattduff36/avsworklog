@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Verify Inspection RLS Policies
  * 

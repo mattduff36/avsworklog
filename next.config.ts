@@ -14,26 +14,17 @@ const nextConfig: NextConfig = {
   // Mark server-only packages to prevent client-side bundling
   serverExternalPackages: ['exceljs'],
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   webpack: (config) => {
     // Handle canvas package for pdfjs-dist
     config.resolve.alias.canvas = false;
     
-    // Optimize webpack cache to handle large strings more efficiently
-    // This addresses the "Serializing big strings" warning from Supabase types
-    if (config.cache && typeof config.cache === 'object') {
-      config.cache = {
-        ...config.cache,
-        // Use gzip compression for cache to reduce memory footprint
-        compression: 'gzip',
-        // Set maximum age for cached items
-        maxAge: 5184000000, // 60 days
-      };
-    }
+    // Disable persistent cache to avoid noisy PackFile serialization warnings in CI.
+    config.cache = false;
     
     // Suppress non-critical warnings
     config.ignoreWarnings = [

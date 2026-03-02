@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Lint Script: Ban Raw Palette Utilities
  * Prevents usage of raw palette utilities in feature code

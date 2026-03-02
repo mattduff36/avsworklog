@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
@@ -103,7 +102,7 @@ export async function PUT(request: NextRequest) {
 
     // Parse request body
     const body: AdminUpdatePreferenceRequest = await request.json();
-    const { user_id, module_key, notify_in_app, notify_email } = body;
+    const { user_id, module_key, enabled, notify_in_app, notify_email } = body;
 
     if (!user_id || !module_key) {
       return NextResponse.json({ 
@@ -119,11 +118,12 @@ export async function PUT(request: NextRequest) {
     }
 
     // Build upsert data
-    const upsertData: any = {
+    const upsertData: Record<string, unknown> = {
       user_id,
       module_key,
     };
 
+    if (enabled !== undefined) upsertData.enabled = enabled;
     if (notify_in_app !== undefined) upsertData.notify_in_app = notify_in_app;
     if (notify_email !== undefined) upsertData.notify_email = notify_email;
 

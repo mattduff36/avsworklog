@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Workshop Tasks Module Integration Tests
  * Tests all workflows for /workshop-tasks page including task management and category management

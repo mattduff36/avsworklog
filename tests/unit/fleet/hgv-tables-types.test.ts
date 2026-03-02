@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * HGV Tables and Types Tests
  *

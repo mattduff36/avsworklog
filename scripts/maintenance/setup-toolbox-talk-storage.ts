@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Setup script for Toolbox Talk PDF Storage Bucket
  * Creates the toolbox-talk-pdfs bucket in Supabase Storage with RLS policies

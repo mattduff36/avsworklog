@@ -1,7 +1,39 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { GetPendingMessagesResponse } from '@/types/messages';
+
+interface SenderShape {
+  full_name?: string | null;
+}
+
+interface PendingMessageShape {
+  id?: string;
+  type?: 'TOOLBOX_TALK' | 'REMINDER' | 'NOTIFICATION';
+  subject?: string | null;
+  body?: string | null;
+  priority?: 'HIGH' | 'LOW';
+  sender_id?: string | null;
+  created_at?: string | null;
+  deleted_at?: string | null;
+  pdf_file_path?: string | null;
+  sender?: SenderShape | SenderShape[] | null;
+}
+
+interface RecipientShape {
+  id?: string;
+  messages?: PendingMessageShape | PendingMessageShape[] | null;
+}
+
+function pickMessage(messages: RecipientShape['messages']): PendingMessageShape | null {
+  if (!messages) return null;
+  return Array.isArray(messages) ? messages[0] ?? null : messages;
+}
+
+function pickSender(sender: PendingMessageShape['sender']): SenderShape | null {
+  if (!sender) return null;
+  return Array.isArray(sender) ? sender[0] ?? null : sender;
+}
 
 /**
  * GET /api/messages/pending
@@ -86,17 +118,63 @@ export async function GET() {
     }
 
     // Transform the data to include recipient_id for updates
-    const formattedToolboxTalks = toolboxTalks?.map(item => ({
-      ...item.messages,
-      recipient_id: item.id,
-      sender_name: item.messages.sender?.full_name || 'Deleted User'
-    })) || [];
+    const formattedToolboxTalks = (toolboxTalks ?? [])
+      .map((rawItem) => {
+        const item = rawItem as RecipientShape;
+        const message = pickMessage(item.messages);
+        if (!message?.id || !message.type || !message.priority || !message.created_at) return null;
 
-    const formattedReminders = reminders?.map(item => ({
-      ...item.messages,
-      recipient_id: item.id,
-      sender_name: item.messages.sender?.full_name || 'Deleted User'
-    })) || [];
+        return {
+          id: message.id,
+          type: message.type,
+          subject: message.subject ?? '',
+          body: message.body ?? '',
+          priority: message.priority,
+          sender_id: message.sender_id ?? null,
+          created_at: message.created_at,
+          updated_at: message.created_at,
+          deleted_at: message.deleted_at ?? null,
+          created_via: 'api',
+          pdf_file_path: message.pdf_file_path ?? null,
+          sender: {
+            id: message.sender_id ?? '',
+            full_name: pickSender(message.sender)?.full_name ?? 'Deleted User',
+            role: 'unknown',
+          },
+          recipient_id: item.id ?? '',
+          sender_name: pickSender(message.sender)?.full_name ?? 'Deleted User',
+        };
+      })
+      .filter((item) => item !== null);
+
+    const formattedReminders = (reminders ?? [])
+      .map((rawItem) => {
+        const item = rawItem as RecipientShape;
+        const message = pickMessage(item.messages);
+        if (!message?.id || !message.type || !message.priority || !message.created_at) return null;
+
+        return {
+          id: message.id,
+          type: message.type,
+          subject: message.subject ?? '',
+          body: message.body ?? '',
+          priority: message.priority,
+          sender_id: message.sender_id ?? null,
+          created_at: message.created_at,
+          updated_at: message.created_at,
+          deleted_at: message.deleted_at ?? null,
+          created_via: 'api',
+          pdf_file_path: message.pdf_file_path ?? null,
+          sender: {
+            id: message.sender_id ?? '',
+            full_name: pickSender(message.sender)?.full_name ?? 'Deleted User',
+            role: 'unknown',
+          },
+          recipient_id: item.id ?? '',
+          sender_name: pickSender(message.sender)?.full_name ?? 'Deleted User',
+        };
+      })
+      .filter((item) => item !== null);
 
     const response: GetPendingMessagesResponse = {
       success: true,

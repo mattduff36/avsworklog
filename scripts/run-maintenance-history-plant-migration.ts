@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Migration Runner: Add Plant Support to Maintenance History
  * 

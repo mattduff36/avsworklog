@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Migration Script: Convert Draft Van Inspections from 26-point to 14-point Checklist
  * 

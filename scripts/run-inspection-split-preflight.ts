@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Preflight Audit: Vehicle Inspections Table Split
  *

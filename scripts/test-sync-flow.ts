@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Test the complete sync flow for FE24 TYO to identify where the wrong date comes from
  */

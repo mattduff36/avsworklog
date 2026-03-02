@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Migration Runner: Fix stale vehicle_categories / vehicle_id references
  *

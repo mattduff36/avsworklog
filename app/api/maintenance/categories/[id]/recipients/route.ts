@@ -2,22 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
 
-interface RecipientWithProfile {
-  id: string;
-  category_id: string;
-  user_id: string;
-  created_at: string;
-  profile?: {
-    full_name: string | null;
-  };
-}
-
 /**
  * GET /api/maintenance/categories/[id]/recipients
  * Get all recipients for a category
  */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -51,7 +41,7 @@ export async function GET(
       recipients: recipients || [] 
     });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('GET /api/maintenance/categories/[id]/recipients failed', error, 'MaintenanceAPI');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -82,7 +72,11 @@ export async function POST(
       .eq('id', user.id)
       .single();
     
-    const roleData = profile?.role as { name: string; is_manager_admin: boolean } | null;
+    const roleRaw = profile?.role as
+      | { name?: string; is_manager_admin?: boolean }
+      | Array<{ name?: string; is_manager_admin?: boolean }>
+      | null;
+    const roleData = Array.isArray(roleRaw) ? roleRaw[0] : roleRaw;
     if (!roleData?.is_manager_admin && roleData?.name !== 'admin' && roleData?.name !== 'manager') {
       return NextResponse.json(
         { error: 'Only admins and managers can manage recipients' },
@@ -162,7 +156,7 @@ export async function POST(
       count: user_ids.length 
     });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('POST /api/maintenance/categories/[id]/recipients failed', error, 'MaintenanceAPI');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

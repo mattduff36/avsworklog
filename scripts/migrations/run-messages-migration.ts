@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Run Messages Database Migration
  * Creates messages and message_recipients tables

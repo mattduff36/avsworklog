@@ -76,16 +76,14 @@ export async function POST(request: NextRequest) {
       .eq('is_active', true)
       .single();
 
-    let defaultSubcategoryId: string | null = null;
     if (repairCategory) {
-      const { data: subcategory } = await supabaseAdmin
+      await supabaseAdmin
         .from('workshop_task_subcategories')
         .select('id')
         .eq('category_id', repairCategory.id)
         .ilike('name', '%inspection%defect%')
         .eq('is_active', true)
         .single();
-      defaultSubcategoryId = subcategory?.id || null;
     }
 
     // Fetch existing tasks for this plant

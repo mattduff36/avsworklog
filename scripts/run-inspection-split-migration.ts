@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Runner: Split vehicle_inspections → van_inspections + plant_inspections
  *

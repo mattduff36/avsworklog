@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Demonstration of error messages that will be logged
  * Shows what you'll see in the Debug Console

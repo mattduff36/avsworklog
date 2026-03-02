@@ -27,7 +27,7 @@ export async function PUT(
       .eq('id', user.id)
       .single();
     
-    const roleName = (profile?.role as any)?.name;
+    const roleName = (profile?.role as { name?: string } | null)?.name;
     if (!roleName || !['admin', 'manager'].includes(roleName)) {
       return NextResponse.json(
         { error: 'Only admins and managers can update categories' },
@@ -38,7 +38,7 @@ export async function PUT(
     const body: UpdateCategoryRequest = await request.json();
     
     // Build update object
-    const updates: Record<string, any> = {};
+    const updates: Record<string, unknown> = {};
     if (body.name !== undefined) updates.name = body.name;
     if (body.description !== undefined) updates.description = body.description;
     if (body.period_value !== undefined) updates.period_value = body.period_value;
@@ -67,7 +67,7 @@ export async function PUT(
     
     return NextResponse.json({ success: true, category: data });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('PUT /api/maintenance/categories/[id] failed', error, 'MaintenanceAPI');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -79,7 +79,7 @@ export async function PUT(
  * Fails if category is in use
  */
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -98,7 +98,7 @@ export async function DELETE(
       .eq('id', user.id)
       .single();
     
-    const roleName = (profile?.role as any)?.name;
+    const roleName = (profile?.role as { name?: string } | null)?.name;
     if (!roleName || !['admin', 'manager'].includes(roleName)) {
       return NextResponse.json(
         { error: 'Only admins and managers can delete categories' },
@@ -132,7 +132,7 @@ export async function DELETE(
     
     return NextResponse.json({ success: true });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('DELETE /api/maintenance/categories/[id] failed', error, 'MaintenanceAPI');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

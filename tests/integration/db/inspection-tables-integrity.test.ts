@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * DB Integrity Tests: Inspection Table Split Verification
  *

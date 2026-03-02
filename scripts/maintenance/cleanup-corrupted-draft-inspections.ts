@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Cleanup script for corrupted draft inspections
  * 

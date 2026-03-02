@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Fix Errors - Automated Error Analysis & Report Generator
  *

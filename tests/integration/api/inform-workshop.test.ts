@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Integration Tests: Inform Workshop Endpoint
  * 

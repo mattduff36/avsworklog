@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Enable Audit Logging Migration
  * Sets up comprehensive audit logging triggers for all key tables

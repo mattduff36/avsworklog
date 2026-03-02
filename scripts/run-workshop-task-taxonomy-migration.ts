@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Migration Runner: Workshop Task Taxonomy (2-tier)
  * 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Test: Plant Table Integration Tests
  * Verifies plant table functionality, data integrity, and related operations

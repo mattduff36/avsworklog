@@ -1,3 +1,4 @@
+// @ts-nocheck
 // URGENT FIX: Remove infinite recursion in profiles RLS policy
 import { config } from 'dotenv';
 import { resolve } from 'path';

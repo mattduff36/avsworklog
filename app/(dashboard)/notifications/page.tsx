@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -46,7 +45,7 @@ const MODULE_ICONS: Record<string, any> = {
 };
 
 export default function NotificationsPage() {
-  const { profile, isAdmin, isSuperAdmin, isManager } = useAuth();
+  const { isAdmin, isManager } = useAuth();
   
   // Deep-link query param from notification panel
   const [openNotificationId, setOpenNotificationId] = useQueryState('openNotification', {
@@ -72,7 +71,7 @@ export default function NotificationsPage() {
   // Admin state
   const [selectedUserId, setSelectedUserId] = useState<string>('all');
   const [users, setUsers] = useState<Array<{ id: string; full_name: string; role: string }>>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [, setLoadingUsers] = useState(false);
   const [adminNotifications, setAdminNotifications] = useState<NotificationItem[]>([]);
   const [loadingAdminNotifications, setLoadingAdminNotifications] = useState(false);
 

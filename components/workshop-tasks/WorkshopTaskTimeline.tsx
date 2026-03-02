@@ -28,7 +28,7 @@ type WorkshopTaskTimelineTask = {
   logged_comment?: string | null;
   actioned_at?: string | null;
   actioned_comment?: string | null;
-  status_history?: StatusHistoryEvent[] | null;
+  status_history?: unknown[] | null;
   profiles_created?: {
     full_name: string;
   } | null;
@@ -132,6 +132,17 @@ const buildFallbackStatusHistory = (task: WorkshopTaskTimelineTask): StatusHisto
   return items;
 };
 
+function isStatusHistoryEvent(value: unknown): value is StatusHistoryEvent {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<StatusHistoryEvent>;
+  return (
+    typeof candidate.id === 'string' &&
+    candidate.type === 'status' &&
+    typeof candidate.status === 'string' &&
+    typeof candidate.created_at === 'string'
+  );
+}
+
 export function WorkshopTaskTimeline({
   task,
   comments = [],
@@ -141,7 +152,7 @@ export function WorkshopTaskTimeline({
 }) {
   const statusHistory =
     Array.isArray(task.status_history) && task.status_history.length > 0
-      ? task.status_history
+      ? task.status_history.filter(isStatusHistoryEvent)
       : buildFallbackStatusHistory(task);
 
   const createdBy =

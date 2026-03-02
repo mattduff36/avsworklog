@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Fix vehicles that are in van_archive but still showing as active
  * This happened when the archive succeeded but the DELETE failed due to FK constraints

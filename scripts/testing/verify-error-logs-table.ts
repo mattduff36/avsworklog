@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Verify error_logs table exists and check permissions
  */

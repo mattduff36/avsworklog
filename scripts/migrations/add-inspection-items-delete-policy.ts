@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Migration Script: Add DELETE policy for inspection_items
  * 

@@ -52,7 +52,7 @@ export function OfficeActionDialog({
   currentDueDate,
   onSuccess,
 }: OfficeActionDialogProps) {
-  const { isManager, isAdmin } = useAuth();
+  const { isManager: _isManager, isAdmin: _isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState<'reminder' | 'update' | 'refresh'>('reminder');
   const [loading, setLoading] = useState(false);
   

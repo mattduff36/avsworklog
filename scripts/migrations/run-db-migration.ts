@@ -17,21 +17,21 @@ if (!connectionString) {
   process.exit(1);
 }
 
-async function runMigration() {
+async function runMigration(conn: string) {
   console.log('🚀 Running database migration...\n');
 
   // Parse connection string and rebuild with explicit SSL config
-  const url = new URL(connectionString);
+  const url = new URL(conn);
   
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,
     database: url.pathname.slice(1),
     user: url.username,
-    password: url.password,
+    password: url.password ? decodeURIComponent(url.password) : undefined,
     ssl: {
-      rejectUnauthorized: false
-    }
+      rejectUnauthorized: false,
+    },
   });
 
   try {
@@ -68,20 +68,22 @@ async function runMigration() {
     console.log('   npm run dev');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    const pgError = err as { detail?: string; hint?: string; message?: string };
     console.error('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.error('❌ MIGRATION FAILED');
     console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     console.error('Error:', error.message);
-    if (error.detail) {
-      console.error('Details:', error.detail);
+    if (pgError.detail) {
+      console.error('Details:', pgError.detail);
     }
-    if (error.hint) {
-      console.error('Hint:', error.hint);
+    if (pgError.hint) {
+      console.error('Hint:', pgError.hint);
     }
-    
+
     // Check if column already exists
-    if (error.message?.includes('already exists')) {
+    if (pgError.message?.includes('already exists')) {
       console.log('\n✅ Column already exists - no action needed!\n');
       process.exit(0);
     }
@@ -92,5 +94,8 @@ async function runMigration() {
   }
 }
 
-runMigration().catch(console.error);
+runMigration(connectionString).catch((err: unknown) => {
+  console.error(err);
+  process.exit(1);
+});
 

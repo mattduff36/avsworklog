@@ -8,7 +8,8 @@ const { Client } = pg;
 // Load .env.local
 config({ path: resolve(process.cwd(), '.env.local') });
 
-const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
+const connectionString: string | undefined =
+  process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
 const sqlFile = 'supabase/migrations/20260126_error_log_alerts.sql';
 
 if (!connectionString) {
@@ -17,21 +18,21 @@ if (!connectionString) {
   process.exit(1);
 }
 
-async function runMigration() {
+async function runMigration(conn: string) {
   console.log('🔔 Running Error Log Alerts Migration...\n');
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(conn);
   
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,
     database: url.pathname.slice(1),
     user: url.username,
-    password: url.password,
+    password: url.password ? decodeURIComponent(url.password) : undefined,
     ssl: {
-      rejectUnauthorized: false
-    }
+      rejectUnauthorized: false,
+    },
   });
 
   try {
@@ -63,7 +64,7 @@ async function runMigration() {
     console.log('   ✓ Link to notification message for reference');
 
     // Verify table exists
-    const tableCheck = await client.query(`
+    const tableCheck = await client.query<{ tablename: string }>(`
       SELECT tablename
       FROM pg_tables
       WHERE schemaname = 'public'
@@ -75,19 +76,20 @@ async function runMigration() {
     }
 
     // Count policies
-    const policyCount = await client.query(`
+    const policyCount = await client.query<{ count: string }>(`
       SELECT COUNT(*) as count
       FROM pg_policies
       WHERE schemaname = 'public'
         AND tablename = 'error_log_alerts';
     `);
 
-    console.log(`✅ VERIFICATION: ${policyCount.rows[0].count} RLS policies created\n`);
+    console.log(`✅ VERIFICATION: ${policyCount.rows[0]?.count} RLS policies created\n`);
 
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error(String(err));
     console.error('\n❌ Migration failed:');
     console.error(error.message);
-    
+
     if (error.message.includes('already exists')) {
       console.log('\n💡 TIP: Table may already exist. Check if migration was previously run.');
     }
@@ -99,4 +101,7 @@ async function runMigration() {
   }
 }
 
-runMigration();
+runMigration(connectionString).catch((err: unknown) => {
+  console.error(err);
+  process.exit(1);
+});

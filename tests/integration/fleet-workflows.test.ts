@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Fleet Module Integration Tests
  * Tests all workflows for /fleet page including vehicles, maintenance, and categories

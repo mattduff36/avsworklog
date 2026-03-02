@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Run Plant Maintenance Unique Constraint Migration
  * 

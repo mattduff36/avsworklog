@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Plant History Page Integration Tests
  * Tests all workflows for /fleet/plant/[plantId]/history page

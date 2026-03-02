@@ -4,6 +4,27 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { logger } from '@/lib/utils/logger';
 import type { MaintenanceHistoryResponse } from '@/types/maintenance';
 
+interface WorkshopTaskCategoryShape {
+  name: string;
+}
+
+interface WorkshopTaskShape {
+  id: string;
+  created_at: string;
+  status: string;
+  action_type: 'inspection_defect' | 'workshop_vehicle_task' | 'manager_action';
+  workshop_comments: string | null;
+  description: string | null;
+  logged_comment: string | null;
+  actioned_comment: string | null;
+  actioned_at: string | null;
+  logged_at: string | null;
+  status_history?: unknown[] | null;
+  created_by: string | null;
+  workshop_task_categories?: WorkshopTaskCategoryShape[] | WorkshopTaskCategoryShape | null;
+  profiles?: { full_name: string | null } | null;
+}
+
 // Helper to create service role client for bypassing RLS
 function getSupabaseServiceRole() {
   return createSupabaseClient(
@@ -23,7 +44,7 @@ function getSupabaseServiceRole() {
  * Returns maintenance history for a vehicle
  */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ vehicleId: string }> }
 ) {
   try {
@@ -126,7 +147,7 @@ export async function GET(
       .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
       .order('created_at', { ascending: false });
     
-    const workshopTasks = directTasks || [];
+    const workshopTasks = (directTasks || []) as WorkshopTaskShape[];
     const workshopError = directError;
     
     if (workshopError) {
@@ -141,7 +162,7 @@ export async function GET(
     }
     
     // Fetch profile names for workshop tasks using service role for consistency
-    let tasksWithProfiles = workshopTasks || [];
+    let tasksWithProfiles: WorkshopTaskShape[] = workshopTasks;
     if (workshopTasks && workshopTasks.length > 0) {
       const userIds = [...new Set(workshopTasks.map(t => t.created_by).filter(Boolean))];
       
@@ -153,23 +174,33 @@ export async function GET(
           .in('id', userIds);
         
         const profileMap = new Map((profiles || []).map(p => [p.id, p.full_name]));
-        tasksWithProfiles = workshopTasks.map(task => ({
+        tasksWithProfiles = workshopTasks.map((task) => ({
           ...task,
-          profiles: task.created_by ? { full_name: profileMap.get(task.created_by) || null } : null
+          profiles: task.created_by ? { full_name: profileMap.get(task.created_by) || null } : null,
         }));
       } else {
         // No user IDs to fetch, but still need to add profiles property (as null) to each task
-        tasksWithProfiles = workshopTasks.map(task => ({
+        tasksWithProfiles = workshopTasks.map((task) => ({
           ...task,
-          profiles: null
+          profiles: null,
         }));
       }
     }
+
+    const normalizedWorkshopTasks = tasksWithProfiles.map((task) => ({
+      ...task,
+      workshop_task_categories: Array.isArray(task.workshop_task_categories)
+        ? task.workshop_task_categories[0] ?? null
+        : task.workshop_task_categories ?? null,
+      profiles: task.profiles?.full_name
+        ? { full_name: task.profiles.full_name }
+        : null,
+    }));
     
     const response: MaintenanceHistoryResponse = {
       success: true,
       history: history || [],
-      workshopTasks: tasksWithProfiles,
+      workshopTasks: normalizedWorkshopTasks,
       vehicle: {
         id: vehicle.id,
         reg_number: vehicle.reg_number
@@ -179,7 +210,7 @@ export async function GET(
     
     return NextResponse.json(response);
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('GET /api/maintenance/history/[vehicleId] failed', error, 'MaintenanceAPI');
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

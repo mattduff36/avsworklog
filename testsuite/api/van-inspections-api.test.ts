@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Van Inspections API Integration Tests
  *

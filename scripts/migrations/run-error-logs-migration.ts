@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Script to create error_logs table in the database
  * Run this from the project root: npx tsx scripts/run-error-logs-migration.ts

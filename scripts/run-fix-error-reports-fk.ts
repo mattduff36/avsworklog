@@ -8,7 +8,8 @@ const { Client } = pg;
 // Load .env.local
 config({ path: resolve(process.cwd(), '.env.local') });
 
-const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
+const connectionString: string | undefined =
+  process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
 const sqlFile = 'supabase/migrations/20260126_fix_error_reports_fk.sql';
 
 if (!connectionString) {
@@ -17,21 +18,21 @@ if (!connectionString) {
   process.exit(1);
 }
 
-async function runMigration() {
+async function runMigration(conn: string) {
   console.log('🔧 Running Error Reports FK Fix Migration...\n');
 
   // Parse connection string with SSL config
-  const url = new URL(connectionString);
+  const url = new URL(conn);
   
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port) || 5432,
     database: url.pathname.slice(1),
     user: url.username,
-    password: url.password,
+    password: url.password ? decodeURIComponent(url.password) : undefined,
     ssl: {
-      rejectUnauthorized: false
-    }
+      rejectUnauthorized: false,
+    },
   });
 
   try {
@@ -62,7 +63,7 @@ async function runMigration() {
     console.log('   ✓ /admin/errors/manage page will load correctly');
 
     // Verify FK exists
-    const fkCheck = await client.query(`
+    const fkCheck = await client.query<{ constraint_name: string; table_name: string }>(`
       SELECT constraint_name, table_name
       FROM information_schema.table_constraints
       WHERE constraint_name IN (
@@ -74,13 +75,16 @@ async function runMigration() {
     `);
 
     console.log(`\n✅ VERIFICATION: ${fkCheck.rows.length} FK constraints updated\n`);
-    fkCheck.rows.forEach(row => console.log(`   ✓ ${row.constraint_name} on ${row.table_name}`));
+    fkCheck.rows.forEach((row) =>
+      console.log(`   ✓ ${row.constraint_name} on ${row.table_name}`)
+    );
     console.log();
 
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error(String(err));
     console.error('\n❌ Migration failed:');
     console.error(error.message);
-    
+
     if (error.message.includes('already exists')) {
       console.log('\n💡 TIP: Constraints may already exist. Check if migration was previously run.');
     }
@@ -92,4 +96,7 @@ async function runMigration() {
   }
 }
 
-runMigration();
+runMigration(connectionString).catch((err: unknown) => {
+  console.error(err);
+  process.exit(1);
+});

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Save, Send, Edit2, CheckCircle2, XCircle, AlertCircle, Camera, Download } from 'lucide-react';
+import { Save, Send, Edit2, CheckCircle2, XCircle, AlertCircle, Download } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
 import { formatDate } from '@/lib/utils/date';
 import { InspectionStatus, InspectionItem } from '@/types/inspection';
@@ -47,6 +47,10 @@ interface DailyHour {
   hours: number | null;
 }
 
+interface InspectionItemWithDay extends InspectionItem {
+  day_of_week: number | null;
+}
+
 export default function ViewPlantInspectionPage() {
   const router = useRouter();
   const params = useParams();
@@ -54,9 +58,9 @@ export default function ViewPlantInspectionPage() {
   const supabase = createClient();
   
   const [inspection, setInspection] = useState<PlantInspectionWithDetails | null>(null);
-  const [items, setItems] = useState<InspectionItem[]>([]);
+  const [items, setItems] = useState<InspectionItemWithDay[]>([]);
   const [dailyHours, setDailyHours] = useState<DailyHour[]>([]);
-  const [originalDefectItems, setOriginalDefectItems] = useState<InspectionItem[]>([]);
+  const [originalDefectItems, setOriginalDefectItems] = useState<InspectionItemWithDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -106,9 +110,10 @@ export default function ViewPlantInspectionPage() {
 
       if (itemsError) throw itemsError;
 
-      setItems(itemsData || []);
+      const typedItems = (itemsData || []) as InspectionItemWithDay[];
+      setItems(typedItems);
       
-      const defectItems = (itemsData || []).filter(item => item.status === 'attention');
+      const defectItems = typedItems.filter((item: InspectionItemWithDay) => item.status === 'attention');
       setOriginalDefectItems(defectItems);
 
       // Fetch daily hours
@@ -146,15 +151,6 @@ export default function ViewPlantInspectionPage() {
     }
   }, [params.id, authLoading, fetchInspection]);
 
-  const updateItem = (itemNumber: number, field: string, value: string | InspectionStatus) => {
-    const newItems = items.map(item => 
-      item.item_number === itemNumber 
-        ? { ...item, [field]: value }
-        : item
-    );
-    setItems(newItems);
-  };
-
   const handleHoursChange = (dayOfWeek: number, hours: string) => {
     const hoursNum = hours === '' ? null : parseInt(hours);
     setEditableDailyHours(prev => ({ ...prev, [dayOfWeek]: hoursNum }));
@@ -189,14 +185,16 @@ export default function ViewPlantInspectionPage() {
 
       type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
       const itemsToInsert: InspectionItemInsert[] = items
-        .filter(item => item.status)
+        .filter((item: InspectionItemWithDay): item is InspectionItemWithDay & { day_of_week: number } =>
+          Boolean(item.status) && item.day_of_week !== null
+        )
         .map(item => ({
           inspection_id: inspection.id,
           item_number: item.item_number,
           item_description: item.item_description,
-          day_of_week: item.day_of_week,
+          day_of_week: item.day_of_week as number,
           status: item.status,
-          comments: item.comments || null,
+          comments: item.comments ?? null,
         }));
 
       if (itemsToInsert.length > 0) {
@@ -255,7 +253,7 @@ export default function ViewPlantInspectionPage() {
             item_ids: string[];
           }>();
 
-          insertedItems.forEach((item: any) => {
+          insertedItems.forEach((item: InspectionItemWithDay) => {
             const key = `${item.item_number}-${item.item_description}`;
             if (!groupedDefects.has(key)) {
               groupedDefects.set(key, {
@@ -267,7 +265,7 @@ export default function ViewPlantInspectionPage() {
               });
             }
             const group = groupedDefects.get(key)!;
-            group.days.push(item.day_of_week);
+            if (item.day_of_week !== null) group.days.push(item.day_of_week);
             group.item_ids.push(item.id);
             if (item.comments) {
               group.comments.push(item.comments);
@@ -321,7 +319,8 @@ export default function ViewPlantInspectionPage() {
           if (pendingActions && pendingActions.length > 0) {
             for (const resolvedItem of resolvedItems) {
               const matchingAction = pendingActions.find(
-                action => action.inspection_item_id === resolvedItem.id
+                (action: { id: string; inspection_item_id: string | null; description: string | null; status: string }) =>
+                  action.inspection_item_id === resolvedItem.id
               );
 
               if (matchingAction) {
@@ -408,21 +407,6 @@ export default function ViewPlantInspectionPage() {
         return <AlertCircle className="h-5 w-5 text-gray-400" />;
       default:
         return null;
-    }
-  };
-
-  const getStatusColor = (status: InspectionStatus, isSelected: boolean) => {
-    if (!isSelected) return 'bg-gray-100 text-gray-400 border-gray-200';
-    
-    switch (status) {
-      case 'ok':
-        return 'bg-green-100 text-green-700 border-green-300';
-      case 'attention':
-        return 'bg-red-100 text-red-700 border-red-300';
-      case 'na':
-        return 'bg-gray-100 text-gray-700 border-gray-300';
-      default:
-        return 'bg-gray-100 text-gray-400 border-gray-200';
     }
   };
 

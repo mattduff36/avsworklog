@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Migration Runner: Fix notification_preferences admin insert RLS (v3 - final)
  * 

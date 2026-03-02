@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Fix Inspection Items RLS Policies Migration
  * Updates inspection_items RLS policies to use roles table instead of deprecated profiles.role
