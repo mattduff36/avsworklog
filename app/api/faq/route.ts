@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     // Build base query
     // Note: faq_articles/faq_categories tables added by migration - types will update after migration runs
-    let articlesQuery = (supabase as any)
+    let articlesQuery = supabase
       .from('faq_articles')
       .select(`
         *,
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Also fetch all categories for the sidebar/filter
-    const { data: categories, error: categoriesError } = await (supabase as any)
+    const { data: categories, error: categoriesError } = await supabase
       .from('faq_categories')
       .select('*')
       .eq('is_active', true)

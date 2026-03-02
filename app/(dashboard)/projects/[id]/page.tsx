@@ -133,7 +133,7 @@ export default function RAMSDetailsPage() {
         ...doc,
         uploader_name: doc.uploader?.full_name || 'Unknown',
       });
-      setRequiredSignature((doc as any).document_type?.required_signature ?? true);
+      setRequiredSignature((doc as { document_type?: { required_signature?: boolean } | null }).document_type?.required_signature ?? true);
 
       // Fetch assignments
       const { data: assignData, error: assignError } = await supabase

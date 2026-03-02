@@ -30,7 +30,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Note: faq_categories table added by migration - types will update after migration runs
-    const { data: category, error } = await (supabase as any)
+    const { data: category, error } = await supabase
       .from('faq_categories')
       .select('*')
       .eq('id', id)
@@ -96,7 +96,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (body.is_active !== undefined) updateData.is_active = body.is_active;
 
     // Note: faq_categories table added by migration - types will update after migration runs
-    const { data: category, error } = await (supabase as any)
+    const { data: category, error } = await supabase
       .from('faq_categories')
       .update(updateData)
       .eq('id', id)
@@ -157,7 +157,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     // Check if category has articles
     // Note: faq_articles table added by migration - types will update after migration runs
-    const { count } = await (supabase as any)
+    const { count } = await supabase
       .from('faq_articles')
       .select('*', { count: 'exact', head: true })
       .eq('category_id', id);
@@ -168,7 +168,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       }, { status: 400 });
     }
 
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('faq_categories')
       .delete()
       .eq('id', id);

@@ -349,12 +349,13 @@ export default function DashboardPage() {
       }
 
       // Filter workshop tasks
-      const workshopTasks = (allActions || []).filter((a: any) => 
+      type ActionRow = { action_type?: string; status?: string };
+      const workshopTasks = (allActions || []).filter((a: ActionRow) => 
         a.action_type === 'inspection_defect' || a.action_type === 'workshop_vehicle_task'
       );
 
-      const workshopPending = workshopTasks.filter((t: any) => t.status === 'pending').length;
-      const workshopInProgress = workshopTasks.filter((t: any) => t.status === 'logged').length;
+      const workshopPending = workshopTasks.filter((t: ActionRow) => t.status === 'pending').length;
+      const workshopInProgress = workshopTasks.filter((t: ActionRow) => t.status === 'logged').length;
       const workshopTotal = workshopPending + workshopInProgress;
 
       // Fetch maintenance data to count alerts

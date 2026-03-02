@@ -289,10 +289,10 @@ export function PlantTable({
         });
 
         fetchPlantData();
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error restoring plant:', error);
         toast.error('Failed to restore plant', {
-          description: error.message || 'Please try again.',
+          description: error instanceof Error ? error.message : 'Please try again.',
         });
       } finally {
         setRestoringId(null);
@@ -323,10 +323,10 @@ export function PlantTable({
         });
 
         fetchPlantData();
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error permanently deleting plant:', error);
         toast.error('Failed to permanently remove plant', {
-          description: error.message || 'Please try again.',
+          description: error instanceof Error ? error.message : 'Please try again.',
         });
       } finally {
         setDeletingId(null);

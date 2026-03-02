@@ -14,7 +14,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { taskId } = await params;
     const supabase = await createClient();
-    const db = supabase as unknown as { from: (table: string) => any };
+    type DbClient = { from: (t: string) => ReturnType<typeof supabase.from> };
+    const db = supabase as unknown as DbClient;
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Get all responses for these attachments
     const attachmentIds = (attachments || []).map((a: { id: string }) => a.id);
-    let responses: any[] = [];
+    let responses: unknown[] = [];
     
     if (attachmentIds.length > 0) {
       const { data: responsesData, error: responsesError } = await db
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Get questions for the templates
     const templateIds = [...new Set((attachments || []).map((a: { template_id: string }) => a.template_id))];
-    let questions: any[] = [];
+    let questions: unknown[] = [];
     
     if (templateIds.length > 0) {
       const { data: questionsData, error: questionsError } = await db
@@ -75,10 +76,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Combine data
     const typedAttachments = (attachments || []) as Array<{ id: string; template_id: string } & Record<string, unknown>>;
+    const typedQuestions = questions as Array<{ template_id?: string }>;
+    const typedResponses = responses as Array<{ attachment_id?: string }>;
     const result = typedAttachments.map(attachment => ({
       ...attachment,
-      questions: questions.filter(q => q.template_id === attachment.template_id),
-      responses: responses.filter(r => r.attachment_id === attachment.id),
+      questions: typedQuestions.filter(q => q.template_id === attachment.template_id),
+      responses: typedResponses.filter(r => r.attachment_id === attachment.id),
     }));
 
     return NextResponse.json({
@@ -111,7 +114,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { taskId } = await params;
     const supabase = await createClient();
-    const db = supabase as unknown as { from: (table: string) => any };
+    type DbClient = { from: (t: string) => ReturnType<typeof supabase.from> };
+    const db = supabase as unknown as DbClient;
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {

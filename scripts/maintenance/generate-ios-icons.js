@@ -2,7 +2,7 @@
  * Generate iOS PWA icons from source icon
  * Run with: node scripts/generate-ios-icons.js
  */
-
+/* eslint-disable @typescript-eslint/no-require-imports */
 const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');

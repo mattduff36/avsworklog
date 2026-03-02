@@ -72,8 +72,10 @@ export function AssetLocationMapModal({
   // We poll until the server reports loading=false (all fetched).
   useEffect(() => {
     if (!open) {
-      setFetchDone(false);
-      setOtherVehicles([]);
+      queueMicrotask(() => {
+        setFetchDone(false);
+        setOtherVehicles([]);
+      });
       return;
     }
 
@@ -106,7 +108,7 @@ export function AssetLocationMapModal({
     }
 
     // Start immediately — even partial data is useful
-    setFetchDone(true); // allow map to render with whatever we have
+    queueMicrotask(() => setFetchDone(true)); // allow map to render with whatever we have
     fetchAll();
 
     return () => {

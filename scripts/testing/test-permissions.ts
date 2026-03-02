@@ -62,21 +62,21 @@ async function testPermissions() {
 
     const modules = ['timesheets', 'inspections', 'absence', 'rams', 'approvals', 'actions', 'reports'];
     
-    for (const module of modules) {
+    for (const moduleName of modules) {
       const { data: perms, error: permError } = await supabase
         .from('role_permissions')
         .select('role_id, enabled, roles(name, display_name)')
-        .eq('module_name', module);
+        .eq('module_name', moduleName);
 
       if (permError) {
-        console.error(`  ❌ Error checking ${module}:`, permError.message);
+        console.error(`  ❌ Error checking ${moduleName}:`, permError.message);
         continue;
       }
 
       const enabled = perms?.filter(p => p.enabled) || [];
       const disabled = perms?.filter(p => !p.enabled) || [];
 
-      console.log(`  📦 ${module.toUpperCase()}`);
+      console.log(`  📦 ${moduleName.toUpperCase()}`);
       type PermWithRole = { enabled?: boolean; roles?: { display_name?: string } | { display_name?: string }[] };
       const getDisplayName = (p: PermWithRole) => {
         const r = Array.isArray(p.roles) ? p.roles[0] : p.roles;

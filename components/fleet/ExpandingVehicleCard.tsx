@@ -62,7 +62,7 @@ export function ExpandingVehicleCard({ vehicle, categories, onUpdate, fromTab = 
       reg_number: vehicle.reg_number,
       nickname: vehicle.nickname || '',
       category_id: vehicle.category_id,
-      status: vehicle.status as any,
+      status: vehicle.status as 'active' | 'inactive' | 'sold' | 'written_off',
     },
   });
 
@@ -76,7 +76,7 @@ export function ExpandingVehicleCard({ vehicle, categories, onUpdate, fromTab = 
         reg_number: vehicle.reg_number,
         nickname: vehicle.nickname || '',
         category_id: vehicle.category_id,
-        status: vehicle.status as any,
+        status: vehicle.status as 'active' | 'inactive' | 'sold' | 'written_off',
       });
     }
     setIsExpanded(!isExpanded);
@@ -294,7 +294,7 @@ export function ExpandingVehicleCard({ vehicle, categories, onUpdate, fromTab = 
                 </Label>
                 <Select
                   value={selectedStatus}
-                  onValueChange={(value) => setValue('status', value as any, { shouldDirty: true })}
+                  onValueChange={(value) => setValue('status', value as 'active' | 'inactive' | 'sold' | 'written_off', { shouldDirty: true })}
                   disabled={!isEditing}
                 >
                   <SelectTrigger 

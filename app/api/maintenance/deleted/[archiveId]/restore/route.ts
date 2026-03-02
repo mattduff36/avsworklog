@@ -66,7 +66,7 @@ export async function PUT(
       }
     } else {
       // Vehicle doesn't exist, recreate it from archived data
-      const vehicleData = archivedVehicle.vehicle_data as any;
+      const vehicleData = archivedVehicle.vehicle_data as Record<string, unknown>;
       
       const { error: insertError } = await supabase
         .from('vans')

@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     const users = (profiles || []).map(p => ({
       user_id: p.id,
       full_name: p.full_name,
-      role_name: (p.role as any)?.name || 'unknown',
+      role_name: (p.role as { name?: string } | null)?.name || 'unknown',
       preferences: (allPrefs || []).filter(pref => pref.user_id === p.id),
     }));
 

@@ -31,7 +31,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Fetch suggestion
     // Note: suggestions table added by migration - types will update after migration runs
-    const { data: suggestion, error: suggestionError } = await (supabase as any)
+    const { data: suggestion, error: suggestionError } = await supabase
       .from('suggestions')
       .select(`
         *,
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Fetch update history
-    const { data: updates, error: updatesError } = await (supabase as any)
+    const { data: updates, error: updatesError } = await supabase
       .from('suggestion_updates')
       .select(`
         *,
@@ -108,7 +108,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // Get current suggestion state
     // Note: suggestions table added by migration - types will update after migration runs
-    const { data: currentSuggestion, error: fetchError } = await (supabase as any)
+    const { data: currentSuggestion, error: fetchError } = await supabase
       .from('suggestions')
       .select('status')
       .eq('id', id)
@@ -131,7 +131,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     // Update suggestion
-    const { data: suggestion, error: updateError } = await (supabase as any)
+    const { data: suggestion, error: updateError } = await supabase
       .from('suggestions')
       .update(updateData)
       .eq('id', id)
@@ -144,7 +144,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // Create update record if status changed or note provided
     if (body.status !== currentSuggestion?.status || body.note) {
-      await (supabase as any)
+      await supabase
         .from('suggestion_updates')
         .insert({
           suggestion_id: id,

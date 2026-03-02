@@ -16,7 +16,7 @@ export function MobileNavBar() {
       // Check for standalone mode (Android, iOS)
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
       // Check for iOS Safari standalone
-      const isIOSStandalone = (window.navigator as any).standalone === true;
+      const isIOSStandalone = (window.navigator as unknown as { standalone?: boolean }).standalone === true;
       
       setIsPWA(isStandalone || isIOSStandalone);
     };

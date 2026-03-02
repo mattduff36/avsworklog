@@ -27,7 +27,7 @@ export function PullToRefresh() {
     // Check if running as PWA (standalone mode)
     const checkPWAMode = () => {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-      const isIOSStandalone = (window.navigator as any).standalone === true;
+      const isIOSStandalone = (window.navigator as unknown as { standalone?: boolean }).standalone === true;
       setIsPWA(isStandalone || isIOSStandalone);
     };
 

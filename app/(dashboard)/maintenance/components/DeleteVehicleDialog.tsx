@@ -85,7 +85,7 @@ export function DeleteVehicleDialog({
           description: data.error || 'Please try again.',
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Error archiving vehicle', error, 'DeleteVehicleDialog');
       setError('An unexpected error occurred');
       toast.error('An unexpected error occurred', {

@@ -217,19 +217,19 @@ export default function ViewInspectionPage() {
                 item_ids: string[];
               }>();
 
-              insertedItems.forEach((item: any) => {
-                const key = `${item.item_number}-${item.item_description}`;
+              insertedItems.forEach((item: { id: string; item_number?: number; item_description?: string; day_of_week?: number; comments?: string }) => {
+                const key = `${item.item_number ?? 0}-${item.item_description ?? ''}`;
                 if (!groupedDefects.has(key)) {
                   groupedDefects.set(key, {
-                    item_number: item.item_number,
-                    item_description: item.item_description,
-                    days: [],
+                    item_number: item.item_number ?? 0,
+                    item_description: item.item_description ?? '',
+                    days: [] as number[],
                     comments: [],
                     item_ids: []
                   });
                 }
                 const group = groupedDefects.get(key)!;
-                if (item.day_of_week !== null) group.days.push(item.day_of_week);
+                if (item.day_of_week != null) group.days.push(item.day_of_week);
                 group.item_ids.push(item.id);
                 if (item.comments) {
                   group.comments.push(item.comments);

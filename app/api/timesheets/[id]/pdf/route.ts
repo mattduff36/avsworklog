@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { renderToStream } from '@react-pdf/renderer';
 import { TimesheetPDF } from '@/lib/pdf/timesheet-pdf';
+import type { Timesheet } from '@/types/timesheet';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
@@ -12,7 +13,8 @@ export async function GET(
   try {
     const { id } = await params;
     const supabase = await createClient();
-    const db = supabase as unknown as { from: (table: string) => any };
+    type DbClient = { from: (t: string) => ReturnType<typeof supabase.from> };
+    const db = supabase as unknown as DbClient;
 
     // Get the current user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -69,7 +71,7 @@ export async function GET(
     // Generate PDF
     const stream = await renderToStream(
       TimesheetPDF({
-        timesheet: typedTimesheet as any,
+        timesheet: typedTimesheet as unknown as Timesheet,
         employeeName: employeeName,
       })
     );

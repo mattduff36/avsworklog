@@ -449,8 +449,8 @@ export default function HgvHistoryPage({
       }
 
       setMaintenanceRecord({
-        ...(maintenance as any),
-        hgv_id: (maintenance as any).hgv_id ?? resolvedParams.hgvId,
+        ...(maintenance as Record<string, unknown>),
+        hgv_id: (maintenance as { hgv_id?: string | null }).hgv_id ?? resolvedParams.hgvId,
         overdue_count: 0,
         due_soon_count: 0,
       } as VehicleMaintenanceWithStatus);

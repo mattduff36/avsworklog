@@ -7,19 +7,26 @@ interface PDFViewerProps {
   url: string;
 }
 
+interface PDFDoc {
+  getPage: (n: number) => Promise<{ getViewport: (o: { scale: number }) => { width: number; height: number }; render: (o: unknown) => { promise: Promise<void> } }>;
+  numPages: number;
+  destroy: () => Promise<void>;
+}
+
 // Load PDF.js from CDN to avoid webpack bundling issues
 declare global {
   interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    pdfjsLib?: any;
+    pdfjsLib?: {
+      getDocument: (url: string) => { promise: Promise<PDFDoc> };
+      GlobalWorkerOptions: { workerSrc: string };
+    };
   }
 }
 
 export function PDFViewer({ url }: PDFViewerProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [pdfDoc, setPdfDoc] = useState<any>(null);
+  const [pdfDoc, setPdfDoc] = useState<PDFDoc | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Effect 1: Load PDF.js library and fetch PDF document
@@ -116,6 +123,7 @@ export function PDFViewer({ url }: PDFViewerProps) {
     if (!pdfDoc || loading || !containerRef.current) {
       return;
     }
+    const doc = pdfDoc;
 
     let mounted = true;
 
@@ -125,10 +133,10 @@ export function PDFViewer({ url }: PDFViewerProps) {
 
         containerRef.current.innerHTML = ''; // Clear container
 
-        for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+        for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
           if (!mounted) break;
 
-          const page = await pdfDoc.getPage(pageNum);
+          const page = await doc.getPage(pageNum);
           
           // Create canvas for this page
           const canvas = document.createElement('canvas');

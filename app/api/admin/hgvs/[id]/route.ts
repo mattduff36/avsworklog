@@ -28,7 +28,7 @@ export async function PUT(
     const body = await request.json();
     const { reg_number, category_id, status, nickname } = body;
 
-    const updates: any = {};
+    const updates: Record<string, unknown> = {};
 
     if (reg_number !== undefined) {
       const validationError = validateRegistrationNumber(reg_number);

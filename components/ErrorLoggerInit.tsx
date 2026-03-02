@@ -11,7 +11,7 @@ export function ErrorLoggerInit() {
   useEffect(() => {
     // Make error logger available globally for easy access
     if (typeof window !== 'undefined') {
-      (window as any).errorLogger = errorLogger;
+      (window as unknown as Record<string, unknown>).errorLogger = errorLogger;
     }
     
     // Log initialization

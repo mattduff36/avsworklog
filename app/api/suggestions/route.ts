@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch user's own suggestions
     // Note: suggestions table added by migration - types will update after migration runs
-    const { data: suggestions, error } = await (supabase as any)
+    const { data: suggestions, error } = await supabase
       .from('suggestions')
       .select('*')
       .eq('created_by', user.id)
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     // Create suggestion
     // Note: suggestions table added by migration - types will update after migration runs
-    const { data: suggestion, error } = await (supabase as any)
+    const { data: suggestion, error } = await supabase
       .from('suggestions')
       .insert({
         created_by: user.id,

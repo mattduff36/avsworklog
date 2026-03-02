@@ -105,9 +105,9 @@ export function SubcategoryDialog({
       onOpenChange(false);
       onSuccess?.();
       router.refresh();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.warn('Error saving subcategory:', error);
-      toast.error(error.message || 'Failed to save subcategory');
+      toast.error(error instanceof Error ? error.message : 'Failed to save subcategory');
     } finally {
       setLoading(false);
     }

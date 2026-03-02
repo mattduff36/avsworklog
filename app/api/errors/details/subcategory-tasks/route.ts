@@ -82,8 +82,8 @@ export async function GET(request: NextRequest) {
       title: task.title,
       status: task.status,
       vehicle: {
-        reg_number: (task.vehicles as any)?.reg_number || 'Unknown',
-        nickname: (task.vehicles as any)?.nickname || null,
+        reg_number: (task.vehicles as { reg_number?: string | null; nickname?: string | null } | null)?.reg_number || 'Unknown',
+        nickname: (task.vehicles as { reg_number?: string | null; nickname?: string | null } | null)?.nickname || null,
       },
       created_at: task.created_at,
       url: `/workshop-tasks?task=${task.id}`,

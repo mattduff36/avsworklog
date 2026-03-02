@@ -54,9 +54,11 @@ export function UploadRAMSModal({ open, onClose, onSubmit, prefillTitle, prefill
   }, [open, selectedTypeId]);
 
   useEffect(() => {
-    if (prefillTitle) setTitle(prefillTitle);
-    if (prefillDescription) setDescription(prefillDescription);
-    if (prefillTypeId) setSelectedTypeId(prefillTypeId);
+    queueMicrotask(() => {
+      if (prefillTitle) setTitle(prefillTitle);
+      if (prefillDescription) setDescription(prefillDescription);
+      if (prefillTypeId) setSelectedTypeId(prefillTypeId);
+    });
   }, [prefillTitle, prefillDescription, prefillTypeId]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

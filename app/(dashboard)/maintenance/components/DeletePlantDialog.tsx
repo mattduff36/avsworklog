@@ -106,11 +106,12 @@ export function DeletePlantDialog({
       
       // Reset reason for next time
       setReason('Sold');
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Error retiring plant', error, 'DeletePlantDialog');
-      setError(error.message || 'An unexpected error occurred');
+      const msg = error instanceof Error ? error.message : 'An unexpected error occurred';
+      setError(msg);
       toast.error('Failed to retire plant', {
-        description: error.message || 'Please try again.',
+        description: msg || 'Please try again.',
       });
     } finally {
       setLoading(false);

@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 
     // Build query
     // Note: faq_articles table added by migration - types will update after migration runs
-    let query = (supabase as any)
+    let query = supabase
       .from('faq_articles')
       .select(`
         *,
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     // Create article
     // Note: faq_articles table added by migration - types will update after migration runs
-    const { data: article, error } = await (supabase as any)
+    const { data: article, error } = await supabase
       .from('faq_articles')
       .insert({
         category_id: body.category_id,

@@ -96,9 +96,9 @@ export function HgvCategoryDialog({
       onOpenChange(false);
       onSuccess?.();
       router.refresh();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving HGV category:', error);
-      toast.error(error.message || 'Failed to save HGV category');
+      toast.error(error instanceof Error ? error.message : 'Failed to save HGV category');
     } finally {
       setLoading(false);
     }

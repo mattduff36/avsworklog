@@ -8,6 +8,7 @@ import { VanInspectionPDF } from '@/lib/pdf/van-inspection-pdf';
 import { isVanCategory } from '@/lib/checklists/vehicle-checklists';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { getVehicleCategoryName } from '@/lib/utils/deprecation-logger';
+import type { VanInspection } from '@/types/inspection';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
 const MAX_INSPECTIONS_PER_PDF = 80;
@@ -15,7 +16,8 @@ const MAX_INSPECTIONS_PER_PDF = 80;
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const db = supabase as unknown as { from: (table: string) => any };
+    type DbClient = { from: (t: string) => ReturnType<typeof supabase.from> };
+    const db = supabase as unknown as DbClient;
     const { searchParams } = new URL(request.url);
     const dateFrom = searchParams.get('dateFrom');
     const dateTo = searchParams.get('dateTo');
@@ -102,22 +104,24 @@ export async function GET(request: NextRequest) {
         }
 
         // Determine which PDF template to use based on vehicle category
-        const vehicleType = getVehicleCategoryName((inspection as any).vehicle);
+        type InspectionWithVehicle = { vehicle?: { van_categories?: { name: string } | null; vehicle_type?: string | null; reg_number?: string }; profile?: { full_name?: string }; [key: string]: unknown };
+            const vehicle = (inspection as InspectionWithVehicle).vehicle;
+            const vehicleType = getVehicleCategoryName(vehicle ? { van_categories: vehicle.van_categories ?? null, vehicle_type: vehicle.vehicle_type ?? null } : { van_categories: null, vehicle_type: null });
         const useVanTemplate = isVanCategory(vehicleType);
 
         // Generate PDF using the appropriate template
         const pdfComponent = useVanTemplate
           ? VanInspectionPDF({
-              inspection: inspection as any,
+              inspection: inspection as unknown as VanInspection,
               items,
-              vehicleReg: (inspection as any).vehicle?.reg_number,
-              employeeName: (inspection as any).profile?.full_name,
+              vehicleReg: (inspection as InspectionWithVehicle).vehicle?.reg_number,
+              employeeName: (inspection as InspectionWithVehicle).profile?.full_name,
             })
           : InspectionPDF({
-              inspection: inspection as any,
+              inspection: inspection as unknown as VanInspection,
               items,
-              vehicleReg: (inspection as any).vehicle?.reg_number,
-              employeeName: (inspection as any).profile?.full_name,
+              vehicleReg: (inspection as InspectionWithVehicle).vehicle?.reg_number,
+              employeeName: (inspection as InspectionWithVehicle).profile?.full_name,
             });
 
         // Render to buffer
@@ -298,22 +302,24 @@ export async function POST(request: NextRequest) {
             }
 
             // Determine which PDF template to use
-            const vehicleType = getVehicleCategoryName((inspection as any).vehicle);
+            type InspectionWithVehicle = { vehicle?: { van_categories?: { name: string } | null; vehicle_type?: string | null; reg_number?: string }; profile?: { full_name?: string }; [key: string]: unknown };
+            const vehicle = (inspection as InspectionWithVehicle).vehicle;
+            const vehicleType = getVehicleCategoryName(vehicle ? { van_categories: vehicle.van_categories ?? null, vehicle_type: vehicle.vehicle_type ?? null } : { van_categories: null, vehicle_type: null });
             const useVanTemplate = isVanCategory(vehicleType);
 
             // Generate PDF
             const pdfComponent = useVanTemplate
               ? VanInspectionPDF({
-                  inspection: inspection as any,
+                  inspection: inspection as unknown as VanInspection,
                   items,
-                  vehicleReg: (inspection as any).vehicle?.reg_number,
-                  employeeName: (inspection as any).profile?.full_name,
+                  vehicleReg: (inspection as InspectionWithVehicle).vehicle?.reg_number,
+                  employeeName: (inspection as InspectionWithVehicle).profile?.full_name,
                 })
               : InspectionPDF({
-                  inspection: inspection as any,
+                  inspection: inspection as unknown as VanInspection,
                   items,
-                  vehicleReg: (inspection as any).vehicle?.reg_number,
-                  employeeName: (inspection as any).profile?.full_name,
+                  vehicleReg: (inspection as InspectionWithVehicle).vehicle?.reg_number,
+                  employeeName: (inspection as InspectionWithVehicle).profile?.full_name,
                 });
 
             const pdfBuffer = await renderToBuffer(pdfComponent);

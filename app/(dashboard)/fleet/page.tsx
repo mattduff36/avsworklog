@@ -74,6 +74,15 @@ type HgvAsset = {
   hgv_categories?: { name: string; id: string } | null;
 };
 
+type PlantAsset = {
+  id: string;
+  plant_id: string;
+  nickname: string | null;
+  status: string;
+  category_id: string | null;
+  van_categories?: { name: string; id: string } | null;
+};
+
 function FleetContent() {
   const searchParams = useSearchParams();
   const router = useNextRouter();
@@ -136,7 +145,7 @@ function FleetContent() {
   
   // State for vehicles and categories
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [plantAssets, setPlantAssets] = useState<any[]>([]); // Separate state for plant assets
+  const [plantAssets, setPlantAssets] = useState<PlantAsset[]>([]); // Separate state for plant assets
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   
@@ -350,9 +359,9 @@ function FleetContent() {
       setDeleteCategoryDialogOpen(false);
       setSelectedCategory(null);
       fetchCategories(); // Refresh categories
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting category:', error);
-      toast.error(error.message || 'Failed to delete category');
+      toast.error(error instanceof Error ? error.message : 'Failed to delete category');
     } finally {
       setDeletingCategory(false);
     }
@@ -392,9 +401,9 @@ function FleetContent() {
       setDeleteHgvCategoryDialogOpen(false);
       setSelectedHgvCategory(null);
       fetchHgvCategories();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting HGV category:', error);
-      toast.error(error.message || 'Failed to delete HGV category');
+      toast.error(error instanceof Error ? error.message : 'Failed to delete HGV category');
     } finally {
       setDeletingHgvCategory(false);
     }

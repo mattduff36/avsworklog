@@ -46,7 +46,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     async function fetchUserData() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user?.email) {
-        setUserEmail(user.email);
+        queueMicrotask(() => setUserEmail(user.email));
       }
     }
     fetchUserData();
@@ -60,7 +60,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         .order('is_manager_admin', { ascending: false })
         .order('display_name', { ascending: true });
       if (!error && data) {
-        setAllRoles(data);
+        queueMicrotask(() => setAllRoles(data));
       }
     }
     fetchRoles();
@@ -68,7 +68,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     // Read current selection from cookie (or legacy localStorage)
     const cookieVal = getViewAsRoleId();
     if (cookieVal) {
-      setViewAsRoleIdState(cookieVal);
+      queueMicrotask(() => setViewAsRoleIdState(cookieVal));
     } else {
       // Migrate legacy localStorage value if present
       const legacy = localStorage.getItem('viewAsRole');

@@ -310,9 +310,9 @@ function PlantInspectionsContent() {
       setDeleteDialogOpen(false);
       setInspectionToDelete(null);
       fetchInspections();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error deleting plant inspection:', err);
-      toast.error(err.message || 'Failed to delete inspection');
+      toast.error(err instanceof Error ? err.message : 'Failed to delete inspection');
     } finally {
       setDeleting(false);
     }
@@ -489,9 +489,9 @@ function PlantInspectionsContent() {
                         )}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
-                        {isManager && (inspection as any).profile?.full_name && (
+                        {isManager && (inspection as { profile?: { full_name?: string } | null }).profile?.full_name && (
                           <span className="font-medium text-white">
-                            {(inspection as any).profile.full_name}
+                            {(inspection as { profile?: { full_name?: string } | null }).profile?.full_name}
                             {' • '}
                           </span>
                         )}

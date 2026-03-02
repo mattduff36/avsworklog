@@ -30,7 +30,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Note: faq_articles table added by migration - types will update after migration runs
-    const { data: article, error } = await (supabase as any)
+    const { data: article, error } = await supabase
       .from('faq_articles')
       .select(`
         *,
@@ -103,7 +103,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (body.sort_order !== undefined) updateData.sort_order = body.sort_order;
 
     // Note: faq_articles table added by migration - types will update after migration runs
-    const { data: article, error } = await (supabase as any)
+    const { data: article, error } = await supabase
       .from('faq_articles')
       .update(updateData)
       .eq('id', id)
@@ -166,7 +166,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     // Note: faq_articles table added by migration - types will update after migration runs
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('faq_articles')
       .delete()
       .eq('id', id);

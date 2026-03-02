@@ -13,7 +13,7 @@ describe('EditPlantRecordDialog User Null Check Fix', () => {
   describe('Bug: Unsafe user?.id in query before null check', () => {
     it('should demonstrate the bug before fix', async () => {
       const logs: string[] = [];
-      let user = null as { id: string } | null; // Simulating auth state transition
+      const user = null as { id: string } | null; // Simulating auth state transition
 
       // BEFORE: Query profile before checking user exists
       const simulateBuggyCode = async () => {
@@ -52,7 +52,7 @@ describe('EditPlantRecordDialog User Null Check Fix', () => {
 
     it('should show correct behavior after fix', async () => {
       const logs: string[] = [];
-      let user = null as { id: string } | null; // Simulating auth state transition
+      const user = null as { id: string } | null; // Simulating auth state transition
 
       // AFTER: Check user exists BEFORE querying
       const simulateFixedCode = async () => {
@@ -271,7 +271,7 @@ describe('EditPlantRecordDialog User Null Check Fix', () => {
     it('should handle profile not found gracefully', async () => {
       const logs: string[] = [];
       const user = { id: 'user-123' };
-      let profile = null as { full_name?: string } | null; // Profile not found
+      const profile = null as { full_name?: string } | null; // Profile not found
 
       if (user) {
         logs.push('Querying profile');
@@ -403,11 +403,11 @@ describe('EditPlantRecordDialog User Null Check Fix', () => {
         { id: 'user-123' }
       ];
 
-      users.forEach(user => {
-        if (user) {
-          validQueries.push(`id = ${user.id}`);
+      users.forEach((u) => {
+        if (u) {
+          validQueries.push(`id = ${u.id}`);
         } else {
-          invalidQueries.push(`id = ${user}`);
+          invalidQueries.push(`id = ${u}`);
         }
       });
 
@@ -439,7 +439,7 @@ describe('EditPlantRecordDialog User Null Check Fix', () => {
 
     it('should demonstrate short-circuit evaluation safety', () => {
       const logs: string[] = [];
-      let user: { id: string } | null = null;
+      const user: { id: string } | null = null;
       const changedFields = ['field1'];
 
       // Short-circuit: if first condition false, second not evaluated

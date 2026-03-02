@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch all categories with article counts
     // Note: faq_categories table added by migration - types will update after migration runs
-    const { data: categories, error } = await (supabase as any)
+    const { data: categories, error } = await supabase
       .from('faq_categories')
       .select(`
         *,
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Format with article counts
-    const formattedCategories = categories?.map((cat: any) => ({
+    const formattedCategories = categories?.map((cat: { articles?: { count?: number }[]; [key: string]: unknown }) => ({
       ...cat,
       article_count: cat.articles?.[0]?.count || 0,
     }));
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     // Create category
     // Note: faq_categories table added by migration - types will update after migration runs
-    const { data: category, error } = await (supabase as any)
+    const { data: category, error } = await supabase
       .from('faq_categories')
       .insert({
         name: body.name.trim(),

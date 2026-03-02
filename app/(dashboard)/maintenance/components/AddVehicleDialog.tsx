@@ -188,7 +188,7 @@ export function AddVehicleDialog({
       setLoading(true);
       
       // Prepare payload based on asset type
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         asset_type: assetType,
         category_id: formData.category_id,
         status: formData.status,
@@ -247,7 +247,7 @@ export function AddVehicleDialog({
             : errorMessage || 'Please try again.',
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(`Error adding ${assetType}`, error, 'AddVehicleDialog');
       setError('An unexpected error occurred');
       toast.error('An unexpected error occurred', {

@@ -77,7 +77,7 @@ function NewHgvInspectionContent() {
           .order('reg_number'),
         isManager
           ? supabase.from('profiles').select('id, full_name, employee_id').order('full_name')
-          : Promise.resolve({ data: [] as any[] }),
+          : Promise.resolve({ data: [] as unknown[] }),
       ]);
 
       setHgvs((hgvData || []) as HgvAsset[]);

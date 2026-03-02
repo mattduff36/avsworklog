@@ -82,7 +82,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Build upsert data
-    const upsertData: any = {
+    const upsertData: Record<string, unknown> = {
       user_id: user.id,
       module_key,
     };

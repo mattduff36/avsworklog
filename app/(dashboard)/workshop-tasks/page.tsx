@@ -636,7 +636,7 @@ export default function WorkshopTasksPage() {
       const taskTitle = `Workshop Task - ${getAssetIdLabel(selectedVehicle)}`;
       
       // Build task data with correct asset reference
-      const taskData: any = {
+      const taskData: Record<string, unknown> = {
         action_type: 'workshop_vehicle_task',
         workshop_comments: workshopComments,
         title: taskTitle,
@@ -899,9 +899,9 @@ export default function WorkshopTasksPage() {
       toast.success('Task placed on hold');
       setShowOnHoldModal(false);
       await fetchTasks();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating task:', error);
-      toast.error(error?.message || 'Failed to update task');
+      toast.error(error instanceof Error ? error.message : 'Failed to update task');
     } finally {
       setUpdatingStatus(prev => {
         const next = new Set(prev);
@@ -968,9 +968,9 @@ export default function WorkshopTasksPage() {
       toast.success('Task resumed');
       setShowResumeModal(false);
       await fetchTasks();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error resuming task:', error);
-      toast.error(error?.message || 'Failed to resume task');
+      toast.error(error instanceof Error ? error.message : 'Failed to resume task');
     } finally {
       setUpdatingStatus(prev => {
         const next = new Set(prev);
@@ -1331,7 +1331,7 @@ export default function WorkshopTasksPage() {
       const isHgv = selectedVehicle?.asset_type === 'hgv';
 
       // Update the workshop task with correct asset reference
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         workshop_comments: editComments,
         title: `Workshop Task - ${getAssetIdLabel(selectedVehicle)}`,
         description: editComments.substring(0, 200),

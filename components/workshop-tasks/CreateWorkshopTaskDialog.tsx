@@ -361,7 +361,7 @@ export function CreateWorkshopTaskDialog({
         : `Workshop Task - ${assetIdLabel}`;
 
       // Create the workshop task with correct asset reference
-      const taskData: any = {
+      const taskData: Record<string, unknown> = {
         action_type: 'workshop_vehicle_task',
         workshop_comments: workshopComments,
         title: taskTitle,
@@ -422,7 +422,7 @@ export function CreateWorkshopTaskDialog({
       }
 
       // Update meter reading in vehicle_maintenance table
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         last_updated_at: new Date().toISOString(),
         last_updated_by: user.id,
       };

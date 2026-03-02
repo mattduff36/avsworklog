@@ -386,15 +386,15 @@ function NewPlantInspectionContent() {
         
         const loggedMap = new Map<string, { comment: string; actionId: string }>();
         
-        lockedItems.forEach((item: any) => {
-          const key = `${item.item_number}`;
+        lockedItems.forEach((item: { item_number?: string; status?: string; comment?: string; actionId?: string }) => {
+          const key = `${item.item_number ?? ''}`;
           const statusLabel = 
             item.status === 'on_hold' ? 'on hold' :
             item.status === 'logged' ? 'logged' :
             'in progress';
           loggedMap.set(key, {
             comment: item.comment || `Defect ${statusLabel} by management`,
-            actionId: item.actionId
+            actionId: item.actionId ?? ''
           });
         });
 
@@ -405,7 +405,7 @@ function NewPlantInspectionContent() {
 
         loggedMap.forEach((loggedInfo, itemNum) => {
           newCheckboxStates[itemNum] = 'attention';
-          newComments[itemNum] = loggedInfo.comment;
+          newComments[itemNum] = loggedInfo.comment ?? '';
         });
 
         setCheckboxStates(newCheckboxStates);
@@ -812,7 +812,7 @@ function NewPlantInspectionContent() {
       router.push('/plant-inspections');
     } catch (err) {
       const errMessage = err instanceof Error ? err.message : String(err);
-      const errCode = (err && typeof err === 'object' && 'code' in err) ? (err as any).code : '';
+      const errCode = (err && typeof err === 'object' && 'code' in err) ? (err as { code?: string }).code : '';
       const fullErrStr = errMessage + ' ' + errCode;
       
       const isDuplicateKey =

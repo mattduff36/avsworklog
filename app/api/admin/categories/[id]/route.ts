@@ -49,7 +49,7 @@ export async function PUT(
     }
 
     // Build updates object
-    const updates: Record<string, any> = {
+    const updates: Record<string, unknown> = {
       name: name.trim(),
       description: description?.trim() || null,
     };

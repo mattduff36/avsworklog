@@ -44,7 +44,7 @@ export async function GET(
     }
 
     // Guard: vehicle must exist with category data for PDF generation
-    if (!(inspection as any).vehicle) {
+    if (!(inspection as { vehicle?: unknown }).vehicle) {
       return NextResponse.json(
         { error: 'Vehicle data not found for this inspection. The vehicle may have been deleted.' },
         { status: 404 }
@@ -66,10 +66,10 @@ export async function GET(
         additionalData: {
           inspectionId: id,
           supabaseError: {
-            code: (itemsError as any).code,
+            code: (itemsError as { code?: string }).code,
             message: itemsError.message,
-            details: (itemsError as any).details,
-            hint: (itemsError as any).hint,
+            details: (itemsError as { details?: string }).details,
+            hint: (itemsError as { hint?: string }).hint,
           },
         },
       });
@@ -91,7 +91,9 @@ export async function GET(
     }
 
     // Determine which PDF template to use based on vehicle category
-    const vehicleType = getVehicleCategoryName((inspection as any).vehicle);
+    type InspectionWithVehicle = { vehicle?: { van_categories?: { name: string } | null; vehicle_type?: string | null; reg_number?: string }; profile?: { full_name?: string } };
+const vehicle = (inspection as InspectionWithVehicle).vehicle;
+const vehicleType = getVehicleCategoryName(vehicle ?? {});
     const useVanTemplate = isVanCategory(vehicleType);
     
     console.log(`PDF Generation - Vehicle Type: ${vehicleType}, Using Van Template: ${useVanTemplate}`);
@@ -101,21 +103,21 @@ export async function GET(
       ? VanInspectionPDF({
           inspection,
           items,
-          vehicleReg: (inspection as any).vehicle?.reg_number,
-          employeeName: (inspection as any).profile?.full_name,
+          vehicleReg: (inspection as InspectionWithVehicle).vehicle?.reg_number,
+          employeeName: (inspection as InspectionWithVehicle).profile?.full_name,
         })
       : InspectionPDF({
           inspection,
           items,
-          vehicleReg: (inspection as any).vehicle?.reg_number,
-          employeeName: (inspection as any).profile?.full_name,
+          vehicleReg: (inspection as InspectionWithVehicle).vehicle?.reg_number,
+          employeeName: (inspection as InspectionWithVehicle).profile?.full_name,
         });
     
     const stream = await renderToStream(pdfComponent);
 
     // Convert stream to buffer
     const chunks: Buffer[] = [];
-    for await (const chunk of stream as any) {
+    for await (const chunk of stream as AsyncIterable<Buffer | Uint8Array | string>) {
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
     const buffer = Buffer.concat(chunks);

@@ -132,7 +132,7 @@ export async function PATCH(
     }
 
     // Build update data
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     
     if (status !== undefined) {
       updateData.status = status;

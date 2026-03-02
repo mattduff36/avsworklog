@@ -10,10 +10,10 @@ describe('Plant Component Structure Validation', () => {
     it('should export EditPlantRecordDialog component', async () => {
       // Dynamic import to check file exists and exports correctly
       try {
-        const module = await import('@/app/(dashboard)/maintenance/components/EditPlantRecordDialog');
-        expect(module.EditPlantRecordDialog).toBeDefined();
-        expect(typeof module.EditPlantRecordDialog).toBe('function');
-      } catch (error) {
+        const mod = await import('@/app/(dashboard)/maintenance/components/EditPlantRecordDialog');
+        expect(mod.EditPlantRecordDialog).toBeDefined();
+        expect(typeof mod.EditPlantRecordDialog).toBe('function');
+      } catch {
         throw new Error('EditPlantRecordDialog component not found or has syntax errors');
       }
     });
@@ -22,10 +22,10 @@ describe('Plant Component Structure Validation', () => {
   describe('DeletePlantDialog', () => {
     it('should export DeletePlantDialog component', async () => {
       try {
-        const module = await import('@/app/(dashboard)/maintenance/components/DeletePlantDialog');
-        expect(module.DeletePlantDialog).toBeDefined();
-        expect(typeof module.DeletePlantDialog).toBe('function');
-      } catch (error) {
+        const mod = await import('@/app/(dashboard)/maintenance/components/DeletePlantDialog');
+        expect(mod.DeletePlantDialog).toBeDefined();
+        expect(typeof mod.DeletePlantDialog).toBe('function');
+      } catch {
         throw new Error('DeletePlantDialog component not found or has syntax errors');
       }
     });
@@ -34,10 +34,10 @@ describe('Plant Component Structure Validation', () => {
   describe('Plant History Page', () => {
     it('should have valid plant history page component', async () => {
       try {
-        const module = await import('@/app/(dashboard)/fleet/plant/[plantId]/history/page');
-        expect(module.default).toBeDefined();
-        expect(typeof module.default).toBe('function');
-      } catch (error) {
+        const mod = await import('@/app/(dashboard)/fleet/plant/[plantId]/history/page');
+        expect(mod.default).toBeDefined();
+        expect(typeof mod.default).toBe('function');
+      } catch {
         throw new Error('Plant history page component not found or has syntax errors');
       }
     });
@@ -47,10 +47,10 @@ describe('Plant Component Structure Validation', () => {
 describe('Plant Maintenance Hooks', () => {
   it('should export usePlantMaintenanceHistory hook', async () => {
     try {
-      const module = await import('@/lib/hooks/useMaintenance');
-      expect(module.usePlantMaintenanceHistory).toBeDefined();
-      expect(typeof module.usePlantMaintenanceHistory).toBe('function');
-    } catch (error) {
+      const mod = await import('@/lib/hooks/useMaintenance');
+      expect(mod.usePlantMaintenanceHistory).toBeDefined();
+      expect(typeof mod.usePlantMaintenanceHistory).toBe('function');
+    } catch {
       throw new Error('usePlantMaintenanceHistory hook not found');
     }
   });
@@ -59,19 +59,19 @@ describe('Plant Maintenance Hooks', () => {
 describe('Type Definitions', () => {
   it('should have updated MaintenanceHistory type with plant_id', async () => {
     try {
-      const module = await import('@/types/maintenance');
+      const mod = await import('@/types/maintenance');
       // Type checking happens at compile time, this just validates import works
-      expect(module).toBeDefined();
-    } catch (error) {
+      expect(mod).toBeDefined();
+    } catch {
       throw new Error('Maintenance types not found or have errors');
     }
   });
 
   it('should have updated database types with plant_id', async () => {
     try {
-      const module = await import('@/types/database');
-      expect(module).toBeDefined();
-    } catch (error) {
+      const mod = await import('@/types/database');
+      expect(mod).toBeDefined();
+    } catch {
       throw new Error('Database types not found or have errors');
     }
   });

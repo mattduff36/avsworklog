@@ -63,9 +63,11 @@ export function MarkTaskCompleteDialog({
   // Reset form when dialog opens/closes or task changes
   useEffect(() => {
     if (open && task) {
-      setIntermediateComment('');
-      setCompletedComment('');
-      setMaintenanceFields({});
+      queueMicrotask(() => {
+        setIntermediateComment('');
+        setCompletedComment('');
+        setMaintenanceFields({});
+      });
     }
   }, [open, task]);
 

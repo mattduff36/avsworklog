@@ -33,7 +33,14 @@ interface MotHistoryDialogProps {
 
 export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, existingMotDueDate }: MotHistoryDialogProps) {
   const [expandedTestId, setExpandedTestId] = useState<string | null>(null);
-  const [motData, setMotData] = useState<any>(null);
+  interface MotData {
+  tests?: Array<{ result?: string; expiryDate?: string | null; [key: string]: unknown }>;
+  defects?: Array<{ type?: string; [key: string]: unknown }>;
+  currentStatus?: { status?: string; expiryDate?: string | null; daysRemaining?: number; lastTestDate?: string | null };
+  firstUsedDate?: string | null;
+  [key: string]: unknown;
+}
+const [motData, setMotData] = useState<MotData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [vehicleNotFound, setVehicleNotFound] = useState(false);
@@ -58,9 +65,9 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
         setVehicleNotFound(result.vehicleNotFound || false);
         setError(result.message || 'No MOT history available');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching MOT history:', err);
-      setError(err.message || 'Failed to load MOT history');
+      setError(err instanceof Error ? err.message : 'Failed to load MOT history');
     } finally {
       setLoading(false);
     }
@@ -95,10 +102,11 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
     }
   };
   
-  const countDefectsByType = (defects: any[]) => {
+  const countDefectsByType = (defects: { type?: string }[]) => {
     const counts: Record<string, number> = {};
     defects.forEach(defect => {
-      counts[defect.type] = (counts[defect.type] || 0) + 1;
+      const key = defect.type ?? 'unknown';
+      counts[key] = (counts[key] || 0) + 1;
     });
     return counts;
   };
@@ -190,7 +198,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
         ) : (
           <div className="space-y-4">
             {/* Current MOT Status Card */}
-            {motData.currentStatus.status === 'No MOT History' || motData.currentStatus.status === 'Not Yet Due' || motData.tests.length === 0 ? (
+            {motData.currentStatus?.status === 'No MOT History' || motData.currentStatus?.status === 'Not Yet Due' || (motData.tests?.length ?? 0) === 0 ? (
               // Special card for vans with no MOT history (too new)
               <div className="bg-gradient-to-r from-slate-800/50 to-slate-700/30 border border-border/50 rounded-lg p-4 md:p-6">
                 <div className="text-center py-4">
@@ -215,10 +223,10 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                           }
                         </p>
                       </>
-                    ) : motData.currentStatus.expiryDate ? (
+                    ) : motData.currentStatus?.expiryDate ? (
                       <>
                         <p className="text-2xl font-bold text-blue-400 mb-3">
-                          {formatDate(motData.currentStatus.expiryDate)}
+                          {formatDate(motData.currentStatus?.expiryDate ?? null)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           From GOV.UK MOT database
@@ -262,21 +270,21 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 text-sm">
                   <div>
                     <span className="text-muted-foreground">Expiry Date:</span>
-                    <p className="text-white font-semibold text-lg">{formatDate(motData.currentStatus.expiryDate)}</p>
+                    <p className="text-white font-semibold text-lg">{formatDate(motData.currentStatus?.expiryDate)}</p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Status:</span>
-                    <p className={`font-semibold text-lg ${motData.currentStatus.status === 'Valid' ? 'text-green-400' : 'text-red-400'}`}>
-                      {motData.currentStatus.status}
+                    <p className={`font-semibold text-lg ${motData.currentStatus?.status === 'Valid' ? 'text-green-400' : 'text-red-400'}`}>
+                      {motData.currentStatus?.status}
                     </p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Days Remaining:</span>
-                    <p className="text-white font-semibold text-lg">{motData.currentStatus.daysRemaining}</p>
+                    <p className="text-white font-semibold text-lg">{motData.currentStatus?.daysRemaining}</p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Last Test:</span>
-                    <p className="text-white font-semibold text-lg">{formatDate(motData.currentStatus.lastTestDate)}</p>
+                    <p className="text-white font-semibold text-lg">{formatDate(motData.currentStatus?.lastTestDate)}</p>
                   </div>
                 </div>
               </div>
@@ -287,15 +295,15 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
               <div className="space-y-3">
                 <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Test History</h3>
                 
-                {motData.tests.map((test: any) => {
-                const defects = Array.isArray(test.defects) ? test.defects : [];
+                {motData.tests.map((test: { result?: string; expiryDate?: string | null; motTestNumber?: string; completedDate?: string; odometerValue?: number | string | null; odometerUnit?: string | null; testStationName?: string | null; testStationPcode?: string | null; defects?: { type?: string; text?: string; locationLateral?: string }[]; [key: string]: unknown }, idx: number) => {
+                const defects = Array.isArray(test.defects) ? test.defects as { type?: string; text?: string; locationLateral?: string }[] : [];
                 const defectCounts = countDefectsByType(defects);
                 const isExpanded = expandedTestId === test.motTestNumber;
                 const isPassed = test.testResult === 'PASSED';
                 
                 return (
                   <div 
-                    key={test.motTestNumber}
+                    key={test.motTestNumber ?? idx}
                     className={`border rounded-lg p-3 md:p-4 ${
                       isPassed 
                         ? 'bg-gradient-to-r from-green-900/20 to-green-800/10 border-green-700/30' 
@@ -312,7 +320,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                         )}
                         <div className="min-w-0">
                           <h4 className="text-lg font-semibold text-white flex items-center gap-2">
-                            {test.testResult}
+                            {String(test.testResult ?? '')}
                             <span className="text-sm text-slate-400 font-normal">
                               {formatDate(test.completedDate)}
                             </span>
@@ -345,7 +353,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                         <span className="text-white font-medium">
                           {test.odometerValue === null || test.odometerValue === undefined
                             ? 'Not Set'
-                            : `${formatMileage(test.odometerValue)} ${test.odometerUnit || ''}`.trim()}
+                            : `${formatMileage(typeof test.odometerValue === 'number' ? test.odometerValue : Number(test.odometerValue) || 0)} ${test.odometerUnit || ''}`.trim()}
                         </span>
                       </div>
                       {(test.testStationName || test.testStationPcode) && (
@@ -369,7 +377,7 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setExpandedTestId(isExpanded ? null : test.motTestNumber)}
+                          onClick={() => setExpandedTestId(isExpanded ? null : (test.motTestNumber ?? null))}
                           className="w-full text-blue-400 hover:text-blue-300 hover:bg-slate-800"
                         >
                           {isExpanded ? (
@@ -387,25 +395,25 @@ export function MotHistoryDialog({ open, onOpenChange, vehicleReg, vehicleId, ex
 
                         {isExpanded && (
                           <div className="mt-3 space-y-2 border-t border-slate-700 pt-3">
-                            {defects.map((defect: any, idx: number) => (
+                            {defects.map((defect: { type?: string; [key: string]: unknown }, idx: number) => (
                               <div 
                                 key={idx}
-                                className={`p-3 rounded border ${getDefectColor(defect.type)}`}
+                                className={`p-3 rounded border ${getDefectColor(defect.type ?? '')}`}
                               >
                                 <div className="flex items-start gap-2">
-                                  <span className="text-lg">{getDefectIcon(defect.type)}</span>
+                                  <span className="text-lg">{getDefectIcon(defect.type ?? '')}</span>
                                   <div className="flex-1">
                                     <div className="flex items-center gap-2 mb-1">
-                                      <Badge className={`${getDefectColor(defect.type)} border text-xs`}>
-                                        {defect.type}
+                                      <Badge className={`${getDefectColor(defect.type ?? '')} border text-xs`}>
+                                        {defect.type ?? 'Unknown'}
                                       </Badge>
-                                      {defect.locationLateral && (
+                                      {defect.locationLateral != null && defect.locationLateral !== '' ? (
                                         <span className="text-xs text-muted-foreground">
-                                          {defect.locationLateral}
+                                          {String(defect.locationLateral)}
                                         </span>
-                                      )}
+                                      ) : null}
                                     </div>
-                                    <p className="text-sm text-white">{defect.text}</p>
+                                    <p className="text-sm text-white">{defect.text != null ? String(defect.text) : ''}</p>
                                   </div>
                                 </div>
                               </div>

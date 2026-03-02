@@ -228,7 +228,7 @@ export function RoleManagement() {
       // Convert permissions array to object
       const permsObj: Record<ModuleName, boolean> = {} as Record<ModuleName, boolean>;
       ALL_MODULES.forEach(module => {
-        const perm = data.role.permissions.find((p: any) => p.module_name === module);
+        const perm = data.role.permissions.find((p: { module_name?: string }) => p.module_name === module);
         permsObj[module] = perm?.enabled || false;
       });
       setPermissions(permsObj);

@@ -23,11 +23,13 @@ export function AddAssetFlowDialog({
   const [selectedType, setSelectedType] = useState<NewAssetType | null>(initialAssetType);
 
   useEffect(() => {
-    if (open) {
-      setSelectedType(initialAssetType);
-      return;
-    }
-    setSelectedType(null);
+    queueMicrotask(() => {
+      if (open) {
+        setSelectedType(initialAssetType);
+      } else {
+        setSelectedType(null);
+      }
+    });
   }, [open, initialAssetType]);
 
   function handleCloseAll() {

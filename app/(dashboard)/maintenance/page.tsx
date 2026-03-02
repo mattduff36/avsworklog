@@ -82,8 +82,8 @@ function MaintenanceContent() {
 
   const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
     const isPlant = vehicle.is_plant === true || vehicle.vehicle?.asset_type === 'plant';
-    const isHgv = vehicle.vehicle?.asset_type === 'hgv' || !!(vehicle as any).hgv_id;
-    const assetId = (vehicle as any).hgv_id ?? vehicle.van_id ?? vehicle.vehicle?.id ?? vehicle.id;
+    const isHgv = vehicle.vehicle?.asset_type === 'hgv' || !!(vehicle as VehicleMaintenanceWithStatus).hgv_id;
+    const assetId = (vehicle as VehicleMaintenanceWithStatus).hgv_id ?? vehicle.van_id ?? vehicle.vehicle?.id ?? vehicle.id;
 
     if (isPlant) {
       router.push(`/fleet/plant/${assetId}/history?fromTab=maintenance`);

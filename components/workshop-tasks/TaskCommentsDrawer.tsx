@@ -106,9 +106,9 @@ export function TaskCommentsDrawer({
       setTimeline((prev) => [...prev, data.comment]);
       setNewComment('');
       toast.success('Comment added');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error adding comment:', error);
-      toast.error(error.message || 'Failed to add comment');
+      toast.error(error instanceof Error ? error.message : 'Failed to add comment');
     } finally {
       setSubmitting(false);
     }
@@ -151,9 +151,9 @@ export function TaskCommentsDrawer({
       setEditingCommentId(null);
       setEditText('');
       toast.success('Comment updated');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating comment:', error);
-      toast.error(error.message || 'Failed to update comment');
+      toast.error(error instanceof Error ? error.message : 'Failed to update comment');
     }
   };
 
@@ -178,9 +178,9 @@ export function TaskCommentsDrawer({
       // Remove comment from timeline
       setTimeline((prev) => prev.filter((item) => item.id !== commentId));
       toast.success('Comment deleted');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting comment:', error);
-      toast.error(error.message || 'Failed to delete comment');
+      toast.error(error instanceof Error ? error.message : 'Failed to delete comment');
     }
   };
 

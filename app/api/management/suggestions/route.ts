@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     // Build query — fetch suggestions first, then look up profiles separately
     // (no direct FK from suggestions.created_by → profiles.id)
-    let query = (supabase as any)
+    let query = supabase
       .from('suggestions')
       .select('*')
       .order('created_at', { ascending: false })
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     }));
 
     // Get counts by status
-    const { data: countData } = await (supabase as any)
+    const { data: countData } = await supabase
       .from('suggestions')
       .select('status');
 

@@ -115,9 +115,9 @@ export function VehicleCategoryDialog({
       onOpenChange(false);
       onSuccess?.();
       router.refresh();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving vehicle category:', error);
-      toast.error(error.message || 'Failed to save category');
+      toast.error(error instanceof Error ? error.message : 'Failed to save category');
     } finally {
       setLoading(false);
     }

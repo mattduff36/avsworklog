@@ -9,7 +9,8 @@ export async function DELETE(
 ) {
   try {
     const supabase = await createClient();
-    const db = supabase as unknown as { from: (table: string) => any };
+    type DbClient = { from: (t: string) => ReturnType<typeof supabase.from> };
+    const db = supabase as unknown as DbClient;
     const {
       data: { user },
     } = await supabase.auth.getUser();

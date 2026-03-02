@@ -533,7 +533,7 @@ function NewInspectionContent() {
         const { lockedItems } = await response.json();
         
         // Transform to match existing data structure
-        loggedActionsData = lockedItems.map((item: any) => ({
+        loggedActionsData = lockedItems.map((item: { id: string; [key: string]: unknown }) => ({
           inspection_items: {
             item_number: item.item_number,
             item_description: item.item_description

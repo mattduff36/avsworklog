@@ -218,8 +218,8 @@ export function Navbar() {
           .eq('id', profile.id)
           .single();
         
-        const rolePerms = data?.roles as any;
-        rolePerms?.role_permissions?.forEach((perm: any) => {
+        const rolePerms = data?.roles as { role_permissions?: { module_name?: string; enabled?: boolean }[] } | null;
+        rolePerms?.role_permissions?.forEach((perm: { module_name?: string; enabled?: boolean }) => {
           if (perm.enabled) {
             enabledModules.add(perm.module_name as ModuleName);
           }

@@ -95,7 +95,7 @@ export async function DELETE(
       hadInspections: hasInspections
     });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('DELETE /api/maintenance/deleted/[archiveId] failed', error, 'DeletedMaintenanceAPI');
     
     await logServerError({
@@ -108,7 +108,7 @@ export async function DELETE(
     });
     
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

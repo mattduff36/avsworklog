@@ -82,7 +82,7 @@ export default function ReadRAMSPage() {
       }
 
       setRamsDocument(doc);
-      setRequiredSignature((doc as any).document_type?.required_signature ?? true);
+      setRequiredSignature((doc as { document_type?: { required_signature?: boolean } | null }).document_type?.required_signature ?? true);
 
       // Fetch assignment (for employees)
       const { data: assignmentData } = await supabase
@@ -138,7 +138,7 @@ export default function ReadRAMSPage() {
     // For signed documents, we can still track the action but don't update status
     if (assignment) {
       try {
-        const updateData: any = {
+        const updateData: { action_taken: 'downloaded' | 'opened' | 'emailed'; status?: string; read_at?: string } = {
           action_taken: action,
         };
 
@@ -269,7 +269,7 @@ export default function ReadRAMSPage() {
         await new Promise(resolve => setTimeout(resolve, 500));
         await recordAction('opened', !!assignment);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 
                           typeof error === 'string' ? error : 'Unknown error';
       console.error('Error opening RAMS document:', {
@@ -310,7 +310,7 @@ export default function ReadRAMSPage() {
 
       // Record action (only if assignment exists, not required for signed docs)
       await recordAction('emailed', !!assignment);
-    } catch (error: any) {
+    } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 
                           typeof error === 'string' ? error : 'Unknown error';
       console.error('Error sending RAMS email:', {

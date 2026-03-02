@@ -5,7 +5,8 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const db = supabase as unknown as { from: (table: string) => any };
+    type DbClient = { from: (t: string) => ReturnType<typeof supabase.from> };
+    const db = supabase as unknown as DbClient;
 
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();

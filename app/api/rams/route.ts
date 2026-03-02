@@ -6,7 +6,8 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const db = supabase as unknown as { from: (table: string) => any };
+    type DbClient = { from: (t: string) => ReturnType<typeof supabase.from> };
+    const db = supabase as unknown as DbClient;
 
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -165,8 +166,14 @@ export async function GET(request: NextRequest) {
       const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
       const counts = {
         all: allDocs?.length || 0,
-        needs_signature: allDocs?.filter((d: { document_type?: { required_signature?: boolean } | null }) => d.document_type?.required_signature !== false).length || 0,
-        read_only: allDocs?.filter((d: { document_type?: { required_signature?: boolean } | null }) => d.document_type?.required_signature === false).length || 0,
+        needs_signature: allDocs?.filter((d: { document_type?: { required_signature?: boolean } | { required_signature?: boolean }[] | null }) => {
+          const dt = Array.isArray((d as { document_type?: unknown }).document_type) ? (d as { document_type?: { required_signature?: boolean }[] }).document_type?.[0] : (d as { document_type?: { required_signature?: boolean } }).document_type;
+          return dt?.required_signature !== false;
+        }).length || 0,
+        read_only: allDocs?.filter((d: { document_type?: { required_signature?: boolean } | { required_signature?: boolean }[] | null }) => {
+          const dt = Array.isArray((d as { document_type?: unknown }).document_type) ? (d as { document_type?: { required_signature?: boolean }[] }).document_type?.[0] : (d as { document_type?: { required_signature?: boolean } }).document_type;
+          return dt?.required_signature === false;
+        }).length || 0,
         recently_uploaded: allDocs?.filter((d: { created_at: string }) => new Date(d.created_at).getTime() > sevenDaysAgo).length || 0,
       };
 

@@ -36,7 +36,7 @@ import { NOTIFICATION_MODULES } from '@/types/notifications';
 const BlockingMessageModal = dynamic(() => import('@/components/messages/BlockingMessageModal').then(m => ({ default: m.BlockingMessageModal })), { ssr: false });
 const ReminderModal = dynamic(() => import('@/components/messages/ReminderModal').then(m => ({ default: m.ReminderModal })), { ssr: false });
 
-const MODULE_ICONS: Record<string, any> = {
+const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   'AlertTriangle': AlertTriangle,
   'Wrench': Wrench,
   'FileText': FileText,
@@ -128,9 +128,9 @@ export default function NotificationsPage() {
             .order('full_name');
 
           if (error) throw error;
-          setUsers((profilesData || []).map((p: any) => ({
+          setUsers((profilesData || []).map((p: { id: string; full_name?: string | null; role?: { name?: string } | null }) => ({
             id: p.id,
-            full_name: p.full_name,
+            full_name: p.full_name ?? '',
             role: p.role?.name || 'unknown',
           })));
         } catch (error) {

@@ -192,10 +192,10 @@ export async function POST(
       message: 'Document sent via email successfully'
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error sending RAMS document via email:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to send email' },
+      { error: error instanceof Error ? error.message : 'Failed to send email' },
       { status: 500 }
     );
   }

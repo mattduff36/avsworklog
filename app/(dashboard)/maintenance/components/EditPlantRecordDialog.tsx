@@ -267,7 +267,7 @@ export function EditPlantRecordDialog({
       }
 
       // Update plant table fields (LOLER)
-      const plantUpdates: Record<string, any> = {};
+      const plantUpdates: Record<string, unknown> = {};
       
       // Normalize date values for comparison (treat null, undefined, empty string as equivalent)
       const normalizeDateValue = (val: string | null | undefined): string | null => {
@@ -338,7 +338,7 @@ export function EditPlantRecordDialog({
       }
 
       // Update or create vehicle_maintenance record
-      const maintenanceUpdates: Record<string, any> = {
+      const maintenanceUpdates: Record<string, unknown> = {
         current_hours: data.current_hours || null,
         last_service_hours: data.last_service_hours || null,
         next_service_hours: data.next_service_hours || null,
@@ -347,9 +347,9 @@ export function EditPlantRecordDialog({
       };
 
       // Helper to normalize values for comparison (treat undefined, null, '', 0 as equivalent for comparison)
-      const normalizeValue = (val: any): any => {
+      const normalizeValue = (val: unknown): string | null => {
         if (val === undefined || val === null || val === '') return null;
-        return val;
+        return typeof val === 'string' ? val : typeof val === 'number' ? String(val) : null;
       };
 
       // Only track changes where the values are actually different
