@@ -96,6 +96,7 @@ export function EditMaintenanceDialog({
   const createMutation = useCreateMaintenance();
   const [isMileageFocused, setIsMileageFocused] = useState(false);
   const dialogContentRef = useRef<HTMLDivElement>(null);
+  const assetTypeLabel = vehicle?.vehicle?.asset_type === 'plant' ? 'Plant' : vehicle?.vehicle?.asset_type === 'hgv' ? 'HGV' : 'Van';
   
   // Check if this is a new maintenance record (vehicle.id is null for vans without maintenance records)
   const isNewRecord = !vehicle?.id;
@@ -162,7 +163,8 @@ export function EditMaintenanceDialog({
     const nicknameChanged = data.nickname?.trim() !== vehicle.vehicle?.nickname;
     if (nicknameChanged && vehicle.vehicle?.id) {
       try {
-        const response = await fetch(`/api/admin/vans/${vehicle.vehicle.id}`, {
+        const endpoint = vehicle.vehicle.asset_type === 'hgv' ? 'hgvs' : 'vans';
+        const response = await fetch(`/api/admin/${endpoint}/${vehicle.vehicle.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -201,12 +203,16 @@ export function EditMaintenanceDialog({
 
     if (isNewRecord) {
       const vanId = vehicle.van_id;
-      if (!vanId) {
-        throw new Error('Missing van ID for new maintenance record');
+      const hgvId = vehicle.hgv_id;
+
+      if (!vanId && !hgvId) {
+        throw new Error('Missing asset ID for new maintenance record');
       }
+
       // Create new maintenance record
       await createMutation.mutateAsync({ 
-        van_id: vanId, 
+        van_id: vanId ?? undefined,
+        hgv_id: hgvId ?? undefined,
         data: updates 
       });
     } else {
@@ -241,7 +247,7 @@ export function EditMaintenanceDialog({
       >
         <DialogHeader>
           <DialogTitle className="text-2xl">
-            {isNewRecord ? 'Create' : 'Edit'} {vehicle.vehicle?.asset_type === 'plant' ? 'Plant' : vehicle.vehicle?.asset_type === 'hgv' ? 'HGV' : 'Van'} Record - {vehicle.vehicle?.reg_number || vehicle.vehicle?.plant_id}
+            {isNewRecord ? 'Create' : 'Edit'} {assetTypeLabel} Record - {vehicle.vehicle?.reg_number || vehicle.vehicle?.plant_id}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {isNewRecord 
@@ -252,10 +258,10 @@ export function EditMaintenanceDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Van/Plant Nickname */}
+          {/* Asset Nickname */}
           <div className="space-y-2">
             <Label htmlFor="nickname" className="text-white">
-              {vehicle.vehicle?.asset_type === 'plant' ? 'Plant' : 'Van'} Nickname <span className="text-slate-400 text-xs">(Optional)</span>
+              {assetTypeLabel} Nickname <span className="text-slate-400 text-xs">(Optional)</span>
             </Label>
             <Input
               id="nickname"
@@ -264,7 +270,7 @@ export function EditMaintenanceDialog({
               className="bg-input border-border text-white"
             />
             <p className="text-xs text-muted-foreground">
-              A friendly name to help identify this vehicle quickly
+              A friendly name to help identify this asset quickly
             </p>
             {errors.nickname && (
               <p className="text-sm text-red-400">{errors.nickname.message}</p>

@@ -15,10 +15,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertCircle, CheckCircle2, Info, MinusCircle, Send, Timer, User, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Info, Send, Timer, User, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { TRUCK_CHECKLIST_ITEMS } from '@/lib/checklists/vehicle-checklists';
 import { formatDate, formatDateISO, getDayOfWeek } from '@/lib/utils/date';
+import { scrollAndHighlightValidationTarget } from '@/lib/utils/validation-scroll';
 import type { Database } from '@/types/database';
 import type { Employee } from '@/types/common';
 import type { InspectionStatus } from '@/types/inspection';
@@ -29,6 +30,7 @@ type HgvAsset = {
   id: string;
   reg_number: string;
   nickname: string | null;
+  current_mileage?: number | null;
   hgv_categories?: { name: string } | null;
 };
 
@@ -36,6 +38,7 @@ type InspectionItemInsert = Database['public']['Tables']['inspection_items']['In
 type InspectionInsert = Database['public']['Tables']['hgv_inspections']['Insert'];
 
 const MIN_HGV_INSPECTION_SECONDS = 10 * 60;
+const STICKY_NAV_OFFSET_PX = 96;
 
 function NewHgvInspectionContent() {
   const router = useRouter();
@@ -48,7 +51,6 @@ function NewHgvInspectionContent() {
   const [hgvId, setHgvId] = useState('');
   const [inspectionDate, setInspectionDate] = useState('');
   const [currentMileage, setCurrentMileage] = useState('');
-  const [latestKnownMileage, setLatestKnownMileage] = useState<number | null>(null);
 
   const [checklistStarted, setChecklistStarted] = useState(false);
   const [inspectionStartMs, setInspectionStartMs] = useState<number | null>(null);
@@ -64,14 +66,13 @@ function NewHgvInspectionContent() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
-  const [showConfirmSubmitDialog, setShowConfirmSubmitDialog] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
       const [{ data: hgvData }, { data: employeeData }] = await Promise.all([
         supabase
           .from('hgvs')
-          .select('id, reg_number, nickname, hgv_categories(name)')
+          .select('id, reg_number, nickname, current_mileage, hgv_categories(name)')
           .eq('status', 'active')
           .order('reg_number'),
         isManager
@@ -129,22 +130,6 @@ function NewHgvInspectionContent() {
       setComments(initialComments);
     } catch {
       // Non-blocking.
-    }
-  };
-
-  const loadLatestMileage = async (selectedHgvId: string) => {
-    try {
-      const { data } = await supabase
-        .from('hgv_inspections')
-        .select('current_mileage')
-        .eq('hgv_id', selectedHgvId)
-        .not('current_mileage', 'is', null)
-        .order('inspection_date', { ascending: false })
-        .limit(1)
-        .single();
-      setLatestKnownMileage(data?.current_mileage ?? null);
-    } catch {
-      setLatestKnownMileage(null);
     }
   };
 
@@ -217,6 +202,52 @@ function NewHgvInspectionContent() {
     return null;
   };
 
+  const scrollToValidationTarget = () => {
+    const scroll = (el: Element | null) =>
+      scrollAndHighlightValidationTarget(el, STICKY_NAV_OFFSET_PX);
+
+    if (!hgvId) {
+      scroll(document.getElementById('hgv'));
+      return;
+    }
+
+    if (!inspectionDate) {
+      scroll(document.getElementById('inspectionDate'));
+      return;
+    }
+
+    if (!selectedEmployeeId) {
+      scroll(document.getElementById('selectedEmployeeId'));
+      return;
+    }
+
+    const mileageValue = parseInt(currentMileage, 10);
+    if (Number.isNaN(mileageValue) || mileageValue < 0) {
+      scroll(document.getElementById('currentMileage'));
+      return;
+    }
+
+    const firstMissingStatus = TRUCK_CHECKLIST_ITEMS
+      .map((_, idx) => `${idx + 1}`)
+      .find((itemKey) => !checkboxStates[itemKey]);
+    if (firstMissingStatus) {
+      scroll(document.querySelector(`[data-checklist-item="${firstMissingStatus}"]`));
+      return;
+    }
+
+    const firstMissingComment = Object.entries(checkboxStates)
+      .find(([itemKey, status]) => status === 'attention' && !comments[itemKey]?.trim());
+    if (firstMissingComment) {
+      const [itemKey] = firstMissingComment;
+      scroll(document.querySelector(`[data-comment-input="${itemKey}"]`));
+      return;
+    }
+
+    if (informWorkshop && inspectorComments.trim().length < 10) {
+      scroll(document.getElementById('inspectorComments'));
+    }
+  };
+
   const saveInspection = async (signatureData: string) => {
     if (!user) return;
     setLoading(true);
@@ -252,6 +283,15 @@ function NewHgvInspectionContent() {
 
       if (insertInspectionError || !inspection) {
         throw insertInspectionError || new Error('Failed to create inspection');
+      }
+
+      const { error: updateHgvMileageError } = await supabase
+        .from('hgvs')
+        .update({ current_mileage: mileageValue })
+        .eq('id', hgvId);
+
+      if (updateHgvMileageError) {
+        throw updateHgvMileageError;
       }
 
       const dayOfWeek = getDayOfWeek(new Date(`${inspectionDate}T00:00:00`));
@@ -327,9 +367,10 @@ function NewHgvInspectionContent() {
     const validationError = validate();
     if (validationError) {
       setError(validationError);
+      scrollToValidationTarget();
       return;
     }
-    setShowConfirmSubmitDialog(true);
+    setShowSignatureDialog(true);
   };
 
   const getStatusIcon = (status: InspectionStatus, isSelected: boolean) => {
@@ -338,8 +379,6 @@ function NewHgvInspectionContent() {
         return <CheckCircle2 className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-green-400' : 'text-muted-foreground'}`} />;
       case 'attention':
         return <XCircle className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-red-400' : 'text-muted-foreground'}`} />;
-      case 'na':
-        return <MinusCircle className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-slate-300' : 'text-muted-foreground'}`} />;
       default:
         return null;
     }
@@ -397,7 +436,7 @@ function NewHgvInspectionContent() {
                 Creating inspection for
               </Label>
               <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                <SelectTrigger className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
+                <SelectTrigger id="selectedEmployeeId" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
                   <SelectValue placeholder="Select employee..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -427,10 +466,8 @@ function NewHgvInspectionContent() {
                   setCheckboxStates({});
                   setComments({});
                   setLoggedDefects(new Map());
-                  setLatestKnownMileage(null);
                   if (value) {
                     loadLockedDefects(value);
-                    loadLatestMileage(value);
                   }
                 }}
               >
@@ -480,7 +517,10 @@ function NewHgvInspectionContent() {
                 step="1"
                 value={currentMileage}
                 onChange={(e) => setCurrentMileage(e.target.value)}
-                placeholder={latestKnownMileage ? `e.g. ${latestKnownMileage}` : 'e.g. 245000'}
+                placeholder={(() => {
+                  const selectedHgv = hgvs.find((hgv) => hgv.id === hgvId);
+                  return selectedHgv?.current_mileage != null ? `e.g. ${selectedHgv.current_mileage}` : 'e.g. 245000';
+                })()}
                 className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground"
                 required
               />
@@ -512,7 +552,7 @@ function NewHgvInspectionContent() {
           <CardHeader className="pb-3">
             <CardTitle className="text-foreground">26-Point HGV Safety Check</CardTitle>
             <CardDescription className="text-muted-foreground">
-              Mark each item as Pass, Fail, or N/A
+              Mark each item as Pass or Fail
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 p-4 md:p-6">
@@ -533,7 +573,7 @@ function NewHgvInspectionContent() {
                     const currentStatus = checkboxStates[key];
                     const isLocked = loggedDefects.has(key);
                     return (
-                      <tr key={itemNumber} className={`border-b border-border/50 hover:bg-slate-800/30 ${isLocked ? 'bg-red-500/5' : ''}`}>
+                      <tr key={itemNumber} data-checklist-item={key} className={`border-b border-border/50 hover:bg-slate-800/30 ${isLocked ? 'bg-red-500/5' : ''}`}>
                         <td className="p-3 text-sm text-muted-foreground">{itemNumber}</td>
                         <td className="p-3 text-sm text-white">
                           {item}
@@ -541,7 +581,7 @@ function NewHgvInspectionContent() {
                         </td>
                         <td className="p-3">
                           <div className="flex items-center justify-center gap-2">
-                            {(['ok', 'attention', 'na'] as InspectionStatus[]).map((status) => (
+                            {(['ok', 'attention'] as InspectionStatus[]).map((status) => (
                               <button
                                 key={status}
                                 type="button"
@@ -556,6 +596,8 @@ function NewHgvInspectionContent() {
                         </td>
                         <td className="p-3">
                           <Input
+                            id={`hgv-comment-${itemNumber}`}
+                            data-comment-input={key}
                             value={comments[key] || ''}
                             onChange={(e) => handleCommentChange(itemNumber, e.target.value)}
                             placeholder={currentStatus === 'attention' ? 'Required for failed items' : 'Optional notes'}
@@ -577,10 +619,10 @@ function NewHgvInspectionContent() {
                 const currentStatus = checkboxStates[key];
                 const isLocked = loggedDefects.has(key);
                 return (
-                  <div key={itemNumber} className={`bg-slate-900/30 border rounded-lg p-4 space-y-3 ${isLocked ? 'border-red-500/50' : 'border-border/50'}`}>
+                  <div key={itemNumber} data-checklist-item={key} className={`bg-slate-900/30 border rounded-lg p-4 space-y-3 ${isLocked ? 'border-red-500/50' : 'border-border/50'}`}>
                     <div className="text-sm font-medium text-white">{itemNumber}. {item}</div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(['ok', 'attention', 'na'] as InspectionStatus[]).map((status) => (
+                    <div className="grid grid-cols-2 gap-2">
+                      {(['ok', 'attention'] as InspectionStatus[]).map((status) => (
                         <button
                           key={status}
                           type="button"
@@ -588,11 +630,13 @@ function NewHgvInspectionContent() {
                           disabled={isLocked}
                           className={`h-12 rounded-xl border-2 ${getStatusColor(status, currentStatus === status)} ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
                         >
-                          {status === 'ok' ? 'Pass' : status === 'attention' ? 'Fail' : 'N/A'}
+                          {status === 'ok' ? 'Pass' : 'Fail'}
                         </button>
                       ))}
                     </div>
                     <Textarea
+                      id={`hgv-comment-${itemNumber}`}
+                      data-comment-input={key}
                       value={comments[key] || ''}
                       onChange={(e) => handleCommentChange(itemNumber, e.target.value)}
                       placeholder={currentStatus === 'attention' ? 'Required for failed items' : 'Optional notes'}
@@ -608,6 +652,7 @@ function NewHgvInspectionContent() {
               <div className="space-y-2">
                 <Label className="text-white text-base">End of Inspection Notes</Label>
                 <Textarea
+                  id="inspectorComments"
                   value={inspectorComments}
                   onChange={(e) => setInspectorComments(e.target.value)}
                   placeholder="Add any additional notes..."
@@ -655,36 +700,6 @@ function NewHgvInspectionContent() {
           </Button>
         </div>
       )}
-
-      <Dialog open={showConfirmSubmitDialog} onOpenChange={setShowConfirmSubmitDialog}>
-        <DialogContent className="border-border text-white max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-white text-xl">Confirm Submission</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              HGV inspections are daily and must take at least 10 minutes.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowConfirmSubmitDialog(false)}
-              className="border-slate-600 text-white hover:bg-slate-800"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                setShowConfirmSubmitDialog(false);
-                setShowSignatureDialog(true);
-              }}
-              className="bg-inspection hover:bg-inspection/90 text-white font-semibold"
-            >
-              <Send className="h-4 w-4 mr-2" />
-              Continue to Signature
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>
         <DialogContent className="border-border text-white max-w-lg">

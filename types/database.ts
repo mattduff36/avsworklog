@@ -89,6 +89,7 @@ export interface Database {
           category_id: string
           status: string
           nickname: string | null
+          current_mileage: number | null
           created_at: string
         }
         Insert: {
@@ -97,6 +98,7 @@ export interface Database {
           category_id: string
           status?: string
           nickname?: string | null
+          current_mileage?: number | null
           created_at?: string
         }
         Update: {
@@ -105,6 +107,7 @@ export interface Database {
           category_id?: string
           status?: string
           nickname?: string | null
+          current_mileage?: number | null
           created_at?: string
         }
       }

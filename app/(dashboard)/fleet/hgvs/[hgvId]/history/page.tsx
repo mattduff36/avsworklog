@@ -715,7 +715,7 @@ export default function HgvHistoryPage({
             </p>
           </div>
         </div>
-        {maintenanceRecord && (
+        {vehicle && (
           <Button
             variant="outline"
             size="sm"
@@ -1367,12 +1367,75 @@ export default function HgvHistoryPage({
       </Tabs>
 
       {/* Edit Vehicle Record Dialog */}
-      {maintenanceRecord && (
+      {vehicle && (
         <EditMaintenanceDialog
           open={editDialogOpen}
           onOpenChange={setEditDialogOpen}
           vehicle={{
-            ...maintenanceRecord,
+            ...(maintenanceRecord || {
+              id: null,
+              van_id: null,
+              hgv_id: resolvedParams.hgvId,
+              plant_id: null,
+              current_mileage: null,
+              tax_due_date: null,
+              mot_due_date: null,
+              first_aid_kit_expiry: null,
+              next_service_mileage: null,
+              last_service_mileage: null,
+              cambelt_due_mileage: null,
+              current_hours: null,
+              last_service_hours: null,
+              next_service_hours: null,
+              tracker_id: null,
+              last_mileage_update: null,
+              last_updated_at: '',
+              last_updated_by: null,
+              last_dvla_sync: null,
+              dvla_sync_status: null,
+              dvla_sync_error: null,
+              dvla_raw_data: null,
+              ves_make: null,
+              ves_colour: null,
+              ves_fuel_type: null,
+              ves_year_of_manufacture: null,
+              ves_engine_capacity: null,
+              ves_tax_status: null,
+              ves_mot_status: null,
+              ves_co2_emissions: null,
+              ves_euro_status: null,
+              ves_real_driving_emissions: null,
+              ves_type_approval: null,
+              ves_wheelplan: null,
+              ves_revenue_weight: null,
+              ves_marked_for_export: null,
+              ves_month_of_first_registration: null,
+              ves_date_of_last_v5c_issued: null,
+              mot_expiry_date: null,
+              mot_api_sync_status: null,
+              mot_api_sync_error: null,
+              last_mot_api_sync: null,
+              mot_raw_data: null,
+              mot_make: null,
+              mot_model: null,
+              mot_first_used_date: null,
+              mot_registration_date: null,
+              mot_manufacture_date: null,
+              mot_engine_size: null,
+              mot_fuel_type: null,
+              mot_primary_colour: null,
+              mot_secondary_colour: null,
+              mot_vehicle_id: null,
+              mot_registration: null,
+              mot_vin: null,
+              mot_v5c_reference: null,
+              mot_dvla_id: null,
+              created_at: '',
+              updated_at: '',
+              notes: null,
+              overdue_count: 0,
+              due_soon_count: 0,
+            }),
             vehicle: {
               id: vehicle?.id || resolvedParams.hgvId,
               reg_number: vehicle?.reg_number || null,

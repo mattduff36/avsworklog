@@ -233,6 +233,7 @@ export async function PUT(
         .insert({
           van_id: currentRecord.van_id,
           plant_id: currentRecord.plant_id,
+          hgv_id: currentRecord.hgv_id,
           field_name: 'no_changes',
           old_value: null,
           new_value: null,
@@ -261,11 +262,23 @@ export async function PUT(
       logger.error('Failed to update maintenance', updateError);
       throw updateError;
     }
+
+    if (currentRecord.hgv_id && body.current_mileage !== undefined && body.current_mileage !== null) {
+      const { error: updateHgvError } = await supabase
+        .from('hgvs')
+        .update({ current_mileage: body.current_mileage })
+        .eq('id', currentRecord.hgv_id);
+
+      if (updateHgvError) {
+        logger.error('Failed to sync hgvs.current_mileage from maintenance update', updateHgvError);
+      }
+    }
     
     // Create history entries for all changed fields
     const historyEntries = changedFields.map(change => ({
       van_id: currentRecord.van_id,
       plant_id: currentRecord.plant_id,
+      hgv_id: currentRecord.hgv_id,
       field_name: change.field_name,
       old_value: change.old_value,
       new_value: change.new_value,

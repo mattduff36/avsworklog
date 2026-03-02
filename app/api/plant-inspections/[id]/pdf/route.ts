@@ -5,6 +5,30 @@ import { PlantInspectionPDF } from '@/lib/pdf/plant-inspection-pdf';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
+interface PlantInspectionWithRelations {
+  id: string;
+  user_id: string;
+  inspection_date: string;
+  inspection_end_date: string;
+  current_mileage: number | null;
+  inspector_comments: string | null;
+  signature_data: string | null;
+  signed_at: string | null;
+  is_hired_plant: boolean;
+  hired_plant_id_serial: string | null;
+  hired_plant_description: string | null;
+  hired_plant_hiring_company: string | null;
+  plant?: {
+    plant_id: string;
+    nickname: string | null;
+    serial_number: string | null;
+    van_categories: { name: string } | null;
+  } | null;
+  profile?: {
+    full_name: string;
+  } | null;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -78,35 +102,37 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const isHired = inspection.is_hired_plant === true;
+    const inspectionWithRelations = inspection as unknown as PlantInspectionWithRelations;
+    const isHired = inspectionWithRelations.is_hired_plant === true;
 
     // Generate PDF
     const pdfComponent = PlantInspectionPDF({
       inspection: {
-        id: inspection.id,
-        inspection_date: inspection.inspection_date,
-        inspection_end_date: inspection.inspection_end_date,
-        current_mileage: inspection.current_mileage,
-        inspector_comments: inspection.inspector_comments,
-        signature_data: inspection.signature_data,
+        id: inspectionWithRelations.id,
+        inspection_date: inspectionWithRelations.inspection_date,
+        inspection_end_date: inspectionWithRelations.inspection_end_date,
+        current_mileage: inspectionWithRelations.current_mileage,
+        inspector_comments: inspectionWithRelations.inspector_comments,
+        signature_data: inspectionWithRelations.signature_data,
+        signed_at: inspectionWithRelations.signed_at,
       },
       plant: isHired
         ? {
-            plant_id: inspection.hired_plant_id_serial || 'Unknown',
-            nickname: inspection.hired_plant_description || null,
+            plant_id: inspectionWithRelations.hired_plant_id_serial || 'Unknown',
+            nickname: inspectionWithRelations.hired_plant_description || null,
             serial_number: null,
             van_categories: null,
             isHired: true,
-            hiringCompany: inspection.hired_plant_hiring_company || null,
+            hiringCompany: inspectionWithRelations.hired_plant_hiring_company || null,
           }
         : {
-            plant_id: (inspection as any).plant?.plant_id || 'Unknown',
-            nickname: (inspection as any).plant?.nickname,
-            serial_number: (inspection as any).plant?.serial_number || null,
-            van_categories: (inspection as any).plant?.van_categories,
+            plant_id: inspectionWithRelations.plant?.plant_id || 'Unknown',
+            nickname: inspectionWithRelations.plant?.nickname || null,
+            serial_number: inspectionWithRelations.plant?.serial_number || null,
+            van_categories: inspectionWithRelations.plant?.van_categories || null,
           },
       operator: {
-        full_name: (inspection as any).profile?.full_name || 'Unknown',
+        full_name: inspectionWithRelations.profile?.full_name || 'Unknown',
       },
       items: items.map(item => ({
         item_number: item.item_number,
@@ -131,9 +157,9 @@ export async function GET(
     const buffer = Buffer.concat(chunks);
 
     const plantId = isHired
-      ? (inspection.hired_plant_id_serial || 'hired').replace(/[^a-zA-Z0-9-_]/g, '')
-      : ((inspection as any).plant?.plant_id || 'unknown');
-    const date = inspection.inspection_end_date.replace(/-/g, '');
+      ? (inspectionWithRelations.hired_plant_id_serial || 'hired').replace(/[^a-zA-Z0-9-_]/g, '')
+      : (inspectionWithRelations.plant?.plant_id || 'unknown');
+    const date = inspectionWithRelations.inspection_end_date.replace(/-/g, '');
 
     // Return PDF
     return new NextResponse(buffer, {

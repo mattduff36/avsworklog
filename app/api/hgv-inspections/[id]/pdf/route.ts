@@ -4,6 +4,24 @@ import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { HgvInspectionPDF } from '@/lib/pdf/hgv-inspection-pdf';
 
+interface HgvInspectionWithRelations {
+  id: string;
+  user_id: string;
+  inspection_date: string;
+  current_mileage: number | null;
+  inspector_comments: string | null;
+  signature_data: string | null;
+  signed_at: string | null;
+  hgv?: {
+    reg_number: string;
+    nickname: string | null;
+    hgv_categories: { name: string } | null;
+  } | null;
+  profile?: {
+    full_name: string;
+  } | null;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -53,24 +71,29 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
+    const inspectionWithRelations = inspection as unknown as HgvInspectionWithRelations;
+
     const pdfComponent = HgvInspectionPDF({
       inspection: {
-        id: inspection.id,
-        inspection_date: inspection.inspection_date,
-        current_mileage: inspection.current_mileage,
-        inspector_comments: inspection.inspector_comments,
+        id: inspectionWithRelations.id,
+        inspection_date: inspectionWithRelations.inspection_date,
+        current_mileage: inspectionWithRelations.current_mileage,
+        inspector_comments: inspectionWithRelations.inspector_comments,
+        signature_data: inspectionWithRelations.signature_data,
+        signed_at: inspectionWithRelations.signed_at,
       },
       hgv: {
-        reg_number: (inspection as any).hgv?.reg_number || 'Unknown',
-        nickname: (inspection as any).hgv?.nickname || null,
-        hgv_categories: (inspection as any).hgv?.hgv_categories || null,
+        reg_number: inspectionWithRelations.hgv?.reg_number || 'Unknown',
+        nickname: inspectionWithRelations.hgv?.nickname || null,
+        hgv_categories: inspectionWithRelations.hgv?.hgv_categories || null,
       },
       operator: {
-        full_name: (inspection as any).profile?.full_name || 'Unknown',
+        full_name: inspectionWithRelations.profile?.full_name || 'Unknown',
       },
       items: (items || []).map(item => ({
         item_number: item.item_number,
         item_description: item.item_description,
+        day_of_week: item.day_of_week,
         status: item.status as 'ok' | 'attention' | 'na',
         comments: item.comments,
       })),
@@ -83,8 +106,8 @@ export async function GET(
     }
     const buffer = Buffer.concat(chunks);
 
-    const reg = ((inspection as any).hgv?.reg_number || 'hgv').replace(/[^a-zA-Z0-9-_]/g, '');
-    const date = inspection.inspection_date.replace(/-/g, '');
+    const reg = (inspectionWithRelations.hgv?.reg_number || 'hgv').replace(/[^a-zA-Z0-9-_]/g, '');
+    const date = inspectionWithRelations.inspection_date.replace(/-/g, '');
 
     return new NextResponse(buffer, {
       headers: {

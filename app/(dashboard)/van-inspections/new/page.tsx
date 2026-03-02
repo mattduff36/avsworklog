@@ -26,6 +26,7 @@ import { Database } from '@/types/database';
 import { Employee } from '@/types/common';
 import { toast } from 'sonner';
 import { showErrorWithReport } from '@/lib/utils/error-reporting';
+import { scrollAndHighlightValidationTarget } from '@/lib/utils/validation-scroll';
 
 // Dynamic imports for heavy components - loaded only when needed
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -87,6 +88,8 @@ type ProfileWithRole = {
     is_manager_admin?: boolean;
   } | null;
 };
+
+const STICKY_NAV_OFFSET_PX = 96;
 
 function NewInspectionContent() {
   const router = useRouter();
@@ -662,18 +665,30 @@ function NewInspectionContent() {
     // For editing existing inspections, proceed directly to validation
     validateAndSubmit();
   };
-  
+
+  const scrollToTarget = (el: Element | null) =>
+    scrollAndHighlightValidationTarget(el, STICKY_NAV_OFFSET_PX);
+
+  const openDayAndScrollToChecklistTarget = (dayOfWeek: number, selector: string) => {
+    setActiveDay(String(dayOfWeek - 1));
+    requestAnimationFrame(() => {
+      scrollToTarget(document.querySelector(selector));
+    });
+  };
+
   const validateAndSubmit = () => {
     if (!vehicleId) {
       setError('Please select a vehicle');
-      // Dialog will stay open due to onOpenChange handler checking error state
+      setShowConfirmSubmitDialog(false);
+      scrollToTarget(document.getElementById('vehicle'));
       return;
     }
 
     const mileageValue = getParsedMileage();
     if (mileageValue === null) {
       setError('Please enter a valid current mileage');
-      // Dialog will stay open due to onOpenChange handler checking error state
+      setShowConfirmSubmitDialog(false);
+      scrollToTarget(document.getElementById('mileage'));
       return;
     }
 
@@ -681,6 +696,8 @@ function NewInspectionContent() {
     if (mileageWarning?.warning && !mileageConfirmed) {
       setError('Please confirm the mileage is correct before submitting');
       setShowMileageWarningDialog(true);
+      setShowConfirmSubmitDialog(false);
+      scrollToTarget(document.getElementById('mileage'));
       return;
     }
 
@@ -688,14 +705,35 @@ function NewInspectionContent() {
     const weekEndDate = new Date(weekEnding + 'T00:00:00');
     if (weekEndDate.getDay() !== 0) {
       setError('Week ending must be a Sunday');
-      // Dialog will stay open due to onOpenChange handler checking error state
+      setShowConfirmSubmitDialog(false);
+      scrollToTarget(document.getElementById('weekEnding'));
+      return;
+    }
+
+    const missingStatusKey = (() => {
+      for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek += 1) {
+        for (let itemNumber = 1; itemNumber <= currentChecklist.length; itemNumber += 1) {
+          const key = `${dayOfWeek}-${itemNumber}`;
+          if (!checkboxStates[key]) return key;
+        }
+      }
+      return null;
+    })();
+
+    if (missingStatusKey) {
+      const [dayOfWeek] = missingStatusKey.split('-').map(Number);
+      setError('Please complete all checklist items before submitting');
+      setShowConfirmSubmitDialog(false);
+      openDayAndScrollToChecklistTarget(dayOfWeek, `[data-checklist-item="${missingStatusKey}"]`);
       return;
     }
 
     // Validate: all defects must have comments
     const defectsWithoutComments: string[] = [];
+    let firstDefectWithoutCommentKey: string | null = null;
     Object.entries(checkboxStates).forEach(([key, status]) => {
       if (status === 'attention' && !comments[key]) {
+        if (!firstDefectWithoutCommentKey) firstDefectWithoutCommentKey = key;
         const [dayOfWeek, itemNumber] = key.split('-').map(Number);
         const dayName = DAY_NAMES[dayOfWeek - 1] || `Day ${dayOfWeek}`;
         const itemName = currentChecklist[itemNumber - 1] || `Item ${itemNumber}`;
@@ -708,7 +746,11 @@ function NewInspectionContent() {
       toast.error('Missing defect comments', {
         description: `Please add comments for: ${defectsWithoutComments.slice(0, 3).join(', ')}${defectsWithoutComments.length > 3 ? '...' : ''}`,
       });
-      // Dialog will stay open due to onOpenChange handler checking error state
+      setShowConfirmSubmitDialog(false);
+      if (firstDefectWithoutCommentKey) {
+        const [dayOfWeek] = firstDefectWithoutCommentKey.split('-').map(Number);
+        openDayAndScrollToChecklistTarget(dayOfWeek, `[data-comment-input="${firstDefectWithoutCommentKey}"]`);
+      }
       return;
     }
 
@@ -718,6 +760,8 @@ function NewInspectionContent() {
       toast.error('Comment too short', {
         description: 'Add at least 10 characters to your end-of-inspection notes to create a workshop task.',
       });
+      setShowConfirmSubmitDialog(false);
+      scrollToTarget(document.getElementById('inspector-comments'));
       return;
     }
     
@@ -1308,7 +1352,7 @@ function NewInspectionContent() {
                 Creating inspection for
               </Label>
               <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                <SelectTrigger className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
+                <SelectTrigger id="selectedEmployeeId" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
                   <SelectValue placeholder="Select employee..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -1464,7 +1508,7 @@ function NewInspectionContent() {
               onChange={(e) => handleMileageChange(e.target.value)}
               placeholder={(() => {
                 const sel = vehicles.find(v => v.id === vehicleId);
-                return sel?.current_mileage ? `e.g. ${sel.current_mileage}` : 'e.g. 45000';
+                return sel?.current_mileage != null ? `e.g. ${sel.current_mileage}` : 'e.g. 45000';
               })()}
               min="0"
               step="1"
@@ -1473,11 +1517,6 @@ function NewInspectionContent() {
               }`}
               required
             />
-            {baselineMileage !== null && baselineMileageSource !== 'none' && (
-              <p className="text-xs text-muted-foreground">
-                Last recorded: {formatMileage(baselineMileage)}
-              </p>
-            )}
             {mileageWarning?.warning && !mileageConfirmed && (
               <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                 <div className="flex items-start gap-2">
@@ -1587,7 +1626,7 @@ function NewInspectionContent() {
                     const loggedInfo = loggedDefects.get(loggedKey);
               
               return (
-                <div key={itemNumber} className={`bg-slate-900/30 border rounded-lg p-4 space-y-3 ${
+                <div key={itemNumber} data-checklist-item={key} className={`bg-slate-900/30 border rounded-lg p-4 space-y-3 ${
                   isLogged ? 'border-red-500/50 bg-red-500/5' : 'border-border/50'
                 }`}>
                   {/* Item Header */}
@@ -1629,6 +1668,7 @@ function NewInspectionContent() {
                         {currentStatus === 'attention' ? (isLogged ? 'Manager Comment (Read-Only)' : 'Comments (Required)') : 'Notes'}
                       </Label>
                       <Textarea
+                        data-comment-input={key}
                         value={comments[key] || ''}
                         onChange={(e) => !isLogged && handleCommentChange(itemNumber, e.target.value)}
                         placeholder={isLogged ? '' : 'Add details...'}
@@ -1703,7 +1743,7 @@ function NewInspectionContent() {
                   const isLogged = loggedDefects.has(loggedKey);
                   
                   return (
-                    <tr key={itemNumber} className={`border-b border-border/50 hover:bg-slate-800/30 ${
+                    <tr key={itemNumber} data-checklist-item={key} className={`border-b border-border/50 hover:bg-slate-800/30 ${
                       isLogged ? 'bg-red-500/5' : ''
                     }`}>
                       <td className="p-3 text-sm text-muted-foreground">{itemNumber}</td>
@@ -1735,6 +1775,7 @@ function NewInspectionContent() {
                       </td>
                       <td className="p-3">
                         <Input
+                          data-comment-input={key}
                           value={comments[key] || ''}
                           onChange={(e) => !isLogged && handleCommentChange(itemNumber, e.target.value)}
                           placeholder={isLogged ? '' : (currentStatus === 'attention' ? 'Required for defects' : 'Optional notes')}

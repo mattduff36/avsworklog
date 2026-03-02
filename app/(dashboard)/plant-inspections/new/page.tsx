@@ -23,6 +23,7 @@ import { Database } from '@/types/database';
 import { Employee } from '@/types/common';
 import { toast } from 'sonner';
 import { showErrorWithReport } from '@/lib/utils/error-reporting';
+import { scrollAndHighlightValidationTarget } from '@/lib/utils/validation-scroll';
 
 // Dynamic imports for heavy components
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -72,6 +73,8 @@ type ProfileWithRole = {
     is_manager_admin?: boolean;
   } | null;
 };
+
+const STICKY_NAV_OFFSET_PX = 96;
 
 function NewPlantInspectionContent() {
   const router = useRouter();
@@ -452,24 +455,35 @@ function NewPlantInspectionContent() {
     
     validateAndSubmit();
   };
-  
+
+  const scrollToTarget = (el: Element | null) =>
+    scrollAndHighlightValidationTarget(el, STICKY_NAV_OFFSET_PX);
+
   const validateAndSubmit = () => {
     if (!isHiredPlant && !selectedPlantId) {
       setError('Please select a plant');
+      setShowConfirmSubmitDialog(false);
+      scrollToTarget(document.getElementById('plant'));
       return;
     }
 
     if (isHiredPlant) {
       if (!hiredPlantIdSerial.trim()) {
         setError('Please enter the hired plant ID / serial number');
+        setShowConfirmSubmitDialog(false);
+        scrollToTarget(document.getElementById('hiredPlantId'));
         return;
       }
       if (!hiredPlantDescription.trim()) {
         setError('Please enter a plant description');
+        setShowConfirmSubmitDialog(false);
+        scrollToTarget(document.getElementById('hiredPlantDesc'));
         return;
       }
       if (!hiredPlantHiringCompany.trim()) {
         setError('Please enter the hiring company');
+        setShowConfirmSubmitDialog(false);
+        scrollToTarget(document.getElementById('hiredPlantCompany'));
         return;
       }
     }
@@ -479,6 +493,8 @@ function NewPlantInspectionContent() {
     const isOldDraftWithoutHours = existingInspectionId && originalCurrentMileage === null;
     if (hoursValue === null && !isOldDraftWithoutHours) {
       setError('Please enter a valid current hours reading');
+      setShowConfirmSubmitDialog(false);
+      scrollToTarget(document.getElementById('currentHours'));
       return;
     }
 
@@ -496,13 +512,18 @@ function NewPlantInspectionContent() {
       toast.error('Incomplete checklist', {
         description: `${missingItems.length} item${missingItems.length > 1 ? 's' : ''} still need a status`,
       });
+      setShowConfirmSubmitDialog(false);
+      const firstMissingItemNumber = currentChecklist.findIndex((_, idx) => !checkboxStates[`${idx + 1}`]) + 1;
+      scrollToTarget(document.querySelector(`[data-checklist-item="${firstMissingItemNumber}"]`));
       return;
     }
 
     // Validate: all defects must have comments
     const defectsWithoutComments: string[] = [];
+    let firstDefectWithoutCommentKey: string | null = null;
     Object.entries(checkboxStates).forEach(([key, status]) => {
       if (status === 'attention' && !comments[key]) {
+        if (!firstDefectWithoutCommentKey) firstDefectWithoutCommentKey = key;
         const itemNumber = parseInt(key);
         const itemName = currentChecklist[itemNumber - 1] || `Item ${itemNumber}`;
         defectsWithoutComments.push(itemName);
@@ -514,6 +535,10 @@ function NewPlantInspectionContent() {
       toast.error('Missing defect comments', {
         description: `Please add comments for: ${defectsWithoutComments.slice(0, 3).join(', ')}${defectsWithoutComments.length > 3 ? '...' : ''}`,
       });
+      setShowConfirmSubmitDialog(false);
+      if (firstDefectWithoutCommentKey) {
+        scrollToTarget(document.querySelector(`[data-comment-input="${firstDefectWithoutCommentKey}"]`));
+      }
       return;
     }
 
@@ -521,6 +546,8 @@ function NewPlantInspectionContent() {
     if (!isHiredPlant && informWorkshop && inspectorComments.trim().length < 10) {
       setError('Workshop notification requires at least 10 characters in the comment field');
       toast.error('Comment too short');
+      setShowConfirmSubmitDialog(false);
+      scrollToTarget(document.getElementById('inspector-comments'));
       return;
     }
     
@@ -909,7 +936,7 @@ function NewPlantInspectionContent() {
                 Creating inspection for
               </Label>
               <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                <SelectTrigger className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
+                <SelectTrigger id="selectedEmployeeId" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
                   <SelectValue placeholder="Select employee..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -1056,7 +1083,7 @@ function NewPlantInspectionContent() {
               onChange={(e) => setCurrentHours(e.target.value)}
               placeholder={(() => {
                 const sel = plants.find(p => p.id === selectedPlantId);
-                return sel?.current_hours ? `e.g. ${sel.current_hours}` : 'e.g. 45000';
+                return sel?.current_hours != null ? `e.g. ${sel.current_hours}` : 'e.g. 45000';
               })()}
               min="0"
               step="1"
@@ -1102,7 +1129,7 @@ function NewPlantInspectionContent() {
               const isLogged = loggedDefects.has(`${itemNumber}`);
         
               return (
-                <div key={itemNumber} className={`bg-slate-900/30 border rounded-lg p-4 space-y-3 ${
+                <div key={itemNumber} data-checklist-item={key} className={`bg-slate-900/30 border rounded-lg p-4 space-y-3 ${
                   isLogged ? 'border-red-500/50 bg-red-500/5' : 'border-border/50'
                 }`}>
                   <div className="flex items-start gap-3">
@@ -1144,6 +1171,7 @@ function NewPlantInspectionContent() {
                         {currentStatus === 'attention' ? (isLogged ? 'Manager Comment' : 'Comments (Required)') : 'Notes'}
                       </Label>
                       <Textarea
+                        data-comment-input={key}
                         value={comments[key] || ''}
                         onChange={(e) => !isLogged && handleCommentChange(itemNumber, e.target.value)}
                         placeholder={isLogged ? '' : 'Add details...'}
@@ -1201,7 +1229,7 @@ function NewPlantInspectionContent() {
                   const isLogged = loggedDefects.has(`${itemNumber}`);
                   
                   return (
-                    <tr key={itemNumber} className={`border-b border-border/50 hover:bg-slate-800/30 ${
+                    <tr key={itemNumber} data-checklist-item={key} className={`border-b border-border/50 hover:bg-slate-800/30 ${
                       isLogged ? 'bg-red-500/5' : ''
                     }`}>
                       <td className="p-3 text-sm text-muted-foreground">{itemNumber}</td>
@@ -1236,6 +1264,7 @@ function NewPlantInspectionContent() {
                       </td>
                       <td className="p-3">
                         <Input
+                          data-comment-input={key}
                           value={comments[key] || ''}
                           onChange={(e) => !isLogged && handleCommentChange(itemNumber, e.target.value)}
                           placeholder={isLogged ? '' : (currentStatus === 'attention' ? 'Required for defects' : 'Optional notes')}

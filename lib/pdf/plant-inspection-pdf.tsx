@@ -1,263 +1,118 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { PLANT_INSPECTION_ITEMS } from '@/lib/checklists/plant-checklists';
 import { formatDate } from '@/lib/utils/date';
 
-// Styles for the Plant Inspection PDF
 const styles = StyleSheet.create({
-  page: {
-    padding: 20,
-    fontSize: 7,
-    fontFamily: 'Helvetica',
-  },
-  header: {
-    textAlign: 'center',
-    marginBottom: 15,
-  },
-  title: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  subtitle: {
-    fontSize: 9,
-    color: '#666',
-  },
-  infoSection: {
-    marginBottom: 10,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    marginBottom: 8,
-    gap: 10,
-  },
-  infoBox: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#000',
-    padding: 6,
-  },
-  label: {
-    fontSize: 7,
-    fontWeight: 'bold',
-    marginBottom: 2,
-    color: '#666',
-  },
-  value: {
-    fontSize: 9,
-    fontWeight: 'bold',
-  },
-  hoursTable: {
-    borderWidth: 1,
-    borderColor: '#000',
-    marginBottom: 10,
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#f0f0f0',
-    borderBottomWidth: 1,
-    borderBottomColor: '#000',
-  },
-  dayHeader: {
-    flex: 1,
-    padding: 5,
-    textAlign: 'center',
-    fontSize: 7,
-    fontWeight: 'bold',
-    borderRightWidth: 1,
-    borderRightColor: '#000',
-  },
-  dayHeaderLast: {
-    flex: 1,
-    padding: 5,
-    textAlign: 'center',
-    fontSize: 7,
-    fontWeight: 'bold',
-  },
-  tableRow: {
-    flexDirection: 'row',
-  },
-  hoursCell: {
-    flex: 1,
-    padding: 5,
-    textAlign: 'center',
-    fontSize: 8,
-    borderRightWidth: 1,
-    borderRightColor: '#000',
-  },
-  hoursCellLast: {
-    flex: 1,
-    padding: 5,
-    textAlign: 'center',
-    fontSize: 8,
-  },
-  checklist: {
-    borderWidth: 1,
-    borderColor: '#000',
-    marginBottom: 10,
-  },
-  checklistHeaderRow: {
-    flexDirection: 'row',
-    backgroundColor: '#f0f0f0',
-    borderBottomWidth: 1,
-    borderBottomColor: '#000',
-    padding: 4,
-  },
-  checklistNumberHeader: {
-    width: '5%',
-    fontSize: 7,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  checklistItemHeader: {
-    width: '30%',
-    fontSize: 7,
-    fontWeight: 'bold',
-    paddingLeft: 4,
-  },
-  checklistDayHeader: {
-    width: '9.29%', // 65% / 7 days
-    fontSize: 6,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    borderLeftWidth: 1,
-    borderLeftColor: '#000',
-    paddingVertical: 2,
-  },
-  checklistRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
-    minHeight: 16,
-  },
-  checklistRowLast: {
-    flexDirection: 'row',
-    minHeight: 16,
-  },
-  itemNumber: {
-    width: '5%',
-    padding: 3,
-    fontSize: 7,
-    textAlign: 'center',
-    justifyContent: 'center',
-  },
-  itemDescription: {
-    width: '30%',
-    padding: 3,
-    fontSize: 6,
-    justifyContent: 'center',
-  },
-  statusCell: {
-    width: '9.29%',
-    padding: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderLeftWidth: 1,
-    borderLeftColor: '#000',
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  okText: {
-    color: '#22c55e',
-  },
-  failText: {
-    color: '#ef4444',
-  },
-  naText: {
-    color: '#999',
-  },
-  signatureSection: {
-    marginTop: 15,
-    marginBottom: 10,
-  },
-  signatureRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    marginBottom: 8,
-  },
-  signatureLabel: {
-    fontSize: 8,
-    fontWeight: 'bold',
-    marginRight: 10,
-  },
-  signatureLine: {
-    flex: 1,
-    borderBottomWidth: 1,
-    borderBottomColor: '#000',
-    minHeight: 20,
-  },
-  commentsSection: {
-    borderWidth: 1,
-    borderColor: '#000',
-    padding: 8,
-    minHeight: 60,
-  },
-  commentsLabel: {
-    fontSize: 8,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  commentsText: {
-    fontSize: 7,
-    lineHeight: 1.4,
-  },
-  dailyChecklistItemHeader: {
-    width: '55%',
-    fontSize: 7,
-    fontWeight: 'bold',
-    paddingLeft: 4,
-  },
-  dailyChecklistStatusHeader: {
-    width: '15%',
-    fontSize: 7,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    borderLeftWidth: 1,
-    borderLeftColor: '#000',
-    paddingVertical: 2,
-  },
-  dailyChecklistCommentsHeader: {
-    width: '25%',
-    fontSize: 7,
-    fontWeight: 'bold',
-    paddingLeft: 4,
-    borderLeftWidth: 1,
-    borderLeftColor: '#000',
-    paddingVertical: 2,
-  },
-  dailyItemDescription: {
-    width: '55%',
-    padding: 3,
-    fontSize: 6,
-    justifyContent: 'center',
-  },
-  dailyStatusCell: {
-    width: '15%',
-    padding: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderLeftWidth: 1,
-    borderLeftColor: '#000',
-  },
-  dailyCommentsCell: {
-    width: '25%',
-    padding: 3,
-    fontSize: 6,
-    justifyContent: 'center',
-    borderLeftWidth: 1,
-    borderLeftColor: '#000',
-  },
-  footer: {
+  page: { padding: 20, fontSize: 7, fontFamily: 'Helvetica' },
+  formNumber: {
     position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
-    textAlign: 'center',
-    fontSize: 6,
-    color: '#666',
+    top: 34,
+    right: 24,
+    fontSize: 14,
+    color: '#555',
+    fontWeight: 'bold',
   },
+  companyHeader: { textAlign: 'center', marginBottom: 8 },
+  companyName: { fontSize: 16, fontWeight: 'bold', marginBottom: 1 },
+  companyDetails: { fontSize: 6, marginBottom: 1 },
+  companyPhone: { fontSize: 8, fontWeight: 'bold' },
+  registeredNo: { fontSize: 6, fontStyle: 'italic', marginTop: 1, marginBottom: 2 },
+  pageTitle: { fontSize: 11, fontWeight: 'bold', marginTop: 2 },
+  topTable: { borderWidth: 1, borderColor: '#000' },
+  topRow: { flexDirection: 'row', minHeight: 30 },
+  topCell: {
+    padding: 4,
+    justifyContent: 'center',
+    borderRightWidth: 1,
+    borderRightColor: '#000',
+  },
+  topCellLast: { padding: 4, justifyContent: 'center' },
+  topLabel: { fontSize: 8 },
+  topValue: { fontSize: 8, fontWeight: 'bold', marginTop: 3 },
+  checklistTable: { borderWidth: 1, borderTopWidth: 0, borderColor: '#000' },
+  checklistHeader: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#000',
+    backgroundColor: '#f0f0f0',
+    minHeight: 18,
+    alignItems: 'center',
+  },
+  row: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#000', minHeight: 18 },
+  rowLast: { flexDirection: 'row', minHeight: 18 },
+  numCell: {
+    width: '6%',
+    borderRightWidth: 1,
+    borderRightColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 2,
+  },
+  itemCell: {
+    width: '50%',
+    borderRightWidth: 1,
+    borderRightColor: '#000',
+    justifyContent: 'center',
+    padding: 3,
+  },
+  passCell: {
+    width: '10%',
+    borderRightWidth: 1,
+    borderRightColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 2,
+  },
+  failCell: {
+    width: '10%',
+    borderRightWidth: 1,
+    borderRightColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 2,
+  },
+  commentsCell: { width: '24%', justifyContent: 'center', padding: 3 },
+  headerText: { fontSize: 7, fontWeight: 'bold' },
+  numText: { fontSize: 8, fontWeight: 'bold' },
+  itemText: { fontSize: 7 },
+  markText: { fontSize: 7, fontWeight: 'bold' },
+  commentsText: { fontSize: 6, lineHeight: 1.2 },
+  checkedByBox: {
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderColor: '#000',
+    paddingHorizontal: 4,
+    paddingVertical: 3,
+    minHeight: 34,
+    justifyContent: 'center',
+  },
+  checkedByLabel: { fontSize: 7, fontWeight: 'bold', marginBottom: 2 },
+  signatureRow: { flexDirection: 'row', alignItems: 'center' },
+  signatureImageWrap: {
+    width: 120,
+    height: 48,
+    borderWidth: 1,
+    borderColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  signatureImage: { width: 114, height: 40, objectFit: 'contain' },
+  signatureMissing: { fontSize: 6, color: '#666' },
+  signerMeta: { fontSize: 7 },
+  defectsBox: {
+    borderWidth: 1,
+    borderColor: '#000',
+    marginTop: 5,
+    padding: 4,
+    minHeight: 70,
+  },
+  defectsTitle: { fontSize: 8, fontWeight: 'bold', marginBottom: 3 },
+  defectsText: { fontSize: 6, lineHeight: 1.2 },
+  legendSection: { marginTop: 6, textAlign: 'center' },
+  legendText: { fontSize: 6, fontWeight: 'bold', marginBottom: 1 },
+  legendNote: { fontSize: 5 },
 });
 
 interface PlantInspectionPDFProps {
@@ -268,6 +123,7 @@ interface PlantInspectionPDFProps {
     current_mileage: number | null;
     inspector_comments: string | null;
     signature_data: string | null;
+    signed_at?: string | null;
   };
   plant: {
     plant_id: string;
@@ -293,232 +149,166 @@ interface PlantInspectionPDFProps {
   }>;
 }
 
-export function PlantInspectionPDF({ 
-  inspection, 
-  plant, 
-  operator, 
-  items, 
-  dailyHours 
+export function PlantInspectionPDF({
+  inspection,
+  plant,
+  operator,
+  items,
+  dailyHours,
 }: PlantInspectionPDFProps) {
-  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const isDaily = inspection.inspection_date === inspection.inspection_end_date;
+  const formNumber = inspection.id ? inspection.id.slice(-5).toUpperCase() : '00000';
+  const inspectionDay = (() => {
+    const date = new Date(inspection.inspection_date);
+    const jsDay = date.getDay();
+    return jsDay === 0 ? 7 : jsDay;
+  })();
+
+  const getSingleItem = (itemNumber: number) => {
+    const sameNumber = items.filter((item) => item.item_number === itemNumber);
+    if (sameNumber.length === 0) {
+      return null;
+    }
+
+    const exactDayMatch = sameNumber.find((item) => item.day_of_week === inspectionDay);
+    if (exactDayMatch) {
+      return exactDayMatch;
+    }
+
+    return [...sameNumber].sort((a, b) => a.day_of_week - b.day_of_week)[0];
+  };
+
+  const formatSignedAt = (signedAt?: string | null) => {
+    if (!signedAt) {
+      return '-';
+    }
+    const date = new Date(signedAt);
+    if (Number.isNaN(date.getTime())) {
+      return '-';
+    }
+    const time = date.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    return `${formatDate(signedAt)} ${time}`;
+  };
+
+  const machineText = plant.isHired
+    ? `${plant.plant_id}${plant.nickname ? ` (${plant.nickname})` : ''}`
+    : `${plant.plant_id}${plant.nickname ? ` (${plant.nickname})` : ''}${plant.serial_number ? ` (SN: ${plant.serial_number})` : ''}`;
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>OPERATED PLANT INSPECTION PAD</Text>
-          <Text style={styles.subtitle}>
-            {isDaily
-              ? `Date: ${formatDate(inspection.inspection_date)}`
-              : `Week: ${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
-            }
+        <View style={styles.formNumber}>
+          <Text>{formNumber}</Text>
+        </View>
+
+        <View style={styles.companyHeader}>
+          <Text style={styles.companyName}>A. & V. SQUIRES PLANT COMPANY LTD</Text>
+          <Text style={styles.companyDetails}>
+            REGISTERED OFFICE: VIVIENNE HOUSE, RACECOURSE ROAD, CREW LANE INDUSTRIAL ESTATE, SOUTHWELL, NOTTS. NG25 0TX
           </Text>
+          <Text style={styles.companyPhone}>Telephone: SOUTHWELL (01636) 812227</Text>
+          <Text style={styles.registeredNo}>Registered in England No. 1000918</Text>
+          <Text style={styles.pageTitle}>OPERATED PLANT INSPECTION PAD</Text>
         </View>
 
-        {/* Info Section */}
-        <View style={styles.infoSection}>
-          <View style={styles.infoRow}>
-            <View style={styles.infoBox}>
-              <Text style={styles.label}>{plant.isHired ? 'HIRED PLANT ID / SERIAL' : 'PLANT NUMBER'}</Text>
-              <Text style={styles.value}>
-                {plant.isHired ? plant.plant_id : (
-                  <>
-                    {plant.plant_id}
-                    {plant.nickname && ` (${plant.nickname})`}
-                    {plant.serial_number && ` (SN: ${plant.serial_number})`}
-                  </>
-                )}
-              </Text>
+        <View style={styles.topTable}>
+          <View style={styles.topRow}>
+            <View style={[styles.topCell, { width: '44%' }]}>
+              <Text style={styles.topLabel}>MACHINE</Text>
+              <Text style={styles.topValue}>{machineText}</Text>
             </View>
-            <View style={styles.infoBox}>
-              <Text style={styles.label}>OPERATOR&apos;S NAME</Text>
-              <Text style={styles.value}>{operator.full_name}</Text>
+            <View style={[styles.topCell, { width: '18%' }]}>
+              <Text style={styles.topLabel}>HOURS</Text>
+              <Text style={styles.topValue}>{inspection.current_mileage != null ? `${inspection.current_mileage}` : '-'}</Text>
+            </View>
+            <View style={[styles.topCellLast, { width: '38%' }]}>
+              <Text style={styles.topLabel}>OPERATOR&apos;S NAME</Text>
+              <Text style={styles.topValue}>{operator.full_name}</Text>
             </View>
           </View>
-          {plant.isHired && (
-            <View style={styles.infoRow}>
-              {plant.nickname && (
-                <View style={styles.infoBox}>
-                  <Text style={styles.label}>PLANT DESCRIPTION</Text>
-                  <Text style={styles.value}>{plant.nickname}</Text>
-                </View>
-              )}
-              {plant.hiringCompany && (
-                <View style={styles.infoBox}>
-                  <Text style={styles.label}>HIRING COMPANY</Text>
-                  <Text style={styles.value}>{plant.hiringCompany}</Text>
-                </View>
-              )}
-            </View>
-          )}
-          {(plant.van_categories || inspection.current_mileage != null) && (
-            <View style={styles.infoRow}>
-              {plant.van_categories && (
-                <View style={styles.infoBox}>
-                  <Text style={styles.label}>CATEGORY</Text>
-                  <Text style={styles.value}>{plant.van_categories.name}</Text>
-                </View>
-              )}
-              {inspection.current_mileage != null && (
-                <View style={styles.infoBox}>
-                  <Text style={styles.label}>CURRENT HOURS</Text>
-                  <Text style={styles.value}>{inspection.current_mileage.toLocaleString()}h</Text>
-                </View>
-              )}
-            </View>
-          )}
         </View>
 
-        {/* Hours Table (legacy - for older inspections with daily hours) */}
-        {dailyHours.length > 0 && (
-        <View style={styles.hoursTable}>
-          <View style={styles.tableHeader}>
-            {dayNames.map((day, idx) => (
-              <Text 
-                key={day} 
-                style={idx === 6 ? styles.dayHeaderLast : styles.dayHeader}
-              >
-                {day}
-              </Text>
-            ))}
+        <View style={styles.checklistTable}>
+          <View style={styles.checklistHeader}>
+            <View style={styles.numCell}>
+              <Text style={styles.headerText}>#</Text>
+            </View>
+            <View style={styles.itemCell}>
+              <Text style={styles.headerText}>CHECKLIST ITEM</Text>
+            </View>
+            <View style={styles.passCell}>
+              <Text style={styles.headerText}>PASS</Text>
+            </View>
+            <View style={styles.failCell}>
+              <Text style={styles.headerText}>FAIL</Text>
+            </View>
+            <View style={styles.commentsCell}>
+              <Text style={styles.headerText}>COMMENTS</Text>
+            </View>
           </View>
-          <View style={styles.tableRow}>
-            {[1, 2, 3, 4, 5, 6, 7].map((dayOfWeek, idx) => {
-              const hours = dailyHours.find(h => h.day_of_week === dayOfWeek);
-              return (
-                <Text 
-                  key={dayOfWeek} 
-                  style={idx === 6 ? styles.hoursCellLast : styles.hoursCell}
-                >
-                  {hours?.hours ?? '-'}
-                </Text>
-              );
-            })}
-          </View>
-        </View>
-        )}
+          {PLANT_INSPECTION_ITEMS.map((itemLabel, index) => {
+            const itemNumber = index + 1;
+            const item = getSingleItem(itemNumber);
+            const isLast = index === PLANT_INSPECTION_ITEMS.length - 1;
+            const rowStyle = isLast ? styles.rowLast : styles.row;
+            const passMark = item?.status === 'ok' ? 'PASS' : '';
+            const failMark = item?.status === 'attention' ? 'FAIL' : '';
+            const itemComments = item?.status === 'na'
+              ? ['N/A', item?.comments].filter(Boolean).join(' - ')
+              : (item?.comments || '');
 
-        {/* Checklist */}
-        <View style={styles.checklist}>
-          {isDaily ? (
-            <>
-              <View style={styles.checklistHeaderRow}>
-                <Text style={styles.checklistNumberHeader}>#</Text>
-                <Text style={styles.dailyChecklistItemHeader}>Item</Text>
-                <Text style={styles.dailyChecklistStatusHeader}>Status</Text>
-                <Text style={styles.dailyChecklistCommentsHeader}>Comments</Text>
+            return (
+              <View key={itemNumber} style={rowStyle}>
+                <View style={styles.numCell}>
+                  <Text style={styles.numText}>{String(itemNumber).padStart(2, '0')}</Text>
+                </View>
+                <View style={styles.itemCell}>
+                  <Text style={styles.itemText}>{itemLabel}</Text>
+                </View>
+                <View style={styles.passCell}>
+                  <Text style={styles.markText}>{passMark}</Text>
+                </View>
+                <View style={styles.failCell}>
+                  <Text style={styles.markText}>{failMark}</Text>
+                </View>
+                <View style={styles.commentsCell}>
+                  <Text style={styles.commentsText}>{itemComments}</Text>
+                </View>
               </View>
-              {PLANT_INSPECTION_ITEMS.map((item, idx) => {
-                const itemNumber = idx + 1;
-                const isLast = idx === PLANT_INSPECTION_ITEMS.length - 1;
-                const itemStatus = items.find(i => i.item_number === itemNumber);
-                
-                return (
-                  <View 
-                    key={itemNumber} 
-                    style={isLast ? styles.checklistRowLast : styles.checklistRow}
-                  >
-                    <View style={styles.itemNumber}>
-                      <Text>{itemNumber}</Text>
-                    </View>
-                    <View style={styles.dailyItemDescription}>
-                      <Text>{item}</Text>
-                    </View>
-                    <View style={styles.dailyStatusCell}>
-                      {itemStatus?.status === 'ok' && (
-                        <Text style={[styles.statusText, styles.okText]}>✓</Text>
-                      )}
-                      {itemStatus?.status === 'attention' && (
-                        <Text style={[styles.statusText, styles.failText]}>✗</Text>
-                      )}
-                      {itemStatus?.status === 'na' && (
-                        <Text style={[styles.statusText, styles.naText]}>N/A</Text>
-                      )}
-                      {!itemStatus && (
-                        <Text style={[styles.statusText, styles.naText]}>-</Text>
-                      )}
-                    </View>
-                    <View style={styles.dailyCommentsCell}>
-                      <Text>{itemStatus?.comments || ''}</Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </>
-          ) : (
-            <>
-              <View style={styles.checklistHeaderRow}>
-                <Text style={styles.checklistNumberHeader}>#</Text>
-                <Text style={styles.checklistItemHeader}>Item</Text>
-                {dayNames.map((day) => (
-                  <Text key={day} style={styles.checklistDayHeader}>
-                    {day}
-                  </Text>
-                ))}
-              </View>
-              {PLANT_INSPECTION_ITEMS.map((item, idx) => {
-                const itemNumber = idx + 1;
-                const isLast = idx === PLANT_INSPECTION_ITEMS.length - 1;
-                
-                return (
-                  <View 
-                    key={itemNumber} 
-                    style={isLast ? styles.checklistRowLast : styles.checklistRow}
-                  >
-                    <View style={styles.itemNumber}>
-                      <Text>{itemNumber}</Text>
-                    </View>
-                    <View style={styles.itemDescription}>
-                      <Text>{item}</Text>
-                    </View>
-                    {[1, 2, 3, 4, 5, 6, 7].map((dayOfWeek) => {
-                      const itemStatus = items.find(
-                        i => i.item_number === itemNumber && i.day_of_week === dayOfWeek
-                      );
-                      
-                      return (
-                        <View key={dayOfWeek} style={styles.statusCell}>
-                          {itemStatus?.status === 'ok' && (
-                            <Text style={[styles.statusText, styles.okText]}>✓</Text>
-                          )}
-                          {itemStatus?.status === 'attention' && (
-                            <Text style={[styles.statusText, styles.failText]}>✗</Text>
-                          )}
-                          {itemStatus?.status === 'na' && (
-                            <Text style={[styles.statusText, styles.naText]}>N/A</Text>
-                          )}
-                        </View>
-                      );
-                    })}
-                  </View>
-                );
-              })}
-            </>
-          )}
+            );
+          })}
         </View>
 
-        {/* Signature Section */}
-        <View style={styles.signatureSection}>
+        <View style={styles.checkedByBox}>
+          <Text style={styles.checkedByLabel}>Checked By</Text>
           <View style={styles.signatureRow}>
-            <Text style={styles.signatureLabel}>Checked By:</Text>
-            <View style={styles.signatureLine} />
+            <View style={styles.signatureImageWrap}>
+              {inspection.signature_data ? (
+                <Image src={inspection.signature_data} style={styles.signatureImage} alt="" />
+              ) : (
+                <Text style={styles.signatureMissing}>No signature</Text>
+              )}
+            </View>
+            <Text style={styles.signerMeta}>
+              {operator.full_name}  |  Signed: {formatSignedAt(inspection.signed_at)}
+            </Text>
           </View>
         </View>
 
-        {/* Defects/Comments Section */}
-        <View style={styles.commentsSection}>
-          <Text style={styles.commentsLabel}>Defects / Comments:</Text>
-          <Text style={styles.commentsText}>
-            {inspection.inspector_comments || 'None'}
-          </Text>
+        <View style={styles.defectsBox}>
+          <Text style={styles.defectsTitle}>DEFECTS / COMMENTS</Text>
+          <Text style={styles.defectsText}>{inspection.inspector_comments || 'None'}</Text>
         </View>
 
-        {/* Footer */}
-        <Text style={styles.footer}>
-          Plant Inspection Report • Generated: {formatDate(new Date().toISOString())}
-        </Text>
+        <View style={styles.legendSection}>
+          <Text style={styles.legendText}>USE THE FOLLOWING: PASS = IN ORDER   FAIL = REQUIRES ATTENTION   N/A = NOT APPLICABLE</Text>
+          <Text style={styles.legendNote}>Inspection Date: {formatDate(inspection.inspection_date)}</Text>
+          {dailyHours.length > 0 && <Text style={styles.legendNote}>Daily hours records present: {dailyHours.length}</Text>}
+          {plant.hiringCompany && <Text style={styles.legendNote}>Hiring Company: {plant.hiringCompany}</Text>}
+        </View>
       </Page>
     </Document>
   );

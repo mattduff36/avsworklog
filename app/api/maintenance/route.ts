@@ -304,12 +304,14 @@ export async function POST(request: NextRequest) {
     const userName = profile?.full_name || 'Unknown User';
     
     // Parse request body
-    const body: UpdateMaintenanceRequest & { van_id: string } = await request.json();
+    const body: UpdateMaintenanceRequest & { van_id?: string; hgv_id?: string } = await request.json();
     
-    // Validate van_id
-    if (!body.van_id) {
+    const assetId = body.van_id || body.hgv_id;
+    const assetColumn = body.van_id ? 'van_id' : body.hgv_id ? 'hgv_id' : null;
+
+    if (!assetId || !assetColumn) {
       return NextResponse.json(
-        { error: 'van_id is required' },
+        { error: 'van_id or hgv_id is required' },
         { status: 400 }
       );
     }
@@ -326,7 +328,7 @@ export async function POST(request: NextRequest) {
     const { data: existingRecord } = await supabase
       .from('vehicle_maintenance')
       .select('id')
-      .eq('van_id', body.van_id)
+      .eq(assetColumn, assetId)
       .single();
     
     if (existingRecord) {
@@ -338,7 +340,8 @@ export async function POST(request: NextRequest) {
     
     // Create new maintenance record
     const newRecord = {
-      van_id: body.van_id,
+      van_id: body.van_id || null,
+      hgv_id: body.hgv_id || null,
       current_mileage: body.current_mileage || 0,
       tax_due_date: body.tax_due_date || null,
       mot_due_date: body.mot_due_date || null,
@@ -361,13 +364,25 @@ export async function POST(request: NextRequest) {
       logger.error('Failed to create maintenance record', createError);
       throw createError;
     }
+
+    if (body.hgv_id && body.current_mileage !== undefined && body.current_mileage !== null) {
+      const { error: updateHgvError } = await supabase
+        .from('hgvs')
+        .update({ current_mileage: body.current_mileage })
+        .eq('id', body.hgv_id);
+
+      if (updateHgvError) {
+        logger.error('Failed to sync hgvs.current_mileage from maintenance create', updateHgvError);
+      }
+    }
     
     // Create history entry for initial creation
     const historyEntries = [];
     
     if (body.tax_due_date) {
       historyEntries.push({
-        van_id: body.van_id,
+        van_id: body.van_id || null,
+        hgv_id: body.hgv_id || null,
         field_name: 'tax_due_date',
         old_value: null,
         new_value: body.tax_due_date,
@@ -380,7 +395,8 @@ export async function POST(request: NextRequest) {
     
     if (body.mot_due_date) {
       historyEntries.push({
-        van_id: body.van_id,
+        van_id: body.van_id || null,
+        hgv_id: body.hgv_id || null,
         field_name: 'mot_due_date',
         old_value: null,
         new_value: body.mot_due_date,
@@ -393,7 +409,8 @@ export async function POST(request: NextRequest) {
     
     if (body.first_aid_kit_expiry) {
       historyEntries.push({
-        van_id: body.van_id,
+        van_id: body.van_id || null,
+        hgv_id: body.hgv_id || null,
         field_name: 'first_aid_kit_expiry',
         old_value: null,
         new_value: body.first_aid_kit_expiry,
@@ -406,7 +423,8 @@ export async function POST(request: NextRequest) {
     
     if (body.next_service_mileage) {
       historyEntries.push({
-        van_id: body.van_id,
+        van_id: body.van_id || null,
+        hgv_id: body.hgv_id || null,
         field_name: 'next_service_mileage',
         old_value: null,
         new_value: body.next_service_mileage.toString(),
@@ -419,7 +437,8 @@ export async function POST(request: NextRequest) {
     
     if (body.cambelt_due_mileage) {
       historyEntries.push({
-        van_id: body.van_id,
+        van_id: body.van_id || null,
+        hgv_id: body.hgv_id || null,
         field_name: 'cambelt_due_mileage',
         old_value: null,
         new_value: body.cambelt_due_mileage.toString(),

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { VanInspection, InspectionItem } from '@/types/inspection';
 import { formatDate } from '@/lib/utils/date';
 
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
     fontSize: 7,
   },
   checkText: {
-    fontSize: 10,
+    fontSize: 6,
     fontWeight: 'bold',
   },
   // Checked by section
@@ -174,10 +174,37 @@ const styles = StyleSheet.create({
     borderColor: '#000',
     borderTopWidth: 0,
     padding: 4,
-    minHeight: 16,
+    minHeight: 34,
   },
   checkedByText: {
     fontSize: 7,
+  },
+  checkedByLabel: {
+    fontSize: 7,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  signatureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  signatureImageWrap: {
+    width: 120,
+    height: 48,
+    borderWidth: 1,
+    borderColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  signatureImage: {
+    width: 114,
+    height: 40,
+    objectFit: 'contain',
+  },
+  signatureMissing: {
+    fontSize: 6,
+    color: '#666',
   },
   // Comments sections
   commentsBox: {
@@ -206,6 +233,22 @@ interface VanInspectionPDFProps {
 }
 
 export function VanInspectionPDF({ inspection, items, vehicleReg, employeeName }: VanInspectionPDFProps) {
+  const formatSignedAt = (signedAt?: string | null) => {
+    if (!signedAt) {
+      return '-';
+    }
+    const date = new Date(signedAt);
+    if (Number.isNaN(date.getTime())) {
+      return '-';
+    }
+    const time = date.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    return `${formatDate(signedAt)} ${time}`;
+  };
+
   // Get form number (last 5 digits of ID or full ID if shorter)
   const formNumber = inspection.id 
     ? inspection.id.slice(-5).toUpperCase() 
@@ -228,15 +271,14 @@ export function VanInspectionPDF({ inspection, items, vehicleReg, employeeName }
   // Sort by item number
   uniqueItems.sort((a, b) => a.number - b.number);
 
-  // Helper to get check mark for an item on a specific day (1=Monday, 7=Sunday)
+  // Helper to get check text for an item on a specific day (1=Monday, 7=Sunday)
   const getCheckMark = (itemNumber: number, dayOfWeek: number) => {
     const item = items.find(i => 
       Number(i.item_number) === Number(itemNumber) && 
       Number(i.day_of_week) === Number(dayOfWeek)
     );
     if (!item) return '';
-    // Use simple ASCII characters that render in PDFs: / for OK, X for attention, O for N/A
-    return item.status === 'ok' ? '/' : item.status === 'attention' ? 'X' : 'O';
+    return item.status === 'ok' ? 'PASS' : item.status === 'attention' ? 'FAIL' : 'N/A';
   };
 
   // Collect all defects and comments
@@ -244,7 +286,7 @@ export function VanInspectionPDF({ inspection, items, vehicleReg, employeeName }
     .filter(item => item.comments || item.status === 'attention')
     .map(item => {
       const itemName = item.item_description;
-      const status = item.status === 'ok' ? '/' : item.status === 'attention' ? 'X' : 'O';
+      const status = item.status === 'ok' ? 'PASS' : item.status === 'attention' ? 'FAIL' : 'N/A';
       const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][item.day_of_week - 1];
       return `${item.item_number}. ${itemName} (${dayName}) [${status}]${item.comments ? ': ' + item.comments : ''}`;
     })
@@ -341,7 +383,19 @@ export function VanInspectionPDF({ inspection, items, vehicleReg, employeeName }
 
         {/* Checked By Section */}
         <View style={styles.checkedBySection}>
-          <Text style={styles.checkedByText}>Checked by: {employeeName || ''}</Text>
+          <Text style={styles.checkedByLabel}>Checked By</Text>
+          <View style={styles.signatureRow}>
+            <View style={styles.signatureImageWrap}>
+              {inspection.signature_data ? (
+                <Image src={inspection.signature_data} style={styles.signatureImage} alt="" />
+              ) : (
+                <Text style={styles.signatureMissing}>No signature</Text>
+              )}
+            </View>
+            <Text style={styles.checkedByText}>
+              {employeeName || ''}  |  Signed: {formatSignedAt(inspection.signed_at)}
+            </Text>
+          </View>
         </View>
 
         {/* Defects / Comments Section */}
