@@ -126,6 +126,42 @@ export async function PUT(
         });
       }
     }
+
+    if (body.six_weekly_inspection_due_date !== undefined) {
+      updates.six_weekly_inspection_due_date = body.six_weekly_inspection_due_date;
+      if (currentRecord.six_weekly_inspection_due_date !== body.six_weekly_inspection_due_date) {
+        changedFields.push({
+          field_name: 'six_weekly_inspection_due_date',
+          old_value: currentRecord.six_weekly_inspection_due_date,
+          new_value: body.six_weekly_inspection_due_date,
+          value_type: 'date'
+        });
+      }
+    }
+
+    if (body.fire_extinguisher_due_date !== undefined) {
+      updates.fire_extinguisher_due_date = body.fire_extinguisher_due_date;
+      if (currentRecord.fire_extinguisher_due_date !== body.fire_extinguisher_due_date) {
+        changedFields.push({
+          field_name: 'fire_extinguisher_due_date',
+          old_value: currentRecord.fire_extinguisher_due_date,
+          new_value: body.fire_extinguisher_due_date,
+          value_type: 'date'
+        });
+      }
+    }
+
+    if (body.taco_calibration_due_date !== undefined) {
+      updates.taco_calibration_due_date = body.taco_calibration_due_date;
+      if (currentRecord.taco_calibration_due_date !== body.taco_calibration_due_date) {
+        changedFields.push({
+          field_name: 'taco_calibration_due_date',
+          old_value: currentRecord.taco_calibration_due_date,
+          new_value: body.taco_calibration_due_date,
+          value_type: 'date'
+        });
+      }
+    }
     
     if (body.next_service_mileage !== undefined) {
       updates.next_service_mileage = body.next_service_mileage;

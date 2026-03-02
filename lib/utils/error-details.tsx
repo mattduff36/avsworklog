@@ -9,10 +9,10 @@ import { ErrorDetailsType } from '@/types/error-details';
 
 interface ShowErrorWithDetailsOptions {
   message: string;
-  detailsType: ErrorDetailsType;
+  detailsType?: ErrorDetailsType;
   itemId?: string;
   onShowDetails?: () => void;
-  additionalData?: Record<string, any>;
+  additionalData?: Record<string, unknown>;
 }
 
 /**
@@ -20,10 +20,7 @@ interface ShowErrorWithDetailsOptions {
  */
 export function showErrorWithDetails({
   message,
-  detailsType,
-  itemId,
   onShowDetails,
-  additionalData
 }: ShowErrorWithDetailsOptions) {
   toast.error(message, {
     duration: 6000, // Longer duration to give time to click "Show Details"
@@ -40,7 +37,7 @@ export function showErrorWithDetails({
 export async function fetchErrorDetails(
   detailsType: ErrorDetailsType,
   params: Record<string, string>
-): Promise<any> {
+): Promise<unknown> {
   const queryString = new URLSearchParams(params).toString();
   const response = await fetch(`/api/errors/details/${detailsType}?${queryString}`);
   

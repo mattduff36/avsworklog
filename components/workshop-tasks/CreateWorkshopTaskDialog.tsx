@@ -200,21 +200,21 @@ export function CreateWorkshopTaskDialog({
 
           // Combine both into a unified list with asset type indicators
           const combinedVehicles = [
-            ...(vehicleData || []).map(v => ({
+            ...(vehicleData || []).map((v: { id: string; reg_number: string | null; nickname: string | null }) => ({
               id: v.id,
               reg_number: v.reg_number,
               plant_id: null,
               nickname: v.nickname,
               asset_type: 'van' as const
             })),
-            ...(hgvData || []).map(v => ({
+            ...(hgvData || []).map((v: { id: string; reg_number: string | null; nickname: string | null }) => ({
               id: v.id,
               reg_number: v.reg_number,
               plant_id: null,
               nickname: v.nickname,
               asset_type: 'hgv' as const
             })),
-            ...(plantData || []).map(p => ({
+            ...(plantData || []).map((p: { id: string; plant_id: string | null; nickname: string | null }) => ({
               id: p.id,
               reg_number: null,
               plant_id: p.plant_id,
@@ -546,7 +546,11 @@ export function CreateWorkshopTaskDialog({
               </SelectTrigger>
               <SelectContent>
                 {(() => {
-                  const { recentVehicles, otherVehicles } = splitVehiclesByRecent(vehicles, recentVehicleIds);
+                  const vehiclesForRecent = vehicles.map((vehicle) => ({
+                    ...vehicle,
+                    reg_number: vehicle.reg_number ?? vehicle.plant_id ?? '',
+                  }));
+                  const { recentVehicles, otherVehicles } = splitVehiclesByRecent(vehiclesForRecent, recentVehicleIds);
                   return (
                     <>
                       {recentVehicles.length > 0 && (

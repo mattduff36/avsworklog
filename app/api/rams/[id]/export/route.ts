@@ -11,6 +11,7 @@ export async function GET(
 ) {
   try {
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { id } = await params;
 
     // Check authentication
@@ -35,7 +36,7 @@ export async function GET(
     }
 
     // Fetch document
-    const { data: document, error: docError } = await supabase
+    const { data: document, error: docError } = await db
       .from('rams_documents')
       .select(`
         *,
@@ -49,7 +50,7 @@ export async function GET(
     }
 
     // Fetch employee assignments with signatures
-    const { data: assignments, error: assignError } = await supabase
+    const { data: assignments, error: assignError } = await db
       .from('rams_assignments')
       .select(`
         *,
@@ -67,7 +68,7 @@ export async function GET(
     }
 
     // Fetch visitor signatures
-    const { data: visitorSignatures, error: visitorError } = await supabase
+    const { data: visitorSignatures, error: visitorError } = await db
       .from('rams_visitor_signatures')
       .select(`
         *,
@@ -90,10 +91,26 @@ export async function GET(
     const logoUrl = `${protocol}://${host}/images/logo.png`;
 
     // Generate PDF
+    const typedDocument = document as ({
+      id: string;
+      title: string;
+      description: string | null;
+      file_name: string;
+      file_size: number;
+      file_type: string;
+      created_at: string;
+      uploader?: { full_name?: string | null } | null;
+    } & Record<string, unknown>);
     const pdfDocument = RAMSExportDocument({
       document: {
-        ...document,
-        uploader_name: document.uploader?.full_name || 'Unknown',
+        id: typedDocument.id,
+        title: typedDocument.title,
+        description: typedDocument.description,
+        file_name: typedDocument.file_name,
+        file_size: typedDocument.file_size,
+        file_type: typedDocument.file_type,
+        created_at: typedDocument.created_at,
+        uploader_name: typedDocument.uploader?.full_name || 'Unknown',
       },
       assignments: assignments || [],
       visitorSignatures: visitorSignatures || [],
@@ -103,10 +120,10 @@ export async function GET(
     const pdfBuffer = await renderToBuffer(pdfDocument);
 
     // Return PDF
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${document.title.replace(/[^a-z0-9]/gi, '_')}_signatures.pdf"`,
+        'Content-Disposition': `attachment; filename="${typedDocument.title.replace(/[^a-z0-9]/gi, '_')}_signatures.pdf"`,
       },
     });
   } catch (error) {

@@ -11,6 +11,8 @@ import {
 
 type VehicleRow = {
   reg_number?: string | null;
+  vehicle_type?: string | null;
+  van_categories?: { name: string } | null;
 };
 
 type InspectorRow = {
@@ -164,7 +166,7 @@ export async function GET(request: NextRequest) {
     const filename = `Inspection_Compliance_${dateRange}.xlsx`;
 
     // Return Excel file
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="${filename}"`,

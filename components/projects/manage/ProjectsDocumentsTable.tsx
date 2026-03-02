@@ -51,7 +51,7 @@ function SortHeader({
   label,
   field,
   currentSort,
-  currentDir,
+  currentDir: _currentDir,
   onSort,
 }: {
   label: string;

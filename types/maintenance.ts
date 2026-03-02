@@ -11,7 +11,7 @@ export interface MaintenanceCategory {
   alert_threshold_days: number | null;
   alert_threshold_miles: number | null;
   alert_threshold_hours: number | null;
-  applies_to: ('van' | 'plant')[];
+  applies_to: ('van' | 'plant' | 'hgv')[];
   is_active: boolean;
   sort_order: number;
   created_at: string;
@@ -45,6 +45,9 @@ export interface VehicleMaintenance {
   tax_due_date: string | null;
   mot_due_date: string | null;
   first_aid_kit_expiry: string | null;
+  six_weekly_inspection_due_date?: string | null;
+  fire_extinguisher_due_date?: string | null;
+  taco_calibration_due_date?: string | null;
   loler_due_date?: string | null; // LOLER inspection due (plant machinery only)
   
   // Mileage-based maintenance (vehicles)
@@ -71,7 +74,7 @@ export interface VehicleMaintenance {
   last_dvla_sync: string | null;
   dvla_sync_status: 'never' | 'success' | 'error' | 'pending' | null;
   dvla_sync_error: string | null;
-  dvla_raw_data: Record<string, any> | null;
+  dvla_raw_data: Record<string, unknown> | null;
   
   // VES API Vehicle Data
   ves_make: string | null;
@@ -96,7 +99,7 @@ export interface VehicleMaintenance {
   mot_api_sync_status: 'never' | 'success' | 'error' | 'pending' | null;
   mot_api_sync_error: string | null;
   last_mot_api_sync: string | null;
-  mot_raw_data: Record<string, any> | null;
+  mot_raw_data: Record<string, unknown> | null;
   
   // MOT History API Data - Vehicle details
   mot_make: string | null;
@@ -146,8 +149,8 @@ export interface VehicleArchive {
   archive_comment: string | null;
   archived_by: string | null;
   archived_at: string;
-  vehicle_data: Record<string, any>;
-  maintenance_data: Record<string, any> | null;
+  vehicle_data: Record<string, unknown>;
+  maintenance_data: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -195,6 +198,9 @@ export interface VehicleMaintenanceWithStatus extends VehicleMaintenance {
   service_status?: MaintenanceItemStatus;
   cambelt_status?: MaintenanceItemStatus;
   first_aid_status?: MaintenanceItemStatus;
+  six_weekly_status?: MaintenanceItemStatus;
+  fire_extinguisher_status?: MaintenanceItemStatus;
+  taco_calibration_status?: MaintenanceItemStatus;
   loler_status?: MaintenanceItemStatus; // For plant machinery
   
   // Overall counts
@@ -211,6 +217,9 @@ export interface UpdateMaintenanceRequest {
   tax_due_date?: string | null;
   mot_due_date?: string | null;
   first_aid_kit_expiry?: string | null;
+  six_weekly_inspection_due_date?: string | null;
+  fire_extinguisher_due_date?: string | null;
+  taco_calibration_due_date?: string | null;
   next_service_mileage?: number | null;
   last_service_mileage?: number | null;
   cambelt_due_mileage?: number | null;
@@ -230,7 +239,7 @@ export interface CreateCategoryRequest {
   alert_threshold_days?: number;
   alert_threshold_miles?: number;
   alert_threshold_hours?: number;
-  applies_to?: ('van' | 'plant')[];
+  applies_to?: ('van' | 'plant' | 'hgv')[];
   sort_order?: number;
   responsibility?: CategoryResponsibility;
   show_on_overview?: boolean;
@@ -245,7 +254,7 @@ export interface UpdateCategoryRequest {
   alert_threshold_days?: number;
   alert_threshold_miles?: number;
   alert_threshold_hours?: number;
-  applies_to?: ('van' | 'plant')[];
+  applies_to?: ('van' | 'plant' | 'hgv')[];
   is_active?: boolean;
   sort_order?: number;
   responsibility?: CategoryResponsibility;
@@ -292,7 +301,7 @@ export interface WorkshopTaskHistoryItem {
   actioned_comment: string | null;
   actioned_at: string | null;
   logged_at: string | null;
-  status_history?: any[] | null;
+  status_history?: unknown[] | null;
   workshop_task_categories?: {
     name: string;
   } | null;

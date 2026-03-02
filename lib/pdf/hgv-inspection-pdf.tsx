@@ -265,7 +265,7 @@ export function HgvInspectionPDF({ inspection, hgv, operator, items }: HgvInspec
           <View style={styles.signatureRow}>
             <View style={styles.signatureImageWrap}>
               {inspection.signature_data ? (
-                <Image src={inspection.signature_data} style={styles.signatureImage} alt="" />
+                <Image src={inspection.signature_data} style={styles.signatureImage} />
               ) : (
                 <Text style={styles.signatureMissing}>No signature</Text>
               )}

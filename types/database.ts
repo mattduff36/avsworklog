@@ -337,6 +337,9 @@ export interface Database {
           tax_due_date: string | null
           mot_due_date: string | null
           first_aid_kit_expiry: string | null
+          six_weekly_inspection_due_date: string | null
+          fire_extinguisher_due_date: string | null
+          taco_calibration_due_date: string | null
           current_mileage: number | null
           last_service_mileage: number | null
           next_service_mileage: number | null
@@ -361,6 +364,9 @@ export interface Database {
           tax_due_date?: string | null
           mot_due_date?: string | null
           first_aid_kit_expiry?: string | null
+          six_weekly_inspection_due_date?: string | null
+          fire_extinguisher_due_date?: string | null
+          taco_calibration_due_date?: string | null
           current_mileage?: number | null
           last_service_mileage?: number | null
           next_service_mileage?: number | null
@@ -385,6 +391,9 @@ export interface Database {
           tax_due_date?: string | null
           mot_due_date?: string | null
           first_aid_kit_expiry?: string | null
+          six_weekly_inspection_due_date?: string | null
+          fire_extinguisher_due_date?: string | null
+          taco_calibration_due_date?: string | null
           current_mileage?: number | null
           last_service_mileage?: number | null
           next_service_mileage?: number | null

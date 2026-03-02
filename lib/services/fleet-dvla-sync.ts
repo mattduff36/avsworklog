@@ -89,6 +89,7 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
     logPrefix = '',
     delayMsBetweenRequests = 0,
   } = options;
+  const db = supabase as unknown as { from: (table: string) => any };
 
   const results: FleetSyncResultRow[] = [];
   let successCount = 0;
@@ -117,7 +118,7 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
         }
       }
 
-      const { data: existingRecord } = await supabase
+      const { data: existingRecord } = await db
         .from('vehicle_maintenance')
         .select('tax_due_date, mot_due_date')
         .eq(fkField, target.assetId)
@@ -183,18 +184,20 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
             }
           }
         } else if (motExpiryData?.motExpiryDate || motExpiryData?.rawData) {
-          const motRawData = motExpiryData.rawData;
+          const motRawData = motExpiryData.rawData as unknown as Record<string, unknown> | null;
           if (motRawData) {
-            updates.mot_make = motRawData.make || null;
-            updates.mot_model = motRawData.model || null;
-            updates.mot_fuel_type = motRawData.fuelType || null;
-            updates.mot_primary_colour = motRawData.primaryColour || null;
-            updates.mot_registration = motRawData.registration || null;
-            if (motRawData.manufactureYear) {
-              updates.mot_year_of_manufacture = parseInt(motRawData.manufactureYear, 10);
+            updates.mot_make = (motRawData.make as string) || null;
+            updates.mot_model = (motRawData.model as string) || null;
+            updates.mot_fuel_type = (motRawData.fuelType as string) || null;
+            updates.mot_primary_colour = (motRawData.primaryColour as string) || null;
+            updates.mot_registration = (motRawData.registration as string) || null;
+            const manufactureYear = motRawData.manufactureYear as string | undefined;
+            if (manufactureYear) {
+              updates.mot_year_of_manufacture = parseInt(manufactureYear, 10);
             }
-            if (motRawData.firstUsedDate) {
-              updates.mot_first_used_date = motRawData.firstUsedDate;
+            const firstUsedDate = motRawData.firstUsedDate as string | undefined;
+            if (firstUsedDate) {
+              updates.mot_first_used_date = firstUsedDate;
             }
           }
 
@@ -203,13 +206,16 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
             updates.mot_expiry_date = motExpiryData.motExpiryDate;
             if (oldMotDate !== motExpiryData.motExpiryDate) fieldsUpdated.push('mot_due_date');
           } else if (motRawData?.firstUsedDate) {
-            const firstUsedDate = new Date(motRawData.firstUsedDate);
-            const firstMotDue = new Date(firstUsedDate);
-            firstMotDue.setFullYear(firstMotDue.getFullYear() + 3);
-            const calculatedMotDue = toIsoDate(firstMotDue);
-            updates.mot_due_date = calculatedMotDue;
-            updates.mot_expiry_date = calculatedMotDue;
-            if (oldMotDate !== calculatedMotDue) fieldsUpdated.push('mot_due_date (calculated)');
+            const firstUsedRaw = motRawData.firstUsedDate as string | undefined;
+            if (firstUsedRaw) {
+              const firstUsedDate = new Date(firstUsedRaw);
+              const firstMotDue = new Date(firstUsedDate);
+              firstMotDue.setFullYear(firstMotDue.getFullYear() + 3);
+              const calculatedMotDue = toIsoDate(firstMotDue);
+              updates.mot_due_date = calculatedMotDue;
+              updates.mot_expiry_date = calculatedMotDue;
+              if (oldMotDate !== calculatedMotDue) fieldsUpdated.push('mot_due_date (calculated)');
+            }
           }
 
           updates.mot_api_sync_status = 'success';
@@ -224,7 +230,7 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
         }
       }
 
-      const { error: upsertError } = await supabase
+      const { error: upsertError } = await db
         .from('vehicle_maintenance')
         .upsert(
           {
@@ -237,7 +243,7 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
       if (upsertError) throw upsertError;
 
       const persistedMotDate = updates.mot_due_date || null;
-      await supabase.from('dvla_sync_log').insert({
+      await db.from('dvla_sync_log').insert({
         [fkField]: target.assetId,
         registration_number: target.registrationNumber,
         sync_status: 'success',
@@ -258,13 +264,14 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
 
       let updaterName = triggerType === 'automatic' ? 'Scheduled DVLA Sync' : 'DVLA API Sync';
       if (triggeredBy) {
-        const { data: userProfile } = await supabase
+        const { data: userProfile } = await db
           .from('profiles')
           .select('full_name')
           .eq('id', triggeredBy)
           .single();
-        if (userProfile?.full_name) {
-          updaterName = `${userProfile.full_name} (via DVLA Sync)`;
+        const typedProfile = userProfile as { full_name: string | null } | null;
+        if (typedProfile?.full_name) {
+          updaterName = `${typedProfile.full_name} (via DVLA Sync)`;
         }
       }
 
@@ -302,7 +309,7 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
       }
 
       if (historyEntries.length > 0) {
-        const { error: historyError } = await supabase
+        const { error: historyError } = await db
           .from('maintenance_history')
           .insert(historyEntries);
         if (historyError) {
@@ -325,7 +332,7 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
       const errorMessage = getErrorMessage(error);
       console.error(`${logPrefix}[SYNC] Failed ${target.registrationNumber}:`, errorMessage);
 
-      await supabase.from('vehicle_maintenance').upsert(
+      await db.from('vehicle_maintenance').upsert(
         {
           [fkField]: target.assetId,
           dvla_sync_status: 'error',
@@ -336,7 +343,7 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
         { onConflict: fkField }
       );
 
-      await supabase.from('dvla_sync_log').insert({
+      await db.from('dvla_sync_log').insert({
         [fkField]: target.assetId,
         registration_number: target.registrationNumber,
         sync_status: 'error',

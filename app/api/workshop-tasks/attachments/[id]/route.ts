@@ -15,6 +15,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get attachment with template
-    const { data: attachment, error: attachmentError } = await supabase
+    const { data: attachment, error: attachmentError } = await db
       .from('workshop_task_attachments')
       .select(`
         *,
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get questions for the template
-    const { data: questions, error: questionsError } = await supabase
+    const { data: questions, error: questionsError } = await db
       .from('workshop_attachment_questions')
       .select('*')
       .eq('template_id', attachment.template_id)
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get responses for this attachment
-    const { data: responses, error: responsesError } = await supabase
+    const { data: responses, error: responsesError } = await db
       .from('workshop_attachment_responses')
       .select('*')
       .eq('attachment_id', id);
@@ -98,6 +99,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -113,7 +115,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await db
       .from('workshop_task_attachments')
       .delete()
       .eq('id', id);

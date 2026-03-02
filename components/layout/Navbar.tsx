@@ -77,6 +77,24 @@ function getNavItemActiveColors(href: string): { bg: string; text: string } {
   return { bg: 'bg-avs-yellow', text: 'text-slate-900' };
 }
 
+/**
+ * Get module brand color for inactive icon state.
+ */
+function getNavItemIconColor(href: string): string {
+  if (href === '/dashboard' || href === '/help') return 'text-avs-yellow';
+  if (href.startsWith('/timesheets')) return 'text-timesheet';
+  if (href.startsWith('/van-inspections')) return 'text-inspection';
+  if (href.startsWith('/plant-inspections')) return 'text-plant-inspection';
+  if (href.startsWith('/hgv-inspections')) return 'text-inspection';
+  if (href.startsWith('/projects') || href.startsWith('/rams')) return 'text-rams';
+  if (href.startsWith('/absence')) return 'text-absence';
+  if (href.startsWith('/maintenance')) return 'text-maintenance';
+  if (href.startsWith('/fleet')) return 'text-fleet';
+  if (href.startsWith('/workshop')) return 'text-workshop';
+  if (href.startsWith('/reports')) return 'text-avs-yellow';
+  return 'text-avs-yellow';
+}
+
 export function Navbar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -86,7 +104,7 @@ export function Navbar() {
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
-  const [permissionsLoading, setPermissionsLoading] = useState(true);
+  const [, setPermissionsLoading] = useState(true);
   const [hasRAMSAssignments, setHasRAMSAssignments] = useState(false);
   const [isMounted, setIsMounted] = useState(false); // Track client hydration
   const [isCompact, setIsCompact] = useState(false);
@@ -96,7 +114,6 @@ export function Navbar() {
   const supabase = createClient();
 
   // useAuth now provides effective role flags (respecting View As cookie)
-  const isSuperAdmin = isActualSuperAdmin;
   const effectiveIsManager = isManager;
   const effectiveIsAdmin = isAdmin;
 
@@ -393,6 +410,7 @@ export function Navbar() {
                 const Icon = item.icon;
                 const isActive = isLinkActive(item.href);
                 const activeColors = getNavItemActiveColors(item.href);
+                const iconColorClass = getNavItemIconColor(item.href);
                 return (
                   <Link
                     key={item.href}
@@ -406,7 +424,7 @@ export function Navbar() {
                           : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white text-[8px] hover:text-sm px-2 hover:px-3'
                     }`}
                   >
-                    <Icon className="w-4 h-4 flex-shrink-0" />
+                    <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? '' : iconColorClass}`} />
                     <span className={
                       isCompact
                         ? `overflow-hidden whitespace-nowrap transition-all duration-[225ms] ${
@@ -493,6 +511,7 @@ export function Navbar() {
                 const Icon = item.icon;
                 const isActive = isLinkActive(item.href);
                 const activeColors = getNavItemActiveColors(item.href);
+                const iconColorClass = getNavItemIconColor(item.href);
                 return (
                   <Link
                     key={item.href}
@@ -504,7 +523,7 @@ export function Navbar() {
                         : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                     }`}
                   >
-                    <Icon className="w-5 h-5 mr-3" />
+                    <Icon className={`w-5 h-5 mr-3 ${isActive ? '' : iconColorClass}`} />
                     {item.label}
                   </Link>
                 );
@@ -523,6 +542,7 @@ export function Navbar() {
                     const Icon = item.icon;
                     const isActive = isLinkActive(item.href);
                     const activeColors = getNavItemActiveColors(item.href);
+                    const iconColorClass = getNavItemIconColor(item.href);
                     return (
                       <Link
                         key={item.href}
@@ -534,7 +554,7 @@ export function Navbar() {
                             : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                         }`}
                       >
-                        <Icon className="w-5 h-5 mr-3" />
+                        <Icon className={`w-5 h-5 mr-3 ${isActive ? '' : iconColorClass}`} />
                         {item.label}
                       </Link>
                     );
@@ -550,6 +570,7 @@ export function Navbar() {
                         const Icon = item.icon;
                         const isActive = isLinkActive(item.href);
                         const activeColors = getNavItemActiveColors(item.href);
+                        const iconColorClass = getNavItemIconColor(item.href);
                         return (
                           <Link
                             key={item.href}
@@ -561,7 +582,7 @@ export function Navbar() {
                                 : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                             }`}
                           >
-                            <Icon className="w-5 h-5 mr-3" />
+                            <Icon className={`w-5 h-5 mr-3 ${isActive ? '' : iconColorClass}`} />
                             {item.label}
                           </Link>
                         );

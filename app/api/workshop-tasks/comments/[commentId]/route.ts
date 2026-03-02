@@ -14,6 +14,7 @@ export async function PATCH(
 ) {
   try {
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -40,18 +41,19 @@ export async function PATCH(
     }
 
     // Fetch comment to check ownership
-    const { data: existingComment, error: fetchError } = await supabase
+    const { data: existingComment, error: fetchError } = await db
       .from('workshop_task_comments')
       .select('id, author_id, task_id')
       .eq('id', commentId)
       .single();
+    const typedExistingComment = existingComment as { id: string; author_id: string; task_id: string } | null;
 
-    if (fetchError || !existingComment) {
+    if (fetchError || !typedExistingComment) {
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
     }
 
     // Check permission: author or manager/admin
-    const isAuthor = existingComment.author_id === user.id;
+    const isAuthor = typedExistingComment.author_id === user.id;
     const isManager = await isManagerOrAdmin(user.id);
 
     if (!isAuthor && !isManager) {
@@ -62,11 +64,11 @@ export async function PATCH(
     }
 
     // Update comment
-    const { data: updatedComment, error: updateError } = await supabase
+    const { data: updatedComment, error: updateError } = await db
       .from('workshop_task_comments')
       .update({
         body: bodyText,
-      })
+      } as never)
       .eq('id', commentId)
       .select(`
         id,
@@ -81,6 +83,13 @@ export async function PATCH(
         )
       `)
       .single();
+    const typedUpdatedComment = updatedComment as {
+      id: string;
+      body: string;
+      created_at: string;
+      updated_at: string;
+      profiles: { id: string; full_name: string } | null;
+    } | null;
 
     if (updateError) {
       throw updateError;
@@ -89,15 +98,15 @@ export async function PATCH(
     return NextResponse.json({
       success: true,
       comment: {
-        id: updatedComment.id,
+        id: typedUpdatedComment?.id || '',
         type: 'comment',
-        created_at: updatedComment.created_at,
-        updated_at: updatedComment.updated_at,
-        author: updatedComment.profiles ? {
-          id: (updatedComment.profiles as any).id,
-          full_name: (updatedComment.profiles as any).full_name,
+        created_at: typedUpdatedComment?.created_at,
+        updated_at: typedUpdatedComment?.updated_at,
+        author: typedUpdatedComment?.profiles ? {
+          id: typedUpdatedComment.profiles.id,
+          full_name: typedUpdatedComment.profiles.full_name,
         } : null,
-        body: updatedComment.body,
+        body: typedUpdatedComment?.body || '',
         can_edit: isAuthor || isManager,
         can_delete: isAuthor || isManager,
       },
@@ -129,6 +138,7 @@ export async function DELETE(
 ) {
   try {
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -143,18 +153,19 @@ export async function DELETE(
     }
 
     // Fetch comment to check ownership
-    const { data: existingComment, error: fetchError } = await supabase
+    const { data: existingComment, error: fetchError } = await db
       .from('workshop_task_comments')
       .select('id, author_id')
       .eq('id', commentId)
       .single();
+    const typedExistingComment = existingComment as { id: string; author_id: string } | null;
 
-    if (fetchError || !existingComment) {
+    if (fetchError || !typedExistingComment) {
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
     }
 
     // Check permission: author or manager/admin
-    const isAuthor = existingComment.author_id === user.id;
+    const isAuthor = typedExistingComment.author_id === user.id;
     const isManager = await isManagerOrAdmin(user.id);
 
     if (!isAuthor && !isManager) {
@@ -165,7 +176,7 @@ export async function DELETE(
     }
 
     // Delete comment
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await db
       .from('workshop_task_comments')
       .delete()
       .eq('id', commentId);

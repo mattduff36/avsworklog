@@ -57,6 +57,8 @@ export function MarkTaskCompleteDialog({
   const requiresIntermediateStep = task?.status === 'pending' || task?.status === 'on_hold';
   const completionUpdates = task?.workshop_task_categories?.completion_updates || [];
   const hasMaintenanceUpdates = completionUpdates.length > 0;
+  const getInputValue = (value: CompletionFieldValues[string]): string | number =>
+    typeof value === 'number' ? value : typeof value === 'string' ? value : '';
 
   // Reset form when dialog opens/closes or task changes
   useEffect(() => {
@@ -255,7 +257,9 @@ export function MarkTaskCompleteDialog({
                           type="number"
                           min="1"
                           step="1"
-                          value={maintenanceFields[config.field_name] || ''}
+                          value={
+                            getInputValue(maintenanceFields[config.field_name])
+                          }
                           onChange={(e) =>
                             handleMaintenanceFieldChange(config.field_name, e.target.value)
                           }
@@ -267,7 +271,9 @@ export function MarkTaskCompleteDialog({
                         <Input
                           id={`maintenance-${config.field_name}`}
                           type="date"
-                          value={maintenanceFields[config.field_name] || ''}
+                          value={
+                            getInputValue(maintenanceFields[config.field_name])
+                          }
                           onChange={(e) =>
                             handleMaintenanceFieldChange(config.field_name, e.target.value)
                           }
@@ -278,7 +284,9 @@ export function MarkTaskCompleteDialog({
                         <Input
                           id={`maintenance-${config.field_name}`}
                           type="text"
-                          value={maintenanceFields[config.field_name] || ''}
+                          value={
+                            getInputValue(maintenanceFields[config.field_name])
+                          }
                           onChange={(e) =>
                             handleMaintenanceFieldChange(config.field_name, e.target.value)
                           }

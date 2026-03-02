@@ -15,21 +15,13 @@
 
 import { errorLogger } from './error-logger';
 
-type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-
-interface LogOptions {
-  data?: any;
-  componentName?: string;
-}
-
 class Logger {
   private isDevelopment = process.env.NODE_ENV === 'development';
-  private isProduction = process.env.NODE_ENV === 'production';
 
   /**
    * Debug logging - only shown in development
    */
-  debug(message: string, data?: any): void {
+  debug(message: string, data?: unknown): void {
     if (this.isDevelopment) {
       console.debug(`[DEBUG] ${message}`, data || '');
     }
@@ -38,14 +30,14 @@ class Logger {
   /**
    * Info logging - shown in all environments
    */
-  info(message: string, data?: any): void {
+  info(message: string, data?: unknown): void {
     console.info(`[INFO] ${message}`, data || '');
   }
 
   /**
    * Warning logging - shown in all environments
    */
-  warn(message: string, data?: any): void {
+  warn(message: string, data?: unknown): void {
     console.warn(`[WARN] ${message}`, data || '');
   }
 
@@ -108,7 +100,7 @@ class Logger {
   /**
    * Table logging for arrays/objects (development only)
    */
-  table(data: any): void {
+  table(data: unknown): void {
     if (this.isDevelopment && console.table) {
       console.table(data);
     }

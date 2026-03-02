@@ -76,8 +76,18 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
       .single();
 
     if (profileError || !profile) return none;
+    const typedProfile = profile as {
+      super_admin: boolean | null;
+      role: {
+        id: string;
+        name: string;
+        display_name: string;
+        is_manager_admin: boolean;
+        is_super_admin: boolean;
+      } | null;
+    };
 
-    const actualRole = profile.role as {
+    const actualRole = typedProfile.role as {
       id: string;
       name: string;
       display_name: string;
@@ -86,7 +96,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
     } | null;
 
     const isActualSuperAdmin =
-      profile.super_admin === true || actualRole?.is_super_admin === true;
+      typedProfile.super_admin === true || actualRole?.is_super_admin === true;
 
     // Build baseline result from actual role
     const result: EffectiveRoleInfo = {
@@ -116,13 +126,20 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
       .single();
 
     if (overrideError || !overrideRole) return result;
+    const typedOverrideRole = overrideRole as {
+      id: string;
+      name: string;
+      display_name: string;
+      is_manager_admin: boolean;
+      is_super_admin: boolean;
+    };
 
     return {
-      role_id: overrideRole.id,
-      role_name: overrideRole.name,
-      display_name: overrideRole.display_name,
-      is_manager_admin: overrideRole.is_manager_admin,
-      is_super_admin: overrideRole.is_super_admin,
+      role_id: typedOverrideRole.id,
+      role_name: typedOverrideRole.name,
+      display_name: typedOverrideRole.display_name,
+      is_manager_admin: typedOverrideRole.is_manager_admin,
+      is_super_admin: typedOverrideRole.is_super_admin,
       is_viewing_as: true,
       is_actual_super_admin: true,
       user_id: user.id,

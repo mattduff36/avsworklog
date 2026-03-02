@@ -15,6 +15,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -47,9 +48,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const { data: question, error: updateError } = await supabase
+    const { data: question, error: updateError } = await db
       .from('workshop_attachment_questions')
-      .update(updates)
+      .update(updates as never)
       .eq('id', id)
       .select('*')
       .single();
@@ -91,6 +92,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -106,7 +108,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await db
       .from('workshop_attachment_questions')
       .delete()
       .eq('id', id);

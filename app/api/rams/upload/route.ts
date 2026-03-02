@@ -7,6 +7,7 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
 
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create database record
-    const { data: document, error: dbError } = await supabase
+    const { data: document, error: dbError } = await db
       .from('rams_documents')
       .insert({
         title,
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
         file_type: validation.fileType!,
         uploaded_by: user.id,
         document_type_id: documentTypeId || null,
-      })
+      } as never)
       .select()
       .single();
 

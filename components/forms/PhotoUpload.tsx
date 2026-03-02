@@ -90,7 +90,7 @@ export default function PhotoUpload({ inspectionId, itemNumber, onClose, onUploa
       const fileName = `${inspectionId}/${itemNumber}/${Date.now()}.${fileExt}`;
 
       // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { data: _uploadData, error: uploadError } = await supabase.storage
         .from('inspection-photos')
         .upload(fileName, selectedFile);
 

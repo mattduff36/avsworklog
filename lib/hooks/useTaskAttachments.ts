@@ -64,10 +64,11 @@ export function useTaskAttachments({
         setAttachments([]);
         return;
       }
+      const typedAttachmentsData = attachmentsData as TaskAttachmentWithDetails[];
 
       // Get all template IDs and attachment IDs
-      const templateIds = [...new Set(attachmentsData.map(a => a.template_id))];
-      const attachmentIds = attachmentsData.map(a => a.id);
+      const templateIds = [...new Set(typedAttachmentsData.map((a: TaskAttachmentWithDetails) => a.template_id))];
+      const attachmentIds = typedAttachmentsData.map((a: TaskAttachmentWithDetails) => a.id);
 
       // Fetch questions for all templates
       const { data: questionsData, error: questionsError } = await supabase
@@ -89,12 +90,14 @@ export function useTaskAttachments({
       if (responsesError) {
         throw responsesError;
       }
+      const typedQuestions = (questionsData || []) as AttachmentQuestion[];
+      const typedResponses = (responsesData || []) as AttachmentResponse[];
 
       // Combine data
-      const combinedAttachments: TaskAttachmentWithDetails[] = attachmentsData.map(attachment => ({
+      const combinedAttachments: TaskAttachmentWithDetails[] = typedAttachmentsData.map((attachment: TaskAttachmentWithDetails) => ({
         ...attachment,
-        questions: (questionsData || []).filter(q => q.template_id === attachment.template_id),
-        responses: (responsesData || []).filter(r => r.attachment_id === attachment.id),
+        questions: typedQuestions.filter((q: AttachmentQuestion) => q.template_id === attachment.template_id),
+        responses: typedResponses.filter((r: AttachmentResponse) => r.attachment_id === attachment.id),
       }));
 
       setAttachments(combinedAttachments);

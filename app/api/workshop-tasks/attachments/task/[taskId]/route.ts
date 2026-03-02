@@ -14,6 +14,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { taskId } = await params;
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get attachments with templates
-    const { data: attachments, error: attachmentsError } = await supabase
+    const { data: attachments, error: attachmentsError } = await db
       .from('workshop_task_attachments')
       .select(`
         *,
@@ -40,11 +41,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get all responses for these attachments
-    const attachmentIds = (attachments || []).map(a => a.id);
+    const attachmentIds = (attachments || []).map((a: { id: string }) => a.id);
     let responses: any[] = [];
     
     if (attachmentIds.length > 0) {
-      const { data: responsesData, error: responsesError } = await supabase
+      const { data: responsesData, error: responsesError } = await db
         .from('workshop_attachment_responses')
         .select('*')
         .in('attachment_id', attachmentIds);
@@ -56,11 +57,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get questions for the templates
-    const templateIds = [...new Set((attachments || []).map(a => a.template_id))];
+    const templateIds = [...new Set((attachments || []).map((a: { template_id: string }) => a.template_id))];
     let questions: any[] = [];
     
     if (templateIds.length > 0) {
-      const { data: questionsData, error: questionsError } = await supabase
+      const { data: questionsData, error: questionsError } = await db
         .from('workshop_attachment_questions')
         .select('*')
         .in('template_id', templateIds)
@@ -73,7 +74,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Combine data
-    const result = (attachments || []).map(attachment => ({
+    const typedAttachments = (attachments || []) as Array<{ id: string; template_id: string } & Record<string, unknown>>;
+    const result = typedAttachments.map(attachment => ({
       ...attachment,
       questions: questions.filter(q => q.template_id === attachment.template_id),
       responses: responses.filter(r => r.attachment_id === attachment.id),
@@ -109,6 +111,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { taskId } = await params;
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -127,7 +130,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Verify task exists and is a workshop task
-    const { data: task, error: taskError } = await supabase
+    const { data: task, error: taskError } = await db
       .from('actions')
       .select('id, action_type')
       .eq('id', taskId)
@@ -137,7 +140,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    if (!['inspection_defect', 'workshop_vehicle_task'].includes(task.action_type)) {
+    if (!['inspection_defect', 'workshop_vehicle_task'].includes((task as { action_type: string }).action_type)) {
       return NextResponse.json(
         { error: 'Attachments can only be added to workshop tasks' },
         { status: 400 }
@@ -145,7 +148,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Verify template exists
-    const { data: template, error: templateError } = await supabase
+    const { data: template, error: templateError } = await db
       .from('workshop_attachment_templates')
       .select('id')
       .eq('id', template_id)
@@ -156,7 +159,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Check if attachment already exists for this task+template
-    const { data: existingAttachment, error: duplicateCheckError } = await supabase
+    const { data: existingAttachment, error: duplicateCheckError } = await db
       .from('workshop_task_attachments')
       .select('id')
       .eq('task_id', taskId)
@@ -176,14 +179,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Create attachment
-    const { data: attachment, error: insertError } = await supabase
+    const { data: attachment, error: insertError } = await db
       .from('workshop_task_attachments')
       .insert({
         task_id: taskId,
         template_id,
         status: 'pending',
         created_by: user.id,
-      })
+      } as never)
       .select(`
         *,
         workshop_attachment_templates (
@@ -200,7 +203,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get questions for the template
-    const { data: questions } = await supabase
+    const { data: questions } = await db
       .from('workshop_attachment_questions')
       .select('*')
       .eq('template_id', template_id)

@@ -3,9 +3,8 @@
 import { useEffect, useMemo } from 'react';
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
-import { Database } from '@/types/database';
 
-type RealtimeCallback<T = Record<string, unknown>> = (payload: RealtimePostgresChangesPayload<T>) => void;
+type RealtimeCallback<T extends Record<string, any> = Record<string, any>> = (payload: RealtimePostgresChangesPayload<T>) => void;
 
 export function useRealtimeSubscription(
   table: string,

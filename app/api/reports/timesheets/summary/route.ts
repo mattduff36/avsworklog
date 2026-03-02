@@ -178,7 +178,7 @@ function transformTimesheetsToExcel(
       if (entry.did_not_work) {
         row[`${day} Hours`] = 'DNW';
       } else if (entry.working_in_yard) {
-        row[`${day} Hours`] = `${formatExcelHours(entry.daily_total)} (Yard)`;
+        row[`${day} Hours`] = `${formatExcelHours(entry.daily_total ?? null)} (Yard)`;
       } else {
         row[`${day} Hours`] = formatExcelHours(entry.daily_total ?? null);
       }
@@ -295,7 +295,7 @@ export async function GET(request: NextRequest) {
     const dateRange = dateFrom && dateTo ? `${dateFrom}_to_${dateTo}` : new Date().toISOString().split('T')[0];
     const filename = `Timesheet_Summary_${dateRange}.xlsx`;
 
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="${filename}"`,

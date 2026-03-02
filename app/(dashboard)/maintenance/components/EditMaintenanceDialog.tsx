@@ -37,6 +37,9 @@ const editMaintenanceSchema = z.object({
   tax_due_date: z.string().optional().nullable(),
   mot_due_date: z.string().optional().nullable(),
   first_aid_kit_expiry: z.string().optional().nullable(),
+  six_weekly_inspection_due_date: z.string().optional().nullable(),
+  fire_extinguisher_due_date: z.string().optional().nullable(),
+  taco_calibration_due_date: z.string().optional().nullable(),
   next_service_mileage: z.preprocess(
     (val) => val === '' || val === null || val === undefined ? null : Number(val),
     z.number().int().positive('Too small expected number to be >0').optional().nullable()
@@ -125,6 +128,9 @@ export function EditMaintenanceDialog({
         tax_due_date: formatDateForInput(vehicle.tax_due_date),
         mot_due_date: formatDateForInput(vehicle.mot_due_date),
         first_aid_kit_expiry: formatDateForInput(vehicle.first_aid_kit_expiry),
+        six_weekly_inspection_due_date: formatDateForInput(vehicle.six_weekly_inspection_due_date),
+        fire_extinguisher_due_date: formatDateForInput(vehicle.fire_extinguisher_due_date),
+        taco_calibration_due_date: formatDateForInput(vehicle.taco_calibration_due_date),
         next_service_mileage: vehicle.next_service_mileage || undefined,
         last_service_mileage: vehicle.last_service_mileage || undefined,
         cambelt_due_mileage: vehicle.cambelt_due_mileage || undefined,
@@ -190,6 +196,9 @@ export function EditMaintenanceDialog({
       tax_due_date: data.tax_due_date || null,
       mot_due_date: data.mot_due_date || null,
       first_aid_kit_expiry: data.first_aid_kit_expiry || null,
+      six_weekly_inspection_due_date: data.six_weekly_inspection_due_date || null,
+      fire_extinguisher_due_date: data.fire_extinguisher_due_date || null,
+      taco_calibration_due_date: data.taco_calibration_due_date || null,
       next_service_mileage: data.next_service_mileage || null,
       last_service_mileage: data.last_service_mileage || null,
       cambelt_due_mileage: data.cambelt_due_mileage || null,
@@ -361,6 +370,54 @@ export function EditMaintenanceDialog({
                     <p className="text-sm text-red-400">{errors.first_aid_kit_expiry.message}</p>
                   )}
                 </div>
+
+                {/* HGV: 6 Weekly Inspection Due */}
+                {vehicle.vehicle?.asset_type === 'hgv' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="six_weekly_inspection_due_date">6 Weekly Inspection Due</Label>
+                    <Input
+                      id="six_weekly_inspection_due_date"
+                      type="date"
+                      {...register('six_weekly_inspection_due_date')}
+                      className="bg-input border-border text-white"
+                    />
+                    {errors.six_weekly_inspection_due_date && (
+                      <p className="text-sm text-red-400">{errors.six_weekly_inspection_due_date.message}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* HGV: Fire Extinguisher Due */}
+                {vehicle.vehicle?.asset_type === 'hgv' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="fire_extinguisher_due_date">Fire Extinguisher Due</Label>
+                    <Input
+                      id="fire_extinguisher_due_date"
+                      type="date"
+                      {...register('fire_extinguisher_due_date')}
+                      className="bg-input border-border text-white"
+                    />
+                    {errors.fire_extinguisher_due_date && (
+                      <p className="text-sm text-red-400">{errors.fire_extinguisher_due_date.message}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* HGV: Taco Calibration Due */}
+                {vehicle.vehicle?.asset_type === 'hgv' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="taco_calibration_due_date">Taco Calibration Due</Label>
+                    <Input
+                      id="taco_calibration_due_date"
+                      type="date"
+                      {...register('taco_calibration_due_date')}
+                      className="bg-input border-border text-white"
+                    />
+                    {errors.taco_calibration_due_date && (
+                      <p className="text-sm text-red-400">{errors.taco_calibration_due_date.message}</p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}

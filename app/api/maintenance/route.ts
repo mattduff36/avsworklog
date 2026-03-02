@@ -70,6 +70,9 @@ export async function GET(request: NextRequest) {
     const serviceThreshold = categoryMap.get('service due')?.alert_threshold_miles || 1000;
     const cambeltThreshold = categoryMap.get('cambelt replacement')?.alert_threshold_miles || 5000;
     const firstAidThreshold = categoryMap.get('first aid kit expiry')?.alert_threshold_days || 30;
+    const sixWeeklyThreshold = categoryMap.get('6 weekly inspection due')?.alert_threshold_days || 7;
+    const fireExtinguisherThreshold = categoryMap.get('fire extinguisher due')?.alert_threshold_days || 30;
+    const tacoCalibrationThreshold = categoryMap.get('taco calibration due')?.alert_threshold_days || 60;
     
     // ---------------------------------------------------------------
     // Fetch all three asset tables with their maintenance records
@@ -200,6 +203,9 @@ export async function GET(request: NextRequest) {
           cambelt_due_mileage: null,
           tracker_id: null,
           first_aid_kit_expiry: null,
+          six_weekly_inspection_due_date: null,
+          fire_extinguisher_due_date: null,
+          taco_calibration_due_date: null,
           created_at: null,
           updated_at: null,
           last_updated_by: null,
@@ -211,6 +217,9 @@ export async function GET(request: NextRequest) {
           service_status: { status: 'not_set' as const },
           cambelt_status: { status: 'not_set' as const },
           first_aid_status: { status: 'not_set' as const },
+          six_weekly_status: { status: 'not_set' as const },
+          fire_extinguisher_status: { status: 'not_set' as const },
+          taco_calibration_status: { status: 'not_set' as const },
           overdue_count: 0,
           due_soon_count: 0
         };
@@ -232,9 +241,28 @@ export async function GET(request: NextRequest) {
         maintenance.first_aid_kit_expiry,
         firstAidThreshold
       );
+      const six_weekly_status = getDateBasedStatus(
+        maintenance.six_weekly_inspection_due_date,
+        sixWeeklyThreshold
+      );
+      const fire_extinguisher_status = getDateBasedStatus(
+        maintenance.fire_extinguisher_due_date,
+        fireExtinguisherThreshold
+      );
+      const taco_calibration_status = getDateBasedStatus(
+        maintenance.taco_calibration_due_date,
+        tacoCalibrationThreshold
+      );
 
       const alertCounts = calculateAlertCounts([
-        tax_status, mot_status, service_status, cambelt_status, first_aid_status
+        tax_status,
+        mot_status,
+        service_status,
+        cambelt_status,
+        first_aid_status,
+        six_weekly_status,
+        fire_extinguisher_status,
+        taco_calibration_status,
       ]);
 
       return {
@@ -248,6 +276,9 @@ export async function GET(request: NextRequest) {
         service_status,
         cambelt_status,
         first_aid_status,
+        six_weekly_status,
+        fire_extinguisher_status,
+        taco_calibration_status,
         overdue_count: alertCounts.overdue,
         due_soon_count: alertCounts.due_soon
       };
@@ -346,6 +377,9 @@ export async function POST(request: NextRequest) {
       tax_due_date: body.tax_due_date || null,
       mot_due_date: body.mot_due_date || null,
       first_aid_kit_expiry: body.first_aid_kit_expiry || null,
+      six_weekly_inspection_due_date: body.six_weekly_inspection_due_date || null,
+      fire_extinguisher_due_date: body.fire_extinguisher_due_date || null,
+      taco_calibration_due_date: body.taco_calibration_due_date || null,
       next_service_mileage: body.next_service_mileage || null,
       last_service_mileage: body.last_service_mileage || null,
       cambelt_due_mileage: body.cambelt_due_mileage || null,
@@ -414,6 +448,48 @@ export async function POST(request: NextRequest) {
         field_name: 'first_aid_kit_expiry',
         old_value: null,
         new_value: body.first_aid_kit_expiry,
+        value_type: 'date' as const,
+        comment: body.comment,
+        updated_by: user.id,
+        updated_by_name: userName
+      });
+    }
+
+    if (body.six_weekly_inspection_due_date) {
+      historyEntries.push({
+        van_id: body.van_id || null,
+        hgv_id: body.hgv_id || null,
+        field_name: 'six_weekly_inspection_due_date',
+        old_value: null,
+        new_value: body.six_weekly_inspection_due_date,
+        value_type: 'date' as const,
+        comment: body.comment,
+        updated_by: user.id,
+        updated_by_name: userName
+      });
+    }
+
+    if (body.fire_extinguisher_due_date) {
+      historyEntries.push({
+        van_id: body.van_id || null,
+        hgv_id: body.hgv_id || null,
+        field_name: 'fire_extinguisher_due_date',
+        old_value: null,
+        new_value: body.fire_extinguisher_due_date,
+        value_type: 'date' as const,
+        comment: body.comment,
+        updated_by: user.id,
+        updated_by_name: userName
+      });
+    }
+
+    if (body.taco_calibration_due_date) {
+      historyEntries.push({
+        van_id: body.van_id || null,
+        hgv_id: body.hgv_id || null,
+        field_name: 'taco_calibration_due_date',
+        old_value: null,
+        new_value: body.taco_calibration_due_date,
         value_type: 'date' as const,
         comment: body.comment,
         updated_by: user.id,

@@ -739,7 +739,7 @@ export default function DashboardPage() {
             })}
             
             {/* SuperAdmin Only - Debug Link (only when viewing as actual role) */}
-            {isActualSuperAdmin && !isViewingAs && (() => {
+            {(isActualSuperAdmin || profile?.role?.is_super_admin) && !isViewingAs && (() => {
               const Icon = Bug;
               const animationIndex = managerNavItems.length + (effectiveIsAdmin ? adminNavItems.length : 0);
               

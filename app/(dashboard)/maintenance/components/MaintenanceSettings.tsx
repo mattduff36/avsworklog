@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, AlertTriangle, Briefcase, Wrench, Bell, Mail, Users, ChevronDown } from 'lucide-react';
+import { Plus, Edit, Trash2, AlertTriangle, Briefcase, Wrench, Bell, Mail, Users } from 'lucide-react';
 import { useMaintenanceCategories, useDeleteCategory } from '@/lib/hooks/useMaintenance';
 import {
   AlertDialog,
@@ -35,8 +35,6 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recipientsDialogOpen, setRecipientsDialogOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<MaintenanceCategory | null>(null);
-  const [isExpanded, setIsExpanded] = useState(false);
-  
   const categories = categoriesData?.categories || [];
   const canModifySettings = isAdmin || isManager;
   
@@ -67,17 +65,9 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
     <div className="space-y-6">
       {/* Maintenance Categories Header */}
       <Card className="border-border">
-        <CardHeader 
-          className="cursor-pointer hover:bg-slate-800/30 transition-colors"
-          onClick={() => setIsExpanded(!isExpanded)}
-        >
+        <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1">
-              <ChevronDown 
-                className={`h-5 w-5 text-muted-foreground transition-transform ${
-                  isExpanded ? 'rotate-180' : ''
-                }`}
-              />
               <div>
                 <CardTitle className="text-white flex items-center gap-2">
                   <Wrench className="h-5 w-5" />
@@ -103,7 +93,6 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
           </div>
         </CardHeader>
         
-        {isExpanded && (
           <CardContent className="pt-6">
           {categories.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
@@ -153,6 +142,11 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                             {category.applies_to?.includes('plant') && (
                               <Badge variant="outline" className="text-purple-400 border-purple-400/50 font-mono" title="Applies to plant machinery">
                                 P
+                              </Badge>
+                            )}
+                            {category.applies_to?.includes('hgv') && (
+                              <Badge variant="outline" className="text-emerald-400 border-emerald-400/50 font-mono" title="Applies to HGVs">
+                                H
                               </Badge>
                             )}
                             {(!category.applies_to || category.applies_to.length === 0) && (
@@ -267,7 +261,6 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
             </div>
           )}
         </CardContent>
-        )}
       </Card>
       
       {/* Info Card */}
@@ -278,7 +271,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
             <div className="text-sm text-blue-800 dark:text-blue-200">
               <p className="font-semibold mb-1">About Maintenance Categories</p>
               <p>
-                Categories define what types of maintenance to track. Each category has an alert threshold and can apply to vans, plant machinery, or both.
+                Categories define what types of maintenance to track. Each category has an alert threshold and can apply to vans, HGVs, plant machinery, or any combination.
               </p>
               <p className="mt-2">
                 <strong>Category Types:</strong>
@@ -289,7 +282,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                 <li><strong>Hours-based</strong> (Plant Service) - Alert X engine hours before due</li>
               </ul>
               <p className="mt-2">
-                <strong>Applies To:</strong> Categories can apply to vans only, plant only, or both. Hours-based categories typically apply to plant machinery since they track engine operating hours.
+                <strong>Applies To:</strong> Categories can apply to vans, HGVs, plant machinery, or combinations. Hours-based categories typically apply to plant machinery since they track engine operating hours.
               </p>
               <div className="mt-2 flex items-center gap-4 text-xs">
                 <span className="font-semibold">Key:</span>
@@ -300,6 +293,10 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                 <span className="flex items-center gap-1">
                   <span className="font-mono px-1.5 py-0.5 rounded border border-purple-400/50 text-purple-400">P</span>
                   = Plant
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="font-mono px-1.5 py-0.5 rounded border border-emerald-400/50 text-emerald-400">H</span>
+                  = HGV
                 </span>
               </div>
               <p className="mt-2">

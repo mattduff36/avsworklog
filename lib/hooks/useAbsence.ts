@@ -131,15 +131,20 @@ export function useAbsenceSummaryForCurrentUser() {
         .lte('date', end.toISOString().split('T')[0]);
       
       if (absencesError) throw absencesError;
+      const typedAbsences = (absences || []) as Array<{
+        status: string;
+        duration_days: number | null;
+        reason_id: string | null;
+      }>;
       
       // Calculate approved and pending for Annual Leave only
-      const approved_taken = absences
-        ?.filter(a => a.status === 'approved' && a.reason_id === annualLeaveReason.id)
-        .reduce((sum, a) => sum + (a.duration_days || 0), 0) || 0;
+      const approved_taken = typedAbsences
+        .filter((a) => a.status === 'approved' && a.reason_id === annualLeaveReason.id)
+        .reduce((sum: number, a) => sum + (a.duration_days || 0), 0);
       
-      const pending_total = absences
-        ?.filter(a => a.status === 'pending' && a.reason_id === annualLeaveReason.id)
-        .reduce((sum, a) => sum + (a.duration_days || 0), 0) || 0;
+      const pending_total = typedAbsences
+        .filter((a) => a.status === 'pending' && a.reason_id === annualLeaveReason.id)
+        .reduce((sum: number, a) => sum + (a.duration_days || 0), 0);
       
       const remaining = allowance - approved_taken - pending_total;
       
@@ -442,15 +447,20 @@ export function useAbsenceSummaryForEmployee(profileId: string) {
         .lte('date', end.toISOString().split('T')[0]);
       
       if (absencesError) throw absencesError;
+      const typedAbsences = (absences || []) as Array<{
+        status: string;
+        duration_days: number | null;
+        reason_id: string | null;
+      }>;
       
       // Calculate approved and pending for Annual Leave only
-      const approved_taken = absences
-        ?.filter(a => a.status === 'approved' && a.reason_id === annualLeaveReason.id)
-        .reduce((sum, a) => sum + (a.duration_days || 0), 0) || 0;
+      const approved_taken = typedAbsences
+        .filter((a) => a.status === 'approved' && a.reason_id === annualLeaveReason.id)
+        .reduce((sum: number, a) => sum + (a.duration_days || 0), 0);
       
-      const pending_total = absences
-        ?.filter(a => a.status === 'pending' && a.reason_id === annualLeaveReason.id)
-        .reduce((sum, a) => sum + (a.duration_days || 0), 0) || 0;
+      const pending_total = typedAbsences
+        .filter((a) => a.status === 'pending' && a.reason_id === annualLeaveReason.id)
+        .reduce((sum: number, a) => sum + (a.duration_days || 0), 0);
       
       const remaining = allowance - approved_taken - pending_total;
       

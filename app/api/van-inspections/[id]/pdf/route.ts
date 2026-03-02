@@ -83,7 +83,7 @@ export async function GET(
     // Check authorization - user must be owner, manager, or admin
     const profile = await getProfileWithRole(user.id);
 
-    const isOwner = inspection.user_id === user.id;
+    const isOwner = (inspection as { user_id?: string | null }).user_id === user.id;
     const isManager = profile?.role?.is_manager_admin || false;
 
     if (!isOwner && !isManager) {

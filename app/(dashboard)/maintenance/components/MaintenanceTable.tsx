@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
-import { AddVehicleDialog } from './AddVehicleDialog';
+import { AddAssetFlowDialog } from './add-asset/AddAssetFlowDialog';
 import { DeleteVehicleDialog } from './DeleteVehicleDialog';
 import { 
   getStatusColorClass,
@@ -61,7 +61,10 @@ type SortField =
   | 'mot_due' 
   | 'service_due' 
   | 'cambelt_due'
-  | 'first_aid_expiry';
+  | 'first_aid_expiry'
+  | 'six_weekly_due'
+  | 'fire_extinguisher_due'
+  | 'taco_calibration_due';
 
 type SortDirection = 'asc' | 'desc';
 
@@ -73,6 +76,9 @@ interface ColumnVisibility {
   service_due: boolean;
   cambelt_due: boolean;
   first_aid_expiry: boolean;
+  six_weekly_due: boolean;
+  fire_extinguisher_due: boolean;
+  taco_calibration_due: boolean;
 }
 
 export function MaintenanceTable({ 
@@ -83,6 +89,7 @@ export function MaintenanceTable({
   assetLabel = 'Van',
 }: MaintenanceTableProps) {
   const assetLabelLower = assetLabel.toLowerCase();
+  const isHgvTable = assetLabel === 'HGV';
   const assetLabelPlural = `${assetLabel}s`;
   const assetLabelPluralLower = `${assetLabelLower}s`;
   const router = useRouter();
@@ -145,6 +152,9 @@ export function MaintenanceTable({
     service_due: true,
     cambelt_due: true,
     first_aid_expiry: true,
+    six_weekly_due: true,
+    fire_extinguisher_due: true,
+    taco_calibration_due: true,
   });
   
   const toggleColumn = (column: keyof ColumnVisibility) => {
@@ -201,6 +211,24 @@ export function MaintenanceTable({
         if (!a.first_aid_kit_expiry) return 1;
         if (!b.first_aid_kit_expiry) return -1;
         return multiplier * (new Date(a.first_aid_kit_expiry).getTime() - new Date(b.first_aid_kit_expiry).getTime());
+
+      case 'six_weekly_due':
+        if (!a.six_weekly_inspection_due_date && !b.six_weekly_inspection_due_date) return 0;
+        if (!a.six_weekly_inspection_due_date) return 1;
+        if (!b.six_weekly_inspection_due_date) return -1;
+        return multiplier * (new Date(a.six_weekly_inspection_due_date).getTime() - new Date(b.six_weekly_inspection_due_date).getTime());
+
+      case 'fire_extinguisher_due':
+        if (!a.fire_extinguisher_due_date && !b.fire_extinguisher_due_date) return 0;
+        if (!a.fire_extinguisher_due_date) return 1;
+        if (!b.fire_extinguisher_due_date) return -1;
+        return multiplier * (new Date(a.fire_extinguisher_due_date).getTime() - new Date(b.fire_extinguisher_due_date).getTime());
+
+      case 'taco_calibration_due':
+        if (!a.taco_calibration_due_date && !b.taco_calibration_due_date) return 0;
+        if (!a.taco_calibration_due_date) return 1;
+        if (!b.taco_calibration_due_date) return -1;
+        return multiplier * (new Date(a.taco_calibration_due_date).getTime() - new Date(b.taco_calibration_due_date).getTime());
       
       default:
         return 0;
@@ -233,7 +261,7 @@ export function MaintenanceTable({
               onClick={() => setAddVehicleDialogOpen(true)}
             >
               <Plus className="h-4 w-4 mr-2 hidden md:inline" />
-              <span className="hidden md:inline">Add {assetLabel}</span>
+              <span className="hidden md:inline">Add Asset</span>
               <Plus className="h-4 w-4 md:hidden" />
             </Button>
           </div>
@@ -308,18 +336,42 @@ export function MaintenanceTable({
                 >
                   Service Due
                 </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columnVisibility.cambelt_due}
-                  onCheckedChange={() => toggleColumn('cambelt_due')}
-                >
-                  Cambelt Due
-                </DropdownMenuCheckboxItem>
+                {!isHgvTable && (
+                  <DropdownMenuCheckboxItem
+                    checked={columnVisibility.cambelt_due}
+                    onCheckedChange={() => toggleColumn('cambelt_due')}
+                  >
+                    Cambelt Due
+                  </DropdownMenuCheckboxItem>
+                )}
                 <DropdownMenuCheckboxItem
                   checked={columnVisibility.first_aid_expiry}
                   onCheckedChange={() => toggleColumn('first_aid_expiry')}
                 >
                   First Aid
                 </DropdownMenuCheckboxItem>
+                {isHgvTable && (
+                  <>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.six_weekly_due}
+                      onCheckedChange={() => toggleColumn('six_weekly_due')}
+                    >
+                      6 Weekly
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.fire_extinguisher_due}
+                      onCheckedChange={() => toggleColumn('fire_extinguisher_due')}
+                    >
+                      Fire Extinguisher
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.taco_calibration_due}
+                      onCheckedChange={() => toggleColumn('taco_calibration_due')}
+                    >
+                      Taco Calibration
+                    </DropdownMenuCheckboxItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -404,7 +456,7 @@ export function MaintenanceTable({
                           </div>
                         </TableHead>
                       )}
-                      {columnVisibility.cambelt_due && (
+                      {!isHgvTable && columnVisibility.cambelt_due && (
                       <TableHead 
                           className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
                           style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
@@ -424,6 +476,42 @@ export function MaintenanceTable({
                         >
                           <div className="flex items-center gap-2">
                             First Aid
+                            <ArrowUpDown className="h-3 w-3" />
+                          </div>
+                      </TableHead>
+                      )}
+                      {isHgvTable && columnVisibility.six_weekly_due && (
+                      <TableHead 
+                          className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
+                          style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
+                          onClick={() => handleSort('six_weekly_due')}
+                        >
+                          <div className="flex items-center gap-2">
+                            6 Weekly
+                            <ArrowUpDown className="h-3 w-3" />
+                          </div>
+                      </TableHead>
+                      )}
+                      {isHgvTable && columnVisibility.fire_extinguisher_due && (
+                      <TableHead 
+                          className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
+                          style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
+                          onClick={() => handleSort('fire_extinguisher_due')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Fire Extinguisher
+                            <ArrowUpDown className="h-3 w-3" />
+                          </div>
+                      </TableHead>
+                      )}
+                      {isHgvTable && columnVisibility.taco_calibration_due && (
+                      <TableHead 
+                          className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
+                          style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
+                          onClick={() => handleSort('taco_calibration_due')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Taco Calibration
                             <ArrowUpDown className="h-3 w-3" />
                           </div>
                       </TableHead>
@@ -496,7 +584,7 @@ export function MaintenanceTable({
                         )}
                         
                         {/* Cambelt Due */}
-                        {columnVisibility.cambelt_due && (
+                        {!isHgvTable && columnVisibility.cambelt_due && (
                           <TableCell>
                             <Badge className={`font-medium ${getStatusColorClass(vehicle.cambelt_status?.status || 'not_set')}`}>
                               {formatMileage(vehicle.cambelt_due_mileage)}
@@ -512,6 +600,27 @@ export function MaintenanceTable({
                             </Badge>
                           </TableCell>
                         )}
+                        {isHgvTable && columnVisibility.six_weekly_due && (
+                          <TableCell>
+                            <Badge className={`font-medium ${getStatusColorClass(vehicle.six_weekly_status?.status || 'not_set')}`}>
+                              {formatMaintenanceDate(vehicle.six_weekly_inspection_due_date || null)}
+                            </Badge>
+                          </TableCell>
+                        )}
+                        {isHgvTable && columnVisibility.fire_extinguisher_due && (
+                          <TableCell>
+                            <Badge className={`font-medium ${getStatusColorClass(vehicle.fire_extinguisher_status?.status || 'not_set')}`}>
+                              {formatMaintenanceDate(vehicle.fire_extinguisher_due_date || null)}
+                            </Badge>
+                          </TableCell>
+                        )}
+                        {isHgvTable && columnVisibility.taco_calibration_due && (
+                          <TableCell>
+                            <Badge className={`font-medium ${getStatusColorClass(vehicle.taco_calibration_status?.status || 'not_set')}`}>
+                              {formatMaintenanceDate(vehicle.taco_calibration_due_date || null)}
+                            </Badge>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -523,7 +632,7 @@ export function MaintenanceTable({
           {vehicles.length > 0 && (
             <div className="md:hidden space-y-3">
               {sortedVehicles.map((vehicle) => {
-                const cardVehicleId = vehicle.van_id ?? vehicle.id;
+                const cardVehicleId = (vehicle as any).hgv_id ?? vehicle.van_id ?? vehicle.id;
                 const isExpanded = expandedCardId === cardVehicleId;
                 
                 return (
@@ -632,7 +741,7 @@ export function MaintenanceTable({
                                 </Badge>
                               </div>
                             )}
-                            {columnVisibility.cambelt_due && vehicle.cambelt_due_mileage && (
+                            {!isHgvTable && columnVisibility.cambelt_due && vehicle.cambelt_due_mileage && (
                               <div className="flex items-center justify-between">
                                 <span className="text-sm text-muted-foreground">Cambelt Due:</span>
                                 <Badge className={`font-medium ${getStatusColorClass(vehicle.cambelt_status?.status || 'not_set')}`}>
@@ -645,6 +754,30 @@ export function MaintenanceTable({
                                 <span className="text-sm text-muted-foreground">First Aid Expiry:</span>
                                 <Badge className={`font-medium ${getStatusColorClass(vehicle.first_aid_status?.status || 'not_set')}`}>
                                   {formatMaintenanceDate(vehicle.first_aid_kit_expiry)}
+                                </Badge>
+                              </div>
+                            )}
+                            {isHgvTable && columnVisibility.six_weekly_due && vehicle.six_weekly_inspection_due_date && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground">6 Weekly Due:</span>
+                                <Badge className={`font-medium ${getStatusColorClass(vehicle.six_weekly_status?.status || 'not_set')}`}>
+                                  {formatMaintenanceDate(vehicle.six_weekly_inspection_due_date)}
+                                </Badge>
+                              </div>
+                            )}
+                            {isHgvTable && columnVisibility.fire_extinguisher_due && vehicle.fire_extinguisher_due_date && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground">Fire Extinguisher Due:</span>
+                                <Badge className={`font-medium ${getStatusColorClass(vehicle.fire_extinguisher_status?.status || 'not_set')}`}>
+                                  {formatMaintenanceDate(vehicle.fire_extinguisher_due_date)}
+                                </Badge>
+                              </div>
+                            )}
+                            {isHgvTable && columnVisibility.taco_calibration_due && vehicle.taco_calibration_due_date && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground">Taco Calibration Due:</span>
+                                <Badge className={`font-medium ${getStatusColorClass(vehicle.taco_calibration_status?.status || 'not_set')}`}>
+                                  {formatMaintenanceDate(vehicle.taco_calibration_due_date)}
                                 </Badge>
                               </div>
                             )}
@@ -992,7 +1125,7 @@ export function MaintenanceTable({
       {/* History Dialog */}
       
       {/* Add Vehicle Dialog */}
-      <AddVehicleDialog
+      <AddAssetFlowDialog
         open={addVehicleDialogOpen}
         onOpenChange={setAddVehicleDialogOpen}
         onSuccess={() => {

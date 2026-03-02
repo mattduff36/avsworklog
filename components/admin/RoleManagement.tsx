@@ -632,7 +632,7 @@ export function RoleManagement() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setDeleteDialogOpen(false); setSelectedUser(null); }} className="border-slate-600 text-white hover:bg-slate-800">
+            <Button variant="outline" onClick={() => { setDeleteDialogOpen(false); setSelectedRole(null); }} className="border-slate-600 text-white hover:bg-slate-800">
               Cancel
             </Button>
             <Button

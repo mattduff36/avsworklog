@@ -133,7 +133,7 @@ export function MessagesReportView() {
 
   const filteredMessages = messages.filter(msg =>
     msg.message.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    msg.message.sender_name.toLowerCase().includes(searchQuery.toLowerCase())
+    (msg.message.sender?.full_name || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (loading) {
@@ -216,7 +216,7 @@ export function MessagesReportView() {
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    From: {selectedMessage.message.sender_name} • {formatDistanceToNow(new Date(selectedMessage.message.created_at), { addSuffix: true })}
+                    From: {selectedMessage.message.sender?.full_name || 'System'} • {formatDistanceToNow(new Date(selectedMessage.message.created_at), { addSuffix: true })}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
@@ -363,7 +363,7 @@ export function MessagesReportView() {
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground mb-2">
-                    From: {msg.message.sender_name} • {formatDistanceToNow(new Date(msg.message.created_at), { addSuffix: true })}
+                    From: {msg.message.sender?.full_name || 'System'} • {formatDistanceToNow(new Date(msg.message.created_at), { addSuffix: true })}
                   </p>
                   <div className="flex items-center gap-4 text-sm">
                     <span className="text-muted-foreground">

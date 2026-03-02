@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, UserPlus, AlertTriangle, Upload, File, X } from 'lucide-react';
+import { UserPlus, AlertTriangle, Upload, File, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { AssignRecipientsModal } from './AssignRecipientsModal';
 

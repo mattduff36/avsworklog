@@ -11,6 +11,8 @@ import {
 
 type VehicleRow = {
   reg_number?: string | null;
+  vehicle_type?: string | null;
+  van_categories?: { name: string } | null;
 };
 
 type InspectorRow = {
@@ -116,11 +118,11 @@ export async function GET(request: NextRequest) {
       defectItems.forEach((item) => {
         excelData.push({
           'Vehicle Reg': inspection.vehicle?.reg_number || '-',
-          'Vehicle Type': getVehicleCategoryName(inspection.vehicle),
+          'Vehicle Type': getVehicleCategoryName(inspection.vehicle || {}),
           'Inspector': inspection.inspector?.full_name || 'Unknown',
           'Inspection Date': formatExcelDate(inspection.inspection_date),
-          'Item #': item.item_number,
-          'Item Description': item.item_description,
+          'Item #': String(item.item_number ?? ''),
+          'Item Description': item.item_description || '-',
           'Defect Comments': item.comments || '-',
           'Inspection Status': formatExcelStatus(inspection.status),
         });
@@ -178,7 +180,7 @@ export async function GET(request: NextRequest) {
     const filename = `Defects_Report_${dateRange}.xlsx`;
 
     // Return Excel file
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="${filename}"`,

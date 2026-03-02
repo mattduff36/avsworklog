@@ -1,13 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { redirectToLegacyVanEndpoint } from '@/lib/api/error-handler';
 
 export async function GET(request: NextRequest) {
-  const url = new URL(request.url);
-  url.pathname = url.pathname.replace('/api/admin/vehicles', '/api/admin/vans');
-  return NextResponse.redirect(url, 308);
+  return redirectToLegacyVanEndpoint(request, '/api/admin/vehicles');
 }
 
 export async function POST(request: NextRequest) {
-  const url = new URL(request.url);
-  url.pathname = url.pathname.replace('/api/admin/vehicles', '/api/admin/vans');
-  return NextResponse.redirect(url, 308);
+  return redirectToLegacyVanEndpoint(request, '/api/admin/vehicles');
 }

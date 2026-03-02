@@ -5,6 +5,7 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
 
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify assignment exists and belongs to user
-    const { data: assignment, error: assignmentError } = await supabase
+    const { data: assignment, error: assignmentError } = await db
       .from('rams_assignments')
       .select('id, rams_document_id, employee_id, status')
       .eq('id', assignment_id)
@@ -39,7 +40,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if already signed
-    if (assignment.status === 'signed') {
+    const typedAssignment = assignment as { status: string };
+    if (typedAssignment.status === 'signed') {
       return NextResponse.json(
         { error: 'This document has already been signed' },
         { status: 400 }
@@ -47,14 +49,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Update assignment with signature
-    const { data: updatedAssignment, error: updateError } = await supabase
+    const { data: updatedAssignment, error: updateError } = await db
       .from('rams_assignments')
       .update({
         status: 'signed',
         signed_at: new Date().toISOString(),
         signature_data,
         comments: comments || null,
-      })
+      } as never)
       .eq('id', assignment_id)
       .select()
       .single();

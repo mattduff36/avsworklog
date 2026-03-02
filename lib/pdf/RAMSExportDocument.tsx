@@ -288,7 +288,7 @@ export function RAMSExportDocument({
             </View>
           </View>
 
-          {signedAssignments.map((assignment, index) => (
+          {signedAssignments.map((assignment) => (
             <View key={assignment.id} style={styles.section}>
               <View style={styles.signatureBox}>
                 {/* Two column layout: Info on left, Signature on right */}
@@ -378,7 +378,7 @@ export function RAMSExportDocument({
             </View>
           </View>
 
-          {visitorSignatures.map((signature, index) => (
+          {visitorSignatures.map((signature) => (
             <View key={signature.id} style={styles.section}>
               <View style={styles.signatureBox}>
                 {/* Two column layout: Info on left, Signature on right */}

@@ -25,7 +25,7 @@ export type StatusFilter = TimesheetStatusFilter | InspectionStatusFilter | Abse
  * Generic type to extend database types with profile information
  * Usage: TimesheetWithProfile = WithProfile<Timesheet>
  */
-export interface WithProfile<T> {
+export type WithProfile<T> = T & {
   user?: {
     full_name: string;
     employee_id?: string | null;
@@ -34,7 +34,7 @@ export interface WithProfile<T> {
     full_name: string;
     employee_id?: string | null;
   };
-}
+};
 
 /**
  * Extended types for list views with related data

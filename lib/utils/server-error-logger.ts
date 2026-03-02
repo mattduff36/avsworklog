@@ -150,7 +150,7 @@ export async function logServerError({
       .insert([{
         ...errorLog,
         timestamp: new Date().toISOString(),
-      }]);
+      }] as never);
 
     if (insertError) {
       // Log to console but don't throw - we don't want error logging to break the app
@@ -166,10 +166,10 @@ export async function logServerError({
  * Wrap an API route handler with automatic error logging
  */
 export function withErrorLogging<T>(
-  handler: (request: Request, ...args: any[]) => Promise<T>,
+  handler: (request: Request, ...args: unknown[]) => Promise<T>,
   componentName: string
 ) {
-  return async (request: Request, ...args: any[]): Promise<T> => {
+  return async (request: Request, ...args: unknown[]): Promise<T> => {
     try {
       return await handler(request, ...args);
     } catch (error) {

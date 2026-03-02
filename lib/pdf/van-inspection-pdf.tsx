@@ -275,7 +275,7 @@ export function VanInspectionPDF({ inspection, items, vehicleReg, employeeName }
   const getCheckMark = (itemNumber: number, dayOfWeek: number) => {
     const item = items.find(i => 
       Number(i.item_number) === Number(itemNumber) && 
-      Number(i.day_of_week) === Number(dayOfWeek)
+      Number((i as unknown as { day_of_week?: number }).day_of_week ?? 0) === Number(dayOfWeek)
     );
     if (!item) return '';
     return item.status === 'ok' ? 'PASS' : item.status === 'attention' ? 'FAIL' : 'N/A';
@@ -287,7 +287,8 @@ export function VanInspectionPDF({ inspection, items, vehicleReg, employeeName }
     .map(item => {
       const itemName = item.item_description;
       const status = item.status === 'ok' ? 'PASS' : item.status === 'attention' ? 'FAIL' : 'N/A';
-      const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][item.day_of_week - 1];
+      const dayIndex = Number((item as unknown as { day_of_week?: number }).day_of_week ?? 1) - 1;
+      const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][dayIndex];
       return `${item.item_number}. ${itemName} (${dayName}) [${status}]${item.comments ? ': ' + item.comments : ''}`;
     })
     .join('\n');
@@ -387,7 +388,7 @@ export function VanInspectionPDF({ inspection, items, vehicleReg, employeeName }
           <View style={styles.signatureRow}>
             <View style={styles.signatureImageWrap}>
               {inspection.signature_data ? (
-                <Image src={inspection.signature_data} style={styles.signatureImage} alt="" />
+                <Image src={inspection.signature_data} style={styles.signatureImage} />
               ) : (
                 <Text style={styles.signatureMissing}>No signature</Text>
               )}

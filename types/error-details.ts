@@ -23,14 +23,14 @@ export interface ErrorDetailsAction {
   requiresConfirmation?: boolean;
 }
 
-export interface ErrorDetailsResponse<T = any> {
+export interface ErrorDetailsResponse<T = unknown> {
   success: boolean;
   detailsType: ErrorDetailsType;
   summary: {
     title: string;
     description?: string;
     count: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   items: T[];
   actions?: ErrorDetailsAction[];

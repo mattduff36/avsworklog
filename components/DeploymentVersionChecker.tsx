@@ -28,6 +28,7 @@
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { AuthChangeEvent } from '@supabase/supabase-js';
 
 // Baked in at build time by Vercel's system env vars.
 // Will be undefined in local dev → checker is a no-op.
@@ -90,7 +91,7 @@ export function DeploymentVersionChecker() {
     // re-run their useEffects (which is what caused Sarah's hourly errors).
     // Intercepting it here lets us reload before the damage is done.
     const supabase = createClient();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => {
       if (event === 'TOKEN_REFRESHED') {
         // Bypass rate-limit for this trigger — it only fires ~once per hour
         lastCheckRef.current = 0;

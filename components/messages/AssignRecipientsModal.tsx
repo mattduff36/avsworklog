@@ -46,7 +46,6 @@ export function AssignRecipientsModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const [selectedRole, setSelectedRole] = useState<string>('');
   useEffect(() => {
     if (open) {
       async function fetchEmployees() {
@@ -123,8 +122,6 @@ export function AssignRecipientsModal({
 
   const handleSelectRole = (role: string) => {
     const employeesWithRole = employees.filter(emp => emp.role?.name === role);
-    const roleEmployeeIds = new Set(employeesWithRole.map(emp => emp.id));
-    
     // Check if all employees in this role are already selected
     const allRoleSelected = employeesWithRole.every(emp => selectedIds.has(emp.id));
     
@@ -135,13 +132,11 @@ export function AssignRecipientsModal({
       employeesWithRole.forEach(emp => {
         newSelected.delete(emp.id);
       });
-      setSelectedRole('');
     } else {
       // Select all employees in this role
       employeesWithRole.forEach(emp => {
         newSelected.add(emp.id);
       });
-      setSelectedRole(role);
     }
     
     setSelectedIds(newSelected);
@@ -163,7 +158,6 @@ export function AssignRecipientsModal({
       // Reset and close
       setSelectedIds(new Set());
       setSearchQuery('');
-      setSelectedRole('');
       onClose();
     } catch (error) {
       console.error('Send error:', error);
@@ -177,7 +171,6 @@ export function AssignRecipientsModal({
     if (loading) return;
     setSelectedIds(new Set());
     setSearchQuery('');
-    setSelectedRole('');
     onClose();
   };
 

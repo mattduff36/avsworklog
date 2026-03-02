@@ -90,12 +90,12 @@ export function AssignEmployeesModal({
 
           // Mark employees who have already signed
           const signedEmployeeIds = new Set(
-            assignments?.filter(a => a.status === 'signed').map(a => a.employee_id) || []
+            ((assignments || []) as Array<{ employee_id: string; status: string }>).filter((a) => a.status === 'signed').map((a) => a.employee_id)
           );
 
           // Mark employees who are currently assigned (regardless of status)
           const assignedEmployeeIds = new Set(
-            assignments?.map(a => a.employee_id) || []
+            ((assignments || []) as Array<{ employee_id: string; status: string }>).map((a) => a.employee_id)
           );
 
           // Set original assigned IDs for comparison
@@ -104,7 +104,7 @@ export function AssignEmployeesModal({
           // Pre-select all currently assigned employees
           setSelectedIds(assignedEmployeeIds);
 
-          const employeesWithStatus = allEmployees?.map((emp: any) => ({
+          const employeesWithStatus = (allEmployees as Array<{ id: string; full_name: string; roles: { name: string; display_name: string } | null }>).map((emp) => ({
             id: emp.id,
             full_name: emp.full_name,
             role: emp.roles ? {

@@ -176,13 +176,13 @@ function MaintenanceContent() {
                       <Truck className="h-4 w-4" />
                       Vans
                     </TabsTrigger>
-                    <TabsTrigger value="hgv" className="gap-2">
-                      <Truck className="h-4 w-4" />
-                      HGVs
-                    </TabsTrigger>
                     <TabsTrigger value="plant" className="gap-2">
                       <HardHat className="h-4 w-4" />
                       Plant
+                    </TabsTrigger>
+                    <TabsTrigger value="hgv" className="gap-2">
+                      <Truck className="h-4 w-4" />
+                      HGVs
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>

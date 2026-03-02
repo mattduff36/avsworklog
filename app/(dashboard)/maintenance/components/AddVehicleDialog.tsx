@@ -374,7 +374,7 @@ export function AddVehicleDialog({
                   disabled={loading}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Manufacturer's serial number (alphanumeric only, auto-uppercase)
+                  Manufacturer&apos;s serial number (alphanumeric only, auto-uppercase)
                 </p>
               </div>
 

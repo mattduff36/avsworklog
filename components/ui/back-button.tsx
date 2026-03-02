@@ -41,7 +41,7 @@ export function BackButton({ className, userRole, fallbackHref }: BackButtonProp
 
     // Fallback for direct URL access (no browser history):
     // use ?from= param or computed parent route from sitemap config
-    const from = searchParams.get('from') || searchParams.get('fromTab')
+    const from = searchParams.get('from') || searchParams.get('fromTab') || undefined
     const computedFallback = fallbackHref || getParentHref(pathname, searchParams, userRole)
     const backHref = getBackHref(from, computedFallback)
     router.push(backHref)

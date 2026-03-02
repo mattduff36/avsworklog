@@ -3,9 +3,6 @@ import { toast } from 'sonner';
 import type {
   ManageDocumentsQuery,
   ManageDocumentsResponse,
-  ManageDocumentRow,
-  ManageDocumentsCounts,
-  ProjectFavouriteWithDocument,
 } from '@/types/rams';
 
 // ============================================================================

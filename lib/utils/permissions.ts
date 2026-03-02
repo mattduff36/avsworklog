@@ -48,16 +48,18 @@ export async function getProfileWithRole(userId: string): Promise<ProfileWithRol
       return null;
     }
 
+    const typedData = data as ProfileWithRole | null;
+    const role = typedData?.role;
     console.log('getProfileWithRole result:', {
       user_id: userId,
-      profile_id: data?.id,
-      role_id: data?.role_id,
-      role_name: (data as any)?.role?.name,
-      role_display_name: (data as any)?.role?.display_name,
-      is_manager_admin: (data as any)?.role?.is_manager_admin
+      profile_id: typedData?.id,
+      role_id: typedData?.role_id,
+      role_name: role?.name,
+      role_display_name: role?.display_name,
+      is_manager_admin: role?.is_manager_admin
     });
 
-    return data as ProfileWithRole;
+    return typedData;
   } catch (error) {
     console.error('Error fetching profile with role:', error);
     return null;
@@ -80,8 +82,9 @@ export async function userHasPermission(
       .select('role_id, roles!inner(is_manager_admin)')
       .eq('id', userId)
       .single();
+    const typedProfile = profile as { role_id: string | null; roles: { is_manager_admin: boolean } | null } | null;
 
-    if (profile?.roles?.is_manager_admin) {
+    if (typedProfile?.roles?.is_manager_admin) {
       return true;
     }
 
@@ -89,11 +92,12 @@ export async function userHasPermission(
     const { data: permission } = await supabase
       .from('role_permissions')
       .select('enabled')
-      .eq('role_id', profile?.role_id)
+      .eq('role_id', (typedProfile?.role_id ?? '') as never)
       .eq('module_name', module)
       .single();
+    const typedPermission = permission as { enabled: boolean } | null;
 
-    return permission?.enabled ?? false;
+    return typedPermission?.enabled ?? false;
   } catch (error) {
     console.error('Error checking permission:', error);
     return false;
@@ -123,9 +127,13 @@ export async function getUserPermissions(
       `)
       .eq('id', userId)
       .single();
+    const typedProfile = profile as {
+      roles: { is_manager_admin: boolean } | null;
+      role_permissions: Array<{ module_name: ModuleName; enabled: boolean }> | null;
+    } | null;
 
     // If manager/admin, return all permissions as enabled
-    if (profile?.roles?.is_manager_admin) {
+    if (typedProfile?.roles?.is_manager_admin) {
       return {
         'timesheets': true,
         'inspections': true,
@@ -146,7 +154,7 @@ export async function getUserPermissions(
 
     // Build permissions object from role_permissions
     const permissions: UserPermissions = {};
-    profile?.role_permissions?.forEach((perm: any) => {
+    typedProfile?.role_permissions?.forEach((perm) => {
       permissions[perm.module_name] = perm.enabled;
     });
 
@@ -169,8 +177,9 @@ export async function isManagerOrAdmin(userId: string): Promise<boolean> {
       .select('role_id, roles!inner(is_manager_admin)')
       .eq('id', userId)
       .single();
+    const typedProfile = profile as { roles: { is_manager_admin: boolean } | null } | null;
 
-    return profile?.roles?.is_manager_admin ?? false;
+    return typedProfile?.roles?.is_manager_admin ?? false;
   } catch (error) {
     console.error('Error checking manager/admin status:', error);
     return false;
@@ -189,8 +198,9 @@ export async function isSuperAdmin(userId: string): Promise<boolean> {
       .select('super_admin')
       .eq('id', userId)
       .single();
+    const typedProfile = profile as { super_admin: boolean | null } | null;
 
-    return profile?.super_admin ?? false;
+    return typedProfile?.super_admin ?? false;
   } catch (error) {
     console.error('Error checking super admin status:', error);
     return false;
@@ -224,8 +234,9 @@ export async function getUsersWithPermission(
         )
       `)
       .or(`roles.is_manager_admin.eq.true,and(roles.role_permissions.module_name.eq.${module},roles.role_permissions.enabled.eq.true)`);
+    const typedProfiles = profiles as Array<{ id: string }> | null;
 
-    return profiles?.map((p: any) => p.id) ?? [];
+    return typedProfiles?.map((p) => p.id) ?? [];
   } catch (error) {
     console.error('Error getting users with permission:', error);
     return [];
@@ -248,10 +259,11 @@ export async function validateUserAssignment(
       .select('full_name, roles!inner(display_name)')
       .eq('id', userId)
       .single();
+    const typedProfile = profile as { full_name: string | null; roles: { display_name: string | null } | null } | null;
 
     return {
       valid: false,
-      error: `${profile?.full_name || 'This user'} (${profile?.roles?.display_name}) does not have access to ${module}. Please update their role permissions or choose a different user.`,
+      error: `${typedProfile?.full_name || 'This user'} (${typedProfile?.roles?.display_name}) does not have access to ${module}. Please update their role permissions or choose a different user.`,
     };
   }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { User } from '@supabase/supabase-js';
+import { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { Database } from '@/types/database';
 import { getViewAsRoleId } from '@/lib/utils/view-as-cookie';
@@ -118,7 +118,7 @@ export function useAuth() {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
@@ -130,7 +130,7 @@ export function useAuth() {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
@@ -192,7 +192,7 @@ export function useAuth() {
           table: 'profiles',
           filter: `id=eq.${user.id}`,
         },
-        (payload) => {
+        (_payload: unknown) => {
           console.log('Profile updated in database - checking for role changes...');
           // Force re-fetch to get latest data
           fetchProfile(user.id);
@@ -224,7 +224,7 @@ export function useAuth() {
         if (data && data.role) {
           const storageKey = `role_cache_${user.id}`;
           const cachedRoleId = localStorage.getItem(storageKey);
-          const currentRoleId = (data.role as any).name;
+          const currentRoleId = (data.role as { name?: string } | null)?.name || '';
 
           if (cachedRoleId && cachedRoleId !== currentRoleId) {
             // Role changed! Force logout
@@ -261,7 +261,8 @@ export function useAuth() {
   // Fetch effective role when view-as cookie is set and user is actual super admin
   useEffect(() => {
     const viewAsRoleId = getViewAsRoleId();
-    const isActualSuper = profile?.super_admin || profile?.role?.is_super_admin || false;
+    const isActualSuper =
+      profile?.super_admin === true || profile?.role?.is_super_admin === true;
 
     if (!viewAsRoleId || !isActualSuper) {
       setEffectiveRole(null);
@@ -327,7 +328,8 @@ export function useAuth() {
   };
 
   // Actual (real) super admin flag – never affected by view-as
-  const isActualSuperAdmin = profile?.super_admin || profile?.role?.is_super_admin || false;
+  const isActualSuperAdmin =
+    profile?.super_admin === true || profile?.role?.is_super_admin === true;
 
   // When viewing as another role, derive flags from the effective role
   const isViewingAs = isActualSuperAdmin && effectiveRole !== null;

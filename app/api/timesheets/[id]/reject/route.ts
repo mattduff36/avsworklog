@@ -9,6 +9,7 @@ export async function POST(
 ) {
   try {
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { id: timesheetId } = await params;
     const { comments } = await request.json();
 
@@ -29,7 +30,7 @@ export async function POST(
     }
 
     // Verify user is a manager/admin
-    const { data: profile } = await supabase
+    const { data: profile } = await db
       .from('profiles')
       .select(`
         id,
@@ -38,7 +39,8 @@ export async function POST(
       .eq('id', user.id)
       .single();
 
-    if (!profile?.roles?.is_manager_admin) {
+    const typedProfile = profile as { roles: { is_manager_admin: boolean } | null } | null;
+    if (!typedProfile?.roles?.is_manager_admin) {
       return NextResponse.json(
         { error: 'Only managers and admins can reject timesheets' },
         { status: 403 }
@@ -46,7 +48,7 @@ export async function POST(
     }
 
     // Get timesheet details
-    const { data: timesheet, error: timesheetError } = await supabase
+    const { data: timesheet, error: timesheetError } = await db
       .from('timesheets')
       .select(`
         id,
@@ -61,15 +63,22 @@ export async function POST(
       `)
       .eq('id', timesheetId)
       .single();
+    const typedTimesheet = timesheet as {
+      id: string;
+      user_id: string;
+      week_ending: string;
+      status: string;
+      profiles: { id: string; full_name: string; email: string | null } | null;
+    } | null;
 
-    if (timesheetError || !timesheet) {
+    if (timesheetError || !typedTimesheet) {
       return NextResponse.json(
         { error: 'Timesheet not found' },
         { status: 404 }
       );
     }
 
-    if (timesheet.status !== 'submitted') {
+    if (typedTimesheet.status !== 'submitted') {
       return NextResponse.json(
         { error: 'Only submitted timesheets can be rejected' },
         { status: 400 }
@@ -77,14 +86,14 @@ export async function POST(
     }
 
     // Update timesheet status
-    const { error: updateError } = await supabase
+    const { error: updateError } = await db
       .from('timesheets')
       .update({
         status: 'rejected',
         reviewed_by: user.id,
         reviewed_at: new Date().toISOString(),
         manager_comments: comments.trim(),
-      })
+      } as never)
       .eq('id', timesheetId);
 
     if (updateError) {
@@ -93,12 +102,12 @@ export async function POST(
     }
 
     // Send email notification
-    const employeeProfile = timesheet.profiles as unknown as { full_name: string; email: string };
+    const employeeProfile = typedTimesheet.profiles as unknown as { full_name: string; email: string };
     if (employeeProfile?.email) {
       const emailResult = await sendTimesheetRejectionEmail({
         to: employeeProfile.email,
         employeeName: employeeProfile.full_name,
-        weekEnding: new Date(timesheet.week_ending).toLocaleDateString('en-GB', {
+        weekEnding: new Date(typedTimesheet.week_ending).toLocaleDateString('en-GB', {
           weekday: 'long',
           day: 'numeric',
           month: 'long',
@@ -113,32 +122,32 @@ export async function POST(
     }
 
     // Create in-app notification
-    const { error: messageError } = await supabase
+    const { data: message, error: messageInsertError } = await db
       .from('messages')
       .insert({
         title: 'Timesheet Rejected',
-        content: `Your timesheet for week ending ${new Date(timesheet.week_ending).toLocaleDateString('en-GB', {
+        content: `Your timesheet for week ending ${new Date(typedTimesheet.week_ending).toLocaleDateString('en-GB', {
           day: 'numeric',
           month: 'short',
           year: 'numeric',
         })} has been rejected.\n\nManager's Comments: ${comments.trim()}`,
         message_type: 'timesheet_rejection',
         created_by: user.id,
-      })
+      } as never)
       .select('id')
-      .single()
-      .then(({ data: message, error }) => {
-        if (error || !message) return { error };
-        
-        // Create recipient
-        return supabase
-          .from('message_recipients')
-          .insert({
-            message_id: message.id,
-            recipient_id: timesheet.user_id,
-            read: false,
-          });
-      });
+      .single();
+    let messageError = messageInsertError;
+    const typedMessage = message as { id: string } | null;
+    if (!messageError && typedMessage) {
+      const { error: recipientError } = await db
+        .from('message_recipients')
+        .insert({
+          message_id: typedMessage.id,
+          recipient_id: typedTimesheet.user_id,
+          read: false,
+        } as never);
+      messageError = recipientError;
+    }
 
     if (messageError) {
       console.error('Failed to create in-app notification:', messageError);

@@ -6,6 +6,7 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
 
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
       monthPlantInspectionsResult,
     ] = await Promise.all([
       // Total hours this week
-      supabase
+      db
         .from('timesheets')
         .select('total_hours')
         .eq('status', 'approved')
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
         .lte('week_ending', endOfWeek.toISOString()),
       
       // Total hours this month
-      supabase
+      db
         .from('timesheets')
         .select('total_hours')
         .eq('status', 'approved')
@@ -61,40 +62,40 @@ export async function GET(request: NextRequest) {
         .lte('week_ending', endOfMonth.toISOString()),
       
       // Pending timesheet approvals
-      supabase
+      db
         .from('timesheets')
         .select('id', { count: 'exact' })
         .eq('status', 'submitted'),
       
       // Active employees (non-admin/manager roles)
-      supabase
+      db
         .from('profiles')
         .select('id, roles!inner(is_manager_admin)', { count: 'exact' })
         .eq('roles.is_manager_admin', false),
       
       // Van inspections completed this week
-      supabase
+      db
         .from('van_inspections')
         .select('id', { count: 'exact' })
         .gte('inspection_date', startOfWeek.toISOString())
         .lte('inspection_date', endOfWeek.toISOString()),
       
       // Van inspections completed this month
-      supabase
+      db
         .from('van_inspections')
         .select('id', { count: 'exact' })
         .gte('inspection_date', startOfMonth.toISOString())
         .lte('inspection_date', endOfMonth.toISOString()),
 
       // Plant inspections completed this week
-      supabase
+      db
         .from('plant_inspections')
         .select('id', { count: 'exact' })
         .gte('inspection_date', startOfWeek.toISOString())
         .lte('inspection_date', endOfWeek.toISOString()),
       
       // Plant inspections completed this month
-      supabase
+      db
         .from('plant_inspections')
         .select('id', { count: 'exact' })
         .gte('inspection_date', startOfMonth.toISOString())
@@ -102,11 +103,13 @@ export async function GET(request: NextRequest) {
     ]);
 
     // Calculate total hours
-    const weekHours = weekTimesheetsResult.data?.reduce((sum, t) => sum + (t.total_hours || 0), 0) || 0;
-    const monthHours = monthTimesheetsResult.data?.reduce((sum, t) => sum + (t.total_hours || 0), 0) || 0;
+    const weekHours = ((weekTimesheetsResult.data || []) as Array<{ total_hours?: number | null }>)
+      .reduce((sum, t) => sum + (t.total_hours || 0), 0);
+    const monthHours = ((monthTimesheetsResult.data || []) as Array<{ total_hours?: number | null }>)
+      .reduce((sum, t) => sum + (t.total_hours || 0), 0);
 
     // Get inspection pass/fail statistics for this month (van inspections)
-    const { data: inspectionItems } = await supabase
+    const { data: inspectionItems } = await db
       .from('inspection_items')
       .select(`
         status,
@@ -117,8 +120,9 @@ export async function GET(request: NextRequest) {
       .gte('inspection.inspection_date', startOfMonth.toISOString())
       .lte('inspection.inspection_date', endOfMonth.toISOString());
 
-    const passCount = inspectionItems?.filter(i => i.status === 'pass').length || 0;
-    const failCount = inspectionItems?.filter(i => i.status === 'fail').length || 0;
+    const typedInspectionItems = (inspectionItems || []) as Array<{ status?: string | null }>;
+    const passCount = typedInspectionItems.filter((i) => i.status === 'pass').length;
+    const failCount = typedInspectionItems.filter((i) => i.status === 'fail').length;
     const totalItems = passCount + failCount;
     const passRate = totalItems > 0 ? ((passCount / totalItems) * 100).toFixed(1) : 0;
 
@@ -126,7 +130,7 @@ export async function GET(request: NextRequest) {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const { data: recentDefects } = await supabase
+    const { data: recentDefects } = await db
       .from('inspection_items')
       .select(`
         id,
@@ -138,9 +142,8 @@ export async function GET(request: NextRequest) {
       .eq('status', 'fail')
       .gte('inspection.inspection_date', thirtyDaysAgo.toISOString());
 
-    const outstandingDefects = recentDefects?.filter(
-      (d: any) => d.inspection.status !== 'approved'
-    ).length || 0;
+    const outstandingDefects = ((recentDefects || []) as Array<{ inspection?: { status?: string | null } | null }>)
+      .filter((d) => d.inspection?.status !== 'approved').length;
 
     // Return statistics
     return NextResponse.json({
@@ -153,7 +156,7 @@ export async function GET(request: NextRequest) {
         weekCompleted: (weekVanInspectionsResult.count || 0) + (weekPlantInspectionsResult.count || 0),
         monthCompleted: (monthVanInspectionsResult.count || 0) + (monthPlantInspectionsResult.count || 0),
         pendingApprovals: 0,
-        passRate: parseFloat(passRate),
+        passRate: typeof passRate === 'string' ? Number.parseFloat(passRate) : passRate,
         outstandingDefects,
       },
       employees: {

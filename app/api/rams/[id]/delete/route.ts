@@ -9,6 +9,7 @@ export async function DELETE(
 ) {
   try {
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -30,7 +31,7 @@ export async function DELETE(
     const documentId = (await params).id;
 
     // Get document info for file deletion
-    const { data: document, error: fetchError } = await supabase
+    const { data: document, error: fetchError } = await db
       .from('rams_documents')
       .select('file_path')
       .eq('id', documentId)
@@ -44,9 +45,10 @@ export async function DELETE(
     }
 
     // Delete file from storage
+    const typedDocument = document as { file_path: string };
     const { error: storageError } = await supabase.storage
       .from('rams-documents')
-      .remove([document.file_path]);
+      .remove([typedDocument.file_path]);
 
     if (storageError) {
       console.error('Storage deletion error:', storageError);
@@ -54,7 +56,7 @@ export async function DELETE(
     }
 
     // Delete document (cascade will delete assignments and visitor signatures)
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await db
       .from('rams_documents')
       .delete()
       .eq('id', documentId);

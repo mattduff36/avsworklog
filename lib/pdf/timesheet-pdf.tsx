@@ -180,10 +180,9 @@ const styles = StyleSheet.create({
 interface TimesheetPDFProps {
   timesheet: Timesheet;
   employeeName?: string;
-  employeeEmail?: string;
 }
 
-export function TimesheetPDF({ timesheet, employeeName, employeeEmail }: TimesheetPDFProps) {
+export function TimesheetPDF({ timesheet, employeeName }: TimesheetPDFProps) {
   // Sort entries by day of week
   const sortedEntries = (timesheet.entries || []).sort((a, b) => a.day_of_week - b.day_of_week);
   
@@ -361,7 +360,7 @@ export function TimesheetPDF({ timesheet, employeeName, employeeEmail }: Timeshe
             <View style={styles.signatureRightSection}>
               <Text style={styles.signatureRightLabel}>Signature</Text>
               {timesheet.signature_data ? (
-                <Image style={styles.signatureImage} src={timesheet.signature_data} alt="Driver signature" />
+                <Image style={styles.signatureImage} src={timesheet.signature_data} />
               ) : (
                 <View style={styles.signatureDots} />
               )}

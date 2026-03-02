@@ -5,6 +5,7 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
 
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify document exists
-    const { data: document, error: docError } = await supabase
+    const { data: document, error: docError } = await db
       .from('rams_documents')
       .select('id, title')
       .eq('id', document_id)
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if visitor signature already exists (prevent duplicates)
-    const { data: existingSignature } = await supabase
+    const { data: existingSignature } = await db
       .from('rams_visitor_signatures')
       .select('id')
       .eq('rams_document_id', document_id)
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create visitor signature record
-    const { data: visitorSignature, error: signError } = await supabase
+    const { data: visitorSignature, error: signError } = await db
       .from('rams_visitor_signatures')
       .insert({
         rams_document_id: document_id,
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
         visitor_role: visitor_role || null,
         signature_data,
         recorded_by: user.id,
-      })
+      } as never)
       .select()
       .single();
 

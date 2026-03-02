@@ -22,7 +22,6 @@ import { useUpdateEmployeeAllowance, useAbsenceSummaryForEmployee } from '@/lib/
 import { getCurrentFinancialYear } from '@/lib/utils/date';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import Link from 'next/link';
 
 interface Profile {
   id: string;

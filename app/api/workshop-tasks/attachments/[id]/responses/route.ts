@@ -14,13 +14,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { id: attachmentId } = await params;
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: responses, error } = await supabase
+    const { data: responses, error } = await db
       .from('workshop_attachment_responses')
       .select('*')
       .eq('attachment_id', attachmentId);
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { id: attachmentId } = await params;
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -77,7 +79,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get the attachment to verify it exists and get the template_id
-    const { data: attachment, error: attachmentError } = await supabase
+    const { data: attachment, error: attachmentError } = await db
       .from('workshop_task_attachments')
       .select('*, workshop_attachment_templates(id, name)')
       .eq('id', attachmentId)
@@ -88,7 +90,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get all questions for the template to create snapshots
-    const { data: questions, error: questionsError } = await supabase
+    const { data: questions, error: questionsError } = await db
       .from('workshop_attachment_questions')
       .select('*')
       .eq('template_id', attachment.template_id);
@@ -97,7 +99,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       throw questionsError;
     }
 
-    const questionsMap = new Map(questions?.map(q => [q.id, q]) || []);
+    const typedQuestions = (questions || []) as Array<{ id: string; question_text: string; question_type: string; is_required: boolean }>;
+    const questionsMap = new Map(typedQuestions.map((q) => [q.id, q]));
 
     // Process each response
     const processedResponses = [];
@@ -125,7 +128,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Upsert responses (delete existing, insert new)
     if (processedResponses.length > 0) {
       // Delete existing responses for this attachment
-      const { error: deleteError } = await supabase
+      const { error: deleteError } = await db
         .from('workshop_attachment_responses')
         .delete()
         .eq('attachment_id', attachmentId);
@@ -135,9 +138,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
 
       // Insert new responses
-      const { error: insertError } = await supabase
+      const { error: insertError } = await db
         .from('workshop_attachment_responses')
-        .insert(processedResponses);
+        .insert(processedResponses as never);
 
       if (insertError) {
         throw insertError;
@@ -155,7 +158,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
 
       // Validate all required questions have been answered with valid values
-      const requiredQuestions = questions?.filter(q => q.is_required) || [];
+      const requiredQuestions = typedQuestions.filter((q) => q.is_required);
       const responsesByQuestionId = new Map(processedResponses.map(r => [r.question_id, r.response_value]));
       const invalidRequiredQuestions = requiredQuestions.filter(q => {
         const responseValue = responsesByQuestionId.get(q.id);
@@ -184,13 +187,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         );
       }
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await db
         .from('workshop_task_attachments')
         .update({
           status: 'completed',
           completed_at: new Date().toISOString(),
           completed_by: user.id,
-        })
+        } as never)
         .eq('id', attachmentId);
 
       if (updateError) {
@@ -199,7 +202,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Fetch updated responses
-    const { data: updatedResponses, error: fetchError } = await supabase
+    const { data: updatedResponses, error: fetchError } = await db
       .from('workshop_attachment_responses')
       .select('*')
       .eq('attachment_id', attachmentId);
@@ -209,7 +212,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Fetch updated attachment
-    const { data: updatedAttachment, error: attachmentFetchError } = await supabase
+    const { data: updatedAttachment, error: attachmentFetchError } = await db
       .from('workshop_task_attachments')
       .select('*')
       .eq('id', attachmentId)

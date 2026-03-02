@@ -11,19 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Wrench, Truck, Settings, Plus, Edit, Trash2, AlertTriangle, HardHat, ChevronDown } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
 
-// Dynamic import for PlantOverview
-const PlantOverview = dynamic(
-  () => import('@/app/(dashboard)/maintenance/components/PlantOverview').then(mod => ({ default: mod.PlantOverview })),
-  { 
-    loading: () => (
-      <div className="flex items-center justify-center p-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    ),
-    ssr: false
-  }
-);
-
 // Dynamic import for PlantTable
 const PlantTable = dynamic(
   () => import('@/app/(dashboard)/maintenance/components/PlantTable').then(mod => ({ default: mod.PlantTable })),
@@ -51,7 +38,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useMaintenance } from '@/lib/hooks/useMaintenance';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -96,7 +82,7 @@ function FleetContent() {
   const supabase = createClient();
   
   // Initialize to default - useEffect will sync with URL to prevent hydration mismatch
-  const [activeTab, setActiveTab] = useState('plant');
+  const [activeTab, setActiveTab] = useState('vans');
   const [hasModulePermission, setHasModulePermission] = useState<boolean | null>(null);
   
   // Vehicle Category Dialog States
@@ -114,20 +100,17 @@ function FleetContent() {
   const [deletingHgvCategory, setDeletingHgvCategory] = useState(false);
   
   // Helper function to validate if user can access a tab
-  const canAccessTab = (tab: string, canManage: boolean): boolean => {
-    const restrictedTabs = ['vans', 'hgvs', 'settings'];
-    if (restrictedTabs.includes(tab)) {
-      return canManage;
-    }
-    return tab === 'plant';
+  const canAccessTab = (tab: string): boolean => {
+    const fleetTabs = ['vans', 'plant', 'hgvs', 'settings'];
+    return fleetTabs.includes(tab);
   };
   
   // Validate and set activeTab based on permissions and URL
   useEffect(() => {
     if (authLoading) return;
     
-    const canManage = isManager || isAdmin || isSuperAdmin;
-    const requestedTab = searchParams.get('tab') || 'plant';
+    const defaultTab = 'vans';
+    const requestedTab = searchParams.get('tab') || defaultTab;
     
     // Legacy redirect: tab=maintenance now lives on /maintenance
     if (requestedTab === 'maintenance') {
@@ -141,11 +124,12 @@ function FleetContent() {
       return;
     }
     
-    if (canAccessTab(requestedTab, canManage)) {
+    if (canAccessTab(requestedTab)) {
       setActiveTab(requestedTab);
     } else {
-      setActiveTab('plant');
-      router.push('/fleet?tab=plant', { scroll: false });
+      const fallbackTab = defaultTab;
+      setActiveTab(fallbackTab);
+      router.push(`/fleet?tab=${fallbackTab}`, { scroll: false });
     }
   }, [searchParams, authLoading, isManager, isAdmin, isSuperAdmin, router]);
   // Fetch maintenance data
@@ -316,10 +300,8 @@ function FleetContent() {
   
   // Update URL when tab changes
   const handleTabChange = (value: string) => {
-    const canManage = isManager || isAdmin || isSuperAdmin;
-    
     // Validate tab access before changing
-    if (!canAccessTab(value, canManage)) {
+    if (!canAccessTab(value)) {
       logger.warn(`Attempted to access restricted tab: ${value}`, 'FleetPage');
       return;
     }
@@ -343,21 +325,6 @@ function FleetContent() {
       if (hgvAssets.length === 0) fetchHgvAssets();
     }
   };
-  
-  
-  const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
-    const assetType = vehicle.vehicle?.asset_type;
-    const assetId = (vehicle as any).hgv_id ?? vehicle.van_id ?? vehicle.vehicle?.id ?? vehicle.id;
-
-    if (assetType === 'plant' || vehicle.is_plant === true) {
-      router.push(`/fleet/plant/${assetId}/history?fromTab=${activeTab}`);
-    } else if (assetType === 'hgv') {
-      router.push(`/fleet/hgvs/${assetId}/history?fromTab=${activeTab}`);
-    } else {
-      router.push(`/fleet/vans/${assetId}/history?fromTab=${activeTab}`);
-    }
-  };
-
   // Vehicle Category Dialog Handlers
   const openEditCategoryDialog = (category: Category) => {
     setSelectedCategory(category);
@@ -444,7 +411,6 @@ function FleetContent() {
   
   // Check access
   const hasAccess = hasModulePermission;
-  const canManageFleet = isManager || isAdmin || isSuperAdmin;
   
   // Show loading while auth or permissions are being checked
   if (authLoading || hasModulePermission === null) {
@@ -487,27 +453,23 @@ function FleetContent() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className={`grid w-full lg:w-auto lg:inline-grid ${canManageFleet ? 'grid-cols-4' : 'grid-cols-1'}`}>
+        <TabsList className="grid w-full lg:w-auto lg:inline-grid grid-cols-4">
+          <TabsTrigger value="vans" className="gap-2">
+            <Truck className="h-4 w-4" />
+            Vans
+          </TabsTrigger>
           <TabsTrigger value="plant" className="gap-2">
             <HardHat className="h-4 w-4" />
             Plant
           </TabsTrigger>
-          {canManageFleet && (
-            <>
-              <TabsTrigger value="vans" className="gap-2">
-                <Truck className="h-4 w-4" />
-                Vans
-              </TabsTrigger>
-              <TabsTrigger value="hgvs" className="gap-2">
-                <Truck className="h-4 w-4" />
-                HGVs
-              </TabsTrigger>
-              <TabsTrigger value="settings" className="gap-2">
-                <Settings className="h-4 w-4" />
-                Settings
-              </TabsTrigger>
-            </>
-          )}
+          <TabsTrigger value="hgvs" className="gap-2">
+            <Truck className="h-4 w-4" />
+            HGVs
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="gap-2">
+            <Settings className="h-4 w-4" />
+            Settings
+          </TabsTrigger>
         </TabsList>
 
         {/* Plant Tab */}
@@ -526,22 +488,17 @@ function FleetContent() {
                 </p>
               </CardContent>
             </Card>
-          ) : canManageFleet ? (
+          ) : (
             <PlantTable 
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
               onVehicleAdded={fetchPlantAssets}
             />
-          ) : (
-            <PlantOverview 
-              onVehicleClick={handleVehicleClick}
-            />
           )}
         </TabsContent>
 
         {/* Vans Tab - Admin/Manager only */}
-        {canManageFleet && (
-          <TabsContent value="vans" className="space-y-6">
+        <TabsContent value="vans" className="space-y-6">
             {maintenanceLoading ? (
               <div className="flex items-center justify-center min-h-[400px]">
                 <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -564,12 +521,10 @@ function FleetContent() {
                 onVehicleAdded={() => {}}
               />
             )}
-          </TabsContent>
-        )}
+        </TabsContent>
 
         {/* HGVs Tab - Admin/Manager only */}
-        {canManageFleet && (
-          <TabsContent value="hgvs" className="space-y-6">
+        <TabsContent value="hgvs" className="space-y-6">
             {maintenanceLoading ? (
               <div className="flex items-center justify-center min-h-[400px]">
                 <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -593,12 +548,10 @@ function FleetContent() {
                 assetLabel="HGV"
               />
             )}
-          </TabsContent>
-        )}
+        </TabsContent>
 
         {/* Settings Tab - Admin/Manager only */}
-        {canManageFleet && (
-          <TabsContent value="settings" className="space-y-6">
+        <TabsContent value="settings" className="space-y-6">
             {/* Van Categories Section - Admin Only */}
             {isAdmin && (
               <>
@@ -937,8 +890,7 @@ function FleetContent() {
               </>
             )}
 
-          </TabsContent>
-        )}
+        </TabsContent>
       </Tabs>
       
       {/* Vehicle Category Dialogs */}

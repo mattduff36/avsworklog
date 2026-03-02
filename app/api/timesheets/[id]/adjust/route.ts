@@ -25,6 +25,7 @@ export async function POST(
 ) {
   try {
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { id: timesheetId } = await params;
     const { comments, notifyManagerIds } = await request.json();
 
@@ -109,7 +110,7 @@ export async function POST(
     }
 
     // Update timesheet status
-    const { error: updateError } = await supabase
+    const { error: updateError } = await db
       .from('timesheets')
       .update({
         status: 'adjusted',
@@ -117,7 +118,7 @@ export async function POST(
         adjusted_at: new Date().toISOString(),
         adjustment_recipients: notifyManagerIds || [],
         manager_comments: comments.trim(),
-      })
+      } as never)
       .eq('id', timesheetId);
 
     if (updateError) {
@@ -151,15 +152,16 @@ export async function POST(
 
     // Send emails to selected managers
     if (notifyManagerIds && notifyManagerIds.length > 0) {
-      const { data: managers } = await supabase
+      const { data: managers } = await db
         .from('profiles')
         .select('id, full_name')
         .in('id', notifyManagerIds);
+      const typedManagers = (managers || []) as Array<{ id: string; full_name: string }>;
 
-      if (managers) {
+      if (typedManagers.length > 0) {
         // Get emails from auth.users for these managers
         // Fetch each user by ID to avoid pagination limits of listUsers()
-        for (const manager of managers) {
+        for (const manager of typedManagers) {
           try {
             const { data: { user: managerUser }, error: managerUserError } = await supabaseAdmin.auth.admin.getUserById(manager.id);
             
@@ -183,7 +185,7 @@ export async function POST(
     }
 
     // Create in-app notification for employee
-    const { data: employeeMessage } = await supabase
+    const { data: employeeMessage } = await db
       .from('messages')
       .insert({
         title: 'Your Timesheet Has Been Adjusted',
@@ -201,18 +203,18 @@ export async function POST(
     const typedEmployeeMessage = employeeMessage as unknown as { id: string } | null;
 
     if (typedEmployeeMessage) {
-      await supabase
+      await db
         .from('message_recipients')
         .insert({
           message_id: typedEmployeeMessage.id,
           recipient_id: typedTimesheet.user_id,
           read: false,
-        });
+        } as never);
     }
 
     // Create in-app notifications for selected managers
     if (notifyManagerIds && notifyManagerIds.length > 0) {
-      const { data: managerMessage } = await supabase
+      const { data: managerMessage } = await db
         .from('messages')
         .insert({
           title: 'Timesheet Adjusted',
@@ -236,9 +238,9 @@ export async function POST(
           read: false,
         }));
 
-        await supabase
+        await db
           .from('message_recipients')
-          .insert(recipients);
+          .insert(recipients as never);
       }
     }
 

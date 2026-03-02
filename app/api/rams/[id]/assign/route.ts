@@ -9,6 +9,7 @@ export async function POST(
 ) {
   try {
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { id } = await params;
 
     // Check authentication
@@ -44,7 +45,7 @@ export async function POST(
     }
 
     // Verify document exists
-    const { data: document, error: docError } = await supabase
+    const { data: document, error: docError } = await db
       .from('rams_documents')
       .select('id, title')
       .eq('id', id)
@@ -55,14 +56,13 @@ export async function POST(
     }
 
     // Get current assignments BEFORE making changes to calculate accurate counts
-    const { data: currentAssignments } = await supabase
+    const { data: currentAssignments } = await db
       .from('rams_assignments')
       .select('employee_id')
       .eq('rams_document_id', id);
     
-    const currentAssignedIds = new Set(
-      currentAssignments?.map(a => a.employee_id) || []
-    );
+    const typedCurrentAssignments = (currentAssignments || []) as Array<{ employee_id: string }>;
+    const currentAssignedIds = new Set(typedCurrentAssignments.map((a) => a.employee_id));
 
     // Calculate counts before making changes
     const newlyAssignedIds = employee_ids.filter(id => !currentAssignedIds.has(id));
@@ -72,23 +72,22 @@ export async function POST(
     let actualRemovedCount = 0;
     if (unassign_ids && Array.isArray(unassign_ids) && unassign_ids.length > 0) {
       // Check which employees have signed - they cannot be unassigned
-      const { data: signedAssignments } = await supabase
+      const { data: signedAssignments } = await db
         .from('rams_assignments')
         .select('employee_id')
         .eq('rams_document_id', id)
         .eq('status', 'signed')
         .in('employee_id', unassign_ids);
 
-      const signedEmployeeIds = new Set(
-        signedAssignments?.map(a => a.employee_id) || []
-      );
+      const typedSignedAssignments = (signedAssignments || []) as Array<{ employee_id: string }>;
+      const signedEmployeeIds = new Set(typedSignedAssignments.map((a) => a.employee_id));
 
       // Filter out signed employees from unassign list
       const unassignableIds = unassign_ids.filter(id => !signedEmployeeIds.has(id));
       actualRemovedCount = unassignableIds.length;
 
       if (unassignableIds.length > 0) {
-        const { error: unassignError } = await supabase
+        const { error: unassignError } = await db
           .from('rams_assignments')
           .delete()
           .eq('rams_document_id', id)
@@ -109,7 +108,7 @@ export async function POST(
     // Only process assignments if there are employees to assign
     if (employee_ids.length > 0) {
       // Verify all employee IDs exist
-      const { data: employees, error: empError } = await supabase
+      const { data: employees, error: empError } = await db
         .from('profiles')
         .select('id')
         .in('id', employee_ids);
@@ -126,14 +125,15 @@ export async function POST(
       }
 
       // Get existing assignments to preserve status for already assigned employees
-      const { data: existingAssignments } = await supabase
+      const { data: existingAssignments } = await db
         .from('rams_assignments')
         .select('employee_id, status')
         .eq('rams_document_id', id)
         .in('employee_id', employee_ids);
 
+      const typedExistingAssignments = (existingAssignments || []) as Array<{ employee_id: string; status: string }>;
       const existingStatusMap = new Map(
-        existingAssignments?.map(a => [a.employee_id, a.status]) || []
+        typedExistingAssignments.map((a) => [a.employee_id, a.status])
       );
 
       // Create assignments (using upsert to handle duplicates)
@@ -145,7 +145,7 @@ export async function POST(
         status: (existingStatusMap.get(employee_id) || 'pending') as 'pending' | 'read' | 'signed',
       }));
 
-      const { data: assignments, error: assignError } = await supabase
+      const { data: _assignments, error: assignError } = await db
         .from('rams_assignments')
         .upsert(assignmentsToCreate, {
           onConflict: 'rams_document_id,employee_id',

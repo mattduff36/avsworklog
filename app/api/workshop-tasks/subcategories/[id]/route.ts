@@ -14,6 +14,7 @@ export async function GET(
 ) {
   try {
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -26,7 +27,7 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid subcategory ID' }, { status: 400 });
     }
 
-    const { data: subcategory, error } = await supabase
+    const { data: subcategory, error } = await db
       .from('workshop_task_subcategories')
       .select(`
         id,
@@ -83,6 +84,7 @@ export async function PATCH(
 ) {
   try {
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -122,9 +124,9 @@ export async function PATCH(
     }
 
     // Update subcategory
-    const { data: subcategory, error: updateError } = await supabase
+    const { data: subcategory, error: updateError } = await db
       .from('workshop_task_subcategories')
-      .update(updates)
+      .update(updates as never)
       .eq('id', id)
       .select(`
         id,
@@ -186,6 +188,7 @@ export async function DELETE(
 ) {
   try {
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -208,7 +211,7 @@ export async function DELETE(
     }
 
     // Check if subcategory is in use
-    const { count, error: countError } = await supabase
+    const { count, error: countError } = await db
       .from('actions')
       .select('id', { count: 'exact', head: true })
       .eq('workshop_subcategory_id', id);
@@ -228,7 +231,7 @@ export async function DELETE(
     }
 
     // Delete subcategory
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await db
       .from('workshop_task_subcategories')
       .delete()
       .eq('id', id);

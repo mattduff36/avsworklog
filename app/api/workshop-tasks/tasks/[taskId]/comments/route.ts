@@ -80,12 +80,25 @@ export async function GET(
       .select('id, action_type, created_at, created_by, logged_at, logged_by, logged_comment, actioned_at, actioned_by, actioned_comment, status_history')
       .eq('id', taskId)
       .single();
+    const typedTask = task as {
+      id: string;
+      action_type: string;
+      created_at: string;
+      created_by: string | null;
+      logged_at: string | null;
+      logged_by: string | null;
+      logged_comment: string | null;
+      actioned_at: string | null;
+      actioned_by: string | null;
+      actioned_comment: string | null;
+      status_history: unknown;
+    } | null;
 
-    if (taskError || !task) {
+    if (taskError || !typedTask) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    if (!['inspection_defect', 'workshop_vehicle_task'].includes(task.action_type)) {
+    if (!['inspection_defect', 'workshop_vehicle_task'].includes(typedTask.action_type)) {
       return NextResponse.json(
         { error: 'Task is not a workshop task' },
         { status: 400 }
@@ -108,6 +121,13 @@ export async function GET(
       .eq('task_id', taskId)
       .order('created_at', { ascending: order === 'asc' })
       .limit(limit);
+    const typedComments = (comments || []) as Array<{
+      id: string;
+      body: string;
+      created_at: string;
+      author_id: string;
+      profiles: { id: string; full_name: string } | null;
+    }>;
 
     if (commentsError) {
       throw commentsError;
@@ -116,7 +136,7 @@ export async function GET(
     // Build timeline items array
     const timelineItems: TimelineItem[] = [];
 
-    const statusHistory = Array.isArray(task.status_history) ? task.status_history : [];
+    const statusHistory = Array.isArray(typedTask.status_history) ? typedTask.status_history : [];
     const historyAuthorIds = [...new Set(
       statusHistory
         .map((event: any) => event?.author_id)
@@ -129,7 +149,8 @@ export async function GET(
         .from('profiles')
         .select('id, full_name')
         .in('id', historyAuthorIds);
-      statusAuthorMap = new Map((profiles || []).map((p) => [p.id, p]));
+      const typedProfiles = (profiles || []) as Array<{ id: string; full_name: string }>;
+      statusAuthorMap = new Map(typedProfiles.map((p) => [p.id, p]));
     }
 
     if (statusHistory.length > 0) {
@@ -139,7 +160,7 @@ export async function GET(
           ? statusAuthorMap.get(event.author_id) || null
           : null;
         timelineItems.push({
-          id: event.id || `status:${event.status}:${task.id}:${event.created_at}`,
+          id: event.id || `status:${event.status}:${typedTask.id}:${event.created_at}`,
           type: 'status_event',
           created_at: event.created_at,
           author: event.author_name
@@ -151,55 +172,52 @@ export async function GET(
       }
     } else {
       // Fallback: derive from logged/actioned fields
-      if (task.logged_at && task.logged_by) {
+      if (typedTask.logged_at && typedTask.logged_by) {
         const { data: loggedByProfile } = await supabase
           .from('profiles')
           .select('id, full_name')
-          .eq('id', task.logged_by)
+          .eq('id', typedTask.logged_by)
           .single();
 
         timelineItems.push({
-          id: `status:logged:${task.id}`,
+          id: `status:logged:${typedTask.id}`,
           type: 'status_event',
-          created_at: task.logged_at,
+          created_at: typedTask.logged_at,
           author: loggedByProfile || null,
-          body: task.logged_comment || 'Marked as In Progress',
-          meta: { status: task.status === 'on_hold' ? 'on_hold' : 'logged' },
+          body: typedTask.logged_comment || 'Marked as In Progress',
+          meta: { status: 'logged' },
         });
       }
 
-      if (task.actioned_at && task.actioned_by) {
+      if (typedTask.actioned_at && typedTask.actioned_by) {
         const { data: actionedByProfile } = await supabase
           .from('profiles')
           .select('id, full_name')
-          .eq('id', task.actioned_by)
+          .eq('id', typedTask.actioned_by)
           .single();
 
         timelineItems.push({
-          id: `status:completed:${task.id}`,
+          id: `status:completed:${typedTask.id}`,
           type: 'status_event',
-          created_at: task.actioned_at,
+          created_at: typedTask.actioned_at,
           author: actionedByProfile || null,
-          body: task.actioned_comment || 'Marked as Complete',
+          body: typedTask.actioned_comment || 'Marked as Complete',
           meta: { status: 'completed' },
         });
       }
     }
 
     // Add freeform comments
-    if (comments) {
-      for (const comment of comments) {
+    if (typedComments.length > 0) {
+      for (const comment of typedComments) {
         timelineItems.push({
           id: comment.id,
           type: 'comment',
           created_at: comment.created_at,
-          author: comment.profiles ? {
-            id: (comment.profiles as any).id,
-            full_name: (comment.profiles as any).full_name,
-          } : null,
+          author: comment.profiles ? { id: comment.profiles.id, full_name: comment.profiles.full_name } : null,
           body: comment.body,
-          can_edit: comment.author_id === user.id, // TODO: Add manager check
-          can_delete: comment.author_id === user.id, // TODO: Add manager check
+          can_edit: comment.author_id === user.id,
+          can_delete: comment.author_id === user.id,
         });
       }
     }
@@ -284,12 +302,13 @@ export async function POST(
       .select('id, action_type')
       .eq('id', taskId)
       .single();
+    const typedTask = task as { id: string; action_type: string } | null;
 
-    if (taskError || !task) {
+    if (taskError || !typedTask) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    if (!['inspection_defect', 'workshop_vehicle_task'].includes(task.action_type)) {
+    if (!['inspection_defect', 'workshop_vehicle_task'].includes(typedTask.action_type)) {
       return NextResponse.json(
         { error: 'Task is not a workshop task' },
         { status: 400 }
@@ -303,7 +322,7 @@ export async function POST(
         task_id: taskId,
         author_id: user.id,
         body: bodyText,
-      })
+      } as never)
       .select(`
         id,
         task_id,
@@ -316,6 +335,12 @@ export async function POST(
         )
       `)
       .single();
+    const typedComment = comment as {
+      id: string;
+      body: string;
+      created_at: string;
+      profiles: { id: string; full_name: string } | null;
+    } | null;
 
     if (insertError) {
       throw insertError;
@@ -324,14 +349,14 @@ export async function POST(
     return NextResponse.json({
       success: true,
       comment: {
-        id: comment.id,
+        id: typedComment?.id || '',
         type: 'comment',
-        created_at: comment.created_at,
-        author: comment.profiles ? {
-          id: (comment.profiles as any).id,
-          full_name: (comment.profiles as any).full_name,
+        created_at: typedComment?.created_at,
+        author: typedComment?.profiles ? {
+          id: typedComment.profiles.id,
+          full_name: typedComment.profiles.full_name,
         } : null,
-        body: comment.body,
+        body: typedComment?.body || '',
         can_edit: true,
         can_delete: true,
       },

@@ -32,7 +32,7 @@ export interface VehicleDataResponse {
   monthOfFirstRegistration?: string | null;
   dateOfLastV5CIssued?: string | null;
   
-  rawData?: any; // Store complete API response for debugging
+  rawData?: unknown; // Store complete API response for debugging
 }
 
 export interface DVLASyncResult {

@@ -15,6 +15,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get template
-    const { data: template, error: templateError } = await supabase
+    const { data: template, error: templateError } = await db
       .from('workshop_attachment_templates')
       .select('*')
       .eq('id', id)
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get questions
-    const { data: questions, error: questionsError } = await supabase
+    const { data: questions, error: questionsError } = await db
       .from('workshop_attachment_questions')
       .select('*')
       .eq('template_id', id)
@@ -77,6 +78,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -108,9 +110,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const { data: template, error: updateError } = await supabase
+    const { data: template, error: updateError } = await db
       .from('workshop_attachment_templates')
-      .update(updates)
+      .update(updates as never)
       .eq('id', id)
       .select('*')
       .single();
@@ -152,6 +154,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -167,7 +170,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await db
       .from('workshop_attachment_templates')
       .delete()
       .eq('id', id);

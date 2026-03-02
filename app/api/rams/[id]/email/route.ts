@@ -7,7 +7,7 @@ import { getProfileWithRole } from '@/lib/utils/permissions';
  * POST /api/rams/[id]/email
  */
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -112,11 +112,6 @@ export async function POST(
     const bytes = new Uint8Array(fileBuffer);
     const binary = bytes.reduce((acc, byte) => acc + String.fromCharCode(byte), '');
     const fileBase64 = btoa(binary);
-
-    // Determine MIME type
-    const mimeType = doc.file_type === 'pdf' 
-      ? 'application/pdf' 
-      : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
     // Send email via Resend
     const emailResponse = await fetch('https://api.resend.com/emails', {

@@ -15,13 +15,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { id: templateId } = await params;
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: questions, error } = await supabase
+    const { data: questions, error } = await db
       .from('workshop_attachment_questions')
       .select('*')
       .eq('template_id', templateId)
@@ -61,6 +62,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { id: templateId } = await params;
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -88,7 +90,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Verify template exists
-    const { data: template, error: templateError } = await supabase
+    const { data: template, error: templateError } = await db
       .from('workshop_attachment_templates')
       .select('id')
       .eq('id', templateId)
@@ -101,7 +103,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Get max sort_order if not provided
     let finalSortOrder = sort_order;
     if (finalSortOrder === undefined) {
-      const { data: maxQuestion } = await supabase
+      const { data: maxQuestion } = await db
         .from('workshop_attachment_questions')
         .select('sort_order')
         .eq('template_id', templateId)
@@ -113,7 +115,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Insert question
-    const { data: question, error: insertError } = await supabase
+    const { data: question, error: insertError } = await db
       .from('workshop_attachment_questions')
       .insert({
         template_id: templateId,
@@ -121,7 +123,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         question_type: question_type || 'checkbox',
         is_required: is_required || false,
         sort_order: finalSortOrder,
-      })
+      } as never)
       .select('*')
       .single();
 

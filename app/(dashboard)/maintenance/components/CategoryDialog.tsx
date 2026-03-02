@@ -55,7 +55,7 @@ const createCategorySchema = z.object({
   period_value: z.coerce.number()
     .int('Period must be a whole number')
     .positive('Period must be a positive number'),
-  applies_to: z.array(z.enum(['van', 'plant']))
+  applies_to: z.array(z.enum(['van', 'plant', 'hgv']))
     .min(1, 'Category must apply to at least one asset type')
     .default(['van']),
   is_active: z.boolean().optional(),
@@ -518,6 +518,26 @@ export function CategoryDialog({
               </div>
               <div className="flex items-center space-x-2">
                 <Checkbox
+                  id="applies-hgv"
+                  checked={appliesTo?.includes('hgv') || false}
+                  onCheckedChange={(checked) => {
+                    const current = appliesTo || [];
+                    if (checked) {
+                      setValue('applies_to', [...current.filter(a => a !== 'hgv'), 'hgv']);
+                    } else {
+                      setValue('applies_to', current.filter(a => a !== 'hgv'));
+                    }
+                  }}
+                  disabled={isSubmitting || selectedType === 'hours'}
+                  className="border-slate-600"
+                />
+                <Label htmlFor="applies-hgv" className="text-white cursor-pointer flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-emerald-400" />
+                  HGVs
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
                   id="applies-plant"
                   checked={appliesTo?.includes('plant') || false}
                   onCheckedChange={(checked) => {
@@ -538,7 +558,7 @@ export function CategoryDialog({
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              {selectedType === 'mileage' && 'Mileage-based categories only apply to vans.'}
+              {selectedType === 'mileage' && 'Mileage-based categories apply to vans and HGVs.'}
               {selectedType === 'hours' && 'Hours-based categories only apply to plant machinery.'}
               {selectedType === 'date' && 'Select which asset types this category applies to (at least one required).'}
             </p>

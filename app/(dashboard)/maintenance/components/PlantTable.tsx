@@ -28,7 +28,7 @@ import {
   FolderClock
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { AddVehicleDialog } from './AddVehicleDialog';
+import { AddAssetFlowDialog } from './add-asset/AddAssetFlowDialog';
 import { formatMaintenanceDate, getStatusColorClass } from '@/lib/utils/maintenanceCalculations';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -372,7 +372,7 @@ export function PlantTable({
               onClick={() => setAddVehicleDialogOpen(true)}
             >
               <Plus className="h-4 w-4 mr-2 hidden md:inline" />
-              <span className="hidden md:inline">Add Plant</span>
+              <span className="hidden md:inline">Add Asset</span>
               <Plus className="h-4 w-4 md:hidden" />
             </Button>
           </div>
@@ -1040,10 +1040,9 @@ export function PlantTable({
         </CardContent>
       </Card>
 
-      <AddVehicleDialog
+      <AddAssetFlowDialog
         open={addVehicleDialogOpen}
         onOpenChange={setAddVehicleDialogOpen}
-        assetType="plant"
         onSuccess={() => {
           // Refetch local data and notify parent
           fetchPlantData();

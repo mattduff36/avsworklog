@@ -136,7 +136,6 @@ class NotificationService {
     toast.info(message, {
       description,
       duration: 5000,
-      important: true,
     });
   }
 }

@@ -1734,8 +1734,8 @@ export default function WorkshopTasksPage() {
       <Tabs value={assetTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className={`grid w-full ${showSettings ? 'grid-cols-5' : 'grid-cols-4'}`}>
           <TabsTrigger value="van">Van Tasks</TabsTrigger>
-          <TabsTrigger value="hgv">HGV Tasks</TabsTrigger>
           <TabsTrigger value="plant">Plant Tasks</TabsTrigger>
+          <TabsTrigger value="hgv">HGV Tasks</TabsTrigger>
           <TabsTrigger value="tools" disabled>
             <span className="flex items-center gap-1">
               Tools
@@ -3770,8 +3770,8 @@ export default function WorkshopTasksPage() {
                 <Tabs value={categoryTaxonomyMode} onValueChange={(v) => setCategoryTaxonomyMode(v as 'van' | 'plant' | 'hgv')}>
                   <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="van">Van Categories</TabsTrigger>
-                    <TabsTrigger value="hgv">HGV Categories</TabsTrigger>
                     <TabsTrigger value="plant">Plant Categories</TabsTrigger>
+                    <TabsTrigger value="hgv">HGV Categories</TabsTrigger>
                   </TabsList>
                 </Tabs>
               </CardContent>

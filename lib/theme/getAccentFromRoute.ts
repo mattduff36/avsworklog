@@ -24,7 +24,7 @@ export type AccentType =
  */
 export function getAccentFromRoute(
   pathname: string,
-  searchParams?: URLSearchParams | null
+  _searchParams?: URLSearchParams | null
 ): AccentType {
   // Normalize pathname
   const path = pathname.toLowerCase();

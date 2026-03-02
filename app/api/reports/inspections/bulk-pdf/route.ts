@@ -15,6 +15,7 @@ const MAX_INSPECTIONS_PER_PDF = 80;
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { searchParams } = new URL(request.url);
     const dateFrom = searchParams.get('dateFrom');
     const dateTo = searchParams.get('dateTo');
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch all non-draft inspections within the date range
-    const { data: inspections, error: inspectionsError } = await supabase
+    const { data: inspections, error: inspectionsError } = await db
       .from('van_inspections')
       .select(`
         *,
@@ -71,12 +72,11 @@ export async function GET(request: NextRequest) {
     }
 
     // If more than MAX_INSPECTIONS_PER_PDF, we need to create multiple PDFs in a ZIP
-    const needsZip = inspections.length > MAX_INSPECTIONS_PER_PDF;
-    
     // Split inspections into chunks of MAX_INSPECTIONS_PER_PDF
-    const chunks: typeof inspections[] = [];
-    for (let i = 0; i < inspections.length; i += MAX_INSPECTIONS_PER_PDF) {
-      chunks.push(inspections.slice(i, i + MAX_INSPECTIONS_PER_PDF));
+    const typedInspections = inspections as Array<{ id: string } & Record<string, unknown>>;
+    const chunks: typeof typedInspections[] = [];
+    for (let i = 0; i < typedInspections.length; i += MAX_INSPECTIONS_PER_PDF) {
+      chunks.push(typedInspections.slice(i, i + MAX_INSPECTIONS_PER_PDF));
     }
 
     // Generate PDFs for each chunk
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
         const inspection = chunk[i];
         
         // Fetch inspection items
-        const { data: items, error: itemsError } = await supabase
+        const { data: items, error: itemsError } = await db
           .from('inspection_items')
           .select('*')
           .eq('inspection_id', inspection.id)
@@ -108,13 +108,13 @@ export async function GET(request: NextRequest) {
         // Generate PDF using the appropriate template
         const pdfComponent = useVanTemplate
           ? VanInspectionPDF({
-              inspection,
+              inspection: inspection as any,
               items,
               vehicleReg: (inspection as any).vehicle?.reg_number,
               employeeName: (inspection as any).profile?.full_name,
             })
           : InspectionPDF({
-              inspection,
+              inspection: inspection as any,
               items,
               vehicleReg: (inspection as any).vehicle?.reg_number,
               employeeName: (inspection as any).profile?.full_name,
@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
 
     // If we only have one PDF, return it directly
     if (pdfBuffers.length === 1) {
-      return new NextResponse(pdfBuffers[0].buffer, {
+      return new NextResponse(new Uint8Array(pdfBuffers[0].buffer), {
         headers: {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `attachment; filename="${pdfBuffers[0].name}"`,
@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
 
     const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
 
-    return new NextResponse(zipBuffer, {
+    return new NextResponse(new Uint8Array(zipBuffer), {
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="All_Inspections_${dateFrom}_to_${dateTo}.zip"`,
@@ -245,7 +245,8 @@ export async function POST(request: NextRequest) {
           return;
         }
 
-        const totalInspections = inspections.length;
+        const typedInspections = inspections as Array<{ id: string } & Record<string, unknown>>;
+        const totalInspections = typedInspections.length;
         const needsZip = totalInspections > MAX_INSPECTIONS_PER_PDF;
         const numParts = Math.ceil(totalInspections / MAX_INSPECTIONS_PER_PDF);
 
@@ -258,9 +259,9 @@ export async function POST(request: NextRequest) {
         }) + '\n'));
 
         // Split inspections into chunks
-        const chunks: typeof inspections[] = [];
-        for (let i = 0; i < inspections.length; i += MAX_INSPECTIONS_PER_PDF) {
-          chunks.push(inspections.slice(i, i + MAX_INSPECTIONS_PER_PDF));
+        const chunks: typeof typedInspections[] = [];
+        for (let i = 0; i < typedInspections.length; i += MAX_INSPECTIONS_PER_PDF) {
+          chunks.push(typedInspections.slice(i, i + MAX_INSPECTIONS_PER_PDF));
         }
 
         const pdfBuffers: { name: string; buffer: Buffer }[] = [];
@@ -303,13 +304,13 @@ export async function POST(request: NextRequest) {
             // Generate PDF
             const pdfComponent = useVanTemplate
               ? VanInspectionPDF({
-                  inspection,
+                  inspection: inspection as any,
                   items,
                   vehicleReg: (inspection as any).vehicle?.reg_number,
                   employeeName: (inspection as any).profile?.full_name,
                 })
               : InspectionPDF({
-                  inspection,
+                  inspection: inspection as any,
                   items,
                   vehicleReg: (inspection as any).vehicle?.reg_number,
                   employeeName: (inspection as any).profile?.full_name,

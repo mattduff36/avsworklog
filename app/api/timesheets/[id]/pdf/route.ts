@@ -12,6 +12,7 @@ export async function GET(
   try {
     const { id } = await params;
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
 
     // Get the current user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -20,7 +21,7 @@ export async function GET(
     }
 
     // Fetch timesheet with entries
-    const { data: timesheet, error: timesheetError } = await supabase
+    const { data: timesheet, error: timesheetError } = await db
       .from('timesheets')
       .select(`
         *,
@@ -28,6 +29,7 @@ export async function GET(
       `)
       .eq('id', id)
       .single();
+    const typedTimesheet = timesheet as { user_id: string; entries?: unknown[] } & Record<string, unknown>;
 
     if (timesheetError || !timesheet) {
       return NextResponse.json({ error: 'Timesheet not found' }, { status: 404 });
@@ -36,7 +38,7 @@ export async function GET(
     // Check authorization - user must be owner, manager, or admin
     const profile = await getProfileWithRole(user.id);
 
-    const isOwner = timesheet.user_id === user.id;
+    const isOwner = typedTimesheet.user_id === user.id;
     const isManager = profile?.role?.is_manager_admin || false;
 
     if (!isOwner && !isManager) {
@@ -44,10 +46,10 @@ export async function GET(
     }
 
     // Get employee name from profiles table (full_name is the correct field)
-    const { data: employee, error: employeeError } = await supabase
+    const { data: employee, error: employeeError } = await db
       .from('profiles')
       .select('full_name')
-      .eq('id', timesheet.user_id)
+      .eq('id', typedTimesheet.user_id)
       .single();
 
     if (employeeError) {
@@ -58,7 +60,7 @@ export async function GET(
 
     console.log('PDF Generation Debug:', {
       timesheetId: id,
-      userId: timesheet.user_id,
+      userId: typedTimesheet.user_id,
       employeeName,
       hasEmployee: !!employee,
       employeeError: employeeError?.message
@@ -67,16 +69,15 @@ export async function GET(
     // Generate PDF
     const stream = await renderToStream(
       TimesheetPDF({
-        timesheet,
+        timesheet: typedTimesheet as any,
         employeeName: employeeName,
-        employeeEmail: undefined,
       })
     );
 
     // Convert stream to buffer
     const chunks: Uint8Array[] = [];
     for await (const chunk of stream) {
-      chunks.push(chunk);
+      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
     }
     const buffer = Buffer.concat(chunks);
 

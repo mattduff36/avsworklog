@@ -10,6 +10,7 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
     const categoryId = searchParams.get('category_id');
     const includeInactive = searchParams.get('include_inactive') === 'true';
 
-    let query = supabase
+    let query = db
       .from('workshop_task_subcategories')
       .select(`
         id,
@@ -84,6 +85,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -111,7 +113,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert subcategory
-    const { data: subcategory, error: insertError } = await supabase
+    const { data: subcategory, error: insertError } = await db
       .from('workshop_task_subcategories')
       .insert({
         category_id,
@@ -123,7 +125,7 @@ export async function POST(request: NextRequest) {
         ui_icon,
         ui_badge_style,
         created_by: user.id,
-      })
+      } as never)
       .select(`
         id,
         category_id,

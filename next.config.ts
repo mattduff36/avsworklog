@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: process.env.SKIP_BUILD_CHECKS === 'true',
   },
-  webpack: (config, { isServer }) => {
+  webpack: (config) => {
     // Handle canvas package for pdfjs-dist
     config.resolve.alias.canvas = false;
     

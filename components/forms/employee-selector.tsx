@@ -40,7 +40,7 @@ export function EmployeeSelector({
         if (error) throw error;
 
         // Sort: current user first, then alphabetically
-        const sorted = (data || []).sort((a, b) => {
+        const sorted = ((data || []) as Array<{ id: string; full_name: string; employee_id: string | null }>).sort((a, b) => {
           if (currentUserId) {
             if (a.id === currentUserId) return -1;
             if (b.id === currentUserId) return 1;

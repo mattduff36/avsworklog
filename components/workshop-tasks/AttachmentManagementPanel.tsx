@@ -718,7 +718,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
               <div className="space-y-0.5">
                 <Label htmlFor="templateActive">Active</Label>
                 <p className="text-xs text-muted-foreground">
-                  Inactive templates won't appear when creating tasks
+                  Inactive templates won&apos;t appear when creating tasks
                 </p>
               </div>
               <Switch

@@ -6,6 +6,7 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const db = supabase as unknown as { from: (table: string) => any };
 
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
       const offset = Math.max(Number(searchParams.get('offset')) || 0, 0);
 
       // Base query for documents
-      let docsQuery = supabase
+      let docsQuery = db
         .from('rams_documents')
         .select(`
           *,
@@ -83,11 +84,16 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      const docIds = documents.map(d => d.id);
+      const typedDocuments = (documents || []) as Array<{
+        id: string;
+        uploader?: { full_name?: string | null } | null;
+        document_type?: { id: string; name: string; required_signature?: boolean | null } | null;
+      } & Record<string, unknown>>;
+      const docIds = typedDocuments.map((d) => d.id);
 
       // Batch-fetch all assignment stats in one query instead of N+1
       const { data: allAssignments } = docIds.length > 0
-        ? await supabase
+        ? await db
             .from('rams_assignments')
             .select('rams_document_id, status')
             .in('rams_document_id', docIds)
@@ -104,16 +110,16 @@ export async function GET(request: NextRequest) {
 
       // Check which docs are favourited by this user
       const { data: userFavs } = docIds.length > 0
-        ? await supabase
+        ? await db
             .from('project_favourites')
             .select('document_id')
             .eq('user_id', user.id)
             .in('document_id', docIds)
         : { data: [] as { document_id: string }[] };
 
-      const favSet = new Set((userFavs || []).map(f => f.document_id));
+      const favSet = new Set(((userFavs || []) as Array<{ document_id: string }>).map((f) => f.document_id));
 
-      let documentsWithStats = documents.map((doc) => {
+      let documentsWithStats = typedDocuments.map((doc) => {
         const stats = statsMap.get(doc.id) || { assigned: 0, signed: 0, pending: 0 };
         const reqSig = doc.document_type?.required_signature ?? true;
         return {
@@ -150,7 +156,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Compute category counts (unfiltered, for stat cards)
-      const { data: allDocs } = await supabase
+      const { data: allDocs } = await db
         .from('rams_documents')
         .select('id, created_at, document_type_id, document_type:project_document_types(required_signature)')
         .eq('is_active', true);
@@ -159,9 +165,9 @@ export async function GET(request: NextRequest) {
       const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
       const counts = {
         all: allDocs?.length || 0,
-        needs_signature: allDocs?.filter(d => (d.document_type as any)?.required_signature !== false).length || 0,
-        read_only: allDocs?.filter(d => (d.document_type as any)?.required_signature === false).length || 0,
-        recently_uploaded: allDocs?.filter(d => new Date(d.created_at).getTime() > sevenDaysAgo).length || 0,
+        needs_signature: allDocs?.filter((d: { document_type?: { required_signature?: boolean } | null }) => d.document_type?.required_signature !== false).length || 0,
+        read_only: allDocs?.filter((d: { document_type?: { required_signature?: boolean } | null }) => d.document_type?.required_signature === false).length || 0,
+        recently_uploaded: allDocs?.filter((d: { created_at: string }) => new Date(d.created_at).getTime() > sevenDaysAgo).length || 0,
       };
 
       return NextResponse.json({
@@ -173,7 +179,7 @@ export async function GET(request: NextRequest) {
     }
 
     // All users: Get only assigned documents (default behavior)
-    let query = supabase
+    let query = db
       .from('rams_assignments')
       .select(`
         *,
@@ -204,8 +210,17 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform data to include document details
-    const documents = assignments?.map(assignment => {
-      const doc = assignment.document as any;
+    const typedAssignments = (assignments || []) as Array<{
+      id: string;
+      status: string;
+      assigned_at: string | null;
+      signed_at: string | null;
+      document: Record<string, unknown> | null;
+    }>;
+    const documents = typedAssignments.map((assignment) => {
+      const doc = assignment.document as {
+        document_type?: { name?: string; required_signature?: boolean };
+      } & Record<string, unknown>;
       return {
         ...doc,
         assignment_id: assignment.id,
@@ -215,7 +230,7 @@ export async function GET(request: NextRequest) {
         document_type_name: doc?.document_type?.name || null,
         required_signature: doc?.document_type?.required_signature ?? true,
       };
-    }) || [];
+    });
 
     return NextResponse.json({
       success: true,

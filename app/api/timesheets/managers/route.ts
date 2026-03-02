@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
-import { createClient as createServerClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
@@ -81,7 +80,7 @@ export async function GET() {
     // Fetch each user by ID to avoid pagination limits of listUsers()
     const emailMap = new Map<string, string | null>();
     
-    for (const profile of profilesData ?? []) {
+    for (const profile of ((profilesData ?? []) as Array<{ id: string; full_name: string; roles: { name: string; display_name: string; is_manager_admin: boolean } | null }>)) {
       try {
         const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.getUserById(profile.id);
         if (!userError && user?.email) {
@@ -97,7 +96,7 @@ export async function GET() {
     }
 
     // Merge profiles with emails
-    const data = (profilesData ?? []).map((profile) => ({
+    const data = ((profilesData ?? []) as Array<{ id: string; full_name: string; roles: { name: string; display_name: string; is_manager_admin: boolean } | null }>).map((profile) => ({
       ...profile,
       email: emailMap.get(profile.id) || null,
     }));
@@ -131,7 +130,6 @@ export async function GET() {
 
     await logServerError({
       error: error as Error,
-      request,
       componentName: '/api/timesheets/managers',
       additionalData: {
         endpoint: '/api/timesheets/managers',

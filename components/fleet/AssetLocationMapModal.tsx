@@ -142,7 +142,7 @@ export function AssetLocationMapModal({
       const map = new maptilersdk.Map({
         container: mapContainerRef.current,
         style: '019c5e68-f020-7497-955c-16a05a3779b3',
-        center: [location.lng, location.lat],
+        center: [location!.lng, location!.lat],
         zoom: 15,
         interactive: true,
       });
@@ -150,7 +150,7 @@ export function AssetLocationMapModal({
       // Add other vehicle markers (blue) with labels
       let otherCount = 0;
       for (const v of otherVehicles) {
-        if (String(v.vehicleId) === String(location.vehicleId)) continue;
+        if (String(v.vehicleId) === String(location!.vehicleId)) continue;
         if (isNaN(v.lat) || isNaN(v.lng)) continue;
 
         const label = extractLabel(v.name, v.vrn);
@@ -175,14 +175,14 @@ export function AssetLocationMapModal({
 
       // Add main asset marker (red) – on top
       const marker = new maptilersdk.Marker({ color: '#ef4444' })
-        .setLngLat([location.lng, location.lat])
+        .setLngLat([location!.lng, location!.lat])
         .setPopup(
           new maptilersdk.Popup({ offset: 25 }).setHTML(
             `<div style="color: #1e293b; padding: 4px; font-size: 13px;">
               <strong>${assetLabel}</strong><br/>
-              ${location.vrn ? `VRN: ${location.vrn}<br/>` : ''}
-              Speed: ${location.speed ?? 0} mph<br/>
-              Last seen: ${new Date(location.updatedAt).toLocaleString('en-GB')}
+              ${location!.vrn ? `VRN: ${location!.vrn}<br/>` : ''}
+              Speed: ${location!.speed ?? 0} mph<br/>
+              Last seen: ${new Date(location!.updatedAt).toLocaleString('en-GB')}
             </div>`
           )
         )

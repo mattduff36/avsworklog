@@ -289,11 +289,11 @@ export async function POST(request: NextRequest) {
           priority: 'high',
           status: 'pending',
           created_by: createdBy,
-        };
+        } as ActionInsert & { workshop_subcategory_id: string };
 
         const { error: insertError } = await supabaseAdmin
           .from('actions')
-          .insert(newTask);
+          .insert(newTask as never);
 
         if (insertError) {
           console.error(`Error creating task for ${signature}:`, insertError);

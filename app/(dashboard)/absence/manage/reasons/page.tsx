@@ -26,7 +26,6 @@ import {
 } from '@/lib/hooks/useAbsence';
 import { AbsenceReason } from '@/types/absence';
 import { toast } from 'sonner';
-import Link from 'next/link';
 
 export default function AbsenceReasonsPage() {
   const { isAdmin, loading: authLoading } = useAuth();
