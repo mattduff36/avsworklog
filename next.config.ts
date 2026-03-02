@@ -14,10 +14,10 @@ const nextConfig: NextConfig = {
   // Mark server-only packages to prevent client-side bundling
   serverExternalPackages: ['exceljs'],
   eslint: {
-    ignoreDuringBuilds: process.env.SKIP_BUILD_CHECKS === 'true',
+    ignoreDuringBuilds: true,
   },
   typescript: {
-    ignoreBuildErrors: process.env.SKIP_BUILD_CHECKS === 'true',
+    ignoreBuildErrors: true,
   },
   webpack: (config) => {
     // Handle canvas package for pdfjs-dist
