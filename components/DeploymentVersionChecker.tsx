@@ -103,13 +103,11 @@ export function DeploymentVersionChecker() {
       clearInterval(intervalId);
       subscription.unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Route-change check (client-side navigation)
   useEffect(() => {
     checkVersion('navigation');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   return null;

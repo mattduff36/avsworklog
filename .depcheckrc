@@ -1,0 +1,13 @@
+{
+  "ignores": [
+    "@tailwindcss/postcss",
+    "@typescript-eslint/eslint-plugin",
+    "@typescript-eslint/parser",
+    "@vitest/coverage-v8",
+    "cross-env",
+    "eslint-config-next",
+    "eslint-plugin-react",
+    "eslint-plugin-react-hooks",
+    "tailwindcss"
+  ]
+}

@@ -598,7 +598,7 @@ export function EditPlantRecordDialog({
               className="bg-input border-border text-white uppercase"
             />
             <p className="text-xs text-muted-foreground">
-              Manufacturer's serial number (alphanumeric only, auto-uppercase)
+              Manufacturer&apos;s serial number (alphanumeric only, auto-uppercase)
             </p>
             {errors.serial_number && (
               <p className="text-sm text-red-400">{errors.serial_number.message}</p>

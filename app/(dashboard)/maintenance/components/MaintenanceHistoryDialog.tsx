@@ -100,7 +100,7 @@ export function MaintenanceHistoryDialog({
         performAutoSync();
       }
     }
-  }, [open, vehicleId, vesData, isSyncing]);
+  }, [open, vehicleId, vesData, isSyncing, assetType]);
   
   // Group combined items by date (show all changes made together)
   const groupedHistory: Record<string, typeof combinedItems> = {};

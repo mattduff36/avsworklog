@@ -635,7 +635,7 @@ ${log.changes && Object.keys(log.changes).length > 0 ? `CHANGES:\n${Object.entri
 
     setPurging(true);
     try {
-      let combinedCounts: Record<string, number> = {};
+      const combinedCounts: Record<string, number> = {};
       for (const [ft, ids] of Object.entries(byType)) {
         if (ids.length === 0) continue;
         const response = await fetch('/api/debug/test-vehicles', {

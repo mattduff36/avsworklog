@@ -14,14 +14,10 @@ const nextConfig: NextConfig = {
   // Mark server-only packages to prevent client-side bundling
   serverExternalPackages: ['exceljs'],
   eslint: {
-    // Warning: This allows production builds to successfully complete even if
-    // your project has ESLint errors.
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: process.env.SKIP_BUILD_CHECKS === 'true',
   },
   typescript: {
-    // Allow build with known Supabase TypeScript limitation in conditional updates
-    // All other type errors have been properly fixed with Database types
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: process.env.SKIP_BUILD_CHECKS === 'true',
   },
   webpack: (config, { isServer }) => {
     // Handle canvas package for pdfjs-dist

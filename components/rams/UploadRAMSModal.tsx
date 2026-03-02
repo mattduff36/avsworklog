@@ -51,7 +51,7 @@ export function UploadRAMSModal({ open, onClose, onSubmit, prefillTitle, prefill
         })
         .catch(err => console.error('Error loading document types:', err));
     }
-  }, [open]);
+  }, [open, selectedTypeId]);
 
   useEffect(() => {
     if (prefillTitle) setTitle(prefillTitle);
