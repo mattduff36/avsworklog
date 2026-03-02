@@ -276,6 +276,7 @@ export function useAllAbsences(filters?: {
   
   return useQuery({
     queryKey: ['absences', 'all', filters],
+    enabled: filters !== undefined,
     queryFn: async () => {
       let query = supabase
         .from('absences')

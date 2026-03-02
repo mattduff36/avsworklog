@@ -869,7 +869,7 @@ export default function ActionsPage() {
                               <span className="md:inline">Logged</span>
                             </Button>
                             <Button
-                              onClick={() => handleMarkAsComplete(action.id, action.status)}
+                              onClick={() => handleMarkAsComplete(action.id)}
                               disabled={isCompleting}
                               className={`h-12 md:h-16 min-w-0 md:min-w-[140px] text-sm md:text-base font-semibold transition-all ${
                                 isCompleting
@@ -984,7 +984,7 @@ export default function ActionsPage() {
                               <span className="md:inline">Undo</span>
                             </Button>
                             <Button
-                              onClick={() => handleMarkAsComplete(action.id, action.status)}
+                              onClick={() => handleMarkAsComplete(action.id)}
                               disabled={isCompleting}
                               className={`h-12 md:h-16 min-w-0 md:min-w-[140px] text-sm md:text-base font-semibold transition-all ${
                                 isCompleting

@@ -237,7 +237,7 @@ function ApprovalsContent() {
 
   const totalCount = timesheets.length;
 
-  const getFilterLabel = (filter: StatusFilter) => {
+  const getFilterLabel = (filter: StatusFilter): string => {
     switch (filter) {
       case 'pending': return 'Pending';
       case 'approved': return 'Approved';
@@ -245,6 +245,7 @@ function ApprovalsContent() {
       case 'processed': return 'Processed';
       case 'adjusted': return 'Adjusted';
       case 'all': return 'All';
+      default: return filter;
     }
   };
 

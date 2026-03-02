@@ -50,7 +50,11 @@ const RoleManagement = dynamic(() => import('@/components/admin/RoleManagement')
 });
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
-type ProfileWithEmail = Profile & { email?: string };
+type ProfileWithRole = Omit<Profile, 'role'> & {
+  role?: { name: string; display_name: string } | null;
+  role_id?: string | null;
+};
+type ProfileWithEmail = ProfileWithRole & { email?: string };
 
 type TabType = 'users' | 'roles';
 
@@ -125,10 +129,10 @@ export default function UsersAdminPage() {
     const emailMap = new Map(authUsers?.map((u: { id: string; email: string }) => [u.id, u.email]) || []);
 
     // Merge profiles with emails
-    return profiles?.map(profile => ({
+    return (profiles as unknown as ProfileWithRole[])?.map(profile => ({
       ...profile,
-      email: emailMap.get(profile.id) || ''
-    })) || [];
+      email: emailMap.get(profile.id) as string || ''
+    })) || [] as ProfileWithEmail[];
   }
 
   // Fetch available roles
@@ -471,7 +475,7 @@ export default function UsersAdminPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)} className="space-y-6">
         <TabsList className="grid w-full max-w-md grid-cols-2 bg-slate-100 dark:bg-slate-800 p-0">
           <TabsTrigger 
             value="users" 

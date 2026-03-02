@@ -283,7 +283,7 @@ export default function FAQEditorPage() {
       if (response.ok) {
         toast.success(editingArticle ? 'Article updated' : 'Article created');
         setArticleDialogOpen(false);
-        fetchArticles();
+        fetchArticles(selectedCategoryFilter);
       } else {
         throw new Error(data.error || 'Failed to save article');
       }
@@ -309,7 +309,7 @@ export default function FAQEditorPage() {
       if (response.ok) {
         toast.success('Article deleted');
         setDeleteArticleDialog(null);
-        fetchArticles();
+        fetchArticles(selectedCategoryFilter);
       } else {
         throw new Error(data.error || 'Failed to delete article');
       }

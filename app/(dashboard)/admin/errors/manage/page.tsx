@@ -23,7 +23,6 @@ import {
   Loader2, 
   Search,
   CheckCircle2,
-  XCircle,
   Eye,
   User,
   Clock
@@ -42,7 +41,7 @@ import {
 
 export default function ErrorReportsManagePage() {
   const router = useRouter();
-  const { isManager, isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   
   const [reports, setReports] = useState<ErrorReportWithUser[]>([]);
   const [loading, setLoading] = useState(true);

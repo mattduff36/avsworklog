@@ -79,8 +79,7 @@ export default function AbsencePage() {
   // Fetch data - use all absences for managers/admins
   const { data: userAbsences, isLoading: loadingUserAbsences } = useAbsencesForCurrentUser();
   const { data: allAbsencesData, isLoading: loadingAllAbsences } = useAllAbsences(
-    isManager || isAdmin ? {} : undefined,
-    { enabled: isManager || isAdmin }
+    isManager || isAdmin ? {} : undefined
   );
   const { data: summary, isLoading: loadingSummary } = useAbsenceSummaryForCurrentUser();
   const { data: reasons } = useAbsenceReasons();
@@ -132,9 +131,9 @@ export default function AbsencePage() {
         .order('full_name');
       
       if (error) throw error;
-      setEmployees(data || []);
-      // Pre-select all employees
-      setSelectedEmployeeIds((data || []).map(e => e.id));
+      const employees = (data || []) as Employee[];
+      setEmployees(employees);
+      setSelectedEmployeeIds(employees.map(e => e.id));
     } catch (err) {
       console.error('Error fetching employees:', err);
     }

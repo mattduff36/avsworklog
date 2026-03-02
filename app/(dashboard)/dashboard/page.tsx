@@ -71,14 +71,6 @@ export default function DashboardPage() {
   // Intro animation state (all devices)
   const [showIntro, setShowIntro] = useState(true);
   
-  // Track if component is mounted (client-side only) to prevent hydration issues
-  const [isMounted, setIsMounted] = useState(false);
-  
-  // Set mounted state after hydration
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-  
   // Hide intro after 3 seconds
   useEffect(() => {
     const timer = setTimeout(() => {
