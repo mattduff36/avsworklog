@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { ERROR_REPORT_STATUS_LABELS } from '@/types/error-reports';
 import type { 
   GetErrorReportDetailResponse, 
   UpdateErrorReportRequest,
@@ -162,7 +164,8 @@ export async function PATCH(
     }
 
     // Create update history entry if status changed or note provided
-    if ((status && status !== currentReport.status) || note) {
+    const statusChanged = status && status !== currentReport.status;
+    if (statusChanged || note) {
       const { error: historyError } = await supabase
         .from('error_report_updates')
         .insert({
@@ -175,7 +178,51 @@ export async function PATCH(
 
       if (historyError) {
         console.error('Error creating update history:', historyError);
-        // Don't fail the request if history fails
+      }
+    }
+
+    // Send in-app notification to the reporter when status changes
+    if (statusChanged && currentReport.created_by) {
+      try {
+        const adminSupabase = createAdminClient();
+        const oldLabel = ERROR_REPORT_STATUS_LABELS[currentReport.status as keyof typeof ERROR_REPORT_STATUS_LABELS] || currentReport.status;
+        const newLabel = ERROR_REPORT_STATUS_LABELS[status as keyof typeof ERROR_REPORT_STATUS_LABELS] || status;
+        const reportTitle = currentReport.title?.substring(0, 60) || 'Your error report';
+
+        const subject = `Error Report Updated: ${oldLabel} → ${newLabel}`;
+        const bodyParts = [
+          `Your error report **"${reportTitle}"** has been updated.`,
+          '',
+          `**Status:** ${oldLabel} → ${newLabel}`,
+        ];
+        if (note) bodyParts.push(`**Admin note:** ${note}`);
+        bodyParts.push('', '---', '*You can view your reports on the Help page.*');
+
+        const { data: message, error: msgError } = await adminSupabase
+          .from('messages')
+          .insert({
+            type: 'NOTIFICATION',
+            priority: 'HIGH',
+            subject,
+            body: bodyParts.join('\n'),
+            sender_id: user.id,
+          })
+          .select()
+          .single();
+
+        if (msgError) throw msgError;
+
+        const { error: recipientError } = await adminSupabase
+          .from('message_recipients')
+          .insert({
+            message_id: message.id,
+            user_id: currentReport.created_by,
+            status: 'PENDING',
+          });
+
+        if (recipientError) throw recipientError;
+      } catch (notifyError) {
+        console.error('Failed to send status-change notification to reporter:', notifyError);
       }
     }
 
