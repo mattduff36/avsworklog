@@ -28,8 +28,8 @@ export function ReminderModal({
 }: ReminderModalProps) {
   const hasDismissed = useRef(false);
 
-  // Auto-dismiss (mark as read) silently when the modal opens — fire-and-forget.
-  // Does NOT close the modal; the user reads at their own pace and closes manually.
+  // Auto-dismiss (mark as read) when the modal opens.
+  // On success, dispatch event so Navbar badge updates immediately.
   useEffect(() => {
     if (!open || hasDismissed.current) return;
     hasDismissed.current = true;
@@ -37,9 +37,15 @@ export function ReminderModal({
     fetch(`/api/messages/${message.recipient_id}/dismiss`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-    }).catch(() => {
-      // Silently fail — the notification stays unread and can be retried next time
-    });
+    })
+      .then((res) => {
+        if (res.ok) {
+          window.dispatchEvent(new CustomEvent('notification-dismissed'));
+        }
+      })
+      .catch(() => {
+        // Silently fail — the notification stays unread and can be retried next time
+      });
   }, [open, message.recipient_id]);
 
   // When the user closes the modal, notify the parent so it can refresh/advance

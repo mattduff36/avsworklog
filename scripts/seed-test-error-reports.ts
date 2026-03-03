@@ -133,14 +133,15 @@ async function run() {
     const newLabel = STATUS_LABELS[newStatus] ?? newStatus;
     const titleTrunc = report.title.substring(0, 60);
 
-    const subject = `Error Report Updated: ${oldLabel} → ${newLabel}`;
+    const subject = `Error Report Updated to ${newLabel}`;
     const bodyParts = [
-      `Your error report **"${titleTrunc}"** has been updated.`,
+      `Your error report "${titleTrunc}" has been updated.`,
       '',
-      `**Status:** ${oldLabel} → ${newLabel}`,
+      `Status: ${oldLabel} → ${newLabel}`,
+      '',
     ];
-    if (report.admin_note) bodyParts.push(`**Admin note:** ${report.admin_note}`);
-    bodyParts.push('', '---', '*You can view your reports on the Help page.*');
+    if (report.admin_note) bodyParts.push(`Admin note: ${report.admin_note}`, '');
+    bodyParts.push('---', 'Tip: You can view your reports on the Help page.');
 
     const { data: msg, error: msgErr } = await supabase
       .from('messages')

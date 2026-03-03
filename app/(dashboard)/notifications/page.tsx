@@ -274,7 +274,7 @@ export default function NotificationsPage() {
       case 'DISMISSED':
         return (
           <Badge variant="secondary" className="gap-1">
-            Acknowledged
+            Read
           </Badge>
         );
       case 'SHOWN':
@@ -288,7 +288,7 @@ export default function NotificationsPage() {
         return (
           <Badge variant="destructive" className="gap-1">
             <AlertTriangle className="h-3 w-3" />
-            Pending
+            Unread
           </Badge>
         );
     }

@@ -189,14 +189,15 @@ export async function PATCH(
         const newLabel = ERROR_REPORT_STATUS_LABELS[status as keyof typeof ERROR_REPORT_STATUS_LABELS] || status;
         const reportTitle = currentReport.title?.substring(0, 60) || 'Your error report';
 
-        const subject = `Error Report Updated: ${oldLabel} → ${newLabel}`;
+        const subject = `Error Report Updated to ${newLabel}`;
         const bodyParts = [
-          `Your error report **"${reportTitle}"** has been updated.`,
+          `Your error report "${reportTitle}" has been updated.`,
           '',
-          `**Status:** ${oldLabel} → ${newLabel}`,
+          `Status: ${oldLabel} → ${newLabel}`,
+          '',
         ];
-        if (note) bodyParts.push(`**Admin note:** ${note}`);
-        bodyParts.push('', '---', '*You can view your reports on the Help page.*');
+        if (note) bodyParts.push(`Admin note: ${note}`, '');
+        bodyParts.push('---', 'Tip: You can view your reports on the Help page.');
 
         const { data: message, error: msgError } = await adminSupabase
           .from('messages')

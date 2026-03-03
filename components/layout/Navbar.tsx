@@ -324,10 +324,19 @@ export function Navbar() {
     }
 
     fetchNotificationCount();
+
+    // Refresh badge when a notification is dismissed (e.g. from ReminderModal)
+    const handleNotificationDismissed = () => {
+      fetchNotificationCount();
+    };
+    window.addEventListener('notification-dismissed', handleNotificationDismissed);
     
-    // Poll every 60 seconds for new notifications
+    // Poll every 60 seconds for new notifications (badge updates when received)
     const interval = setInterval(fetchNotificationCount, 60000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('notification-dismissed', handleNotificationDismissed);
+    };
   }, [user?.id, supabase]);
 
   const handleSignOut = async () => {
