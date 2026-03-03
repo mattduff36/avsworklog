@@ -60,12 +60,9 @@ function isExpectedNetworkError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
 
   const message = error.message.toLowerCase();
-  return (
-    message.includes('failed to fetch') ||
-    message.includes('networkerror') ||
-    message.includes('network request failed') ||
-    message.includes('load failed')
-  );
+  const exactNetworkMessages = ['failed to fetch', 'load failed', 'network request failed'];
+  if (exactNetworkMessages.includes(message)) return true;
+  return message.includes('networkerror');
 }
 
 interface VehicleWithAlerts extends VehicleMaintenanceWithStatus {
@@ -232,7 +229,10 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         : `/api/maintenance/history/${vehicleId}`;
       
       const response = await fetch(endpoint);
-      if (!response.ok) throw new Error(`Failed to fetch history (${response.status})`);
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || `Request failed with status ${response.status}`);
+      }
       
       const data = await response.json();
       
@@ -246,7 +246,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       }));
     } catch (error) {
       if (!isExpectedNetworkError(error)) {
-        console.warn('Unexpected error fetching vehicle history:', error);
+        console.error('Error fetching vehicle history:', error);
       }
       setVehicleHistory(prev => ({
         ...prev,
@@ -282,7 +282,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     });
     
     vehiclesWithAlerts.forEach(vehicle => {
-      const vehicleId = vehicle.van_id ?? vehicle.id;
+      const vehicleId = vehicle.van_id ?? vehicle.hgv_id ?? vehicle.id;
       if (vehicleId) {
         // Check if this is a plant asset (has is_plant flag)
         const isPlant = 'is_plant' in vehicle && vehicle.is_plant === true;
@@ -976,7 +976,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   }
 
   const renderVehicleCard = (vehicle: VehicleWithAlerts, isOverdue: boolean) => {
-    const vehicleId = vehicle.van_id ?? vehicle.id;
+    const vehicleId = vehicle.van_id ?? vehicle.hgv_id ?? vehicle.id;
     const isExpanded = expandedVehicles.has(vehicleId);
     const historyData = vehicleHistory[vehicleId];
     

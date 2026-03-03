@@ -58,16 +58,37 @@ export async function GET(
     // Await params (Next.js 15 requirement)
     const { vehicleId } = await params;
     
-    // Get vehicle info
-    const { data: vehicle, error: vehicleError } = await supabase
+    // Try vans table first, then hgvs table
+    let vehicle: { id: string; reg_number: string } | null = null;
+    let assetType: 'van' | 'hgv' = 'van';
+    
+    const { data: van } = await supabase
       .from('vans')
       .select('id, reg_number')
       .eq('id', vehicleId)
       .single();
     
-    if (vehicleError || !vehicle) {
+    if (van) {
+      vehicle = van;
+      assetType = 'van';
+    } else {
+      const { data: hgv } = await supabase
+        .from('hgvs')
+        .select('id, reg_number')
+        .eq('id', vehicleId)
+        .single();
+      
+      if (hgv) {
+        vehicle = hgv;
+        assetType = 'hgv';
+      }
+    }
+    
+    if (!vehicle) {
       return NextResponse.json({ error: 'Vehicle not found' }, { status: 404 });
     }
+    
+    const fkColumn = assetType === 'hgv' ? 'hgv_id' : 'van_id';
     
     // Get maintenance record with VES and MOT data
     const { data: maintenanceData } = await supabase
@@ -101,14 +122,14 @@ export async function GET(
         mot_first_used_date,
         last_mot_api_sync
       `)
-      .eq('van_id', vehicleId)
+      .eq(fkColumn, vehicleId)
       .single();
     
     // Get history (RLS handles permission check)
     const { data: history, error } = await supabase
       .from('maintenance_history')
       .select('*')
-      .eq('van_id', vehicleId)
+      .eq(fkColumn, vehicleId)
       .order('created_at', { ascending: false });
     
     if (error) {
@@ -122,7 +143,6 @@ export async function GET(
     // Note: Includes BOTH 'workshop_vehicle_task' (manual) and 'inspection_defect' (from inspections)
     const supabaseServiceRole = getSupabaseServiceRole();
     
-    // First, try to fetch tasks with van_id (workshop_vehicle_task)
     const { data: directTasks, error: directError } = await supabaseServiceRole
       .from('actions')
       .select(`
@@ -143,7 +163,7 @@ export async function GET(
           name
         )
       `)
-      .eq('van_id', vehicleId)
+      .eq(fkColumn, vehicleId)
       .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
       .order('created_at', { ascending: false });
     
