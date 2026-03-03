@@ -714,21 +714,41 @@ function NewInspectionContent() {
       return;
     }
 
-    const missingStatusKey = (() => {
+    // Validate: at least 1 day must be fully completed, and any started day must be finished
+    const { completedDays, partiallyCompleteDayKey } = (() => {
+      let completed = 0;
       for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek += 1) {
+        let dayItemCount = 0;
+        let firstMissingKey: string | null = null;
         for (let itemNumber = 1; itemNumber <= currentChecklist.length; itemNumber += 1) {
           const key = `${dayOfWeek}-${itemNumber}`;
-          if (!checkboxStates[key]) return key;
+          if (checkboxStates[key]) {
+            dayItemCount++;
+          } else if (!firstMissingKey) {
+            firstMissingKey = key;
+          }
+        }
+        if (dayItemCount === currentChecklist.length) {
+          completed++;
+        } else if (dayItemCount > 0 && firstMissingKey) {
+          return { completedDays: completed, partiallyCompleteDayKey: firstMissingKey };
         }
       }
-      return null;
+      return { completedDays: completed, partiallyCompleteDayKey: null };
     })();
 
-    if (missingStatusKey) {
-      const [dayOfWeek] = missingStatusKey.split('-').map(Number);
-      setError('Please complete all checklist items before submitting');
+    if (partiallyCompleteDayKey) {
+      const [dayOfWeek] = partiallyCompleteDayKey.split('-').map(Number);
+      const dayName = DAY_NAMES[dayOfWeek - 1] || `Day ${dayOfWeek}`;
+      setError(`${dayName} is partially completed. Please finish all items for that day or clear it entirely.`);
       setShowConfirmSubmitDialog(false);
-      openDayAndScrollToChecklistTarget(dayOfWeek, `[data-checklist-item="${missingStatusKey}"]`);
+      openDayAndScrollToChecklistTarget(dayOfWeek, `[data-checklist-item="${partiallyCompleteDayKey}"]`);
+      return;
+    }
+
+    if (completedDays === 0) {
+      setError('Please complete at least one day before submitting');
+      setShowConfirmSubmitDialog(false);
       return;
     }
 
@@ -1294,8 +1314,15 @@ function NewInspectionContent() {
     }
   };
 
-  // Calculate progress (7 days × number of items)
-  const totalItems = currentChecklist.length * 7;
+  // Calculate progress based on started days only
+  const startedDayCount = (() => {
+    let count = 0;
+    for (let d = 1; d <= 7; d++) {
+      if (currentChecklist.some((_, i) => checkboxStates[`${d}-${i + 1}`])) count++;
+    }
+    return count;
+  })();
+  const totalItems = currentChecklist.length * (startedDayCount || 7);
   const completedItems = Object.keys(checkboxStates).length;
   const progressPercent = Math.round((completedItems / totalItems) * 100);
 

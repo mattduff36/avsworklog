@@ -230,6 +230,13 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       
       const response = await fetch(endpoint);
       if (!response.ok) {
+        if (response.status === 404) {
+          setVehicleHistory(prev => ({
+            ...prev,
+            [vehicleId]: { history: [], workshopTasks: [], loading: false }
+          }));
+          return;
+        }
         const body = await response.json().catch(() => ({}));
         throw new Error(body.error || `Request failed with status ${response.status}`);
       }
@@ -260,7 +267,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   
   // Helper to determine if a vehicle ID corresponds to a plant asset
   const isPlantAsset = useCallback((vehicleId: string) => {
-    const vehicle = vehicles.find(v => v.van_id === vehicleId || v.id === vehicleId);
+    const vehicle = vehicles.find(v => v.plant_id === vehicleId || v.van_id === vehicleId || v.hgv_id === vehicleId || v.id === vehicleId);
     return vehicle && 'is_plant' in vehicle && vehicle.is_plant === true;
   }, [vehicles]);
   
@@ -282,10 +289,11 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     });
     
     vehiclesWithAlerts.forEach(vehicle => {
-      const vehicleId = vehicle.van_id ?? vehicle.hgv_id ?? vehicle.id;
+      const isPlant = 'is_plant' in vehicle && vehicle.is_plant === true;
+      const vehicleId = isPlant
+        ? (vehicle.plant_id ?? vehicle.id)
+        : (vehicle.van_id ?? vehicle.hgv_id ?? vehicle.id);
       if (vehicleId) {
-        // Check if this is a plant asset (has is_plant flag)
-        const isPlant = 'is_plant' in vehicle && vehicle.is_plant === true;
         fetchVehicleHistory(vehicleId, isPlant);
       }
     });
@@ -976,7 +984,10 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   }
 
   const renderVehicleCard = (vehicle: VehicleWithAlerts, isOverdue: boolean) => {
-    const vehicleId = vehicle.van_id ?? vehicle.hgv_id ?? vehicle.id;
+    const isPlant = 'is_plant' in vehicle && vehicle.is_plant === true;
+    const vehicleId = isPlant
+      ? (vehicle.plant_id ?? vehicle.id)
+      : (vehicle.van_id ?? vehicle.hgv_id ?? vehicle.id);
     const isExpanded = expandedVehicles.has(vehicleId);
     const historyData = vehicleHistory[vehicleId];
     
