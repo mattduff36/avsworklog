@@ -32,23 +32,32 @@ export async function GET() {
       );
     }
 
-    // Get all auth users with emails
+    // Fetch ALL auth users by paginating (default page size is 50)
     const supabaseAdmin = getSupabaseAdmin();
-    const { data: authUsers, error: authError } = await supabaseAdmin.auth.admin.listUsers();
+    const allUsers: { id: string; email: string | undefined }[] = [];
+    let page = 1;
+    const perPage = 1000;
 
-    if (authError) {
-      console.error('Error fetching auth users:', authError);
-      return NextResponse.json(
-        { error: 'Failed to fetch users' },
-        { status: 500 }
-      );
+    while (true) {
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
+
+      if (error) {
+        console.error('Error fetching auth users (page ' + page + '):', error);
+        return NextResponse.json(
+          { error: 'Failed to fetch users' },
+          { status: 500 }
+        );
+      }
+
+      for (const u of data.users) {
+        allUsers.push({ id: u.id, email: u.email });
+      }
+
+      if (data.users.length < perPage) break;
+      page++;
     }
 
-    // Return users with id and email
-    const usersWithEmails = authUsers.users.map(u => ({
-      id: u.id,
-      email: u.email
-    }));
+    const usersWithEmails = allUsers;
 
     return NextResponse.json({ users: usersWithEmails });
   } catch (error) {
