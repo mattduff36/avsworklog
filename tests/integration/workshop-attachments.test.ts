@@ -14,12 +14,14 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing Supabase credentials in .env.local');
-  throw new Error('Missing required environment variables for integration tests');
+// SAFETY CHECK: Skip when env vars are missing or not running against localhost/staging
+const shouldSkip = !supabaseUrl || !supabaseKey || (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('staging'));
+if (shouldSkip) {
+  console.warn('⏭️  Skipping Workshop Attachments tests – missing env vars or not running against localhost/staging (URL: %s)', supabaseUrl);
 }
+const describeOrSkip = shouldSkip ? describe.skip : describe;
 
-describe('Workshop Task Attachments', () => {
+describeOrSkip('Workshop Task Attachments', () => {
   let supabase: SupabaseClient;
   let testUserId: string;
   let testTemplateId: string;

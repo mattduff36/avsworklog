@@ -10,7 +10,15 @@ const canAuth =
   Boolean(SUPABASE_ANON_KEY) &&
   Boolean(process.env.TEST_USER_EMAIL || process.env.TESTSUITE_EMPLOYEE_EMAIL || 'testsuite-employee@squiresapp.test');
 
-const describeWithAuth = canAuth ? describe : describe.skip;
+// SAFETY CHECK: Skip all tests when SUPABASE_URL is not localhost/staging
+const isLocalOrStaging = SUPABASE_URL && (SUPABASE_URL.includes('localhost') || SUPABASE_URL.includes('127.0.0.1') || SUPABASE_URL.includes('staging'));
+const shouldSkipAll = !isLocalOrStaging;
+if (shouldSkipAll) {
+  console.warn('⏭️  Skipping Inspections API tests – not running against localhost or staging (URL: %s)', SUPABASE_URL);
+}
+
+const describeOrSkip = shouldSkipAll ? describe.skip : describe;
+const describeWithAuth = (!shouldSkipAll && canAuth) ? describe : describe.skip;
 
 async function jsonRequest(path: string, init?: RequestInit) {
   const response = await fetch(`${BASE_URL}${path}`, init);
@@ -19,7 +27,7 @@ async function jsonRequest(path: string, init?: RequestInit) {
   return { response, body };
 }
 
-describe('Inspections API hardening', () => {
+describeOrSkip('Inspections API hardening', () => {
   const unauthRoutes = [
     { method: 'GET', path: '/api/van-inspections/fake-id/pdf' },
     { method: 'DELETE', path: '/api/van-inspections/fake-id/delete' },

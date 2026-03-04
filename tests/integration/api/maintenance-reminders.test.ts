@@ -4,8 +4,16 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:4000';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const RUN_LIVE_API_TESTS = process.env.RUN_LIVE_API_TESTS === 'true';
 
-const canAuth = Boolean(SUPABASE_URL) && Boolean(SUPABASE_ANON_KEY);
+const isLocalOrStaging = BASE_URL.includes('localhost') || BASE_URL.includes('127.0.0.1') || BASE_URL.includes('staging');
+const shouldSkip = !isLocalOrStaging || !RUN_LIVE_API_TESTS;
+if (shouldSkip) {
+  console.warn('⏭️  Skipping Maintenance reminders API tests – requires RUN_LIVE_API_TESTS=true and a running local/staging server');
+}
+
+const canAuth = Boolean(SUPABASE_URL) && Boolean(SUPABASE_ANON_KEY) && !shouldSkip;
+const describeOrSkip = shouldSkip ? describe.skip : describe;
 const describeWithAuth = canAuth ? describe : describe.skip;
 
 async function postReminder(body: unknown, headers?: Record<string, string>) {
@@ -21,7 +29,7 @@ async function postReminder(body: unknown, headers?: Record<string, string>) {
   return { response, json };
 }
 
-describe('Maintenance reminders API hardening', () => {
+describeOrSkip('Maintenance reminders API hardening', () => {
   it('rejects unauthenticated requests', async () => {
     const { response, json } = await postReminder({
       vehicleId: 'fake-vehicle',

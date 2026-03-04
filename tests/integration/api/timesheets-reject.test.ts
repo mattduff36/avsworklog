@@ -5,6 +5,8 @@ import { POST } from '@/app/api/timesheets/[id]/reject/route';
 import { createMockTimesheet, createMockManager, createMockProfile } from '../../utils/factories';
 import { mockSupabaseAuthUser, mockSupabaseQuery, mockFetch, resetAllMocks } from '../../utils/test-helpers';
 
+vi.mock('@/lib/supabase/server');
+
 describe('POST /api/timesheets/[id]/reject', () => {
   beforeEach(() => {
     resetAllMocks();

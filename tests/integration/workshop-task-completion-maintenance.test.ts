@@ -8,7 +8,14 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-describe('Workshop Task Completion with Maintenance Updates', () => {
+// SAFETY CHECK: Skip when not running against localhost or staging
+const shouldSkip = !supabaseUrl || !supabaseServiceKey || (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('staging'));
+if (shouldSkip) {
+  console.warn('⏭️  Skipping Workshop Task Completion tests – not running against localhost or staging (URL: %s)', supabaseUrl);
+}
+const describeOrSkip = shouldSkip ? describe.skip : describe;
+
+describeOrSkip('Workshop Task Completion with Maintenance Updates', () => {
   let supabase: SupabaseClient;
   let testVehicleId: string;
   let testTaskId: string;

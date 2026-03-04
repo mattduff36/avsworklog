@@ -24,6 +24,7 @@ export default defineWorkspace([
       environment: 'happy-dom',
       include: ['tests/ui/**/*.test.tsx'],
       globals: true,
+      setupFiles: ['./tests/ui/setup.ts'],
     },
     resolve: {
       alias: {

@@ -52,6 +52,11 @@ export function RoleManagement() {
   const [selectedRole, setSelectedRole] = useState<RoleMatrixRow | null>(null);
   const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
   const abortControllers = useRef<Map<string, AbortController>>(new Map());
+  const pendingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const pendingCells = useRef<Map<string, Set<string>>>(new Map());
+  const inflightCellKeys = useRef<Map<string, Set<string>>>(new Map());
+  const matrixRolesRef = useRef(matrixRoles);
+  matrixRolesRef.current = matrixRoles;
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -90,34 +95,35 @@ export function RoleManagement() {
     }
   }
 
-  const handleTogglePermission = useCallback(
-    async (role: RoleMatrixRow, mod: ModuleName, newValue: boolean) => {
-      const cellKey = `${role.id}:${mod}`;
+  const flushRolePermissions = useCallback(
+    async (roleId: string) => {
+      const cellsForRole = pendingCells.current.get(roleId);
+      if (!cellsForRole || cellsForRole.size === 0) return;
 
-      const prev = abortControllers.current.get(cellKey);
-      if (prev) prev.abort();
+      const prevController = abortControllers.current.get(roleId);
+      if (prevController) prevController.abort();
 
       const controller = new AbortController();
-      abortControllers.current.set(cellKey, controller);
+      abortControllers.current.set(roleId, controller);
 
-      const oldPermissions = { ...role.permissions };
-      const updatedPermissions = { ...role.permissions, [mod]: newValue };
+      const currentRole = matrixRolesRef.current.find((r) => r.id === roleId);
+      if (!currentRole) return;
 
-      setMatrixRoles((prev) =>
-        prev.map((r) =>
-          r.id === role.id ? { ...r, permissions: updatedPermissions } : r
-        )
-      );
-
-      setSavingCells((prev) => new Set(prev).add(cellKey));
+      const cellKeys = new Set(cellsForRole);
+      const prevInflight = inflightCellKeys.current.get(roleId);
+      if (prevInflight) {
+        prevInflight.forEach((k) => cellKeys.add(k));
+      }
+      inflightCellKeys.current.set(roleId, cellKeys);
+      pendingCells.current.delete(roleId);
 
       try {
         const permissionsArray = ALL_MODULES.map((m) => ({
           module_name: m,
-          enabled: m === mod ? newValue : role.permissions[m],
+          enabled: currentRole.permissions[m],
         }));
 
-        const response = await fetch(`/api/admin/roles/${role.id}/permissions`, {
+        const response = await fetch(`/api/admin/roles/${roleId}/permissions`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ permissions: permissionsArray }),
@@ -126,36 +132,63 @@ export function RoleManagement() {
 
         if (!response.ok) {
           const data = await response.json();
-          throw new Error(data.error || 'Failed to update permission');
+          throw new Error(data.error || 'Failed to update permissions');
         }
 
         toast.success(
-          `${MODULE_SHORT_NAMES[mod]} ${newValue ? 'enabled' : 'disabled'} for ${role.display_name}`,
+          `Permissions updated for ${currentRole.display_name}`,
           { duration: 2000 }
         );
       } catch (error) {
         if ((error as Error).name === 'AbortError') return;
 
-        setMatrixRoles((prev) =>
-          prev.map((r) =>
-            r.id === role.id ? { ...r, permissions: oldPermissions } : r
-          )
-        );
-        toast.error(
-          `Failed to update ${MODULE_SHORT_NAMES[mod]} for ${role.display_name}`
-        );
+        toast.error(`Failed to update permissions for ${currentRole.display_name}`);
+        fetchRoles();
       } finally {
-        if (abortControllers.current.get(cellKey) === controller) {
+        if (abortControllers.current.get(roleId) === controller) {
           setSavingCells((prev) => {
             const next = new Set(prev);
-            next.delete(cellKey);
+            cellKeys.forEach((k) => next.delete(k));
             return next;
           });
-          abortControllers.current.delete(cellKey);
+          abortControllers.current.delete(roleId);
+          inflightCellKeys.current.delete(roleId);
         }
       }
     },
     []
+  );
+
+  const handleTogglePermission = useCallback(
+    (role: RoleMatrixRow, mod: ModuleName, newValue: boolean) => {
+      const cellKey = `${role.id}:${mod}`;
+      const roleId = role.id;
+
+      setMatrixRoles((prev) =>
+        prev.map((r) =>
+          r.id === roleId ? { ...r, permissions: { ...r.permissions, [mod]: newValue } } : r
+        )
+      );
+
+      setSavingCells((prev) => new Set(prev).add(cellKey));
+
+      if (!pendingCells.current.has(roleId)) {
+        pendingCells.current.set(roleId, new Set());
+      }
+      pendingCells.current.get(roleId)!.add(cellKey);
+
+      const existingTimer = pendingTimers.current.get(roleId);
+      if (existingTimer) clearTimeout(existingTimer);
+
+      pendingTimers.current.set(
+        roleId,
+        setTimeout(() => {
+          pendingTimers.current.delete(roleId);
+          flushRolePermissions(roleId);
+        }, 300)
+      );
+    },
+    [flushRolePermissions]
   );
 
   async function handleAddRole() {

@@ -10,13 +10,14 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Skip if no environment variables
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.log('⏭️  Skipping tests - missing environment variables');
-  process.exit(0);
+const isLocalOrStaging = supabaseUrl && (supabaseUrl.includes('localhost') || supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('staging'));
+const shouldSkip = !supabaseUrl || !supabaseServiceKey || !isLocalOrStaging;
+if (shouldSkip) {
+  console.warn('⏭️  Skipping Plant Table Read-Only tests – missing env vars or not running against localhost/staging');
 }
+const describeOrSkip = shouldSkip ? describe.skip : describe;
 
-describe('Plant Table Read-Only Verification', () => {
+describeOrSkip('Plant Table Read-Only Verification', () => {
   let supabase: SupabaseClient;
 
   beforeAll(() => {

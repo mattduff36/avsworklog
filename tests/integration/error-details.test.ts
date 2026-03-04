@@ -12,15 +12,13 @@ import { resolve } from 'path';
 
 dotenv.config({ path: resolve(process.cwd(), '.env.local') });
 
-// SAFETY CHECK: Never run against production
+// SAFETY CHECK: Skip when not running against localhost or staging
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-if (!supabaseUrl.includes('localhost') && 
-    !supabaseUrl.includes('127.0.0.1') && 
-    !supabaseUrl.includes('staging')) {
-  console.error('❌ SAFETY CHECK FAILED: Tests can only run against localhost or staging');
-  console.error('Current URL:', supabaseUrl);
-  process.exit(1);
+const shouldSkip = !supabaseUrl || (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('staging'));
+if (shouldSkip) {
+  console.warn('⏭️  Skipping Error Details tests – not running against localhost or staging (URL: %s)', supabaseUrl);
 }
+const describeOrSkip = shouldSkip ? describe.skip : describe;
 
 const supabase = createClient(
   supabaseUrl,
@@ -33,7 +31,7 @@ const supabase = createClient(
   }
 );
 
-describe('Error Details API - Subcategory Tasks', () => {
+describeOrSkip('Error Details API - Subcategory Tasks', () => {
   let testCategoryId: string;
   let testSubcategoryId: string;
   let testVehicleId: string;

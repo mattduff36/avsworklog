@@ -9,23 +9,14 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// SAFETY CHECK: Prevent running against production
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('❌ Missing required environment variables');
-  console.error('❌ NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set');
-  console.error('❌ Tests will be skipped.');
-  process.exit(1);
+// SAFETY CHECK: Skip when env vars are missing or not running against localhost/staging
+const shouldSkip = !supabaseUrl || !supabaseServiceKey || (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('staging'));
+if (shouldSkip) {
+  console.warn('⏭️  Skipping Plant Table tests – missing env vars or not running against localhost/staging (URL: %s)', supabaseUrl);
 }
+const describeOrSkip = shouldSkip ? describe.skip : describe;
 
-if (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('staging')) {
-  console.error('❌ SAFETY CHECK FAILED');
-  console.error('❌ This test suite creates database records and should NOT run against production!');
-  console.error(`❌ Current URL: ${supabaseUrl}`);
-  console.error('❌ Tests will be skipped.');
-  process.exit(1);
-}
-
-describe('Plant Table Integration Tests', () => {
+describeOrSkip('Plant Table Integration Tests', () => {
   let supabase: SupabaseClient;
   let testPlantId: string;
   let testManagerId: string;

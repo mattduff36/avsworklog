@@ -46,7 +46,7 @@ describe('MotHistoryDialog', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Test History/i)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /Test History/i })).toBeInTheDocument();
     });
 
     expect(screen.getByText('Not Set')).toBeInTheDocument();
@@ -89,7 +89,7 @@ describe('MotHistoryDialog', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Test History/i)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /Test History/i })).toBeInTheDocument();
     });
 
     expect(screen.getByText(/12,345 mi/)).toBeInTheDocument();

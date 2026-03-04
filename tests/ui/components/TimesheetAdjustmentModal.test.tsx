@@ -16,7 +16,9 @@ describe('TimesheetAdjustmentModal', () => {
   });
 
   describe('Rendering', () => {
-    it('should render when open', () => {
+    it('should render when open', async () => {
+      mockFetch({ managers: [] });
+
       render(
         <TimesheetAdjustmentModal
           open={true}
@@ -49,6 +51,8 @@ describe('TimesheetAdjustmentModal', () => {
 
   describe('Comment validation', () => {
     it('should require comments before submission', async () => {
+      mockFetch({ managers: [] });
+
       render(
         <TimesheetAdjustmentModal
           open={true}
@@ -61,7 +65,7 @@ describe('TimesheetAdjustmentModal', () => {
 
       const submitButton = screen.getByRole('button', { name: /Mark as Adjusted/i });
       
-      // Button should be disabled initially (no comment)
+      // Button should be disabled initially (no comment, no recipients)
       expect(submitButton).toBeDisabled();
     });
 

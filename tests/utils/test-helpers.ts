@@ -20,16 +20,18 @@ export const mockEmailSend = () => {
 export const waitFor = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const mockFetch = (response: unknown, status = 200) => {
-  global.fetch = vi.fn().mockResolvedValue({
+  const mockFn = vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
     json: async () => response,
     text: async () => JSON.stringify(response),
   });
+  vi.stubGlobal('fetch', mockFn);
 };
 
 export const resetAllMocks = () => {
   vi.clearAllMocks();
   vi.resetAllMocks();
+  vi.unstubAllGlobals();
 };
 

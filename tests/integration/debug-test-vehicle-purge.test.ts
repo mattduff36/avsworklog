@@ -5,15 +5,13 @@ import { resolve } from 'path';
 
 dotenv.config({ path: resolve(process.cwd(), '.env.local') });
 
-// SAFETY CHECK: Prevent running against production
+// SAFETY CHECK: Skip when not running against localhost or staging
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-if (!SUPABASE_URL.includes('localhost') && !SUPABASE_URL.includes('127.0.0.1') && !SUPABASE_URL.includes('staging')) {
-  console.error('❌ SAFETY CHECK FAILED');
-  console.error('❌ This test suite creates real database records and should NOT run against production!');
-  console.error(`❌ Current URL: ${SUPABASE_URL}`);
-  console.error('❌ Tests will be skipped.');
-  process.exit(1);
+const shouldSkip = !SUPABASE_URL || (!SUPABASE_URL.includes('localhost') && !SUPABASE_URL.includes('127.0.0.1') && !SUPABASE_URL.includes('staging'));
+if (shouldSkip) {
+  console.warn('⏭️  Skipping Test Vehicle Purge tests – not running against localhost or staging (URL: %s)', SUPABASE_URL);
 }
+const describeOrSkip = shouldSkip ? describe.skip : describe;
 
 const supabase = createClient(
   SUPABASE_URL,
@@ -26,7 +24,7 @@ const supabase = createClient(
   }
 );
 
-describe('Test Vehicle Purge API', () => {
+describeOrSkip('Test Vehicle Purge API', () => {
   let testVehicleId: string;
   let testInspectionId: string;
   let testTaskId: string;

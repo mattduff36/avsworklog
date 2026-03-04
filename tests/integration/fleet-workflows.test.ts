@@ -14,23 +14,14 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing Supabase credentials in .env.local');
-  console.error('NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl ? 'Set' : 'Missing');
-  console.error('NEXT_PUBLIC_SUPABASE_ANON_KEY:', supabaseKey ? 'Set' : 'Missing');
-  throw new Error('Missing required environment variables for integration tests');
+// SAFETY CHECK: Skip when not running against localhost or staging
+const shouldSkip = !supabaseUrl || !supabaseKey || (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('staging'));
+if (shouldSkip) {
+  console.warn('⏭️  Skipping Fleet Module tests – not running against localhost or staging (URL: %s)', supabaseUrl);
 }
+const describeOrSkip = shouldSkip ? describe.skip : describe;
 
-// SAFETY CHECK: Prevent running against production
-if (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('staging')) {
-  console.error('❌ SAFETY CHECK FAILED');
-  console.error('❌ This test suite modifies database records and should NOT run against production!');
-  console.error(`❌ Current URL: ${supabaseUrl}`);
-  console.error('❌ Tests will be skipped.');
-  process.exit(1);
-}
-
-describe('Fleet Module Workflows', () => {
+describeOrSkip('Fleet Module Workflows', () => {
   let supabase: SupabaseClient;
   let testVehicleId: string;
 

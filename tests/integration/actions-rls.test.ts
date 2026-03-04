@@ -9,16 +9,14 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-// SAFETY CHECK: Prevent running against production
-if (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('staging')) {
-  console.error('❌ SAFETY CHECK FAILED');
-  console.error('❌ This test suite creates database records and should NOT run against production!');
-  console.error(`❌ Current URL: ${supabaseUrl}`);
-  console.error('❌ Tests will be skipped.');
-  process.exit(1);
+// SAFETY CHECK: Skip when not running against localhost or staging
+const shouldSkip = !supabaseUrl || (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('staging'));
+if (shouldSkip) {
+  console.warn('⏭️  Skipping Actions RLS tests – not running against localhost or staging (URL: %s)', supabaseUrl);
 }
+const describeOrSkip = shouldSkip ? describe.skip : describe;
 
-describe('Actions RLS Policy Fix', () => {
+describeOrSkip('Actions RLS Policy Fix', () => {
   let supabase: SupabaseClient;
   let testUserId: string;
   let testVehicleId: string;
