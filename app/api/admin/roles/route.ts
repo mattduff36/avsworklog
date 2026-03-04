@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isManagerOrAdmin } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import type { GetRolesResponse, CreateRoleRequest, RoleWithUserCount } from '@/types/roles';
+import type { GetRolesResponse, CreateRoleRequest, RoleWithUserCount, RoleMatrixRow, ModuleName } from '@/types/roles';
 import { ALL_MODULES } from '@/types/roles';
 
 /**
@@ -41,8 +41,8 @@ export async function GET(request: NextRequest) {
       throw rolesError;
     }
 
-    // Format response - count only enabled permissions
     interface RolePermissionRow {
+      module_name: string;
       enabled: boolean;
     }
 
@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
       description: string | null;
       is_super_admin: boolean;
       is_manager_admin: boolean;
+      timesheet_type?: string;
       created_at: string;
       updated_at: string;
       profiles?: Array<{ count: number }>;
@@ -72,12 +73,33 @@ export async function GET(request: NextRequest) {
       permission_count: role.role_permissions?.filter((permission) => permission.enabled).length || 0,
     }));
 
+    const matrixRoles: RoleMatrixRow[] = (roles as RoleRow[]).map((role) => {
+      const perms: Record<ModuleName, boolean> = {} as Record<ModuleName, boolean>;
+      ALL_MODULES.forEach((mod) => {
+        const found = role.role_permissions?.find((p) => p.module_name === mod);
+        perms[mod] = found?.enabled ?? false;
+      });
+      return {
+        id: role.id,
+        name: role.name,
+        display_name: role.display_name,
+        description: role.description,
+        is_super_admin: role.is_super_admin,
+        is_manager_admin: role.is_manager_admin,
+        timesheet_type: role.timesheet_type,
+        created_at: role.created_at,
+        updated_at: role.updated_at,
+        user_count: role.profiles?.[0]?.count || 0,
+        permissions: perms,
+      };
+    });
+
     const response: GetRolesResponse = {
       success: true,
       roles: formattedRoles,
     };
 
-    return NextResponse.json(response);
+    return NextResponse.json({ ...response, matrix: matrixRoles });
 
   } catch (error) {
     console.error('Error in GET /api/admin/roles:', error);
@@ -161,7 +183,7 @@ export async function POST(request: NextRequest) {
     const defaultPermissions = ALL_MODULES.map(module => ({
       role_id: newRole.id,
       module_name: module,
-      enabled: ['timesheets', 'inspections', 'rams', 'absence', 'toolbox-talks'].includes(module),
+      enabled: ['timesheets', 'inspections', 'rams', 'absence'].includes(module),
     }));
 
     const { error: permsError } = await supabase

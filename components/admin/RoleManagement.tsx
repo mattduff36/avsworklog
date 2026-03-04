@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -17,25 +16,47 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Shield, Plus, Edit, Trash2, Loader2, AlertTriangle, Users, Lock, FileText } from 'lucide-react';
-import type { RoleWithUserCount, ModuleName } from '@/types/roles';
-import { ALL_MODULES, MODULE_DESCRIPTIONS, MODULE_DISPLAY_NAMES } from '@/types/roles';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Shield, Plus, Edit, Trash2, Loader2, AlertTriangle, FileText, Check, Minus } from 'lucide-react';
+import type { RoleMatrixRow, ModuleName } from '@/types/roles';
+import {
+  ALL_MODULES,
+  STANDARD_MODULES,
+  MANAGEMENT_MODULES,
+  MODULE_SHORT_NAMES,
+  MODULE_DISPLAY_NAMES,
+  MODULE_CSS_VAR,
+} from '@/types/roles';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TimesheetTypeOptions } from '@/app/(dashboard)/timesheets/types/registry';
 
+function getModuleColor(mod: ModuleName): string {
+  const cssVar = MODULE_CSS_VAR[mod];
+  return `hsl(var(${cssVar}))`;
+}
+
+function getModuleColorAlpha(mod: ModuleName, alpha: number): string {
+  const cssVar = MODULE_CSS_VAR[mod];
+  return `hsl(var(${cssVar}) / ${alpha})`;
+}
+
 export function RoleManagement() {
-  const [roles, setRoles] = useState<RoleWithUserCount[]>([]);
+  const [matrixRoles, setMatrixRoles] = useState<RoleMatrixRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRole, setSelectedRole] = useState<RoleWithUserCount | null>(null);
-  
-  // Dialog states
+  const [selectedRole, setSelectedRole] = useState<RoleMatrixRow | null>(null);
+  const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
+  const abortControllers = useRef<Map<string, AbortController>>(new Map());
+
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
 
-  // Form states
   const [formData, setFormData] = useState({
     name: '',
     display_name: '',
@@ -43,11 +64,9 @@ export function RoleManagement() {
     is_manager_admin: false,
     timesheet_type: 'civils' as string,
   });
-  const [permissions, setPermissions] = useState<Record<ModuleName, boolean>>({} as Record<ModuleName, boolean>);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
 
-  // Fetch roles
   useEffect(() => {
     fetchRoles();
   }, []);
@@ -57,12 +76,12 @@ export function RoleManagement() {
       setLoading(true);
       const response = await fetch('/api/admin/roles');
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch roles');
       }
-      
-      setRoles(data.roles);
+
+      setMatrixRoles(data.matrix ?? []);
     } catch (error) {
       console.error('Error fetching roles:', error);
       toast.error('Failed to load roles');
@@ -71,7 +90,74 @@ export function RoleManagement() {
     }
   }
 
-  // Handle add role
+  const handleTogglePermission = useCallback(
+    async (role: RoleMatrixRow, mod: ModuleName, newValue: boolean) => {
+      const cellKey = `${role.id}:${mod}`;
+
+      const prev = abortControllers.current.get(cellKey);
+      if (prev) prev.abort();
+
+      const controller = new AbortController();
+      abortControllers.current.set(cellKey, controller);
+
+      const oldPermissions = { ...role.permissions };
+      const updatedPermissions = { ...role.permissions, [mod]: newValue };
+
+      setMatrixRoles((prev) =>
+        prev.map((r) =>
+          r.id === role.id ? { ...r, permissions: updatedPermissions } : r
+        )
+      );
+
+      setSavingCells((prev) => new Set(prev).add(cellKey));
+
+      try {
+        const permissionsArray = ALL_MODULES.map((m) => ({
+          module_name: m,
+          enabled: m === mod ? newValue : role.permissions[m],
+        }));
+
+        const response = await fetch(`/api/admin/roles/${role.id}/permissions`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ permissions: permissionsArray }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to update permission');
+        }
+
+        toast.success(
+          `${MODULE_SHORT_NAMES[mod]} ${newValue ? 'enabled' : 'disabled'} for ${role.display_name}`,
+          { duration: 2000 }
+        );
+      } catch (error) {
+        if ((error as Error).name === 'AbortError') return;
+
+        setMatrixRoles((prev) =>
+          prev.map((r) =>
+            r.id === role.id ? { ...r, permissions: oldPermissions } : r
+          )
+        );
+        toast.error(
+          `Failed to update ${MODULE_SHORT_NAMES[mod]} for ${role.display_name}`
+        );
+      } finally {
+        if (abortControllers.current.get(cellKey) === controller) {
+          setSavingCells((prev) => {
+            const next = new Set(prev);
+            next.delete(cellKey);
+            return next;
+          });
+          abortControllers.current.delete(cellKey);
+        }
+      }
+    },
+    []
+  );
+
   async function handleAddRole() {
     if (!formData.name || !formData.display_name) {
       setFormError('Please fill in all required fields');
@@ -106,7 +192,6 @@ export function RoleManagement() {
     }
   }
 
-  // Handle edit role
   async function handleEditRole() {
     if (!selectedRole || !formData.display_name) {
       setFormError('Please fill in all required fields');
@@ -142,7 +227,6 @@ export function RoleManagement() {
     }
   }
 
-  // Handle delete role
   async function handleDeleteRole() {
     if (!selectedRole) return;
 
@@ -172,77 +256,7 @@ export function RoleManagement() {
     }
   }
 
-  // Handle update permissions
-  async function handleUpdatePermissions() {
-    if (!selectedRole) return;
-
-    try {
-      setFormLoading(true);
-      setFormError('');
-
-      const permissionsArray = Object.entries(permissions).map(([module_name, enabled]) => ({
-        module_name: module_name as ModuleName,
-        enabled,
-      }));
-
-      const response = await fetch(`/api/admin/roles/${selectedRole.id}/permissions`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ permissions: permissionsArray }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update permissions');
-      }
-
-      toast.success('Permissions updated successfully');
-      fetchRoles();
-      setPermissionsDialogOpen(false);
-      setSelectedRole(null);
-    } catch (error) {
-      console.error('Error updating permissions:', error);
-      setFormError(error instanceof Error ? error.message : 'Failed to update permissions');
-    } finally {
-      setFormLoading(false);
-    }
-  }
-
-  // Open permissions dialog
-  async function openPermissionsDialog(role: RoleWithUserCount) {
-    try {
-      setFormError('');
-      setFormLoading(true);
-
-      // Fetch full role details with permissions
-      const response = await fetch(`/api/admin/roles/${role.id}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch role details');
-      }
-
-      setSelectedRole(data.role);
-
-      // Convert permissions array to object
-      const permsObj: Record<ModuleName, boolean> = {} as Record<ModuleName, boolean>;
-      ALL_MODULES.forEach(module => {
-        const perm = data.role.permissions.find((p: { module_name?: string }) => p.module_name === module);
-        permsObj[module] = perm?.enabled || false;
-      });
-      setPermissions(permsObj);
-
-      setPermissionsDialogOpen(true);
-    } catch (error) {
-      console.error('Error fetching role details:', error);
-      toast.error('Failed to load permissions');
-    } finally {
-      setFormLoading(false);
-    }
-  }
-
-  function openEditDialog(role: RoleWithUserCount) {
+  function openEditDialog(role: RoleMatrixRow) {
     setSelectedRole(role);
     setFormData({
       name: role.name,
@@ -255,7 +269,7 @@ export function RoleManagement() {
     setEditDialogOpen(true);
   }
 
-  function openDeleteDialog(role: RoleWithUserCount) {
+  function openDeleteDialog(role: RoleMatrixRow) {
     setSelectedRole(role);
     setFormError('');
     setDeleteDialogOpen(true);
@@ -280,16 +294,118 @@ export function RoleManagement() {
     );
   }
 
+  const isProtectedRole = (role: RoleMatrixRow) =>
+    role.is_super_admin || role.is_manager_admin;
+
+  function renderModuleColumns(modules: ModuleName[]) {
+    return modules.map((mod) => (
+      <th
+        key={mod}
+        className="p-0 align-bottom"
+        style={{ width: 30, minWidth: 30, maxWidth: 30, height: 100 }}
+      >
+        <div className="flex items-end justify-center h-full pb-2">
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className="cursor-default text-[11px] font-medium tracking-wide whitespace-nowrap"
+                  style={{
+                    writingMode: 'vertical-rl',
+                    transform: 'rotate(180deg)',
+                    color: getModuleColor(mod),
+                  }}
+                >
+                  {MODULE_SHORT_NAMES[mod]}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                {MODULE_DISPLAY_NAMES[mod]}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </th>
+    ));
+  }
+
+  function renderPermissionCell(role: RoleMatrixRow, mod: ModuleName) {
+    const cellKey = `${role.id}:${mod}`;
+    const isSaving = savingCells.has(cellKey);
+    const isEnabled = role.permissions[mod];
+    const isProtected = isProtectedRole(role);
+    const color = getModuleColor(mod);
+
+    if (isProtected) {
+      return (
+        <td key={mod} className="px-0 py-0.5 text-center">
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center justify-center">
+                  <div
+                    className="h-6 w-6 rounded flex items-center justify-center"
+                    style={{ backgroundColor: `color-mix(in srgb, ${color} 25%, transparent)` }}
+                  >
+                    <Check className="h-3.5 w-3.5" style={{ color }} />
+                  </div>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                {role.is_super_admin ? 'Super Admin' : 'Manager/Admin'} — full access
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </td>
+      );
+    }
+
+    return (
+      <td key={mod} className="px-0 py-0.5 text-center">
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={() => handleTogglePermission(role, mod, !isEnabled)}
+                className="h-6 w-6 rounded flex items-center justify-center mx-auto transition-all duration-150 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                style={
+                  isSaving
+                    ? { backgroundColor: 'hsl(215 20% 18%)', border: '1.5px solid hsl(215 20% 30%)' }
+                    : isEnabled
+                      ? { backgroundColor: color, boxShadow: `0 0 6px ${getModuleColorAlpha(mod, 0.25)}` }
+                      : { backgroundColor: 'transparent', border: '1.5px solid hsl(215 20% 30%)' }
+                }
+                aria-label={`${MODULE_DISPLAY_NAMES[mod]} for ${role.display_name}: ${isSaving ? 'saving' : isEnabled ? 'enabled' : 'disabled'}`}
+              >
+                {isSaving ? (
+                  <Loader2 className="h-3.5 w-3.5 text-slate-400 animate-spin" />
+                ) : isEnabled ? (
+                  <Check className="h-3.5 w-3.5 text-white" />
+                ) : (
+                  <Minus className="h-3 w-3 text-slate-600" />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs">
+              {MODULE_DISPLAY_NAMES[mod]}: {isSaving ? 'Saving…' : isEnabled ? 'Enabled' : 'Disabled'}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </td>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <Card className="border-border">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-white">Job Roles & Permissions</CardTitle>
               <CardDescription className="text-muted-foreground">
-                Manage job roles and configure module access permissions
+                Toggle module access per role. Changes save instantly.
               </CardDescription>
             </div>
             <Button
@@ -305,92 +421,101 @@ export function RoleManagement() {
           </div>
         </CardHeader>
         <CardContent>
-          {roles.length === 0 ? (
+          {matrixRoles.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No roles configured yet.
             </div>
           ) : (
             <div className="border border-slate-700 rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-slate-700 hover:bg-slate-800/50">
-                    <TableHead className="text-muted-foreground">Role Name</TableHead>
-                    <TableHead className="text-muted-foreground">Description</TableHead>
-                    <TableHead className="text-muted-foreground">Type</TableHead>
-                    <TableHead className="text-muted-foreground">Users</TableHead>
-                    <TableHead className="text-muted-foreground">Modules</TableHead>
-                    <TableHead className="text-right text-muted-foreground">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {roles.map((role) => (
-                    <TableRow key={role.id} className="border-slate-700 hover:bg-slate-800/50">
-                      <TableCell className="font-medium text-white">
-                        <div className="flex items-center gap-2">
-                          {role.is_super_admin && <Shield className="h-4 w-4 text-purple-500" />}
-                          {role.display_name}
+              <table className="w-full text-sm table-fixed">
+                <colgroup>
+                  <col style={{ width: 140 }} />
+                  {STANDARD_MODULES.map((m) => (
+                    <col key={m} style={{ width: 30 }} />
+                  ))}
+                  {MANAGEMENT_MODULES.map((m) => (
+                    <col key={m} style={{ width: 30 }} />
+                  ))}
+                  <col style={{ width: 60 }} />
+                </colgroup>
+                <thead>
+                  <tr className="bg-slate-800/60">
+                    <th
+                      rowSpan={2}
+                      className="sticky left-0 z-10 bg-slate-800 px-3 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider align-bottom border-b border-slate-700"
+                    >
+                      Role Name
+                    </th>
+                    <th
+                      colSpan={STANDARD_MODULES.length}
+                      className="px-1 py-1 text-center text-[10px] font-semibold text-slate-400 uppercase tracking-widest border-l border-slate-700/50"
+                    >
+                      Standard Modules
+                    </th>
+                    <th
+                      colSpan={MANAGEMENT_MODULES.length}
+                      className="px-1 py-1 text-center text-[10px] font-semibold text-slate-400 uppercase tracking-widest border-l border-slate-700/50"
+                    >
+                      Management
+                    </th>
+                    <th
+                      rowSpan={2}
+                      className="px-1 py-2 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider border-l border-slate-700/50 align-bottom border-b border-slate-700"
+                    >
+                      Actions
+                    </th>
+                  </tr>
+                  <tr className="border-b border-slate-700">
+                    {renderModuleColumns(STANDARD_MODULES)}
+                    {renderModuleColumns(MANAGEMENT_MODULES)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {matrixRoles.map((role) => (
+                    <tr
+                      key={role.id}
+                      className="border-b border-slate-700/50 hover:bg-slate-800/40 transition-colors"
+                    >
+                      <td className="sticky left-0 z-10 bg-slate-900/95 px-3 py-1 font-medium text-white whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
                           {role.is_super_admin && (
-                            <Badge variant="outline" className="text-purple-500 border-purple-500">
+                            <Shield className="h-3.5 w-3.5 text-purple-500 flex-shrink-0" />
+                          )}
+                          <span className="text-sm truncate">{role.display_name}</span>
+                          {role.is_super_admin && (
+                            <Badge variant="outline" className="text-purple-500 border-purple-500 text-[9px] px-1 py-0 flex-shrink-0">
                               Super Admin
                             </Badge>
                           )}
+                          {role.is_manager_admin && !role.is_super_admin && (
+                            <Badge variant="outline" className="text-amber-500 border-amber-500 text-[9px] px-1 py-0 flex-shrink-0">
+                              Admin
+                            </Badge>
+                          )}
                         </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground max-w-xs truncate">
-                        {role.description || '-'}
-                      </TableCell>
-                      <TableCell>
-                        {role.is_manager_admin ? (
-                          <Badge variant="default" className="bg-amber-500">
-                            Manager/Admin
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">Employee</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Users className="h-3 w-3 text-muted-foreground" />
-                          {role.user_count}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {role.is_super_admin || role.is_manager_admin ? (
-                          <Badge variant="outline" className="text-green-500 border-green-500">
-                            All Access
-                          </Badge>
-                        ) : (
-                          <span className="text-sm">{role.permission_count}/{ALL_MODULES.length} enabled</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex gap-1 justify-end">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openPermissionsDialog(role)}
-                            disabled={role.is_super_admin || role.is_manager_admin}
-                            className="text-green-400 hover:text-green-300 hover:bg-slate-800 disabled:opacity-30"
-                            title={role.is_super_admin || role.is_manager_admin ? 'Cannot modify admin permissions' : 'Manage Permissions'}
-                          >
-                            <Lock className="h-3 w-3" />
-                          </Button>
+                      </td>
+
+                      {STANDARD_MODULES.map((mod) => renderPermissionCell(role, mod))}
+                      {MANAGEMENT_MODULES.map((mod) => renderPermissionCell(role, mod))}
+
+                      <td className="px-1 py-0.5 text-center border-l border-slate-700/50">
+                        <div className="flex gap-0.5 justify-center">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => openEditDialog(role)}
                             disabled={role.is_super_admin}
-                            className="text-blue-400 hover:text-blue-300 hover:bg-slate-800 disabled:opacity-30"
+                            className="text-blue-400 hover:text-blue-300 hover:bg-slate-800 disabled:opacity-30 h-7 w-7 p-0"
                             title={role.is_super_admin ? 'Cannot edit super admin' : 'Edit Role'}
                           >
-                            <Edit className="h-3 w-3" />
+                            <Edit className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => openDeleteDialog(role)}
                             disabled={role.is_super_admin || role.is_manager_admin || role.user_count > 0}
-                            className="text-red-400 hover:text-red-300 hover:bg-slate-800 disabled:opacity-30"
+                            className="text-red-400 hover:text-red-300 hover:bg-slate-800 disabled:opacity-30 h-7 w-7 p-0"
                             title={
                               role.is_super_admin || role.is_manager_admin
                                 ? 'Cannot delete admin roles'
@@ -399,14 +524,14 @@ export function RoleManagement() {
                                 : 'Delete Role'
                             }
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
           )}
         </CardContent>
@@ -463,8 +588,8 @@ export function RoleManagement() {
                 <FileText className="h-4 w-4" />
                 Timesheet Type
               </Label>
-              <Select 
-                value={formData.timesheet_type} 
+              <Select
+                value={formData.timesheet_type}
                 onValueChange={(value) => setFormData({ ...formData, timesheet_type: value })}
               >
                 <SelectTrigger id="add-timesheet-type" className="bg-input border-border text-white">
@@ -655,66 +780,6 @@ export function RoleManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Permissions Dialog */}
-      <Dialog open={permissionsDialogOpen} onOpenChange={setPermissionsDialogOpen}>
-        <DialogContent className="border-border text-white max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Manage Permissions: {selectedRole?.display_name}</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Enable or disable access to modules for this role
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {formError && (
-              <div className="bg-red-500/10 border border-red-500/50 rounded p-3 text-sm text-red-400">
-                {formError}
-              </div>
-            )}
-            <div className="space-y-2">
-              {ALL_MODULES.map((module) => (
-                <div
-                  key={module}
-                  className="flex items-start justify-between p-3 bg-slate-800 rounded hover:bg-slate-750 transition-colors"
-                >
-                  <div className="flex-1">
-                    <Label htmlFor={`perm-${module}`} className="font-medium">
-                      {MODULE_DISPLAY_NAMES[module]}
-                    </Label>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {MODULE_DESCRIPTIONS[module]}
-                    </p>
-                  </div>
-                  <Switch
-                    id={`perm-${module}`}
-                    checked={permissions[module] || false}
-                    onCheckedChange={(checked) =>
-                      setPermissions({ ...permissions, [module]: checked })
-                    }
-                    className="ml-4"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setPermissionsDialogOpen(false); setSelectedRole(null); }} className="border-slate-600 text-white hover:bg-slate-800">
-              Cancel
-            </Button>
-            <Button onClick={handleUpdatePermissions} disabled={formLoading} className="bg-green-600 hover:bg-green-700">
-              {formLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Save Permissions'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
-

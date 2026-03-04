@@ -100,7 +100,7 @@ export const employeeNavItems: NavItem[] = [
     href: '/fleet', 
     label: 'Fleet', 
     icon: Truck, 
-    module: 'maintenance',
+    module: 'admin-vans',
     category: 'employee'
   },
   { 

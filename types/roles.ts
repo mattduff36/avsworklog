@@ -31,6 +31,65 @@ export interface RoleWithUserCount extends Role {
   permission_count: number;
 }
 
+export interface RoleMatrixRow extends Role {
+  user_count: number;
+  permissions: Record<ModuleName, boolean>;
+}
+
+export const STANDARD_MODULES: ModuleName[] = [
+  'timesheets',
+  'inspections',
+  'plant-inspections',
+  'hgv-inspections',
+  'rams',
+  'absence',
+  'maintenance',
+  'workshop-tasks',
+  'admin-vans',
+];
+
+export const MANAGEMENT_MODULES: ModuleName[] = [
+  'approvals',
+  'actions',
+  'reports',
+  'toolbox-talks',
+  'admin-users',
+];
+
+export const MODULE_SHORT_NAMES: Record<ModuleName, string> = {
+  'timesheets': 'Timesheets',
+  'inspections': 'Van Insp.',
+  'plant-inspections': 'Plant Insp.',
+  'hgv-inspections': 'HGV Insp.',
+  'rams': 'Projects',
+  'absence': 'Absence',
+  'maintenance': 'Maint.',
+  'toolbox-talks': 'Toolbox',
+  'workshop-tasks': 'Workshop',
+  'approvals': 'Approvals',
+  'actions': 'Actions',
+  'reports': 'Reports',
+  'admin-users': 'Users',
+  'admin-vans': 'Fleet',
+};
+
+export const MODULE_CSS_VAR: Record<ModuleName, string> = {
+  'timesheets': '--timesheet-primary',
+  'inspections': '--inspection-primary',
+  'plant-inspections': '--plant-inspection-primary',
+  'hgv-inspections': '--inspection-primary',
+  'rams': '--rams-primary',
+  'absence': '--absence-primary',
+  'maintenance': '--maintenance-primary',
+  'toolbox-talks': '--avs-yellow',
+  'workshop-tasks': '--workshop-primary',
+  'approvals': '--avs-yellow',
+  'actions': '--avs-yellow',
+  'reports': '--avs-yellow',
+  'admin-users': '--avs-yellow',
+  'admin-vans': '--fleet-primary',
+};
+
 // All available modules in the system
 export type ModuleName =
   | 'timesheets'
@@ -90,7 +149,7 @@ export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
   'rams': 'Access and sign project documents',
   'absence': 'Request and manage absence',
   'maintenance': 'Track and manage van maintenance schedules',
-  'toolbox-talks': 'Receive and sign toolbox talks',
+  'toolbox-talks': 'Send toolbox talks to users (admin/manager only)',
   'workshop-tasks': 'Track van & plant repairs and workshop work',
   'approvals': 'Approve timesheets, inspections, and absences',
   'actions': 'Manage and track actions',
