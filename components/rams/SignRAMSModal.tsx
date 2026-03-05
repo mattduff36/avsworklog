@@ -66,11 +66,19 @@ export function SignRAMSModal({
       onSuccess();
       onClose();
     } catch (error) {
-      // Only log meaningful errors (not empty objects)
-      if (error && (error instanceof Error || (typeof error === 'object' && Object.keys(error).length > 0))) {
-        console.error('Sign error:', error);
+      const isNetworkError =
+        error instanceof TypeError &&
+        /failed to fetch|load failed|networkerror|network request failed/i.test(error.message);
+
+      if (isNetworkError) {
+        console.warn('Sign network error (transient):', error.message);
+        toast.error('Network error — please check your connection and try again');
+      } else {
+        if (error && (error instanceof Error || (typeof error === 'object' && Object.keys(error).length > 0))) {
+          console.error('Sign error:', error);
+        }
+        toast.error(error instanceof Error ? error.message : 'Signature failed');
       }
-      toast.error(error instanceof Error ? error.message : 'Signature failed');
     } finally {
       setLoading(false);
     }
