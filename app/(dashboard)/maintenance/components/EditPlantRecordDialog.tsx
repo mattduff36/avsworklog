@@ -33,6 +33,7 @@ type Plant = {
   id: string;
   plant_id: string;
   nickname: string | null;
+  reg_number: string | null;
   serial_number: string | null;
   loler_due_date: string | null;
   loler_last_inspection_date: string | null;
@@ -49,6 +50,9 @@ type MaintenanceRecord = {
   next_service_hours: number | null;
   tracker_id: string | null;
   last_hours_update: string | null;
+  tax_due_date: string | null;
+  mot_due_date: string | null;
+  current_mileage: number | null;
 };
 
 // ============================================================================
@@ -58,12 +62,21 @@ type MaintenanceRecord = {
 const editPlantRecordSchema = z.object({
   // Nickname
   nickname: z.string().max(100, 'Nickname must be less than 100 characters').optional().nullable(),
+  // Registration Number (road-going plant)
+  reg_number: z.string().max(20, 'Registration must be less than 20 characters').optional().nullable(),
   // Serial Number
   serial_number: z.string()
     .max(100, 'Serial number must be less than 100 characters')
     .transform(val => val ? normalizePlantSerialNumber(val) : null)
     .refine(val => !val || isValidPlantSerialNumber(val), 'Serial Number must be alphanumeric (letters and numbers only)')
     .optional().nullable(),
+  // Road vehicle fields
+  tax_due_date: z.string().optional().nullable(),
+  mot_due_date: z.string().optional().nullable(),
+  current_mileage: z.preprocess(
+    (val) => val === '' || val === null || val === undefined ? null : Number(val),
+    z.number().int().positive('Mileage must be a positive number').optional().nullable()
+  ),
   // Hours-based fields
   current_hours: z.preprocess(
     (val) => val === '' || val === null || val === undefined ? null : Number(val),
@@ -142,7 +155,11 @@ export function EditPlantRecordDialog({
     if (plant) {
       reset({
         nickname: plant.nickname || '',
+        reg_number: plant.reg_number || '',
         serial_number: plant.serial_number || '',
+        tax_due_date: formatDateForInput(maintenanceRecord?.tax_due_date),
+        mot_due_date: formatDateForInput(maintenanceRecord?.mot_due_date),
+        current_mileage: maintenanceRecord?.current_mileage || undefined,
         current_hours: maintenanceRecord?.current_hours || plant.current_hours || undefined,
         last_service_hours: maintenanceRecord?.last_service_hours || undefined,
         next_service_hours: maintenanceRecord?.next_service_hours || undefined,
@@ -266,6 +283,30 @@ export function EditPlantRecordDialog({
         }
       }
 
+      // Update plant reg_number if changed
+      const newRegNumber = data.reg_number?.trim().toUpperCase() || null;
+      const oldRegNumber = plant.reg_number;
+      if (newRegNumber !== oldRegNumber) {
+        const { error: regError } = await supabase
+          .from('plant')
+          .update({
+            reg_number: newRegNumber,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', plant.id);
+
+        if (regError) {
+          console.error('Error updating plant reg_number:', regError);
+        } else {
+          fieldChanges.push({
+            field_name: 'reg_number',
+            old_value: oldRegNumber,
+            new_value: newRegNumber,
+            value_type: 'text'
+          });
+        }
+      }
+
       // Update plant table fields (LOLER)
       const plantUpdates: Record<string, unknown> = {};
       
@@ -342,6 +383,9 @@ export function EditPlantRecordDialog({
         current_hours: data.current_hours || null,
         last_service_hours: data.last_service_hours || null,
         next_service_hours: data.next_service_hours || null,
+        tax_due_date: normalizeDateValue(data.tax_due_date) || null,
+        mot_due_date: normalizeDateValue(data.mot_due_date) || null,
+        current_mileage: data.current_mileage || null,
         tracker_id: data.tracker_id?.trim() || null,
         updated_at: new Date().toISOString(),
       };
@@ -395,6 +439,41 @@ export function EditPlantRecordDialog({
           old_value: oldTrackerId,
           new_value: newTrackerId,
           value_type: 'text'
+        });
+      }
+
+      // Road vehicle field changes
+      const newTaxDueDate = normalizeDateValue(data.tax_due_date);
+      const oldTaxDueDate = normalizeDateValue(formatDateForInput(maintenanceRecord?.tax_due_date));
+      if (newTaxDueDate !== oldTaxDueDate) {
+        fieldChanges.push({
+          field_name: 'tax_due_date',
+          old_value: maintenanceRecord?.tax_due_date || null,
+          new_value: newTaxDueDate,
+          value_type: 'date'
+        });
+      }
+
+      const newMotDueDate = normalizeDateValue(data.mot_due_date);
+      const oldMotDueDate = normalizeDateValue(formatDateForInput(maintenanceRecord?.mot_due_date));
+      if (newMotDueDate !== oldMotDueDate) {
+        fieldChanges.push({
+          field_name: 'mot_due_date',
+          old_value: maintenanceRecord?.mot_due_date || null,
+          new_value: newMotDueDate,
+          value_type: 'date'
+        });
+      }
+
+      const newCurrentMileage = normalizeValue(data.current_mileage);
+      const oldCurrentMileage = normalizeValue(maintenanceRecord?.current_mileage);
+      if (newCurrentMileage !== oldCurrentMileage) {
+        maintenanceUpdates.last_mileage_update = new Date().toISOString();
+        fieldChanges.push({
+          field_name: 'current_mileage',
+          old_value: oldCurrentMileage?.toString() || null,
+          new_value: newCurrentMileage?.toString() || null,
+          value_type: 'mileage'
         });
       }
 
@@ -603,6 +682,75 @@ export function EditPlantRecordDialog({
             {errors.serial_number && (
               <p className="text-sm text-red-400">{errors.serial_number.message}</p>
             )}
+          </div>
+
+          {/* Road Vehicle Details */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg border-b border-slate-700 pb-2">
+              Road Vehicle Details
+            </h3>
+            <p className="text-xs text-muted-foreground -mt-2">
+              For road-going plant machinery. Leave blank if not applicable.
+            </p>
+            
+            <div className="grid md:grid-cols-2 gap-4">
+              {/* Registration Number */}
+              <div className="space-y-2">
+                <Label htmlFor="reg_number">Registration Number</Label>
+                <Input
+                  id="reg_number"
+                  {...register('reg_number')}
+                  placeholder="e.g., AB12 CDE"
+                  className="bg-input border-border text-white uppercase"
+                />
+                {errors.reg_number && (
+                  <p className="text-sm text-red-400">{errors.reg_number.message}</p>
+                )}
+              </div>
+
+              {/* Current Mileage */}
+              <div className="space-y-2">
+                <Label htmlFor="current_mileage">Current Mileage</Label>
+                <Input
+                  id="current_mileage"
+                  type="number"
+                  {...register('current_mileage')}
+                  placeholder="e.g., 45000"
+                  className="bg-input border-border text-white"
+                />
+                {errors.current_mileage && (
+                  <p className="text-sm text-red-400">{errors.current_mileage.message}</p>
+                )}
+              </div>
+
+              {/* Tax Due Date */}
+              <div className="space-y-2">
+                <Label htmlFor="tax_due_date">Tax Due Date</Label>
+                <Input
+                  id="tax_due_date"
+                  type="date"
+                  {...register('tax_due_date')}
+                  className="bg-input border-border text-white"
+                />
+                {errors.tax_due_date && (
+                  <p className="text-sm text-red-400">{errors.tax_due_date.message}</p>
+                )}
+              </div>
+
+              {/* MOT Due Date */}
+              <div className="space-y-2">
+                <Label htmlFor="mot_due_date">MOT Due Date</Label>
+                <Input
+                  id="mot_due_date"
+                  type="date"
+                  {...register('mot_due_date')}
+                  className="bg-input border-border text-white"
+                />
+                {errors.mot_due_date && (
+                  <p className="text-sm text-red-400">{errors.mot_due_date.message}</p>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Hours-based Maintenance (Plant Machinery) */}

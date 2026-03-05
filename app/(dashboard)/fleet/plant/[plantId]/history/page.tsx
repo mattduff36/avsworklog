@@ -65,6 +65,9 @@ type MaintenanceRecord = {
   next_service_hours: number | null;
   tracker_id: string | null;
   last_hours_update: string | null;
+  tax_due_date: string | null;
+  mot_due_date: string | null;
+  current_mileage: number | null;
 };
 
 type MaintenanceHistoryEntry = {
@@ -388,10 +391,14 @@ export default function PlantHistoryPage({
   const getFieldLabel = (fieldName: string): string => {
     const labels: Record<string, string> = {
       nickname: 'Nickname',
+      reg_number: 'Registration Number',
       serial_number: 'Serial Number',
       current_hours: 'Current Hours',
       last_service_hours: 'Last Service Hours',
       next_service_hours: 'Next Service Hours',
+      tax_due_date: 'Tax Due Date',
+      mot_due_date: 'MOT Due Date',
+      current_mileage: 'Current Mileage',
       loler_due_date: 'LOLOR / Inspection Due Date',
       loler_last_inspection_date: 'LOLOR / Inspection Last Inspection',
       loler_certificate_number: 'LOLOR / Inspection Certificate',
