@@ -39,7 +39,9 @@ export function parseMileage(value: string): number | null {
 
 export function isApplicableToType(appliesTo: string[] | null | undefined, assetType: NewAssetType): boolean {
   if (!appliesTo || appliesTo.length === 0) return assetType === 'van';
-  if (assetType === 'van') return appliesTo.includes('van') || appliesTo.includes('vehicle');
+  if (assetType === 'van') {
+    return (appliesTo.includes('van') || appliesTo.includes('vehicle')) && !appliesTo.includes('plant');
+  }
   if (assetType === 'plant') return appliesTo.includes('plant');
   return appliesTo.includes('hgv');
 }

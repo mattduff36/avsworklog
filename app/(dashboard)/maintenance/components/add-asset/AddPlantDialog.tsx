@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { OnceDialog } from '@/components/ui/once-ui';
-import { isValidPlantSerialNumber, normalizePlantSerialNumber } from '@/lib/utils/plant-serial-number';
 import { isApplicableToType, type VehicleCategoryOption } from './utils';
 
 interface AddPlantDialogProps {
@@ -27,10 +26,6 @@ export function AddPlantDialog({ open, onOpenChange, onSuccess }: AddPlantDialog
   const [formData, setFormData] = useState({
     plant_id: '',
     nickname: '',
-    serial_number: '',
-    reg_number: '',
-    year: '',
-    weight_class: '',
     category_id: '',
     status: 'active',
   });
@@ -61,10 +56,6 @@ export function AddPlantDialog({ open, onOpenChange, onSuccess }: AddPlantDialog
     setFormData({
       plant_id: '',
       nickname: '',
-      serial_number: '',
-      reg_number: '',
-      year: '',
-      weight_class: '',
       category_id: '',
       status: 'active',
     });
@@ -83,11 +74,6 @@ export function AddPlantDialog({ open, onOpenChange, onSuccess }: AddPlantDialog
       return;
     }
 
-    if (formData.serial_number && !isValidPlantSerialNumber(formData.serial_number)) {
-      setError('Serial Number must contain only letters and numbers');
-      return;
-    }
-
     try {
       setIsLoading(true);
       const response = await fetch('/api/admin/plant', {
@@ -96,10 +82,6 @@ export function AddPlantDialog({ open, onOpenChange, onSuccess }: AddPlantDialog
         body: JSON.stringify({
           plant_id: formData.plant_id.trim(),
           nickname: formData.nickname.trim() || null,
-          serial_number: formData.serial_number.trim() || null,
-          reg_number: formData.reg_number.trim() || null,
-          year: formData.year ? Number.parseInt(formData.year, 10) : null,
-          weight_class: formData.weight_class.trim() || null,
           category_id: formData.category_id,
           status: formData.status,
         }),
@@ -123,73 +105,30 @@ export function AddPlantDialog({ open, onOpenChange, onSuccess }: AddPlantDialog
       open={open}
       onOpenChange={onOpenChange}
       title="Add Plant"
-      description="Create a plant asset with required machinery details."
-      className="max-w-2xl"
+      description="Create a plant asset with required category details."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error ? <p className="rounded border border-red-700 bg-red-900/20 p-2 text-sm text-red-300">{error}</p> : null}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="plant-id">Plant ID *</Label>
-            <Input
-              id="plant-id"
-              value={formData.plant_id}
-              onChange={(event) => setFormData((prev) => ({ ...prev, plant_id: event.target.value }))}
-              placeholder="P001"
-              className="bg-slate-900 text-white"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="plant-nickname">Nickname</Label>
-            <Input
-              id="plant-nickname"
-              value={formData.nickname}
-              onChange={(event) => setFormData((prev) => ({ ...prev, nickname: event.target.value }))}
-              className="bg-slate-900 text-white"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="plant-serial">Serial Number</Label>
-            <Input
-              id="plant-serial"
-              value={formData.serial_number}
-              onChange={(event) =>
-                setFormData((prev) => ({ ...prev, serial_number: normalizePlantSerialNumber(event.target.value) || '' }))
-              }
-              className="bg-slate-900 text-white"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="plant-reg">Registration</Label>
-            <Input
-              id="plant-reg"
-              value={formData.reg_number}
-              onChange={(event) =>
-                setFormData((prev) => ({ ...prev, reg_number: event.target.value.toUpperCase().replace(/[^A-Z0-9\s]/g, '') }))
-              }
-              className="bg-slate-900 text-white"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="plant-year">Year</Label>
-            <Input
-              id="plant-year"
-              type="number"
-              value={formData.year}
-              onChange={(event) => setFormData((prev) => ({ ...prev, year: event.target.value }))}
-              className="bg-slate-900 text-white"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="plant-weight">Weight Class</Label>
-            <Input
-              id="plant-weight"
-              value={formData.weight_class}
-              onChange={(event) => setFormData((prev) => ({ ...prev, weight_class: event.target.value }))}
-              className="bg-slate-900 text-white"
-            />
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="plant-id">Plant ID *</Label>
+          <Input
+            id="plant-id"
+            value={formData.plant_id}
+            onChange={(event) => setFormData((prev) => ({ ...prev, plant_id: event.target.value }))}
+            placeholder="P001"
+            className="bg-slate-900 text-white"
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="plant-nickname">Nickname</Label>
+          <Input
+            id="plant-nickname"
+            value={formData.nickname}
+            onChange={(event) => setFormData((prev) => ({ ...prev, nickname: event.target.value }))}
+            placeholder="Optional"
+            className="bg-slate-900 text-white"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="plant-category">Category *</Label>

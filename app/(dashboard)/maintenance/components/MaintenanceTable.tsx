@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -44,6 +44,15 @@ import {
 import { EditMaintenanceDialog } from './EditMaintenanceDialog';
 import { useDeletedVehicles, usePermanentlyDeleteArchivedVehicle, useRestoreArchivedVehicle } from '@/lib/hooks/useMaintenance';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { createClient } from '@/lib/supabase/client';
+
+type RetiredHgv = {
+  id: string;
+  reg_number: string;
+  nickname: string | null;
+  current_mileage: number | null;
+  hgv_categories?: { name: string; id: string } | null;
+};
 
 interface MaintenanceTableProps {
   vehicles: VehicleMaintenanceWithStatus[];
@@ -107,10 +116,40 @@ export function MaintenanceTable({
   const [pendingRestore, setPendingRestore] = useState<Set<string>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<Set<string>>(new Set());
   
-  // Fetch retired vehicles
+  // Fetch retired vans from van_archive (only used for van tab)
   const { data: retiredData, isLoading: retiredLoading } = useDeletedVehicles();
   const permanentlyDelete = usePermanentlyDeleteArchivedVehicle();
   const restoreVehicle = useRestoreArchivedVehicle();
+
+  // Fetch retired HGVs from hgvs table (only used for HGV tab)
+  const supabase = useMemo(() => createClient(), []);
+  const [retiredHgvs, setRetiredHgvs] = useState<RetiredHgv[]>([]);
+  const [retiredHgvsLoading, setRetiredHgvsLoading] = useState(false);
+
+  const fetchRetiredHgvs = useCallback(async () => {
+    if (!isHgvTable) return;
+    setRetiredHgvsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('hgvs')
+        .select('id, reg_number, nickname, current_mileage, hgv_categories(name, id)')
+        .eq('status', 'retired')
+        .order('reg_number', { ascending: true });
+      if (error) throw error;
+      setRetiredHgvs(data || []);
+    } catch {
+      setRetiredHgvs([]);
+    } finally {
+      setRetiredHgvsLoading(false);
+    }
+  }, [isHgvTable, supabase]);
+
+  useEffect(() => {
+    fetchRetiredHgvs();
+  }, [fetchRetiredHgvs]);
+
+  const effectiveRetiredCount = isHgvTable ? retiredHgvs.length : (retiredData?.count || 0);
+  const effectiveRetiredLoading = isHgvTable ? retiredHgvsLoading : retiredLoading;
   
   // Handlers with per-vehicle loading state
   const handleRestore = (vehicleId: string, regNumber: string) => {
@@ -277,7 +316,7 @@ export function MaintenanceTable({
               </TabsTrigger>
               <TabsTrigger value="deleted" className="flex items-center gap-2">
                 <FolderClock className="h-4 w-4" />
-                Retired {assetLabelPlural} ({retiredData?.count || 0})
+                Retired {assetLabelPlural} ({effectiveRetiredCount})
               </TabsTrigger>
             </TabsList>
             
@@ -839,9 +878,9 @@ export function MaintenanceTable({
           )}
             </TabsContent>
             
-            {/* Retired Vans Tab */}
+            {/* Retired Assets Tab */}
             <TabsContent value="deleted" className="space-y-4 mt-4">
-              {/* Search Bar for Retired Vans */}
+              {/* Search Bar */}
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -852,127 +891,232 @@ export function MaintenanceTable({
                 />
               </div>
               
-              {retiredLoading ? (
+              {effectiveRetiredLoading ? (
                 <div className="text-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-3" />
                   <p className="text-muted-foreground">Loading retired {assetLabelPluralLower}...</p>
                 </div>
-              ) : !retiredData || retiredData.vehicles.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <FolderClock className="h-12 w-12 mx-auto mb-3 text-slate-600" />
-                  <p>No retired {assetLabelPluralLower} found.</p>
-                </div>
+              ) : isHgvTable ? (
+                /* ── Retired HGVs (from hgvs table) ── */
+                retiredHgvs.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <FolderClock className="h-12 w-12 mx-auto mb-3 text-slate-600" />
+                    <p>No retired {assetLabelPluralLower} found.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="hidden md:block border border-slate-700 rounded-lg">
+                      <Table className="min-w-full">
+                        <TableHeader>
+                          <TableRow className="border-border">
+                            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">Registration</TableHead>
+                            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">Nickname</TableHead>
+                            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">Mileage</TableHead>
+                            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">Category</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {retiredHgvs
+                            .filter(h => (h.reg_number || '').toLowerCase().includes(retiredSearchQuery.toLowerCase()))
+                            .map((hgv) => (
+                              <TableRow key={hgv.id} className="border-slate-700 hover:bg-slate-800/30">
+                                <TableCell className="font-medium text-white">{hgv.reg_number}</TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {hgv.nickname || <span className="text-slate-400 italic">No nickname</span>}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">{formatMileage(hgv.current_mileage)}</TableCell>
+                                <TableCell className="text-muted-foreground">{hgv.hgv_categories?.name || '—'}</TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <div className="md:hidden space-y-3">
+                      {retiredHgvs
+                        .filter(h => (h.reg_number || '').toLowerCase().includes(retiredSearchQuery.toLowerCase()))
+                        .map((hgv) => (
+                          <Card key={hgv.id} className="bg-slate-800 border-border">
+                            <CardContent className="p-4">
+                              <h3 className="font-semibold text-white text-lg">{hgv.reg_number}</h3>
+                              {hgv.nickname && <p className="text-xs text-muted-foreground">{hgv.nickname}</p>}
+                              <div className="space-y-2 text-sm mt-2">
+                                {hgv.current_mileage && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Mileage:</span>
+                                    <span className="text-white">{formatMileage(hgv.current_mileage)}</span>
+                                  </div>
+                                )}
+                                {hgv.hgv_categories?.name && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Category:</span>
+                                    <span className="text-white">{hgv.hgv_categories.name}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                    </div>
+                  </>
+                )
               ) : (
-                <>
-                  {/* Desktop Table View for Retired Vans */}
-                  <div className="hidden md:block border border-slate-700 rounded-lg">
-                    <Table className="min-w-full">
-                      <TableHeader>
-                        <TableRow className="border-border">
-                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
-                            Registration
-                          </TableHead>
-                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
-                            Nickname
-                          </TableHead>
-                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
-                            Mileage
-                          </TableHead>
-                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
-                            Tax Due
-                          </TableHead>
-                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
-                            MOT Due
-                          </TableHead>
-                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
-                            Retired Date
-                          </TableHead>
-                          <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
-                            Reason
-                          </TableHead>
-                          <TableHead className="bg-slate-900 text-right text-muted-foreground border-b-2 border-border">
-                            Actions
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {retiredData.vehicles
-                          .filter(vehicle => 
-                            vehicle.reg_number.toLowerCase().includes(retiredSearchQuery.toLowerCase())
-                          )
-                          .map((vehicle) => (
-                          <TableRow 
-                            key={vehicle.id}
-                            className="border-slate-700 hover:bg-slate-800/30"
-                          >
-                            {/* Registration */}
-                            <TableCell className="font-medium text-white">
-                              {vehicle.reg_number}
-                            </TableCell>
-                            
-                            {/* Nickname */}
-                            <TableCell className="text-muted-foreground">
-                              {vehicle.nickname || (
-                                <span className="text-slate-400 italic">No nickname</span>
-                              )}
-                            </TableCell>
-                            
-                            {/* Mileage */}
-                            <TableCell className="text-muted-foreground">
-                              {formatMileage(vehicle.current_mileage)}
-                            </TableCell>
-                            
-                            {/* Tax Due */}
-                            <TableCell>
-                              <span className="text-muted-foreground">
-                                {formatMaintenanceDate(vehicle.tax_due_date)}
-                              </span>
-                            </TableCell>
-                            
-                            {/* MOT Due */}
-                            <TableCell>
-                              <span className="text-muted-foreground">
-                                {formatMaintenanceDate(vehicle.mot_due_date)}
-                              </span>
-                            </TableCell>
-                            
-                            {/* Deleted Date */}
-                            <TableCell className="text-muted-foreground">
-                              {new Date(vehicle.archived_at).toLocaleDateString()}
-                            </TableCell>
-                            
-                            {/* Reason */}
-                            <TableCell>
-                              <Badge 
-                                variant="outline" 
-                                className={
-                                  vehicle.archive_reason === 'Sold' 
-                                    ? 'border-blue-500 text-blue-400' 
-                                    : vehicle.archive_reason === 'Scrapped'
-                                    ? 'border-red-500 text-red-400'
-                                    : 'border-slate-500 text-muted-foreground'
-                                }
-                              >
-                                {vehicle.archive_reason}
-                              </Badge>
-                            </TableCell>
-                            
-                            {/* Actions */}
-                            <TableCell className="text-right">
+                /* ── Retired Vans (from van_archive) ── */
+                !retiredData || retiredData.vehicles.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <FolderClock className="h-12 w-12 mx-auto mb-3 text-slate-600" />
+                    <p>No retired {assetLabelPluralLower} found.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="hidden md:block border border-slate-700 rounded-lg">
+                      <Table className="min-w-full">
+                        <TableHeader>
+                          <TableRow className="border-border">
+                            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">Registration</TableHead>
+                            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">Nickname</TableHead>
+                            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">Mileage</TableHead>
+                            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">Tax Due</TableHead>
+                            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">MOT Due</TableHead>
+                            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">Retired Date</TableHead>
+                            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">Reason</TableHead>
+                            <TableHead className="bg-slate-900 text-right text-muted-foreground border-b-2 border-border">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {retiredData.vehicles
+                            .filter(vehicle => vehicle.reg_number.toLowerCase().includes(retiredSearchQuery.toLowerCase()))
+                            .map((vehicle) => (
+                              <TableRow key={vehicle.id} className="border-slate-700 hover:bg-slate-800/30">
+                                <TableCell className="font-medium text-white">{vehicle.reg_number}</TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {vehicle.nickname || <span className="text-slate-400 italic">No nickname</span>}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">{formatMileage(vehicle.current_mileage)}</TableCell>
+                                <TableCell>
+                                  <span className="text-muted-foreground">{formatMaintenanceDate(vehicle.tax_due_date)}</span>
+                                </TableCell>
+                                <TableCell>
+                                  <span className="text-muted-foreground">{formatMaintenanceDate(vehicle.mot_due_date)}</span>
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {new Date(vehicle.archived_at).toLocaleDateString()}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      vehicle.archive_reason === 'Sold'
+                                        ? 'border-blue-500 text-blue-400'
+                                        : vehicle.archive_reason === 'Scrapped'
+                                        ? 'border-red-500 text-red-400'
+                                        : 'border-slate-500 text-muted-foreground'
+                                    }
+                                  >
+                                    {vehicle.archive_reason}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {(isAdmin || isManager) && (
+                                    <div className="flex items-center justify-end gap-2">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleRestore(vehicle.id, vehicle.reg_number)}
+                                        disabled={pendingRestore.has(vehicle.id)}
+                                        className="text-green-400 hover:text-green-300 hover:bg-green-900/20"
+                                        title="Restore to Active"
+                                      >
+                                        {pendingRestore.has(vehicle.id) ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <Undo2 className="h-3 w-3" />
+                                        )}
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handlePermanentDelete(vehicle.id, vehicle.reg_number)}
+                                        disabled={pendingDelete.has(vehicle.id)}
+                                        className="text-red-400 hover:text-red-300 hover:bg-slate-800"
+                                        title="Permanently Remove"
+                                      >
+                                        {pendingDelete.has(vehicle.id) ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <XCircle className="h-3 w-3" />
+                                        )}
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <div className="md:hidden space-y-3">
+                      {retiredData.vehicles
+                        .filter(vehicle => vehicle.reg_number.toLowerCase().includes(retiredSearchQuery.toLowerCase()))
+                        .map((vehicle) => (
+                          <Card key={vehicle.id} className="bg-slate-800 border-border">
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between mb-3">
+                                <div>
+                                  <h3 className="font-semibold text-white text-lg">{vehicle.reg_number}</h3>
+                                  {vehicle.nickname && <p className="text-xs text-muted-foreground">{vehicle.nickname}</p>}
+                                </div>
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    vehicle.archive_reason === 'Sold'
+                                      ? 'border-blue-500 text-blue-400'
+                                      : vehicle.archive_reason === 'Scrapped'
+                                      ? 'border-red-500 text-red-400'
+                                      : 'border-slate-500 text-muted-foreground'
+                                  }
+                                >
+                                  {vehicle.archive_reason}
+                                </Badge>
+                              </div>
+                              <div className="space-y-2 text-sm">
+                                {vehicle.current_mileage && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Mileage:</span>
+                                    <span className="text-white">{formatMileage(vehicle.current_mileage)}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Tax Due:</span>
+                                  <span className="text-white">{formatMaintenanceDate(vehicle.tax_due_date)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">MOT Due:</span>
+                                  <span className="text-white">{formatMaintenanceDate(vehicle.mot_due_date)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Retired:</span>
+                                  <span className="text-white">{new Date(vehicle.archived_at).toLocaleDateString()}</span>
+                                </div>
+                              </div>
                               {(isAdmin || isManager) && (
-                                <div className="flex items-center justify-end gap-2">
+                                <div className="mt-4 pt-3 border-t border-slate-700 space-y-2">
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => handleRestore(vehicle.id, vehicle.reg_number)}
                                     disabled={pendingRestore.has(vehicle.id)}
-                                    className="text-green-400 hover:text-green-300 hover:bg-green-900/20"
-                                    title="Restore to Active"
+                                    className="w-full text-green-400 hover:text-green-300 hover:bg-green-900/20"
                                   >
                                     {pendingRestore.has(vehicle.id) ? (
-                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                      <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Restoring...
+                                      </>
                                     ) : (
-                                      <Undo2 className="h-3 w-3" />
+                                      <>
+                                        <Undo2 className="h-4 w-4 mr-2" />
+                                        Restore to Active
+                                      </>
                                     )}
                                   </Button>
                                   <Button
@@ -980,128 +1124,28 @@ export function MaintenanceTable({
                                     size="sm"
                                     onClick={() => handlePermanentDelete(vehicle.id, vehicle.reg_number)}
                                     disabled={pendingDelete.has(vehicle.id)}
-                                    className="text-red-400 hover:text-red-300 hover:bg-slate-800"
-                                    title="Permanently Remove"
+                                    className="w-full text-red-400 hover:text-red-300 hover:bg-red-900/20"
                                   >
                                     {pendingDelete.has(vehicle.id) ? (
-                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                      <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Removing...
+                                      </>
                                     ) : (
-                                      <XCircle className="h-3 w-3" />
+                                      <>
+                                        <XCircle className="h-4 w-4 mr-2" />
+                                        Permanently Remove
+                                      </>
                                     )}
                                   </Button>
                                 </div>
                               )}
-                            </TableCell>
-                          </TableRow>
+                            </CardContent>
+                          </Card>
                         ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  
-                  {/* Mobile Card View for Retired Vans */}
-                  <div className="md:hidden space-y-3">
-                    {retiredData.vehicles
-                      .filter(vehicle => 
-                        vehicle.reg_number.toLowerCase().includes(retiredSearchQuery.toLowerCase())
-                      )
-                      .map((vehicle) => (
-                      <Card 
-                        key={vehicle.id}
-                        className="bg-slate-800 border-border"
-                      >
-                        <CardContent className="p-4">
-                          {/* Header */}
-                          <div className="flex items-center justify-between mb-3">
-                            <div>
-                              <h3 className="font-semibold text-white text-lg">{vehicle.reg_number}</h3>
-                              {vehicle.nickname && (
-                                <p className="text-xs text-muted-foreground">{vehicle.nickname}</p>
-                              )}
-                            </div>
-                            <Badge 
-                              variant="outline"
-                              className={
-                                vehicle.archive_reason === 'Sold' 
-                                  ? 'border-blue-500 text-blue-400' 
-                                  : vehicle.archive_reason === 'Scrapped'
-                                  ? 'border-red-500 text-red-400'
-                                  : 'border-slate-500 text-muted-foreground'
-                              }
-                            >
-                              {vehicle.archive_reason}
-                            </Badge>
-                          </div>
-                          
-                          {/* Details */}
-                          <div className="space-y-2 text-sm">
-                            {vehicle.current_mileage && (
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Mileage:</span>
-                                <span className="text-white">{formatMileage(vehicle.current_mileage)}</span>
-                              </div>
-                            )}
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Tax Due:</span>
-                              <span className="text-white">{formatMaintenanceDate(vehicle.tax_due_date)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">MOT Due:</span>
-                              <span className="text-white">{formatMaintenanceDate(vehicle.mot_due_date)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Retired:</span>
-                              <span className="text-white">{new Date(vehicle.archived_at).toLocaleDateString()}</span>
-                            </div>
-                          </div>
-                          
-                          {/* Actions */}
-                          {(isAdmin || isManager) && (
-                            <div className="mt-4 pt-3 border-t border-slate-700 space-y-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRestore(vehicle.id, vehicle.reg_number)}
-                                disabled={pendingRestore.has(vehicle.id)}
-                                className="w-full text-green-400 hover:text-green-300 hover:bg-green-900/20"
-                              >
-                                {pendingRestore.has(vehicle.id) ? (
-                                  <>
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Restoring...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Undo2 className="h-4 w-4 mr-2" />
-                                    Restore to Active
-                                  </>
-                                )}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handlePermanentDelete(vehicle.id, vehicle.reg_number)}
-                                disabled={pendingDelete.has(vehicle.id)}
-                                className="w-full text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                              >
-                                {pendingDelete.has(vehicle.id) ? (
-                                  <>
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Removing...
-                                  </>
-                                ) : (
-                                  <>
-                                    <XCircle className="h-4 w-4 mr-2" />
-                                    Permanently Remove
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </>
+                    </div>
+                  </>
+                )
               )}
             </TabsContent>
           </Tabs>
