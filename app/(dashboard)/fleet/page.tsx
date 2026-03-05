@@ -89,8 +89,9 @@ function FleetContent() {
   const { profile, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const supabase = createClient();
   
-  // Initialize to default - useEffect will sync with URL to prevent hydration mismatch
-  const [activeTab, setActiveTab] = useState('vans');
+  // Two-level tab state matching Maintenance/Workshop pages
+  const [pageTab, setPageTab] = useState<'overview' | 'settings'>('overview');
+  const [assetTab, setAssetTab] = useState<'vans' | 'plant' | 'hgvs'>('vans');
   const [hasModulePermission, setHasModulePermission] = useState<boolean | null>(null);
   
   // Vehicle Category Dialog States
@@ -107,37 +108,33 @@ function FleetContent() {
   const [selectedHgvCategory, setSelectedHgvCategory] = useState<HgvCategory | null>(null);
   const [deletingHgvCategory, setDeletingHgvCategory] = useState(false);
   
-  // Helper function to validate if user can access a tab
-  const canAccessTab = (tab: string): boolean => {
-    const fleetTabs = ['vans', 'plant', 'hgvs', 'settings'];
-    return fleetTabs.includes(tab);
-  };
+  const validAssetTabs = ['vans', 'plant', 'hgvs'] as const;
   
-  // Validate and set activeTab based on permissions and URL
+  // Validate and set tabs based on URL
   useEffect(() => {
     if (authLoading) return;
     
-    const defaultTab = 'vans';
-    const requestedTab = searchParams.get('tab') || defaultTab;
+    const requestedTab = searchParams.get('tab') || 'vans';
     
-    // Legacy redirect: tab=maintenance now lives on /maintenance
+    // Legacy redirects
     if (requestedTab === 'maintenance') {
       router.replace('/maintenance');
       return;
     }
-
-    // Legacy redirect: tab=vehicles was renamed to tab=vans
     if (requestedTab === 'vehicles') {
       router.replace('/fleet?tab=vans', { scroll: false });
       return;
     }
     
-    if (canAccessTab(requestedTab)) {
-      setActiveTab(requestedTab);
+    if (requestedTab === 'settings') {
+      setPageTab('settings');
+    } else if ((validAssetTabs as readonly string[]).includes(requestedTab)) {
+      setPageTab('overview');
+      setAssetTab(requestedTab as 'vans' | 'plant' | 'hgvs');
     } else {
-      const fallbackTab = defaultTab;
-      setActiveTab(fallbackTab);
-      router.push(`/fleet?tab=${fallbackTab}`, { scroll: false });
+      setAssetTab('vans');
+      setPageTab('overview');
+      router.push('/fleet?tab=vans', { scroll: false });
     }
   }, [searchParams, authLoading, isManager, isAdmin, isSuperAdmin, router]);
   // Fetch maintenance data
@@ -285,47 +282,49 @@ function FleetContent() {
   
   // Fetch data on initial load based on active tab from URL
   useEffect(() => {
-    if (activeTab === 'plant') {
-      if (plantAssets.length === 0) fetchPlantAssets();
-    } else if (activeTab === 'vans') {
-      if (vehicles.length === 0) fetchVehicles();
-      if (categories.length === 0) fetchCategories();
-    } else if (activeTab === 'hgvs') {
-      if (hgvAssets.length === 0) fetchHgvAssets();
-    } else if (activeTab === 'settings') {
+    if (pageTab === 'settings') {
       if (categories.length === 0) fetchCategories();
       if (vehicles.length === 0) fetchVehicles();
       if (plantAssets.length === 0) fetchPlantAssets();
       if (hgvCategories.length === 0) fetchHgvCategories();
+      if (hgvAssets.length === 0) fetchHgvAssets();
+    } else if (assetTab === 'plant') {
+      if (plantAssets.length === 0) fetchPlantAssets();
+    } else if (assetTab === 'vans') {
+      if (vehicles.length === 0) fetchVehicles();
+      if (categories.length === 0) fetchCategories();
+    } else if (assetTab === 'hgvs') {
       if (hgvAssets.length === 0) fetchHgvAssets();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+  }, [pageTab, assetTab]);
   
-  // Update URL when tab changes
-  const handleTabChange = (value: string) => {
-    // Validate tab access before changing
-    if (!canAccessTab(value)) {
-      logger.warn(`Attempted to access restricted tab: ${value}`, 'FleetPage');
-      return;
-    }
-    
-    setActiveTab(value);
-    router.push(`/fleet?tab=${value}`, { scroll: false });
-    
-    // Fetch data when switching to tabs
-    if (value === 'plant') {
-      if (plantAssets.length === 0) fetchPlantAssets();
-    } else if (value === 'vans') {
-      if (vehicles.length === 0) fetchVehicles();
-      if (categories.length === 0) fetchCategories();
-    } else if (value === 'hgvs') {
-      if (hgvAssets.length === 0) fetchHgvAssets();
-    } else if (value === 'settings') {
+  const handlePageTabChange = (value: string) => {
+    const v = value as 'overview' | 'settings';
+    setPageTab(v);
+    if (v === 'settings') {
+      router.push('/fleet?tab=settings', { scroll: false });
       if (categories.length === 0) fetchCategories();
       if (vehicles.length === 0) fetchVehicles();
       if (plantAssets.length === 0) fetchPlantAssets();
       if (hgvCategories.length === 0) fetchHgvCategories();
+      if (hgvAssets.length === 0) fetchHgvAssets();
+    } else {
+      router.push(`/fleet?tab=${assetTab}`, { scroll: false });
+    }
+  };
+
+  const handleAssetTabChange = (value: string) => {
+    const v = value as 'vans' | 'plant' | 'hgvs';
+    setAssetTab(v);
+    router.push(`/fleet?tab=${v}`, { scroll: false });
+
+    if (v === 'plant') {
+      if (plantAssets.length === 0) fetchPlantAssets();
+    } else if (v === 'vans') {
+      if (vehicles.length === 0) fetchVehicles();
+      if (categories.length === 0) fetchCategories();
+    } else if (v === 'hgvs') {
       if (hgvAssets.length === 0) fetchHgvAssets();
     }
   };
@@ -456,28 +455,43 @@ function FleetContent() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full lg:w-auto lg:inline-grid grid-cols-4">
-          <TabsTrigger value="vans" className="gap-2">
-            <Truck className="h-4 w-4" />
-            Vans
-          </TabsTrigger>
-          <TabsTrigger value="plant" className="gap-2">
-            <HardHat className="h-4 w-4" />
-            Plant
-          </TabsTrigger>
-          <TabsTrigger value="hgvs" className="gap-2">
-            <Truck className="h-4 w-4" />
-            HGVs
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="gap-2">
-            <Settings className="h-4 w-4" />
-            Settings
-          </TabsTrigger>
-        </TabsList>
+      <Tabs value={pageTab} onValueChange={handlePageTabChange}>
+        {(isAdmin || isManager) && (
+          <TabsList>
+            <TabsTrigger value="overview" className="gap-2">
+              <Wrench className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="gap-2">
+              <Settings className="h-4 w-4" />
+              Settings
+            </TabsTrigger>
+          </TabsList>
+        )}
 
-        {/* Plant Tab */}
-        <TabsContent value="plant" className="space-y-6">
+        <TabsContent value="overview" className="space-y-6 mt-0">
+          <div className="flex items-center justify-end">
+            <Tabs value={assetTab} onValueChange={handleAssetTabChange}>
+              <TabsList>
+                <TabsTrigger value="vans" className="gap-2">
+                  <Truck className="h-4 w-4" />
+                  Vans
+                </TabsTrigger>
+                <TabsTrigger value="plant" className="gap-2">
+                  <HardHat className="h-4 w-4" />
+                  Plant
+                </TabsTrigger>
+                <TabsTrigger value="hgvs" className="gap-2">
+                  <Truck className="h-4 w-4" />
+                  HGVs
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+
+          {/* Plant content */}
+          {assetTab === 'plant' && (
+            <div className="space-y-6">
           {maintenanceLoading ? (
             <div className="flex items-center justify-center min-h-[400px]">
               <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -499,63 +513,70 @@ function FleetContent() {
               onVehicleAdded={fetchPlantAssets}
             />
           )}
+            </div>
+          )}
+
+          {/* Vans content */}
+          {assetTab === 'vans' && (
+            <div className="space-y-6">
+              {maintenanceLoading ? (
+                <div className="flex items-center justify-center min-h-[400px]">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                </div>
+              ) : maintenanceError ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <Wrench className="h-16 w-16 text-red-400 mb-4" />
+                    <h2 className="text-2xl font-semibold mb-2">Error Loading Van Data</h2>
+                    <p className="text-gray-600 text-center max-w-md">
+                      {maintenanceError?.message || 'Failed to load van records'}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <MaintenanceTable 
+                  vehicles={(maintenanceData?.vehicles || []).filter(v => v.vehicle?.asset_type === 'van')}
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
+                  onVehicleAdded={() => {}}
+                />
+              )}
+            </div>
+          )}
+
+          {/* HGVs content */}
+          {assetTab === 'hgvs' && (
+            <div className="space-y-6">
+              {maintenanceLoading ? (
+                <div className="flex items-center justify-center min-h-[400px]">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                </div>
+              ) : maintenanceError ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <Truck className="h-16 w-16 text-red-400 mb-4" />
+                    <h2 className="text-2xl font-semibold mb-2">Error Loading HGV Data</h2>
+                    <p className="text-gray-600 text-center max-w-md">
+                      {maintenanceError?.message || 'Failed to load HGV records'}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <MaintenanceTable 
+                  vehicles={(maintenanceData?.vehicles || []).filter(v => v.vehicle?.asset_type === 'hgv')}
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
+                  onVehicleAdded={() => {}}
+                  assetLabel="HGV"
+                />
+              )}
+            </div>
+          )}
         </TabsContent>
 
-        {/* Vans Tab - Admin/Manager only */}
-        <TabsContent value="vans" className="space-y-6">
-            {maintenanceLoading ? (
-              <div className="flex items-center justify-center min-h-[400px]">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-              </div>
-            ) : maintenanceError ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Wrench className="h-16 w-16 text-red-400 mb-4" />
-                  <h2 className="text-2xl font-semibold mb-2">Error Loading Van Data</h2>
-                  <p className="text-gray-600 text-center max-w-md">
-                    {maintenanceError?.message || 'Failed to load van records'}
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <MaintenanceTable 
-                vehicles={(maintenanceData?.vehicles || []).filter(v => v.vehicle?.asset_type === 'van')}
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                onVehicleAdded={() => {}}
-              />
-            )}
-        </TabsContent>
-
-        {/* HGVs Tab - Admin/Manager only */}
-        <TabsContent value="hgvs" className="space-y-6">
-            {maintenanceLoading ? (
-              <div className="flex items-center justify-center min-h-[400px]">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-              </div>
-            ) : maintenanceError ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Truck className="h-16 w-16 text-red-400 mb-4" />
-                  <h2 className="text-2xl font-semibold mb-2">Error Loading HGV Data</h2>
-                  <p className="text-gray-600 text-center max-w-md">
-                    {maintenanceError?.message || 'Failed to load HGV records'}
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <MaintenanceTable 
-                vehicles={(maintenanceData?.vehicles || []).filter(v => v.vehicle?.asset_type === 'hgv')}
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                onVehicleAdded={() => {}}
-                assetLabel="HGV"
-              />
-            )}
-        </TabsContent>
-
-        {/* Settings Tab - Admin/Manager only */}
-        <TabsContent value="settings" className="space-y-6">
+        {/* Settings Tab */}
+        {(isAdmin || isManager) && (
+        <TabsContent value="settings" className="space-y-6 mt-0">
             {/* Van Categories Section - Admin Only */}
             {isAdmin && (
               <>
@@ -895,6 +916,7 @@ function FleetContent() {
             )}
 
         </TabsContent>
+        )}
       </Tabs>
       
       {/* Vehicle Category Dialogs */}

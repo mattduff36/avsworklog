@@ -29,6 +29,10 @@ type Task = Database['public']['Tables']['actions']['Row'] & {
     reg_number: string;
     nickname: string | null;
   } | null;
+  hgvs?: {
+    reg_number: string;
+    nickname: string | null;
+  } | null;
   plant?: {
     plant_id: string;
     nickname: string | null;
@@ -88,9 +92,10 @@ export function WorkshopTaskModal({
       return idLabel;
     };
 
-    // Check direct van or plant reference
     if (task.vans) {
       return getAssetDisplay(task.vans);
+    } else if (task.hgvs) {
+      return getAssetDisplay(task.hgvs);
     } else if (task.plant) {
       return getAssetDisplay(task.plant);
     }
