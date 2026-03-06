@@ -28,12 +28,16 @@
     "**/dist/**": true,
     "**/build/**": true,
     "**/coverage/**": true,
+    "**/test-results/**": true,
+    "**/playwright-report/**": true,
+    "**/reports/**": true,
     "**/.turbo/**": true,
     "**/.vercel/**": true,
     "**/.git/**": true,
     "**/.pnpm-store/**": true,
     "**/.yarn/**": true,
     "**/.cache/**": true,
+    "**/supabase/.temp/**": true,
     "**/tmp/**": true
   },
 
@@ -44,7 +48,26 @@
     "**/dist/**": true,
     "**/build/**": true,
     "**/coverage/**": true,
+    "**/test-results/**": true,
+    "**/playwright-report/**": true,
+    "**/reports/**": true,
     "**/.turbo/**": true,
-    "**/.vercel/**": true
+    "**/.vercel/**": true,
+    "**/.cache/**": true,
+    "**/supabase/.temp/**": true
+  },
+  "files.exclude": {
+    "**/.next": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/coverage": true,
+    "**/test-results": true,
+    "**/playwright-report": true,
+    "**/reports": true,
+    "**/.turbo": true,
+    "**/.vercel": true,
+    "**/.cache": true,
+    "**/supabase/.temp": true,
+    "**/out": true
   }
 }

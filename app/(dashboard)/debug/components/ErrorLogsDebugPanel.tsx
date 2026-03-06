@@ -1,0 +1,787 @@
+'use client';
+
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectableCard } from '@/components/ui/selectable-card';
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Copy,
+  Filter,
+  Loader2,
+  Monitor,
+  RefreshCw,
+  Search,
+  Smartphone,
+  Trash,
+  Users,
+  XCircle,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { ErrorLogEntry } from '../types';
+
+type ErrorSeverity = 'urgent' | 'important' | 'medium' | 'low';
+
+const UNHANDLED_COMPONENTS = ['Global Error Handler', 'Unhandled Promise Rejection', 'Error Boundary'];
+
+function getErrorSeverity(log: ErrorLogEntry): ErrorSeverity {
+  const handling = (log.additional_data as Record<string, unknown> | null)?.errorHandling as
+    | { wasHandled?: boolean; didShowMessage?: boolean | null }
+    | undefined;
+
+  if (handling) {
+    if (!handling.wasHandled && handling.didShowMessage === false) return 'urgent';
+    if (handling.wasHandled && handling.didShowMessage === true) return 'important';
+    if (handling.wasHandled && handling.didShowMessage === false) return 'medium';
+    if (handling.didShowMessage === null) return 'low';
+  }
+
+  const comp = log.component_name ?? '';
+  if (UNHANDLED_COMPONENTS.includes(comp)) return 'urgent';
+  if (comp === 'Console Error') return 'medium';
+  if (comp.startsWith('/api/')) return 'low';
+  return 'urgent';
+}
+
+function getErrorBadgeProps(severity: ErrorSeverity): {
+  variant: 'destructive' | 'warning' | 'secondary';
+  className: string;
+} {
+  switch (severity) {
+    case 'urgent':
+      return { variant: 'destructive', className: 'font-mono text-xs' };
+    case 'important':
+      return { variant: 'warning', className: 'font-mono text-xs' };
+    case 'medium':
+      return { variant: 'secondary', className: 'font-mono text-xs bg-yellow-500 text-black hover:bg-yellow-600' };
+    case 'low':
+      return { variant: 'secondary', className: 'font-mono text-xs bg-slate-500 text-white hover:bg-slate-600' };
+  }
+}
+
+interface ErrorLogsDebugPanelProps {
+  supabase: ReturnType<typeof createClient>;
+}
+
+export function ErrorLogsDebugPanel({ supabase }: ErrorLogsDebugPanelProps) {
+  const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([]);
+  const [clearingErrors, setClearingErrors] = useState(false);
+  const [expandedErrors, setExpandedErrors] = useState<string[]>([]);
+  const [viewedErrors, setViewedErrors] = useState<Set<string>>(new Set());
+  const [lastCheckedErrorId, setLastCheckedErrorId] = useState<string | null>(null);
+  const notifyingNewErrorsRef = useRef(false);
+  const lastNotifiedErrorIdRef = useRef<string | null>(null);
+
+  const [filterLocalhost, setFilterLocalhost] = useState(true);
+  const [filterAdminAccount, setFilterAdminAccount] = useState(true);
+  const [filterErrorType, setFilterErrorType] = useState<string>('all');
+  const [filterDeviceType, setFilterDeviceType] = useState<string>('all');
+  const [filterComponent, setFilterComponent] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    const stored = localStorage.getItem('viewedErrorLogs');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setViewedErrors(new Set(parsed));
+      } catch (err) {
+        console.error('Failed to parse viewed errors:', err);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchErrorLogs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fetchErrorLogs = async () => {
+    try {
+      const { data: errorData, error } = await supabase
+        .from('error_logs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(200);
+
+      if (error) {
+        if (error.message.includes('does not exist') || error.code === 'PGRST204') {
+          setErrorLogs([]);
+          return;
+        }
+
+        toast.error('Failed to fetch error logs. Table may need to be created.');
+        return;
+      }
+
+      if (errorData) {
+        const uniqueUserIds = [...new Set(errorData.map((e: { user_id: string | null }) => e.user_id).filter(Boolean))];
+        const { data: profilesData } = await supabase.from('profiles').select('id, full_name').in('id', uniqueUserIds);
+
+        const userIdToName = new Map(profilesData?.map((p: { id: string; full_name: string }) => [p.id, p.full_name]) || []);
+
+        const enrichedErrorData = errorData.map((log: ErrorLogEntry) => ({
+          ...log,
+          user_name: log.user_id ? userIdToName.get(log.user_id) || null : null,
+        }));
+
+        const typedErrorData = enrichedErrorData as ErrorLogEntry[];
+        setErrorLogs(typedErrorData);
+
+        if (typedErrorData.length > 0) {
+          const newestErrorId = typedErrorData[0].id;
+
+          if (lastCheckedErrorId && newestErrorId !== lastNotifiedErrorIdRef.current && !notifyingNewErrorsRef.current) {
+            notifyingNewErrorsRef.current = true;
+            try {
+              const lastIndex = typedErrorData.findIndex((e) => e.id === lastCheckedErrorId);
+              // If lastCheckedErrorId fell out of the 200-row window, avoid bulk backfill notifications.
+              const newErrors = lastIndex > 0 ? typedErrorData.slice(0, lastIndex) : [];
+              const unviewedNewErrors = newErrors.filter((newError) => !viewedErrors.has(newError.id));
+
+              if (unviewedNewErrors.length > 0) {
+                // Notify concurrently to avoid a long sequential loop blocking fetch flow.
+                void Promise.allSettled(
+                  unviewedNewErrors.map(async (newError) => {
+                    const response = await fetch('/api/errors/notify-new', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ error_log_id: newError.id }),
+                    });
+                    if (!response.ok) {
+                      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    console.log(`Notified admins of new error: ${newError.id}`);
+                  }),
+                ).then((results) => {
+                  for (const result of results) {
+                    if (result.status === 'rejected') {
+                      console.error('Failed to notify admins of new error:', result.reason);
+                    }
+                  }
+                });
+              }
+            } finally {
+              lastNotifiedErrorIdRef.current = newestErrorId;
+              notifyingNewErrorsRef.current = false;
+            }
+          }
+
+          setLastCheckedErrorId(newestErrorId);
+        }
+      }
+    } catch {
+      toast.error('Error loading error logs');
+    }
+  };
+
+  const clearAllErrorLogs = async () => {
+    const confirmed = await import('@/lib/services/notification.service').then((m) =>
+      m.notify.confirm({
+        title: 'Clear All Error Logs',
+        description: 'Are you sure you want to clear ALL error logs? This cannot be undone.',
+        confirmText: 'Clear All',
+        destructive: true,
+      }),
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setClearingErrors(true);
+    try {
+      const { error } = await supabase.from('error_logs').delete().gte('timestamp', '1970-01-01');
+
+      if (error) throw error;
+
+      toast.success('All error logs cleared successfully');
+      setLastCheckedErrorId(null);
+      lastNotifiedErrorIdRef.current = null;
+      fetchErrorLogs();
+    } catch (error) {
+      console.error('Error clearing error logs:', error);
+      toast.error('Failed to clear error logs');
+    } finally {
+      setClearingErrors(false);
+    }
+  };
+
+  const toggleErrorExpanded = (id: string) => {
+    const isExpanding = !expandedErrors.includes(id);
+
+    if (isExpanding) {
+      setExpandedErrors([id]);
+
+      if (!viewedErrors.has(id)) {
+        try {
+          const storedViewed = localStorage.getItem('viewedErrorLogs');
+          const currentViewed = storedViewed ? new Set(JSON.parse(storedViewed)) : new Set<string>();
+          currentViewed.add(id);
+          localStorage.setItem('viewedErrorLogs', JSON.stringify(Array.from(currentViewed)));
+        } catch (error) {
+          console.warn('Failed to update viewed errors in localStorage:', error);
+        }
+        setViewedErrors((prev) => new Set(prev).add(id));
+      }
+    } else {
+      setExpandedErrors((prev) => prev.filter((x) => x !== id));
+    }
+  };
+
+  const copyErrorToClipboard = async (log: ErrorLogEntry, e: MouseEvent) => {
+    e.stopPropagation();
+
+    const isMobile = log.user_agent.includes('Mobile') || log.user_agent.includes('iPhone') || log.user_agent.includes('Android');
+    const browserMatch = log.user_agent.match(/(Chrome|Safari|Firefox|Edge)\/[\d.]+/);
+    const browser = browserMatch ? browserMatch[0] : 'Unknown';
+
+    const content = `ERROR LOG ENTRY
+=================
+
+Type: ${log.error_type}
+Component: ${log.component_name || 'N/A'}
+Device: ${isMobile ? 'Mobile' : 'Desktop'}
+Browser: ${browser}
+
+ERROR MESSAGE:
+${log.error_message}
+
+TIMESTAMP: ${new Date(log.timestamp).toLocaleString('en-GB')}
+USER: ${log.user_name && log.user_email ? `${log.user_name} (${log.user_email})` : log.user_name || log.user_email || 'Anonymous'}
+PAGE URL: ${log.page_url}
+
+${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional_data ? `ADDITIONAL DATA:\n${JSON.stringify(log.additional_data, null, 2)}` : ''}`;
+
+    try {
+      await navigator.clipboard.writeText(content);
+      toast.success('Error log copied to clipboard');
+    } catch {
+      toast.error('Failed to copy to clipboard');
+    }
+  };
+
+  const getFilteredErrorLogs = () => {
+    let filtered = [...errorLogs];
+
+    if (filterLocalhost) {
+      filtered = filtered.filter((log) => !log.page_url.toLowerCase().includes('localhost'));
+    }
+
+    if (filterAdminAccount) {
+      filtered = filtered.filter((log) => log.user_email !== 'admin@mpdee.co.uk');
+    }
+
+    if (filterErrorType !== 'all') {
+      filtered = filtered.filter((log) => log.error_type === filterErrorType);
+    }
+
+    if (filterDeviceType !== 'all') {
+      filtered = filtered.filter((log) => {
+        const isMobile = log.user_agent.includes('Mobile') || log.user_agent.includes('iPhone') || log.user_agent.includes('Android');
+        return filterDeviceType === 'mobile' ? isMobile : !isMobile;
+      });
+    }
+
+    if (filterComponent !== 'all') {
+      filtered = filtered.filter((log) => log.component_name === filterComponent);
+    }
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (log) =>
+          log.error_message.toLowerCase().includes(query) ||
+          (log.error_stack && log.error_stack.toLowerCase().includes(query)) ||
+          (log.component_name && log.component_name.toLowerCase().includes(query)) ||
+          log.page_url.toLowerCase().includes(query),
+      );
+    }
+
+    return filtered;
+  };
+
+  const uniqueErrorTypes = Array.from(new Set(errorLogs.map((log) => log.error_type))).sort();
+  const uniqueComponents = Array.from(new Set(errorLogs.map((log) => log.component_name).filter((c): c is string => c != null))).sort();
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Application Error Log</CardTitle>
+            <CardDescription>Track all application errors and exceptions (Last 200 entries)</CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={fetchErrorLogs} variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            <Button
+              onClick={clearAllErrorLogs}
+              variant="destructive"
+              size="sm"
+              disabled={clearingErrors || errorLogs.length === 0}
+              className="bg-red-600 hover:bg-red-700 text-white border-red-600"
+            >
+              {clearingErrors ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash className="h-4 w-4 mr-2" />}
+              Clear All
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4 p-3 border border-border rounded-lg bg-muted/50">
+          <div className="flex items-center gap-2 mb-3">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <h3 className="font-semibold text-sm text-foreground">Filters</h3>
+            <Badge variant="secondary" className="ml-auto text-xs">
+              {getFilteredErrorLogs().length} / {errorLogs.length}
+            </Badge>
+          </div>
+
+          <div className="mb-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search errors..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-11 h-9"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <SelectableCard selected={filterLocalhost} onSelect={() => setFilterLocalhost(!filterLocalhost)} variant="default" className="h-9">
+              <span className="text-xs font-medium">Hide Localhost</span>
+            </SelectableCard>
+
+            <SelectableCard selected={filterAdminAccount} onSelect={() => setFilterAdminAccount(!filterAdminAccount)} variant="default" className="h-9">
+              <span className="text-xs font-medium">Hide Admin</span>
+            </SelectableCard>
+
+            <div>
+              <Select value={filterErrorType} onValueChange={setFilterErrorType}>
+                <SelectTrigger className="w-full h-9">
+                  <SelectValue placeholder="Error Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {uniqueErrorTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Select value={filterDeviceType} onValueChange={setFilterDeviceType}>
+                <SelectTrigger className="w-full h-9">
+                  <SelectValue placeholder="Device" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Devices</SelectItem>
+                  <SelectItem value="mobile">
+                    <div className="flex items-center gap-2">
+                      <Smartphone className="h-3 w-3" />
+                      Mobile
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="desktop">
+                    <div className="flex items-center gap-2">
+                      <Monitor className="h-3 w-3" />
+                      Desktop
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {uniqueComponents.length > 0 && (
+              <div className="lg:col-span-4">
+                <Select value={filterComponent} onValueChange={setFilterComponent}>
+                  <SelectTrigger className="w-full h-9">
+                    <SelectValue placeholder="Component" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Components</SelectItem>
+                    {uniqueComponents.map((component) => (
+                      <SelectItem key={component} value={component}>
+                        {component}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
+          {(searchQuery ||
+            filterErrorType !== 'all' ||
+            filterDeviceType !== 'all' ||
+            filterComponent !== 'all' ||
+            filterLocalhost ||
+            filterAdminAccount) && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                <span className="text-muted-foreground">Active:</span>
+                {filterLocalhost && (
+                  <Badge variant="secondary" className="text-xs h-5">
+                    No Localhost
+                  </Badge>
+                )}
+                {filterAdminAccount && (
+                  <Badge variant="secondary" className="text-xs h-5">
+                    No Admin
+                  </Badge>
+                )}
+                {filterErrorType !== 'all' && (
+                  <Badge variant="secondary" className="text-xs h-5">
+                    {filterErrorType}
+                  </Badge>
+                )}
+                {filterDeviceType !== 'all' && (
+                  <Badge variant="secondary" className="text-xs h-5">
+                    {filterDeviceType === 'mobile' ? '📱' : '🖥️'}
+                  </Badge>
+                )}
+                {filterComponent !== 'all' && (
+                  <Badge variant="secondary" className="text-xs h-5">
+                    {filterComponent}
+                  </Badge>
+                )}
+                {searchQuery && (
+                  <Badge variant="secondary" className="text-xs h-5">
+                    Search
+                  </Badge>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 text-xs px-2 ml-auto"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setFilterErrorType('all');
+                    setFilterDeviceType('all');
+                    setFilterComponent('all');
+                    setFilterLocalhost(true);
+                    setFilterAdminAccount(true);
+                  }}
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {errorLogs.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-50 text-green-500" />
+            <p className="font-semibold">No errors logged</p>
+            <p className="text-sm mt-1">Application errors will appear here when they occur</p>
+          </div>
+        ) : getFilteredErrorLogs().length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Filter className="h-12 w-12 mx-auto mb-3 opacity-50" />
+            <p className="font-semibold">No errors match your filters</p>
+            <p className="text-sm mt-1">Try adjusting your filter settings above</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={() => {
+                setSearchQuery('');
+                setFilterErrorType('all');
+                setFilterDeviceType('all');
+                setFilterComponent('all');
+                setFilterLocalhost(false);
+                setFilterAdminAccount(false);
+              }}
+            >
+              Clear All Filters
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {(() => {
+              const filteredLogs = getFilteredErrorLogs();
+              const newErrors = filteredLogs.filter((log) => !viewedErrors.has(log.id));
+              const viewedErrorsList = filteredLogs.filter((log) => viewedErrors.has(log.id));
+
+              return (
+                <>
+                  {newErrors.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-red-200 dark:border-red-900">
+                        <Badge variant="destructive" className="font-semibold">
+                          New
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {newErrors.length} unread error{newErrors.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {newErrors.map((log) => {
+                          const isMobile = log.user_agent.includes('Mobile') || log.user_agent.includes('iPhone') || log.user_agent.includes('Android');
+                          const browserMatch = log.user_agent.match(/(Chrome|Safari|Firefox|Edge)\/[\d.]+/);
+                          const browser = browserMatch ? browserMatch[0] : 'Unknown';
+                          const isExpanded = expandedErrors.includes(log.id);
+                          const severity = getErrorSeverity(log);
+                          const badgeProps = getErrorBadgeProps(severity);
+
+                          return (
+                            <div
+                              key={log.id}
+                              className="border border-red-200 dark:border-red-900 rounded-lg overflow-hidden hover:border-red-300 dark:hover:border-red-800 transition-colors"
+                            >
+                              <div
+                                className="p-4 cursor-pointer hover:bg-red-50/50 dark:hover:bg-red-950/20 transition-colors"
+                                onClick={() => toggleErrorExpanded(log.id)}
+                              >
+                                <div className="flex items-start gap-3">
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                                  ) : (
+                                    <ChevronRight className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                                  )}
+                                  <XCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                                      <Badge variant={badgeProps.variant} className={badgeProps.className}>
+                                        {log.error_type}
+                                      </Badge>
+                                      {log.component_name && (
+                                        <Badge variant="outline" className="text-xs">
+                                          {log.component_name}
+                                        </Badge>
+                                      )}
+                                      {isMobile && (
+                                        <Badge variant="secondary" className="text-xs">
+                                          📱 Mobile
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <p className="font-semibold text-red-700 dark:text-red-400 mb-2">{log.error_message}</p>
+                                    <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                                      <div className="flex items-center gap-1">
+                                        <Clock className="h-3 w-3" />
+                                        {new Date(log.timestamp).toLocaleString('en-GB', {
+                                          day: '2-digit',
+                                          month: '2-digit',
+                                          year: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit',
+                                          second: '2-digit',
+                                        })}
+                                      </div>
+                                      {log.user_name && (
+                                        <>
+                                          <span>•</span>
+                                          <div className="flex items-center gap-1">
+                                            <Users className="h-3 w-3" />
+                                            {log.user_name}
+                                          </div>
+                                        </>
+                                      )}
+                                      {log.user_email && (
+                                        <>
+                                          <span>•</span>
+                                          <span className="font-mono text-xs">{log.user_email}</span>
+                                        </>
+                                      )}
+                                      <span>•</span>
+                                      <span className="font-mono">{browser}</span>
+                                    </div>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 flex-shrink-0 hover:bg-red-100 dark:hover:bg-red-950"
+                                    onClick={(e) => copyErrorToClipboard(log, e)}
+                                    title="Copy to clipboard"
+                                  >
+                                    <Copy className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {isExpanded && (
+                                <div className="border-t border-red-200 dark:border-red-900 bg-red-50/30 dark:bg-red-950/10 p-4 space-y-3">
+                                  <div>
+                                    <p className="text-xs font-semibold text-muted-foreground mb-1">PAGE URL:</p>
+                                    <p className="text-xs font-mono bg-muted/50 rounded p-2 break-all">{log.page_url}</p>
+                                  </div>
+
+                                  {log.error_stack && (
+                                    <div>
+                                      <p className="text-xs font-semibold text-muted-foreground mb-1">STACK TRACE:</p>
+                                      <pre className="text-xs font-mono bg-muted/50 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap break-words">
+                                        {log.error_stack}
+                                      </pre>
+                                    </div>
+                                  )}
+
+                                  {log.additional_data && (
+                                    <div>
+                                      <p className="text-xs font-semibold text-muted-foreground mb-1">ADDITIONAL DATA:</p>
+                                      <pre className="text-xs font-mono bg-muted/50 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap break-words">
+                                        {JSON.stringify(log.additional_data, null, 2)}
+                                      </pre>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {viewedErrorsList.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-muted">
+                        <Badge variant="secondary" className="font-semibold">
+                          Viewed
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {viewedErrorsList.length} viewed error{viewedErrorsList.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {viewedErrorsList.map((log) => {
+                          const isMobile = log.user_agent.includes('Mobile') || log.user_agent.includes('iPhone') || log.user_agent.includes('Android');
+                          const browserMatch = log.user_agent.match(/(Chrome|Safari|Firefox|Edge)\/[\d.]+/);
+                          const browser = browserMatch ? browserMatch[0] : 'Unknown';
+                          const isExpanded = expandedErrors.includes(log.id);
+                          const severity = getErrorSeverity(log);
+                          const badgeProps = getErrorBadgeProps(severity);
+
+                          return (
+                            <div
+                              key={log.id}
+                              className="border border-red-200 dark:border-red-900 rounded-lg overflow-hidden hover:border-red-300 dark:hover:border-red-800 transition-colors"
+                            >
+                              <div
+                                className="p-4 cursor-pointer hover:bg-red-50/50 dark:hover:bg-red-950/20 transition-colors"
+                                onClick={() => toggleErrorExpanded(log.id)}
+                              >
+                                <div className="flex items-start gap-3">
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                                  ) : (
+                                    <ChevronRight className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                                  )}
+                                  <XCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                                      <Badge variant={badgeProps.variant} className={badgeProps.className}>
+                                        {log.error_type}
+                                      </Badge>
+                                      {log.component_name && (
+                                        <Badge variant="outline" className="text-xs">
+                                          {log.component_name}
+                                        </Badge>
+                                      )}
+                                      {isMobile && (
+                                        <Badge variant="secondary" className="text-xs">
+                                          📱 Mobile
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <p className="font-semibold text-red-700 dark:text-red-400 mb-2">{log.error_message}</p>
+                                    <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                                      <div className="flex items-center gap-1">
+                                        <Clock className="h-3 w-3" />
+                                        {new Date(log.timestamp).toLocaleString('en-GB', {
+                                          day: '2-digit',
+                                          month: '2-digit',
+                                          year: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit',
+                                          second: '2-digit',
+                                        })}
+                                      </div>
+                                      {log.user_name && (
+                                        <>
+                                          <span>•</span>
+                                          <div className="flex items-center gap-1">
+                                            <Users className="h-3 w-3" />
+                                            {log.user_name}
+                                          </div>
+                                        </>
+                                      )}
+                                      {log.user_email && (
+                                        <>
+                                          <span>•</span>
+                                          <span className="font-mono text-xs">{log.user_email}</span>
+                                        </>
+                                      )}
+                                      <span>•</span>
+                                      <span className="font-mono">{browser}</span>
+                                    </div>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 flex-shrink-0 hover:bg-red-100 dark:hover:bg-red-950"
+                                    onClick={(e) => copyErrorToClipboard(log, e)}
+                                    title="Copy to clipboard"
+                                  >
+                                    <Copy className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {isExpanded && (
+                                <div className="border-t border-red-200 dark:border-red-900 bg-red-50/30 dark:bg-red-950/10 p-4 space-y-3">
+                                  <div>
+                                    <p className="text-xs font-semibold text-muted-foreground mb-1">PAGE URL:</p>
+                                    <p className="text-xs font-mono bg-muted/50 rounded p-2 break-all">{log.page_url}</p>
+                                  </div>
+
+                                  {log.error_stack && (
+                                    <div>
+                                      <p className="text-xs font-semibold text-muted-foreground mb-1">STACK TRACE:</p>
+                                      <pre className="text-xs font-mono bg-red-500/10 border border-red-500/20 rounded p-3 overflow-x-auto whitespace-pre-wrap break-all max-h-64 overflow-y-auto">
+                                        {log.error_stack}
+                                      </pre>
+                                    </div>
+                                  )}
+
+                                  {log.additional_data && Object.keys(log.additional_data).length > 0 && (
+                                    <div>
+                                      <p className="text-xs font-semibold text-muted-foreground mb-1">ADDITIONAL DATA:</p>
+                                      <pre className="text-xs font-mono bg-muted/50 rounded p-3 overflow-x-auto max-h-64 overflow-y-auto">
+                                        {JSON.stringify(log.additional_data, null, 2)}
+                                      </pre>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

@@ -1,8 +1,8 @@
 /**
  * Cleanup Test Data
- * 
+ *
  * Removes all test inspections and tasks containing "TEST19"
- * Only affects: TE57 VAN and TE57 HGV
+ * Affects: TE57 VAN, TE57 HGV, TE57 PNT
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -16,30 +16,35 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+type FleetDef = { name: string; table: string; regCol: string; idCol: string; inspTable: string; inspIdCol: string };
+
+const fleet: FleetDef[] = [
+  { name: 'TE57 VAN', table: 'vans',  regCol: 'reg_number', idCol: 'van_id',   inspTable: 'van_inspections',   inspIdCol: 'van_id' },
+  { name: 'TE57 HGV', table: 'hgvs',  regCol: 'reg_number', idCol: 'hgv_id',   inspTable: 'hgv_inspections',   inspIdCol: 'hgv_id' },
+  { name: 'TE57 PNT', table: 'plant', regCol: 'plant_id',   idCol: 'plant_id', inspTable: 'plant_inspections', inspIdCol: 'plant_id' },
+];
+
 async function cleanup() {
   console.log('🧹 Cleaning up test data (TEST19)...\n');
 
-  const testVehicles = ['TE57 VAN', 'TE57 HGV'];
+  for (const def of fleet) {
+    console.log(`\n📋 Cleaning: ${def.name}`);
 
-  for (const regNumber of testVehicles) {
-    console.log(`\n📋 Cleaning: ${regNumber}`);
-
-    const { data: vehicle } = await supabase
-      .from('vans')
+    const { data: asset } = await supabase
+      .from(def.table)
       .select('id')
-      .eq('reg_number', regNumber)
+      .eq(def.regCol, def.name)
       .single();
 
-    if (!vehicle) {
-      console.log(`   ❌ Vehicle not found`);
+    if (!asset) {
+      console.log(`   ❌ Asset not found`);
       continue;
     }
 
-    // Delete tasks containing TEST19
     const { data: tasks } = await supabase
       .from('actions')
       .select('id')
-      .eq('van_id', vehicle.id)
+      .eq(def.idCol, asset.id)
       .or('description.ilike.%TEST19%,workshop_comments.ilike.%TEST19%,logged_comment.ilike.%TEST19%');
 
     if (tasks && tasks.length > 0) {
@@ -47,25 +52,24 @@ async function cleanup() {
         .from('actions')
         .delete()
         .in('id', tasks.map(t => t.id));
-      
+
       console.log(`   ✅ Deleted ${tasks.length} test task(s)`);
     } else {
       console.log(`   ℹ️  No test tasks to delete`);
     }
 
-    // Delete inspections (items will cascade)
     const { data: inspections } = await supabase
-      .from('van_inspections')
+      .from(def.inspTable)
       .select('id')
-      .eq('van_id', vehicle.id)
-      .gte('inspection_date', '2026-01-19'); // Only recent test inspections
+      .eq(def.inspIdCol, asset.id)
+      .gte('inspection_date', '2026-01-19');
 
     if (inspections && inspections.length > 0) {
       await supabase
-        .from('van_inspections')
+        .from(def.inspTable)
         .delete()
         .in('id', inspections.map(i => i.id));
-      
+
       console.log(`   ✅ Deleted ${inspections.length} test inspection(s)`);
     } else {
       console.log(`   ℹ️  No test inspections to delete`);

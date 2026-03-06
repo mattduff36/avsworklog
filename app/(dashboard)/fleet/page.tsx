@@ -4,10 +4,9 @@ import { useEffect, useState, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useSearchParams, useRouter as useNextRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { Loader2, Wrench, Truck, Settings, Plus, Edit, Trash2, AlertTriangle, HardHat, ChevronDown } from 'lucide-react';
+import { Loader2, Wrench, Truck, Settings, HardHat } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
 
 // Dynamic import for PlantTable
@@ -25,63 +24,12 @@ const PlantTable = dynamic(
 
 // Import existing components
 import { MaintenanceTable } from '@/app/(dashboard)/maintenance/components/MaintenanceTable';
-import { VehicleCategoryDialog } from './components/VehicleCategoryDialog';
-import { HgvCategoryDialog } from './components/HgvCategoryDialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { useMaintenance } from '@/lib/hooks/useMaintenance';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-
-type Vehicle = {
-  id: string;
-  reg_number: string;
-  nickname: string | null;
-  status: string;
-  category_id: string;
-  van_categories?: { name: string; id: string } | null;
-};
-
-type Category = {
-  id: string;
-  name: string;
-  description: string | null;
-  applies_to?: string[];
-};
-
-type HgvCategory = {
-  id: string;
-  name: string;
-  description: string | null;
-  created_at?: string;
-  updated_at?: string;
-};
-
-type HgvAsset = {
-  id: string;
-  reg_number: string | null;
-  nickname: string | null;
-  status: string;
-  category_id: string | null;
-  hgv_categories?: { name: string; id: string } | null;
-};
-
-type PlantAsset = {
-  id: string;
-  plant_id: string;
-  nickname: string | null;
-  status: string;
-  category_id: string | null;
-  van_categories?: { name: string; id: string } | null;
-};
+import { FleetSettingsTab } from './components/FleetSettingsTab';
+import { FleetCategoryDialogs } from './components/FleetCategoryDialogs';
+import type { Category, HgvAsset, HgvCategory, PlantAsset, Vehicle } from './types';
 
 function FleetContent() {
   const searchParams = useSearchParams();
@@ -127,7 +75,13 @@ function FleetContent() {
     }
     
     if (requestedTab === 'settings') {
-      setPageTab('settings');
+      if (isAdmin || isManager) {
+        setPageTab('settings');
+      } else {
+        setPageTab('overview');
+        setAssetTab('vans');
+        router.replace('/fleet?tab=vans', { scroll: false });
+      }
     } else if ((validAssetTabs as readonly string[]).includes(requestedTab)) {
       setPageTab('overview');
       setAssetTab(requestedTab as 'vans' | 'plant' | 'hgvs');
@@ -574,478 +528,53 @@ function FleetContent() {
           )}
         </TabsContent>
 
-        {/* Settings Tab */}
-        {(isAdmin || isManager) && (
-        <TabsContent value="settings" className="space-y-6 mt-0">
-            {/* Van Categories Section - Admin Only */}
-            {isAdmin && (
-              <>
-                {/* Plant Machinery Categories */}
-                <Card className="border-border">
-                  <CardHeader 
-                    className="cursor-pointer hover:bg-slate-800/30 transition-colors"
-                    onClick={() => setPlantCategoriesExpanded(!plantCategoriesExpanded)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1">
-                        <ChevronDown 
-                          className={`h-5 w-5 text-muted-foreground transition-transform ${
-                            plantCategoriesExpanded ? 'rotate-180' : ''
-                          }`}
-                        />
-                        <div>
-                          <CardTitle className="text-white flex items-center gap-2">
-                            <HardHat className="h-5 w-5" />
-                            Plant Machinery Categories
-                          </CardTitle>
-                          <CardDescription className="text-muted-foreground">
-                            {(() => {
-                              const plantCategories = categories.filter(c => 
-                                (c.applies_to || []).includes('plant')
-                              );
-                              return `${plantCategories.length} ${plantCategories.length === 1 ? 'category' : 'categories'}`;
-                            })()}
-                          </CardDescription>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        className="bg-fleet hover:bg-fleet-dark"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setAddCategoryDialogOpen(true);
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Category
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  
-                {plantCategoriesExpanded && (
-                  <CardContent className="pt-6">
-                      {categoriesLoading ? (
-                        <div className="flex items-center justify-center py-8">
-                          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                        </div>
-                      ) : (() => {
-                        const plantCategories = categories.filter(c => 
-                          (c.applies_to || []).includes('plant')
-                        );
-                        
-                        return plantCategories.length === 0 ? (
-                          <div className="text-center py-8 text-muted-foreground">
-                            No plant machinery categories found
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            {plantCategories.map((category) => {
-                              const plantCount = plantAssets.filter(p => p.category_id === category.id).length;
-                              return (
-                              <Card key={category.id} className="bg-slate-800/50 border-border">
-                                <CardContent className="p-4">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-4 flex-1">
-                                      <div className="bg-orange-500/10 p-3 rounded-lg">
-                                        <HardHat className="h-5 w-5 text-orange-400" />
-                                      </div>
-                                      <div className="flex-1">
-                                        <h3 className="text-lg font-semibold text-white">{category.name}</h3>
-                                        <p className="text-sm text-muted-foreground mt-1">
-                                          {category.description || 'No description'}
-                                        </p>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                      <div className="text-right">
-                                        <div className="text-2xl font-bold text-orange-400">
-                                          {plantCount}
-                                        </div>
-                                        <p className="text-xs text-muted-foreground">plant assets</p>
-                                      </div>
-                                      <div className="flex gap-1">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => openEditCategoryDialog(category)}
-                                          className="text-blue-400 hover:text-blue-300 hover:bg-slate-800"
-                                          title="Edit Category"
-                                        >
-                                          <Edit className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => openDeleteCategoryDialog(category)}
-                                          className="text-red-400 hover:text-red-300 hover:bg-slate-800"
-                                          title="Delete Category"
-                                        >
-                                          <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            )})}
-                          </div>
-                        );
-                      })()}
-                    </CardContent>
-                  )}
-                </Card>
-
-                {/* Van Categories */}
-                <Card className="border-border">
-                  <CardHeader 
-                    className="cursor-pointer hover:bg-slate-800/30 transition-colors"
-                    onClick={() => setVanCategoriesExpanded(!vanCategoriesExpanded)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1">
-                        <ChevronDown 
-                          className={`h-5 w-5 text-muted-foreground transition-transform ${
-                            vanCategoriesExpanded ? 'rotate-180' : ''
-                          }`}
-                        />
-                        <div>
-                          <CardTitle className="text-white flex items-center gap-2">
-                            <Truck className="h-5 w-5" />
-                            Van Categories
-                          </CardTitle>
-                          <CardDescription className="text-muted-foreground">
-                            {(() => {
-                              const vanCategories = categories.filter(c => 
-                                (c.applies_to || ['van']).includes('van')
-                              );
-                              return `${vanCategories.length} ${vanCategories.length === 1 ? 'category' : 'categories'}`;
-                            })()}
-                          </CardDescription>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        className="bg-fleet hover:bg-fleet-dark"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setAddCategoryDialogOpen(true);
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Category
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  
-                {vanCategoriesExpanded && (
-                  <CardContent className="pt-6">
-                    {categoriesLoading ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                      </div>
-                    ) : (() => {
-                      const vanCategories = categories.filter(c => {
-                        return (c.applies_to || ['van']).includes('van');
-                      });
-                      
-                      return vanCategories.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          No van categories found
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {vanCategories.map((category) => (
-                            <Card key={category.id} className="bg-slate-800/50 border-border">
-                              <CardContent className="p-4">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-4 flex-1">
-                                    <div className="bg-blue-500/10 p-3 rounded-lg">
-                                      <Truck className="h-5 w-5 text-blue-400" />
-                                    </div>
-                                    <div className="flex-1">
-                                      <h3 className="text-lg font-semibold text-white">{category.name}</h3>
-                                      <p className="text-sm text-muted-foreground mt-1">
-                                        {category.description || 'No description'}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-4">
-                                    <div className="text-right">
-                                      <div className="text-2xl font-bold text-blue-400">
-                                        {vehicles.filter(v => v.category_id === category.id).length}
-                                      </div>
-                                      <p className="text-xs text-muted-foreground">vans</p>
-                                    </div>
-                                    <div className="flex gap-1">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => openEditCategoryDialog(category)}
-                                        className="text-blue-400 hover:text-blue-300 hover:bg-slate-800"
-                                        title="Edit Category"
-                                      >
-                                        <Edit className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => openDeleteCategoryDialog(category)}
-                                        className="text-red-400 hover:text-red-300 hover:bg-slate-800"
-                                        title="Delete Category"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                    </CardContent>
-                  )}
-                </Card>
-
-                {/* HGV Categories */}
-                <Card className="border-border">
-                  <CardHeader 
-                    className="cursor-pointer hover:bg-slate-800/30 transition-colors"
-                    onClick={() => setHgvCategoriesExpanded(!hgvCategoriesExpanded)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1">
-                        <ChevronDown 
-                          className={`h-5 w-5 text-muted-foreground transition-transform ${
-                            hgvCategoriesExpanded ? 'rotate-180' : ''
-                          }`}
-                        />
-                        <div>
-                          <CardTitle className="text-white flex items-center gap-2">
-                            <Truck className="h-5 w-5" />
-                            HGV Categories
-                          </CardTitle>
-                          <CardDescription className="text-muted-foreground">
-                            {`${hgvCategories.length} ${hgvCategories.length === 1 ? 'category' : 'categories'}`}
-                          </CardDescription>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        className="bg-fleet hover:bg-fleet-dark"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setAddHgvCategoryDialogOpen(true);
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Category
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  
-                  {hgvCategoriesExpanded && (
-                    <CardContent className="pt-6">
-                      {hgvCategoriesLoading ? (
-                        <div className="flex items-center justify-center py-8">
-                          <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
-                        </div>
-                      ) : hgvCategories.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          No HGV categories found
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {hgvCategories.map((category) => {
-                            const hgvCount = hgvAssets.filter(h => h.category_id === category.id).length;
-                            return (
-                              <Card key={category.id} className="bg-slate-800/50 border-border">
-                                <CardContent className="p-4">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-4 flex-1">
-                                      <div className="bg-emerald-500/10 p-3 rounded-lg">
-                                        <Truck className="h-5 w-5 text-emerald-400" />
-                                      </div>
-                                      <div className="flex-1">
-                                        <h3 className="text-lg font-semibold text-white">{category.name}</h3>
-                                        <p className="text-sm text-muted-foreground mt-1">
-                                          {category.description || 'No description'}
-                                        </p>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                      <div className="text-right">
-                                        <div className="text-2xl font-bold text-emerald-400">
-                                          {hgvCount}
-                                        </div>
-                                        <p className="text-xs text-muted-foreground">HGVs</p>
-                                      </div>
-                                      <div className="flex gap-1">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => openEditHgvCategoryDialog(category)}
-                                          className="text-emerald-400 hover:text-emerald-300 hover:bg-slate-800"
-                                          title="Edit Category"
-                                        >
-                                          <Edit className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => openDeleteHgvCategoryDialog(category)}
-                                          className="text-red-400 hover:text-red-300 hover:bg-slate-800"
-                                          title="Delete Category"
-                                        >
-                                          <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </CardContent>
-                  )}
-                </Card>
-              </>
-            )}
-
-        </TabsContent>
-        )}
+        <FleetSettingsTab
+          isAdmin={isAdmin}
+          isManager={isManager}
+          categories={categories}
+          categoriesLoading={categoriesLoading}
+          vehicles={vehicles}
+          plantAssets={plantAssets}
+          hgvCategories={hgvCategories}
+          hgvCategoriesLoading={hgvCategoriesLoading}
+          hgvAssets={hgvAssets}
+          plantCategoriesExpanded={plantCategoriesExpanded}
+          vanCategoriesExpanded={vanCategoriesExpanded}
+          hgvCategoriesExpanded={hgvCategoriesExpanded}
+          onPlantCategoriesExpandedChange={setPlantCategoriesExpanded}
+          onVanCategoriesExpandedChange={setVanCategoriesExpanded}
+          onHgvCategoriesExpandedChange={setHgvCategoriesExpanded}
+          onAddCategory={() => setAddCategoryDialogOpen(true)}
+          onEditCategory={openEditCategoryDialog}
+          onDeleteCategory={openDeleteCategoryDialog}
+          onAddHgvCategory={() => setAddHgvCategoryDialogOpen(true)}
+          onEditHgvCategory={openEditHgvCategoryDialog}
+          onDeleteHgvCategory={openDeleteHgvCategoryDialog}
+        />
       </Tabs>
-      
-      {/* Vehicle Category Dialogs */}
-      <VehicleCategoryDialog
-        open={addCategoryDialogOpen}
-        onOpenChange={setAddCategoryDialogOpen}
-        mode="create"
-        onSuccess={handleCategorySuccess}
-      />
-      
-      <VehicleCategoryDialog
-        open={editCategoryDialogOpen}
-        onOpenChange={setEditCategoryDialogOpen}
-        mode="edit"
-        category={selectedCategory}
-        onSuccess={handleCategorySuccess}
-      />
-      
-      {/* HGV Category Dialogs */}
-      <HgvCategoryDialog
-        open={addHgvCategoryDialogOpen}
-        onOpenChange={setAddHgvCategoryDialogOpen}
-        mode="create"
-        onSuccess={handleHgvCategorySuccess}
-      />
-      
-      <HgvCategoryDialog
-        open={editHgvCategoryDialogOpen}
-        onOpenChange={setEditHgvCategoryDialogOpen}
-        mode="edit"
-        category={selectedHgvCategory}
-        onSuccess={handleHgvCategorySuccess}
-      />
-      
-      {/* Delete HGV Category Confirmation Dialog */}
-      <AlertDialog open={deleteHgvCategoryDialogOpen} onOpenChange={setDeleteHgvCategoryDialogOpen}>
-        <AlertDialogContent className="border-border text-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
-              Delete HGV Category
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-muted-foreground">
-              Are you sure you want to delete this HGV category? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          
-          {selectedHgvCategory && (
-            <div className="bg-slate-800 rounded p-4 space-y-2">
-              <p className="text-sm">
-                <span className="text-muted-foreground">Name:</span>{' '}
-                <span className="text-white font-medium">{selectedHgvCategory.name}</span>
-              </p>
-              {selectedHgvCategory.description && (
-                <p className="text-sm">
-                  <span className="text-muted-foreground">Description:</span>{' '}
-                  <span className="text-white">{selectedHgvCategory.description}</span>
-                </p>
-              )}
-            </div>
-          )}
-          
-          <AlertDialogFooter>
-            <AlertDialogCancel 
-              className="border-slate-600 text-white hover:bg-slate-800"
-              disabled={deletingHgvCategory}
-            >
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteHgvCategory}
-              className="bg-red-600 hover:bg-red-700"
-              disabled={deletingHgvCategory}
-            >
-              {deletingHgvCategory && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete Category
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
-      {/* Delete Category Confirmation Dialog */}
-      <AlertDialog open={deleteCategoryDialogOpen} onOpenChange={setDeleteCategoryDialogOpen}>
-        <AlertDialogContent className="border-border text-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
-              Delete Category
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-muted-foreground">
-              Are you sure you want to delete this category? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          
-          {selectedCategory && (
-            <div className="bg-slate-800 rounded p-4 space-y-2">
-              <p className="text-sm">
-                <span className="text-muted-foreground">Name:</span>{' '}
-                <span className="text-white font-medium">{selectedCategory.name}</span>
-              </p>
-              {selectedCategory.description && (
-                <p className="text-sm">
-                  <span className="text-muted-foreground">Description:</span>{' '}
-                  <span className="text-white">{selectedCategory.description}</span>
-                </p>
-              )}
-            </div>
-          )}
-          
-          <AlertDialogFooter>
-            <AlertDialogCancel 
-              className="border-slate-600 text-white hover:bg-slate-800"
-              disabled={deletingCategory}
-            >
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteCategory}
-              className="bg-red-600 hover:bg-red-700"
-              disabled={deletingCategory}
-            >
-              {deletingCategory && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete Category
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <FleetCategoryDialogs
+        addCategoryDialogOpen={addCategoryDialogOpen}
+        editCategoryDialogOpen={editCategoryDialogOpen}
+        deleteCategoryDialogOpen={deleteCategoryDialogOpen}
+        selectedCategory={selectedCategory}
+        deletingCategory={deletingCategory}
+        onAddCategoryDialogOpenChange={setAddCategoryDialogOpen}
+        onEditCategoryDialogOpenChange={setEditCategoryDialogOpen}
+        onDeleteCategoryDialogOpenChange={setDeleteCategoryDialogOpen}
+        onCategorySuccess={handleCategorySuccess}
+        onDeleteCategory={handleDeleteCategory}
+        addHgvCategoryDialogOpen={addHgvCategoryDialogOpen}
+        editHgvCategoryDialogOpen={editHgvCategoryDialogOpen}
+        deleteHgvCategoryDialogOpen={deleteHgvCategoryDialogOpen}
+        selectedHgvCategory={selectedHgvCategory}
+        deletingHgvCategory={deletingHgvCategory}
+        onAddHgvCategoryDialogOpenChange={setAddHgvCategoryDialogOpen}
+        onEditHgvCategoryDialogOpenChange={setEditHgvCategoryDialogOpen}
+        onDeleteHgvCategoryDialogOpenChange={setDeleteHgvCategoryDialogOpen}
+        onHgvCategorySuccess={handleHgvCategorySuccess}
+        onDeleteHgvCategory={handleDeleteHgvCategory}
+      />
     </div>
   );
 }
