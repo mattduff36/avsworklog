@@ -20,7 +20,6 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: false,
   },
   webpack: (config) => {
-    // Handle canvas package for pdfjs-dist
     config.resolve.alias.canvas = false;
     
     // Disable persistent cache to avoid noisy PackFile serialization warnings in CI.

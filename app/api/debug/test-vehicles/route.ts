@@ -4,6 +4,14 @@ import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
+type FleetItem = {
+  id: string;
+  reg_number?: string;
+  plant_id?: string;
+  category_id?: string;
+  status?: string;
+};
+
 // Helper to create admin client with service role key
 function getSupabaseAdmin() {
   return createClient(
@@ -20,9 +28,9 @@ function getSupabaseAdmin() {
 
 /**
  * GET /api/debug/test-vehicles
- * List fleet items (vans and/or HGVs) matching a prefix (for test data management)
+ * List fleet items (vans, HGVs, and/or plant) matching a prefix (for test data management)
  * SuperAdmin only
- * Query: prefix=TE57, type=vans|hgvs|all
+ * Query: prefix=TE57, type=vans|hgvs|plant|all
  */
 export async function GET(request: NextRequest) {
   try {
@@ -46,14 +54,16 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const prefix = searchParams.get('prefix') || 'TE57';
-    const typeParam = searchParams.get('type') || 'all'; // vans | hgvs | all
+    const typeParam = searchParams.get('type') || 'all'; // vans | hgvs | plant | all
 
+    type FleetItem = { id: string; reg_number: string; nickname: string | null; status: string; fleet_type: 'van' | 'hgv' | 'plant' };
     const adminSupabase = getSupabaseAdmin();
     const result: {
-      vans: Array<{ id: string; reg_number: string; nickname: string | null; status: string; fleet_type: 'van' }>;
-      hgvs: Array<{ id: string; reg_number: string; nickname: string | null; status: string; fleet_type: 'hgv' }>;
+      vans: FleetItem[];
+      hgvs: FleetItem[];
+      plant: FleetItem[];
       prefix: string;
-    } = { vans: [], hgvs: [], prefix };
+    } = { vans: [], hgvs: [], plant: [], prefix };
 
     if (typeParam === 'vans' || typeParam === 'all') {
       const { data: vans, error } = await adminSupabase
@@ -77,6 +87,23 @@ export async function GET(request: NextRequest) {
       result.hgvs = (hgvs || []).map(h => ({ ...h, fleet_type: 'hgv' as const }));
     }
 
+    if (typeParam === 'plant' || typeParam === 'all') {
+      const { data: plantItems, error } = await adminSupabase
+        .from('plant')
+        .select('id, plant_id, nickname, status')
+        .ilike('plant_id', `${prefix}%`)
+        .order('plant_id');
+
+      if (error) throw error;
+      result.plant = (plantItems || []).map(p => ({
+        id: p.id,
+        reg_number: p.plant_id,
+        nickname: p.nickname,
+        status: p.status,
+        fleet_type: 'plant' as const,
+      }));
+    }
+
     // For backward compatibility: when type=vans only, return { vehicles } for existing tests
     if (typeParam === 'vans') {
       return NextResponse.json({
@@ -84,15 +111,17 @@ export async function GET(request: NextRequest) {
         vehicles: result.vans,
         vans: result.vans,
         hgvs: [],
+        plant: [],
         prefix,
       });
     }
 
     return NextResponse.json({
       success: true,
-      vehicles: [...result.vans, ...result.hgvs],
+      vehicles: [...result.vans, ...result.hgvs, ...result.plant],
       vans: result.vans,
       hgvs: result.hgvs,
+      plant: result.plant,
       prefix,
     });
   } catch (error) {
@@ -143,7 +172,7 @@ export async function POST(request: NextRequest) {
       vehicle_ids,
       prefix,
       actions,
-      fleet_type = 'vans', // vans | hgvs
+      fleet_type = 'vans', // vans | hgvs | plant
     } = body;
 
     // Validate required fields
@@ -162,39 +191,42 @@ export async function POST(request: NextRequest) {
     }
 
     const validPrefix = prefix || 'TE57';
-    const fleetType = fleet_type === 'hgvs' ? 'hgvs' : 'vans';
+    const fleetType = fleet_type === 'hgvs' ? 'hgvs' : fleet_type === 'plant' ? 'plant' : 'vans';
     const adminSupabase = getSupabaseAdmin();
 
-    const table = fleetType === 'hgvs' ? 'hgvs' : 'vans';
-    const idColumn = fleetType === 'hgvs' ? 'hgv_id' : 'van_id';
+    const table = fleetType === 'hgvs' ? 'hgvs' : fleetType === 'plant' ? 'plant' : 'vans';
+    const idColumn = fleetType === 'hgvs' ? 'hgv_id' : fleetType === 'plant' ? 'plant_id' : 'van_id';
+    const regColumn = fleetType === 'plant' ? 'plant_id' : 'reg_number';
 
     // SECURITY: Verify all selected items match the prefix
-    const { data: itemsToProcess, error: itemError } = await adminSupabase
+    const { data: rawItemsToProcess, error: itemError } = await adminSupabase
       .from(table)
-      .select('id, reg_number')
+      .select(`id, ${regColumn}`)
       .in('id', vehicle_ids);
 
     if (itemError) {
       throw itemError;
     }
 
-    if (!itemsToProcess || itemsToProcess.length === 0) {
+    if (!rawItemsToProcess || rawItemsToProcess.length === 0) {
       return NextResponse.json(
         { error: 'No fleet items found with provided IDs' },
         { status: 404 }
       );
     }
 
+    const itemsToProcess = rawItemsToProcess as FleetItem[];
+
     // CRITICAL SECURITY CHECK: Verify ALL items match the prefix
     const invalidItems = itemsToProcess.filter(
-      v => !v.reg_number.toUpperCase().startsWith(validPrefix.toUpperCase())
+      v => !((v[regColumn as keyof FleetItem] as string) ?? '').toUpperCase().startsWith(validPrefix.toUpperCase())
     );
 
     if (invalidItems.length > 0) {
       return NextResponse.json(
         {
           error: `Security violation: Cannot process items that don't match prefix "${validPrefix}"`,
-          invalid_vehicles: invalidItems.map(v => v.reg_number),
+          invalid_vehicles: invalidItems.map(v => v[regColumn as keyof FleetItem]),
         },
         { status: 403 }
       );
@@ -205,7 +237,7 @@ export async function POST(request: NextRequest) {
     // Build counts object
     const counts: Record<string, number> = {};
 
-    // Count/delete inspections (van_inspections or hgv_inspections)
+    // Count/delete inspections (van_inspections, hgv_inspections, or plant_inspections)
     if (actions?.inspections) {
       if (fleetType === 'vans') {
         const { count: inspectionCount } = await adminSupabase
@@ -223,8 +255,7 @@ export async function POST(request: NextRequest) {
 
           if (deleteError) throw deleteError;
         }
-      } else {
-        // HGV: hgv_inspections; child tables (inspection_items, etc.) reference inspection_id
+      } else if (fleetType === 'hgvs') {
         const { data: hgvInspections } = await adminSupabase
           .from('hgv_inspections')
           .select('id')
@@ -234,12 +265,32 @@ export async function POST(request: NextRequest) {
         counts.inspections = inspectionIds.length;
 
         if (mode === 'execute' && inspectionIds.length > 0) {
-          // Delete child tables first (inspection_items, inspection_photos, inspection_daily_hours)
           await adminSupabase.from('inspection_items').delete().in('inspection_id', inspectionIds);
           await adminSupabase.from('inspection_photos').delete().in('inspection_id', inspectionIds);
           await adminSupabase.from('inspection_daily_hours').delete().in('inspection_id', inspectionIds);
           const { error: deleteError } = await adminSupabase
             .from('hgv_inspections')
+            .delete()
+            .in('id', inspectionIds);
+
+          if (deleteError) throw deleteError;
+        }
+      } else {
+        // Plant: plant_inspections with child tables
+        const { data: plantInspections } = await adminSupabase
+          .from('plant_inspections')
+          .select('id')
+          .in('plant_id', itemIds);
+
+        const inspectionIds = plantInspections?.map(i => i.id) || [];
+        counts.inspections = inspectionIds.length;
+
+        if (mode === 'execute' && inspectionIds.length > 0) {
+          await adminSupabase.from('inspection_items').delete().in('inspection_id', inspectionIds);
+          await adminSupabase.from('inspection_photos').delete().in('inspection_id', inspectionIds);
+          await adminSupabase.from('inspection_daily_hours').delete().in('inspection_id', inspectionIds);
+          const { error: deleteError } = await adminSupabase
+            .from('plant_inspections')
             .delete()
             .in('id', inspectionIds);
 
@@ -306,7 +357,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Count/delete maintenance records (vehicle_maintenance, maintenance_history use van_id and hgv_id)
+    // Count/delete maintenance records
     if (actions?.maintenance) {
       const { count: maintenanceCount } = await adminSupabase
         .from('vehicle_maintenance')
@@ -358,8 +409,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Count/delete MOT history records
-    if (actions?.maintenance) {
+    // Count/delete MOT history records (road vehicles only, not plant)
+    if (actions?.maintenance && fleetType !== 'plant') {
       const { count: motCount } = await adminSupabase
         .from('mot_test_history')
         .select('id', { count: 'exact', head: true })
@@ -376,9 +427,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Count/delete vehicle archives (van_archive only - HGVs have no archive table)
+    // Count/delete vehicle archives (van_archive only - HGVs and plant have no archive table)
     if (actions?.archives && fleetType === 'vans') {
-      const regNumbers = itemsToProcess.map(v => v.reg_number);
+      const regNumbers = itemsToProcess.map(v => v.reg_number as string);
       const { count: archiveCount } = await adminSupabase
         .from('van_archive')
         .select('id', { count: 'exact', head: true })
@@ -393,8 +444,8 @@ export async function POST(request: NextRequest) {
           .in('reg_number', regNumbers);
         if (e) throw e;
       }
-    } else if (actions?.archives && fleetType === 'hgvs') {
-      counts.vehicle_archives = 0; // No hgv_archive table
+    } else if (actions?.archives && (fleetType === 'hgvs' || fleetType === 'plant')) {
+      counts.vehicle_archives = 0;
     }
 
     // Return preview or execution results
@@ -481,47 +532,50 @@ export async function DELETE(request: NextRequest) {
     }
 
     const validPrefix = prefix || 'TE57';
-    const fleetType = fleet_type === 'hgvs' ? 'hgvs' : 'vans';
+    const fleetType = fleet_type === 'hgvs' ? 'hgvs' : fleet_type === 'plant' ? 'plant' : 'vans';
     const adminSupabase = getSupabaseAdmin();
 
-    // Archive is only supported for vans (no hgv_archive table)
-    if (mode === 'archive' && fleetType === 'hgvs') {
+    // Archive is only supported for vans (HGVs and plant have no archive table)
+    if (mode === 'archive' && fleetType !== 'vans') {
       return NextResponse.json(
-        { error: 'Archive is not supported for HGVs. Use Hard Delete instead.' },
+        { error: `Archive is not supported for ${fleetType}. Use Hard Delete instead.` },
         { status: 400 }
       );
     }
 
-    const table = fleetType === 'hgvs' ? 'hgvs' : 'vans';
-    const idColumn = fleetType === 'hgvs' ? 'hgv_id' : 'van_id';
+    const table = fleetType === 'hgvs' ? 'hgvs' : fleetType === 'plant' ? 'plant' : 'vans';
+    const idColumn = fleetType === 'hgvs' ? 'hgv_id' : fleetType === 'plant' ? 'plant_id' : 'van_id';
+    const regColumn = fleetType === 'plant' ? 'plant_id' : 'reg_number';
 
     // SECURITY: Verify all selected items match the prefix
-    const { data: itemsToProcess, error: itemError } = await adminSupabase
+    const { data: rawItemsToProcessDel, error: itemError } = await adminSupabase
       .from(table)
-      .select('id, reg_number, category_id, status')
+      .select(`id, ${regColumn}, category_id, status`)
       .in('id', vehicle_ids);
 
     if (itemError) {
       throw itemError;
     }
 
-    if (!itemsToProcess || itemsToProcess.length === 0) {
+    if (!rawItemsToProcessDel || rawItemsToProcessDel.length === 0) {
       return NextResponse.json(
         { error: 'No fleet items found with provided IDs' },
         { status: 404 }
       );
     }
 
+    const itemsToProcess = rawItemsToProcessDel as FleetItem[];
+
     // CRITICAL SECURITY CHECK: Verify ALL items match the prefix
-    const invalidItems = itemsToProcess.filter(
-      v => !v.reg_number.toUpperCase().startsWith(validPrefix.toUpperCase())
+    const invalidItemsDel = itemsToProcess.filter(
+      v => !((v[regColumn as keyof FleetItem] as string) ?? '').toUpperCase().startsWith(validPrefix.toUpperCase())
     );
 
-    if (invalidItems.length > 0) {
+    if (invalidItemsDel.length > 0) {
       return NextResponse.json(
         {
           error: `Security violation: Cannot delete items that don't match prefix "${validPrefix}"`,
-          invalid_vehicles: invalidItems.map(v => v.reg_number),
+          invalid_vehicles: invalidItemsDel.map(v => v[regColumn as keyof FleetItem]),
         },
         { status: 403 }
       );
@@ -559,7 +613,7 @@ export async function DELETE(request: NextRequest) {
           if (archiveError) {
             console.error('Failed to archive vehicle:', archiveError);
             failedVehicles.push({
-              reg_number: vehicle.reg_number,
+              reg_number: vehicle.reg_number ?? '',
               error: archiveError.message,
             });
             continue; // Skip to next vehicle
@@ -573,7 +627,7 @@ export async function DELETE(request: NextRequest) {
 
           if (updateError) {
             failedVehicles.push({
-              reg_number: vehicle.reg_number,
+              reg_number: vehicle.reg_number ?? '',
               error: `Failed to update status: ${updateError.message}`,
             });
           } else {
@@ -581,7 +635,7 @@ export async function DELETE(request: NextRequest) {
           }
         } else {
           failedVehicles.push({
-            reg_number: vehicle.reg_number,
+            reg_number: vehicle.reg_number ?? '',
             error: 'Vehicle data not found',
           });
         }
@@ -683,7 +737,7 @@ export async function DELETE(request: NextRequest) {
         }
       }
 
-      // 4. Delete inspections (van_inspections or hgv_inspections + children)
+      // 4. Delete inspections (van_inspections, hgv_inspections, or plant_inspections + children)
       if (fleetType === 'vans') {
         const { count: inspectionsCount } = await adminSupabase
           .from('van_inspections')
@@ -700,7 +754,7 @@ export async function DELETE(request: NextRequest) {
 
           if (deleteInspectionsError) throw deleteInspectionsError;
         }
-      } else {
+      } else if (fleetType === 'hgvs') {
         const { data: hgvInspections } = await adminSupabase
           .from('hgv_inspections')
           .select('id')
@@ -715,6 +769,25 @@ export async function DELETE(request: NextRequest) {
           await adminSupabase.from('inspection_daily_hours').delete().in('inspection_id', inspectionIds);
           const { error: e } = await adminSupabase
             .from('hgv_inspections')
+            .delete()
+            .in('id', inspectionIds);
+          if (e) throw e;
+        }
+      } else {
+        const { data: plantInspections } = await adminSupabase
+          .from('plant_inspections')
+          .select('id')
+          .in('plant_id', vehicleIds);
+
+        const inspectionIds = plantInspections?.map(i => i.id) || [];
+        deleteCounts.inspections = inspectionIds.length;
+
+        if (inspectionIds.length > 0) {
+          await adminSupabase.from('inspection_items').delete().in('inspection_id', inspectionIds);
+          await adminSupabase.from('inspection_photos').delete().in('inspection_id', inspectionIds);
+          await adminSupabase.from('inspection_daily_hours').delete().in('inspection_id', inspectionIds);
+          const { error: e } = await adminSupabase
+            .from('plant_inspections')
             .delete()
             .in('id', inspectionIds);
           if (e) throw e;
@@ -755,21 +828,23 @@ export async function DELETE(request: NextRequest) {
         if (deleteDvlaError) throw deleteDvlaError;
       }
 
-      // 7. Delete MOT test history (defects/comments cascade)
-      const { count: motCount } = await adminSupabase
-        .from('mot_test_history')
-        .select('id', { count: 'exact', head: true })
-        .in(idColumn, vehicleIds);
-
-      deleteCounts.mot_test_history = motCount || 0;
-
-      if (deleteCounts.mot_test_history > 0) {
-        const { error: deleteMotError } = await adminSupabase
+      // 7. Delete MOT test history (road vehicles only, not plant)
+      if (fleetType !== 'plant') {
+        const { count: motCount } = await adminSupabase
           .from('mot_test_history')
-          .delete()
+          .select('id', { count: 'exact', head: true })
           .in(idColumn, vehicleIds);
 
-        if (deleteMotError) throw deleteMotError;
+        deleteCounts.mot_test_history = motCount || 0;
+
+        if (deleteCounts.mot_test_history > 0) {
+          const { error: deleteMotError } = await adminSupabase
+            .from('mot_test_history')
+            .delete()
+            .in(idColumn, vehicleIds);
+
+          if (deleteMotError) throw deleteMotError;
+        }
       }
 
       // 8. Delete vehicle maintenance
@@ -789,9 +864,9 @@ export async function DELETE(request: NextRequest) {
         if (deleteMaintenanceError) throw deleteMaintenanceError;
       }
 
-      // 9. Delete vehicle archives (van_archive only; HGVs have no archive table)
+      // 9. Delete vehicle archives (van_archive only; HGVs and plant have no archive table)
       if (fleetType === 'vans') {
-        const regNumbers = itemsToProcess.map(v => v.reg_number);
+        const regNumbers = itemsToProcess.map(v => v.reg_number as string);
         const { count: archiveCount } = await adminSupabase
           .from('van_archive')
           .select('id', { count: 'exact', head: true })

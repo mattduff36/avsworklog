@@ -2,152 +2,121 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, AlertCircle, Download } from 'lucide-react';
-import { toast } from 'sonner';
+import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { PDFCanvasRenderer } from '@/components/pdf/PDFCanvasRenderer';
 
 function PDFViewerContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [hasReachedBottom, setHasReachedBottom] = useState(false);
   
   const url = searchParams.get('url');
-  const title = searchParams.get('title') || 'Document';
   const returnUrl = searchParams.get('return') || '/rams';
+  const showSign = searchParams.get('sign') === '1';
+
+  useEffect(() => {
+    if (!showSign || hasReachedBottom) return;
+
+    let scrollListenerAdded = false;
+
+    const onScroll = () => {
+      const scrollBottom = window.innerHeight + window.scrollY;
+      const threshold = document.documentElement.scrollHeight - 100;
+      if (scrollBottom >= threshold) {
+        setHasReachedBottom(true);
+      }
+    };
+
+    // Poll until the PDF has actually rendered and the page is scrollable.
+    // Before that, scrollHeight ≈ innerHeight so the check would pass instantly.
+    let lastHeight = 0;
+    let stableCount = 0;
+
+    const interval = setInterval(() => {
+      const docHeight = document.documentElement.scrollHeight;
+      const viewportHeight = window.innerHeight;
+
+      if (docHeight > viewportHeight + 200) {
+        clearInterval(interval);
+        scrollListenerAdded = true;
+        window.addEventListener('scroll', onScroll, { passive: true });
+        onScroll();
+      } else {
+        if (docHeight === lastHeight && docHeight > 0) {
+          stableCount++;
+          if (stableCount >= 6) {
+            clearInterval(interval);
+            setHasReachedBottom(true);
+          }
+        } else {
+          stableCount = 0;
+          lastHeight = docHeight;
+        }
+      }
+    }, 300);
+
+    return () => {
+      clearInterval(interval);
+      if (scrollListenerAdded) {
+        window.removeEventListener('scroll', onScroll);
+      }
+    };
+  }, [showSign, hasReachedBottom]);
 
   useEffect(() => {
     if (!url) {
       setError('No PDF URL provided');
-      setLoading(false);
       return;
     }
 
-    // Validate and set the PDF URL
     try {
-      const decodedUrl = decodeURIComponent(url);
-      setPdfUrl(decodedUrl);
-      setLoading(false);
-    } catch (err) {
-      console.error('Error decoding PDF URL:', err);
+      setPdfUrl(decodeURIComponent(url));
+    } catch {
       setError('Invalid PDF URL');
-      setLoading(false);
     }
   }, [url]);
 
-  const handleBack = () => {
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      router.back();
-    } else {
-      router.push(returnUrl);
-    }
-  };
-
-  const handleDownload = async () => {
-    if (!pdfUrl) return;
-
-    try {
-      const response = await fetch(pdfUrl);
-      if (!response.ok) throw new Error('Failed to fetch file');
-      
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = window.document.createElement('a');
-      a.href = downloadUrl;
-      a.download = `${title}.pdf`;
-      window.document.body.appendChild(a);
-      a.click();
-      
-      setTimeout(() => {
-        window.URL.revokeObjectURL(downloadUrl);
-        window.document.body.removeChild(a);
-      }, 100);
-      
-      toast.success('Download started');
-    } catch (err) {
-      console.error('Error downloading PDF:', err);
-      toast.error('Failed to download PDF');
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-900">
-        <div className="text-center space-y-3">
-          <Loader2 className="h-12 w-12 animate-spin text-rams mx-auto" />
-          <p className="text-muted-foreground">Loading PDF...</p>
-        </div>
-      </div>
-    );
-  }
-
   if (error || !pdfUrl) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 p-4">
+      <div className="flex flex-col items-center justify-center py-16 px-4">
         <div className="max-w-md w-full bg-slate-800 rounded-lg p-8 text-center space-y-4">
           <div className="flex items-center justify-center w-16 h-16 rounded-full bg-red-900/20 mx-auto">
             <AlertCircle className="h-8 w-8 text-red-400" />
           </div>
           <h2 className="text-xl font-bold text-white">Unable to load PDF</h2>
           <p className="text-muted-foreground">{error || 'An unknown error occurred'}</p>
-          <Button
-            onClick={handleBack}
-            className="bg-rams hover:bg-rams-dark text-white"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Go Back
-          </Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative w-full h-screen bg-slate-900">
-      {/* Floating Back Button - Always visible on mobile */}
-      <div className="fixed top-4 left-4 z-50 flex items-center gap-2">
-        <Button
-          onClick={handleBack}
-          size="lg"
-          className="bg-slate-800/95 hover:bg-slate-700 text-white shadow-xl backdrop-blur-sm border border-slate-700 transition-all duration-200 active:scale-95"
-        >
-          <ArrowLeft className="h-5 w-5 mr-2" />
-          <span className="hidden sm:inline">Back</span>
-        </Button>
-        
-        {/* Download button for mobile */}
-        <Button
-          onClick={handleDownload}
-          size="lg"
-          className="bg-rams/95 hover:bg-rams-dark text-white shadow-xl backdrop-blur-sm border border-rams-dark transition-all duration-200 active:scale-95 sm:hidden"
-          title="Download PDF"
-        >
-          <Download className="h-5 w-5" />
-        </Button>
+    <div className="relative w-full" style={{ overscrollBehavior: 'contain' }}>
+      <div className={`px-2 sm:px-4 ${showSign ? 'pb-32' : 'pb-8'}`}>
+        <PDFCanvasRenderer url={pdfUrl} />
       </div>
 
-      {/* Desktop Download Button */}
-      <div className="fixed top-4 right-4 z-50 hidden sm:block">
-        <Button
-          onClick={handleDownload}
-          size="lg"
-          className="bg-rams/95 hover:bg-rams-dark text-white shadow-xl backdrop-blur-sm border border-rams-dark transition-all duration-200 active:scale-95"
+      {showSign && (
+        <button
+          disabled={!hasReachedBottom}
+          onClick={() => {
+            const sep = returnUrl.includes('?') ? '&' : '?';
+            router.push(`${returnUrl}${sep}openSign=1`);
+          }}
+          className={`fixed bottom-0 inset-x-0 z-50 flex items-center justify-center gap-2 text-white text-base font-medium h-24 transition-colors duration-200 ${
+            hasReachedBottom
+              ? 'bg-green-600 hover:bg-green-700 active:bg-green-800'
+              : 'bg-gray-500 cursor-not-allowed opacity-70'
+          }`}
         >
-          <Download className="h-4 w-4 mr-2" />
-          Download
-        </Button>
-      </div>
-
-      {/* PDF Viewer */}
-      <iframe
-        src={pdfUrl}
-        className="w-full h-full border-0"
-        title={title}
-        onError={() => {
-          setError('Failed to load PDF. The file may be corrupted or in an unsupported format.');
-        }}
-      />
+          <CheckCircle2 className="h-5 w-5" />
+          {hasReachedBottom
+            ? 'I have read and understood - Sign Document'
+            : 'Scroll to bottom to sign'}
+        </button>
+      )}
     </div>
   );
 }

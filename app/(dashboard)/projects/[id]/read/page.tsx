@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -32,9 +32,10 @@ interface Assignment {
 
 type ActionType = 'downloaded' | 'opened' | 'emailed' | null;
 
-export default function ReadRAMSPage() {
+function ReadRAMSContent() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const documentId = params.id as string;
   
   const [ramsDocument, setRamsDocument] = useState<RAMSDocument | null>(null);
@@ -130,6 +131,29 @@ export default function ReadRAMSPage() {
   useEffect(() => {
     fetchDocument();
   }, [fetchDocument]);
+
+  useEffect(() => {
+    if (searchParams.get('openSign') === '1' && assignment && assignment.status !== 'signed' && !loading) {
+      setSignModalOpen(true);
+    }
+  }, [searchParams, assignment, loading]);
+
+  useEffect(() => {
+    if (loading || !fileUrl || !ramsDocument || !assignment) return;
+    if (assignment.status === 'signed') return;
+    if (!requiredSignature) return;
+    if (!actionTaken) return;
+    if (searchParams.get('openSign') === '1') return;
+
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    if (isStandalone || isMobile) {
+      const returnPath = `/projects/${documentId}/read`;
+      const viewerUrl = `/pdf-viewer?url=${encodeURIComponent(fileUrl)}&title=${encodeURIComponent(ramsDocument.title ?? '')}&return=${encodeURIComponent(returnPath)}&sign=1`;
+      router.replace(viewerUrl);
+    }
+  }, [loading, fileUrl, ramsDocument, assignment, requiredSignature, actionTaken, searchParams, documentId, router]);
 
   const recordAction = async (action: 'downloaded' | 'opened' | 'emailed', requireAssignment: boolean = true) => {
     // For signed documents, we don't require assignment to exist
@@ -250,7 +274,8 @@ export default function ReadRAMSPage() {
       
       // Use in-app PDF viewer for PWA/mobile to ensure back navigation works
       if (isStandalone || isMobile) {
-        const viewerUrl = `/pdf-viewer?url=${encodeURIComponent(fileUrl)}&title=${encodeURIComponent(ramsDocument?.title ?? '')}&return=${encodeURIComponent(`/projects/${documentId}/read`)}`;
+        const returnPath = `/projects/${documentId}/read`;
+        const viewerUrl = `/pdf-viewer?url=${encodeURIComponent(fileUrl)}&title=${encodeURIComponent(ramsDocument?.title ?? '')}&return=${encodeURIComponent(returnPath)}${canSign ? '&sign=1' : ''}`;
         router.push(viewerUrl);
         
         // Record action
@@ -604,5 +629,17 @@ export default function ReadRAMSPage() {
 
     </div>
     </RAMSErrorBoundary>
+  );
+}
+
+export default function ReadRAMSPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-rams" />
+      </div>
+    }>
+      <ReadRAMSContent />
+    </Suspense>
   );
 }
