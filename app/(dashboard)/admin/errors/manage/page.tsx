@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/hooks/useAuth';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,7 +41,7 @@ import {
 
 export default function ErrorReportsManagePage() {
   const router = useRouter();
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { hasPermission: canManageErrors, loading: permissionLoading } = usePermissionCheck('error-reports', false);
   
   const [reports, setReports] = useState<ErrorReportWithUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,10 +64,10 @@ export default function ErrorReportsManagePage() {
 
   // Redirect non-admins
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
+    if (!permissionLoading && !canManageErrors) {
       router.push('/dashboard');
     }
-  }, [authLoading, isAdmin, router]);
+  }, [permissionLoading, canManageErrors, router]);
 
   const fetchReports = useCallback(async (filter: string) => {
     try {
@@ -96,10 +96,10 @@ export default function ErrorReportsManagePage() {
 
   // Fetch reports
   useEffect(() => {
-    if (isAdmin) {
+    if (canManageErrors) {
       fetchReports(statusFilter);
     }
-  }, [statusFilter, isAdmin, fetchReports]);
+  }, [statusFilter, canManageErrors, fetchReports]);
 
   const openDetailDialog = async (report: ErrorReportWithUser) => {
     setSelectedReport(report);
@@ -178,7 +178,7 @@ export default function ErrorReportsManagePage() {
     }
   };
 
-  if (authLoading) {
+  if (permissionLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-red-500" />
@@ -186,7 +186,7 @@ export default function ErrorReportsManagePage() {
     );
   }
 
-  if (!isAdmin) {
+  if (!canManageErrors) {
     return null;
   }
 

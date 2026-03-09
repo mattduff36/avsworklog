@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, use } from 'react';
-import { useAuth } from '@/lib/hooks/useAuth';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,7 +39,7 @@ interface PageProps {
 
 export default function CustomerHistoryPage({ params }: PageProps) {
   const { id } = use(params);
-  const { isManager, isAdmin, loading: authLoading } = useAuth();
+  const { hasPermission: canViewCustomers, loading: permissionLoading } = usePermissionCheck('customers', false);
   const router = useRouter();
 
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -71,13 +71,13 @@ export default function CustomerHistoryPage({ params }: PageProps) {
   }, [id]);
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!isManager && !isAdmin) {
+    if (permissionLoading) return;
+    if (!canViewCustomers) {
       router.push('/dashboard');
       return;
     }
     Promise.all([fetchCustomer(), fetchQuotes()]).finally(() => setLoading(false));
-  }, [authLoading, isManager, isAdmin, router, fetchCustomer, fetchQuotes]);
+  }, [permissionLoading, canViewCustomers, router, fetchCustomer, fetchQuotes]);
 
   async function handleUpdate(data: CustomerFormData) {
     const res = await fetch(`/api/customers/${id}`, {
@@ -90,7 +90,7 @@ export default function CustomerHistoryPage({ params }: PageProps) {
     await fetchCustomer();
   }
 
-  if (authLoading || loading) {
+  if (permissionLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-avs-yellow" />
@@ -253,7 +253,7 @@ export default function CustomerHistoryPage({ params }: PageProps) {
           ) : (
             <div className="space-y-2">
               {quotes.map(q => (
-                <Link key={q.id} href="/quotes" className="block group">
+                <Link key={q.id} href={`/quotes?customer_id=${customer.id}&quote_id=${q.id}`} className="block group">
                   <div className="flex items-center justify-between p-3 rounded-lg bg-slate-900/50 hover:bg-slate-700/50 border border-slate-700/50 transition-colors">
                     <div className="flex items-center gap-3">
                       <span className="font-mono font-semibold text-avs-yellow text-sm">{q.quote_reference}</span>

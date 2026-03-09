@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,7 +35,12 @@ type Action = Database['public']['Tables']['actions']['Row'] & {
 
 export default function ActionsPage() {
   const router = useRouter();
-  const { user, isManager, loading: authLoading } = useAuth();
+  const { user } = useAuth();
+  const { hasPermission: canViewActions, loading: actionsPermissionLoading } = usePermissionCheck('actions', false);
+  const { hasPermission: canViewSuggestions } = usePermissionCheck('suggestions', false);
+  const { hasPermission: canViewErrorReports } = usePermissionCheck('error-reports', false);
+  const { hasPermission: canViewMaintenance } = usePermissionCheck('maintenance', false);
+  const { hasPermission: canViewWorkshopTasks } = usePermissionCheck('workshop-tasks', false);
   const supabase = createClient();
   
   const [actions, setActions] = useState<Action[]>([]);
@@ -169,43 +175,69 @@ export default function ActionsPage() {
 
   const fetchSuggestionErrorCounts = useCallback(async () => {
     try {
-      const [
-        { count: sNew },
-        { count: sReview },
-        { count: sResolved },
-        { count: eNew },
-        { count: eInv },
-        { count: eResolved },
-      ] = await Promise.all([
-        supabase.from('suggestions').select('*', { count: 'exact', head: true }).eq('status', 'new'),
-        supabase.from('suggestions').select('*', { count: 'exact', head: true }).in('status', ['under_review', 'planned']),
-        supabase.from('suggestions').select('*', { count: 'exact', head: true }).in('status', ['completed', 'declined']),
-        supabase.from('error_reports').select('*', { count: 'exact', head: true }).eq('status', 'new'),
-        supabase.from('error_reports').select('*', { count: 'exact', head: true }).eq('status', 'investigating'),
-        supabase.from('error_reports').select('*', { count: 'exact', head: true }).eq('status', 'resolved'),
-      ]);
-      setSuggestionsNew(sNew || 0);
-      setSuggestionsUnderReview(sReview || 0);
-      setSuggestionsResolved(sResolved || 0);
-      setErrorsNew(eNew || 0);
-      setErrorsInvestigating(eInv || 0);
-      setErrorsResolved(eResolved || 0);
+      let sNew = 0;
+      let sReview = 0;
+      let sResolved = 0;
+      let eNew = 0;
+      let eInv = 0;
+      let eResolved = 0;
+
+      if (canViewSuggestions) {
+        const [
+          { count: fetchedSNew },
+          { count: fetchedSReview },
+          { count: fetchedSResolved },
+        ] = await Promise.all([
+          supabase.from('suggestions').select('*', { count: 'exact', head: true }).eq('status', 'new'),
+          supabase.from('suggestions').select('*', { count: 'exact', head: true }).in('status', ['under_review', 'planned']),
+          supabase.from('suggestions').select('*', { count: 'exact', head: true }).in('status', ['completed', 'declined']),
+        ]);
+        sNew = fetchedSNew || 0;
+        sReview = fetchedSReview || 0;
+        sResolved = fetchedSResolved || 0;
+      }
+
+      if (canViewErrorReports) {
+        const [
+          { count: fetchedENew },
+          { count: fetchedEInv },
+          { count: fetchedEResolved },
+        ] = await Promise.all([
+          supabase.from('error_reports').select('*', { count: 'exact', head: true }).eq('status', 'new'),
+          supabase.from('error_reports').select('*', { count: 'exact', head: true }).eq('status', 'investigating'),
+          supabase.from('error_reports').select('*', { count: 'exact', head: true }).eq('status', 'resolved'),
+        ]);
+        eNew = fetchedENew || 0;
+        eInv = fetchedEInv || 0;
+        eResolved = fetchedEResolved || 0;
+      }
+
+      setSuggestionsNew(sNew);
+      setSuggestionsUnderReview(sReview);
+      setSuggestionsResolved(sResolved);
+      setErrorsNew(eNew);
+      setErrorsInvestigating(eInv);
+      setErrorsResolved(eResolved);
     } catch (err) {
       console.error('Error fetching suggestion/error counts:', err);
     }
-  }, [supabase]);
+  }, [supabase, canViewSuggestions, canViewErrorReports]);
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!isManager) {
+    if (!actionsPermissionLoading) {
+      if (!canViewActions) {
         router.push('/dashboard');
         return;
       }
       fetchActions();
-      fetchMaintenanceCounts();
-      fetchSuggestionErrorCounts();
+      if (canViewMaintenance) {
+        fetchMaintenanceCounts();
+      }
+      if (canViewSuggestions || canViewErrorReports) {
+        fetchSuggestionErrorCounts();
+      }
     }
-  }, [authLoading, isManager, router, fetchActions, fetchMaintenanceCounts, fetchSuggestionErrorCounts]);
+  }, [actionsPermissionLoading, canViewActions, canViewMaintenance, canViewSuggestions, canViewErrorReports, router, fetchActions, fetchMaintenanceCounts, fetchSuggestionErrorCounts]);
 
   // Mark as logged - opens modal for comment
   const handleMarkAsLogged = (actionId: string) => {
@@ -440,7 +472,7 @@ export default function ActionsPage() {
     }
   };
 
-  if (authLoading || loading) {
+  if (actionsPermissionLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <p className="text-muted-foreground">Loading actions...</p>
@@ -473,6 +505,7 @@ export default function ActionsPage() {
       {/* Action Categories */}
       <div className="space-y-6">
         {/* Workshop Tasks Category */}
+        {canViewWorkshopTasks && (
         <Card className="">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -571,8 +604,10 @@ export default function ActionsPage() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Maintenance & Service Category */}
+        {canViewMaintenance && (
         <Card className="">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -640,8 +675,10 @@ export default function ActionsPage() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Suggestions */}
+        {canViewSuggestions && (
         <Card className="">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -698,8 +735,10 @@ export default function ActionsPage() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Error Reports */}
+        {canViewErrorReports && (
         <Card className="">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -756,6 +795,7 @@ export default function ActionsPage() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Site Audit Inspections - Coming Soon */}
         <Card className="bg-white dark:bg-slate-900 border-border opacity-60">

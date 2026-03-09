@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendProfileUpdateEmail } from '@/lib/utils/email';
 import { getEffectiveRole } from '@/lib/utils/view-as';
+import { canEffectiveRoleAccessModule, canEffectiveRoleAssignRole } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
 // Helper to create admin client with service role key
@@ -43,9 +44,10 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!effectiveRole.is_manager_admin) {
+    const canAccessUserAdmin = await canEffectiveRoleAccessModule('admin-users');
+    if (!canAccessUserAdmin) {
       return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
+        { error: 'Forbidden: admin-users access required' },
         { status: 403 }
       );
     }
@@ -68,6 +70,14 @@ export async function PUT(
     }
 
     const supabaseAdmin = getSupabaseAdmin();
+
+    const canAssignRequestedRole = await canEffectiveRoleAssignRole(role_id);
+    if (!canAssignRequestedRole) {
+      return NextResponse.json(
+        { error: 'Forbidden: you cannot assign this role' },
+        { status: 403 }
+      );
+    }
 
     // Fetch existing user data for change tracking and email notification
     const { data: existingUser, error: fetchError } = await supabaseAdmin
@@ -207,8 +217,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!effectiveRole.is_manager_admin) {
-      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+    const canAccessUserAdmin = await canEffectiveRoleAccessModule('admin-users');
+    if (!canAccessUserAdmin) {
+      return NextResponse.json({ error: 'Forbidden: admin-users access required' }, { status: 403 });
     }
 
     const userId = (await params).id;
@@ -233,6 +244,22 @@ export async function DELETE(
 
     if (!userProfile) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const { data: targetProfileRole } = await supabaseAdmin
+      .from('profiles')
+      .select('role_id')
+      .eq('id', userId)
+      .single();
+
+    if (targetProfileRole?.role_id) {
+      const canManageTargetRole = await canEffectiveRoleAssignRole(targetProfileRole.role_id);
+      if (!canManageTargetRole) {
+        return NextResponse.json(
+          { error: 'Forbidden: you cannot manage this user role' },
+          { status: 403 }
+        );
+      }
     }
 
     if (mode === 'keep-data') {

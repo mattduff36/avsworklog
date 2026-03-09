@@ -19,8 +19,8 @@ export default function DebugPage() {
   const { profile } = useAuth();
   const router = useRouter();
   const supabase = createClient();
-  const [userEmail, setUserEmail] = useState('');
   const [loading, setLoading] = useState(true);
+  const [authorized, setAuthorized] = useState(false);
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
 
   useEffect(() => {
@@ -35,15 +35,14 @@ export default function DebugPage() {
         return;
       }
 
-      setUserEmail(authUser.email || '');
-
       const { getViewAsRoleId } = await import('@/lib/utils/view-as-cookie');
       const viewAsRoleId = getViewAsRoleId();
 
-      const { data: profile, error: profileError } = await supabase
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select(`
           id,
+          super_admin,
           role:roles (
             id,
             name,
@@ -54,15 +53,19 @@ export default function DebugPage() {
         .eq('id', authUser.id)
         .single();
 
-      if (profileError || !profile) {
+      if (profileError || !profileData) {
         console.error('Error fetching user profile:', profileError);
         toast.error('Access denied: Unable to verify permissions');
         router.push('/dashboard');
         return;
       }
 
-      const isSupeAdmin = profile.role?.is_super_admin === true || authUser.email === 'admin@mpdee.co.uk';
-      if (!isSupeAdmin) {
+      const isSuperAdmin =
+        profileData.super_admin === true ||
+        profileData.role?.is_super_admin === true ||
+        authUser.email === 'admin@mpdee.co.uk';
+
+      if (!isSuperAdmin) {
         toast.error('Access denied: SuperAdmin only');
         router.push('/dashboard');
         return;
@@ -74,21 +77,17 @@ export default function DebugPage() {
         return;
       }
 
-      setLoading(false);
-    }
-    void checkAccess();
-  }, [supabase, router]);
-
-  useEffect(() => {
-    if (userEmail === 'admin@mpdee.co.uk') {
+      setAuthorized(true);
       setDebugInfo({
         environment: process.env.NODE_ENV || 'development',
         buildTime: new Date().toISOString(),
         nodeVersion: typeof process !== 'undefined' ? process.version : 'N/A',
         nextVersion: '15.5.6',
       });
+      setLoading(false);
     }
-  }, [userEmail]);
+    void checkAccess();
+  }, [supabase, router]);
 
   if (loading) {
     return (
@@ -98,7 +97,7 @@ export default function DebugPage() {
     );
   }
 
-  if (userEmail !== 'admin@mpdee.co.uk') {
+  if (!authorized) {
     return null;
   }
 

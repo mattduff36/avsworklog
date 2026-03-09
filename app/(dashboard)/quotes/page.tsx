@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useAuth } from '@/lib/hooks/useAuth';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
@@ -20,7 +20,7 @@ interface CustomerOption {
 }
 
 export default function QuotesPage() {
-  const { isManager, isAdmin, loading: authLoading } = useAuth();
+  const { hasPermission: canViewQuotes, loading: permissionLoading } = usePermissionCheck('quotes', false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -35,6 +35,7 @@ export default function QuotesPage() {
   const [editingQuote, setEditingQuote] = useState<Quote | null>(null);
 
   const customerId = searchParams.get('customer_id');
+  const quoteIdFromQuery = searchParams.get('quote_id');
 
   const fetchData = useCallback(async () => {
     try {
@@ -61,14 +62,20 @@ export default function QuotesPage() {
   }, [customerId]);
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!isManager && !isAdmin) {
+    if (permissionLoading) return;
+    if (!canViewQuotes) {
       toast.error('Access denied');
       router.push('/dashboard');
       return;
     }
     fetchData();
-  }, [authLoading, isManager, isAdmin, router, fetchData]);
+  }, [permissionLoading, canViewQuotes, router, fetchData]);
+
+  useEffect(() => {
+    if (quoteIdFromQuery) {
+      setDetailQuoteId(quoteIdFromQuery);
+    }
+  }, [quoteIdFromQuery]);
 
   async function handleCreate(data: QuoteFormData) {
     const res = await fetch('/api/quotes', {
@@ -117,7 +124,7 @@ export default function QuotesPage() {
     setFormOpen(true);
   }
 
-  if (authLoading || loading) {
+  if (permissionLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-avs-yellow" />

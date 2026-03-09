@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/hooks/useAuth';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,7 +36,7 @@ import { SUGGESTION_STATUS_LABELS, SUGGESTION_STATUS_COLORS } from '@/types/faq'
 
 export default function SuggestionsManagePage() {
   const router = useRouter();
-  const { isManager, isAdmin, loading: authLoading } = useAuth();
+  const { hasPermission: canManageSuggestions, loading: permissionLoading } = usePermissionCheck('suggestions', false);
   
   const [suggestions, setSuggestions] = useState<SuggestionWithUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,10 +58,10 @@ export default function SuggestionsManagePage() {
 
   // Redirect non-managers
   useEffect(() => {
-    if (!authLoading && !isManager && !isAdmin) {
+    if (!permissionLoading && !canManageSuggestions) {
       router.push('/dashboard');
     }
-  }, [authLoading, isManager, isAdmin, router]);
+  }, [permissionLoading, canManageSuggestions, router]);
 
   const fetchSuggestions = useCallback(async (filter: string) => {
     try {
@@ -90,10 +90,10 @@ export default function SuggestionsManagePage() {
 
   // Fetch suggestions
   useEffect(() => {
-    if (isManager || isAdmin) {
+    if (canManageSuggestions) {
       fetchSuggestions(statusFilter);
     }
-  }, [statusFilter, isManager, isAdmin, fetchSuggestions]);
+  }, [statusFilter, canManageSuggestions, fetchSuggestions]);
 
   const openDetailDialog = async (suggestion: SuggestionWithUser) => {
     setSelectedSuggestion(suggestion);
@@ -173,7 +173,7 @@ export default function SuggestionsManagePage() {
     }
   };
 
-  if (authLoading) {
+  if (permissionLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -181,7 +181,7 @@ export default function SuggestionsManagePage() {
     );
   }
 
-  if (!isManager && !isAdmin) {
+  if (!canManageSuggestions) {
     return null;
   }
 

@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { generateSecurePassword } from '@/lib/utils/password';
 import { sendPasswordEmail } from '@/lib/utils/email';
-import { getEffectiveRole } from '@/lib/utils/view-as';
+import { canEffectiveRoleAccessModule, canEffectiveRoleAssignRole } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
 // Helper to create admin client with service role key
@@ -25,16 +25,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Check effective role (respects View As mode)
-    const effectiveRole = await getEffectiveRole();
-
-    if (!effectiveRole.user_id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (!effectiveRole.is_manager_admin) {
+    const canAccessUserAdmin = await canEffectiveRoleAccessModule('admin-users');
+    if (!canAccessUserAdmin) {
       return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
+        { error: 'Forbidden: admin-users access required' },
         { status: 403 }
       );
     }
@@ -47,12 +41,22 @@ export async function POST(
     // Get target user's profile
     const { data: targetProfile, error: profileError } = await supabase
       .from('profiles')
-      .select('full_name')
+      .select('full_name, role_id')
       .eq('id', userId)
       .single();
 
     if (profileError || !targetProfile) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    if (targetProfile.role_id) {
+      const canManageTargetRole = await canEffectiveRoleAssignRole(targetProfile.role_id);
+      if (!canManageTargetRole) {
+        return NextResponse.json(
+          { error: 'Forbidden: you cannot reset password for this role' },
+          { status: 403 }
+        );
+      }
     }
 
     // Get user's email from auth and update password

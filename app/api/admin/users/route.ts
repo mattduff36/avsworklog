@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { generateSecurePassword } from '@/lib/utils/password';
 import { sendPasswordEmail } from '@/lib/utils/email';
 import { getEffectiveRole } from '@/lib/utils/view-as';
+import { canEffectiveRoleAccessModule, canEffectiveRoleAssignRole } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
 // Helper to create admin client with service role key
@@ -28,8 +29,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!effectiveRole.is_manager_admin) {
-      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+    const canAccessUserAdmin = await canEffectiveRoleAccessModule('admin-users');
+    if (!canAccessUserAdmin) {
+      return NextResponse.json({ error: 'Forbidden: admin-users access required' }, { status: 403 });
     }
 
     // Get request body
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest) {
     const supabaseAdmin = getSupabaseAdmin();
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from('roles')
-      .select('id')
+      .select('id, name')
       .eq('id', role_id)
       .single();
 
@@ -63,6 +65,14 @@ export async function POST(request: NextRequest) {
         error: 'Invalid role selected. Please select a valid role.',
         details: roleError?.message || 'Role not found'
       }, { status: 400 });
+    }
+
+    const canAssignRequestedRole = await canEffectiveRoleAssignRole(role_id);
+    if (!canAssignRequestedRole) {
+      return NextResponse.json(
+        { error: 'Forbidden: you cannot assign this role' },
+        { status: 403 }
+      );
     }
 
     // Generate secure random password

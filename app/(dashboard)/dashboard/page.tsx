@@ -22,8 +22,9 @@ import {
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
 import type { ModuleName } from '@/types/roles';
+import { ALL_MODULES } from '@/types/roles';
 import { toast } from 'sonner';
-import { managerNavItems, adminNavItems } from '@/lib/config/navigation';
+import { managerNavItems, adminNavItems, getFilteredNavByPermissions } from '@/lib/config/navigation';
 
 type PendingApprovalCount = {
   type: 'timesheets' | 'inspections' | 'absences' | 'pending' | 'logged' | 'completed' | 'workshop' | 'maintenance' | 'suggestions' | 'errors';
@@ -107,12 +108,9 @@ export default function DashboardPage() {
       
       setPermissionsLoading(true);
       
-      // Managers and admins have all permissions
-      if (isManager || isAdmin) {
-        setUserPermissions(new Set([
-          'timesheets', 'inspections', 'plant-inspections', 'hgv-inspections', 'rams', 'absence', 'maintenance', 'toolbox-talks', 'workshop-tasks',
-          'approvals', 'actions', 'reports', 'admin-users', 'admin-vans'
-        ] as ModuleName[]));
+      // Admin keeps full access by definition.
+      if (isAdmin) {
+        setUserPermissions(new Set(ALL_MODULES));
         setPermissionsLoading(false);
         return;
       }
@@ -175,16 +173,28 @@ export default function DashboardPage() {
     fetchPermissions();
   }, [profile?.id, isManager, isAdmin, isViewingAs, effectiveRole, supabase]);
 
+  const canViewApprovals = userPermissions.has('approvals');
+  const canViewActions = userPermissions.has('actions');
+  const canViewMaintenance = userPermissions.has('maintenance');
+  const canViewWorkshopTasks = userPermissions.has('workshop-tasks');
+  const canViewSuggestions = userPermissions.has('suggestions');
+  const canViewErrorReports = userPermissions.has('error-reports');
+
   useEffect(() => {
-    // Fetch manager data only when the effective role has manager/admin access
-    if (isManager || isAdmin) {
-      fetchPendingApprovals();
-      fetchTopActions();
-      fetchNotificationCounts();
+    if (!permissionsLoading) {
+      if (canViewApprovals) {
+        fetchPendingApprovals();
+      }
+      if (canViewActions) {
+        fetchTopActions();
+      }
+      if (canViewSuggestions || canViewErrorReports) {
+        fetchNotificationCounts();
+      }
     }
     fetchPendingRAMS();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isManager, isAdmin, profile]);
+  }, [permissionsLoading, canViewApprovals, canViewActions, canViewSuggestions, canViewErrorReports, profile?.id]);
 
   const fetchPendingApprovals = async () => {
     // Skip fetching if offline - rely on cached page data
@@ -397,28 +407,32 @@ export default function DashboardPage() {
 
       const maintenanceTotal = maintenanceOverdue + maintenanceDueSoon;
 
-      // Fetch suggestion counts (new + under_review/planned = needing attention)
+      // Fetch suggestion counts only when user can view suggestions
       let suggestionsTotal = 0;
-      try {
-        const [{ count: sNew }, { count: sReview }] = await Promise.all([
-          supabase.from('suggestions').select('*', { count: 'exact', head: true }).eq('status', 'new'),
-          supabase.from('suggestions').select('*', { count: 'exact', head: true }).in('status', ['under_review', 'planned']),
-        ]);
-        suggestionsTotal = (sNew || 0) + (sReview || 0);
-      } catch (e) {
-        console.error('Error fetching suggestion counts:', e);
+      if (canViewSuggestions) {
+        try {
+          const [{ count: sNew }, { count: sReview }] = await Promise.all([
+            supabase.from('suggestions').select('*', { count: 'exact', head: true }).eq('status', 'new'),
+            supabase.from('suggestions').select('*', { count: 'exact', head: true }).in('status', ['under_review', 'planned']),
+          ]);
+          suggestionsTotal = (sNew || 0) + (sReview || 0);
+        } catch (e) {
+          console.error('Error fetching suggestion counts:', e);
+        }
       }
 
-      // Fetch error report counts (new + investigating = needing attention)
+      // Fetch error report counts only when user can view error reports
       let errorsTotal = 0;
-      try {
-        const [{ count: eNew }, { count: eInv }] = await Promise.all([
-          supabase.from('error_reports').select('*', { count: 'exact', head: true }).eq('status', 'new'),
-          supabase.from('error_reports').select('*', { count: 'exact', head: true }).eq('status', 'investigating'),
-        ]);
-        errorsTotal = (eNew || 0) + (eInv || 0);
-      } catch (e) {
-        console.error('Error fetching error report counts:', e);
+      if (canViewErrorReports) {
+        try {
+          const [{ count: eNew }, { count: eInv }] = await Promise.all([
+            supabase.from('error_reports').select('*', { count: 'exact', head: true }).eq('status', 'new'),
+            supabase.from('error_reports').select('*', { count: 'exact', head: true }).eq('status', 'investigating'),
+          ]);
+          errorsTotal = (eNew || 0) + (eInv || 0);
+        } catch (e) {
+          console.error('Error fetching error report counts:', e);
+        }
       }
 
       // Build actions summary array
@@ -526,19 +540,27 @@ export default function DashboardPage() {
     if (!navigator.onLine) return;
 
     try {
-      const [{ count: suggestionsCount }, { count: errorReportsCount }] = await Promise.all([
-        supabase
+      let suggestionsCount = 0;
+      let errorReportsCount = 0;
+
+      if (canViewSuggestions) {
+        const { count } = await supabase
           .from('suggestions')
           .select('*', { count: 'exact', head: true })
-          .eq('status', 'new'),
-        supabase
+          .eq('status', 'new');
+        suggestionsCount = count || 0;
+      }
+
+      if (canViewErrorReports) {
+        const { count } = await supabase
           .from('error_reports')
           .select('*', { count: 'exact', head: true })
-          .eq('status', 'new'),
-      ]);
+          .eq('status', 'new');
+        errorReportsCount = count || 0;
+      }
 
-      setNewSuggestionsCount(suggestionsCount || 0);
-      setNewErrorReportsCount(errorReportsCount || 0);
+      setNewSuggestionsCount(suggestionsCount);
+      setNewErrorReportsCount(errorReportsCount);
     } catch (error) {
       console.error('Error fetching notification counts:', error);
     }
@@ -587,6 +609,18 @@ export default function DashboardPage() {
       setRamsLoading(false);
     }
   };
+
+  const visibleManagerTiles = getFilteredNavByPermissions(managerNavItems, userPermissions, effectiveIsAdmin);
+  const visibleAdminTiles = getFilteredNavByPermissions(adminNavItems, userPermissions, effectiveIsAdmin);
+  const visibleManagementTiles = [...visibleManagerTiles, ...visibleAdminTiles];
+
+  const visibleActionsSummary = actionsSummary.filter((item) => {
+    if (item.type === 'workshop') return canViewWorkshopTasks;
+    if (item.type === 'maintenance') return canViewMaintenance;
+    if (item.type === 'suggestions') return canViewSuggestions;
+    if (item.type === 'errors') return canViewErrorReports;
+    return true;
+  });
 
   return (
     <div className="space-y-8 max-w-6xl">
@@ -649,9 +683,8 @@ export default function DashboardPage() {
                 
                 const moduleName = moduleMap[formType.id];
                 
-                // Check if user has permission to this module
-                // Managers and admins always have access (unless viewing as employee)
-                if (!effectiveIsManager && !effectiveIsAdmin && moduleName && !userPermissions.has(moduleName)) {
+                // Check module permission (admin permissions are expanded to full set above).
+                if (moduleName && !userPermissions.has(moduleName)) {
                   return false;
                 }
                 
@@ -693,14 +726,14 @@ export default function DashboardPage() {
       </div>
 
       {/* Manager/Admin Quick Access - Smaller Tiles */}
-      {effectiveIsManager && (
+      {visibleManagementTiles.length > 0 && (
         <div>
           <h3 className="text-lg font-semibold text-white mb-3">
             Management Tools
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {/* Manager Links - Using shared navigation config */}
-            {managerNavItems.map((link, index) => {
+            {visibleManagerTiles.map((link, index) => {
               const Icon = link.icon;
               const badgeCount = link.href === '/suggestions/manage' ? newSuggestionsCount : 0;
               
@@ -727,9 +760,9 @@ export default function DashboardPage() {
             })}
             
             {/* Admin Links - Using shared navigation config */}
-            {effectiveIsAdmin && adminNavItems.map((link, index) => {
+            {visibleAdminTiles.map((link, index) => {
               const Icon = link.icon;
-              const animationIndex = managerNavItems.length + index;
+              const animationIndex = visibleManagerTiles.length + index;
               const badgeCount = link.href === '/admin/errors/manage' ? newErrorReportsCount : 0;
               
               return (
@@ -757,7 +790,7 @@ export default function DashboardPage() {
             {/* SuperAdmin Only - Debug Link (only when viewing as actual role) */}
             {(isActualSuperAdmin || profile?.role?.is_super_admin) && !isViewingAs && (() => {
               const Icon = Bug;
-              const animationIndex = managerNavItems.length + (effectiveIsAdmin ? adminNavItems.length : 0);
+              const animationIndex = visibleManagementTiles.length;
               
               return (
                 <Link key="/debug" href="/debug">
@@ -780,7 +813,7 @@ export default function DashboardPage() {
       )}
 
       {/* Pending Approvals Summary - Manager/Admin Only */}
-      {effectiveIsManager && (
+      {canViewApprovals && (
         <Card className="border-border animate-card-fade" style={{ animationDelay: '300ms' }}>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-white">
@@ -863,7 +896,7 @@ export default function DashboardPage() {
       )}
 
       {/* Manager Actions Section */}
-      {effectiveIsManager && (
+      {canViewActions && (
         <Card className="border-border animate-card-fade" style={{ animationDelay: '400ms' }}>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-white">
@@ -885,7 +918,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {actionsSummary.map((actionType) => {
+                {visibleActionsSummary.map((actionType) => {
                   const Icon = actionType.icon;
                   const isComingSoon = actionType.type === 'inspections';
                   
@@ -969,7 +1002,7 @@ export default function DashboardPage() {
                   );
                 })}
                 
-                {actionsSummary.reduce((sum, a) => sum + a.count, 0) === 0 && (
+                {visibleActionsSummary.reduce((sum, a) => sum + a.count, 0) === 0 && (
                   <div className="text-center py-8 text-slate-400 mt-4">
                     <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-20 text-green-400" />
                     <p className="text-lg mb-1">All clear!</p>

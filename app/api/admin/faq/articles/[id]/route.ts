@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isManagerOrAdmin } from '@/lib/utils/permissions';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { UpdateFAQArticleRequest } from '@/types/faq';
 
@@ -23,10 +23,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin
-    const isAuthorized = await isManagerOrAdmin(user.id);
+    const isAuthorized = await canEffectiveRoleAccessModule('faq-editor');
     if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden - faq-editor access required' }, { status: 403 });
     }
 
     // Note: faq_articles table added by migration - types will update after migration runs
@@ -82,10 +81,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin
-    const isAuthorized = await isManagerOrAdmin(user.id);
+    const isAuthorized = await canEffectiveRoleAccessModule('faq-editor');
     if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden - faq-editor access required' }, { status: 403 });
     }
 
     const body: UpdateFAQArticleRequest = await request.json();
@@ -159,10 +157,9 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin
-    const isAuthorized = await isManagerOrAdmin(user.id);
+    const isAuthorized = await canEffectiveRoleAccessModule('faq-editor');
     if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden - faq-editor access required' }, { status: 403 });
     }
 
     // Note: faq_articles table added by migration - types will update after migration runs

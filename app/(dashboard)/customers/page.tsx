@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter } from 'next/navigation';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { Loader2, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CustomersTable } from './components/CustomersTable';
@@ -10,7 +10,7 @@ import { CustomerFormDialog } from './components/CustomerFormDialog';
 import type { Customer, CustomerFormData } from './types';
 
 export default function CustomersPage() {
-  const { isManager, isAdmin, loading: authLoading } = useAuth();
+  const { hasPermission: canViewCustomers, loading: permissionLoading } = usePermissionCheck('customers', false);
   const router = useRouter();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -33,14 +33,14 @@ export default function CustomersPage() {
   }, []);
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!isManager && !isAdmin) {
+    if (permissionLoading) return;
+    if (!canViewCustomers) {
       toast.error('Access denied');
       router.push('/dashboard');
       return;
     }
     fetchCustomers();
-  }, [authLoading, isManager, isAdmin, router, fetchCustomers]);
+  }, [permissionLoading, canViewCustomers, router, fetchCustomers]);
 
   async function handleCreate(data: CustomerFormData) {
     const res = await fetch('/api/customers', {
@@ -76,7 +76,7 @@ export default function CustomersPage() {
     router.push(`/customers/${customer.id}/history`);
   }
 
-  if (authLoading || loading) {
+  if (permissionLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-avs-yellow" />

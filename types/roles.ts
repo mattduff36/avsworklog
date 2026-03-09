@@ -53,6 +53,9 @@ export const MANAGEMENT_MODULES: ModuleName[] = [
   'actions',
   'reports',
   'toolbox-talks',
+  'suggestions',
+  'faq-editor',
+  'error-reports',
   'admin-users',
   'customers',
   'quotes',
@@ -71,6 +74,9 @@ export const MODULE_SHORT_NAMES: Record<ModuleName, string> = {
   'approvals': 'Approvals',
   'actions': 'Actions',
   'reports': 'Reports',
+  'suggestions': 'Suggest.',
+  'faq-editor': 'FAQ',
+  'error-reports': 'Errors',
   'admin-users': 'Users',
   'admin-vans': 'Fleet',
   'customers': 'Customers',
@@ -90,6 +96,9 @@ export const MODULE_CSS_VAR: Record<ModuleName, string> = {
   'approvals': '--avs-yellow',
   'actions': '--avs-yellow',
   'reports': '--avs-yellow',
+  'suggestions': '--avs-yellow',
+  'faq-editor': '--avs-yellow',
+  'error-reports': '--avs-yellow',
   'admin-users': '--avs-yellow',
   'admin-vans': '--fleet-primary',
   'customers': '--avs-yellow',
@@ -110,6 +119,9 @@ export type ModuleName =
   | 'approvals'
   | 'actions'
   | 'reports'
+  | 'suggestions'
+  | 'faq-editor'
+  | 'error-reports'
   | 'admin-users'
   | 'admin-vans'
   | 'customers'
@@ -128,6 +140,9 @@ export const ALL_MODULES: ModuleName[] = [
   'approvals',
   'actions',
   'reports',
+  'suggestions',
+  'faq-editor',
+  'error-reports',
   'admin-users',
   'admin-vans',
   'customers',
@@ -147,6 +162,9 @@ export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
   'approvals': 'Approvals',
   'actions': 'Actions',
   'reports': 'Reports',
+  'suggestions': 'Suggestions',
+  'faq-editor': 'FAQ Editor',
+  'error-reports': 'Error Reports',
   'admin-users': 'User Management',
   'admin-vans': 'Fleet Management',
   'customers': 'Customers',
@@ -166,6 +184,9 @@ export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
   'approvals': 'Approve timesheets, inspections, and absences',
   'actions': 'Manage and track actions',
   'reports': 'View system reports',
+  'suggestions': 'Review and triage user suggestions',
+  'faq-editor': 'Manage FAQ categories and articles',
+  'error-reports': 'Review and resolve submitted error reports',
   'admin-users': 'Manage user accounts',
   'admin-vans': 'Manage fleet assets',
   'customers': 'Manage customer directory',
@@ -188,6 +209,7 @@ export interface CreateRoleRequest {
   display_name: string;
   description?: string;
   is_manager_admin?: boolean;
+  role_type?: 'admin' | 'manager' | 'employee';
 }
 
 export interface UpdateRoleRequest {

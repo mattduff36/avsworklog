@@ -220,7 +220,7 @@ export function CustomerFormDialog({ open, onClose, onSubmit, customer }: Custom
                     type="number"
                     min={0}
                     value={form.payment_terms_days}
-                    onChange={e => updateField('payment_terms_days', parseInt(e.target.value) || 30)}
+                    onChange={e => { const v = parseInt(e.target.value); updateField('payment_terms_days', isNaN(v) ? 30 : v); }}
                     className="bg-slate-800 border-slate-600"
                   />
                 </div>
@@ -231,7 +231,7 @@ export function CustomerFormDialog({ open, onClose, onSubmit, customer }: Custom
                     type="number"
                     min={0}
                     value={form.default_validity_days}
-                    onChange={e => updateField('default_validity_days', parseInt(e.target.value) || 30)}
+                    onChange={e => { const v = parseInt(e.target.value); updateField('default_validity_days', isNaN(v) ? 30 : v); }}
                     className="bg-slate-800 border-slate-600"
                   />
                 </div>

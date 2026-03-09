@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isManagerOrAdmin } from '@/lib/utils/permissions';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { UpdateSuggestionRequest, Suggestion, SuggestionUpdateWithUser } from '@/types/faq';
 
@@ -23,10 +23,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is manager/admin
-    const isAuthorized = await isManagerOrAdmin(user.id);
+    const isAuthorized = await canEffectiveRoleAccessModule('suggestions');
     if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden - Manager/Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden - suggestions access required' }, { status: 403 });
     }
 
     // Fetch suggestion
@@ -98,10 +97,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is manager/admin
-    const isAuthorized = await isManagerOrAdmin(user.id);
+    const isAuthorized = await canEffectiveRoleAccessModule('suggestions');
     if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden - Manager/Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden - suggestions access required' }, { status: 403 });
     }
 
     const body: UpdateSuggestionRequest = await request.json();

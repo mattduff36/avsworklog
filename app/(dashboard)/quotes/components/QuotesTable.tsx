@@ -184,7 +184,7 @@ export function QuotesTable({ quotes, onAdd, onRowClick, statusFilter, onStatusF
                     <td className="px-4 py-3 text-slate-300 text-xs truncate max-w-[200px]">{quote.subject_line || '—'}</td>
                     <td className="px-4 py-3 text-slate-300 text-xs">{format(new Date(quote.quote_date), 'dd/MM/yyyy')}</td>
                     <td className="px-4 py-3 text-right font-semibold text-white">
-                      £{Number(quote.subtotal || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                      £{Number(quote.total || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-300">{quote.po_number || '—'}</td>
                     <td className="px-4 py-3">
@@ -228,7 +228,7 @@ export function QuotesTable({ quotes, onAdd, onRowClick, statusFilter, onStatusF
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>{format(new Date(quote.quote_date), 'dd/MM/yyyy')}</span>
                   <span className="font-semibold text-white">
-                    £{Number(quote.subtotal || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                    £{Number(quote.total || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>

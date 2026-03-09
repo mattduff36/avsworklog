@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/lib/hooks/useAuth';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -11,17 +11,17 @@ import { CreateReminderForm } from '@/components/messages/CreateReminderForm';
 import { MessagesReportView } from '@/components/messages/MessagesReportView';
 
 export default function ToolboxTalksPage() {
-  const { isManager, isAdmin, loading: authLoading } = useAuth();
+  const { hasPermission: canViewToolboxTalks, loading: permissionLoading } = usePermissionCheck('toolbox-talks', false);
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('create-toolbox-talk');
 
   // Redirect non-managers/admins
-  if (!authLoading && !isManager && !isAdmin) {
+  if (!permissionLoading && !canViewToolboxTalks) {
     router.push('/dashboard');
     return null;
   }
 
-  if (authLoading) {
+  if (permissionLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

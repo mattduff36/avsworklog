@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isManagerOrAdmin } from '@/lib/utils/permissions';
+import { isEffectiveRoleAdminOrSuper } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { UpdatePermissionsRequest } from '@/types/roles';
+import { MANAGEMENT_MODULES } from '@/types/roles';
 
 /**
  * PUT /api/admin/roles/[id]/permissions
@@ -22,10 +23,10 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is manager/admin
-    const isAuthorized = await isManagerOrAdmin(user.id);
+    // Only admin/super-admin can edit role permissions.
+    const isAuthorized = await isEffectiveRoleAdminOrSuper();
     if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden - Manager/Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
     const body: UpdatePermissionsRequest = await request.json();
@@ -40,7 +41,7 @@ export async function PUT(
     // Check if role exists and is not super admin
     const { data: existingRole, error: fetchError } = await supabase
       .from('roles')
-      .select('is_super_admin, is_manager_admin')
+      .select('name, is_super_admin')
       .eq('id', id)
       .single();
 
@@ -51,11 +52,24 @@ export async function PUT(
       throw fetchError;
     }
 
-    // Cannot modify super admin or manager/admin permissions
-    if (existingRole.is_super_admin || existingRole.is_manager_admin) {
+    // Cannot modify super admin or admin permissions.
+    if (existingRole.is_super_admin || existingRole.name === 'admin') {
       return NextResponse.json({ 
-        error: 'Cannot modify permissions for super admin or manager/admin roles' 
+        error: 'Cannot modify permissions for super admin or admin roles' 
       }, { status: 403 });
+    }
+
+    // Employee roles are restricted to standard modules only.
+    if (existingRole.name.startsWith('employee-')) {
+      const managementEnabled = body.permissions.filter(
+        (perm) => MANAGEMENT_MODULES.includes(perm.module_name) && perm.enabled
+      );
+      if (managementEnabled.length > 0) {
+        return NextResponse.json(
+          { error: 'Employee roles cannot be granted management modules' },
+          { status: 400 }
+        );
+      }
     }
 
     // Update permissions in bulk using upsert

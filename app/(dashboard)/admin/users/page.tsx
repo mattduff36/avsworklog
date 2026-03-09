@@ -38,13 +38,19 @@ import {
   KeyRound,
   Copy,
   CheckCircle2,
+  Briefcase,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import type { Database } from '@/types/database';
 
-// Dynamic import for role management - loaded only when Roles tab is active
 const RoleManagement = dynamic(() => import('@/components/admin/RoleManagement').then(m => ({ default: m.RoleManagement })), { 
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
+});
+
+const JobRolesTab = dynamic(() => import('@/components/admin/JobRolesTab').then(m => ({ default: m.JobRolesTab })), {
   ssr: false,
   loading: () => <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
 });
@@ -56,12 +62,16 @@ type ProfileWithRole = Omit<Profile, 'role'> & {
 };
 type ProfileWithEmail = ProfileWithRole & { email?: string };
 
-type TabType = 'users' | 'roles';
+type TabType = 'users' | 'roles' | 'permissions';
 
 export default function UsersAdminPage() {
-  const { user: currentUser, isAdmin, loading: authLoading } = useAuth();
+  const { user: currentUser, profile, isAdmin, loading: authLoading } = useAuth();
+  const { hasPermission: canManageUsers, loading: permissionLoading } = usePermissionCheck('admin-users', false);
   const supabase = createClient();
   const [activeTab, setActiveTab] = useState<TabType>('users');
+  const isManagerActor = !isAdmin && profile?.role?.is_manager_admin === true;
+  const canManageRoleDefinitions = isAdmin || isManagerActor;
+  const canEditRolePermissions = isAdmin;
 
   // State
   const [users, setUsers] = useState<ProfileWithEmail[]>([]);
@@ -147,16 +157,21 @@ export default function UsersAdminPage() {
           .order('display_name');
         
         if (error) throw error;
-        setAvailableRoles(data || []);
+
+        const filteredRoles = isManagerActor
+          ? (data || []).filter((role: { name: string }) => role.name.startsWith('employee-'))
+          : (data || []);
+
+        setAvailableRoles(filteredRoles);
       } catch (error) {
         console.error('Error fetching roles:', error);
       }
     }
 
-    if (isAdmin) {
+    if (canManageUsers) {
       fetchRoles();
     }
-  }, [isAdmin, supabase]);
+  }, [canManageUsers, isManagerActor, supabase]);
 
   // Fetch users
   useEffect(function () {
@@ -173,11 +188,11 @@ export default function UsersAdminPage() {
       }
     }
 
-    if (isAdmin) {
+    if (canManageUsers) {
       fetchUsers();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin]);
+  }, [canManageUsers]);
 
   // Search and role filter
   useEffect(function () {
@@ -433,7 +448,7 @@ export default function UsersAdminPage() {
   }
 
   // Show loading while auth is being checked
-  if (authLoading) {
+  if (authLoading || permissionLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -442,7 +457,7 @@ export default function UsersAdminPage() {
   }
 
   // Check authorization
-  if (!isAdmin) {
+  if (!canManageUsers) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Card className="max-w-md">
@@ -452,7 +467,7 @@ export default function UsersAdminPage() {
               Access Denied
             </CardTitle>
             <CardDescription>
-              You do not have permission to access user management.
+              You do not have permission to access this page.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -476,7 +491,7 @@ export default function UsersAdminPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)} className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-2 bg-slate-100 dark:bg-slate-800 p-0">
+        <TabsList className={`grid w-full ${canEditRolePermissions ? 'max-w-xl grid-cols-3' : canManageRoleDefinitions ? 'max-w-md grid-cols-2' : 'max-w-sm grid-cols-1'} bg-slate-100 dark:bg-slate-800 p-0`}>
           <TabsTrigger 
             value="users" 
             className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900"
@@ -484,13 +499,24 @@ export default function UsersAdminPage() {
             <User className="h-4 w-4" />
             Users
           </TabsTrigger>
-          <TabsTrigger 
-            value="roles" 
-            className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900"
-          >
-            <Shield className="h-4 w-4" />
-            Roles
-          </TabsTrigger>
+          {canManageRoleDefinitions && (
+            <TabsTrigger 
+              value="roles" 
+              className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900"
+            >
+              <Briefcase className="h-4 w-4" />
+              Roles
+            </TabsTrigger>
+          )}
+          {canEditRolePermissions && (
+            <TabsTrigger 
+              value="permissions" 
+              className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900"
+            >
+              <Shield className="h-4 w-4" />
+              Permissions
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Users Tab Content */}
@@ -1182,9 +1208,18 @@ export default function UsersAdminPage() {
         </TabsContent>
 
         {/* Roles Tab Content */}
-        <TabsContent value="roles">
-          <RoleManagement />
-        </TabsContent>
+        {canManageRoleDefinitions && (
+          <TabsContent value="roles">
+            <JobRolesTab />
+          </TabsContent>
+        )}
+
+        {/* Permissions Tab Content */}
+        {canEditRolePermissions && (
+          <TabsContent value="permissions">
+            <RoleManagement />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

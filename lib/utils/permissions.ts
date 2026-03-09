@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import type { ModuleName, UserPermissions } from '@/types/roles';
+import { ALL_MODULES } from '@/types/roles';
 
 export type ProfileWithRole = {
   id: string;
@@ -76,15 +77,18 @@ export async function userHasPermission(
   const supabase = await createClient();
 
   try {
-    // Check if user is manager/admin (they always have access)
+    // Admin and super-admin always have full access.
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role_id, roles!inner(is_manager_admin)')
+      .select('role_id, roles!inner(name, is_super_admin)')
       .eq('id', userId)
       .single();
-    const typedProfile = profile as { role_id: string | null; roles: { is_manager_admin: boolean } | null } | null;
+    const typedProfile = profile as {
+      role_id: string | null;
+      roles: { name: string; is_super_admin: boolean } | null;
+    } | null;
 
-    if (typedProfile?.roles?.is_manager_admin) {
+    if (typedProfile?.roles?.is_super_admin || typedProfile?.roles?.name === 'admin') {
       return true;
     }
 
@@ -118,44 +122,44 @@ export async function getUserPermissions(
       .select(`
         role_id,
         roles!inner(
+          name,
+          is_super_admin,
           is_manager_admin
-        ),
-        role_permissions(
-          module_name,
-          enabled
         )
       `)
       .eq('id', userId)
       .single();
     const typedProfile = profile as {
-      roles: { is_manager_admin: boolean } | null;
-      role_permissions: Array<{ module_name: ModuleName; enabled: boolean }> | null;
+      role_id: string | null;
+      roles: { name: string; is_super_admin: boolean; is_manager_admin: boolean } | null;
     } | null;
 
-    // If manager/admin, return all permissions as enabled
-    if (typedProfile?.roles?.is_manager_admin) {
-      return {
-        'timesheets': true,
-        'inspections': true,
-        'plant-inspections': true,
-        'hgv-inspections': true,
-        'rams': true,
-        'absence': true,
-        'maintenance': true,
-        'toolbox-talks': true,
-        'workshop-tasks': true,
-        'approvals': true,
-        'actions': true,
-        'reports': true,
-        'admin-users': true,
-        'admin-vans': true,
-      };
+    if (!typedProfile?.role_id) {
+      return {};
+    }
+
+    // Admin and super-admin are full access by definition.
+    if (typedProfile.roles?.is_super_admin || typedProfile.roles?.name === 'admin') {
+      const full: UserPermissions = {};
+      ALL_MODULES.forEach((moduleName) => {
+        full[moduleName] = true;
+      });
+      return full;
+    }
+
+    const { data: rolePermissions } = await supabase
+      .from('role_permissions')
+      .select('module_name, enabled')
+      .eq('role_id', typedProfile.role_id);
+
+    if (!rolePermissions) {
+      return {};
     }
 
     // Build permissions object from role_permissions
     const permissions: UserPermissions = {};
-    typedProfile?.role_permissions?.forEach((perm) => {
-      permissions[perm.module_name] = perm.enabled;
+    (rolePermissions as Array<{ module_name: ModuleName; enabled: boolean }>).forEach((perm) => {
+      permissions[perm.module_name] = !!perm.enabled;
     });
 
     return permissions;
@@ -218,25 +222,50 @@ export async function getUsersWithPermission(
 
   try {
     // Get all users who either:
-    // 1. Have manager/admin role (auto-access), OR
-    // 2. Have specific permission enabled for this module
+    // 1. Are admin/super-admin, OR
+    // 2. Have specific permission enabled for this module.
     const { data: profiles } = await supabase
       .from('profiles')
       .select(`
         id,
         role_id,
         roles!inner(
+          name,
+          is_super_admin,
           is_manager_admin,
-          role_permissions!inner(
-            module_name,
-            enabled
-          )
         )
-      `)
-      .or(`roles.is_manager_admin.eq.true,and(roles.role_permissions.module_name.eq.${module},roles.role_permissions.enabled.eq.true)`);
-    const typedProfiles = profiles as Array<{ id: string }> | null;
+      `);
+    const typedProfiles = profiles as Array<{
+      id: string;
+      role_id: string | null;
+      roles: { name: string; is_super_admin: boolean; is_manager_admin: boolean } | null;
+    }> | null;
 
-    return typedProfiles?.map((p) => p.id) ?? [];
+    if (!typedProfiles?.length) {
+      return [];
+    }
+
+    const roleIds = typedProfiles
+      .map((p) => p.role_id)
+      .filter((id): id is string => !!id);
+
+    const { data: permissionRows } = await supabase
+      .from('role_permissions')
+      .select('role_id, module_name, enabled')
+      .in('role_id', roleIds)
+      .eq('module_name', module)
+      .eq('enabled', true);
+
+    const allowedRoleIds = new Set((permissionRows || []).map((row: { role_id: string }) => row.role_id));
+
+    return typedProfiles
+      .filter((profileRow) => {
+        const role = profileRow.roles;
+        if (!role) return false;
+        if (role.is_super_admin || role.name === 'admin') return true;
+        return profileRow.role_id ? allowedRoleIds.has(profileRow.role_id) : false;
+      })
+      .map((profileRow) => profileRow.id);
   } catch (error) {
     console.error('Error getting users with permission:', error);
     return [];

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getProfileWithRole } from '@/lib/utils/permissions';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { ERROR_REPORT_STATUS_LABELS } from '@/types/error-reports';
 import type { 
@@ -30,10 +30,9 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin
-    const profile = await getProfileWithRole(user.id);
-    if (!profile?.role || (profile.role.name !== 'admin' && !profile.role.is_super_admin)) {
-      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+    const canAccessErrorReports = await canEffectiveRoleAccessModule('error-reports');
+    if (!canAccessErrorReports) {
+      return NextResponse.json({ error: 'Forbidden: error-reports access required' }, { status: 403 });
     }
 
     // Fetch error report
@@ -112,10 +111,9 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin
-    const profile = await getProfileWithRole(user.id);
-    if (!profile?.role || (profile.role.name !== 'admin' && !profile.role.is_super_admin)) {
-      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+    const canAccessErrorReports = await canEffectiveRoleAccessModule('error-reports');
+    if (!canAccessErrorReports) {
+      return NextResponse.json({ error: 'Forbidden: error-reports access required' }, { status: 403 });
     }
 
     // Parse request body

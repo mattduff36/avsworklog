@@ -16,7 +16,7 @@ import { toast } from 'sonner';
  * @returns Object with hasPermission and loading states
  */
 export function usePermissionCheck(moduleName: ModuleName, redirectOnFail = true) {
-  const { user, profile, isManager, isAdmin, isViewingAs, effectiveRole, loading: authLoading } = useAuth();
+  const { user, profile, isAdmin, isViewingAs, effectiveRole, loading: authLoading } = useAuth();
   const router = useRouter();
   const [hasPermission, setHasPermission] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -34,8 +34,8 @@ export function usePermissionCheck(moduleName: ModuleName, redirectOnFail = true
         return;
       }
 
-      // Managers and admins always have full access
-      if (isManager || isAdmin) {
+      // Admin keeps full access by definition.
+      if (isAdmin) {
         setHasPermission(true);
         setLoading(false);
         return;
@@ -69,16 +69,15 @@ export function usePermissionCheck(moduleName: ModuleName, redirectOnFail = true
           // Normal flow: fetch from profile → role → permissions
           const { data: profileData, error } = await supabase
             .from('profiles')
-            .select(`
-              role_id,
-              role:roles!inner(
-                is_manager_admin,
-                role_permissions!inner(
-                  module_name,
-                  enabled
-                )
+          .select(`
+            role_id,
+            role:roles!inner(
+              role_permissions!inner(
+                module_name,
+                enabled
               )
-            `)
+            )
+          `)
             .eq('id', user.id)
             .single();
 
@@ -115,7 +114,7 @@ export function usePermissionCheck(moduleName: ModuleName, redirectOnFail = true
     }
 
     checkPermission();
-  }, [user, profile, isManager, isAdmin, isViewingAs, effectiveRole, authLoading, moduleName, redirectOnFail, router]);
+  }, [user, profile, isAdmin, isViewingAs, effectiveRole, authLoading, moduleName, redirectOnFail, router]);
 
   return { hasPermission, loading };
 }

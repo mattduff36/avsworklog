@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isManagerOrAdmin } from '@/lib/utils/permissions';
+import { isEffectiveRoleAdminOrSuper } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { GetRoleResponse, UpdateRoleRequest } from '@/types/roles';
 
@@ -22,10 +22,9 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is manager/admin
-    const isAuthorized = await isManagerOrAdmin(user.id);
+    const isAuthorized = await isEffectiveRoleAdminOrSuper();
     if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden - Manager/Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
     // Get role with permissions
@@ -96,10 +95,9 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is manager/admin
-    const isAuthorized = await isManagerOrAdmin(user.id);
+    const isAuthorized = await isEffectiveRoleAdminOrSuper();
     if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden - Manager/Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
     const body = (await request.json()) as UpdateRoleRequest & {
@@ -203,10 +201,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is manager/admin
-    const isAuthorized = await isManagerOrAdmin(user.id);
+    const isAuthorized = await isEffectiveRoleAdminOrSuper();
     if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden - Manager/Admin access required' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
     // Check if role exists and is not super admin or manager/admin

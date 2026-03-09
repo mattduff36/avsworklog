@@ -27,12 +27,13 @@ import { createClient } from '@/lib/supabase/client';
 import type { FAQArticleWithCategory, FAQCategory, Suggestion } from '@/types/faq';
 import type { ErrorReport } from '@/types/error-reports';
 import type { ModuleName } from '@/types/roles';
+import { ALL_MODULES } from '@/types/roles';
 import Link from 'next/link';
 import { MODULE_PAGES, getPageLabel, getPageUrl } from '@/lib/config/module-pages';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function HelpPage() {
-  const { profile, isManager, isAdmin } = useAuth(); // Get user info
+  const { profile, isAdmin } = useAuth(); // Get user info
   const supabase = createClient();
   
   // FAQ state
@@ -123,12 +124,9 @@ export default function HelpPage() {
     async function fetchPermissions() {
       if (!profile?.id) return;
       
-      // Managers and admins have all permissions
-      if (isManager || isAdmin) {
-        setUserPermissions(new Set([
-          'timesheets', 'inspections', 'rams', 'absence', 'maintenance', 'workshop-tasks',
-          'approvals', 'actions', 'reports', 'admin-users', 'admin-vans'
-        ] as ModuleName[]));
+      // Admin has full access by definition.
+      if (isAdmin) {
+        setUserPermissions(new Set(ALL_MODULES));
         return;
       }
       
@@ -162,7 +160,7 @@ export default function HelpPage() {
       }
     }
     fetchPermissions();
-  }, [profile?.id, isManager, isAdmin, supabase]);
+  }, [profile?.id, isAdmin, supabase]);
 
   // Fetch FAQ data on mount
   useEffect(() => {
@@ -193,8 +191,7 @@ export default function HelpPage() {
 
   // Filter categories based on user permissions
   const filteredCategories = useMemo(() => {
-    // Managers and admins see all categories
-    if (isManager || isAdmin) {
+    if (isAdmin) {
       return categories;
     }
     
@@ -208,7 +205,7 @@ export default function HelpPage() {
       // Check if user has permission to this module
       return userPermissions.has(category.module_name as ModuleName);
     });
-  }, [categories, userPermissions, isManager, isAdmin]);
+  }, [categories, userPermissions, isAdmin]);
 
   // Filter articles to only show those in accessible categories
   const filteredArticles = useMemo(() => {

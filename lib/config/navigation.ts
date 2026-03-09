@@ -133,30 +133,35 @@ export const managerNavItems: NavItem[] = [
     href: '/approvals', 
     label: 'Approvals', 
     icon: CheckSquare,
+    module: 'approvals',
     category: 'manager'
   },
   { 
     href: '/actions', 
     label: 'Actions', 
     icon: ListTodo,
+    module: 'actions',
     category: 'manager'
   },
   { 
     href: '/toolbox-talks', 
     label: 'Toolbox Talks', 
     icon: MessageSquare,
+    module: 'toolbox-talks',
     category: 'manager'
   },
   { 
     href: '/reports', 
     label: 'Reports', 
     icon: BarChart3,
+    module: 'reports',
     category: 'manager'
   },
   { 
     href: '/suggestions/manage', 
     label: 'Suggestions', 
     icon: Lightbulb,
+    module: 'suggestions',
     category: 'manager'
   },
 ];
@@ -187,18 +192,21 @@ export const adminNavItems: NavItem[] = [
     href: '/admin/users', 
     label: 'Users', 
     icon: Users,
+    module: 'admin-users',
     category: 'admin'
   },
   { 
     href: '/admin/faq', 
     label: 'FAQ Editor', 
     icon: HelpCircle,
+    module: 'faq-editor',
     category: 'admin'
   },
   { 
     href: '/admin/errors/manage', 
     label: 'Error Reports', 
     icon: AlertTriangle,
+    module: 'error-reports',
     category: 'admin'
   },
 ];
@@ -229,12 +237,6 @@ export function getFilteredEmployeeNav(
   hasRAMSAssignments: boolean
 ): NavItem[] {
   return employeeNavItems.filter(item => {
-    // Managers and admins always have access to all modules
-    // (RAMS should be visible to managers/admins regardless of assignments)
-    if (isManager || isAdmin) {
-      return true;
-    }
-    
     // For items with dropdown children, check if user has access to ANY child
     if (item.dropdownItems && item.dropdownItems.length > 0) {
       const hasAccessToAnyChild = item.dropdownItems.some(child => {
@@ -254,11 +256,28 @@ export function getFilteredEmployeeNav(
     }
     
     // Special handling for RAMS - hide for employees with no assignments
-    if (item.module === 'rams' && !hasRAMSAssignments) {
+    if (item.module === 'rams' && !hasRAMSAssignments && !isManager && !isAdmin) {
       return false;
     }
     
     return true;
+  });
+}
+
+export function getFilteredNavByPermissions(
+  items: NavItem[],
+  userPermissions: Set<ModuleName>,
+  isAdmin: boolean
+): NavItem[] {
+  if (isAdmin) {
+    return items;
+  }
+
+  return items.filter((item) => {
+    if (!item.module) {
+      return true;
+    }
+    return userPermissions.has(item.module);
   });
 }
 

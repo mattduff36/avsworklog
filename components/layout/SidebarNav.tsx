@@ -17,7 +17,9 @@ import {
 } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { managerNavItems, adminNavItems } from '@/lib/config/navigation';
+import type { ModuleName } from '@/types/roles';
+import { ALL_MODULES } from '@/types/roles';
+import { managerNavItems, adminNavItems, getFilteredNavByPermissions } from '@/lib/config/navigation';
 import { getViewAsRoleId, setViewAsRoleId } from '@/lib/utils/view-as-cookie';
 
 interface RoleOption {
@@ -35,11 +37,12 @@ interface SidebarNavProps {
 
 export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const pathname = usePathname();
-  const { isAdmin, isManager } = useAuth();
+  const { isAdmin, isManager, effectiveRole, isViewingAs } = useAuth();
   const supabase = createClient();
   const [userEmail, setUserEmail] = useState<string>('');
   const [viewAsRoleId, setViewAsRoleIdState] = useState<string>('');
   const [allRoles, setAllRoles] = useState<RoleOption[]>([]);
+  const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
 
   // Fetch user email, all roles, and current view-as selection
   useEffect(() => {
@@ -65,6 +68,52 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     }
     fetchRoles();
 
+    async function fetchPermissions() {
+      try {
+        if (effectiveRole?.name === 'admin' || effectiveRole?.is_super_admin) {
+          queueMicrotask(() => setUserPermissions(new Set(ALL_MODULES)));
+          return;
+        }
+
+        let effectiveRoleId = isViewingAs ? getViewAsRoleId() : '';
+        if (!effectiveRoleId) {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          if (!user?.id) {
+            queueMicrotask(() => setUserPermissions(new Set()));
+            return;
+          }
+          const { data: profileRow } = await supabase
+            .from('profiles')
+            .select('role_id')
+            .eq('id', user.id)
+            .single();
+          effectiveRoleId = profileRow?.role_id || '';
+        }
+
+        if (!effectiveRoleId) {
+          queueMicrotask(() => setUserPermissions(new Set()));
+          return;
+        }
+
+        const { data: perms } = await supabase
+          .from('role_permissions')
+          .select('module_name, enabled')
+          .eq('role_id', effectiveRoleId)
+          .eq('enabled', true);
+
+        const enabledModules = new Set<ModuleName>();
+        (perms || []).forEach((perm: { module_name: string }) => {
+          enabledModules.add(perm.module_name as ModuleName);
+        });
+        queueMicrotask(() => setUserPermissions(enabledModules));
+      } catch {
+        queueMicrotask(() => setUserPermissions(new Set()));
+      }
+    }
+    fetchPermissions();
+
     // Read current selection from cookie (or legacy localStorage)
     const cookieVal = getViewAsRoleId();
     if (cookieVal) {
@@ -77,7 +126,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         localStorage.removeItem('viewAsRole');
       }
     }
-  }, [supabase]);
+  }, [supabase, effectiveRole?.name, effectiveRole?.is_super_admin, isViewingAs]);
 
   // Collapse sidebar on route change (don't close completely)
   const prevPathnameRef = useRef(pathname);
@@ -100,9 +149,10 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   // Show sidebar for managers/admins or superadmins (who need View As feature)
   if (!isManager && !isSuperAdmin) return null;
 
-  // Use shared navigation config
-  const managerLinks = managerNavItems;
-  const adminLinks = isAdmin ? adminNavItems : [];
+  const managerLinks = getFilteredNavByPermissions(managerNavItems, userPermissions, isAdmin);
+  const adminLinks = getFilteredNavByPermissions(adminNavItems, userPermissions, isAdmin);
+  const hasAnyManagementLinks = managerLinks.length > 0 || adminLinks.length > 0;
+  if (!hasAnyManagementLinks && !showDeveloperTools) return null;
 
   return (
     <>
@@ -141,7 +191,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         {/* Navigation */}
         <div className={`overflow-y-auto py-4 ${isSuperAdmin ? 'h-[calc(100vh-10rem)]' : 'h-[calc(100vh-8.25rem)]'}`}>
           {/* Manager Links */}
-          {isManager && (
+          {(isManager || isAdmin) && managerLinks.length > 0 && (
           <div className={open ? 'px-3 mb-6' : 'px-2 mb-6'}>
             <div className={`px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider transition-opacity duration-200 ${
               open ? 'opacity-100 delay-300' : 'opacity-0 h-0 overflow-hidden'
@@ -179,7 +229,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
           )}
 
           {/* Admin Links */}
-          {isAdmin && (
+          {adminLinks.length > 0 && (
             <div className={open ? 'px-3 mb-6' : 'px-2 mb-6'}>
               <div className={`px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider transition-opacity duration-200 ${
                 open ? 'opacity-100 delay-300' : 'opacity-0 h-0 overflow-hidden'

@@ -93,7 +93,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // Replace line items if provided
     if (line_items) {
-      await supabase.from('quote_line_items').delete().eq('quote_id', id);
+      const { error: deleteLineItemsError } = await supabase
+        .from('quote_line_items')
+        .delete()
+        .eq('quote_id', id);
+      if (deleteLineItemsError) throw deleteLineItemsError;
 
       if (line_items.length > 0) {
         const rows = line_items.map((item: { description?: string; quantity: number; unit?: string; unit_rate: number; sort_order?: number }, idx: number) => ({
@@ -107,7 +111,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         }));
 
         const { error: liError } = await supabase.from('quote_line_items').insert(rows);
-        if (liError) console.error('Error replacing line items:', liError);
+        if (liError) throw liError;
       }
     }
 

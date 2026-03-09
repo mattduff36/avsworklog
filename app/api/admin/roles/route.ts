@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isManagerOrAdmin } from '@/lib/utils/permissions';
+import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { GetRolesResponse, CreateRoleRequest, RoleWithUserCount, RoleMatrixRow, ModuleName } from '@/types/roles';
 import { ALL_MODULES } from '@/types/roles';
@@ -19,10 +19,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is manager/admin
-    const isAuthorized = await isManagerOrAdmin(user.id);
-    if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden - Manager/Admin access required' }, { status: 403 });
+    const effectiveRole = await getEffectiveRole();
+    const isAdminOrSuper = effectiveRole.is_super_admin || effectiveRole.role_name === 'admin';
+    const isManager = effectiveRole.is_manager_admin && !isAdminOrSuper;
+    if (!isAdminOrSuper && !isManager) {
+      return NextResponse.json({ error: 'Forbidden - Admin or Manager access required' }, { status: 403 });
     }
 
     // Get all roles with user counts and permissions
@@ -132,18 +133,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is manager/admin
-    const isAuthorized = await isManagerOrAdmin(user.id);
-    if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden - Manager/Admin access required' }, { status: 403 });
+    const effectiveRole = await getEffectiveRole();
+    const isAdminOrSuper = effectiveRole.is_super_admin || effectiveRole.role_name === 'admin';
+    const isManager = effectiveRole.is_manager_admin && !isAdminOrSuper;
+    if (!isAdminOrSuper && !isManager) {
+      return NextResponse.json({ error: 'Forbidden - Admin or Manager access required' }, { status: 403 });
     }
 
-    const body = (await request.json()) as CreateRoleRequest & { timesheet_type?: string };
+    const body = (await request.json()) as CreateRoleRequest & { timesheet_type?: string; role_type?: 'admin' | 'manager' | 'employee' };
 
     // Validate required fields
     if (!body.name || !body.display_name) {
       return NextResponse.json({ 
         error: 'Missing required fields: name, display_name' 
+      }, { status: 400 });
+    }
+
+    const requestedRoleType =
+      body.role_type ??
+      (body.name === 'admin' ? 'admin' : body.is_manager_admin ? 'manager' : 'employee');
+
+    if (isManager && (requestedRoleType === 'admin' || requestedRoleType === 'manager')) {
+      return NextResponse.json({
+        error: 'Managers can only create Employee roles'
+      }, { status: 403 });
+    }
+
+    if (requestedRoleType === 'admin' && body.name !== 'admin') {
+      return NextResponse.json({
+        error: 'Admin role must use internal name "admin"'
       }, { status: 400 });
     }
 
@@ -168,7 +186,7 @@ export async function POST(request: NextRequest) {
         display_name: body.display_name,
         description: body.description || null,
         is_super_admin: false, // Cannot create super admin via API
-        is_manager_admin: body.is_manager_admin || false,
+        is_manager_admin: requestedRoleType === 'manager' || requestedRoleType === 'admin',
         timesheet_type: body.timesheet_type || 'civils', // Default to civils (Phase 6)
       })
       .select()

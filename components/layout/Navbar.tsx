@@ -17,9 +17,11 @@ import { NotificationPanel } from '@/components/messages/NotificationPanel';
 import { SidebarNav } from './SidebarNav';
 import { createClient } from '@/lib/supabase/client';
 import type { ModuleName } from '@/types/roles';
+import { ALL_MODULES } from '@/types/roles';
 import { 
   dashboardNavItem, 
   getFilteredEmployeeNav, 
+  getFilteredNavByPermissions,
   managerNavItems, 
   adminNavItems 
 } from '@/lib/config/navigation';
@@ -170,9 +172,9 @@ export function Navbar() {
         return;
       }
 
-      // Managers and admins have all permissions
-      if (isManager || isAdmin) {
-        setUserPermissions(new Set(['timesheets', 'inspections', 'plant-inspections', 'hgv-inspections', 'absence', 'rams', 'maintenance', 'workshop-tasks', 'approvals', 'actions', 'reports'] as ModuleName[]));
+      // Admin keeps full access by definition.
+      if (isAdmin) {
+        setUserPermissions(new Set(ALL_MODULES));
         setPermissionsLoading(false);
         return;
       }
@@ -406,8 +408,16 @@ export function Navbar() {
   );
 
   // Manager/admin links for mobile menu only (using shared config)
-  const managerLinks = managerNavItems;
-  const adminLinks = isAdmin ? adminNavItems : [];
+  const managerLinks = getFilteredNavByPermissions(
+    managerNavItems,
+    userPermissions,
+    effectiveIsAdmin
+  );
+  const adminLinks = getFilteredNavByPermissions(
+    adminNavItems,
+    userPermissions,
+    effectiveIsAdmin
+  );
 
   return (
     <>
@@ -559,7 +569,7 @@ export function Navbar() {
               })}
               
               {/* Manager/Admin Section (Mobile) */}
-              {isManager && (
+              {(managerLinks.length > 0 || adminLinks.length > 0) && (
                 <>
                   <div className="my-3 border-t border-border/50"></div>
                   
@@ -590,7 +600,7 @@ export function Navbar() {
                   })}
                   
                   {/* Admin Links */}
-                  {isAdmin && (
+                  {adminLinks.length > 0 && (
                     <>
                       <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider mt-4">
                         Administration

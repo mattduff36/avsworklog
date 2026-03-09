@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/hooks/useAuth';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,7 +46,7 @@ import type { FAQCategory, FAQArticleWithCategory } from '@/types/faq';
 
 export default function FAQEditorPage() {
   const router = useRouter();
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { hasPermission: canEditFaq, loading: permissionLoading } = usePermissionCheck('faq-editor', false);
   
   const [activeTab, setActiveTab] = useState('categories');
   
@@ -91,10 +91,10 @@ export default function FAQEditorPage() {
 
   // Redirect non-admins
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
+    if (!permissionLoading && !canEditFaq) {
       router.push('/dashboard');
     }
-  }, [authLoading, isAdmin, router]);
+  }, [permissionLoading, canEditFaq, router]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -137,18 +137,18 @@ export default function FAQEditorPage() {
 
   // Fetch data on mount
   useEffect(() => {
-    if (isAdmin) {
+    if (canEditFaq) {
       fetchCategories();
       fetchArticles('all');
     }
-  }, [isAdmin, fetchCategories, fetchArticles]);
+  }, [canEditFaq, fetchCategories, fetchArticles]);
 
   // Refetch articles when filter changes
   useEffect(() => {
-    if (isAdmin) {
+    if (canEditFaq) {
       fetchArticles(selectedCategoryFilter);
     }
-  }, [selectedCategoryFilter, isAdmin, fetchArticles]);
+  }, [selectedCategoryFilter, canEditFaq, fetchArticles]);
 
   // Category handlers
   const openAddCategory = () => {
@@ -329,7 +329,7 @@ export default function FAQEditorPage() {
       .replace(/^-|-$/g, '');
   };
 
-  if (authLoading) {
+  if (permissionLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -337,7 +337,7 @@ export default function FAQEditorPage() {
     );
   }
 
-  if (!isAdmin) {
+  if (!canEditFaq) {
     return null;
   }
 

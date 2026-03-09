@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
-import { useAuth } from '@/lib/hooks/useAuth';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,7 +46,7 @@ interface TimesheetWithProfile extends Timesheet {
 }
 
 function ApprovalsContent() {
-  const { isManager, loading: authLoading } = useAuth();
+  const { hasPermission: canViewApprovals, loading: permissionLoading } = usePermissionCheck('approvals', false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -146,14 +146,14 @@ function ApprovalsContent() {
   }, [supabase]);
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!isManager) {
+    if (!permissionLoading) {
+      if (!canViewApprovals) {
         router.push('/dashboard');
         return;
       }
       fetchApprovals(statusFilter);
     }
-  }, [isManager, authLoading, router, fetchApprovals, statusFilter, activeTab]);
+  }, [canViewApprovals, permissionLoading, router, fetchApprovals, statusFilter, activeTab]);
 
   const handleQuickApprove = async (_type: 'timesheet', id: string) => {
     try {
@@ -227,7 +227,7 @@ function ApprovalsContent() {
     }
   };
 
-  if (authLoading || loading) {
+  if (permissionLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <p className="text-muted-foreground">Loading approvals...</p>

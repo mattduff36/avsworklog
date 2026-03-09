@@ -108,6 +108,28 @@ export const MODULE_PAGES: ModulePage[] = [
     ],
   },
   {
+    module: 'suggestions',
+    displayName: MODULE_DISPLAY_NAMES.suggestions,
+    subPages: [
+      { value: 'suggestions-manage', label: 'Manage Suggestions' },
+    ],
+  },
+  {
+    module: 'faq-editor',
+    displayName: MODULE_DISPLAY_NAMES['faq-editor'],
+    subPages: [
+      { value: 'faq-editor-main', label: 'FAQ Editor' },
+      { value: 'faq-editor-categories', label: 'Category Manager' },
+    ],
+  },
+  {
+    module: 'error-reports',
+    displayName: MODULE_DISPLAY_NAMES['error-reports'],
+    subPages: [
+      { value: 'error-reports-manage', label: 'Manage Error Reports' },
+    ],
+  },
+  {
     module: 'toolbox-talks',
     displayName: MODULE_DISPLAY_NAMES['toolbox-talks'],
     subPages: [
@@ -230,6 +252,12 @@ export function getPageUrl(value: string): string {
     'reports-list': '/reports',
     'reports-timesheets': '/reports/timesheets',
     'reports-absence': '/reports/absence',
+
+    // Suggestions / FAQ / Error Reports
+    'suggestions-manage': '/suggestions/manage',
+    'faq-editor-main': '/admin/faq',
+    'faq-editor-categories': '/admin/faq',
+    'error-reports-manage': '/admin/errors/manage',
     
     // Toolbox Talks
     'toolbox-talks-list': '/toolbox-talks',
