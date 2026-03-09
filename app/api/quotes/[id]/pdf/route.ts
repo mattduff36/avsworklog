@@ -1,0 +1,92 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { renderToStream } from '@react-pdf/renderer';
+import { QuotePDF } from '@/lib/pdf/quote-pdf';
+import { logServerError } from '@/lib/utils/server-error-logger';
+
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
+
+export async function GET(request: NextRequest, { params }: RouteParams) {
+  try {
+    const { id } = await params;
+    const supabase = await createClient();
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Fetch quote
+    const { data: quote, error: quoteError } = await supabase
+      .from('quotes')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (quoteError) {
+      if (quoteError.code === 'PGRST116') {
+        return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
+      }
+      throw quoteError;
+    }
+
+    // Fetch line items
+    const { data: lineItems } = await supabase
+      .from('quote_line_items')
+      .select('*')
+      .eq('quote_id', id)
+      .order('sort_order', { ascending: true });
+
+    const pdfDocument = QuotePDF({
+      quoteReference: quote.quote_reference,
+      quoteDate: quote.quote_date,
+      attentionName: quote.attention_name || '',
+      attentionEmail: quote.attention_email || '',
+      salutation: quote.salutation || '',
+      projectDescription: quote.project_description || '',
+      subjectLine: quote.subject_line || '',
+      lineItems: (lineItems || []).map((li: { description: string; quantity: number; unit: string | null; unit_rate: number; line_total: number }) => ({
+        description: li.description,
+        quantity: Number(li.quantity),
+        unit: li.unit,
+        unit_rate: Number(li.unit_rate),
+        line_total: Number(li.line_total),
+      })),
+      subtotal: Number(quote.subtotal),
+      validityDays: quote.validity_days || 30,
+      signoffName: quote.signoff_name || '',
+      signoffTitle: quote.signoff_title || '',
+      customFooterText: quote.custom_footer_text || undefined,
+    });
+
+    const stream = await renderToStream(pdfDocument);
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    const pdfBytes = new Uint8Array(Buffer.concat(chunks));
+
+    const filename = `Quote_${quote.quote_reference.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
+
+    return new NextResponse(pdfBytes, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      },
+    });
+  } catch (error) {
+    const { id } = await params;
+    console.error('Error generating quote PDF:', error);
+
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/api/quotes/[id]/pdf',
+      additionalData: { endpoint: `GET /api/quotes/${id}/pdf` },
+    });
+
+    return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });
+  }
+}

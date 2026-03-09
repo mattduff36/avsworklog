@@ -1674,6 +1674,236 @@ export interface Database {
           updated_at?: string
         }
       }
+      customers: {
+        Row: {
+          id: string
+          company_name: string
+          short_name: string | null
+          contact_name: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          contact_job_title: string | null
+          address_line_1: string | null
+          address_line_2: string | null
+          city: string | null
+          county: string | null
+          postcode: string | null
+          payment_terms_days: number
+          default_validity_days: number
+          status: 'active' | 'inactive'
+          notes: string | null
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          company_name: string
+          short_name?: string | null
+          contact_name?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          contact_job_title?: string | null
+          address_line_1?: string | null
+          address_line_2?: string | null
+          city?: string | null
+          county?: string | null
+          postcode?: string | null
+          payment_terms_days?: number
+          default_validity_days?: number
+          status?: 'active' | 'inactive'
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          company_name?: string
+          short_name?: string | null
+          contact_name?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          contact_job_title?: string | null
+          address_line_1?: string | null
+          address_line_2?: string | null
+          city?: string | null
+          county?: string | null
+          postcode?: string | null
+          payment_terms_days?: number
+          default_validity_days?: number
+          status?: 'active' | 'inactive'
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+      }
+      quotes: {
+        Row: {
+          id: string
+          quote_reference: string
+          customer_id: string
+          requester_id: string | null
+          requester_initials: string | null
+          quote_date: string
+          attention_name: string | null
+          attention_email: string | null
+          subject_line: string | null
+          project_description: string | null
+          salutation: string | null
+          validity_days: number
+          subtotal: number
+          vat_rate: number
+          vat_amount: number
+          total: number
+          status: 'draft' | 'pending_internal_approval' | 'sent' | 'won' | 'lost' | 'ready_to_invoice' | 'invoiced'
+          accepted: boolean
+          po_number: string | null
+          started: boolean
+          invoice_number: string | null
+          invoice_notes: string | null
+          signoff_name: string | null
+          signoff_title: string | null
+          custom_footer_text: string | null
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          updated_by: string | null
+          sent_at: string | null
+          accepted_at: string | null
+          invoiced_at: string | null
+        }
+        Insert: {
+          id?: string
+          quote_reference: string
+          customer_id: string
+          requester_id?: string | null
+          requester_initials?: string | null
+          quote_date?: string
+          attention_name?: string | null
+          attention_email?: string | null
+          subject_line?: string | null
+          project_description?: string | null
+          salutation?: string | null
+          validity_days?: number
+          subtotal?: number
+          vat_rate?: number
+          vat_amount?: number
+          total?: number
+          status?: 'draft' | 'pending_internal_approval' | 'sent' | 'won' | 'lost' | 'ready_to_invoice' | 'invoiced'
+          accepted?: boolean
+          po_number?: string | null
+          started?: boolean
+          invoice_number?: string | null
+          invoice_notes?: string | null
+          signoff_name?: string | null
+          signoff_title?: string | null
+          custom_footer_text?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+          sent_at?: string | null
+          accepted_at?: string | null
+          invoiced_at?: string | null
+        }
+        Update: {
+          id?: string
+          quote_reference?: string
+          customer_id?: string
+          requester_id?: string | null
+          requester_initials?: string | null
+          quote_date?: string
+          attention_name?: string | null
+          attention_email?: string | null
+          subject_line?: string | null
+          project_description?: string | null
+          salutation?: string | null
+          validity_days?: number
+          subtotal?: number
+          vat_rate?: number
+          vat_amount?: number
+          total?: number
+          status?: 'draft' | 'pending_internal_approval' | 'sent' | 'won' | 'lost' | 'ready_to_invoice' | 'invoiced'
+          accepted?: boolean
+          po_number?: string | null
+          started?: boolean
+          invoice_number?: string | null
+          invoice_notes?: string | null
+          signoff_name?: string | null
+          signoff_title?: string | null
+          custom_footer_text?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+          sent_at?: string | null
+          accepted_at?: string | null
+          invoiced_at?: string | null
+        }
+      }
+      quote_line_items: {
+        Row: {
+          id: string
+          quote_id: string
+          description: string
+          quantity: number
+          unit: string | null
+          unit_rate: number
+          line_total: number
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          quote_id: string
+          description: string
+          quantity?: number
+          unit?: string | null
+          unit_rate?: number
+          line_total?: number
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          quote_id?: string
+          description?: string
+          quantity?: number
+          unit?: string | null
+          unit_rate?: number
+          line_total?: number
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      quote_sequences: {
+        Row: {
+          id: string
+          requester_initials: string
+          next_number: number
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          requester_initials: string
+          next_number?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          requester_initials?: string
+          next_number?: number
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

@@ -27,6 +27,8 @@ import {
   HelpCircle,
   Lightbulb,
   AlertTriangle,
+  Building2,
+  Receipt,
   LucideIcon
 } from 'lucide-react';
 import { ModuleName } from '@/types/roles';
@@ -167,6 +169,20 @@ export const managerNavItems: NavItem[] = [
  * - Left sidebar navigation
  */
 export const adminNavItems: NavItem[] = [
+  { 
+    href: '/customers', 
+    label: 'Customers', 
+    icon: Building2,
+    module: 'customers',
+    category: 'admin'
+  },
+  { 
+    href: '/quotes', 
+    label: 'Quotes', 
+    icon: Receipt,
+    module: 'quotes',
+    category: 'admin'
+  },
   { 
     href: '/admin/users', 
     label: 'Users', 

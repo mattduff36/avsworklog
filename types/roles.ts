@@ -54,6 +54,8 @@ export const MANAGEMENT_MODULES: ModuleName[] = [
   'reports',
   'toolbox-talks',
   'admin-users',
+  'customers',
+  'quotes',
 ];
 
 export const MODULE_SHORT_NAMES: Record<ModuleName, string> = {
@@ -71,6 +73,8 @@ export const MODULE_SHORT_NAMES: Record<ModuleName, string> = {
   'reports': 'Reports',
   'admin-users': 'Users',
   'admin-vans': 'Fleet',
+  'customers': 'Customers',
+  'quotes': 'Quotes',
 };
 
 export const MODULE_CSS_VAR: Record<ModuleName, string> = {
@@ -88,6 +92,8 @@ export const MODULE_CSS_VAR: Record<ModuleName, string> = {
   'reports': '--avs-yellow',
   'admin-users': '--avs-yellow',
   'admin-vans': '--fleet-primary',
+  'customers': '--avs-yellow',
+  'quotes': '--avs-yellow',
 };
 
 // All available modules in the system
@@ -105,7 +111,9 @@ export type ModuleName =
   | 'actions'
   | 'reports'
   | 'admin-users'
-  | 'admin-vans';
+  | 'admin-vans'
+  | 'customers'
+  | 'quotes';
 
 export const ALL_MODULES: ModuleName[] = [
   'timesheets',
@@ -122,6 +130,8 @@ export const ALL_MODULES: ModuleName[] = [
   'reports',
   'admin-users',
   'admin-vans',
+  'customers',
+  'quotes',
 ];
 
 export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
@@ -139,6 +149,8 @@ export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
   'reports': 'Reports',
   'admin-users': 'User Management',
   'admin-vans': 'Fleet Management',
+  'customers': 'Customers',
+  'quotes': 'Quotes',
 };
 
 export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
@@ -156,6 +168,8 @@ export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
   'reports': 'View system reports',
   'admin-users': 'Manage user accounts',
   'admin-vans': 'Manage fleet assets',
+  'customers': 'Manage customer directory',
+  'quotes': 'Create and track customer quotations',
 };
 
 // For API responses
