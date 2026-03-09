@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/client';
 
-export type AlertType = 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER';
+export type AlertType = 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER' | '6 Weekly Inspection' | 'Fire Extinguisher' | 'Taco Calibration' | 'Service (Hours)';
 export type AlertSeverity = 'overdue' | 'due_soon';
 
 interface Alert {
@@ -95,6 +95,10 @@ export function getTaskContent(alertType: AlertType, regNumber: string, detail: 
     'Cambelt': `Cambelt Replacement Due - ${regNumber}`,
     'First Aid Kit': `First Aid Kit Expiry - ${regNumber}`,
     'LOLER': `LOLOR Inspection Due - ${regNumber}`,
+    '6 Weekly Inspection': `6 Weekly Inspection Due - ${regNumber}`,
+    'Fire Extinguisher': `Fire Extinguisher Due - ${regNumber}`,
+    'Taco Calibration': `Taco Calibration Due - ${regNumber}`,
+    'Service (Hours)': `Service Due (Hours) - ${regNumber}`,
   };
 
   const comments: Record<AlertType, string> = {
@@ -104,6 +108,10 @@ export function getTaskContent(alertType: AlertType, regNumber: string, detail: 
     'Cambelt': `Cambelt replacement is required. ${detail}`,
     'First Aid Kit': `First aid kit requires replacement. ${detail}`,
     'LOLER': `LOLOR (Lifting Operations and Lifting Equipment Regulations) inspection is required for this plant machinery. ${detail}`,
+    '6 Weekly Inspection': `HGV 6-weekly inspection is due. ${detail}`,
+    'Fire Extinguisher': `Fire extinguisher inspection/replacement is due. ${detail}`,
+    'Taco Calibration': `Tachograph calibration is due. ${detail}`,
+    'Service (Hours)': `Plant machinery service is due based on engine hours. ${detail}`,
   };
 
   return {

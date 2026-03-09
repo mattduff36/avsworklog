@@ -189,11 +189,11 @@ export default function DebugPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="errors" forceMount>
+        <TabsContent value="errors">
           <ErrorLogsDebugPanel supabase={supabase} />
         </TabsContent>
 
-        <TabsContent value="audit" forceMount>
+        <TabsContent value="audit">
           <AuditLogDebugPanel supabase={supabase} />
         </TabsContent>
 

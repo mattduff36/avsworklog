@@ -11,6 +11,7 @@ import type {
 import {
   getDateBasedStatus,
   getMileageBasedStatus,
+  getHoursBasedStatus,
   calculateAlertCounts
 } from '@/lib/utils/maintenanceCalculations';
 
@@ -52,6 +53,9 @@ interface MaintenanceRow {
   six_weekly_inspection_due_date: string | null;
   fire_extinguisher_due_date: string | null;
   taco_calibration_due_date: string | null;
+  current_hours: number | null;
+  next_service_hours: number | null;
+  last_service_hours: number | null;
   created_at: string;
   updated_at: string;
   last_updated_by: string | null;
@@ -118,6 +122,8 @@ export async function GET(_request: NextRequest) {
     const sixWeeklyThreshold = categoryMap.get('6 weekly inspection due')?.alert_threshold_days || 7;
     const fireExtinguisherThreshold = categoryMap.get('fire extinguisher due')?.alert_threshold_days || 30;
     const tacoCalibrationThreshold = categoryMap.get('taco calibration due')?.alert_threshold_days || 60;
+    const lolerThreshold = categoryMap.get('loler due')?.alert_threshold_days || 30;
+    const serviceHoursThreshold = categoryMap.get('service due (hours)')?.alert_threshold_hours || 50;
     
     // ---------------------------------------------------------------
     // Fetch all three asset tables with their maintenance records
@@ -134,7 +140,7 @@ export async function GET(_request: NextRequest) {
         .eq('status', 'active'),
       supabase
         .from('plant')
-        .select('id, plant_id, reg_number, nickname, serial_number, year, weight_class, category_id, status, maintenance:vehicle_maintenance!plant_id(*)')
+        .select('id, plant_id, reg_number, nickname, serial_number, year, weight_class, category_id, status, loler_due_date, maintenance:vehicle_maintenance!plant_id(*)')
         .eq('status', 'active'),
     ]);
 
@@ -154,6 +160,7 @@ export async function GET(_request: NextRequest) {
       serial_number?: string | null;
       year?: number | null;
       weight_class?: string | null;
+      loler_due_date?: string | null;
       maintenance?: Record<string, unknown>[] | Record<string, unknown> | null;
     }
     const taggedAssets: TaggedAsset[] = [
@@ -244,9 +251,18 @@ export async function GET(_request: NextRequest) {
         weight_class: asset.weight_class || null,
       };
 
+      // LOLER due date comes from the plant table, not vehicle_maintenance
+      const loler_due_date = assetType === 'plant' ? (asset.loler_due_date || null) : null;
+      const loler_status = assetType === 'plant'
+        ? getDateBasedStatus(loler_due_date, lolerThreshold)
+        : { status: 'not_set' as const };
+
       if (!maintenance) {
+        const noMaintenanceAlertCounts = assetType === 'plant'
+          ? calculateAlertCounts([loler_status])
+          : { overdue: 0, due_soon: 0 };
+
         return {
-          // Use a stable synthetic id for assets with no maintenance row yet.
           id: asset.id,
           van_id: assetType === 'van' ? asset.id : null,
           hgv_id: assetType === 'hgv' ? asset.id : null,
@@ -256,16 +272,20 @@ export async function GET(_request: NextRequest) {
           last_inspector: inspInfo?.inspector || null,
           last_inspection_date: inspInfo?.date || null,
           current_mileage: null,
+          current_hours: null,
           tax_due_date: null,
           mot_due_date: null,
           next_service_mileage: null,
           last_service_mileage: null,
+          next_service_hours: null,
+          last_service_hours: null,
           cambelt_due_mileage: null,
           tracker_id: null,
           first_aid_kit_expiry: null,
           six_weekly_inspection_due_date: null,
           fire_extinguisher_due_date: null,
           taco_calibration_due_date: null,
+          loler_due_date,
           created_at: null,
           updated_at: null,
           last_updated_by: null,
@@ -280,8 +300,10 @@ export async function GET(_request: NextRequest) {
           six_weekly_status: { status: 'not_set' as const },
           fire_extinguisher_status: { status: 'not_set' as const },
           taco_calibration_status: { status: 'not_set' as const },
-          overdue_count: 0,
-          due_soon_count: 0
+          loler_status,
+          service_hours_status: { status: 'not_set' as const },
+          overdue_count: noMaintenanceAlertCounts.overdue,
+          due_soon_count: noMaintenanceAlertCounts.due_soon
         };
       }
 
@@ -313,6 +335,13 @@ export async function GET(_request: NextRequest) {
         maintenance.taco_calibration_due_date,
         tacoCalibrationThreshold
       );
+      const service_hours_status = assetType === 'plant'
+        ? getHoursBasedStatus(
+            maintenance.current_hours,
+            maintenance.next_service_hours,
+            serviceHoursThreshold
+          )
+        : { status: 'not_set' as const };
 
       const alertCounts = calculateAlertCounts([
         tax_status,
@@ -323,6 +352,8 @@ export async function GET(_request: NextRequest) {
         six_weekly_status,
         fire_extinguisher_status,
         taco_calibration_status,
+        loler_status,
+        service_hours_status,
       ]);
 
       return {
@@ -339,6 +370,9 @@ export async function GET(_request: NextRequest) {
         six_weekly_status,
         fire_extinguisher_status,
         taco_calibration_status,
+        loler_status,
+        loler_due_date,
+        service_hours_status,
         overdue_count: alertCounts.overdue,
         due_soon_count: alertCounts.due_soon
       };

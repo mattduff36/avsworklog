@@ -25,6 +25,11 @@ interface VehicleData {
   first_aid_kit_expiry?: string | null;
   next_service_mileage?: number | null;
   cambelt_due_mileage?: number | null;
+  loler_due_date?: string | null;
+  six_weekly_inspection_due_date?: string | null;
+  fire_extinguisher_due_date?: string | null;
+  taco_calibration_due_date?: string | null;
+  next_service_hours?: number | null;
 }
 
 interface QuickEditPopoverProps {
@@ -41,6 +46,11 @@ const ALERT_TO_FIELD: Record<string, string> = {
   'First Aid Kit': 'first_aid_kit_expiry',
   'Service': 'next_service_mileage',
   'Cambelt': 'cambelt_due_mileage',
+  'LOLER': 'loler_due_date',
+  '6 Weekly Inspection': 'six_weekly_inspection_due_date',
+  'Fire Extinguisher': 'fire_extinguisher_due_date',
+  'Taco Calibration': 'taco_calibration_due_date',
+  'Service (Hours)': 'next_service_hours',
 };
 
 // Map alert type to display label
@@ -50,10 +60,18 @@ const ALERT_TO_LABEL: Record<string, string> = {
   'First Aid Kit': 'First Aid Kit Expiry',
   'Service': 'Service Due Mileage',
   'Cambelt': 'Cambelt Due Mileage',
+  'LOLER': 'LOLER Due Date',
+  '6 Weekly Inspection': '6 Weekly Inspection Due',
+  'Fire Extinguisher': 'Fire Extinguisher Due',
+  'Taco Calibration': 'Taco Calibration Due',
+  'Service (Hours)': 'Service Due (Hours)',
 };
 
 // Fields that use date input
-const DATE_FIELDS = ['Tax', 'MOT', 'First Aid Kit'];
+const DATE_FIELDS = ['Tax', 'MOT', 'First Aid Kit', 'LOLER', '6 Weekly Inspection', 'Fire Extinguisher', 'Taco Calibration'];
+
+// Fields that use hours input
+const HOURS_FIELDS = ['Service (Hours)'];
 
 // Get current value from vehicle based on alert type
 function getCurrentValue(alertType: string, vehicle: VehicleData): string {
@@ -68,6 +86,16 @@ function getCurrentValue(alertType: string, vehicle: VehicleData): string {
       return vehicle.next_service_mileage?.toString() || '';
     case 'Cambelt':
       return vehicle.cambelt_due_mileage?.toString() || '';
+    case 'LOLER':
+      return vehicle.loler_due_date || '';
+    case '6 Weekly Inspection':
+      return vehicle.six_weekly_inspection_due_date || '';
+    case 'Fire Extinguisher':
+      return vehicle.fire_extinguisher_due_date || '';
+    case 'Taco Calibration':
+      return vehicle.taco_calibration_due_date || '';
+    case 'Service (Hours)':
+      return vehicle.next_service_hours?.toString() || '';
     default:
       return '';
   }
@@ -87,6 +115,14 @@ function formatCurrentValue(alertType: string, value: string): string {
     } catch {
       return value;
     }
+  }
+  
+  if (HOURS_FIELDS.includes(alertType)) {
+    const num = parseInt(value, 10);
+    if (!isNaN(num)) {
+      return `${num.toLocaleString()} hours`;
+    }
+    return value;
   }
   
   // Mileage - format with commas
@@ -111,6 +147,7 @@ export function QuickEditPopover({
   const fieldName = ALERT_TO_FIELD[alert.type];
   const fieldLabel = ALERT_TO_LABEL[alert.type] || alert.type;
   const isDateField = DATE_FIELDS.includes(alert.type);
+  const isHoursField = HOURS_FIELDS.includes(alert.type);
   const currentValue = getCurrentValue(alert.type, vehicle);
 
   // Reset form when popover opens
@@ -160,8 +197,15 @@ export function QuickEditPopover({
 
       if (isDateField) {
         payload[fieldName] = newValue;
+      } else if (isHoursField) {
+        const hoursValue = parseInt(newValue.replace(/,/g, ''), 10);
+        if (isNaN(hoursValue) || hoursValue < 0) {
+          toast.error('Please enter a valid hours value');
+          setLoading(false);
+          return;
+        }
+        payload[fieldName] = hoursValue;
       } else {
-        // Mileage field - convert to number
         const mileageValue = parseInt(newValue.replace(/,/g, ''), 10);
         if (isNaN(mileageValue) || mileageValue < 0) {
           toast.error('Please enter a valid mileage');
@@ -186,6 +230,8 @@ export function QuickEditPopover({
       toast.success(`${fieldLabel} updated`, {
         description: isDateField
           ? `Changed to ${new Date(newValue).toLocaleDateString('en-GB')}`
+          : isHoursField
+          ? `Changed to ${parseInt(newValue.replace(/,/g, ''), 10).toLocaleString()} hours`
           : `Changed to ${parseInt(newValue.replace(/,/g, ''), 10).toLocaleString()} miles`,
       });
 
@@ -255,7 +301,7 @@ export function QuickEditPopover({
                 type="number"
                 min="0"
                 step="1"
-                placeholder="Enter mileage"
+                placeholder={isHoursField ? 'Enter hours' : 'Enter mileage'}
                 value={newValue}
                 onChange={(e) => setNewValue(e.target.value)}
                 className="border-border text-white"

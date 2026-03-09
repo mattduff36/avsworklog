@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertTriangle, Calendar, Wrench, ChevronDown, ChevronUp, Loader2, Clock, CheckCircle2, MessageSquare, Pause, Play, Undo2, Briefcase, Info, RefreshCw, Bell } from 'lucide-react';
 import type { VehicleMaintenanceWithStatus, MaintenanceCategory, CategoryResponsibility } from '@/types/maintenance';
-import { formatDaysUntil, formatMilesUntil, formatMileage, formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
+import { formatDaysUntil, formatMilesUntil, formatHoursUntil, formatMileage, formatHours, formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 import type { CompletionUpdatesArray } from '@/types/workshop-completion';
 import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -31,7 +31,11 @@ const ALERT_TO_CATEGORY_NAME: Record<string, string> = {
   'Service': 'service due',
   'Cambelt': 'cambelt replacement',
   'First Aid Kit': 'first aid kit expiry',
-  'LOLER': 'lolor / inspection due',
+  'LOLER': 'loler due',
+  '6 Weekly Inspection': '6 weekly inspection due',
+  'Fire Extinguisher': 'fire extinguisher due',
+  'Taco Calibration': 'taco calibration due',
+  'Service (Hours)': 'service due (hours)',
 };
 
 interface MaintenanceOverviewProps {
@@ -67,6 +71,14 @@ function isExpectedNetworkError(error: unknown): boolean {
 
 interface VehicleWithAlerts extends VehicleMaintenanceWithStatus {
   alerts: Alert[];
+}
+
+interface AlertEntry {
+  vehicle: VehicleWithAlerts;
+  alert: Alert;
+  entryKey: string;
+  vehicleId: string;
+  isPlant: boolean;
 }
 
 interface HistoryEntry {
@@ -145,7 +157,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     assetType: 'van' | 'hgv' | 'plant';
     vehicleReg: string;
     vehicleNickname?: string | null;
-    alertType: 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER';
+    alertType: string;
     dueInfo: string;
     currentDueDate?: string | null;
   } | null>(null);
@@ -437,42 +449,107 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       }
     }
     
+    // Check 6 Weekly Inspection (HGV - only if category applies)
+    if (categoryApplies('6 weekly inspection due')) {
+      if (vehicle.six_weekly_status?.status === 'overdue') {
+        alerts.push({
+          type: '6 Weekly Inspection',
+          detail: formatDaysUntil(vehicle.six_weekly_status.days_until),
+          severity: 'overdue',
+          sortValue: vehicle.six_weekly_status.days_until ?? 0
+        });
+      } else if (vehicle.six_weekly_status?.status === 'due_soon') {
+        alerts.push({
+          type: '6 Weekly Inspection',
+          detail: formatDaysUntil(vehicle.six_weekly_status.days_until),
+          severity: 'due_soon',
+          sortValue: vehicle.six_weekly_status.days_until ?? 0
+        });
+      }
+    }
+    
+    // Check Fire Extinguisher (HGV - only if category applies)
+    if (categoryApplies('fire extinguisher due')) {
+      if (vehicle.fire_extinguisher_status?.status === 'overdue') {
+        alerts.push({
+          type: 'Fire Extinguisher',
+          detail: formatDaysUntil(vehicle.fire_extinguisher_status.days_until),
+          severity: 'overdue',
+          sortValue: vehicle.fire_extinguisher_status.days_until ?? 0
+        });
+      } else if (vehicle.fire_extinguisher_status?.status === 'due_soon') {
+        alerts.push({
+          type: 'Fire Extinguisher',
+          detail: formatDaysUntil(vehicle.fire_extinguisher_status.days_until),
+          severity: 'due_soon',
+          sortValue: vehicle.fire_extinguisher_status.days_until ?? 0
+        });
+      }
+    }
+    
+    // Check Taco Calibration (HGV - only if category applies)
+    if (categoryApplies('taco calibration due')) {
+      if (vehicle.taco_calibration_status?.status === 'overdue') {
+        alerts.push({
+          type: 'Taco Calibration',
+          detail: formatDaysUntil(vehicle.taco_calibration_status.days_until),
+          severity: 'overdue',
+          sortValue: vehicle.taco_calibration_status.days_until ?? 0
+        });
+      } else if (vehicle.taco_calibration_status?.status === 'due_soon') {
+        alerts.push({
+          type: 'Taco Calibration',
+          detail: formatDaysUntil(vehicle.taco_calibration_status.days_until),
+          severity: 'due_soon',
+          sortValue: vehicle.taco_calibration_status.days_until ?? 0
+        });
+      }
+    }
+    
+    // Check Service Due (Hours) (plant machinery - only if category applies)
+    if (categoryApplies('service due (hours)')) {
+      if (vehicle.service_hours_status?.status === 'overdue') {
+        const hoursUntil = vehicle.service_hours_status.hours_until ?? 0;
+        alerts.push({
+          type: 'Service (Hours)',
+          detail: formatHoursUntil(hoursUntil),
+          severity: 'overdue',
+          sortValue: hoursUntil
+        });
+      } else if (vehicle.service_hours_status?.status === 'due_soon') {
+        const hoursUntil = vehicle.service_hours_status.hours_until ?? 0;
+        alerts.push({
+          type: 'Service (Hours)',
+          detail: formatHoursUntil(hoursUntil),
+          severity: 'due_soon',
+          sortValue: hoursUntil
+        });
+      }
+    }
+    
     return {
       ...vehicle,
       alerts
     };
   });
 
-  // Check if any alerts have matching workshop tasks
-  const hasMatchingTasks = (vehicle: VehicleWithAlerts, tasks: WorkshopTask[]): boolean => {
-    if (!vehicle.alerts || vehicle.alerts.length === 0 || !tasks || tasks.length === 0) {
-      return false;
-    }
-    
-    const regNumber = vehicle.vehicle?.reg_number || 'Unknown';
+  // Check if a specific alert has a matching workshop task
+  const hasMatchingTask = (vehicle: VehicleWithAlerts, alert: Alert, tasks: WorkshopTask[]): boolean => {
+    if (!tasks || tasks.length === 0) return false;
+    const regNumber = vehicle.vehicle?.reg_number || vehicle.vehicle?.plant_id || 'Unknown';
     const activeTasks = tasks.filter(t => t.status !== 'completed');
-    
-    return vehicle.alerts.some(alert => {
-      const { title } = getTaskContent(alert.type as AlertType, regNumber, '');
-      return activeTasks.some(task => task.title === title || task.description?.includes(title));
-    });
+    const { title } = getTaskContent(alert.type as AlertType, regNumber, '');
+    return activeTasks.some(task => task.title === title || task.description?.includes(title));
   };
 
-  const handleCreateTask = (vehicleId: string, vehicle: VehicleWithAlerts) => {
+  const handleCreateTask = (vehicleId: string, alert: Alert) => {
     setCreateTaskVehicleId(vehicleId);
-    // Prefill with Service category if available
     setCreateTaskCategoryId(maintenanceCategoryId);
-    // Set the alert type from the first alert (prioritize overdue)
-    const alertType = vehicle.alerts?.[0]?.type as AlertType | undefined;
-    setCreateTaskAlertType(alertType);
-    
+    setCreateTaskAlertType(alert.type as AlertType);
     setShowCreateTaskDialog(true);
   };
 
-  const handleOfficeAction = (vehicleId: string, vehicle: VehicleWithAlerts) => {
-    const alert = vehicle.alerts?.[0];
-    if (!alert) return;
-    
+  const handleOfficeAction = (vehicleId: string, vehicle: VehicleWithAlerts, alert: Alert) => {
     const alertType = alert.type as AlertType;
     
     // Get the current due date based on alert type
@@ -485,6 +562,12 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       currentDueDate = vehicle.first_aid_kit_expiry || null;
     } else if (alertType === 'LOLER') {
       currentDueDate = vehicle.loler_due_date || null;
+    } else if (alertType === '6 Weekly Inspection') {
+      currentDueDate = vehicle.six_weekly_inspection_due_date || null;
+    } else if (alertType === 'Fire Extinguisher') {
+      currentDueDate = vehicle.fire_extinguisher_due_date || null;
+    } else if (alertType === 'Taco Calibration') {
+      currentDueDate = vehicle.taco_calibration_due_date || null;
     }
     
     setOfficeActionVehicle({
@@ -912,56 +995,57 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     setShowCommentsDrawer(true);
   };
 
-  const toggleVehicle = useCallback(async (vehicleId: string, _vehicle?: VehicleMaintenanceWithStatus) => {
+  const toggleEntry = useCallback(async (entryKey: string, vehicleId: string, isPlant: boolean) => {
     setExpandedVehicles(prev => {
       const newExpanded = new Set(prev);
-      if (newExpanded.has(vehicleId)) {
-        newExpanded.delete(vehicleId);
+      if (newExpanded.has(entryKey)) {
+        newExpanded.delete(entryKey);
       } else {
-        newExpanded.add(vehicleId);
-        // Fetch history when expanding (not when collapsing)
-        fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId));
+        newExpanded.add(entryKey);
+        fetchVehicleHistory(vehicleId, isPlant);
       }
       return newExpanded;
     });
-  }, [fetchVehicleHistory, isPlantAsset]);
+  }, [fetchVehicleHistory]);
 
-  const handleCardClick = (vehicleId: string, vehicle: VehicleWithAlerts) => {
-    // If onVehicleClick is provided, use it for navigation
+  const handleCardClick = (entry: AlertEntry) => {
     if (onVehicleClick) {
-      onVehicleClick(vehicle);
+      onVehicleClick(entry.vehicle);
     } else {
-      // Otherwise, just toggle expansion
-      toggleVehicle(vehicleId, vehicle);
+      toggleEntry(entry.entryKey, entry.vehicleId, entry.isPlant);
     }
   };
   
-  // Helper to get the most urgent sortValue for a vehicle (lowest value = most urgent)
-  // All sortValues are normalized to "days equivalent" for fair comparison between
-  // date-based (Tax, MOT, First Aid) and mileage-based (Service, Cambelt) alerts
-  const getMostUrgentSortValue = (vehicle: VehicleWithAlerts): number => {
-    if (!vehicle.alerts || vehicle.alerts.length === 0) return Infinity;
-    return Math.min(...vehicle.alerts.map(a => a.sortValue));
-  };
+  // Flatten to one entry per alert so each alert gets its own card
+  const allAlertEntries: AlertEntry[] = vehiclesWithAlerts.flatMap(v => {
+    const isPlant = 'is_plant' in v && v.is_plant === true;
+    const vehicleId = isPlant
+      ? (v.plant_id ?? v.id)
+      : (v.van_id ?? v.hgv_id ?? v.id);
+    return v.alerts.map(alert => ({
+      vehicle: v,
+      alert,
+      entryKey: `${vehicleId}-${alert.type}`,
+      vehicleId,
+      isPlant,
+    }));
+  });
 
-  // Filter and sort: most overdue first (most negative days equivalent)
-  const overdueVehicles = vehiclesWithAlerts
-    .filter(v => v.alerts.some(a => a.severity === 'overdue'))
-    .sort((a, b) => getMostUrgentSortValue(a) - getMostUrgentSortValue(b));
-  
-  // Filter and sort: soonest due first (lowest positive days equivalent)
-  const dueSoonVehicles = vehiclesWithAlerts
-    .filter(v => 
-      v.alerts.some(a => a.severity === 'due_soon') && !v.alerts.some(a => a.severity === 'overdue')
-    )
-    .sort((a, b) => getMostUrgentSortValue(a) - getMostUrgentSortValue(b));
-  
-  // Don't show panels if no alerts
-  const isPlantView = vehicles.length > 0 && 'is_plant' in vehicles[0] && vehicles[0].is_plant === true;
-  const assetLabel = isPlantView ? 'plant asset' : 'van';
-  const assetLabelPlural = isPlantView ? 'plant assets' : 'vans';
+  const overdueEntries = allAlertEntries
+    .filter(e => e.alert.severity === 'overdue')
+    .sort((a, b) => a.alert.sortValue - b.alert.sortValue);
 
-  if (overdueVehicles.length === 0 && dueSoonVehicles.length === 0) {
+  const dueSoonEntries = allAlertEntries
+    .filter(e => e.alert.severity === 'due_soon')
+    .sort((a, b) => a.alert.sortValue - b.alert.sortValue);
+  
+  const assetTypes = new Set(vehicles.map(v => v.vehicle?.asset_type).filter(Boolean));
+  const isMixed = assetTypes.size > 1;
+  const singleType = assetTypes.size === 1 ? [...assetTypes][0] : null;
+  const assetLabel = isMixed ? 'asset' : singleType === 'plant' ? 'plant asset' : singleType === 'hgv' ? 'HGV' : 'van';
+  const assetLabelPlural = isMixed ? 'assets' : singleType === 'plant' ? 'plant assets' : singleType === 'hgv' ? 'HGVs' : 'vans';
+
+  if (overdueEntries.length === 0 && dueSoonEntries.length === 0) {
     return (
       <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
         <CardContent className="pt-6">
@@ -983,28 +1067,22 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     );
   }
 
-  const renderVehicleCard = (vehicle: VehicleWithAlerts, isOverdue: boolean) => {
-    const isPlant = 'is_plant' in vehicle && vehicle.is_plant === true;
-    const vehicleId = isPlant
-      ? (vehicle.plant_id ?? vehicle.id)
-      : (vehicle.van_id ?? vehicle.hgv_id ?? vehicle.id);
-    const isExpanded = expandedVehicles.has(vehicleId);
+  const renderAlertCard = (entry: AlertEntry, isOverdue: boolean) => {
+    const { vehicle, alert: cardAlert, entryKey, vehicleId, isPlant } = entry;
+    const isExpanded = expandedVehicles.has(entryKey);
     const historyData = vehicleHistory[vehicleId];
     
-    // Wait for history to load before checking for existing tasks
-    // If still loading, assume no tasks (show Loading button)
-    // If loaded (not loading), check if tasks exist
-    const hasExistingTasks = historyData && !historyData.loading && hasMatchingTasks(vehicle, historyData.workshopTasks);
+    const hasExistingTask = historyData && !historyData.loading && hasMatchingTask(vehicle, cardAlert, historyData.workshopTasks);
     
     return (
       <Card 
-        key={vehicleId}
+        key={entryKey}
         className={`cursor-pointer transition-all ${
           isOverdue 
             ? 'bg-white dark:bg-slate-900 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-slate-800/50' 
             : 'bg-white dark:bg-slate-900 border-amber-200 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-slate-800/50'
         }`}
-        onClick={() => handleCardClick(vehicleId, vehicle)}
+        onClick={() => handleCardClick(entry)}
       >
         <CardContent className="p-4">
           {/* Collapsed View - Now includes ALL service information */}
@@ -1015,35 +1093,30 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 <div>
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="font-semibold text-lg text-white">
-                      {vehicle.vehicle?.reg_number || 'Unknown'}
+                      {vehicle.vehicle?.reg_number || vehicle.vehicle?.plant_id || vehicle.vehicle?.serial_number || 'Unknown'}
                     </h3>
                     {vehicle.vehicle?.nickname && (
                       <span className="text-sm text-muted-foreground">({vehicle.vehicle.nickname})</span>
                     )}
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {vehicle.alerts.map((alert, idx) => (
-                      <QuickEditPopover
-                        key={idx}
-                        alert={alert}
-                        vehicleId={vehicleId}
-                        vehicle={vehicle}
-                        onSuccess={handleQuickEditSuccess}
-                      />
-                    ))}
+                    <QuickEditPopover
+                      alert={cardAlert}
+                      vehicleId={vehicleId}
+                      vehicle={vehicle}
+                      onSuccess={handleQuickEditSuccess}
+                    />
                   </div>
                 </div>
               </div>
               
               {/* Status Badge - Top Right Corner (only show if task exists) */}
-              {hasExistingTasks && (() => {
-                const regNumber = vehicle.vehicle?.reg_number || 'Unknown';
+              {hasExistingTask && (() => {
+                const regNumber = vehicle.vehicle?.reg_number || vehicle.vehicle?.plant_id || 'Unknown';
+                const { title: expectedTitle } = getTaskContent(cardAlert.type as AlertType, regNumber, '');
                 const relatedTask = historyData?.workshopTasks.find(task => {
                   if (task.status === 'completed') return false;
-                  return vehicle.alerts.some(alert => {
-                    const { title } = getTaskContent(alert.type as AlertType, regNumber, '');
-                    return task.title === title || task.description?.includes(title);
-                  });
+                  return task.title === expectedTitle || task.description?.includes(expectedTitle);
                 });
                 if (!relatedTask) return null;
                 return (
@@ -1066,76 +1139,116 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
             {/* Service Information - Horizontal Row with Status Badge and Chevron */}
             <div className="flex items-center justify-between gap-4">
               <div className="flex flex-wrap gap-x-6 gap-y-2 flex-1">
-                {/* Current Mileage */}
-                <div className="space-y-0">
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Mileage</div>
-                  <div className="text-sm font-medium text-white">
-                    {formatMileage(vehicle.current_mileage)}
-                  </div>
-                </div>
-
-                {/* Cambelt Due */}
-                <div className="space-y-0">
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Cambelt</div>
-                  <div className={`text-sm font-medium ${vehicle.cambelt_status?.status === 'overdue' || vehicle.cambelt_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
-                    {vehicle.cambelt_due_mileage 
-                      ? formatMileage(vehicle.cambelt_due_mileage)
-                      : 'Not Set'}
-                  </div>
-                </div>
-
-                {/* Tax Due */}
-                <div className="space-y-0">
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Tax Due</div>
-                  <div className={`text-sm font-medium ${vehicle.tax_status?.status === 'overdue' || vehicle.tax_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
-                    {formatMaintenanceDate(vehicle.tax_due_date)}
-                  </div>
-                </div>
-
-                {/* First Aid Kit */}
-                <div className="space-y-0">
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">First Aid</div>
-                  <div className={`text-sm font-medium ${vehicle.first_aid_status?.status === 'overdue' || vehicle.first_aid_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
-                    {formatMaintenanceDate(vehicle.first_aid_kit_expiry)}
-                  </div>
-                </div>
-
-                {/* MOT Due */}
-                <div className="space-y-0">
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">MOT Due</div>
-                  <div className={`text-sm font-medium ${vehicle.mot_status?.status === 'overdue' || vehicle.mot_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
-                    {formatMaintenanceDate(vehicle.mot_due_date)}
-                  </div>
-                </div>
-
-                {/* Service Due */}
-                <div className="space-y-0">
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Service Due</div>
-                  <div className={`text-sm font-medium ${vehicle.service_status?.status === 'overdue' || vehicle.service_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
-                    {vehicle.next_service_mileage 
-                      ? formatMileage(vehicle.next_service_mileage)
-                      : 'Not Set'}
-                  </div>
-                </div>
-
-                {/* Last Service */}
-                <div className="space-y-0">
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Last Service</div>
-                  <div className="text-sm font-medium text-white">
-                    {vehicle.last_service_mileage 
-                      ? formatMileage(vehicle.last_service_mileage)
-                      : 'Not Set'}
-                  </div>
-                </div>
-
-                {/* Tracker ID */}
-                {vehicle.tracker_id && (
-                  <div className="space-y-0">
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">GPS Tracker</div>
-                    <div className="text-sm font-medium text-white">
-                      {vehicle.tracker_id}
+                {isPlant ? (
+                  <>
+                    <div className="space-y-0">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Hours</div>
+                      <div className="text-sm font-medium text-white">
+                        {formatHours(vehicle.current_hours)}
+                      </div>
                     </div>
-                  </div>
+                    <div className="space-y-0">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">LOLER Due</div>
+                      <div className={`text-sm font-medium ${vehicle.loler_status?.status === 'overdue' || vehicle.loler_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                        {formatMaintenanceDate(vehicle.loler_due_date)}
+                      </div>
+                    </div>
+                    <div className="space-y-0">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Tax Due</div>
+                      <div className={`text-sm font-medium ${vehicle.tax_status?.status === 'overdue' || vehicle.tax_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                        {formatMaintenanceDate(vehicle.tax_due_date)}
+                      </div>
+                    </div>
+                    <div className="space-y-0">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Service Due</div>
+                      <div className={`text-sm font-medium ${vehicle.service_hours_status?.status === 'overdue' || vehicle.service_hours_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                        {vehicle.next_service_hours ? formatHours(vehicle.next_service_hours) : 'Not Set'}
+                      </div>
+                    </div>
+                    <div className="space-y-0">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Last Service</div>
+                      <div className="text-sm font-medium text-white">
+                        {vehicle.last_service_hours ? formatHours(vehicle.last_service_hours) : 'Not Set'}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-0">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Mileage</div>
+                      <div className="text-sm font-medium text-white">
+                        {formatMileage(vehicle.current_mileage)}
+                      </div>
+                    </div>
+                    <div className="space-y-0">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Tax Due</div>
+                      <div className={`text-sm font-medium ${vehicle.tax_status?.status === 'overdue' || vehicle.tax_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                        {formatMaintenanceDate(vehicle.tax_due_date)}
+                      </div>
+                    </div>
+                    <div className="space-y-0">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">MOT Due</div>
+                      <div className={`text-sm font-medium ${vehicle.mot_status?.status === 'overdue' || vehicle.mot_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                        {formatMaintenanceDate(vehicle.mot_due_date)}
+                      </div>
+                    </div>
+                    <div className="space-y-0">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">First Aid</div>
+                      <div className={`text-sm font-medium ${vehicle.first_aid_status?.status === 'overdue' || vehicle.first_aid_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                        {formatMaintenanceDate(vehicle.first_aid_kit_expiry)}
+                      </div>
+                    </div>
+                    <div className="space-y-0">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Service Due</div>
+                      <div className={`text-sm font-medium ${vehicle.service_status?.status === 'overdue' || vehicle.service_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                        {vehicle.next_service_mileage ? formatMileage(vehicle.next_service_mileage) : 'Not Set'}
+                      </div>
+                    </div>
+                    <div className="space-y-0">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Last Service</div>
+                      <div className="text-sm font-medium text-white">
+                        {vehicle.last_service_mileage ? formatMileage(vehicle.last_service_mileage) : 'Not Set'}
+                      </div>
+                    </div>
+                    {vehicle.vehicle?.asset_type !== 'hgv' && (
+                      <div className="space-y-0">
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Cambelt</div>
+                        <div className={`text-sm font-medium ${vehicle.cambelt_status?.status === 'overdue' || vehicle.cambelt_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                          {vehicle.cambelt_due_mileage ? formatMileage(vehicle.cambelt_due_mileage) : 'Not Set'}
+                        </div>
+                      </div>
+                    )}
+                    {vehicle.vehicle?.asset_type === 'hgv' && (
+                      <>
+                        <div className="space-y-0">
+                          <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">6 Weekly</div>
+                          <div className={`text-sm font-medium ${vehicle.six_weekly_status?.status === 'overdue' || vehicle.six_weekly_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                            {formatMaintenanceDate(vehicle.six_weekly_inspection_due_date)}
+                          </div>
+                        </div>
+                        <div className="space-y-0">
+                          <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Fire Ext.</div>
+                          <div className={`text-sm font-medium ${vehicle.fire_extinguisher_status?.status === 'overdue' || vehicle.fire_extinguisher_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                            {formatMaintenanceDate(vehicle.fire_extinguisher_due_date)}
+                          </div>
+                        </div>
+                        <div className="space-y-0">
+                          <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Taco Cal.</div>
+                          <div className={`text-sm font-medium ${vehicle.taco_calibration_status?.status === 'overdue' || vehicle.taco_calibration_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                            {formatMaintenanceDate(vehicle.taco_calibration_due_date)}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {vehicle.tracker_id && (
+                      <div className="space-y-0">
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">GPS Tracker</div>
+                        <div className="text-sm font-medium text-white">
+                          {vehicle.tracker_id}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
               
@@ -1150,11 +1263,9 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                   Loading...
                 </Button>
-              ) : !hasExistingTasks ? (
-                // Check if the primary alert is an office responsibility
+              ) : !hasExistingTask ? (
                 (() => {
-                  const primaryAlertType = (vehicle.alerts?.[0]?.type || '') as string;
-                  const responsibility = getCategoryResponsibility(primaryAlertType);
+                  const responsibility = getCategoryResponsibility(cardAlert.type);
                   
                   if (responsibility === 'office') {
                     return (
@@ -1164,7 +1275,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                         className="flex-shrink-0 bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleOfficeAction(vehicleId, vehicle);
+                          handleOfficeAction(vehicleId, vehicle, cardAlert);
                         }}
                       >
                         <Briefcase className="h-4 w-4 mr-1" />
@@ -1180,7 +1291,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                       className="flex-shrink-0 bg-workshop hover:bg-workshop-dark text-white"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleCreateTask(vehicleId, vehicle);
+                        handleCreateTask(vehicleId, cardAlert);
                       }}
                     >
                       <Wrench className="h-4 w-4 mr-1" />
@@ -1195,7 +1306,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                   className="flex-shrink-0 text-muted-foreground hover:text-white hover:bg-slate-800"
                   onClick={(e) => {
                     e.stopPropagation();
-                    toggleVehicle(vehicleId, vehicle);
+                    toggleEntry(entryKey, vehicleId, isPlant);
                   }}
                 >
                   {isExpanded ? (
@@ -1222,14 +1333,11 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                   <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
                 </div>
               ) : (() => {
-                // Find the related non-completed task that matches the alert
-                const regNumber = vehicle.vehicle?.reg_number || 'Unknown';
+                const regNumber = vehicle.vehicle?.reg_number || vehicle.vehicle?.plant_id || 'Unknown';
+                const { title: expectedTitle } = getTaskContent(cardAlert.type as AlertType, regNumber, '');
                 const relatedTask = historyData?.workshopTasks.find(task => {
                   if (task.status === 'completed') return false;
-                  return vehicle.alerts.some(alert => {
-                    const { title } = getTaskContent(alert.type as AlertType, regNumber, '');
-                    return task.title === title || task.description?.includes(title);
-                  });
+                  return task.title === expectedTitle || task.description?.includes(expectedTitle);
                 });
                 
                 if (!relatedTask) {
@@ -1405,7 +1513,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   return (
     <div className="space-y-6">
       {/* Overdue Tasks */}
-      {overdueVehicles.length > 0 && (
+      {overdueEntries.length > 0 && (
         <Card className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
@@ -1415,19 +1523,19 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
               </CardTitle>
             </div>
             <CardDescription className="text-red-700 dark:text-red-300">
-              {overdueVehicles.length} {overdueVehicles.length !== 1 ? assetLabelPlural : assetLabel} requiring immediate attention
+              {overdueEntries.length} {overdueEntries.length !== 1 ? `${assetLabel} tasks` : `${assetLabel} task`} requiring immediate attention
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {overdueVehicles.map(vehicle => renderVehicleCard(vehicle, true))}
+              {overdueEntries.map(entry => renderAlertCard(entry, true))}
             </div>
           </CardContent>
         </Card>
       )}
 
       {/* Due Soon Tasks */}
-      {dueSoonVehicles.length > 0 && (
+      {dueSoonEntries.length > 0 && (
         <Card className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
@@ -1437,12 +1545,12 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
               </CardTitle>
             </div>
             <CardDescription className="text-amber-700 dark:text-amber-300">
-              {dueSoonVehicles.length} {dueSoonVehicles.length !== 1 ? assetLabelPlural : assetLabel} coming up
+              {dueSoonEntries.length} {dueSoonEntries.length !== 1 ? `${assetLabel} tasks` : `${assetLabel} task`} coming up
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {dueSoonVehicles.map(vehicle => renderVehicleCard(vehicle, false))}
+              {dueSoonEntries.map(entry => renderAlertCard(entry, false))}
             </div>
           </CardContent>
         </Card>

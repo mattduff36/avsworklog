@@ -202,6 +202,7 @@ export interface VehicleMaintenanceWithStatus extends VehicleMaintenance {
   fire_extinguisher_status?: MaintenanceItemStatus;
   taco_calibration_status?: MaintenanceItemStatus;
   loler_status?: MaintenanceItemStatus; // For plant machinery
+  service_hours_status?: MaintenanceItemStatus; // For plant machinery (hours-based service)
   
   // Overall counts
   overdue_count: number;

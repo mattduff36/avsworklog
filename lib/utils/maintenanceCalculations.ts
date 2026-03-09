@@ -135,6 +135,60 @@ export function getMileageBasedStatus(
 }
 
 // ============================================================================
+// Hours-based calculations (plant machinery)
+// ============================================================================
+
+export function getHoursUntilDue(
+  currentHours: number | null,
+  dueHours: number | null
+): number | null {
+  if (currentHours === null || dueHours === null) return null;
+  return dueHours - currentHours;
+}
+
+export function getHoursBasedStatus(
+  currentHours: number | null,
+  dueHours: number | null,
+  thresholdHours: number
+): MaintenanceItemStatus {
+  if (!dueHours) {
+    return { status: 'not_set' };
+  }
+
+  if (currentHours === null) {
+    return { status: 'not_set' };
+  }
+
+  const hoursUntil = getHoursUntilDue(currentHours, dueHours);
+
+  if (hoursUntil === null) {
+    return { status: 'not_set' };
+  }
+
+  if (hoursUntil < 0) {
+    return {
+      status: 'overdue',
+      hours_until: hoursUntil,
+      due_hours: dueHours
+    };
+  }
+
+  if (hoursUntil <= thresholdHours) {
+    return {
+      status: 'due_soon',
+      hours_until: hoursUntil,
+      due_hours: dueHours
+    };
+  }
+
+  return {
+    status: 'ok',
+    hours_until: hoursUntil,
+    due_hours: dueHours
+  };
+}
+
+// ============================================================================
 // Status color helpers for UI
 // ============================================================================
 
@@ -262,6 +316,28 @@ export function formatMaintenanceDate(date: string | null | undefined): string {
   } catch {
     return 'Invalid Date';
   }
+}
+
+/**
+ * Format hours until due for display
+ */
+export function formatHoursUntil(hoursUntil: number | null | undefined): string {
+  if (hoursUntil === null || hoursUntil === undefined) return 'Not Set';
+
+  if (hoursUntil < 0) {
+    const absHours = Math.abs(hoursUntil);
+    return `${absHours.toLocaleString()} hrs overdue`;
+  }
+
+  return `${hoursUntil.toLocaleString()} hrs remaining`;
+}
+
+/**
+ * Format hours for display
+ */
+export function formatHours(hours: number | null | undefined): string {
+  if (hours === null || hours === undefined) return 'Not Set';
+  return `${hours.toLocaleString()}h`;
 }
 
 /**

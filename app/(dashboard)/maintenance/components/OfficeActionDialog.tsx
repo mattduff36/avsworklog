@@ -18,7 +18,7 @@ interface OfficeActionDialogProps {
   assetType?: 'van' | 'hgv' | 'plant';
   vehicleReg: string;
   vehicleNickname?: string | null;
-  alertType: 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER';
+  alertType: string;
   dueInfo: string; // e.g., "Overdue by 5 days"
   currentDueDate?: string | null;
   onSuccess?: () => void;
@@ -31,15 +31,22 @@ const ALERT_TO_CATEGORY: Record<string, string> = {
   'Service': 'Service Due',
   'Cambelt': 'Cambelt Replacement',
   'First Aid Kit': 'First Aid Kit Expiry',
-  'LOLER': 'LOLOR / Inspection Due',
+  'LOLER': 'LOLER Due',
+  '6 Weekly Inspection': '6 Weekly Inspection Due',
+  'Fire Extinguisher': 'Fire Extinguisher Due',
+  'Taco Calibration': 'Taco Calibration Due',
+  'Service (Hours)': 'Service Due (Hours)',
 };
 
-// Map alert type to field name for API
+// Map alert type to field name for date-based API updates
 const ALERT_TO_FIELD: Record<string, string> = {
   'Tax': 'tax_due_date',
   'MOT': 'mot_due_date',
   'First Aid Kit': 'first_aid_kit_expiry',
   'LOLER': 'loler_due_date',
+  '6 Weekly Inspection': 'six_weekly_inspection_due_date',
+  'Fire Extinguisher': 'fire_extinguisher_due_date',
+  'Taco Calibration': 'taco_calibration_due_date',
 };
 
 export function OfficeActionDialog({

@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { FileText } from 'lucide-react';
-import { getTaskContent } from '@/lib/utils/serviceTaskCreation';
+import { getTaskContent, type AlertType } from '@/lib/utils/serviceTaskCreation';
 import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
 
@@ -51,7 +51,7 @@ interface CreateWorkshopTaskDialogProps {
   onOpenChange: (open: boolean) => void;
   initialVehicleId?: string;
   initialCategoryId?: string;
-  alertType?: 'Tax' | 'MOT' | 'Service' | 'Cambelt' | 'First Aid Kit' | 'LOLER';
+  alertType?: AlertType;
   onSuccess?: () => void;
 }
 
