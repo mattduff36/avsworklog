@@ -100,7 +100,9 @@ export function PDFCanvasRenderer({ url, className }: PDFCanvasRendererProps) {
       canvas.style.height = `${(viewport.height / dpr).toFixed(0)}px`;
       canvas.className = 'block';
 
-      await page.render({ canvas, viewport }).promise;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) continue;
+      await page.render({ canvasContext: ctx, viewport }).promise;
 
       if (renderIdRef.current !== id) return;
       container.appendChild(canvas);
