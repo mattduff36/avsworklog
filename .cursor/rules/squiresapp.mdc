@@ -24,8 +24,10 @@ alwaysApply: true
 - Before pushing, state what will be pushed (branch and short summary).
 
 ## 3. Build control
-- Run test builds only when the user says “run tests” or “start test build”.
+- Run test builds only when the user says "run tests" or "start test build".
 - Before running tests, confirm branch and scope in one line.
+- **"run a full test build"**: delete `.next` directory first (`rm -rf .next`), then run `npm run build`. This ensures a clean build with no stale cache.
+- **"run a test build"**: run `npm run build` directly, keeping the existing `.next` cache for faster builds.
 
 ## 4. PRD alignment
 - Track every task to a PRD section or ID.
