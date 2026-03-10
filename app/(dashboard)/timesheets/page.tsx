@@ -35,8 +35,10 @@ interface TimesheetWithProfile extends Timesheet {
 }
 
 export default function TimesheetsPage() {
-  const { user, isManager, loading: authLoading } = useAuth();
+  const { user, isManager, isAdmin, loading: authLoading } = useAuth();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('timesheets');
+  const isElevatedUser = isManager || isAdmin;
+  const pageSize = isElevatedUser ? 20 : 10;
   const router = useRouter();
   const [timesheets, setTimesheets] = useState<TimesheetWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,11 +50,11 @@ export default function TimesheetsPage() {
   const [timesheetToDelete, setTimesheetToDelete] = useState<{ id: string; weekEnding: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [displayCount, setDisplayCount] = useState(12); // Show 12 timesheets initially
+  const [displayCount, setDisplayCount] = useState(pageSize);
   const supabase = createClient();
 
   useEffect(() => {
-    if (user && isManager) {
+    if (user && isElevatedUser) {
       const fetchEmployees = async () => {
         try {
           const { data, error } = await supabase
@@ -69,10 +71,11 @@ export default function TimesheetsPage() {
 
       fetchEmployees();
     }
-  }, [user, isManager, supabase]);
+  }, [user, isElevatedUser, supabase]);
 
   const fetchTimesheets = useCallback(async () => {
     if (!user || authLoading) return;
+    setLoading(true);
     setFetchError(null);
     
     try {
@@ -85,7 +88,7 @@ export default function TimesheetsPage() {
         .order('week_ending', { ascending: false });
 
       // Filter based on user role and selection
-      if (!isManager) {
+      if (!isElevatedUser) {
         // Regular employees only see their own
         query = query.eq('user_id', user.id);
       } else if (selectedEmployeeId && selectedEmployeeId !== 'all') {
@@ -141,7 +144,11 @@ export default function TimesheetsPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, authLoading, isManager, selectedEmployeeId, statusFilter, supabase]);
+  }, [user, authLoading, isElevatedUser, selectedEmployeeId, statusFilter, supabase]);
+
+  useEffect(() => {
+    setDisplayCount(pageSize);
+  }, [pageSize, selectedEmployeeId, statusFilter]);
 
   useEffect(() => {
     fetchTimesheets();
@@ -359,7 +366,7 @@ export default function TimesheetsPage() {
         </div>
         
         {/* Manager: Employee Filter */}
-        {isManager && employees.length > 0 && (
+        {isElevatedUser && employees.length > 0 && (
           <div className="pt-4 border-t border-border">
             <div className="flex items-center gap-3 max-w-md">
               <Label htmlFor="employee-filter" className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
@@ -386,7 +393,7 @@ export default function TimesheetsPage() {
       </div>
 
       {/* Status Filter - Only show for managers */}
-      {isManager && (
+      {isElevatedUser && (
         <Card className="border-border">
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
@@ -481,7 +488,7 @@ export default function TimesheetsPage() {
                         Week Ending {formatDate(timesheet.week_ending)}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
-                        {isManager && timesheet.profile?.full_name && (
+                        {isElevatedUser && timesheet.profile?.full_name && (
                           <span className="font-medium text-white">
                             {timesheet.profile.full_name}
                             {timesheet.reg_number && ' • '}
@@ -542,7 +549,7 @@ export default function TimesheetsPage() {
           {timesheets.length > displayCount && (
             <div className="flex justify-center pt-4">
               <Button
-                onClick={() => setDisplayCount(prev => prev + 12)}
+                onClick={() => setDisplayCount((prev) => prev + pageSize)}
                 variant="outline"
                 className="w-full max-w-xs border-border text-white hover:bg-slate-800"
               >

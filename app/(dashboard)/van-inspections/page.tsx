@@ -44,7 +44,9 @@ interface Vehicle {
 }
 
 function InspectionsContent() {
-  const { user, isManager, loading: authLoading } = useAuth();
+  const { user, isManager, isAdmin, loading: authLoading } = useAuth();
+  const isElevatedUser = isManager || isAdmin;
+  const pageSize = isElevatedUser ? 20 : 10;
   usePermissionCheck('inspections');
   const router = useRouter();
   const [inspections, setInspections] = useState<InspectionWithVehicle[]>([]);
@@ -69,12 +71,12 @@ function InspectionsContent() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [inspectionToDelete, setInspectionToDelete] = useState<{ id: string; vehicleReg: string; date: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [displayCount, setDisplayCount] = useState(12); // Show 12 inspections initially
+  const [displayCount, setDisplayCount] = useState(pageSize);
   const supabase = createClient();
 
   // Fetch employees and vehicles
   useEffect(() => {
-    if (user && isManager) {
+    if (user && isElevatedUser) {
       const fetchEmployees = async () => {
         try {
           const { data, error } = await supabase
@@ -120,11 +122,12 @@ function InspectionsContent() {
     if (user?.id) {
       setRecentVehicleIds(getRecentVehicleIds(user.id));
     }
-  }, [user, isManager, supabase]);
+  }, [user, isElevatedUser, supabase]);
 
   const fetchInspections = useCallback(async () => {
     if (!user || authLoading) return;
-    
+    setLoading(true);
+
     try {
       let query = supabase
         .from('van_inspections')
@@ -141,7 +144,7 @@ function InspectionsContent() {
         .order('inspection_date', { ascending: false });
 
       // Filter based on user role and selection
-      if (!isManager) {
+      if (!isElevatedUser) {
         // Regular employees only see their own
         query = query.eq('user_id', user.id);
       } else {
@@ -203,7 +206,11 @@ function InspectionsContent() {
     } finally {
       setLoading(false);
     }
-  }, [user, authLoading, isManager, selectedEmployeeId, statusFilter, vehicleFilter, supabase]);
+  }, [user, authLoading, isElevatedUser, selectedEmployeeId, statusFilter, vehicleFilter, supabase]);
+
+  useEffect(() => {
+    setDisplayCount(pageSize);
+  }, [pageSize, selectedEmployeeId, statusFilter, vehicleFilter]);
 
   useEffect(() => {
     fetchInspections();
@@ -381,7 +388,7 @@ function InspectionsContent() {
         </div>
         
         {/* Manager: Employee Filter */}
-        {isManager && employees.length > 0 && (
+        {isElevatedUser && employees.length > 0 && (
           <div className="pt-4 border-t border-border">
             <div className="flex items-center gap-3 max-w-md">
               <Label htmlFor="employee-filter" className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
@@ -408,7 +415,7 @@ function InspectionsContent() {
       </div>
 
       {/* Filters - Only show for managers */}
-      {isManager && (
+      {isElevatedUser && (
         <Card className="border-border">
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -538,7 +545,7 @@ function InspectionsContent() {
                         {inspection.vans?.reg_number || 'Unknown Van'}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
-                        {isManager && (inspection as { profile?: { full_name?: string } | null }).profile?.full_name && (
+                        {isElevatedUser && (inspection as { profile?: { full_name?: string } | null }).profile?.full_name && (
                           <span className="font-medium text-white">
                             {(inspection as { profile?: { full_name?: string } | null }).profile?.full_name}
                             {' • '}
@@ -604,7 +611,7 @@ function InspectionsContent() {
           {inspections.length > displayCount && (
             <div className="flex justify-center pt-4">
               <Button
-                onClick={() => setDisplayCount(prev => prev + 12)}
+                onClick={() => setDisplayCount((prev) => prev + pageSize)}
                 variant="outline"
                 className="w-full max-w-xs border-border text-white hover:bg-slate-800"
               >
