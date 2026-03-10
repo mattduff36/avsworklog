@@ -48,7 +48,7 @@ interface Plant {
 }
 
 function PlantInspectionsContent() {
-  const { user, isManager } = useAuth();
+  const { user, isManager, loading: authLoading } = useAuth();
   usePermissionCheck('plant-inspections');
   const router = useRouter();
   const [inspections, setInspections] = useState<InspectionWithPlant[]>([]);
@@ -119,7 +119,7 @@ function PlantInspectionsContent() {
   }, [user, isManager, supabase]);
 
   const fetchInspections = useCallback(async () => {
-    if (!user) return;
+    if (!user || authLoading) return;
     
     try {
       let query = supabase
@@ -197,7 +197,7 @@ function PlantInspectionsContent() {
     } finally {
       setLoading(false);
     }
-  }, [user, isManager, selectedEmployeeId, statusFilter, plantFilter, supabase]);
+  }, [user, authLoading, isManager, selectedEmployeeId, statusFilter, plantFilter, supabase]);
 
   useEffect(() => {
     fetchInspections();

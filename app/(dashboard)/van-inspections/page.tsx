@@ -45,8 +45,8 @@ interface Vehicle {
 }
 
 function InspectionsContent() {
-  const { user, isManager } = useAuth();
-  usePermissionCheck('inspections'); // Check permissions but don't use loading state
+  const { user, isManager, loading: authLoading } = useAuth();
+  usePermissionCheck('inspections');
   const router = useRouter();
   const [inspections, setInspections] = useState<InspectionWithVehicle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,7 +124,7 @@ function InspectionsContent() {
   }, [user, isManager, supabase]);
 
   const fetchInspections = useCallback(async () => {
-    if (!user) return;
+    if (!user || authLoading) return;
     
     try {
       let query = supabase
@@ -204,7 +204,7 @@ function InspectionsContent() {
     } finally {
       setLoading(false);
     }
-  }, [user, isManager, selectedEmployeeId, statusFilter, vehicleFilter, supabase]);
+  }, [user, authLoading, isManager, selectedEmployeeId, statusFilter, vehicleFilter, supabase]);
 
   useEffect(() => {
     fetchInspections();

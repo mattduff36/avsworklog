@@ -36,7 +36,7 @@ interface TimesheetWithProfile extends Timesheet {
 }
 
 export default function TimesheetsPage() {
-  const { user, isManager } = useAuth();
+  const { user, isManager, loading: authLoading } = useAuth();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('timesheets');
   const router = useRouter();
   const [timesheets, setTimesheets] = useState<TimesheetWithProfile[]>([]);
@@ -73,7 +73,7 @@ export default function TimesheetsPage() {
   }, [user, isManager, supabase]);
 
   const fetchTimesheets = useCallback(async () => {
-    if (!user) return;
+    if (!user || authLoading) return;
     setFetchError(null);
     
     try {
@@ -142,7 +142,7 @@ export default function TimesheetsPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, isManager, selectedEmployeeId, statusFilter, supabase]);
+  }, [user, authLoading, isManager, selectedEmployeeId, statusFilter, supabase]);
 
   useEffect(() => {
     fetchTimesheets();

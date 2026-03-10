@@ -36,7 +36,7 @@ interface HgvSummary {
 }
 
 function HgvInspectionsContent() {
-  const { user, isManager } = useAuth();
+  const { user, isManager, loading: authLoading } = useAuth();
   usePermissionCheck('hgv-inspections');
   const router = useRouter();
   const supabase = createClient();
@@ -75,7 +75,7 @@ function HgvInspectionsContent() {
   }, [isManager, supabase]);
 
   const fetchInspections = useCallback(async () => {
-    if (!user) return;
+    if (!user || authLoading) return;
     setLoading(true);
 
     try {
@@ -107,7 +107,7 @@ function HgvInspectionsContent() {
     } finally {
       setLoading(false);
     }
-  }, [hgvFilter, isManager, selectedEmployeeId, supabase, user]);
+  }, [authLoading, hgvFilter, isManager, selectedEmployeeId, supabase, user]);
 
   useEffect(() => {
     fetchFilters();
