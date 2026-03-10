@@ -2,6 +2,7 @@ import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { TRUCK_CHECKLIST_ITEMS } from '@/lib/checklists/vehicle-checklists';
 import { formatDate } from '@/lib/utils/date';
+import type { EnrichedDefectItem } from '@/lib/utils/hgvDefectWorkshopDetails';
 
 const styles = StyleSheet.create({
   page: { padding: 20, fontSize: 7, fontFamily: 'Helvetica' },
@@ -50,7 +51,7 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   itemCell: {
-    width: '50%',
+    width: '44%',
     borderRightWidth: 1,
     borderRightColor: '#000',
     justifyContent: 'center',
@@ -72,12 +73,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 2,
   },
-  commentsCell: { width: '24%', justifyContent: 'center', padding: 3 },
+  naCell: {
+    width: '10%',
+    borderRightWidth: 1,
+    borderRightColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 2,
+  },
+  commentsCell: { width: '20%', justifyContent: 'center', padding: 3 },
   headerText: { fontSize: 7, fontWeight: 'bold' },
   numText: { fontSize: 8, fontWeight: 'bold' },
   itemText: { fontSize: 6.5 },
   markText: { fontSize: 7, fontWeight: 'bold' },
   commentsText: { fontSize: 6, lineHeight: 1.2 },
+  sectionDividerRow: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#000',
+    backgroundColor: '#eef4ff',
+  },
+  sectionDividerText: {
+    fontSize: 7,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    paddingVertical: 3,
+  },
   checkedByBox: {
     borderWidth: 1,
     borderTopWidth: 0,
@@ -110,6 +130,19 @@ const styles = StyleSheet.create({
   },
   defectsTitle: { fontSize: 8, fontWeight: 'bold', marginBottom: 3 },
   defectsText: { fontSize: 6, lineHeight: 1.2 },
+  defectItemWrap: { marginTop: 3 },
+  defectItemTitle: { fontSize: 6.2, fontWeight: 'bold' },
+  defectItemBody: { fontSize: 5.8, lineHeight: 1.2 },
+  workshopSignatureWrap: {
+    width: 90,
+    height: 28,
+    borderWidth: 1,
+    borderColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  workshopSignatureImage: { width: 84, height: 22, objectFit: 'contain' },
   legendSection: { marginTop: 6, textAlign: 'center' },
   legendText: { fontSize: 6, fontWeight: 'bold', marginBottom: 1 },
   legendNote: { fontSize: 5 },
@@ -137,9 +170,10 @@ interface HgvInspectionPDFProps {
     status: 'ok' | 'attention' | 'na';
     comments: string | null;
   }>;
+  defectsWithWorkshop?: EnrichedDefectItem[];
 }
 
-export function HgvInspectionPDF({ inspection, hgv, operator, items }: HgvInspectionPDFProps) {
+export function HgvInspectionPDF({ inspection, hgv, operator, items, defectsWithWorkshop = [] }: HgvInspectionPDFProps) {
   const formNumber = inspection.id ? inspection.id.slice(-5).toUpperCase() : '00000';
   const inspectionDay = (() => {
     const date = new Date(inspection.inspection_date);
@@ -223,6 +257,9 @@ export function HgvInspectionPDF({ inspection, hgv, operator, items }: HgvInspec
             <View style={styles.failCell}>
               <Text style={styles.headerText}>FAIL</Text>
             </View>
+            <View style={styles.naCell}>
+              <Text style={styles.headerText}>N/A</Text>
+            </View>
             <View style={styles.commentsCell}>
               <Text style={styles.headerText}>COMMENTS</Text>
             </View>
@@ -234,28 +271,37 @@ export function HgvInspectionPDF({ inspection, hgv, operator, items }: HgvInspec
             const rowStyle = isLast ? styles.rowLast : styles.row;
             const passMark = item?.status === 'ok' ? 'PASS' : '';
             const failMark = item?.status === 'attention' ? 'FAIL' : '';
-            const itemComments = item?.status === 'na'
-              ? ['N/A', item?.comments].filter(Boolean).join(' - ')
-              : (item?.comments || '');
+            const naMark = item?.status === 'na' ? 'N/A' : '';
+            const itemComments = item?.comments || '';
 
             return (
-              <View key={itemNumber} style={rowStyle}>
-                <View style={styles.numCell}>
-                  <Text style={styles.numText}>{String(itemNumber).padStart(2, '0')}</Text>
+              <React.Fragment key={itemNumber}>
+                {itemNumber === 22 && (
+                  <View style={styles.sectionDividerRow}>
+                    <Text style={styles.sectionDividerText}>Artics only</Text>
+                  </View>
+                )}
+                <View style={rowStyle}>
+                  <View style={styles.numCell}>
+                    <Text style={styles.numText}>{String(itemNumber).padStart(2, '0')}</Text>
+                  </View>
+                  <View style={styles.itemCell}>
+                    <Text style={styles.itemText}>{itemLabel}</Text>
+                  </View>
+                  <View style={styles.passCell}>
+                    <Text style={styles.markText}>{passMark}</Text>
+                  </View>
+                  <View style={styles.failCell}>
+                    <Text style={styles.markText}>{failMark}</Text>
+                  </View>
+                  <View style={styles.naCell}>
+                    <Text style={styles.markText}>{naMark}</Text>
+                  </View>
+                  <View style={styles.commentsCell}>
+                    <Text style={styles.commentsText}>{itemComments}</Text>
+                  </View>
                 </View>
-                <View style={styles.itemCell}>
-                  <Text style={styles.itemText}>{itemLabel}</Text>
-                </View>
-                <View style={styles.passCell}>
-                  <Text style={styles.markText}>{passMark}</Text>
-                </View>
-                <View style={styles.failCell}>
-                  <Text style={styles.markText}>{failMark}</Text>
-                </View>
-                <View style={styles.commentsCell}>
-                  <Text style={styles.commentsText}>{itemComments}</Text>
-                </View>
-              </View>
+              </React.Fragment>
             );
           })}
         </View>
@@ -279,10 +325,50 @@ export function HgvInspectionPDF({ inspection, hgv, operator, items }: HgvInspec
         <View style={styles.defectsBox}>
           <Text style={styles.defectsTitle}>DEFECTS / COMMENTS</Text>
           <Text style={styles.defectsText}>{inspection.inspector_comments || 'None'}</Text>
+          {defectsWithWorkshop.map((defect) => {
+            const latestWorkshopTask = defect.workshop_tasks[0];
+            return (
+              <View key={defect.id} style={styles.defectItemWrap}>
+                <Text style={styles.defectItemTitle}>
+                  {defect.item_number}. {defect.item_description}
+                </Text>
+                <Text style={styles.defectItemBody}>
+                  Defect note: {defect.comments || 'None'}
+                </Text>
+                {latestWorkshopTask ? (
+                  <>
+                    <Text style={styles.defectItemBody}>
+                      Workshop complete: {latestWorkshopTask.completed_at ? formatDate(latestWorkshopTask.completed_at) : '-'} by {latestWorkshopTask.completed_by}
+                    </Text>
+                    <Text style={styles.defectItemBody}>
+                      Completion note: {latestWorkshopTask.completed_comment || 'None'}
+                    </Text>
+                    {latestWorkshopTask.completion_signed_at && (
+                      <Text style={styles.defectItemBody}>
+                        Signed: {formatDate(latestWorkshopTask.completion_signed_at)}
+                      </Text>
+                    )}
+                    {latestWorkshopTask.completion_signature_data && (
+                      <View style={styles.workshopSignatureWrap}>
+                        <Image src={latestWorkshopTask.completion_signature_data} style={styles.workshopSignatureImage} />
+                      </View>
+                    )}
+                    {latestWorkshopTask.timeline.slice(-3).map((event) => (
+                      <Text key={event.id} style={styles.defectItemBody}>
+                        - {formatDate(event.created_at)} {event.status}: {event.body}
+                      </Text>
+                    ))}
+                  </>
+                ) : (
+                  <Text style={styles.defectItemBody}>Workshop status: Not completed</Text>
+                )}
+              </View>
+            );
+          })}
         </View>
 
         <View style={styles.legendSection}>
-          <Text style={styles.legendText}>USE THE FOLLOWING: PASS = IN ORDER   FAIL = REQUIRES ATTENTION</Text>
+          <Text style={styles.legendText}>USE THE FOLLOWING: PASS = IN ORDER   FAIL = REQUIRES ATTENTION   N/A = NOT APPLICABLE</Text>
           <Text style={styles.legendNote}>Inspection Date: {formatDate(inspection.inspection_date)}</Text>
           <Text style={styles.legendNote}>Category: {hgv.hgv_categories?.name || 'Uncategorised'}{hgv.nickname ? ` | Nickname: ${hgv.nickname}` : ''}</Text>
         </View>

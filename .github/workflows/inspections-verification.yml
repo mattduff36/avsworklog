@@ -3,8 +3,20 @@ name: Inspections Verification Gate
 on:
   push:
     branches: [main, master]
+    paths-ignore:
+      - 'docs/**'
+      - 'docs_private/**'
+      - '.cursor/**'
+      - 'plans/**'
+      - '**/*.md'
   pull_request:
     branches: [main, master]
+    paths-ignore:
+      - 'docs/**'
+      - 'docs_private/**'
+      - '.cursor/**'
+      - 'plans/**'
+      - '**/*.md'
 
 jobs:
   static-checks:

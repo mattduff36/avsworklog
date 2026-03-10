@@ -3,10 +3,12 @@ import { renderToStream } from '@react-pdf/renderer';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { HgvInspectionPDF } from '@/lib/pdf/hgv-inspection-pdf';
+import { enrichDefectsWithWorkshopCompletion } from '@/lib/utils/hgvDefectWorkshopDetails';
 
 interface HgvInspectionWithRelations {
   id: string;
   user_id: string;
+  hgv_id: string | null;
   inspection_date: string;
   current_mileage: number | null;
   inspector_comments: string | null;
@@ -72,6 +74,18 @@ export async function GET(
     }
 
     const inspectionWithRelations = inspection as unknown as HgvInspectionWithRelations;
+    const defectsWithWorkshop = await enrichDefectsWithWorkshopCompletion(
+      supabase,
+      inspectionWithRelations.hgv_id,
+      (items || [])
+        .filter((item) => item.status === 'attention')
+        .map((item) => ({
+          id: item.id,
+          item_number: item.item_number,
+          item_description: item.item_description,
+          comments: item.comments,
+        }))
+    );
 
     const pdfComponent = HgvInspectionPDF({
       inspection: {
@@ -97,6 +111,7 @@ export async function GET(
         status: item.status as 'ok' | 'attention' | 'na',
         comments: item.comments,
       })),
+      defectsWithWorkshop,
     });
 
     const stream = await renderToStream(pdfComponent);

@@ -28,6 +28,8 @@ type WorkshopTaskTimelineTask = {
   logged_comment?: string | null;
   actioned_at?: string | null;
   actioned_comment?: string | null;
+  actioned_signature_data?: string | null;
+  actioned_signed_at?: string | null;
   status_history?: unknown[] | null;
   profiles_created?: {
     full_name: string;
@@ -127,6 +129,10 @@ const buildFallbackStatusHistory = (task: WorkshopTaskTimelineTask): StatusHisto
       author_id: null,
       author_name: null,
       body: task.actioned_comment || 'Marked as complete',
+      meta: {
+        signature_data: task.actioned_signature_data || undefined,
+        signed_at: task.actioned_signed_at || undefined,
+      },
     });
   }
   return items;
@@ -237,6 +243,17 @@ export function WorkshopTaskTimeline({
                   </div>
                   {item.body && (
                     <p className="text-sm text-muted-foreground">{item.body}</p>
+                  )}
+                  {item.meta?.signature_data && (
+                    <div className="space-y-1">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={item.meta.signature_data} alt="Completion signature" className="border rounded p-1 bg-white max-w-xs" />
+                      {item.meta.signed_at && (
+                        <p className="text-xs text-muted-foreground">
+                          Signed: {formatRelativeTime(item.meta.signed_at)}
+                        </p>
+                      )}
+                    </div>
                   )}
                   <p className="text-xs text-muted-foreground">
                     {formatRelativeTime(item.created_at)}

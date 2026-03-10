@@ -762,9 +762,12 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
       let updatePayload: Record<string, unknown> = {
         status: 'completed',
+        actioned: true,
         actioned_at: now.toISOString(),
         actioned_comment: data.completedComment,
         actioned_by: user?.id || null,
+        actioned_signature_data: data.completedSignatureData || null,
+        actioned_signed_at: data.completedSignedAt || null,
       };
 
       if (requiresIntermediateStep) {
@@ -791,6 +794,12 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         body: data.completedComment,
         authorId: user?.id || null,
         authorName: profile?.full_name || null,
+        meta: data.completedSignatureData
+          ? {
+              signature_data: data.completedSignatureData,
+              signed_at: data.completedSignedAt || new Date(now.getTime() + 1).toISOString(),
+            }
+          : undefined,
         createdAt: new Date(now.getTime() + 1).toISOString(),
       });
       nextHistory = appendStatusHistory(nextHistory, completeEvent);

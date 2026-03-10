@@ -36,6 +36,7 @@ interface WorkshopTasksOverviewTabProps {
   loading: boolean;
   tabFilteredTasks: Action[];
   pendingTasks: Action[];
+  highPriorityPendingCount: number;
   inProgressTasks: Action[];
   onHoldTasks: Action[];
   completedTasks: Action[];
@@ -49,7 +50,7 @@ interface WorkshopTasksOverviewTabProps {
   onShowCompletedChange: (show: boolean) => void;
   updatingStatus: Set<string>;
   taskAttachmentCounts: Map<string, number>;
-  getStatusIcon: (status: string) => ReactNode;
+  getStatusIcon: (status: string, task?: Action) => ReactNode;
   getVehicleReg: (task: Action) => string;
   getSourceLabel: (task: Action) => string;
   getAssetDisplay: (vehicle: Vehicle) => string;
@@ -77,6 +78,7 @@ export function WorkshopTasksOverviewTab({
   loading,
   tabFilteredTasks,
   pendingTasks,
+  highPriorityPendingCount,
   inProgressTasks,
   onHoldTasks,
   completedTasks,
@@ -106,6 +108,9 @@ export function WorkshopTasksOverviewTab({
   onEditTask,
   onDeleteTask,
 }: WorkshopTasksOverviewTabProps) {
+  const hasHighPriorityPending = highPriorityPendingCount > 0;
+  const pendingHeaderIconClass = hasHighPriorityPending ? 'text-red-500' : 'text-amber-400';
+
   return (
     <TabsContent value="overview" className="space-y-6 mt-0">
       <div className="flex items-center justify-end">
@@ -178,6 +183,9 @@ export function WorkshopTasksOverviewTab({
           <CardHeader className="pb-3">
             <CardDescription className="text-muted-foreground">Pending</CardDescription>
             <CardTitle className="text-3xl text-amber-600 dark:text-amber-400">{pendingTasks.length}</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              High Priority: <span className="font-medium text-red-500">{highPriorityPendingCount}</span>
+            </p>
           </CardHeader>
         </Card>
         <Card>
@@ -230,13 +238,13 @@ export function WorkshopTasksOverviewTab({
                 className="w-full flex items-center justify-between p-4 bg-amber-500/10 hover:bg-amber-500/20 transition-colors border-b-2 border-amber-500/30"
               >
                 <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-amber-400" />
+                  <AlertTriangle className={`h-5 w-5 ${pendingHeaderIconClass}`} />
                   Pending Tasks ({pendingTasks.length})
                 </h2>
                 {showPending ? (
-                  <ChevronUp className="h-5 w-5 text-amber-400" />
+                  <ChevronUp className={`h-5 w-5 ${pendingHeaderIconClass}`} />
                 ) : (
-                  <ChevronDown className="h-5 w-5 text-amber-400" />
+                  <ChevronDown className={`h-5 w-5 ${pendingHeaderIconClass}`} />
                 )}
               </button>
               {showPending && (
@@ -254,7 +262,7 @@ export function WorkshopTasksOverviewTab({
                           <div className="flex flex-col md:flex-row items-start justify-between gap-4">
                             <div className="flex-1 w-full">
                               <div className="flex items-center gap-2 mb-2">
-                                {getStatusIcon(task.status)}
+                                {getStatusIcon(task.status, task)}
                                 <h3 className="font-semibold text-lg text-foreground">
                                   {getVehicleReg(task)}
                                 </h3>

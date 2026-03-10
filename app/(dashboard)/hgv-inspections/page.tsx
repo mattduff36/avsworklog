@@ -36,7 +36,9 @@ interface HgvSummary {
 }
 
 function HgvInspectionsContent() {
-  const { user, isManager, loading: authLoading } = useAuth();
+  const { user, isManager, isAdmin, loading: authLoading } = useAuth();
+  const isElevatedUser = isManager || isAdmin;
+  const pageSize = isElevatedUser ? 20 : 10;
   usePermissionCheck('hgv-inspections');
   const router = useRouter();
   const supabase = createClient();
@@ -47,6 +49,7 @@ function HgvInspectionsContent() {
   const [hgvs, setHgvs] = useState<HgvSummary[]>([]);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [displayCount, setDisplayCount] = useState(pageSize);
 
   const [selectedEmployeeId, setSelectedEmployeeId] = useQueryState('employee', {
     defaultValue: 'all',
@@ -65,14 +68,14 @@ function HgvInspectionsContent() {
       .order('reg_number');
     setHgvs(hgvData || []);
 
-    if (isManager) {
+    if (isElevatedUser) {
       const { data: profileData } = await supabase
         .from('profiles')
         .select('id, full_name, employee_id')
         .order('full_name');
       setEmployees((profileData || []) as Employee[]);
     }
-  }, [isManager, supabase]);
+  }, [isElevatedUser, supabase]);
 
   const fetchInspections = useCallback(async () => {
     if (!user || authLoading) return;
@@ -88,7 +91,7 @@ function HgvInspectionsContent() {
         `)
         .order('inspection_date', { ascending: false });
 
-      if (!isManager) {
+      if (!isElevatedUser) {
         query = query.eq('user_id', user.id);
       } else if ((selectedEmployeeId || 'all') !== 'all') {
         query = query.eq('user_id', selectedEmployeeId as string);
@@ -107,7 +110,11 @@ function HgvInspectionsContent() {
     } finally {
       setLoading(false);
     }
-  }, [authLoading, hgvFilter, isManager, selectedEmployeeId, supabase, user]);
+  }, [authLoading, hgvFilter, isElevatedUser, selectedEmployeeId, supabase, user]);
+
+  useEffect(() => {
+    setDisplayCount(pageSize);
+  }, [pageSize, selectedEmployeeId, hgvFilter]);
 
   useEffect(() => {
     fetchFilters();
@@ -178,7 +185,7 @@ function HgvInspectionsContent() {
           </Link>
         </div>
 
-        {isManager && employees.length > 0 && (
+        {isElevatedUser && employees.length > 0 && (
           <div className="pt-4 border-t border-border flex items-center gap-3 max-w-md">
             <Label className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
               <User className="h-4 w-4" />
@@ -202,7 +209,7 @@ function HgvInspectionsContent() {
         )}
       </div>
 
-      {isManager && (
+      {isElevatedUser && (
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
@@ -249,8 +256,9 @@ function HgvInspectionsContent() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
-          {inspections.map((inspection) => (
+        <>
+          <div className="grid gap-4">
+            {inspections.slice(0, displayCount).map((inspection) => (
             <Card
               key={inspection.id}
               className="border-border hover:shadow-lg hover:border-inspection/50 transition-all duration-200 cursor-pointer"
@@ -266,7 +274,7 @@ function HgvInspectionsContent() {
                         {inspection.hgv?.nickname ? ` - ${inspection.hgv.nickname}` : ''}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
-                        {isManager && inspection.profile?.full_name ? `${inspection.profile.full_name} • ` : ''}
+                        {isElevatedUser && inspection.profile?.full_name ? `${inspection.profile.full_name} • ` : ''}
                         {formatDate(inspection.inspection_date)}
                       </CardDescription>
                     </div>
@@ -306,8 +314,20 @@ function HgvInspectionsContent() {
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
+            ))}
+          </div>
+          {inspections.length > displayCount && (
+            <div className="flex justify-center pt-4">
+              <Button
+                onClick={() => setDisplayCount((prev) => prev + pageSize)}
+                variant="outline"
+                className="w-full max-w-xs border-border text-white hover:bg-slate-800"
+              >
+                Show More ({inspections.length - displayCount} remaining)
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

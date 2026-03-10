@@ -2,8 +2,20 @@ name: Playwright Tests
 on:
   push:
     branches: [ main, master ]
+    paths-ignore:
+      - 'docs/**'
+      - 'docs_private/**'
+      - '.cursor/**'
+      - 'plans/**'
+      - '**/*.md'
   pull_request:
     branches: [ main, master ]
+    paths-ignore:
+      - 'docs/**'
+      - 'docs_private/**'
+      - '.cursor/**'
+      - 'plans/**'
+      - '**/*.md'
 jobs:
   test:
     timeout-minutes: 60

@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { AlertCircle, CheckCircle2, Download, MinusCircle, XCircle } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import type { InspectionItem, InspectionStatus } from '@/types/inspection';
+import { enrichDefectsWithWorkshopCompletion, type EnrichedDefectItem } from '@/lib/utils/hgvDefectWorkshopDetails';
 
 interface HgvInspectionDetails {
   id: string;
@@ -36,6 +37,7 @@ export default function ViewHgvInspectionPage() {
 
   const [inspection, setInspection] = useState<HgvInspectionDetails | null>(null);
   const [items, setItems] = useState<InspectionItem[]>([]);
+  const [defectsWithWorkshop, setDefectsWithWorkshop] = useState<EnrichedDefectItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -74,7 +76,22 @@ export default function ViewHgvInspectionPage() {
       if (itemsError) throw itemsError;
 
       setInspection(inspectionData as HgvInspectionDetails);
-      setItems((itemsData || []) as InspectionItem[]);
+      const typedItems = (itemsData || []) as InspectionItem[];
+      setItems(typedItems);
+      const attentionItems = typedItems
+        .filter((item) => item.status === 'attention')
+        .map((item) => ({
+          id: item.id,
+          item_number: item.item_number,
+          item_description: item.item_description,
+          comments: item.comments,
+        }));
+      const enriched = await enrichDefectsWithWorkshopCompletion(
+        supabase,
+        (inspectionData as HgvInspectionDetails).hgv_id,
+        attentionItems
+      );
+      setDefectsWithWorkshop(enriched);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load inspection');
     } finally {
@@ -118,6 +135,8 @@ export default function ViewHgvInspectionPage() {
 
   const defectCount = items.filter(item => item.status === 'attention').length;
   const okCount = items.filter(item => item.status === 'ok').length;
+  const statusLabel = (status: string) =>
+    status === 'logged' ? 'In Progress' : status === 'on_hold' ? 'On Hold' : status === 'resumed' ? 'Resumed' : status === 'completed' ? 'Completed' : status;
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -181,7 +200,7 @@ export default function ViewHgvInspectionPage() {
       <Card>
         <CardHeader>
           <CardTitle>Checklist Items</CardTitle>
-          <CardDescription>26-point HGV checklist results</CardDescription>
+          <CardDescription>25-point HGV checklist results</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="hidden md:block overflow-x-auto">
@@ -228,13 +247,60 @@ export default function ViewHgvInspectionPage() {
         </CardContent>
       </Card>
 
-      {inspection.inspector_comments && (
+      {(inspection.inspector_comments || defectsWithWorkshop.length > 0) && (
         <Card>
           <CardHeader>
-            <CardTitle>Inspector Notes</CardTitle>
+            <CardTitle>Defects / Comments</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm">{inspection.inspector_comments}</p>
+          <CardContent className="space-y-4">
+            {inspection.inspector_comments && (
+              <p className="text-sm whitespace-pre-wrap">{inspection.inspector_comments}</p>
+            )}
+            {defectsWithWorkshop.length > 0 && (
+              <div className="space-y-4">
+                {defectsWithWorkshop.map((defect) => (
+                  <div key={defect.id} className="rounded-md border border-border p-3 space-y-2">
+                    <div className="text-sm font-medium">
+                      {defect.item_number}. {defect.item_description}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Defect note: {defect.comments || 'No defect note recorded'}
+                    </p>
+                    {defect.workshop_tasks.length > 0 ? (
+                      <div className="space-y-3">
+                        {defect.workshop_tasks.map((task) => (
+                          <div key={task.task_id} className="rounded border border-green-700/40 bg-green-900/10 p-2 space-y-2">
+                            <p className="text-xs text-green-300">
+                              Completed: {task.completed_at ? formatDate(task.completed_at) : '-'} by {task.completed_by}
+                            </p>
+                            {task.completed_comment && (
+                              <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                                Completion note: {task.completed_comment}
+                              </p>
+                            )}
+                            {task.completion_signature_data && (
+                              <div className="space-y-1">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={task.completion_signature_data} alt="Workshop completion signature" className="border rounded p-1 bg-white max-w-xs" />
+                              </div>
+                            )}
+                            <div className="space-y-1">
+                              {task.timeline.map((event) => (
+                                <p key={event.id} className="text-xs text-muted-foreground">
+                                  {formatDate(event.created_at)} - {statusLabel(event.status)} - {event.author_name}: {event.body}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No completed workshop task linked yet.</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

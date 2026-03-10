@@ -29,7 +29,7 @@ export const timesheetFormSchema = z.object({
 
 // Vehicle inspection validation schemas
 export const inspectionItemSchema = z.object({
-  item_number: z.number().min(1).max(26),
+  item_number: z.number().min(1).max(25),
   day_of_week: z.number().min(1).max(7),
   status: z.enum(['ok', 'attention', 'na']),
 });

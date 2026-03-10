@@ -9,6 +9,8 @@ export type StatusHistoryEvent = {
   meta?: {
     from?: string;
     to?: string;
+    signature_data?: string;
+    signed_at?: string;
   };
 };
 

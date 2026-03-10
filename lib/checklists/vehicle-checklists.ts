@@ -7,7 +7,7 @@
 
 export type VehicleCategory = 'Artic' | 'Trailer' | 'Truck' | 'Van';
 
-// Truck/Artic/Trailer checklist (26 items)
+// Truck/Artic/Trailer checklist (25 items)
 const TRUCK_CHECKLIST_ITEMS = [
   'Fuel - and ad-blu',
   'Mirrors - includes Class V & Class VI',
@@ -34,7 +34,6 @@ const TRUCK_CHECKLIST_ITEMS = [
   'Couplings Secure',
   'Electrical Connections',
   'Trailer No. Plate',
-  'Nil Defects',
 ];
 
 // Van checklist (14 items)

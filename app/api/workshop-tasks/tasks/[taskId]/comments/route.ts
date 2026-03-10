@@ -13,6 +13,8 @@ type StatusEvent = {
   body: string;
   meta: {
     status: string;
+    signature_data?: string;
+    signed_at?: string;
   };
 };
 
@@ -35,6 +37,10 @@ interface StatusHistoryEvent {
   author_id?: string;
   author_name?: string;
   body?: string;
+  meta?: {
+    signature_data?: string;
+    signed_at?: string;
+  };
 }
 
 interface ProfileShape {
@@ -96,7 +102,7 @@ export async function GET(
     // Fetch the task (verify it exists and is a workshop task)
     const { data: task, error: taskError } = await supabase
       .from('actions')
-      .select('id, action_type, created_at, created_by, logged_at, logged_by, logged_comment, actioned_at, actioned_by, actioned_comment, status_history')
+      .select('id, action_type, created_at, created_by, logged_at, logged_by, logged_comment, actioned_at, actioned_by, actioned_comment, actioned_signature_data, actioned_signed_at, status_history')
       .eq('id', taskId)
       .single();
     const typedTask = task as {
@@ -110,6 +116,8 @@ export async function GET(
       actioned_at: string | null;
       actioned_by: string | null;
       actioned_comment: string | null;
+      actioned_signature_data: string | null;
+      actioned_signed_at: string | null;
       status_history: unknown;
     } | null;
 
@@ -188,7 +196,11 @@ export async function GET(
             ? { id: event.author_id || '', full_name: event.author_name }
             : authorProfile,
           body: event.body || 'Status updated',
-          meta: { status: event.status },
+          meta: {
+            status: event.status,
+            signature_data: event.meta?.signature_data,
+            signed_at: event.meta?.signed_at,
+          },
         });
       }
     } else {
@@ -223,7 +235,11 @@ export async function GET(
           created_at: typedTask.actioned_at,
           author: actionedByProfile || null,
           body: typedTask.actioned_comment || 'Marked as Complete',
-          meta: { status: 'completed' },
+          meta: {
+            status: 'completed',
+            signature_data: typedTask.actioned_signature_data || undefined,
+            signed_at: typedTask.actioned_signed_at || undefined,
+          },
         });
       }
     }

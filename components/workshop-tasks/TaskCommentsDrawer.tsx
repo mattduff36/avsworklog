@@ -22,6 +22,8 @@ type TimelineItem = {
   can_delete?: boolean;
   meta?: {
     status: string;
+    signature_data?: string;
+    signed_at?: string;
   };
   updated_at?: string | null;
 };
@@ -244,6 +246,15 @@ export function TaskCommentsDrawer({
                   </span>
                 </div>
                 <p className="text-sm">{item.body}</p>
+                {item.meta?.signature_data && (
+                  <div className="space-y-1">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={item.meta.signature_data} alt="Completion signature" className="border rounded p-1 bg-white max-w-xs" />
+                    {item.meta.signed_at && (
+                      <p className="text-xs text-muted-foreground">Signed: {formatDate(item.meta.signed_at)}</p>
+                    )}
+                  </div>
+                )}
                 {item.author && (
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <User className="h-3 w-3" />

@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertCircle, CheckCircle2, Info, Send, Timer, User, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Info, MinusCircle, Send, Timer, User, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { TRUCK_CHECKLIST_ITEMS } from '@/lib/checklists/vehicle-checklists';
 import { formatDate, formatDateISO, getDayOfWeek } from '@/lib/utils/date';
@@ -39,6 +39,12 @@ type InspectionInsert = Database['public']['Tables']['hgv_inspections']['Insert'
 
 const MIN_HGV_INSPECTION_SECONDS = 10 * 60;
 const STICKY_NAV_OFFSET_PX = 96;
+const ARTIC_ONLY_START_ITEM = 22;
+const ARTIC_ONLY_END_ITEM = 25;
+
+function isArticOnlyItem(itemNumber: number): boolean {
+  return itemNumber >= ARTIC_ONLY_START_ITEM && itemNumber <= ARTIC_ONLY_END_ITEM;
+}
 
 function NewHgvInspectionContent() {
   const router = useRouter();
@@ -380,6 +386,8 @@ function NewHgvInspectionContent() {
         return <CheckCircle2 className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-green-400' : 'text-muted-foreground'}`} />;
       case 'attention':
         return <XCircle className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-red-400' : 'text-muted-foreground'}`} />;
+      case 'na':
+        return <MinusCircle className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-blue-300' : 'text-muted-foreground'}`} />;
       default:
         return null;
     }
@@ -389,7 +397,17 @@ function NewHgvInspectionContent() {
     if (!isSelected) return 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50';
     if (status === 'ok') return 'bg-green-500/20 border-green-500 shadow-lg shadow-green-500/20';
     if (status === 'attention') return 'bg-red-500/20 border-red-500 shadow-lg shadow-red-500/20';
+    if (status === 'na') return 'bg-blue-500/20 border-blue-400 shadow-lg shadow-blue-500/20';
     return 'bg-slate-500/20 border-slate-400 shadow-lg shadow-slate-500/20';
+  };
+
+  const getStatusOptions = (itemNumber: number): InspectionStatus[] =>
+    isArticOnlyItem(itemNumber) ? ['ok', 'attention', 'na'] : ['ok', 'attention'];
+
+  const getStatusLabel = (status: InspectionStatus): string => {
+    if (status === 'ok') return 'Pass';
+    if (status === 'attention') return 'Fail';
+    return 'N/A';
   };
 
   const completedItems = Object.keys(checkboxStates).length;
@@ -551,9 +569,9 @@ function NewHgvInspectionContent() {
       {checklistStarted && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-foreground">26-Point HGV Safety Check</CardTitle>
+            <CardTitle className="text-foreground">25-Point HGV Safety Check</CardTitle>
             <CardDescription className="text-muted-foreground">
-              Mark each item as Pass or Fail
+              Mark each item as Pass or Fail (items 22-25 also allow N/A)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 p-4 md:p-6">
@@ -563,7 +581,7 @@ function NewHgvInspectionContent() {
                   <tr className="border-b border-border">
                     <th className="text-left p-3 w-12 font-medium text-white">#</th>
                     <th className="text-left p-3 font-medium text-white">Item</th>
-                    <th className="text-center p-3 w-48 font-medium text-white">Status</th>
+                    <th className="text-center p-3 w-64 font-medium text-white">Status</th>
                     <th className="text-left p-3 font-medium text-white">Comments</th>
                   </tr>
                 </thead>
@@ -573,40 +591,50 @@ function NewHgvInspectionContent() {
                     const key = `${itemNumber}`;
                     const currentStatus = checkboxStates[key];
                     const isLocked = loggedDefects.has(key);
+                    const statusOptions = getStatusOptions(itemNumber);
                     return (
-                      <tr key={itemNumber} data-checklist-item={key} className={`border-b border-border/50 hover:bg-slate-800/30 ${isLocked ? 'bg-red-500/5' : ''}`}>
-                        <td className="p-3 text-sm text-muted-foreground">{itemNumber}</td>
-                        <td className="p-3 text-sm text-white">
-                          {item}
-                          {isLocked && <Badge className="ml-2 bg-red-500/20 text-red-400 border-red-500/30 text-xs">LOCKED</Badge>}
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center justify-center gap-2">
-                            {(['ok', 'attention'] as InspectionStatus[]).map((status) => (
-                              <button
-                                key={status}
-                                type="button"
-                                onClick={() => handleStatusChange(itemNumber, status)}
-                                disabled={isLocked}
-                                className={`flex flex-col items-center justify-center w-14 h-14 rounded-lg border-2 transition-all ${getStatusColor(status, currentStatus === status)} ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
-                              >
-                                {getStatusIcon(status, currentStatus === status)}
-                              </button>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="p-3">
-                          <Input
-                            id={`hgv-comment-${itemNumber}`}
-                            data-comment-input={key}
-                            value={comments[key] || ''}
-                            onChange={(e) => handleCommentChange(itemNumber, e.target.value)}
-                            placeholder={currentStatus === 'attention' ? 'Required for failed items' : 'Optional notes'}
-                            className={`bg-slate-900/50 border-slate-600 text-white ${currentStatus === 'attention' && !comments[key] ? 'border-red-500' : ''}`}
-                            readOnly={isLocked}
-                          />
-                        </td>
-                      </tr>
+                      <Fragment key={itemNumber}>
+                        {itemNumber === ARTIC_ONLY_START_ITEM && (
+                          <tr className="bg-blue-500/10 border-y border-blue-400/40">
+                            <td colSpan={4} className="p-2 text-center text-xs font-semibold tracking-wide text-blue-200 uppercase">
+                              Artics only
+                            </td>
+                          </tr>
+                        )}
+                        <tr data-checklist-item={key} className={`border-b border-border/50 hover:bg-slate-800/30 ${isLocked ? 'bg-red-500/5' : ''}`}>
+                          <td className="p-3 text-sm text-muted-foreground">{itemNumber}</td>
+                          <td className="p-3 text-sm text-white">
+                            {item}
+                            {isLocked && <Badge className="ml-2 bg-red-500/20 text-red-400 border-red-500/30 text-xs">LOCKED</Badge>}
+                          </td>
+                          <td className="p-3">
+                            <div className="flex items-center justify-center gap-2">
+                              {statusOptions.map((status) => (
+                                <button
+                                  key={status}
+                                  type="button"
+                                  onClick={() => handleStatusChange(itemNumber, status)}
+                                  disabled={isLocked}
+                                  className={`flex flex-col items-center justify-center w-14 h-14 rounded-lg border-2 transition-all ${getStatusColor(status, currentStatus === status)} ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                >
+                                  {getStatusIcon(status, currentStatus === status)}
+                                </button>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <Input
+                              id={`hgv-comment-${itemNumber}`}
+                              data-comment-input={key}
+                              value={comments[key] || ''}
+                              onChange={(e) => handleCommentChange(itemNumber, e.target.value)}
+                              placeholder={currentStatus === 'attention' ? 'Required for failed items' : 'Optional notes'}
+                              className={`bg-slate-900/50 border-slate-600 text-white ${currentStatus === 'attention' && !comments[key] ? 'border-red-500' : ''}`}
+                              readOnly={isLocked}
+                            />
+                          </td>
+                        </tr>
+                      </Fragment>
                     );
                   })}
                 </tbody>
@@ -619,32 +647,40 @@ function NewHgvInspectionContent() {
                 const key = `${itemNumber}`;
                 const currentStatus = checkboxStates[key];
                 const isLocked = loggedDefects.has(key);
+                const statusOptions = getStatusOptions(itemNumber);
                 return (
-                  <div key={itemNumber} data-checklist-item={key} className={`bg-slate-900/30 border rounded-lg p-4 space-y-3 ${isLocked ? 'border-red-500/50' : 'border-border/50'}`}>
-                    <div className="text-sm font-medium text-white">{itemNumber}. {item}</div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {(['ok', 'attention'] as InspectionStatus[]).map((status) => (
-                        <button
-                          key={status}
-                          type="button"
-                          onClick={() => handleStatusChange(itemNumber, status)}
-                          disabled={isLocked}
-                          className={`h-12 rounded-xl border-2 ${getStatusColor(status, currentStatus === status)} ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
-                        >
-                          {status === 'ok' ? 'Pass' : 'Fail'}
-                        </button>
-                      ))}
+                  <Fragment key={itemNumber}>
+                    {itemNumber === ARTIC_ONLY_START_ITEM && (
+                      <div className="rounded-md border border-blue-400/50 bg-blue-500/10 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-blue-200">
+                        Artics only
+                      </div>
+                    )}
+                    <div data-checklist-item={key} className={`bg-slate-900/30 border rounded-lg p-4 space-y-3 ${isLocked ? 'border-red-500/50' : 'border-border/50'}`}>
+                      <div className="text-sm font-medium text-white">{itemNumber}. {item}</div>
+                      <div className={`grid ${statusOptions.length === 3 ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
+                        {statusOptions.map((status) => (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => handleStatusChange(itemNumber, status)}
+                            disabled={isLocked}
+                            className={`h-12 rounded-xl border-2 ${getStatusColor(status, currentStatus === status)} ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          >
+                            {getStatusLabel(status)}
+                          </button>
+                        ))}
+                      </div>
+                      <Textarea
+                        id={`hgv-comment-${itemNumber}`}
+                        data-comment-input={key}
+                        value={comments[key] || ''}
+                        onChange={(e) => handleCommentChange(itemNumber, e.target.value)}
+                        placeholder={currentStatus === 'attention' ? 'Required for failed items' : 'Optional notes'}
+                        className="min-h-[80px] bg-slate-900/50 border-slate-600 text-white"
+                        readOnly={isLocked}
+                      />
                     </div>
-                    <Textarea
-                      id={`hgv-comment-${itemNumber}`}
-                      data-comment-input={key}
-                      value={comments[key] || ''}
-                      onChange={(e) => handleCommentChange(itemNumber, e.target.value)}
-                      placeholder={currentStatus === 'attention' ? 'Required for failed items' : 'Optional notes'}
-                      className="min-h-[80px] bg-slate-900/50 border-slate-600 text-white"
-                      readOnly={isLocked}
-                    />
-                  </div>
+                  </Fragment>
                 );
               })}
             </div>

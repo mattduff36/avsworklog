@@ -13,12 +13,14 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { SignaturePad } from '@/components/forms/SignaturePad';
 import { CheckCircle2, Info } from 'lucide-react';
 import type { CompletionUpdateConfig, CompletionFieldValues } from '@/types/workshop-completion';
 
 export interface TaskForCompletion {
   id: string;
   status: string;
+  action_type?: string;
   van_id: string | null;
   hgv_id?: string | null;
   plant_id?: string | null;
@@ -32,6 +34,8 @@ export interface TaskForCompletion {
 export interface CompletionData {
   intermediateComment: string;
   completedComment: string;
+  completedSignatureData?: string;
+  completedSignedAt?: string;
   maintenanceUpdates?: CompletionFieldValues;
 }
 
@@ -52,11 +56,15 @@ export function MarkTaskCompleteDialog({
 }: MarkTaskCompleteDialogProps) {
   const [intermediateComment, setIntermediateComment] = useState('');
   const [completedComment, setCompletedComment] = useState('');
+  const [completedSignatureData, setCompletedSignatureData] = useState<string | null>(null);
+  const [completedSignedAt, setCompletedSignedAt] = useState<string | null>(null);
+  const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [maintenanceFields, setMaintenanceFields] = useState<CompletionFieldValues>({});
 
   const requiresIntermediateStep = task?.status === 'pending' || task?.status === 'on_hold';
   const completionUpdates = task?.workshop_task_categories?.completion_updates || [];
   const hasMaintenanceUpdates = completionUpdates.length > 0;
+  const requiresCompletionSignature = task?.action_type === 'inspection_defect' && Boolean(task.hgv_id);
   const getInputValue = (value: CompletionFieldValues[string]): string | number =>
     typeof value === 'number' ? value : typeof value === 'string' ? value : '';
 
@@ -66,6 +74,9 @@ export function MarkTaskCompleteDialog({
       queueMicrotask(() => {
         setIntermediateComment('');
         setCompletedComment('');
+        setCompletedSignatureData(null);
+        setCompletedSignedAt(null);
+        setShowSignaturePad(false);
         setMaintenanceFields({});
       });
     }
@@ -121,6 +132,8 @@ export function MarkTaskCompleteDialog({
     await onConfirm({
       intermediateComment: intermediateComment.trim(),
       completedComment: completedComment.trim(),
+      completedSignatureData: completedSignatureData || undefined,
+      completedSignedAt: completedSignedAt || undefined,
       maintenanceUpdates: Object.keys(processedMaintenanceUpdates).length > 0 
         ? processedMaintenanceUpdates 
         : undefined,
@@ -130,6 +143,9 @@ export function MarkTaskCompleteDialog({
   const handleCancel = () => {
     setIntermediateComment('');
     setCompletedComment('');
+    setCompletedSignatureData(null);
+    setCompletedSignedAt(null);
+    setShowSignaturePad(false);
     setMaintenanceFields({});
     onOpenChange(false);
   };
@@ -138,6 +154,7 @@ export function MarkTaskCompleteDialog({
     (!requiresIntermediateStep || (intermediateComment.trim() && intermediateComment.length <= 300)) &&
     completedComment.trim() &&
     completedComment.length <= 500 &&
+    (!requiresCompletionSignature || Boolean(completedSignatureData)) &&
     validateMaintenanceFields();
 
   if (!task) return null;
@@ -231,6 +248,43 @@ export function MarkTaskCompleteDialog({
               {completedComment.length}/500 characters
             </p>
           </div>
+
+          {requiresCompletionSignature && (
+            <div className="space-y-3 border-t border-border pt-4">
+              <div className="space-y-1">
+                <Label>
+                  Workshop Completion Signature <span className="text-red-500">*</span>
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Required for HGV inspection defect task completion.
+                </p>
+              </div>
+              {completedSignatureData && !showSignaturePad ? (
+                <div className="space-y-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={completedSignatureData} alt="Workshop completion signature" className="border rounded p-2 bg-white max-w-md" />
+                  <Button type="button" variant="outline" size="sm" onClick={() => setShowSignaturePad(true)} disabled={isSubmitting}>
+                    Update Signature
+                  </Button>
+                </div>
+              ) : (
+                <SignaturePad
+                  onSave={(signature) => {
+                    setCompletedSignatureData(signature);
+                    setCompletedSignedAt(new Date().toISOString());
+                    setShowSignaturePad(false);
+                  }}
+                  onCancel={() => {
+                    if (completedSignatureData) {
+                      setShowSignaturePad(false);
+                    }
+                  }}
+                  initialValue={completedSignatureData}
+                  disabled={isSubmitting}
+                />
+              )}
+            </div>
+          )}
 
           {/* Dynamic Maintenance Fields */}
           {hasMaintenanceUpdates && (

@@ -703,8 +703,8 @@ export default function DashboardPage() {
               
               return (
                 <Link key={formType.id} href={formType.href}>
-                  <div 
-                    className={`relative bg-${formType.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3 cursor-pointer animate-tile-pop ${textColorClass}`}
+                  <div
+                    className={`relative overflow-hidden bg-${formType.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3 cursor-pointer animate-tile-pop ${textColorClass}`}
                     style={{ animationDelay: `${index * 75}ms` }}
                   >
                     {showBadge && (
@@ -716,6 +716,14 @@ export default function DashboardPage() {
                     <span className="font-semibold text-2xl leading-tight">
                       {formType.title}
                     </span>
+                    {formType.subtitle && (
+                      <span
+                        className={`pointer-events-none absolute bottom-2 left-2 right-2 truncate text-base leading-tight opacity-90 max-[350px]:hidden ${textColorClass}`}
+                        aria-hidden
+                      >
+                        {formType.subtitle}
+                      </span>
+                    )}
                   </div>
                 </Link>
               );

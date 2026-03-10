@@ -29,6 +29,7 @@ import {
 export interface FormType {
   id: string;
   title: string;
+  subtitle?: string;
   description: string;
   icon: LucideIcon;
   href: string;
@@ -71,7 +72,8 @@ export const FORM_TYPES: FormType[] = [
   {
     id: 'hgv-inspection',
     title: 'HGV Inspections',
-    description: 'Daily 26-point safety checklist',
+    subtitle: '(Driver Daily Walkaround)',
+    description: 'Daily 25-point safety checklist',
     icon: ClipboardCheck,
     href: '/hgv-inspections',
     listHref: '/hgv-inspections',

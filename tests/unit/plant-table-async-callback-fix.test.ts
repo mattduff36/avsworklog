@@ -4,7 +4,7 @@
  * Tests for bug fix related to async callback synchronization
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 describe('Plant Table Async Callback Timing Fix', () => {
   describe('Bug: Callback fires before async fetch completes', () => {
@@ -327,28 +327,36 @@ describe('Plant Table Async Callback Timing Fix', () => {
 
   describe('Performance considerations', () => {
     it('should measure sequential execution time', async () => {
-      const startTime = Date.now();
+      vi.useFakeTimers();
+      try {
+        let completed = false;
 
-      const fetchPlantData = async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      };
+        const fetchPlantData = async () => {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        };
 
-      const onVehicleAdded = () => {
-        // Callback logic
-      };
+        const onVehicleAdded = () => {
+          // Callback logic
+        };
 
-      const onSuccess = async () => {
-        await fetchPlantData();
-        onVehicleAdded();
-      };
+        const onSuccess = async () => {
+          await fetchPlantData();
+          onVehicleAdded();
+        };
 
-      await onSuccess();
+        const run = onSuccess().then(() => {
+          completed = true;
+        });
 
-      const endTime = Date.now();
-      const duration = endTime - startTime;
+        await vi.advanceTimersByTimeAsync(49);
+        expect(completed).toBe(false);
 
-      // Sequential execution takes at least 50ms
-      expect(duration).toBeGreaterThanOrEqual(50);
+        await vi.advanceTimersByTimeAsync(1);
+        await run;
+        expect(completed).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

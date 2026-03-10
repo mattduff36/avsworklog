@@ -20,17 +20,17 @@ describe('Vehicle Checklists', () => {
       expect(items).toBe(VAN_CHECKLIST_ITEMS);
     });
 
-    it('returns 26-item checklist for Truck', () => {
+    it('returns 25-item checklist for Truck', () => {
       const items = getChecklistForCategory('Truck');
-      expect(items).toHaveLength(26);
+      expect(items).toHaveLength(25);
       expect(items).toBe(TRUCK_CHECKLIST_ITEMS);
     });
 
-    it('returns 26-item checklist for Artic', () => {
+    it('returns 25-item checklist for Artic', () => {
       expect(getChecklistForCategory('Artic')).toBe(TRUCK_CHECKLIST_ITEMS);
     });
 
-    it('returns 26-item checklist for Trailer', () => {
+    it('returns 25-item checklist for Trailer', () => {
       expect(getChecklistForCategory('Trailer')).toBe(TRUCK_CHECKLIST_ITEMS);
     });
 

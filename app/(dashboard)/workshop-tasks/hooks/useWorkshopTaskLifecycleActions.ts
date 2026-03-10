@@ -301,6 +301,12 @@ export function useWorkshopTaskLifecycleActions({
         body: data.completedComment,
         authorId: userId || null,
         authorName: profileName || null,
+        meta: data.completedSignatureData
+          ? {
+              signature_data: data.completedSignatureData,
+              signed_at: data.completedSignedAt || new Date(now.getTime() + 1).toISOString(),
+            }
+          : undefined,
         createdAt: new Date(now.getTime() + 1).toISOString(),
       });
       nextHistory = appendStatusHistory(nextHistory, completeEvent);
@@ -313,6 +319,8 @@ export function useWorkshopTaskLifecycleActions({
           actioned_at: new Date(now.getTime() + 1).toISOString(),
           actioned_by: userId || null,
           actioned_comment: data.completedComment,
+          actioned_signature_data: data.completedSignatureData || null,
+          actioned_signed_at: data.completedSignedAt || null,
           status_history: nextHistory,
         })
         .eq('id', taskId);
@@ -392,6 +400,8 @@ export function useWorkshopTaskLifecycleActions({
           actioned: false,
           actioned_at: null,
           actioned_by: null,
+          actioned_signature_data: null,
+          actioned_signed_at: null,
           status_history: nextHistory,
         })
         .eq('id', taskId);
