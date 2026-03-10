@@ -152,7 +152,94 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const managerLinks = getFilteredNavByPermissions(managerNavItems, userPermissions, isAdmin);
   const adminLinks = getFilteredNavByPermissions(adminNavItems, userPermissions, isAdmin);
   const hasAnyManagementLinks = managerLinks.length > 0 || adminLinks.length > 0;
-  if (!hasAnyManagementLinks && !showDeveloperTools) return null;
+  const showSidebar = hasAnyManagementLinks || showDeveloperTools;
+
+  const viewAsPopoverContent = (
+    <div className="space-y-1">
+      <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: '#cbd5e1' }}>
+        View As Role
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          setViewAsRoleIdState('');
+          setViewAsRoleId('');
+          setTimeout(() => window.location.reload(), 100);
+        }}
+        className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
+          viewAsRoleId === '' ? 'bg-avs-yellow' : 'hover:bg-slate-800 hover:text-white'
+        }`}
+        style={viewAsRoleId === '' ? { color: '#0f172a' } : { color: '#e2e8f0' }}
+      >
+        <Crown className="w-4 h-4" style={viewAsRoleId === '' ? { color: '#0f172a' } : { color: '#e2e8f0' }} />
+        <span className="flex-1 text-left" style={viewAsRoleId === '' ? { color: '#0f172a' } : { color: '#e2e8f0' }}>
+          Actual Role (SuperAdmin)
+        </span>
+        {viewAsRoleId === '' && <Check className="w-4 h-4" style={{ color: '#0f172a' }} />}
+      </button>
+
+      <div className="border-t border-slate-700 my-1" />
+
+      {allRoles.map((role) => {
+        const isActive = viewAsRoleId === role.id;
+        const RoleIcon = role.is_super_admin ? Shield : role.is_manager_admin ? Users : User;
+        return (
+          <button
+            key={role.id}
+            type="button"
+            onClick={() => {
+              setViewAsRoleIdState(role.id);
+              setViewAsRoleId(role.id);
+              setTimeout(() => window.location.reload(), 100);
+            }}
+            className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
+              isActive ? 'bg-avs-yellow' : 'hover:bg-slate-800 hover:text-white'
+            }`}
+            style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }}
+          >
+            <RoleIcon className="w-4 h-4 flex-shrink-0" style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }} />
+            <span className="flex-1 text-left truncate" style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }}>
+              {role.display_name}
+            </span>
+            {isActive && <Check className="w-4 h-4 flex-shrink-0" style={{ color: '#0f172a' }} />}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  // Sidebar has no links — show floating View As button for superadmins, nothing otherwise
+  if (!showSidebar) {
+    if (!isSuperAdmin) return null;
+
+    return (
+      <div className="hidden md:block fixed bottom-4 left-4 z-[70]">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`h-10 w-10 ${
+                isViewingAsOtherRole ? 'bg-amber-600/30' : 'hover:bg-slate-800'
+              }`}
+              title={selectedRole ? `Viewing as ${selectedRole.display_name}` : 'View As Role'}
+            >
+              <Eye className={`w-5 h-5 ${isViewingAsOtherRole ? 'text-amber-300' : 'text-slate-400 hover:text-white'}`} />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            side="top"
+            align="start"
+            sideOffset={8}
+            className="w-64 p-2 bg-slate-900 border border-slate-700 shadow-2xl max-h-[70vh] overflow-y-auto"
+            style={{ zIndex: 999999, color: '#e2e8f0' }}
+          >
+            {viewAsPopoverContent}
+          </PopoverContent>
+        </Popover>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -335,59 +422,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                 className="w-64 p-2 bg-slate-900 border border-slate-700 shadow-2xl max-h-[70vh] overflow-y-auto"
                 style={{ zIndex: 999999, color: '#e2e8f0' }}
               >
-                <div className="space-y-1">
-                  <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: '#cbd5e1' }}>
-                    View As Role
-                  </div>
-                  {/* Actual Role (reset) */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setViewAsRoleIdState('');
-                      setViewAsRoleId('');
-                      setTimeout(() => window.location.reload(), 100);
-                    }}
-                    className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
-                      viewAsRoleId === '' ? 'bg-avs-yellow' : 'hover:bg-slate-800 hover:text-white'
-                    }`}
-                    style={viewAsRoleId === '' ? { color: '#0f172a' } : { color: '#e2e8f0' }}
-                  >
-                    <Crown className="w-4 h-4" style={viewAsRoleId === '' ? { color: '#0f172a' } : { color: '#e2e8f0' }} />
-                    <span className="flex-1 text-left" style={viewAsRoleId === '' ? { color: '#0f172a' } : { color: '#e2e8f0' }}>
-                      Actual Role (SuperAdmin)
-                    </span>
-                    {viewAsRoleId === '' && <Check className="w-4 h-4" style={{ color: '#0f172a' }} />}
-                  </button>
-
-                  <div className="border-t border-slate-700 my-1" />
-
-                  {/* All roles from database */}
-                  {allRoles.map((role) => {
-                    const isActive = viewAsRoleId === role.id;
-                    const RoleIcon = role.is_super_admin ? Shield : role.is_manager_admin ? Users : User;
-                    return (
-                      <button
-                        key={role.id}
-                        type="button"
-                        onClick={() => {
-                          setViewAsRoleIdState(role.id);
-                          setViewAsRoleId(role.id);
-                          setTimeout(() => window.location.reload(), 100);
-                        }}
-                        className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
-                          isActive ? 'bg-avs-yellow' : 'hover:bg-slate-800 hover:text-white'
-                        }`}
-                        style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }}
-                      >
-                        <RoleIcon className="w-4 h-4 flex-shrink-0" style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }} />
-                        <span className="flex-1 text-left truncate" style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }}>
-                          {role.display_name}
-                        </span>
-                        {isActive && <Check className="w-4 h-4 flex-shrink-0" style={{ color: '#0f172a' }} />}
-                      </button>
-                    );
-                  })}
-                </div>
+                {viewAsPopoverContent}
               </PopoverContent>
             </Popover>
           </div>
