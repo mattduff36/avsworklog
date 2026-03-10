@@ -8,12 +8,11 @@ import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Clock, CheckCircle2, XCircle, User, Download, Trash2, Filter, Package, AlertTriangle } from 'lucide-react';
+import { Plus, FileText, Clock, CheckCircle2, XCircle, User, Download, Trash2, Filter, Package, AlertTriangle, Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 import { Employee, TimesheetStatusFilter } from '@/types/common';
@@ -323,13 +322,12 @@ export default function TimesheetsPage() {
     }
   };
 
-  // Show loading while checking permissions
   if (permissionLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Checking permissions...</p>
+          <Loader2 className="h-10 w-10 animate-spin text-timesheet mx-auto mb-3" />
+          <p className="text-muted-foreground text-sm">Loading timesheets...</p>
         </div>
       </div>
     );
@@ -436,26 +434,11 @@ export default function TimesheetsPage() {
       )}
 
       {loading ? (
-        <div className="grid gap-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-3 flex-1">
-                    <Skeleton className="h-5 w-5" />
-                    <div className="space-y-2 flex-1">
-                      <Skeleton className="h-5 w-48" />
-                      <Skeleton className="h-4 w-32" />
-                    </div>
-                  </div>
-                  <Skeleton className="h-6 w-20" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-4 w-full" />
-              </CardContent>
-            </Card>
-          ))}
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <Loader2 className="h-10 w-10 animate-spin text-timesheet mx-auto mb-3" />
+            <p className="text-muted-foreground text-sm">Loading timesheets...</p>
+          </div>
         </div>
       ) : timesheets.length === 0 ? (
         <Card className="border-border">

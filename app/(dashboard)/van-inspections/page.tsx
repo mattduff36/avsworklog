@@ -8,13 +8,12 @@ import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { getRecentVehicleIds, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, FileText, Truck } from 'lucide-react';
+import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, FileText, Truck, Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import { VanInspection } from '@/types/inspection';
@@ -490,26 +489,11 @@ function InspectionsContent() {
       )}
 
       {loading ? (
-        <div className="grid gap-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="border-border">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-3 flex-1">
-                    <Skeleton className="h-5 w-5" />
-                    <div className="space-y-2 flex-1">
-                      <Skeleton className="h-5 w-48" />
-                      <Skeleton className="h-4 w-32" />
-                    </div>
-                  </div>
-                  <Skeleton className="h-6 w-20" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-4 w-full" />
-              </CardContent>
-            </Card>
-          ))}
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <Loader2 className="h-10 w-10 animate-spin text-inspection mx-auto mb-3" />
+            <p className="text-muted-foreground text-sm">Loading inspections...</p>
+          </div>
         </div>
       ) : inspections.length === 0 ? (
         <Card className="border-border">

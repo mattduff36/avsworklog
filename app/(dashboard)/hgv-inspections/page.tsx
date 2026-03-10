@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Clipboard, Clock, Download, Filter, Plus, Trash2, User } from 'lucide-react';
+import { Clipboard, Clock, Download, Filter, Loader2, Plus, Trash2, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -168,7 +168,7 @@ function HgvInspectionsContent() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">HGV Inspections</h1>
-            <p className="text-muted-foreground">Daily 26-point HGV safety checks</p>
+            <p className="text-muted-foreground">Daily 25-point HGV safety checks</p>
           </div>
           <Link href="/hgv-inspections/new">
             <Button className="bg-inspection hover:bg-inspection/90 text-white">
@@ -228,9 +228,12 @@ function HgvInspectionsContent() {
       )}
 
       {loading ? (
-        <Card>
-          <CardContent className="py-10 text-center text-muted-foreground">Loading inspections...</CardContent>
-        </Card>
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <Loader2 className="h-10 w-10 animate-spin text-inspection mx-auto mb-3" />
+            <p className="text-muted-foreground text-sm">Loading inspections...</p>
+          </div>
+        </div>
       ) : inspections.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
