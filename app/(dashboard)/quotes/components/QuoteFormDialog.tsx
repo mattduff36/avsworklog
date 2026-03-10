@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Loader2, Plus, Trash2, GripVertical } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { toast } from 'sonner';
 import type { Quote, QuoteFormData, QuoteLineItem } from '../types';
 
 interface Customer {
@@ -164,6 +165,9 @@ export function QuoteFormDialog({ open, onClose, onSubmit, quote, customers }: Q
     try {
       await onSubmit(form, isEditing);
       onClose();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save quote';
+      toast.error(message);
     } finally {
       setSaving(false);
     }

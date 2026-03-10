@@ -122,6 +122,9 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
   return (
     <Dialog open={open} onOpenChange={isOpen => { if (!isOpen) onClose(); }}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700 text-white">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Quote Details</DialogTitle>
+        </DialogHeader>
         {loading || !quote ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-avs-yellow" />
