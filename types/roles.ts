@@ -63,9 +63,9 @@ export const MANAGEMENT_MODULES: ModuleName[] = [
 
 export const MODULE_SHORT_NAMES: Record<ModuleName, string> = {
   'timesheets': 'Timesheets',
-  'inspections': 'Van Insp.',
-  'plant-inspections': 'Plant Insp.',
-  'hgv-inspections': 'HGV Insp.',
+  'inspections': 'Van Checks',
+  'plant-inspections': 'Plant Checks',
+  'hgv-inspections': 'HGV Checks',
   'rams': 'Projects',
   'absence': 'Absence',
   'maintenance': 'Maint.',
@@ -151,9 +151,9 @@ export const ALL_MODULES: ModuleName[] = [
 
 export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
   'timesheets': 'Timesheets',
-  'inspections': 'Van Inspections',
-  'plant-inspections': 'Plant Inspections',
-  'hgv-inspections': 'HGV Inspections',
+  'inspections': 'Van Daily Checks',
+  'plant-inspections': 'Plant Daily Checks',
+  'hgv-inspections': 'HGV Daily Checks',
   'rams': 'Projects',
   'absence': 'Absence & Leave',
   'maintenance': 'Maintenance & Service',
@@ -173,15 +173,15 @@ export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
 
 export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
   'timesheets': 'Create and submit timesheets',
-  'inspections': 'Perform van inspections',
-  'plant-inspections': 'Perform plant machinery inspections',
-  'hgv-inspections': 'Perform daily HGV inspections',
+  'inspections': 'Perform van daily checks',
+  'plant-inspections': 'Perform plant machinery daily checks',
+  'hgv-inspections': 'Perform daily HGV checks',
   'rams': 'Access and sign project documents',
   'absence': 'Request and manage absence',
   'maintenance': 'Track and manage van maintenance schedules',
   'toolbox-talks': 'Send toolbox talks to users (admin/manager only)',
   'workshop-tasks': 'Track van & plant repairs and workshop work',
-  'approvals': 'Approve timesheets, inspections, and absences',
+  'approvals': 'Approve timesheets, daily checks, and absences',
   'actions': 'Manage and track actions',
   'reports': 'View system reports',
   'suggestions': 'Review and triage user suggestions',

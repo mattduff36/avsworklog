@@ -181,7 +181,7 @@ function NewHgvInspectionContent() {
     }
 
     if (!checklistStarted) {
-      return 'Click Start Inspection before completing the checklist';
+      return 'Click Start Daily Check before completing the checklist';
     }
 
     const missingStatus = TRUCK_CHECKLIST_ITEMS
@@ -420,7 +420,7 @@ function NewHgvInspectionContent() {
           <div className="flex items-center space-x-3">
             <BackButton fallbackHref="/hgv-inspections" />
             <div>
-              <h1 className="text-xl md:text-3xl font-bold text-foreground">New HGV Inspection</h1>
+              <h1 className="text-xl md:text-3xl font-bold text-foreground">New HGV Daily Check</h1>
               <p className="text-sm text-muted-foreground hidden md:block">Daily safety check</p>
             </div>
           </div>
@@ -442,7 +442,7 @@ function NewHgvInspectionContent() {
 
       <Card>
         <CardHeader className="pb-4">
-          <CardTitle className="text-foreground">Inspection Details</CardTitle>
+          <CardTitle className="text-foreground">Daily Check Details</CardTitle>
           <CardDescription className="text-muted-foreground">
             {inspectionDate ? `Date: ${formatDate(inspectionDate)}` : 'Select a date'}
           </CardDescription>
@@ -452,7 +452,7 @@ function NewHgvInspectionContent() {
             <div className="space-y-2 pb-4 border-b border-border">
               <Label className="text-foreground text-base flex items-center gap-2">
                 <User className="h-4 w-4" />
-                Creating inspection for
+                Creating daily check for
               </Label>
               <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
                 <SelectTrigger id="selectedEmployeeId" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
@@ -504,7 +504,7 @@ function NewHgvInspectionContent() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="inspectionDate" className="text-foreground text-base flex items-center gap-2">
-                Inspection Date
+                Daily Check Date
                 <span className="text-red-400">*</span>
               </Label>
               <Input
@@ -552,13 +552,13 @@ function NewHgvInspectionContent() {
                 className="h-12 bg-inspection hover:bg-inspection/90 text-white font-semibold whitespace-nowrap"
               >
                 <Timer className="h-4 w-4 mr-2" />
-                Start Inspection
+                Start Daily Check
               </Button>
             ) : (
               <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg shrink-0">
                 <p className="text-sm text-blue-400">
                   <Info className="h-4 w-4 inline mr-2" />
-                  Inspection started. The submit button unlocks after 10 minutes.
+                  Daily check started. The submit button unlocks after 10 minutes.
                 </p>
               </div>
             )}
@@ -687,7 +687,7 @@ function NewHgvInspectionContent() {
 
             <div className="mt-6 p-4 bg-slate-800/40 border border-border/50 rounded-lg space-y-4">
               <div className="space-y-2">
-                <Label className="text-white text-base">End of Inspection Notes</Label>
+                <Label className="text-white text-base">End of Daily Check Notes</Label>
                 <Textarea
                   id="inspectorComments"
                   value={inspectorComments}
@@ -718,7 +718,7 @@ function NewHgvInspectionContent() {
                 className="bg-inspection hover:bg-inspection/90 text-white font-semibold disabled:opacity-70"
               >
                 <Send className="h-4 w-4 mr-2" />
-                {canSubmitNow ? 'Submit Inspection' : `Submit available in ${countdownLabel}`}
+                {canSubmitNow ? 'Submit Daily Check' : `Submit available in ${countdownLabel}`}
               </Button>
             </div>
           </CardContent>
@@ -733,7 +733,7 @@ function NewHgvInspectionContent() {
             className="w-full h-14 bg-inspection hover:bg-inspection/90 text-white font-semibold text-base disabled:opacity-70"
           >
             <Send className="h-5 w-5 mr-2" />
-            {canSubmitNow ? 'Submit Inspection' : `Submit in ${countdownLabel}`}
+            {canSubmitNow ? 'Submit Daily Check' : `Submit in ${countdownLabel}`}
           </Button>
         </div>
       )}
@@ -741,7 +741,7 @@ function NewHgvInspectionContent() {
       <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>
         <DialogContent className="border-border text-white max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-white text-xl">Sign Inspection</DialogTitle>
+            <DialogTitle className="text-white text-xl">Sign Daily Check</DialogTitle>
             <DialogDescription className="text-muted-foreground">
               Sign below to confirm your inspection is accurate.
             </DialogDescription>

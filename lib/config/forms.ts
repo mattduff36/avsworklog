@@ -51,7 +51,7 @@ export const FORM_TYPES: FormType[] = [
   },
   {
     id: 'inspection',
-    title: 'Van Inspections',
+    title: 'Van Daily Checks',
     description: 'Safety checklist',
     icon: ClipboardCheck,
     href: '/van-inspections',
@@ -61,7 +61,7 @@ export const FORM_TYPES: FormType[] = [
   },
   {
     id: 'plant-inspection',
-    title: 'Plant Inspections',
+    title: 'Plant Daily Checks',
     description: 'Plant machinery safety checklist',
     icon: ClipboardCheck,
     href: '/plant-inspections',
@@ -71,8 +71,7 @@ export const FORM_TYPES: FormType[] = [
   },
   {
     id: 'hgv-inspection',
-    title: 'HGV Inspections',
-    subtitle: '(Driver Daily Walkaround)',
+    title: 'HGV Daily Checks',
     description: 'Daily 25-point safety checklist',
     icon: ClipboardCheck,
     href: '/hgv-inspections',

@@ -160,7 +160,7 @@ function HgvInspectionsContent() {
       if (!response.ok) {
         throw new Error('Delete failed');
       }
-      toast.success('Inspection deleted');
+      toast.success('Daily check deleted');
       fetchInspections();
     } catch {
       toast.error('Failed to delete inspection');
@@ -174,13 +174,13 @@ function HgvInspectionsContent() {
       <div className="bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">HGV Inspections</h1>
+            <h1 className="text-3xl font-bold text-white mb-2">HGV Daily Checks</h1>
             <p className="text-muted-foreground">Daily 25-point HGV safety checks</p>
           </div>
           <Link href="/hgv-inspections/new">
             <Button className="bg-inspection hover:bg-inspection/90 text-white">
               <Plus className="h-4 w-4 mr-2" />
-              New Inspection
+              New Daily Check
             </Button>
           </Link>
         </div>
@@ -189,7 +189,7 @@ function HgvInspectionsContent() {
           <div className="pt-4 border-t border-border flex items-center gap-3 max-w-md">
             <Label className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
               <User className="h-4 w-4" />
-              View inspections for:
+              View daily checks for:
             </Label>
             <Select value={selectedEmployeeId || 'all'} onValueChange={setSelectedEmployeeId}>
               <SelectTrigger className="h-10 border-border text-white">
@@ -238,19 +238,19 @@ function HgvInspectionsContent() {
         <div className="flex items-center justify-center py-20">
           <div className="text-center">
             <Loader2 className="h-10 w-10 animate-spin text-inspection mx-auto mb-3" />
-            <p className="text-muted-foreground text-sm">Loading inspections...</p>
+            <p className="text-muted-foreground text-sm">Loading daily checks...</p>
           </div>
         </div>
       ) : inspections.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Clipboard className="h-16 w-16 text-slate-400 mb-4" />
-            <h3 className="text-lg font-semibold text-white mb-2">No HGV inspections yet</h3>
-            <p className="text-slate-400 mb-4">Create your first HGV inspection</p>
+            <h3 className="text-lg font-semibold text-white mb-2">No HGV daily checks yet</h3>
+            <p className="text-slate-400 mb-4">Create your first HGV daily check</p>
             <Link href="/hgv-inspections/new">
               <Button className="bg-inspection hover:bg-inspection/90 text-white">
                 <Plus className="h-4 w-4 mr-2" />
-                Create Inspection
+                Create Daily Check
               </Button>
             </Link>
           </CardContent>

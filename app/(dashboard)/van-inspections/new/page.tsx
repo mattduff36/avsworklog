@@ -1257,7 +1257,7 @@ function NewInspectionContent() {
           description: 'Your inspection has been saved as a draft.',
         });
       } else {
-        toast.success('Inspection submitted successfully', {
+        toast.success('Daily check submitted successfully', {
           description: 'Your inspection has been submitted for review.',
         });
       }
@@ -1336,7 +1336,7 @@ function NewInspectionContent() {
             <BackButton fallbackHref="/van-inspections" />
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-foreground">
-                {existingInspectionId ? 'Edit Van Inspection' : 'New Van Inspection'}
+                {existingInspectionId ? 'Edit Van Daily Check' : 'New Van Daily Check'}
               </h1>
               <p className="text-sm text-muted-foreground hidden md:block">
                 {existingInspectionId ? 'Continue editing your draft' : 'Daily safety check'}
@@ -1372,7 +1372,7 @@ function NewInspectionContent() {
       {/* Van Details Card */}
       <Card className="">
         <CardHeader className="pb-4">
-          <CardTitle className="text-foreground">Inspection Details</CardTitle>
+          <CardTitle className="text-foreground">Daily Check Details</CardTitle>
           <CardDescription className="text-muted-foreground">
             {weekEnding ? `Week ending: ${formatDate(weekEnding)}` : 'Select a date'}
           </CardDescription>
@@ -1383,7 +1383,7 @@ function NewInspectionContent() {
             <div className="space-y-2 pb-4 border-b border-border">
               <Label htmlFor="employee" className="text-foreground text-base flex items-center gap-2">
                 <User className="h-4 w-4" />
-                Creating inspection for
+                Creating daily check for
               </Label>
               <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
                 <SelectTrigger id="selectedEmployeeId" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
@@ -1851,7 +1851,7 @@ function NewInspectionContent() {
             <div className="flex items-start gap-3">
               <Info className="h-5 w-5 text-inspection flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-semibold text-white mb-2">Inspection Guidelines:</p>
+                <p className="font-semibold text-white mb-2">Daily Check Guidelines:</p>
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="h-5 w-5 text-green-400" />
@@ -1870,12 +1870,12 @@ function NewInspectionContent() {
             ))}
           </Tabs>
 
-          {/* End of Inspection Comments */}
+          {/* End of Daily Check Comments */}
           <div className="mt-6 p-4 bg-slate-800/40 border border-border/50 rounded-lg">
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="inspector-comments" className="text-white text-base">
-                  End of Inspection Notes <span className="text-muted-foreground text-sm">(Optional)</span>
+                  End of Daily Check Notes <span className="text-muted-foreground text-sm">(Optional)</span>
                 </Label>
                 <Textarea
                   id="inspector-comments"
@@ -1949,7 +1949,7 @@ function NewInspectionContent() {
               className="bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold"
             >
               <Send className="h-4 w-4 mr-2" />
-              {loading ? 'Submitting...' : 'Submit Inspection'}
+              {loading ? 'Submitting...' : 'Submit Daily Check'}
             </Button>
           </div>
         </CardContent>
@@ -2229,7 +2229,7 @@ function NewInspectionContent() {
               className="bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold"
             >
               <Send className="h-4 w-4 mr-2" />
-              Submit Inspection
+              Submit Daily Check
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2293,7 +2293,7 @@ function NewInspectionContent() {
       <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>
         <DialogContent className="border-border text-white max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-white text-xl">Sign Inspection</DialogTitle>
+            <DialogTitle className="text-white text-xl">Sign Daily Check</DialogTitle>
             <DialogDescription className="text-muted-foreground">
               Please sign below to confirm your inspection is accurate
             </DialogDescription>

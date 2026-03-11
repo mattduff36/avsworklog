@@ -582,7 +582,7 @@ export default function ViewInspectionPage() {
         <Link href="/van-inspections">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Van Inspections
+            Back to Van Daily Checks
           </Button>
         </Link>
         <Card>
@@ -637,7 +637,7 @@ export default function ViewInspectionPage() {
           <div className="flex items-center space-x-3 md:space-x-4">
             <BackButton />
             <div>
-              <h1 className="text-xl md:text-3xl font-bold text-foreground">Van Inspection</h1>
+              <h1 className="text-xl md:text-3xl font-bold text-foreground">Van Daily Check</h1>
               <p className="text-sm md:text-base text-muted-foreground">
                 {inspection.vans?.reg_number} • {
                   inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
@@ -714,7 +714,7 @@ export default function ViewInspectionPage() {
       <Card className="">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Inspection Items</CardTitle>
+            <CardTitle>Daily Check Items</CardTitle>
             {canEdit && !editing && (
               <Button variant="outline" onClick={() => setEditing(true)}>
                 <Edit2 className="h-4 w-4 mr-2" />
@@ -965,7 +965,7 @@ export default function ViewInspectionPage() {
                 disabled={saving}
               >
                 <Send className="h-4 w-4 mr-2" />
-                {saving ? 'Submitting...' : 'Submit Inspection'}
+                {saving ? 'Submitting...' : 'Submit Daily Check'}
               </Button>
             )}
           </div>

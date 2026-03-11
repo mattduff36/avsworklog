@@ -869,7 +869,7 @@ export default function HgvHistoryPage({
           )}
           <TabsTrigger value="inspections" className="gap-2">
             <ClipboardCheck className="h-4 w-4" />
-            Inspections
+            Daily Checks
           </TabsTrigger>
           <TabsTrigger value="documents" className="gap-2">
             <FileText className="h-4 w-4" />
@@ -1070,12 +1070,12 @@ export default function HgvHistoryPage({
         <TabsContent value="inspections" className="space-y-6">
           <Card className="bg-slate-800/50 border-border">
             <CardHeader>
-              <CardTitle>HGV Inspection History</CardTitle>
-              <CardDescription>Daily inspection submissions for this HGV</CardDescription>
+              <CardTitle>HGV Daily Check History</CardTitle>
+              <CardDescription>Daily check submissions for this HGV</CardDescription>
             </CardHeader>
             <CardContent>
               {inspections.length === 0 ? (
-                <div className="text-center py-10 text-muted-foreground">No inspections recorded yet.</div>
+                <div className="text-center py-10 text-muted-foreground">No daily checks recorded yet.</div>
               ) : (
                 <div className="space-y-3">
                   {inspections.map((inspection) => (

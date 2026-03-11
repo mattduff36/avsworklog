@@ -58,21 +58,21 @@ export const employeeNavItems: NavItem[] = [
   },
   { 
     href: '/van-inspections', 
-    label: 'Van Inspections', 
+    label: 'Van Daily Checks', 
     icon: ClipboardCheck, 
     module: 'inspections',
     category: 'employee'
   },
   { 
     href: '/plant-inspections', 
-    label: 'Plant Inspections', 
+    label: 'Plant Daily Checks', 
     icon: ClipboardCheck, 
     module: 'plant-inspections',
     category: 'employee'
   },
   { 
     href: '/hgv-inspections', 
-    label: 'HGV Inspections', 
+    label: 'HGV Daily Checks', 
     icon: ClipboardCheck, 
     module: 'hgv-inspections',
     category: 'employee'

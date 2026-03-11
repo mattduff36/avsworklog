@@ -29,18 +29,18 @@ export const MODULE_PAGES: ModulePage[] = [
     module: 'inspections',
     displayName: MODULE_DISPLAY_NAMES.inspections,
     subPages: [
-      { value: 'inspections-list', label: 'Inspections List' },
-      { value: 'inspections-new', label: 'New Inspection' },
-      { value: 'inspections-view', label: 'View Inspection' },
+      { value: 'inspections-list', label: 'Daily Checks List' },
+      { value: 'inspections-new', label: 'New Daily Check' },
+      { value: 'inspections-view', label: 'View Daily Check' },
     ],
   },
   {
     module: 'hgv-inspections',
     displayName: MODULE_DISPLAY_NAMES['hgv-inspections'],
     subPages: [
-      { value: 'hgv-inspections-list', label: 'HGV Inspections List' },
-      { value: 'hgv-inspections-new', label: 'New HGV Inspection' },
-      { value: 'hgv-inspections-view', label: 'View HGV Inspection' },
+      { value: 'hgv-inspections-list', label: 'HGV Daily Checks List' },
+      { value: 'hgv-inspections-new', label: 'New HGV Daily Check' },
+      { value: 'hgv-inspections-view', label: 'View HGV Daily Check' },
     ],
   },
   {

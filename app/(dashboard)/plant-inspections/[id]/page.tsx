@@ -472,7 +472,7 @@ export default function ViewPlantInspectionPage() {
           <div className="flex items-center space-x-3 md:space-x-4">
             <BackButton fallbackHref="/plant-inspections" />
             <div>
-              <h1 className="text-xl md:text-3xl font-bold text-foreground">Plant Inspection</h1>
+              <h1 className="text-xl md:text-3xl font-bold text-foreground">Plant Daily Check</h1>
               <p className="text-sm md:text-base text-muted-foreground">
                 {inspection.is_hired_plant ? (
                   <>
@@ -553,7 +553,7 @@ export default function ViewPlantInspectionPage() {
         <Card>
           <CardHeader>
             <CardTitle>Current Hours</CardTitle>
-            <CardDescription>Machine hours at time of inspection</CardDescription>
+            <CardDescription>Machine hours at time of daily check</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
@@ -609,11 +609,11 @@ export default function ViewPlantInspectionPage() {
         </Card>
       )}
 
-      {/* Inspection Items */}
+      {/* Daily Check Items */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Inspection Items</CardTitle>
+            <CardTitle>Daily Check Items</CardTitle>
             {canEdit && !editing && (
               <Button variant="outline" onClick={() => setEditing(true)}>
                 <Edit2 className="h-4 w-4 mr-2" />
@@ -776,7 +776,7 @@ export default function ViewPlantInspectionPage() {
                 className="bg-plant-inspection hover:bg-plant-inspection/90 text-slate-900"
               >
                 <Send className="h-4 w-4 mr-2" />
-                {saving ? 'Submitting...' : 'Submit Inspection'}
+                {saving ? 'Submitting...' : 'Submit Daily Check'}
               </Button>
             )}
           </div>

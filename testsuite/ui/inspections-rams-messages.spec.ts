@@ -1,6 +1,6 @@
 /**
  * @tags @inspections @rams @messages
- * Tests page loading for inspections, RAMS, and messages.
+ * Tests page loading for daily checks, RAMS, and messages.
  * Auth: employee storage state (via employee project).
  * NON-DESTRUCTIVE: read-only.
  */
@@ -8,15 +8,15 @@ import { test, expect } from '@playwright/test';
 import { attachConsoleErrorCapture } from '../helpers/console-error-fixture';
 import { waitForAppReady } from '../helpers/wait-for-app';
 
-test.describe('@inspections Inspections Module', () => {
+test.describe('@inspections Daily Checks Module', () => {
   test('inspections page loads', async ({ page }) => {
     const capture = attachConsoleErrorCapture(page);
     await page.goto('/van-inspections');
     await waitForAppReady(page);
 
     const bodyText = await page.locator('body').innerText();
-    const hasInspectionContent = /inspection|van|plant|hgv/i.test(bodyText);
-    expect(hasInspectionContent, 'Inspections module content should load').toBeTruthy();
+    const hasInspectionContent = /daily check|inspection|van|plant|hgv/i.test(bodyText);
+    expect(hasInspectionContent, 'Daily checks module content should load').toBeTruthy();
 
     const errors = capture.getErrors();
     expect(errors, 'No page errors on inspections').toHaveLength(0);

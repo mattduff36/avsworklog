@@ -59,7 +59,7 @@ export default function ViewHgvInspectionPage() {
         .eq('id', id)
         .single();
 
-      if (inspectionError || !inspectionData) throw inspectionError || new Error('Inspection not found');
+      if (inspectionError || !inspectionData) throw inspectionError || new Error('Daily check not found');
 
       if (!isManager && inspectionData.user_id !== user?.id) {
         setError('You do not have permission to view this inspection');
@@ -145,7 +145,7 @@ export default function ViewHgvInspectionPage() {
           <div className="flex items-center space-x-3 md:space-x-4">
             <BackButton fallbackHref="/hgv-inspections" />
             <div>
-              <h1 className="text-xl md:text-3xl font-bold text-foreground">HGV Inspection</h1>
+              <h1 className="text-xl md:text-3xl font-bold text-foreground">HGV Daily Check</h1>
               <p className="text-sm md:text-base text-muted-foreground">
                 {inspection.hgv?.reg_number || 'Unknown HGV'}
                 {inspection.hgv?.nickname ? ` (${inspection.hgv.nickname})` : ''}

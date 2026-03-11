@@ -228,7 +228,7 @@ function InspectionsContent() {
         if (payload.eventType === 'UPDATE' && payload.new && 'status' in payload.new) {
           const status = (payload.new as { status?: string }).status;
           if (status === 'submitted') {
-            toast.success('Inspection submitted', {
+            toast.success('Daily check submitted', {
               description: 'A van inspection has been submitted.',
             });
           }
@@ -355,7 +355,7 @@ function InspectionsContent() {
         throw new Error(data.error || 'Failed to delete inspection');
       }
 
-      toast.success('Inspection deleted successfully');
+      toast.success('Daily check deleted successfully');
       setDeleteDialogOpen(false);
       setInspectionToDelete(null);
       fetchInspections(); // Refresh list
@@ -374,7 +374,7 @@ function InspectionsContent() {
       <div className="bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Van Inspections</h1>
+            <h1 className="text-3xl font-bold text-white mb-2">Van Daily Checks</h1>
             <p className="text-muted-foreground">
               Daily safety check sheets
             </p>
@@ -382,7 +382,7 @@ function InspectionsContent() {
           <Link href="/van-inspections/new">
             <Button className="bg-inspection hover:bg-inspection-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg">
               <Plus className="h-4 w-4 mr-2" />
-              New Inspection
+              New Daily Check
             </Button>
           </Link>
         </div>
@@ -393,7 +393,7 @@ function InspectionsContent() {
             <div className="flex items-center gap-3 max-w-md">
               <Label htmlFor="employee-filter" className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
                 <User className="h-4 w-4" />
-                View inspections for:
+                View daily checks for:
               </Label>
               <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
                 <SelectTrigger id="employee-filter" className="h-10 border-border text-white">
@@ -499,21 +499,21 @@ function InspectionsContent() {
         <div className="flex items-center justify-center py-20">
           <div className="text-center">
             <Loader2 className="h-10 w-10 animate-spin text-inspection mx-auto mb-3" />
-            <p className="text-muted-foreground text-sm">Loading inspections...</p>
+            <p className="text-muted-foreground text-sm">Loading daily checks...</p>
           </div>
         </div>
       ) : inspections.length === 0 ? (
         <Card className="border-border">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Clipboard className="h-16 w-16 text-slate-400 mb-4" />
-            <h3 className="text-lg font-semibold text-white mb-2">No inspections yet</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">No daily checks yet</h3>
             <p className="text-slate-400 mb-4">
-              Create your first van inspection
+              Create your first van daily check
             </p>
             <Link href="/van-inspections/new">
               <Button className="bg-inspection hover:bg-inspection-dark text-white transition-all duration-200 active:scale-95">
                 <Plus className="h-4 w-4 mr-2" />
-                Create Inspection
+                Create Daily Check
               </Button>
             </Link>
           </CardContent>
@@ -626,7 +626,7 @@ function InspectionsContent() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Inspection</AlertDialogTitle>
+            <AlertDialogTitle>Delete Daily Check</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the inspection for{' '}
               <span className="font-semibold">{inspectionToDelete?.vehicleReg}</span> on{' '}

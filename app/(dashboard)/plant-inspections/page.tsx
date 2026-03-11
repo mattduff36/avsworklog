@@ -331,7 +331,7 @@ function PlantInspectionsContent() {
       <div className="bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Plant Inspections</h1>
+            <h1 className="text-3xl font-bold text-white mb-2">Plant Daily Checks</h1>
             <p className="text-muted-foreground">
               Daily plant machinery safety checks
             </p>
@@ -339,7 +339,7 @@ function PlantInspectionsContent() {
           <Link href="/plant-inspections/new">
             <Button className="bg-plant-inspection hover:bg-plant-inspection-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg">
               <Plus className="h-4 w-4 mr-2" />
-              New Inspection
+              New Daily Check
             </Button>
           </Link>
         </div>
@@ -350,7 +350,7 @@ function PlantInspectionsContent() {
             <div className="flex items-center gap-3 max-w-md">
               <Label htmlFor="employee-filter" className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
                 <User className="h-4 w-4" />
-                View inspections for:
+                View daily checks for:
               </Label>
               <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
                 <SelectTrigger id="employee-filter" className="h-10 border-border text-white">
@@ -427,21 +427,21 @@ function PlantInspectionsContent() {
         <div className="flex items-center justify-center py-20">
           <div className="text-center">
             <Loader2 className="h-10 w-10 animate-spin text-plant-inspection mx-auto mb-3" />
-            <p className="text-muted-foreground text-sm">Loading inspections...</p>
+            <p className="text-muted-foreground text-sm">Loading daily checks...</p>
           </div>
         </div>
       ) : inspections.length === 0 ? (
         <Card className="border-border">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Clipboard className="h-16 w-16 text-slate-400 mb-4" />
-            <h3 className="text-lg font-semibold text-white mb-2">No plant inspections yet</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">No plant daily checks yet</h3>
             <p className="text-slate-400 mb-4">
-              Create your first plant inspection
+              Create your first plant daily check
             </p>
             <Link href="/plant-inspections/new">
               <Button className="bg-plant-inspection hover:bg-plant-inspection-dark text-white transition-all duration-200 active:scale-95">
                 <Plus className="h-4 w-4 mr-2" />
-                Create Inspection
+                Create Daily Check
               </Button>
             </Link>
           </CardContent>
@@ -569,7 +569,7 @@ function PlantInspectionsContent() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Plant Inspection</AlertDialogTitle>
+            <AlertDialogTitle>Delete Plant Daily Check</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the inspection for{' '}
               <span className="font-semibold">{inspectionToDelete?.plantId}</span> on{' '}

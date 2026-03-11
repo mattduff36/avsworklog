@@ -1,10 +1,10 @@
 /**
- * E2E: Plant Inspections Full Workflow
+ * E2E: Plant Daily Checks Full Workflow
  *
- * Tests the complete plant inspection user journey:
+ * Tests the complete plant daily check user journey:
  * - List page loads and shows content
  * - Navigation links work (no 404s)
- * - New inspection form loads
+ * - New daily check form loads
  * - No console errors or hydration errors
  * - Network failures captured
  *
@@ -14,7 +14,7 @@ import { test, expect } from '@playwright/test';
 import { attachConsoleErrorCapture } from '../helpers/console-error-fixture';
 import { waitForAppReady } from '../helpers/wait-for-app';
 
-test.describe('Plant Inspections — Page Loading', () => {
+test.describe('Plant Daily Checks — Page Loading', () => {
   test('plant-inspections list page loads without errors', async ({ page }) => {
     const capture = attachConsoleErrorCapture(page);
     const failedRequests: string[] = [];
@@ -28,7 +28,7 @@ test.describe('Plant Inspections — Page Loading', () => {
     await page.goto('/plant-inspections');
     await waitForAppReady(page);
 
-    await expect(page.locator('body')).toContainText(/plant inspection|inspection/i);
+    await expect(page.locator('body')).toContainText(/plant daily check|daily check|inspection/i);
 
     expect(failedRequests, 'No 500 errors on plant-inspections page').toHaveLength(0);
     const errors = capture.getErrors();
@@ -42,15 +42,15 @@ test.describe('Plant Inspections — Page Loading', () => {
     await waitForAppReady(page);
 
     const bodyText = await page.locator('body').innerText();
-    const hasFormContent = /inspection|checklist|plant|save|submit/i.test(bodyText);
-    expect(hasFormContent, 'New plant inspection form should load').toBeTruthy();
+    const hasFormContent = /daily check|inspection|checklist|plant|save|submit/i.test(bodyText);
+    expect(hasFormContent, 'New plant daily check form should load').toBeTruthy();
 
     const errors = capture.getErrors();
     expect(errors, 'No console errors on plant-inspections/new').toHaveLength(0);
   });
 });
 
-test.describe('Plant Inspections — Navigation', () => {
+test.describe('Plant Daily Checks — Navigation', () => {
   test('no 404 on /plant-inspections', async ({ page }) => {
     const response = await page.goto('/plant-inspections');
     expect(response?.status()).not.toBe(404);
@@ -61,13 +61,13 @@ test.describe('Plant Inspections — Navigation', () => {
     expect(response?.status()).not.toBe(404);
   });
 
-  test('can open an existing plant inspection detail page when list has entries', async ({ page }) => {
+  test('can open an existing plant daily check detail page when list has entries', async ({ page }) => {
     await page.goto('/plant-inspections');
     await waitForAppReady(page);
 
     const detailLink = page.locator('a[href^="/plant-inspections/"]:not([href$="/new"])').first();
     const hasDetailLink = (await detailLink.count()) > 0;
-    test.skip(!hasDetailLink, 'No plant inspection records available for this environment');
+    test.skip(!hasDetailLink, 'No plant daily check records available for this environment');
 
     await detailLink.click();
     await waitForAppReady(page);
@@ -76,13 +76,19 @@ test.describe('Plant Inspections — Navigation', () => {
   });
 });
 
-test.describe('Plant Inspections — Content Verification', () => {
+test.describe('Plant Daily Checks — Content Verification', () => {
   test('list page shows "Plant" in content', async ({ page }) => {
     await page.goto('/plant-inspections');
     await waitForAppReady(page);
 
     const bodyText = await page.locator('body').innerText();
     expect(bodyText.toLowerCase()).toContain('plant');
+  });
+
+  test('list page uses daily check terminology', async ({ page }) => {
+    await page.goto('/plant-inspections');
+    await waitForAppReady(page);
+    await expect(page.locator('h1')).toContainText(/Plant Daily Checks/i);
   });
 
   test('no "Vehicle Inspection" text in headings', async ({ page }) => {
