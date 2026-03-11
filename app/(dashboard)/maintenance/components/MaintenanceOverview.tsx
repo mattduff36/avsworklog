@@ -106,8 +106,10 @@ interface WorkshopTask {
   description: string;
   workshop_comments?: string | null;
   van_id?: string;
+  hgv_id?: string;
+  plant_id?: string;
   status_history?: StatusHistoryEvent[] | null;
-  workshop_task_categories?: { 
+  workshop_task_categories?: {
     id: string;
     name: string;
     completion_updates?: CompletionUpdatesArray | null;
@@ -666,7 +668,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       setShowStatusModal(false);
       
       // Refetch vehicle history
-      const vehicleId = selectedTask.van_id;
+      const vehicleId = selectedTask.van_id || selectedTask.hgv_id || selectedTask.plant_id;
       if (vehicleId) {
         setVehicleHistory(prev => {
           const newHistory = { ...prev };
@@ -709,7 +711,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       toast.success('Task reverted to pending');
       
       // Refetch vehicle history
-      const vehicleId = task.van_id;
+      const vehicleId = task.van_id || task.hgv_id || task.plant_id;
       if (vehicleId) {
         setVehicleHistory(prev => {
           const newHistory = { ...prev };
@@ -734,7 +736,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     if (!completingTask) return;
 
     const taskId = completingTask.id;
-    const vehicleId = completingTask.van_id;
+    const vehicleId = completingTask.van_id || completingTask.hgv_id || completingTask.plant_id;
     const requiresIntermediateStep = completingTask.status === 'pending' || completingTask.status === 'on_hold';
 
     try {
@@ -917,9 +919,9 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
       toast.success('Task marked as on hold');
       setShowOnHoldModal(false);
-      
+
       // Refetch vehicle history
-      const vehicleId = onHoldingTask.van_id;
+      const vehicleId = onHoldingTask.van_id || onHoldingTask.hgv_id || onHoldingTask.plant_id;
       if (vehicleId) {
         setVehicleHistory(prev => {
           const newHistory = { ...prev };
@@ -981,9 +983,9 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
       toast.success('Task resumed');
       setShowResumeModal(false);
-      
+
       // Refetch vehicle history
-      const vehicleId = resumingTask.van_id;
+      const vehicleId = resumingTask.van_id || resumingTask.hgv_id || resumingTask.plant_id;
       if (vehicleId) {
         setVehicleHistory(prev => {
           const newHistory = { ...prev };

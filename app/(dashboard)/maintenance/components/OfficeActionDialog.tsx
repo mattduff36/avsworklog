@@ -144,6 +144,7 @@ export function OfficeActionDialog({
         body: JSON.stringify({
           [fieldName]: newDueDate,
           comment: updateComment.trim(),
+          assetType,
         }),
       });
       

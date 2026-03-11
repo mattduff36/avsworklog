@@ -21,6 +21,9 @@ interface WorkshopTaskShape {
   logged_at: string | null;
   status_history?: unknown[] | null;
   created_by: string | null;
+  van_id: string | null;
+  hgv_id: string | null;
+  plant_id: string | null;
   workshop_task_categories?: WorkshopTaskCategoryShape[] | WorkshopTaskCategoryShape | null;
   profiles?: { full_name: string | null } | null;
 }
@@ -159,6 +162,9 @@ export async function GET(
         actioned_at,
         logged_at,
         created_by,
+        van_id,
+        hgv_id,
+        plant_id,
         workshop_task_categories (
           name
         )

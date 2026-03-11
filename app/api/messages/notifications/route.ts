@@ -26,6 +26,26 @@ interface RecipientShape {
   messages?: MessageShape | MessageShape[] | null;
 }
 
+function isTransientFetchError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket hang up/i.test(message);
+}
+
+async function withRetry<T>(operation: () => Promise<T>, retries = 1): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!isTransientFetchError(error) || attempt === retries) {
+        throw error;
+      }
+    }
+  }
+  throw normalizeError(lastError);
+}
+
 function normalizeError(error: unknown): Error {
   if (error instanceof Error) return error;
   if (typeof error === 'string') return new Error(error);
@@ -52,7 +72,9 @@ export async function GET() {
     const supabase = await createClient();
 
     // Check authentication
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await withRetry(
+      () => supabase.auth.getUser()
+    );
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -90,7 +112,7 @@ export async function GET() {
       .gte('messages.created_at', sixtyDaysAgo.toISOString())
       .is('cleared_from_inbox_at', null)
       .is('messages.deleted_at', null)
-      .order('messages(created_at)', { ascending: false }); // Newest first
+      .order('messages(created_at)', { ascending: false });
 
     if (fetchError) {
       console.error('Error fetching notifications:', fetchError);

@@ -47,10 +47,10 @@ export async function PUT(
       );
     }
     
-    // Get current maintenance record
+    // Get current maintenance record (no asset join needed; FKs are on the row itself)
     const { data: currentRecord, error: fetchError } = await supabase
       .from('vehicle_maintenance')
-      .select('*, vehicle:vans(id, reg_number)')
+      .select('*')
       .eq('id', id)
       .single();
     
