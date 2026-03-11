@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { createDVLAApiService } from '@/lib/services/dvla-api';
+import { createMotHistoryService } from '@/lib/services/mot-history-api';
+import { isRoadEligibleRegistration, runFleetDvlaSync } from '@/lib/services/fleet-dvla-sync';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/database';
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,7 +53,22 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json({ plant: data });
+    console.log(`[INFO] Plant created: ${data.plant_id} (ID: ${data.id})`);
+
+    let syncResult: { success: boolean; warning?: string } = { success: true };
+    if (data.reg_number) {
+      syncResult = await syncPlantData(data.id, data.reg_number, effectiveRole.user_id, supabase);
+    }
+
+    return NextResponse.json({
+      plant: data,
+      syncResult,
+      message: syncResult.success
+        ? data.reg_number
+          ? 'Plant created and data synced successfully'
+          : 'Plant created successfully'
+        : 'Plant created. Note: ' + (syncResult.warning || 'API sync will retry automatically'),
+    });
   } catch (error) {
     await logServerError({
       error: error as Error,
@@ -57,6 +77,75 @@ export async function POST(request: NextRequest) {
       additionalData: { endpoint: '/api/admin/plant' },
     });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+async function syncPlantData(
+  plantId: string,
+  regNumber: string,
+  userId: string,
+  supabase: SupabaseClient<Database>
+) {
+  if (!isRoadEligibleRegistration(regNumber)) {
+    return {
+      success: true,
+      skipped: true,
+      reason: 'not road-eligible',
+    };
+  }
+
+  const dvlaService = createDVLAApiService();
+  if (!dvlaService) {
+    return {
+      success: false,
+      warning: 'DVLA API not configured',
+    };
+  }
+
+  const motService = createMotHistoryService();
+
+  try {
+    const summary = await runFleetDvlaSync({
+      supabase,
+      dvlaService,
+      motService,
+      targets: [
+        {
+          assetType: 'plant',
+          assetId: plantId,
+          registrationNumber: regNumber,
+        },
+      ],
+      triggerType: 'auto_on_create',
+      triggeredBy: userId,
+    });
+
+    const row = summary.results[0];
+    if (!row || !row.success) {
+      throw new Error(row?.error || row?.errors?.[0] || 'Unknown plant auto-sync error');
+    }
+
+    return {
+      success: true,
+      fieldsUpdated: row.updatedFields || [],
+    };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown plant auto-sync error';
+    await logServerError({
+      error: error as Error,
+      componentName: 'syncPlantData',
+      additionalData: {
+        plantId,
+        regNumber,
+        context: 'auto_sync_on_plant_create',
+      },
+    });
+
+    return {
+      success: false,
+      error: message,
+      warning: 'Could not fetch plant data from DVLA/MOT APIs. Please check the registration number or try manual sync later.',
+    };
   }
 }
 
