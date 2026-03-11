@@ -159,21 +159,32 @@ export class MotHistoryService {
   }
 
   /**
+   * Check if a test result indicates a pass (handles MOT "PASSED" and
+   * HGV annual-test variants like "PRS", "Pass", case differences, etc.)
+   */
+  private static isPassResult(testResult: string): boolean {
+    const upper = testResult.toUpperCase();
+    return upper === 'PASSED' || upper === 'PASS' || upper === 'PRS';
+  }
+
+  /**
    * Get MOT expiry date for a vehicle
-   * Extracts the most relevant MOT expiry information
+   * Extracts the most relevant MOT / annual-test expiry information.
+   * Works for standard MOTs (cars/vans) and HGV/PSV annual tests.
    */
   async getMotExpiryData(registration: string): Promise<MotExpiryData> {
     const history = await this.getMotHistory(registration);
 
-    // Sort MOT tests by date (most recent first)
+    // Sort tests by date (most recent first)
     const sortedTests = (history.motTests || []).sort((a, b) => 
       new Date(b.completedDate).getTime() - new Date(a.completedDate).getTime()
     );
 
     const latestTest = sortedTests[0];
-    const latestPassedTest = sortedTests.find(test => test.testResult === 'PASSED');
+    const latestPassedTest = sortedTests.find(test =>
+      MotHistoryService.isPassResult(test.testResult)
+    );
 
-    // Determine MOT status and expiry
     let motStatus = 'Unknown';
     let motExpiryDate: string | null = null;
 
@@ -193,7 +204,6 @@ export class MotHistoryService {
         motStatus = 'No Expiry Date';
       }
     } else if (sortedTests.length === 0) {
-      // No MOT tests yet - check if API provides motTestDueDate for new vehicles
       if (history.motTestDueDate) {
         motExpiryDate = history.motTestDueDate;
         motStatus = 'Not Yet Due';

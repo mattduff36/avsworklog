@@ -78,6 +78,14 @@ function toIsoDate(value: Date): string {
   return value.toISOString().split('T')[0];
 }
 
+/**
+ * HGVs, PSVs, buses and trailers require annual tests from year 1.
+ * Cars/vans get their first MOT after 3 years.
+ */
+function firstTestIntervalYears(assetType: FleetAssetType): number {
+  return assetType === 'hgv' ? 1 : 3;
+}
+
 type VehicleMaintenanceUpsert = Database['public']['Tables']['vehicle_maintenance']['Insert'] & Record<string, unknown>;
 type DvlaSyncLogInsert = Database['public']['Tables']['dvla_sync_log']['Insert'];
 type MaintenanceHistoryInsert = Database['public']['Tables']['maintenance_history']['Insert'];
@@ -115,9 +123,14 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
       if (motService) {
         try {
           motExpiryData = await motService.getMotExpiryData(regNumberNoSpaces);
+          console.log(
+            `${logPrefix}[SYNC] MOT API for ${target.registrationNumber} (${target.assetType}): ` +
+            `status=${motExpiryData.motStatus}, expiry=${motExpiryData.motExpiryDate ?? 'none'}, ` +
+            `tests=${(motExpiryData.rawData?.motTests || []).length}`
+          );
         } catch (motError: unknown) {
           motApiError = getErrorMessage(motError);
-          console.error(`${logPrefix}[SYNC] MOT fetch failed for ${target.registrationNumber}:`, motApiError);
+          console.error(`${logPrefix}[SYNC] MOT fetch failed for ${target.registrationNumber} (${target.assetType}):`, motApiError);
         }
       }
 
@@ -168,15 +181,22 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
           updates.last_mot_api_sync = syncTime;
           updates.mot_api_sync_error = motApiError;
 
-          // Keep first MOT fallback behavior for newer assets.
+          // Fallback: estimate test due date from first registration.
+          // HGVs need annual tests from year 1; cars/vans get first MOT after 3 years.
           if (motApiError.includes('No MOT history found') && dvlaData.monthOfFirstRegistration) {
             try {
               const [year, month] = dvlaData.monthOfFirstRegistration.split('.');
               if (year && month) {
+                const intervalYears = firstTestIntervalYears(target.assetType);
                 const firstRegDate = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
-                const firstMotDue = new Date(firstRegDate);
-                firstMotDue.setFullYear(firstMotDue.getFullYear() + 3);
-                const calculatedMotDue = toIsoDate(firstMotDue);
+                const nextDue = new Date(firstRegDate);
+                nextDue.setFullYear(nextDue.getFullYear() + intervalYears);
+                // For HGVs, advance year-by-year until the due date is in the future
+                const now = new Date();
+                while (nextDue < now) {
+                  nextDue.setFullYear(nextDue.getFullYear() + 1);
+                }
+                const calculatedMotDue = toIsoDate(nextDue);
                 updates.mot_due_date = calculatedMotDue;
                 updates.mot_expiry_date = calculatedMotDue;
                 updates.mot_first_used_date = toIsoDate(firstRegDate);
@@ -213,10 +233,15 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
           } else if (motRawData?.firstUsedDate) {
             const firstUsedRaw = motRawData.firstUsedDate as string | undefined;
             if (firstUsedRaw) {
+              const intervalYears = firstTestIntervalYears(target.assetType);
               const firstUsedDate = new Date(firstUsedRaw);
-              const firstMotDue = new Date(firstUsedDate);
-              firstMotDue.setFullYear(firstMotDue.getFullYear() + 3);
-              const calculatedMotDue = toIsoDate(firstMotDue);
+              const nextDue = new Date(firstUsedDate);
+              nextDue.setFullYear(nextDue.getFullYear() + intervalYears);
+              const now = new Date();
+              while (nextDue < now) {
+                nextDue.setFullYear(nextDue.getFullYear() + 1);
+              }
+              const calculatedMotDue = toIsoDate(nextDue);
               updates.mot_due_date = calculatedMotDue;
               updates.mot_expiry_date = calculatedMotDue;
               if (oldMotDate !== calculatedMotDue) fieldsUpdated.push('mot_due_date (calculated)');
