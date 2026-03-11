@@ -25,7 +25,25 @@ export function DVLASyncDebugPanel() {
   const [regNumber, setRegNumber] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [bulkSyncing, setBulkSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<{ success: boolean; message?: string; data?: unknown } | null>(null);
+  interface SyncResultRow {
+    success: boolean;
+    registrationNumber?: string;
+    assetType?: string;
+    updatedFields?: string[];
+    fields_updated?: string[];
+    error?: string;
+    errors?: string[];
+    syncedAt?: string;
+  }
+  const [syncResult, setSyncResult] = useState<{
+    success: boolean;
+    message?: string;
+    total?: number;
+    successful?: number;
+    failed?: number;
+    results?: SyncResultRow[];
+    data?: unknown;
+  } | null>(null);
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
   const [vehicleCount, setVehicleCount] = useState(0);
 
@@ -246,12 +264,70 @@ export function DVLASyncDebugPanel() {
                 <XCircle className="h-5 w-5 text-red-400" />
               )}
               Sync Results
+              {syncResult.total != null && (
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  ({syncResult.successful ?? 0} ok / {syncResult.failed ?? 0} failed / {syncResult.total} total)
+                </span>
+              )}
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <pre className="bg-slate-800 border border-slate-700 p-4 rounded-md overflow-auto text-xs text-muted-foreground">
-              {JSON.stringify(syncResult, null, 2)}
-            </pre>
+          <CardContent className="space-y-2">
+            {syncResult.results?.length ? (
+              <div className="space-y-1 max-h-[600px] overflow-auto">
+                {syncResult.results.map((row, idx) => {
+                  const updated = row.updatedFields?.length || row.fields_updated?.length;
+                  const hasError = !row.success;
+                  return (
+                    <div
+                      key={idx}
+                      className={`flex items-start gap-2 rounded-md px-3 py-2 text-xs font-mono ${
+                        hasError
+                          ? 'bg-red-950/40 border border-red-800/50'
+                          : updated
+                            ? 'bg-green-950/40 border border-green-800/50'
+                            : 'bg-slate-800/60 border border-slate-700/50'
+                      }`}
+                    >
+                      {hasError ? (
+                        <XCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+                      ) : updated ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-400 shrink-0 mt-0.5" />
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4 text-slate-500 shrink-0 mt-0.5" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={hasError ? 'text-red-300 font-semibold' : updated ? 'text-green-300 font-semibold' : 'text-slate-400'}>
+                            {row.registrationNumber || 'Unknown'}
+                          </span>
+                          {row.assetType && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 uppercase">
+                              {row.assetType}
+                            </span>
+                          )}
+                          {updated ? (
+                            <span className="text-green-400">
+                              Updated: {(row.updatedFields || row.fields_updated || []).join(', ')}
+                            </span>
+                          ) : !hasError ? (
+                            <span className="text-slate-500">No changes</span>
+                          ) : null}
+                        </div>
+                        {hasError && (
+                          <div className="text-red-400 mt-1">
+                            {row.error || row.errors?.join('; ') || 'Unknown error'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <pre className="bg-slate-800 border border-slate-700 p-4 rounded-md overflow-auto text-xs text-muted-foreground">
+                {JSON.stringify(syncResult, null, 2)}
+              </pre>
+            )}
           </CardContent>
         </Card>
       )}
