@@ -43,6 +43,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const [viewAsRoleId, setViewAsRoleIdState] = useState<string>('');
   const [allRoles, setAllRoles] = useState<RoleOption[]>([]);
   const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
+  const [pendingAbsenceCount, setPendingAbsenceCount] = useState(0);
 
   // Fetch user email, all roles, and current view-as selection
   useEffect(() => {
@@ -113,6 +114,21 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
       }
     }
     fetchPermissions();
+
+    async function fetchPendingAbsenceCount() {
+      if (!isManager && !isAdmin) {
+        setPendingAbsenceCount(0);
+        return;
+      }
+
+      const { count } = await supabase
+        .from('absences')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+
+      setPendingAbsenceCount(count || 0);
+    }
+    fetchPendingAbsenceCount();
 
     // Read current selection from cookie (or legacy localStorage)
     const cookieVal = getViewAsRoleId();
@@ -289,6 +305,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
               {managerLinks.map((link) => {
                 const Icon = link.icon;
                 const isActive = pathname?.startsWith(link.href);
+                const badgeCount = link.href === '/absence/manage' ? pendingAbsenceCount : 0;
                 return (
                   <Link
                     key={link.href}
@@ -302,12 +319,24 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                         : 'text-muted-foreground hover:bg-slate-800 hover:text-white'
                     }`}
                   >
-                    <Icon className={open ? 'w-4 h-4' : 'w-5 h-5'} />
+                    <div className="relative">
+                      <Icon className={open ? 'w-4 h-4' : 'w-5 h-5'} />
+                      {!open && badgeCount > 0 && (
+                        <span className="absolute -top-2 -right-2 min-w-[1.1rem] px-1 h-[1.1rem] rounded-full bg-red-500 text-white text-[10px] leading-none flex items-center justify-center font-semibold">
+                          {badgeCount > 99 ? '99+' : badgeCount}
+                        </span>
+                      )}
+                    </div>
                     <span className={`transition-opacity duration-200 whitespace-nowrap ${
                       open ? 'opacity-100 delay-300' : 'opacity-0 w-0 overflow-hidden'
                     }`}>
                       {link.label}
                     </span>
+                    {open && badgeCount > 0 && (
+                      <span className="ml-auto min-w-[1.25rem] h-5 px-1 rounded-full bg-red-500 text-white text-[11px] leading-none flex items-center justify-center font-semibold">
+                        {badgeCount > 99 ? '99+' : badgeCount}
+                      </span>
+                    )}
                   </Link>
                 );
               })}

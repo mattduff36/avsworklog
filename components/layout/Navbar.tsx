@@ -121,6 +121,7 @@ export function Navbar() {
   const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
   const [, setPermissionsLoading] = useState(true);
   const [hasRAMSAssignments, setHasRAMSAssignments] = useState(false);
+  const [pendingAbsenceCount, setPendingAbsenceCount] = useState(0);
   const [isMounted, setIsMounted] = useState(false); // Track client hydration
   const [isCompact, setIsCompact] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
@@ -265,6 +266,28 @@ export function Navbar() {
     
     fetchRAMSAssignments();
   }, [profile?.id, supabase]);
+
+  useEffect(() => {
+    async function fetchPendingAbsenceCount() {
+      if (!profile?.id || (!effectiveIsManager && !effectiveIsAdmin)) {
+        setPendingAbsenceCount(0);
+        return;
+      }
+
+      try {
+        const { count } = await supabase
+          .from('absences')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending');
+
+        setPendingAbsenceCount(count || 0);
+      } catch {
+        setPendingAbsenceCount(0);
+      }
+    }
+
+    fetchPendingAbsenceCount();
+  }, [profile?.id, effectiveIsManager, effectiveIsAdmin, supabase]);
 
   // Fetch notification count (only when user is authenticated)
   useEffect(() => {
@@ -582,6 +605,7 @@ export function Navbar() {
                     const isActive = isLinkActive(item.href);
                     const activeColors = getNavItemActiveColors(item.href);
                     const iconColorClass = getNavItemIconColor(item.href);
+                    const badgeCount = item.href === '/absence/manage' ? pendingAbsenceCount : 0;
                     return (
                       <Link
                         key={item.href}
@@ -594,7 +618,12 @@ export function Navbar() {
                         }`}
                       >
                         <Icon className={`w-5 h-5 mr-3 ${isActive ? '' : iconColorClass}`} />
-                        {item.label}
+                        <span>{item.label}</span>
+                        {badgeCount > 0 && (
+                          <span className="ml-auto min-w-[1.25rem] h-5 px-1 rounded-full bg-red-500 text-white text-[11px] leading-none flex items-center justify-center font-semibold">
+                            {badgeCount > 99 ? '99+' : badgeCount}
+                          </span>
+                        )}
                       </Link>
                     );
                   })}

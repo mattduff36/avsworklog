@@ -128,8 +128,7 @@ export function getCurrentFinancialYear(): {
 }
 
 /**
- * Calculate duration in days between two dates (inclusive)
- * This is a base function; weekend/bank holiday exclusions can be added later
+ * Calculate duration in days between two dates (inclusive, weekdays only)
  * @param startDate The start date
  * @param endDate The end date (if null, assumes single day)
  * @param isHalfDay Whether this is a half-day absence
@@ -142,10 +141,13 @@ export function calculateDurationDays(
 ): number {
   // Single day
   if (!endDate || startDate.getTime() === endDate.getTime()) {
+    if (!isWeekday(startDate)) {
+      return 0;
+    }
     return isHalfDay ? 0.5 : 1.0;
   }
   
-  // Multi-day: count all days inclusive
+  // Multi-day: count weekdays only (Mon-Fri), inclusive
   const start = new Date(startDate);
   const end = new Date(endDate);
   
@@ -153,10 +155,22 @@ export function calculateDurationDays(
   start.setHours(0, 0, 0, 0);
   end.setHours(0, 0, 0, 0);
   
-  const diffTime = end.getTime() - start.getTime();
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 for inclusive
-  
-  return diffDays;
+  let weekdays = 0;
+  const current = new Date(start);
+
+  while (current <= end) {
+    if (isWeekday(current)) {
+      weekdays += 1;
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return weekdays;
+}
+
+export function isWeekday(date: Date): boolean {
+  const day = date.getDay();
+  return day >= 1 && day <= 5;
 }
 
 /**

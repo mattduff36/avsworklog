@@ -7,7 +7,13 @@ import {
   AbsenceWithRelations,
   AbsenceSummary
 } from '@/types/absence';
-import { getCurrentFinancialYear } from '@/lib/utils/date';
+import { getCurrentFinancialYear, getFinancialYear } from '@/lib/utils/date';
+
+const ANNUAL_LEAVE_REASON_NAME = 'annual leave';
+
+function hasFilterValue(value?: string): value is string {
+  return !!value && value.trim().length > 0;
+}
 
 // ============================================================================
 // ABSENCE REASONS HOOKS
@@ -117,10 +123,17 @@ export function useAbsenceSummaryForCurrentUser() {
       const { data: annualLeaveReason, error: reasonError } = await supabase
         .from('absence_reasons')
         .select('id')
-        .eq('name', 'Annual leave')
+        .ilike('name', ANNUAL_LEAVE_REASON_NAME)
         .single();
       
-      if (reasonError) throw reasonError;
+      if (reasonError || !annualLeaveReason) {
+        return {
+          allowance,
+          approved_taken: 0,
+          pending_total: 0,
+          remaining: allowance,
+        } as AbsenceSummary;
+      }
       
       // Get absences within financial year
       const { data: absences, error: absencesError } = await supabase
@@ -167,6 +180,54 @@ export function useCreateAbsence() {
   
   return useMutation({
     mutationFn: async (absence: AbsenceInsert) => {
+      // Enforce annual leave allowance at mutation time to prevent stale UI bypasses.
+      if (absence.status === 'pending' && absence.reason_id && absence.profile_id && (absence.duration_days || 0) > 0) {
+        const { data: reason, error: reasonError } = await supabase
+          .from('absence_reasons')
+          .select('id, name')
+          .eq('id', absence.reason_id)
+          .single();
+
+        if (reasonError) throw reasonError;
+
+        const isAnnualLeave = reason?.name?.trim().toLowerCase() === ANNUAL_LEAVE_REASON_NAME;
+        if (isAnnualLeave) {
+          const requestDate = absence.date ? new Date(`${absence.date}T00:00:00`) : new Date();
+          const { start, end } = getFinancialYear(requestDate);
+
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('annual_holiday_allowance_days')
+            .eq('id', absence.profile_id)
+            .single();
+
+          if (profileError) throw profileError;
+
+          const allowance = profile?.annual_holiday_allowance_days || 28;
+
+          const { data: annualAbsences, error: annualAbsencesError } = await supabase
+            .from('absences')
+            .select('duration_days')
+            .eq('profile_id', absence.profile_id)
+            .eq('reason_id', reason.id)
+            .in('status', ['approved', 'pending'])
+            .gte('date', start.toISOString().split('T')[0])
+            .lte('date', end.toISOString().split('T')[0]);
+
+          if (annualAbsencesError) throw annualAbsencesError;
+
+          const usedOrPending = (annualAbsences || []).reduce(
+            (sum: number, entry: { duration_days: number | null }) => sum + (entry.duration_days || 0),
+            0
+          );
+          const requested = absence.duration_days || 0;
+
+          if (usedOrPending + requested > allowance) {
+            throw new Error('Annual leave request exceeds available allowance');
+          }
+        }
+      }
+
       const { data, error } = await supabase
         .from('absences')
         .insert(absence)
@@ -288,7 +349,7 @@ export function useAllAbsences(filters?: {
           approved_by_profile:profiles!absences_approved_by_fkey (full_name)
         `);
       
-      if (filters?.profileId) {
+      if (hasFilterValue(filters?.profileId)) {
         query = query.eq('profile_id', filters.profileId);
       }
       if (filters?.dateFrom) {
@@ -297,10 +358,10 @@ export function useAllAbsences(filters?: {
       if (filters?.dateTo) {
         query = query.lte('date', filters.dateTo);
       }
-      if (filters?.reasonId) {
+      if (hasFilterValue(filters?.reasonId)) {
         query = query.eq('reason_id', filters.reasonId);
       }
-      if (filters?.status) {
+      if (hasFilterValue(filters?.status)) {
         query = query.eq('status', filters.status);
       }
       
@@ -434,10 +495,17 @@ export function useAbsenceSummaryForEmployee(profileId: string) {
       const { data: annualLeaveReason, error: reasonError } = await supabase
         .from('absence_reasons')
         .select('id')
-        .eq('name', 'Annual leave')
+        .ilike('name', ANNUAL_LEAVE_REASON_NAME)
         .single();
       
-      if (reasonError) throw reasonError;
+      if (reasonError || !annualLeaveReason) {
+        return {
+          allowance,
+          approved_taken: 0,
+          pending_total: 0,
+          remaining: allowance,
+        } as AbsenceSummary;
+      }
       
       // Get absences within financial year
       const { data: absences, error: absencesError } = await supabase
@@ -488,7 +556,7 @@ export function useCreateAbsenceReason() {
   const supabase = createClient();
   
   return useMutation({
-    mutationFn: async (reason: { name: string; is_paid: boolean }) => {
+    mutationFn: async (reason: { name: string; is_paid: boolean; color?: string }) => {
       const { data, error } = await supabase
         .from('absence_reasons')
         .insert(reason)

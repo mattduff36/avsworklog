@@ -28,7 +28,13 @@ import { usePendingAbsences, useApproveAbsence, useRejectAbsence, useAbsenceSumm
 import { toast } from 'sonner';
 import { TimesheetsApprovalTable, COLUMN_VISIBILITY_STORAGE_KEY, DEFAULT_COLUMN_VISIBILITY } from './components/TimesheetsApprovalTable';
 import type { ColumnVisibility } from './components/TimesheetsApprovalTable';
+import { AbsencesApprovalTable, ABSENCE_COLUMN_VISIBILITY_STORAGE_KEY, DEFAULT_ABSENCE_COLUMN_VISIBILITY } from './components/AbsencesApprovalTable';
+import type { AbsenceColumnVisibility } from './components/AbsencesApprovalTable';
 import { ProcessTimesheetModal } from './components/ProcessTimesheetModal';
+
+function isAnnualLeaveReason(name: string): boolean {
+  return name.trim().toLowerCase() === 'annual leave';
+}
 
 interface TimesheetEntry {
   daily_total: number | null;
@@ -57,16 +63,24 @@ function ApprovalsContent() {
   const [timesheetFilter, setTimesheetFilter] = useState<TimesheetStatusFilter>('pending');
   const statusFilter: StatusFilter = timesheetFilter;
 
-  // View mode (cards vs table) - persisted to localStorage
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => {
+  // View mode (cards vs table) - persisted to localStorage per tab
+  const [timesheetViewMode, setTimesheetViewMode] = useState<'cards' | 'table'>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('approvals-view-mode') as 'cards' | 'table') || 'cards';
+      return (localStorage.getItem('approvals-ts-view-mode') as 'cards' | 'table') || 'cards';
     }
     return 'cards';
   });
+  const [absenceViewMode, setAbsenceViewMode] = useState<'cards' | 'table'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('approvals-abs-view-mode') as 'cards' | 'table') || 'table';
+    }
+    return 'table';
+  });
 
-  // Column visibility - lifted from table component so the dropdown can sit in the toolbar
+  // Column visibility - timesheets
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(DEFAULT_COLUMN_VISIBILITY);
+  // Column visibility - absences
+  const [absenceColumnVisibility, setAbsenceColumnVisibility] = useState<AbsenceColumnVisibility>(DEFAULT_ABSENCE_COLUMN_VISIBILITY);
 
   useEffect(() => {
     try {
@@ -78,12 +92,29 @@ function ApprovalsContent() {
     } catch {
       // ignore
     }
+    try {
+      const saved = localStorage.getItem(ABSENCE_COLUMN_VISIBILITY_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Partial<AbsenceColumnVisibility>;
+        setAbsenceColumnVisibility(prev => ({ ...prev, ...parsed }));
+      }
+    } catch {
+      // ignore
+    }
   }, []);
 
   const toggleColumn = (column: keyof ColumnVisibility) => {
     setColumnVisibility(prev => {
       const next = { ...prev, [column]: !prev[column] };
       localStorage.setItem(COLUMN_VISIBILITY_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const toggleAbsenceColumn = (column: keyof AbsenceColumnVisibility) => {
+    setAbsenceColumnVisibility(prev => {
+      const next = { ...prev, [column]: !prev[column] };
+      localStorage.setItem(ABSENCE_COLUMN_VISIBILITY_STORAGE_KEY, JSON.stringify(next));
       return next;
     });
   };
@@ -445,7 +476,7 @@ function ApprovalsContent() {
               <>
                 {/* Toolbar: Columns + View Toggle - Desktop Only */}
                 <div className="hidden md:flex items-center justify-end gap-2">
-                  {viewMode === 'table' && (
+                  {timesheetViewMode === 'table' && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" size="sm" className="border-slate-600">
@@ -478,8 +509,8 @@ function ApprovalsContent() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => { setViewMode('table'); localStorage.setItem('approvals-view-mode', 'table'); }}
-                      className={`h-8 px-3 ${viewMode === 'table' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
+                      onClick={() => { setTimesheetViewMode('table'); localStorage.setItem('approvals-ts-view-mode', 'table'); }}
+                      className={`h-8 px-3 ${timesheetViewMode === 'table' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
                     >
                       <Table2 className="h-4 w-4 mr-1.5" />
                       Table
@@ -487,8 +518,8 @@ function ApprovalsContent() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => { setViewMode('cards'); localStorage.setItem('approvals-view-mode', 'cards'); }}
-                      className={`h-8 px-3 ${viewMode === 'cards' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
+                      onClick={() => { setTimesheetViewMode('cards'); localStorage.setItem('approvals-ts-view-mode', 'cards'); }}
+                      className={`h-8 px-3 ${timesheetViewMode === 'cards' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
                     >
                       <LayoutGrid className="h-4 w-4 mr-1.5" />
                       Cards
@@ -497,7 +528,7 @@ function ApprovalsContent() {
                 </div>
 
                 {/* Table View - Desktop Only */}
-                {viewMode === 'table' && (
+                {timesheetViewMode === 'table' && (
                   <div className="hidden md:block">
                     <TimesheetsApprovalTable
                       timesheets={timesheets}
@@ -510,7 +541,7 @@ function ApprovalsContent() {
                 )}
 
                 {/* Card View - Always on mobile, conditional on desktop */}
-                <div className={viewMode === 'table' ? 'md:hidden space-y-4' : 'space-y-4'}>
+                <div className={timesheetViewMode === 'table' ? 'md:hidden space-y-4' : 'space-y-4'}>
                   {timesheets.map((timesheet) => (
                     <Link key={timesheet.id} href={`/timesheets/${timesheet.id}`} className="block">
                       <Card className="bg-white dark:bg-slate-900 border-border hover:shadow-lg hover:border-timesheet/50 transition-all duration-200 cursor-pointer">
@@ -582,20 +613,105 @@ function ApprovalsContent() {
 
           <TabsContent value="absences" className="mt-6 space-y-4">
             {!absences || absences.length === 0 ? (
-              <Card className="">
-                <CardContent className="py-12 text-center text-muted-foreground">
-                  No pending absence approvals
+              <Card className="border-border">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <CheckCircle2 className="h-12 w-12 text-green-400 mb-3" />
+                  <h3 className="text-lg font-semibold text-white mb-1">All caught up!</h3>
+                  <p className="text-sm text-muted-foreground">
+                    There are no pending absence approvals at the moment
+                  </p>
                 </CardContent>
               </Card>
             ) : (
-              absences.map((absence) => (
-                <AbsenceApprovalCard 
-                  key={absence.id} 
-                  absence={absence}
-                  onApprove={approveAbsence}
-                  onReject={rejectAbsence}
-                />
-              ))
+              <>
+                {/* Toolbar: Columns + View Toggle - Desktop Only */}
+                <div className="hidden md:flex items-center justify-end gap-2">
+                  {absenceViewMode === 'table' && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="border-slate-600">
+                          <Settings2 className="h-4 w-4 mr-2" />
+                          Columns
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56 bg-slate-900 border border-border">
+                        <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem checked={absenceColumnVisibility.employeeId} onCheckedChange={() => toggleAbsenceColumn('employeeId')}>
+                          Employee ID
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuCheckboxItem checked={absenceColumnVisibility.reason} onCheckedChange={() => toggleAbsenceColumn('reason')}>
+                          Reason
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuCheckboxItem checked={absenceColumnVisibility.duration} onCheckedChange={() => toggleAbsenceColumn('duration')}>
+                          Duration
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuCheckboxItem checked={absenceColumnVisibility.remainingAllowance} onCheckedChange={() => toggleAbsenceColumn('remainingAllowance')}>
+                          Remaining Allowance
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuCheckboxItem checked={absenceColumnVisibility.paidStatus} onCheckedChange={() => toggleAbsenceColumn('paidStatus')}>
+                          Paid / Unpaid
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuCheckboxItem checked={absenceColumnVisibility.submittedAt} onCheckedChange={() => toggleAbsenceColumn('submittedAt')}>
+                          Submitted
+                        </DropdownMenuCheckboxItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                  <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setAbsenceViewMode('table'); localStorage.setItem('approvals-abs-view-mode', 'table'); }}
+                      className={`h-8 px-3 ${absenceViewMode === 'table' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
+                    >
+                      <Table2 className="h-4 w-4 mr-1.5" />
+                      Table
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setAbsenceViewMode('cards'); localStorage.setItem('approvals-abs-view-mode', 'cards'); }}
+                      className={`h-8 px-3 ${absenceViewMode === 'cards' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
+                    >
+                      <LayoutGrid className="h-4 w-4 mr-1.5" />
+                      Cards
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Table View - Desktop Only */}
+                {absenceViewMode === 'table' && (
+                  <div className="hidden md:block">
+                    <AbsencesApprovalTable
+                      absences={absences}
+                      onApprove={async (id) => {
+                        try { await approveAbsence.mutateAsync(id); }
+                        catch (e) { console.error('Error approving absence:', e); }
+                      }}
+                      onReject={async (id) => {
+                        const reason = prompt('Enter rejection reason:');
+                        if (!reason) return;
+                        try { await rejectAbsence.mutateAsync({ id, reason }); }
+                        catch (e) { console.error('Error rejecting absence:', e); }
+                      }}
+                      columnVisibility={absenceColumnVisibility}
+                    />
+                  </div>
+                )}
+
+                {/* Card View - Always on mobile, conditional on desktop */}
+                <div className={absenceViewMode === 'table' ? 'md:hidden space-y-4' : 'space-y-4'}>
+                  {absences.map((absence) => (
+                    <AbsenceApprovalCard
+                      key={absence.id}
+                      absence={absence}
+                      onApprove={approveAbsence}
+                      onReject={rejectAbsence}
+                    />
+                  ))}
+                </div>
+              </>
             )}
           </TabsContent>
         </Tabs>
@@ -630,7 +746,7 @@ function AbsenceApprovalCard({
   
   async function handleApprove() {
     // Check allowance for Annual Leave
-    if (absence.absence_reasons.name === 'Annual leave') {
+    if (isAnnualLeaveReason(absence.absence_reasons.name)) {
       const projectedRemaining = (summary?.remaining || 0) - absence.duration_days;
       if (projectedRemaining < 0) {
         const confirmed = await import('@/lib/services/notification.service').then(m => 
@@ -671,7 +787,7 @@ function AbsenceApprovalCard({
     }
   }
   
-  const projectedRemaining = absence.absence_reasons.name === 'Annual leave' 
+  const projectedRemaining = isAnnualLeaveReason(absence.absence_reasons.name)
     ? (summary?.remaining || 0) - absence.duration_days 
     : null;
   
@@ -686,58 +802,56 @@ function AbsenceApprovalCard({
                 {absence.profiles.full_name}
                 {absence.profiles.employee_id && ` (${absence.profiles.employee_id})`}
               </CardTitle>
-              <CardDescription className="mt-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="outline" className="border-border text-muted-foreground">
-                    {absence.absence_reasons.name}
+              <CardDescription className="flex items-center gap-2 mt-1 flex-wrap">
+                <span>{absence.absence_reasons.name}</span>
+                <span>·</span>
+                <span>
+                  {absence.end_date && absence.date !== absence.end_date
+                    ? `${formatDate(absence.date)} - ${formatDate(absence.end_date)}`
+                    : formatDate(absence.date)
+                  }
+                  {absence.is_half_day && ` (${absence.half_day_session})`}
+                </span>
+                <span>·</span>
+                <span>{absence.duration_days} {absence.duration_days === 1 ? 'day' : 'days'}</span>
+                {absence.absence_reasons.is_paid ? (
+                  <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10 text-[10px] px-1.5 py-0">
+                    Paid
                   </Badge>
-                  {absence.absence_reasons.is_paid ? (
-                    <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10">
-                      Paid
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="border-slate-600 text-muted-foreground">
-                      Unpaid
-                    </Badge>
-                  )}
-                </div>
-                <div className="text-xs mt-2">
-                  <div>
-                    {absence.end_date && absence.date !== absence.end_date
-                      ? `${formatDate(absence.date)} - ${formatDate(absence.end_date)}`
-                      : formatDate(absence.date)
-                    }
-                    {absence.is_half_day && ` (${absence.half_day_session})`}
-                  </div>
-                  <div className="text-muted-foreground">
-                    Duration: {absence.duration_days} days
-                  </div>
-                </div>
+                ) : (
+                  <Badge variant="outline" className="border-slate-600 text-muted-foreground text-[10px] px-1.5 py-0">
+                    Unpaid
+                  </Badge>
+                )}
               </CardDescription>
             </div>
           </div>
+          <Badge variant="warning">
+            <Clock className="h-3 w-3 mr-1" />
+            Pending
+          </Badge>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
+        <div className="space-y-3">
           {absence.notes && (
             <div className="p-3 bg-slate-800/30 rounded-lg">
               <p className="text-sm text-muted-foreground">
-                <span className="text-muted-foreground font-medium">Notes:</span> {absence.notes}
+                <span className="font-medium">Notes:</span> {absence.notes}
               </p>
             </div>
           )}
-          
-          {absence.absence_reasons.name === 'Annual leave' && summary && (
+
+          {isAnnualLeaveReason(absence.absence_reasons.name) && summary && (
             <div className="p-3 bg-slate-800/30 rounded-lg">
-              <h4 className="text-sm font-medium text-white mb-2">Employee Allowance Summary</h4>
+              <h4 className="text-sm font-medium text-white mb-2">Allowance Summary</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                 <div>
                   <p className="text-muted-foreground">Allowance</p>
                   <p className="text-white font-medium">{summary.allowance} days</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Approved Taken</p>
+                  <p className="text-muted-foreground">Approved</p>
                   <p className="text-white font-medium">{summary.approved_taken} days</p>
                 </div>
                 <div>
@@ -760,7 +874,7 @@ function AbsenceApprovalCard({
               )}
             </div>
           )}
-          
+
           {rejecting ? (
             <div className="space-y-3">
               <div>
@@ -770,7 +884,7 @@ function AbsenceApprovalCard({
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   placeholder="Provide a reason for rejection..."
-                  className="bg-white dark:border-border dark:text-slate-100 text-slate-900"
+                  className="bg-background border-border text-foreground"
                 />
               </div>
               <div className="flex gap-2">

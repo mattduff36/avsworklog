@@ -227,8 +227,8 @@ export function getPageUrl(value: string): string {
     // Absence
     'absence-list': '/absence',
     'absence-manage': '/absence/manage',
-    'absence-allowances': '/absence/allowances',
-    'absence-reasons': '/absence/reasons',
+    'absence-allowances': '/absence/manage/allowances',
+    'absence-reasons': '/absence/manage/reasons',
     
     // Maintenance
     'maintenance-overview': '/maintenance',
@@ -241,8 +241,8 @@ export function getPageUrl(value: string): string {
     
     // Approvals
     'approvals-list': '/approvals',
-    'approvals-timesheets': '/approvals/timesheets',
-    'approvals-absence': '/approvals/absence',
+    'approvals-timesheets': '/approvals?tab=timesheets',
+    'approvals-absence': '/approvals?tab=absences',
     
     // Actions
     'actions-list': '/actions',

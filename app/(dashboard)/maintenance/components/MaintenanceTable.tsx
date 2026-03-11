@@ -21,7 +21,6 @@ import {
   Edit, 
   History,
   ArrowUpDown,
-  Plus,
   Settings2,
   Monitor,
   ChevronDown,
@@ -286,23 +285,13 @@ export function MaintenanceTable({
 
       <Card className="border-border">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-white">
-                All {assetLabelPlural}
-              </CardTitle>
-              <CardDescription className="text-muted-foreground">
-                {vehicles.length} {assetLabelLower}{vehicles.length !== 1 ? 's' : ''} • Click column headers to sort
-              </CardDescription>
-            </div>
-            <Button 
-              className="bg-maintenance hover:bg-maintenance-dark"
-              onClick={() => setAddVehicleDialogOpen(true)}
-            >
-              <Plus className="h-4 w-4 mr-2 hidden md:inline" />
-              <span className="hidden md:inline">Add Asset</span>
-              <Plus className="h-4 w-4 md:hidden" />
-            </Button>
+          <div>
+            <CardTitle className="text-white">
+              All {assetLabelPlural}
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">
+              {vehicles.length} {assetLabelLower}{vehicles.length !== 1 ? 's' : ''} • Click column headers to sort
+            </CardDescription>
           </div>
         </CardHeader>
         

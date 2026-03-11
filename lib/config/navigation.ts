@@ -143,6 +143,13 @@ export const managerNavItems: NavItem[] = [
     module: 'actions',
     category: 'manager'
   },
+  {
+    href: '/absence/manage',
+    label: 'Manage Absence',
+    icon: Calendar,
+    module: 'absence',
+    category: 'manager'
+  },
   { 
     href: '/toolbox-talks', 
     label: 'Toolbox Talks', 

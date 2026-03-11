@@ -6,7 +6,7 @@ import { useSearchParams, useRouter as useNextRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Wrench, Truck, Settings, HardHat } from 'lucide-react';
+import { Loader2, Wrench, Truck, Settings, HardHat, Plus } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
 
 // Dynamic import for PlantTable
@@ -29,6 +29,8 @@ import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { FleetSettingsTab } from './components/FleetSettingsTab';
 import { FleetCategoryDialogs } from './components/FleetCategoryDialogs';
+import { AddAssetFlowDialog } from '@/app/(dashboard)/maintenance/components/add-asset/AddAssetFlowDialog';
+import { Button } from '@/components/ui/button';
 import type { Category, HgvAsset, HgvCategory, PlantAsset, Vehicle } from './types';
 
 function FleetContent() {
@@ -49,6 +51,9 @@ function FleetContent() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [deletingCategory, setDeletingCategory] = useState(false);
   
+  // Header-level Add Asset dialog
+  const [headerAddAssetOpen, setHeaderAddAssetOpen] = useState(false);
+
   // HGV Category Dialog States
   const [addHgvCategoryDialogOpen, setAddHgvCategoryDialogOpen] = useState(false);
   const [editHgvCategoryDialogOpen, setEditHgvCategoryDialogOpen] = useState(false);
@@ -406,6 +411,13 @@ function FleetContent() {
               Manage vans, HGVs, plant machinery, and fleet operations
             </p>
           </div>
+          <Button
+            className="bg-fleet hover:bg-fleet-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
+            onClick={() => setHeaderAddAssetOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Asset
+          </Button>
         </div>
       </div>
 
@@ -552,6 +564,17 @@ function FleetContent() {
           onDeleteHgvCategory={openDeleteHgvCategoryDialog}
         />
       </Tabs>
+
+      <AddAssetFlowDialog
+        open={headerAddAssetOpen}
+        onOpenChange={setHeaderAddAssetOpen}
+        onSuccess={() => {
+          setHeaderAddAssetOpen(false);
+          if (assetTab === 'vans') fetchVehicles();
+          else if (assetTab === 'plant') fetchPlantAssets();
+          else if (assetTab === 'hgvs') fetchHgvAssets();
+        }}
+      />
 
       <FleetCategoryDialogs
         addCategoryDialogOpen={addCategoryDialogOpen}

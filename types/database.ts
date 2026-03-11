@@ -1530,6 +1530,7 @@ export interface Database {
           id: string
           name: string
           is_paid: boolean
+          color: string
           is_active: boolean
           created_at: string
           updated_at: string
@@ -1538,6 +1539,7 @@ export interface Database {
           id?: string
           name: string
           is_paid?: boolean
+          color?: string
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -1546,6 +1548,7 @@ export interface Database {
           id?: string
           name?: string
           is_paid?: boolean
+          color?: string
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -1566,6 +1569,10 @@ export interface Database {
           created_by: string | null
           approved_by: string | null
           approved_at: string | null
+          is_bank_holiday: boolean
+          auto_generated: boolean
+          generation_source: string | null
+          holiday_key: string | null
           created_at: string
           updated_at: string
         }
@@ -1583,6 +1590,10 @@ export interface Database {
           created_by?: string | null
           approved_by?: string | null
           approved_at?: string | null
+          is_bank_holiday?: boolean
+          auto_generated?: boolean
+          generation_source?: string | null
+          holiday_key?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -1600,6 +1611,36 @@ export interface Database {
           created_by?: string | null
           approved_by?: string | null
           approved_at?: string | null
+          is_bank_holiday?: boolean
+          auto_generated?: boolean
+          generation_source?: string | null
+          holiday_key?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      absence_financial_year_generations: {
+        Row: {
+          id: string
+          financial_year_start_year: number
+          generated_at: string
+          generated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          financial_year_start_year: number
+          generated_at?: string
+          generated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          financial_year_start_year?: number
+          generated_at?: string
+          generated_by?: string | null
           created_at?: string
           updated_at?: string
         }

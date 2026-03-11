@@ -78,6 +78,8 @@ export default function DashboardPage() {
   const [hasRAMSAssignments, setHasRAMSAssignments] = useState(false);
   const [newSuggestionsCount, setNewSuggestionsCount] = useState(0);
   const [newErrorReportsCount, setNewErrorReportsCount] = useState(0);
+  const [pendingQuotesCount, setPendingQuotesCount] = useState(0);
+  const [errorLogsCount, setErrorLogsCount] = useState(0);
   const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
   const [permissionsLoading, setPermissionsLoading] = useState(true);
   const [ramsLoading, setRamsLoading] = useState(true);
@@ -191,6 +193,7 @@ export default function DashboardPage() {
       if (canViewSuggestions || canViewErrorReports) {
         fetchNotificationCounts();
       }
+      fetchBadgeCounts();
     }
     fetchPendingRAMS();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -566,6 +569,27 @@ export default function DashboardPage() {
     }
   };
 
+  const fetchBadgeCounts = async () => {
+    if (!navigator.onLine) return;
+
+    try {
+      const [quotesResult, errorLogsResult] = await Promise.all([
+        supabase
+          .from('quotes')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending_internal_approval'),
+        supabase
+          .from('error_logs')
+          .select('*', { count: 'exact', head: true }),
+      ]);
+
+      setPendingQuotesCount(quotesResult.count || 0);
+      setErrorLogsCount(errorLogsResult.count || 0);
+    } catch (error) {
+      console.error('Error fetching badge counts:', error);
+    }
+  };
+
   const fetchPendingRAMS = async () => {
     if (!profile?.id) {
       // Don't set ramsLoading to false - keep it in loading state until profile loads
@@ -613,6 +637,7 @@ export default function DashboardPage() {
   const visibleManagerTiles = getFilteredNavByPermissions(managerNavItems, userPermissions, effectiveIsAdmin);
   const visibleAdminTiles = getFilteredNavByPermissions(adminNavItems, userPermissions, effectiveIsAdmin);
   const visibleManagementTiles = [...visibleManagerTiles, ...visibleAdminTiles];
+  const totalPendingApprovalsCount = pendingApprovals.reduce((sum, a) => sum + a.count, 0);
 
   const visibleActionsSummary = actionsSummary.filter((item) => {
     if (item.type === 'workshop') return canViewWorkshopTasks;
@@ -621,6 +646,7 @@ export default function DashboardPage() {
     if (item.type === 'errors') return canViewErrorReports;
     return true;
   });
+  const totalActionsCount = visibleActionsSummary.reduce((sum, a) => sum + a.count, 0);
 
   return (
     <div className="space-y-8 max-w-6xl">
@@ -741,9 +767,15 @@ export default function DashboardPage() {
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {/* Manager Links - Using shared navigation config */}
-            {visibleManagerTiles.map((link, index) => {
+            {visibleManagerTiles.filter(link => link.href !== '/absence/manage').map((link, index) => {
               const Icon = link.icon;
-              const badgeCount = link.href === '/suggestions/manage' ? newSuggestionsCount : 0;
+              const badgeCount = link.href === '/suggestions/manage'
+                ? newSuggestionsCount
+                : link.href === '/approvals'
+                ? totalPendingApprovalsCount
+                : link.href === '/actions'
+                ? totalActionsCount
+                : 0;
               
               return (
                 <Link key={link.href} href={link.href}>
@@ -771,7 +803,11 @@ export default function DashboardPage() {
             {visibleAdminTiles.map((link, index) => {
               const Icon = link.icon;
               const animationIndex = visibleManagerTiles.length + index;
-              const badgeCount = link.href === '/admin/errors/manage' ? newErrorReportsCount : 0;
+              const badgeCount = link.href === '/admin/errors/manage'
+                ? newErrorReportsCount
+                : link.href === '/quotes'
+                ? pendingQuotesCount
+                : 0;
               
               return (
                 <Link key={link.href} href={link.href}>
@@ -803,9 +839,14 @@ export default function DashboardPage() {
               return (
                 <Link key="/debug" href="/debug">
                   <div 
-                    className="bg-slate-800 dark:bg-slate-900 border-4 border-red-600 hover:border-red-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
+                    className="relative bg-slate-800 dark:bg-slate-900 border-4 border-red-600 hover:border-red-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
                     style={{ height: '100px', animationDelay: `${animationIndex * 75}ms` }}
                   >
+                    {errorLogsCount > 0 && (
+                      <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800">
+                        {errorLogsCount > 99 ? '99+' : errorLogsCount}
+                      </div>
+                    )}
                     <div className="flex flex-col items-start justify-between h-full">
                       <Icon className="h-6 w-6 text-red-500" />
                       <span className="font-semibold text-base leading-tight text-red-500">
