@@ -320,7 +320,7 @@ export default function HelpPage() {
       let data;
       try {
         data = await response.json();
-      } catch (parseError) {
+      } catch {
         throw new Error('Failed to parse response from server');
       }
 

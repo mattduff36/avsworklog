@@ -139,11 +139,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendRemin
 
     // If no recipients configured, send to all managers/admins
     if (recipientUserIds.length === 0) {
-      const { data: _managers, error: _managersError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('roles.is_manager_admin', true);
-      
       // Fallback: get profiles where role is admin or manager
       const { data: adminProfiles } = await supabaseServiceRole
         .from('profiles')

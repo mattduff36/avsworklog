@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -90,7 +91,7 @@ export default function PhotoUpload({ inspectionId, itemNumber, onClose, onUploa
       const fileName = `${inspectionId}/${itemNumber}/${Date.now()}.${fileExt}`;
 
       // Upload to Supabase Storage
-      const { data: _uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('inspection-photos')
         .upload(fileName, selectedFile);
 
@@ -184,9 +185,13 @@ export default function PhotoUpload({ inspectionId, itemNumber, onClose, onUploa
               <div className="grid grid-cols-2 gap-3">
                 {existingPhotos.map((photo) => (
                   <div key={photo.id} className="relative group">
-                    <img
+                    <Image
                       src={photo.photo_url}
                       alt={photo.caption || 'Inspection photo'}
+                      width={400}
+                      height={128}
+                      unoptimized
+                      loader={({ src }) => src}
                       className="w-full h-32 object-cover rounded border"
                     />
                     {photo.caption && (
@@ -222,9 +227,13 @@ export default function PhotoUpload({ inspectionId, itemNumber, onClose, onUploa
 
             {preview ? (
               <div className="relative">
-                <img
+                <Image
                   src={preview}
                   alt="Preview"
+                  width={800}
+                  height={256}
+                  unoptimized
+                  loader={({ src }) => src}
                   className="w-full h-64 object-contain rounded border bg-gray-50"
                 />
                 <Button

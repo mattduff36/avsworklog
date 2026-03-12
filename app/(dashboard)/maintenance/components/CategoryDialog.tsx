@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
@@ -122,7 +122,7 @@ export function CategoryDialog({
     handleSubmit,
     formState: { errors, isSubmitting },
     reset,
-    watch,
+    control,
     setValue,
     getValues,
   } = useForm<CategoryFormData>({
@@ -137,12 +137,12 @@ export function CategoryDialog({
     }
   });
 
-  const selectedType = watch('type');
-  const selectedResponsibility = watch('responsibility');
-  const showOnOverview = watch('show_on_overview');
-  const reminderInApp = watch('reminder_in_app_enabled');
-  const reminderEmail = watch('reminder_email_enabled');
-  const appliesTo = watch('applies_to');
+  const selectedType = useWatch({ control, name: 'type' });
+  const selectedResponsibility = useWatch({ control, name: 'responsibility' });
+  const showOnOverview = useWatch({ control, name: 'show_on_overview' });
+  const reminderInApp = useWatch({ control, name: 'reminder_in_app_enabled' });
+  const reminderEmail = useWatch({ control, name: 'reminder_email_enabled' });
+  const appliesTo = useWatch({ control, name: 'applies_to' });
 
   // Reset form when dialog opens/closes or category changes
   useEffect(() => {

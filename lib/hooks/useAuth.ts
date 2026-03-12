@@ -193,7 +193,7 @@ export function useAuth() {
           table: 'profiles',
           filter: `id=eq.${user.id}`,
         },
-        (_payload: unknown) => {
+        () => {
           console.log('Profile updated in database - checking for role changes...');
           // Force re-fetch to get latest data
           fetchProfile(user.id);

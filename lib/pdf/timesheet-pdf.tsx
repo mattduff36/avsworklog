@@ -1,5 +1,5 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image as PdfImage } from '@react-pdf/renderer';
 import { Timesheet, DAY_NAMES } from '@/types/timesheet';
 import { formatDate } from '@/lib/utils/date';
 
@@ -360,7 +360,7 @@ export function TimesheetPDF({ timesheet, employeeName }: TimesheetPDFProps) {
             <View style={styles.signatureRightSection}>
               <Text style={styles.signatureRightLabel}>Signature</Text>
               {timesheet.signature_data ? (
-                <Image style={styles.signatureImage} src={timesheet.signature_data} />
+                <PdfImage style={styles.signatureImage} src={timesheet.signature_data} />
               ) : (
                 <View style={styles.signatureDots} />
               )}

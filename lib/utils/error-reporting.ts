@@ -41,7 +41,7 @@ export async function reportError(options: ReportErrorOptions): Promise<void> {
         description: 'Thank you! The issue has been reported to our team.',
         duration: 3000,
       });
-    } catch (toastError) {
+    } catch {
       console.error('Error reported successfully (toast unavailable)');
     }
   } catch (err) {
@@ -51,7 +51,7 @@ export async function reportError(options: ReportErrorOptions): Promise<void> {
         description: 'Please try again or contact support directly.',
         duration: 3000,
       });
-    } catch (toastError) {
+    } catch {
       console.error('Could not send report (toast unavailable)');
     }
   }
@@ -95,7 +95,7 @@ export function showErrorWithReport(
         },
       },
     });
-  } catch (toastError) {
+  } catch {
     // Fallback if toast is not available
     console.error(`${title}: ${errorMessage} (Error Code: ${errorCode})`);
   }

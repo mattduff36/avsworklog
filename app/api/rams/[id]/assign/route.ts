@@ -146,7 +146,7 @@ export async function POST(
         status: (existingStatusMap.get(employee_id) || 'pending') as 'pending' | 'read' | 'signed',
       }));
 
-      const { data: _assignments, error: assignError } = await db
+      const { error: assignError } = await db
         .from('rams_assignments')
         .upsert(assignmentsToCreate, {
           onConflict: 'rams_document_id,employee_id',

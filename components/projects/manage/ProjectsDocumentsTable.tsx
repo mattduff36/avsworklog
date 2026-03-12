@@ -51,7 +51,7 @@ function SortHeader({
   label,
   field,
   currentSort,
-  currentDir: _currentDir,
+  currentDir,
   onSort,
 }: {
   label: string;
@@ -61,13 +61,16 @@ function SortHeader({
   onSort: (f: NonNullable<ManageDocumentsQuery['sortBy']>) => void;
 }) {
   const isActive = currentSort === field;
+  const isDesc = isActive && currentDir === 'desc';
   return (
     <button
       onClick={() => onSort(field)}
       className="flex items-center gap-1 hover:text-foreground transition-colors"
     >
       {label}
-      <ArrowUpDown className={`h-3 w-3 ${isActive ? 'text-rams' : 'text-muted-foreground/50'}`} />
+      <ArrowUpDown
+        className={`h-3 w-3 transition-transform ${isActive ? 'text-rams' : 'text-muted-foreground/50'} ${isDesc ? 'rotate-180' : ''}`}
+      />
     </button>
   );
 }

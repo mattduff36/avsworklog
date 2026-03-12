@@ -156,13 +156,18 @@ type HgvInspectionHistoryItem = {
   profiles: { full_name: string } | null;
 };
 
-function DocumentsTabContent({ hgvId: _hgvId, workshopTasks }: { hgvId: string; workshopTasks: WorkshopTask[] }) {
+function DocumentsTabContent({ hgvId, workshopTasks }: { hgvId: string; workshopTasks: WorkshopTask[] }) {
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchAttachments = async () => {
       try {
+        if (!hgvId) {
+          setAttachments([]);
+          setLoading(false);
+          return;
+        }
         setLoading(true);
         const taskIds = workshopTasks.map(t => t.id);
         
@@ -197,7 +202,7 @@ function DocumentsTabContent({ hgvId: _hgvId, workshopTasks }: { hgvId: string; 
     };
 
     fetchAttachments();
-  }, [workshopTasks]);
+  }, [hgvId, workshopTasks]);
 
   if (loading) {
     return (

@@ -133,7 +133,7 @@ export default function ProjectsManagePage() {
   }, [isManager, isAdmin, authLoading, router]);
 
   // Derived data
-  const allDocuments = docsData?.documents ?? [];
+  const allDocuments = useMemo(() => docsData?.documents ?? [], [docsData?.documents]);
   const total = docsData?.total ?? 0;
   const documents = useMemo(() => allDocuments.slice(0, visibleCount), [allDocuments, visibleCount]);
   const hasMoreDocuments = allDocuments.length > visibleCount;

@@ -252,7 +252,7 @@ export default function DashboardPage() {
         toast.error('Unable to load dashboard data', {
           description: 'Please check your internet connection and try again.',
         });
-      } catch (toastError) {
+      } catch {
         console.error('Unable to load dashboard data (toast unavailable)');
       }
     } finally {
@@ -489,7 +489,7 @@ export default function DashboardPage() {
         toast.error('Unable to load actions data', {
           description: 'Please check your internet connection and try again.',
         });
-      } catch (toastError) {
+      } catch {
         console.error('Unable to load actions data (toast unavailable)');
       }
       setActionsSummary([

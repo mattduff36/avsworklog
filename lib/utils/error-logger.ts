@@ -143,7 +143,7 @@ class ErrorLogger {
               const stringified = JSON.stringify(arg, null, 2);
               // If it stringifies to empty object, return a more useful representation
               return stringified === '{}' ? '[Empty Object]' : stringified;
-            } catch (e) {
+            } catch {
               return '[Object (unstringifiable)]';
             }
           }

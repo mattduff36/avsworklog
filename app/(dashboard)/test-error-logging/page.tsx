@@ -27,7 +27,7 @@ export default function TestErrorLoggingPage() {
   const testPromiseRejection = () => {
     addResult('Testing promise rejection...');
     Promise.reject(new Error('Test promise rejection: Async operation failed'))
-      .catch(_error => {
+      .catch(() => {
         addResult('✅ Promise rejection logged');
         toast.error('Promise rejection logged! Check /debug');
       });

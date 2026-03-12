@@ -217,7 +217,7 @@ export default function ViewPlantInspectionPage() {
       }
 
       const dailyHoursToInsert = Object.entries(editableDailyHours)
-        .filter(([_, hours]) => hours !== null)
+        .filter(([, hours]) => hours !== null)
         .map(([day, hours]) => ({
           inspection_id: inspection.id,
           day_of_week: parseInt(day),

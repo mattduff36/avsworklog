@@ -44,7 +44,7 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
       console.error('Error fetching notifications:', error);
       try {
         toast.error('Failed to load notifications');
-      } catch (toastError) {
+      } catch {
         console.error('Failed to load notifications (toast unavailable)');
       }
     } finally {
@@ -67,7 +67,7 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
 
       try {
         toast.success('All notifications cleared');
-      } catch (toastError) {
+      } catch {
         console.error('All notifications cleared (toast unavailable)');
       }
       setNotifications([]);
@@ -76,7 +76,7 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
       console.error('Error clearing notifications:', error);
       try {
         toast.error(error instanceof Error ? error.message : 'Failed to clear notifications');
-      } catch (toastError) {
+      } catch {
         console.error('Failed to clear notifications (toast unavailable)');
       }
     } finally {

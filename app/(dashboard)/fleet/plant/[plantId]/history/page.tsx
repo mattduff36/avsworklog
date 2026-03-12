@@ -126,13 +126,18 @@ type TaskAttachment = {
   } | null;
 };
 
-function DocumentsTabContent({ plantId: _plantId, workshopTasks }: { plantId: string; workshopTasks: WorkshopTask[] }) {
+function DocumentsTabContent({ plantId, workshopTasks }: { plantId: string; workshopTasks: WorkshopTask[] }) {
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchAttachments = async () => {
       try {
+        if (!plantId) {
+          setAttachments([]);
+          setLoading(false);
+          return;
+        }
         setLoading(true);
         const taskIds = workshopTasks.map(t => t.id);
         
@@ -167,7 +172,7 @@ function DocumentsTabContent({ plantId: _plantId, workshopTasks }: { plantId: st
     };
 
     fetchAttachments();
-  }, [workshopTasks]);
+  }, [plantId, workshopTasks]);
 
   if (loading) {
     return (

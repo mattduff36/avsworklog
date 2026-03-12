@@ -1,5 +1,5 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image as PdfImage } from '@react-pdf/renderer';
 import { TRUCK_CHECKLIST_ITEMS } from '@/lib/checklists/vehicle-checklists';
 import { formatDate } from '@/lib/utils/date';
 import type { EnrichedDefectItem } from '@/lib/utils/hgvDefectWorkshopDetails';
@@ -311,7 +311,7 @@ export function HgvInspectionPDF({ inspection, hgv, operator, items, defectsWith
           <View style={styles.signatureRow}>
             <View style={styles.signatureImageWrap}>
               {inspection.signature_data ? (
-                <Image src={inspection.signature_data} style={styles.signatureImage} />
+                <PdfImage src={inspection.signature_data} style={styles.signatureImage} />
               ) : (
                 <Text style={styles.signatureMissing}>No signature</Text>
               )}
@@ -350,7 +350,7 @@ export function HgvInspectionPDF({ inspection, hgv, operator, items, defectsWith
                     )}
                     {latestWorkshopTask.completion_signature_data && (
                       <View style={styles.workshopSignatureWrap}>
-                        <Image src={latestWorkshopTask.completion_signature_data} style={styles.workshopSignatureImage} />
+                        <PdfImage src={latestWorkshopTask.completion_signature_data} style={styles.workshopSignatureImage} />
                       </View>
                     )}
                     {latestWorkshopTask.timeline.slice(-3).map((event) => (

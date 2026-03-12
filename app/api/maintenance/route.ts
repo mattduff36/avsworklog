@@ -68,7 +68,7 @@ interface MaintenanceRow {
  * GET /api/maintenance
  * Returns all vehicle maintenance records with calculated status
  */
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     // Auth check
     const supabase = await createClient();

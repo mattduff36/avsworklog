@@ -10,7 +10,7 @@ import type {
  * GET /api/maintenance/categories
  * Returns all maintenance categories
  */
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();

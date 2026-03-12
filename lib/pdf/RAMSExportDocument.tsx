@@ -1,5 +1,5 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image as PdfImage } from '@react-pdf/renderer';
 import { format } from 'date-fns';
 
 const styles = StyleSheet.create({
@@ -207,7 +207,7 @@ export function RAMSExportDocument({
       {/* Cover Page */}
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
-          <Image src={logoUrl} style={styles.logo} />
+          <PdfImage src={logoUrl} style={styles.logo} />
           <View style={styles.headerText}>
             <Text style={styles.title}>{document.title}</Text>
             <Text style={styles.subtitle}>Risk Assessment & Method Statement - Signature Record</Text>
@@ -281,7 +281,7 @@ export function RAMSExportDocument({
       {signedAssignments.length > 0 && (
         <Page size="A4" style={styles.page}>
           <View style={styles.header}>
-            <Image src={logoUrl} style={styles.logo} />
+            <PdfImage src={logoUrl} style={styles.logo} />
             <View style={styles.headerText}>
               <Text style={styles.title}>Employee Signatures</Text>
               <Text style={styles.subtitle}>{document.title}</Text>
@@ -331,7 +331,7 @@ export function RAMSExportDocument({
                   <View style={styles.signatureRightColumn}>
                     <Text style={{ ...styles.label, marginBottom: 5 }}>Signature:</Text>
                     {assignment.signature_data && (
-                      <Image 
+                      <PdfImage 
                         src={assignment.signature_data} 
                         style={styles.signatureImage} 
                       />
@@ -371,7 +371,7 @@ export function RAMSExportDocument({
       {visitorSignatures.length > 0 && (
         <Page size="A4" style={styles.page}>
           <View style={styles.header}>
-            <Image src={logoUrl} style={styles.logo} />
+            <PdfImage src={logoUrl} style={styles.logo} />
             <View style={styles.headerText}>
               <Text style={styles.title}>Visitor Signatures</Text>
               <Text style={styles.subtitle}>{document.title}</Text>
@@ -417,7 +417,7 @@ export function RAMSExportDocument({
                   <View style={styles.signatureRightColumn}>
                     <Text style={{ ...styles.label, marginBottom: 5 }}>Signature:</Text>
                     {signature.signature_data && (
-                      <Image 
+                      <PdfImage 
                         src={signature.signature_data} 
                         style={styles.signatureImage} 
                       />

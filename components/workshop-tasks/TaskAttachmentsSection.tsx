@@ -46,7 +46,7 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
       setSelectedTemplateId('');
       toast.success('Attachment added');
       onUpdate?.();
-    } catch (err) {
+    } catch {
       toast.error('Failed to add attachment');
     } finally {
       setAdding(false);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image as PdfImage } from '@react-pdf/renderer';
 import { VanInspection, InspectionItem, INSPECTION_ITEMS } from '@/types/inspection';
 import { formatDate } from '@/lib/utils/date';
 
@@ -461,7 +461,7 @@ export function InspectionPDF({ inspection, items, vehicleReg, employeeName }: I
           <View style={styles.signatureRow}>
             <View style={styles.signatureImageWrap}>
               {inspection.signature_data ? (
-                <Image src={inspection.signature_data} style={styles.signatureImage} />
+                <PdfImage src={inspection.signature_data} style={styles.signatureImage} />
               ) : (
                 <Text style={styles.signatureMissing}>No signature</Text>
               )}

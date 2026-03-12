@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Bell, Calendar, RefreshCw, Loader2, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '@/lib/hooks/useAuth';
 
 interface OfficeActionDialogProps {
   open: boolean;
@@ -61,7 +60,6 @@ export function OfficeActionDialog({
   currentDueDate,
   onSuccess,
 }: OfficeActionDialogProps) {
-  const { isManager: _isManager, isAdmin: _isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState<'reminder' | 'update' | 'refresh'>('reminder');
   const [loading, setLoading] = useState(false);
   

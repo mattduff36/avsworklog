@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useMemo, useState, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useSearchParams, useRouter as useNextRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -61,7 +61,7 @@ function FleetContent() {
   const [selectedHgvCategory, setSelectedHgvCategory] = useState<HgvCategory | null>(null);
   const [deletingHgvCategory, setDeletingHgvCategory] = useState(false);
   
-  const validAssetTabs = ['vans', 'plant', 'hgvs'] as const;
+  const validAssetTabs = useMemo(() => ['vans', 'plant', 'hgvs'] as const, []);
   
   // Validate and set tabs based on URL
   useEffect(() => {
@@ -95,7 +95,7 @@ function FleetContent() {
       setPageTab('overview');
       router.push('/fleet?tab=vans', { scroll: false });
     }
-  }, [searchParams, authLoading, isManager, isAdmin, isSuperAdmin, router]);
+  }, [searchParams, authLoading, isManager, isAdmin, isSuperAdmin, router, validAssetTabs]);
   // Fetch maintenance data
   const { data: maintenanceData, isLoading: maintenanceLoading, error: maintenanceError } = useMaintenance();
   

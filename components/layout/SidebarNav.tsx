@@ -142,7 +142,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         localStorage.removeItem('viewAsRole');
       }
     }
-  }, [supabase, effectiveRole?.name, effectiveRole?.is_super_admin, isViewingAs]);
+  }, [supabase, effectiveRole?.name, effectiveRole?.is_super_admin, isViewingAs, isManager, isAdmin]);
 
   // Collapse sidebar on route change (don't close completely)
   const prevPathnameRef = useRef(pathname);

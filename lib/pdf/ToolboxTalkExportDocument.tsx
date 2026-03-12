@@ -1,5 +1,5 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image as PdfImage } from '@react-pdf/renderer';
 import { format } from 'date-fns';
 
 const styles = StyleSheet.create({
@@ -207,7 +207,7 @@ export function ToolboxTalkExportDocument({
       {/* Cover Page */}
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
-          <Image src={logoUrl} style={styles.logo} />
+          <PdfImage src={logoUrl} style={styles.logo} />
           <View style={styles.headerText}>
             <Text style={styles.title}>{message.subject}</Text>
             <Text style={styles.subtitle}>Toolbox Talk - Signature Record</Text>
@@ -292,7 +292,7 @@ export function ToolboxTalkExportDocument({
       {signedRecipients.length > 0 && (
         <Page size="A4" style={styles.page}>
           <View style={styles.header}>
-            <Image src={logoUrl} style={styles.logo} />
+            <PdfImage src={logoUrl} style={styles.logo} />
             <View style={styles.headerText}>
               <Text style={styles.title}>Signed Recipients</Text>
               <Text style={styles.subtitle}>{message.subject}</Text>
@@ -340,7 +340,7 @@ export function ToolboxTalkExportDocument({
                   <View style={styles.signatureRightColumn}>
                     <Text style={{ ...styles.label, marginBottom: 5 }}>Signature:</Text>
                     {recipient.signature_data && (
-                      <Image
+                      <PdfImage
                         src={recipient.signature_data}
                         style={styles.signatureImage}
                       />
@@ -363,7 +363,7 @@ export function ToolboxTalkExportDocument({
       {pendingRecipients.length > 0 && (
         <Page size="A4" style={styles.page}>
           <View style={styles.header}>
-            <Image src={logoUrl} style={styles.logo} />
+            <PdfImage src={logoUrl} style={styles.logo} />
             <View style={styles.headerText}>
               <Text style={styles.title}>Pending Signatures</Text>
               <Text style={styles.subtitle}>{message.subject}</Text>
