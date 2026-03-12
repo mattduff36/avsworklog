@@ -60,8 +60,7 @@ export const MODULE_PAGES: ModulePage[] = [
     subPages: [
       { value: 'absence-list', label: 'Absence List' },
       { value: 'absence-manage', label: 'Manage Absence' },
-      { value: 'absence-allowances', label: 'Allowances' },
-      { value: 'absence-reasons', label: 'Absence Reasons' },
+      { value: 'absence-archive-report', label: 'Absence Archive Report' },
     ],
   },
   {
@@ -227,8 +226,7 @@ export function getPageUrl(value: string): string {
     // Absence
     'absence-list': '/absence',
     'absence-manage': '/absence/manage',
-    'absence-allowances': '/absence/manage/allowances',
-    'absence-reasons': '/absence/manage/reasons',
+    'absence-archive-report': '/absence/archive-report',
     
     // Maintenance
     'maintenance-overview': '/maintenance',

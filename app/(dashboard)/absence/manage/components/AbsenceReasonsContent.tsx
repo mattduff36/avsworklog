@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useAuth } from '@/lib/hooks/useAuth';
-import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,7 +26,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ArrowUpDown, Plus, Search, Settings, Settings2, Trash2 } from 'lucide-react';
-import { BackButton } from '@/components/ui/back-button';
 import {
   useAllAbsenceReasons,
   useCreateAbsenceReason,
@@ -56,20 +53,26 @@ const DEFAULT_COLUMN_VISIBILITY: ColumnVisibility = {
   status: true,
   updated: true,
 };
+const DEFAULT_REASON_COLORS = [
+  '#ffffff', // white
+  '#ffea00', // yellow
+  '#ff6a00', // orange
+  '#ff1744', // red
+  '#ff00ff', // magenta
+  '#7c4dff', // violet
+  '#2979ff', // blue
+  '#00e5ff', // cyan
+  '#00e676', // green
+  '#795548', // brown
+];
 
-export default function AbsenceReasonsPage() {
-  const { isAdmin, loading: authLoading } = useAuth();
-  const router = useRouter();
-  
-  // Data
+export function AbsenceReasonsContent() {
   const { data: reasons, isLoading } = useAllAbsenceReasons();
-  
-  // Mutations
+
   const createReason = useCreateAbsenceReason();
   const updateReason = useUpdateAbsenceReason();
   const deleteReason = useDeleteAbsenceReason();
-  
-  // Dialog state
+
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingReason, setEditingReason] = useState<AbsenceReason | null>(null);
@@ -82,13 +85,6 @@ export default function AbsenceReasonsPage() {
   const [isPaid, setIsPaid] = useState(true);
   const [color, setColor] = useState('#6366f1');
   const [submitting, setSubmitting] = useState(false);
-  
-  // Check admin access
-  useEffect(() => {
-    if (!authLoading && !isAdmin) {
-      router.push('/dashboard');
-    }
-  }, [isAdmin, authLoading, router]);
 
   useEffect(() => {
     try {
@@ -145,23 +141,22 @@ export default function AbsenceReasonsPage() {
     setSortField(field);
     setSortDirection('asc');
   }
-  
-  // Handle create
+
   async function handleCreate() {
     if (!name.trim()) {
       toast.error('Please enter a reason name');
       return;
     }
-    
+
     setSubmitting(true);
-    
+
     try {
       await createReason.mutateAsync({
         name: name.trim(),
         is_paid: isPaid,
         color,
       });
-      
+
       toast.success('Absence reason created');
       setName('');
       setIsPaid(true);
@@ -178,8 +173,7 @@ export default function AbsenceReasonsPage() {
       setSubmitting(false);
     }
   }
-  
-  // Handle edit
+
   function handleEditClick(reason: AbsenceReason) {
     setEditingReason(reason);
     setName(reason.name);
@@ -187,15 +181,15 @@ export default function AbsenceReasonsPage() {
     setColor(reason.color || '#6366f1');
     setShowEditDialog(true);
   }
-  
+
   async function handleUpdate() {
     if (!editingReason || !name.trim()) {
       toast.error('Please enter a reason name');
       return;
     }
-    
+
     setSubmitting(true);
-    
+
     try {
       await updateReason.mutateAsync({
         id: editingReason.id,
@@ -205,7 +199,7 @@ export default function AbsenceReasonsPage() {
           color,
         },
       });
-      
+
       toast.success('Absence reason updated');
       setEditingReason(null);
       setName('');
@@ -223,25 +217,23 @@ export default function AbsenceReasonsPage() {
       setSubmitting(false);
     }
   }
-  
-  // Handle toggle active
+
   async function handleToggleActive(reason: AbsenceReason) {
     try {
       await updateReason.mutateAsync({
         id: reason.id,
         updates: { is_active: !reason.is_active },
       });
-      
+
       toast.success(`Reason ${reason.is_active ? 'disabled' : 'enabled'}`);
     } catch (error) {
       console.error('Error toggling active:', error);
       toast.error('Failed to update reason');
     }
   }
-  
-  // Handle delete (soft delete by setting is_active = false)
+
   async function handleDelete(reason: AbsenceReason) {
-    const confirmed = await import('@/lib/services/notification.service').then(m => 
+    const confirmed = await import('@/lib/services/notification.service').then((m) =>
       m.notify.confirm({
         title: 'Disable Absence Reason',
         description: `Are you sure you want to disable "${reason.name}"? It will no longer be available for new absence requests.`,
@@ -249,10 +241,8 @@ export default function AbsenceReasonsPage() {
         destructive: true,
       })
     );
-    if (!confirmed) {
-      return;
-    }
-    
+    if (!confirmed) return;
+
     try {
       await deleteReason.mutateAsync(reason.id);
       toast.success('Reason disabled');
@@ -261,36 +251,24 @@ export default function AbsenceReasonsPage() {
       toast.error('Failed to delete reason');
     }
   }
-  
-  if (authLoading || isLoading) {
+
+  if (isLoading) {
     return (
-      <div className="space-y-6 max-w-6xl">
-        <Card className="">
-          <CardContent className="flex items-center justify-center py-12">
-            <p className="text-muted-foreground">Loading...</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardContent className="flex items-center justify-center py-12">
+          <p className="text-muted-foreground">Loading...</p>
+        </CardContent>
+      </Card>
     );
   }
-  
-  if (!isAdmin) return null;
-  
+
   return (
-    <div className="space-y-6 max-w-6xl">
-      {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-4">
-            <BackButton />
-            <div>
-              <h1 className="text-3xl font-bold text-foreground mb-2">
-                Absence Reasons
-              </h1>
-              <p className="text-muted-foreground">
-                Manage absence and leave reasons
-              </p>
-            </div>
+    <div className="space-y-6">
+      <Card className="border-border">
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle className="text-foreground">Absence Reasons</CardTitle>
+            <CardDescription className="text-muted-foreground">Manage absence and leave reasons</CardDescription>
           </div>
           <Button
             onClick={() => {
@@ -304,9 +282,9 @@ export default function AbsenceReasonsPage() {
             <Plus className="h-4 w-4 mr-2" />
             Add Reason
           </Button>
-        </div>
-      </div>
-      
+        </CardHeader>
+      </Card>
+
       <Tabs value={tab} onValueChange={(value) => setTab(value as TabState)} className="space-y-4">
         <TabsList className="bg-slate-800 border-border">
           <TabsTrigger value="active">Active ({activeCount})</TabsTrigger>
@@ -360,9 +338,7 @@ export default function AbsenceReasonsPage() {
                 <Settings className="h-5 w-5" />
                 Reasons
               </CardTitle>
-              <CardDescription className="text-muted-foreground">
-                {sortedReasons.length} reasons shown
-              </CardDescription>
+              <CardDescription className="text-muted-foreground">{sortedReasons.length} reasons shown</CardDescription>
             </CardHeader>
             <CardContent>
               {sortedReasons.length === 0 ? (
@@ -451,9 +427,7 @@ export default function AbsenceReasonsPage() {
                               </TableCell>
                             )}
                             {columnVisibility.updated && (
-                              <TableCell className="text-muted-foreground">
-                                {new Date(reason.updated_at).toLocaleDateString()}
-                              </TableCell>
+                              <TableCell className="text-muted-foreground">{new Date(reason.updated_at).toLocaleDateString()}</TableCell>
                             )}
                             <TableCell className="text-right">
                               <div className="inline-flex items-center gap-2">
@@ -526,9 +500,7 @@ export default function AbsenceReasonsPage() {
                               {reason.is_active ? 'Active' : 'Inactive'}
                             </Badge>
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            Updated {new Date(reason.updated_at).toLocaleDateString()}
-                          </div>
+                          <div className="text-xs text-muted-foreground">Updated {new Date(reason.updated_at).toLocaleDateString()}</div>
                           <div className="flex items-center gap-2">
                             <Button
                               variant="outline"
@@ -565,8 +537,7 @@ export default function AbsenceReasonsPage() {
           </Card>
         </TabsContent>
       </Tabs>
-      
-      {/* Create Dialog */}
+
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent className="border-border">
           <DialogHeader>
@@ -575,7 +546,7 @@ export default function AbsenceReasonsPage() {
               Create a new reason for absence or leave
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div>
               <Label htmlFor="name">Reason Name *</Label>
@@ -587,7 +558,7 @@ export default function AbsenceReasonsPage() {
                 className="border-border bg-background text-foreground"
               />
             </div>
-            
+
             <div className="flex items-center gap-2">
               <Checkbox id="isPaid" checked={isPaid} onCheckedChange={(value) => setIsPaid(Boolean(value))} />
               <label htmlFor="isPaid" className="text-sm text-muted-foreground cursor-pointer">
@@ -604,21 +575,13 @@ export default function AbsenceReasonsPage() {
                   onChange={(e) => setColor(e.target.value)}
                   className="h-10 w-16 p-1 border-border bg-background"
                 />
-                <Input
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  className="border-border bg-background text-foreground"
-                />
+                <Input value={color} onChange={(e) => setColor(e.target.value)} className="border-border bg-background text-foreground" />
               </div>
             </div>
           </div>
-          
+
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowCreateDialog(false)}
-              className="border-border text-muted-foreground"
-            >
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="border-border text-muted-foreground">
               Cancel
             </Button>
             <Button
@@ -631,17 +594,14 @@ export default function AbsenceReasonsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      {/* Edit Dialog */}
+
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="border-border">
           <DialogHeader>
             <DialogTitle className="text-white">Edit Absence Reason</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Update the reason details
-            </DialogDescription>
+            <DialogDescription className="text-muted-foreground">Update the reason details</DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div>
               <Label htmlFor="editName">Reason Name *</Label>
@@ -653,7 +613,7 @@ export default function AbsenceReasonsPage() {
                 className="border-border bg-background text-foreground"
               />
             </div>
-            
+
             <div className="flex items-center gap-2">
               <Checkbox id="editIsPaid" checked={isPaid} onCheckedChange={(value) => setIsPaid(Boolean(value))} />
               <label htmlFor="editIsPaid" className="text-sm text-muted-foreground cursor-pointer">
@@ -670,15 +630,30 @@ export default function AbsenceReasonsPage() {
                   onChange={(e) => setColor(e.target.value)}
                   className="h-10 w-16 p-1 border-border bg-background"
                 />
-                <Input
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  className="border-border bg-background text-foreground"
-                />
+                <Input value={color} onChange={(e) => setColor(e.target.value)} className="border-border bg-background text-foreground" />
+              </div>
+              <div className="mt-3">
+                <p className="mb-2 text-xs text-muted-foreground">Default colors</p>
+                <div className="grid grid-cols-5 gap-2">
+                  {DEFAULT_REASON_COLORS.map((presetColor) => {
+                    const isSelected = color.toLowerCase() === presetColor.toLowerCase();
+                    return (
+                      <button
+                        key={presetColor}
+                        type="button"
+                        onClick={() => setColor(presetColor)}
+                        className={`h-8 w-full rounded border transition ${isSelected ? 'border-white ring-2 ring-white/40' : 'border-white/20 hover:border-white/50'}`}
+                        style={{ backgroundColor: presetColor }}
+                        aria-label={`Use color ${presetColor}`}
+                        title={presetColor}
+                      />
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button
               variant="outline"
@@ -703,4 +678,3 @@ export default function AbsenceReasonsPage() {
     </div>
   );
 }
-

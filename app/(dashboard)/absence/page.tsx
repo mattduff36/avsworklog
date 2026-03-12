@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -100,8 +101,11 @@ function getReasonColor(name: string, color?: string | null): string {
 
 export default function AbsencePage() {
   const { profile, isManager, isAdmin } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('absence');
   const supabase = createClient();
+  const [activeTab, setActiveTab] = useState<'calendar' | 'bookings'>('calendar');
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
   
@@ -172,11 +176,6 @@ export default function AbsencePage() {
   }, [isManager, isAdmin, userAbsences, allAbsencesData, selectedEmployeeIds]);
   
   const loadingAbsences = isManager || isAdmin ? loadingAllAbsences : loadingUserAbsences;
-  const pendingRequestCount = useMemo(
-    () => (isManager || isAdmin ? (allAbsencesData || []).filter((absence) => absence.status === 'pending').length : 0),
-    [isManager, isAdmin, allAbsencesData]
-  );
-  
   // Form state
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -268,6 +267,21 @@ export default function AbsencePage() {
       setSelectedReasonId('');
     }
   }, [availableRequestReasons, selectedReasonId]);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab') || 'calendar';
+    if (requestedTab === 'calendar' || requestedTab === 'bookings') {
+      setActiveTab(requestedTab);
+      return;
+    }
+    setActiveTab('calendar');
+    router.replace('/absence?tab=calendar', { scroll: false });
+  }, [searchParams, router]);
+
+  function handleTabChange(value: 'calendar' | 'bookings') {
+    setActiveTab(value);
+    router.replace(`/absence?tab=${value}`, { scroll: false });
+  }
 
   const selectedReason = availableRequestReasons.find((reason) => reason.id === selectedReasonId);
   const deductsAllowance = selectedReason ? isAnnualLeaveReason(selectedReason.name) : false;
@@ -573,14 +587,6 @@ export default function AbsencePage() {
                 <Button variant="outline" className="border-border text-muted-foreground">
                   <Settings className="h-4 w-4 mr-2" />
                   Manage Absence
-                  {pendingRequestCount > 0 && (
-                    <Badge
-                      variant="outline"
-                      className="ml-2 border-amber-500/30 bg-amber-500/10 text-amber-300"
-                    >
-                      {pendingRequestCount > 99 ? '99+' : pendingRequestCount}
-                    </Badge>
-                  )}
                 </Button>
               </Link>
             )}
@@ -814,7 +820,7 @@ export default function AbsencePage() {
         </DialogContent>
       </Dialog>
 
-      <Tabs defaultValue="calendar" className="w-full">
+      <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as 'calendar' | 'bookings')} className="w-full">
         <TabsList className="inline-flex w-auto bg-slate-800/50">
           <TabsTrigger value="calendar">Calendar</TabsTrigger>
           <TabsTrigger value="bookings">My Bookings</TabsTrigger>

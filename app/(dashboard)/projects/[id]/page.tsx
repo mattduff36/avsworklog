@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -75,6 +75,7 @@ interface VisitorSignature {
 export default function RAMSDetailsPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isManager, isAdmin, loading: authLoading } = useAuth();
   const documentId = params.id as string;
 
@@ -86,6 +87,7 @@ export default function RAMSDetailsPage() {
   const [requiredSignature, setRequiredSignature] = useState(true);
   const [isFavourite, setIsFavourite] = useState(false);
   const [favouriteLoading, setFavouriteLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'employees' | 'visitors'>('employees');
 
   const supabase = createClient();
 
@@ -95,6 +97,21 @@ export default function RAMSDetailsPage() {
       router.push('/projects');
     }
   }, [isManager, isAdmin, authLoading, router]);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab') || 'employees';
+    if (requestedTab === 'employees' || requestedTab === 'visitors') {
+      setActiveTab(requestedTab);
+      return;
+    }
+    setActiveTab('employees');
+    router.replace(`/projects/${documentId}?tab=employees`, { scroll: false });
+  }, [searchParams, router, documentId]);
+
+  function handleTabChange(value: 'employees' | 'visitors') {
+    setActiveTab(value);
+    router.replace(`/projects/${documentId}?tab=${value}`, { scroll: false });
+  }
 
   const fetchDocumentDetails = useCallback(async () => {
     setLoading(true);
@@ -431,7 +448,7 @@ export default function RAMSDetailsPage() {
       </Card>
 
       {/* Tabs */}
-      <Tabs defaultValue="employees" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as 'employees' | 'visitors')} className="space-y-4">
         <TabsList>
           <TabsTrigger value="employees">
             <Users className="h-4 w-4 mr-2" />

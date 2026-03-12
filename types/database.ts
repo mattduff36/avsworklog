@@ -1619,6 +1619,83 @@ export interface Database {
           updated_at?: string
         }
       }
+      absences_archive: {
+        Row: {
+          id: string
+          profile_id: string
+          date: string
+          end_date: string | null
+          reason_id: string
+          duration_days: number
+          is_half_day: boolean
+          half_day_session: 'AM' | 'PM' | null
+          notes: string | null
+          status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+          created_by: string | null
+          approved_by: string | null
+          approved_at: string | null
+          is_bank_holiday: boolean
+          auto_generated: boolean
+          generation_source: string | null
+          holiday_key: string | null
+          created_at: string
+          updated_at: string
+          financial_year_start_year: number
+          archived_at: string
+          archived_by: string | null
+          archive_run_id: string | null
+        }
+        Insert: {
+          id: string
+          profile_id: string
+          date: string
+          end_date?: string | null
+          reason_id: string
+          duration_days: number
+          is_half_day?: boolean
+          half_day_session?: 'AM' | 'PM' | null
+          notes?: string | null
+          status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+          created_by?: string | null
+          approved_by?: string | null
+          approved_at?: string | null
+          is_bank_holiday?: boolean
+          auto_generated?: boolean
+          generation_source?: string | null
+          holiday_key?: string | null
+          created_at: string
+          updated_at: string
+          financial_year_start_year: number
+          archived_at?: string
+          archived_by?: string | null
+          archive_run_id?: string | null
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          date?: string
+          end_date?: string | null
+          reason_id?: string
+          duration_days?: number
+          is_half_day?: boolean
+          half_day_session?: 'AM' | 'PM' | null
+          notes?: string | null
+          status?: 'pending' | 'approved' | 'rejected' | 'cancelled'
+          created_by?: string | null
+          approved_by?: string | null
+          approved_at?: string | null
+          is_bank_holiday?: boolean
+          auto_generated?: boolean
+          generation_source?: string | null
+          holiday_key?: string | null
+          created_at?: string
+          updated_at?: string
+          financial_year_start_year?: number
+          archived_at?: string
+          archived_by?: string | null
+          archive_run_id?: string | null
+        }
+      }
       absence_financial_year_generations: {
         Row: {
           id: string
@@ -1641,6 +1718,41 @@ export interface Database {
           financial_year_start_year?: number
           generated_at?: string
           generated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      absence_financial_year_archives: {
+        Row: {
+          id: string
+          financial_year_start_year: number
+          archived_at: string
+          archived_by: string | null
+          row_count: number
+          notes: string | null
+          idempotency_key: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          financial_year_start_year: number
+          archived_at?: string
+          archived_by?: string | null
+          row_count?: number
+          notes?: string | null
+          idempotency_key?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          financial_year_start_year?: number
+          archived_at?: string
+          archived_by?: string | null
+          row_count?: number
+          notes?: string | null
+          idempotency_key?: string | null
           created_at?: string
           updated_at?: string
         }

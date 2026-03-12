@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { createClient } from '@/lib/supabase/client';
@@ -29,6 +30,8 @@ const MarkTaskCompleteDialog = dynamic(() => import('@/components/workshop-tasks
 const ErrorDetailsModal = dynamic(() => import('@/components/ui/error-details-modal').then(m => ({ default: m.ErrorDetailsModal })), { ssr: false });
 
 export default function WorkshopTasksPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('workshop-tasks');
   const { user, profile, isManager, isAdmin } = useAuth();
   const showSettings = isAdmin || isManager;
@@ -49,8 +52,7 @@ export default function WorkshopTasksPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [vehicleFilter, setVehicleFilter] = useState('all');
   const [taskAttachmentCounts, setTaskAttachmentCounts] = useState<Map<string, number>>(new Map());
-  const [activeTab, setActiveTab] = useState<'overview' | 'settings'>('overview');
-  const [assetTab, setAssetTab] = useState<'all' | 'van' | 'plant' | 'hgv'>('all');
+  const lastAssetTabRef = useRef<'all' | 'van' | 'plant' | 'hgv'>('all');
   const [showPending, setShowPending] = useState(true);
   const [showInProgress, setShowInProgress] = useState(true);
   const [showOnHold, setShowOnHold] = useState(false);
@@ -126,6 +128,24 @@ export default function WorkshopTasksPage() {
             ? <AlertTriangle className="h-5 w-5 text-red-500" />
             : <AlertTriangle className="h-5 w-5 text-amber-400" />;
 
+  const validAssetTabs: ReadonlyArray<'all' | 'van' | 'plant' | 'hgv'> = ['all', 'van', 'plant', 'hgv'];
+
+  const { activeTab, assetTab } = useMemo(() => {
+    const requestedTab = searchParams.get('tab') || 'all';
+
+    if (requestedTab === 'settings' && showSettings) {
+      return { activeTab: 'settings' as const, assetTab: lastAssetTabRef.current };
+    }
+
+    if (validAssetTabs.includes(requestedTab as (typeof validAssetTabs)[number])) {
+      lastAssetTabRef.current = requestedTab as 'all' | 'van' | 'plant' | 'hgv';
+      return { activeTab: 'overview' as const, assetTab: requestedTab as 'all' | 'van' | 'plant' | 'hgv' };
+    }
+
+    return { activeTab: 'overview' as const, assetTab: lastAssetTabRef.current };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, showSettings]);
+
   const fetcher = useWorkshopTasksFetchers({ supabase, userId: user?.id, statusFilter, vehicleFilter, setLoading, setTasks, setVehicles, setRecentVehicleIds, setTaskAttachmentCounts, setCategories, setPlantCategories, setHgvCategories, setSubcategories, setPlantSubcategories, setHgvSubcategories, setCurrentMeterReading, setMeterReadingType });
   const filteredSubcategories = selectedCategoryId ? (assetTab === 'plant' ? plantSubcategories : assetTab === 'hgv' ? hgvSubcategories : subcategories).filter(sub => sub.category_id === selectedCategoryId) : [];
   const activeCategories = assetTab === 'plant' ? plantCategories : assetTab === 'hgv' ? hgvCategories : categories;
@@ -139,6 +159,23 @@ export default function WorkshopTasksPage() {
 
   const crud = useWorkshopTaskCrudActions({ supabase, userId: user?.id, categoryTaxonomyMode, vehicles, subcategories, plantSubcategories, hgvSubcategories, selectedVehicleId, selectedCategoryId, selectedSubcategoryId, workshopComments, newMeterReading, currentMeterReading, meterReadingType, selectedAttachmentTemplateIds, categoryHasSubcategories, editingTask, editVehicleId, editCategoryId, editSubcategoryId, editComments, editMileage, editCurrentMileage, initialEditCategoryId, initialEditHadSubcategory, taskToDelete, categoryName, editingCategory, submitting, setSubmitting, setShowAddModal, setSelectedVehicleId, setSelectedCategoryId, setSelectedSubcategoryId, setWorkshopComments, setNewMeterReading, setCurrentMeterReading, setMeterReadingType, setSelectedAttachmentTemplateIds, setEditingTask, setShowEditModal, setEditVehicleId, setEditCategoryId, setEditSubcategoryId, setEditComments, setEditMileage, setEditCurrentMileage, setInitialEditCategoryId, setInitialEditHadSubcategory, setShowDeleteConfirm, setTaskToDelete, setTasks, setDeleting, setShowCategoryModal, setCategoryName, setSubmittingCategory, setEditingCategory, setShowSubcategoryModal, setSubcategoryMode, setSelectedCategoryForSubcategory, setEditingSubcategory, setShowErrorDetailsModal, setErrorDetailsLoading, setErrorDetails, setRecentVehicleIds, fetchTasks: fetcher.fetchTasks, fetchCategories: fetcher.fetchCategories, fetchPlantCategories: fetcher.fetchPlantCategories, fetchHgvCategories: fetcher.fetchHgvCategories, fetchSubcategories: fetcher.fetchSubcategories, getAssetIdLabel });
   const lifecycle = useWorkshopTaskLifecycleActions({ supabase, userId: user?.id, profileName: profile?.full_name, tasks, fetchTasks: fetcher.fetchTasks, selectedTask, loggedComment, onHoldingTask, onHoldComment, resumingTask, resumeComment, completingTask, setUpdatingStatus, setShowStatusModal, setSelectedTask, setLoggedComment, setShowOnHoldModal, setShowResumeModal, setShowCompleteModal, setCompletingTask });
+
+  function handlePageTabChange(nextTab: 'overview' | 'settings') {
+    if (nextTab === 'settings') {
+      router.replace('/workshop-tasks?tab=settings', { scroll: false });
+    } else {
+      router.replace(`/workshop-tasks?tab=${assetTab}`, { scroll: false });
+    }
+  }
+
+  function handleAssetTabChange(nextTab: 'all' | 'van' | 'plant' | 'hgv') {
+    const prev = assetTab;
+    router.replace(`/workshop-tasks?tab=${nextTab}`, { scroll: false });
+    if (prev !== nextTab) {
+      setVehicleFilter('all');
+      setStatusFilter('all');
+    }
+  }
 
   if (permissionLoading) return <div className="flex items-center justify-center min-h-[400px]"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-workshop mx-auto mb-4" /><p className="text-muted-foreground">Checking permissions...</p></div></div>;
   if (!hasPermission) return null;
@@ -155,9 +192,9 @@ export default function WorkshopTasksPage() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'overview' | 'settings')}>
+      <Tabs value={activeTab} onValueChange={(v) => handlePageTabChange(v as 'overview' | 'settings')}>
         {showSettings && <TabsList><TabsTrigger value="overview" className="gap-2"><Wrench className="h-4 w-4" />Overview</TabsTrigger><TabsTrigger value="settings" className="gap-2"><Settings className="h-4 w-4" />Settings</TabsTrigger></TabsList>}
-        <WorkshopTasksOverviewTab assetTab={assetTab} onAssetTabChange={(newTab) => { const prev = assetTab; setAssetTab(newTab as 'all' | 'van' | 'plant' | 'hgv'); if (prev !== newTab) { setVehicleFilter('all'); setStatusFilter('all'); } }} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter} vehicleFilter={vehicleFilter} onVehicleFilterChange={setVehicleFilter} vehicles={vehicles} loading={loading} tabFilteredTasks={tabFilteredTasks} pendingTasks={pendingTasks} highPriorityPendingCount={highPriorityPendingTasks.length} inProgressTasks={inProgressTasks} onHoldTasks={onHoldTasks} completedTasks={completedTasks} showPending={showPending} onShowPendingChange={setShowPending} showInProgress={showInProgress} onShowInProgressChange={setShowInProgress} showOnHold={showOnHold} onShowOnHoldChange={setShowOnHold} showCompleted={showCompleted} onShowCompletedChange={setShowCompleted} updatingStatus={updatingStatus} taskAttachmentCounts={taskAttachmentCounts} getStatusIcon={getStatusIcon} getVehicleReg={getVehicleReg} getSourceLabel={getSourceLabel} getAssetDisplay={getAssetDisplay} onCreateTask={() => setShowAddModal(true)} onOpenTaskModal={(task) => { setModalTask(task); setShowTaskModal(true); }} onOpenComments={(task) => { setCommentsTask(task); setShowCommentsDrawer(true); }} onMarkInProgress={(task) => { setSelectedTask(task); setLoggedComment(''); setShowStatusModal(true); }} onMarkComplete={(task) => { setCompletingTask(task); setShowCompleteModal(true); }} onMarkOnHold={(task) => { setOnHoldingTask(task); setOnHoldComment(''); setShowOnHoldModal(true); }} onResumeTask={(task) => { setResumingTask(task); setResumeComment(''); setShowResumeModal(true); }} onUndoLogged={lifecycle.handleUndoLogged} onUndoComplete={lifecycle.handleUndoComplete} onEditTask={crud.handleEditTask} onDeleteTask={crud.handleDeleteTask} />
+        <WorkshopTasksOverviewTab assetTab={assetTab} onAssetTabChange={(newTab) => handleAssetTabChange(newTab as 'all' | 'van' | 'plant' | 'hgv')} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter} vehicleFilter={vehicleFilter} onVehicleFilterChange={setVehicleFilter} vehicles={vehicles} loading={loading} tabFilteredTasks={tabFilteredTasks} pendingTasks={pendingTasks} highPriorityPendingCount={highPriorityPendingTasks.length} inProgressTasks={inProgressTasks} onHoldTasks={onHoldTasks} completedTasks={completedTasks} showPending={showPending} onShowPendingChange={setShowPending} showInProgress={showInProgress} onShowInProgressChange={setShowInProgress} showOnHold={showOnHold} onShowOnHoldChange={setShowOnHold} showCompleted={showCompleted} onShowCompletedChange={setShowCompleted} updatingStatus={updatingStatus} taskAttachmentCounts={taskAttachmentCounts} getStatusIcon={getStatusIcon} getVehicleReg={getVehicleReg} getSourceLabel={getSourceLabel} getAssetDisplay={getAssetDisplay} onCreateTask={() => setShowAddModal(true)} onOpenTaskModal={(task) => { setModalTask(task); setShowTaskModal(true); }} onOpenComments={(task) => { setCommentsTask(task); setShowCommentsDrawer(true); }} onMarkInProgress={(task) => { setSelectedTask(task); setLoggedComment(''); setShowStatusModal(true); }} onMarkComplete={(task) => { setCompletingTask(task); setShowCompleteModal(true); }} onMarkOnHold={(task) => { setOnHoldingTask(task); setOnHoldComment(''); setShowOnHoldModal(true); }} onResumeTask={(task) => { setResumingTask(task); setResumeComment(''); setShowResumeModal(true); }} onUndoLogged={lifecycle.handleUndoLogged} onUndoComplete={lifecycle.handleUndoComplete} onEditTask={crud.handleEditTask} onDeleteTask={crud.handleDeleteTask} />
         {showSettings && <TabsContent value="settings" className="space-y-6 mt-0"><Card className="border-border"><CardHeader><CardTitle className="text-white">Category Taxonomy</CardTitle><CardDescription className="text-muted-foreground">Manage categories for vans, HGVs, or plant machinery</CardDescription></CardHeader><CardContent><Tabs value={categoryTaxonomyMode} onValueChange={(v) => setCategoryTaxonomyMode(v as 'van' | 'plant' | 'hgv')}><TabsList className="grid w-full grid-cols-3"><TabsTrigger value="van">Van Categories</TabsTrigger><TabsTrigger value="plant">Plant Categories</TabsTrigger><TabsTrigger value="hgv">HGV Categories</TabsTrigger></TabsList></Tabs></CardContent></Card><CategoryManagementPanel categories={categoryTaxonomyMode === 'plant' ? plantCategories : categoryTaxonomyMode === 'hgv' ? hgvCategories : categories} subcategories={categoryTaxonomyMode === 'plant' ? plantSubcategories : categoryTaxonomyMode === 'hgv' ? hgvSubcategories : subcategories} onAddCategory={crud.openAddCategoryModal} onEditCategory={crud.openEditCategoryModal} onDeleteCategory={crud.handleDeleteCategory} onAddSubcategory={crud.openAddSubcategoryModal} onEditSubcategory={crud.openEditSubcategoryModal} onDeleteSubcategory={crud.handleDeleteSubcategory} /><AttachmentManagementPanel taxonomyMode={categoryTaxonomyMode} /></TabsContent>}
       </Tabs>
 

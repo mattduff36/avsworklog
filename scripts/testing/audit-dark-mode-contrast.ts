@@ -32,8 +32,7 @@ export const ALL_PAGES = [
   // Absence
   { path: '/absence', name: 'Absence Calendar', requiresAuth: true },
   { path: '/absence/manage', name: 'Manage Absences', requiresAuth: true },
-  { path: '/absence/manage/reasons', name: 'Absence Reasons', requiresAuth: true },
-  { path: '/absence/manage/allowances', name: 'Absence Allowances', requiresAuth: true },
+  { path: '/absence/archive-report', name: 'Absence Archive Report', requiresAuth: true },
   
   // Maintenance
   { path: '/maintenance', name: 'Maintenance Overview', requiresAuth: true },

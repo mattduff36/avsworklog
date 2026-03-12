@@ -8,6 +8,8 @@ export type AbsenceReasonUpdate = Database['public']['Tables']['absence_reasons'
 export type Absence = Database['public']['Tables']['absences']['Row'];
 export type AbsenceInsert = Database['public']['Tables']['absences']['Insert'];
 export type AbsenceUpdate = Database['public']['Tables']['absences']['Update'];
+export type AbsenceArchive = Database['public']['Tables']['absences_archive']['Row'];
+export type AbsenceRecordSource = 'active' | 'archived';
 
 // Extended types with relations
 export interface AbsenceWithRelations extends Absence {
@@ -22,6 +24,9 @@ export interface AbsenceWithRelations extends Absence {
   approved_by_profile?: {
     full_name: string;
   };
+  record_source?: AbsenceRecordSource;
+  archived_at?: string;
+  financial_year_start_year?: number;
 }
 
 // Summary types

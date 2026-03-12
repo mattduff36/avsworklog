@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -27,13 +27,13 @@ const MaintenanceOverview = dynamic(
 
 function MaintenanceContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { profile, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const supabase = createClient();
 
   const [hasModulePermission, setHasModulePermission] = useState<boolean | null>(null);
-  const [maintenanceFilter, setMaintenanceFilter] = useState<'both' | 'van' | 'hgv' | 'plant'>('both');
-  const [activeTab, setActiveTab] = useState<'overview' | 'settings'>('overview');
   const canManage = isManager || isAdmin || isSuperAdmin;
+  const lastAssetFilterRef = useRef<'both' | 'van' | 'hgv' | 'plant'>('both');
 
   const { data: maintenanceData, isLoading: maintenanceLoading, error: maintenanceError } = useMaintenance();
 
@@ -79,6 +79,52 @@ function MaintenanceContent() {
 
     checkPermission();
   }, [profile?.id, isManager, isAdmin, isSuperAdmin, supabase]);
+
+  const validAssetTabs: ReadonlyArray<'both' | 'van' | 'plant' | 'hgv'> = ['both', 'van', 'plant', 'hgv'];
+
+  const { activeTab, maintenanceFilter } = useMemo(() => {
+    if (authLoading) return { activeTab: 'overview' as const, maintenanceFilter: lastAssetFilterRef.current };
+    const requestedTab = searchParams.get('tab') || 'both';
+
+    if (requestedTab === 'settings' && canManage) {
+      return { activeTab: 'settings' as const, maintenanceFilter: lastAssetFilterRef.current };
+    }
+
+    if (validAssetTabs.includes(requestedTab as (typeof validAssetTabs)[number])) {
+      lastAssetFilterRef.current = requestedTab as 'both' | 'van' | 'plant' | 'hgv';
+      return { activeTab: 'overview' as const, maintenanceFilter: requestedTab as 'both' | 'van' | 'plant' | 'hgv' };
+    }
+
+    return { activeTab: 'overview' as const, maintenanceFilter: lastAssetFilterRef.current };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, authLoading, canManage]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    const requestedTab = searchParams.get('tab') || 'both';
+
+    if (requestedTab === 'settings' && !canManage) {
+      router.replace('/maintenance?tab=both', { scroll: false });
+      return;
+    }
+
+    if (requestedTab !== 'settings' && !validAssetTabs.includes(requestedTab as (typeof validAssetTabs)[number])) {
+      router.replace('/maintenance?tab=both', { scroll: false });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, authLoading, canManage, router]);
+
+  function handlePageTabChange(value: 'overview' | 'settings') {
+    if (value === 'settings') {
+      router.replace('/maintenance?tab=settings', { scroll: false });
+    } else {
+      router.replace(`/maintenance?tab=${maintenanceFilter}`, { scroll: false });
+    }
+  }
+
+  function handleMaintenanceFilterChange(value: 'both' | 'van' | 'hgv' | 'plant') {
+    router.replace(`/maintenance?tab=${value}`, { scroll: false });
+  }
 
   const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
     const isPlant = vehicle.is_plant === true || vehicle.vehicle?.asset_type === 'plant';
@@ -133,7 +179,7 @@ function MaintenanceContent() {
       </div>
 
       {/* Page-level tabs: Overview + Settings (managers/admins only) */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'overview' | 'settings')}>
+      <Tabs value={activeTab} onValueChange={(v) => handlePageTabChange(v as 'overview' | 'settings')}>
         {canManage && (
           <TabsList>
             <TabsTrigger value="overview" className="gap-2">
@@ -166,7 +212,7 @@ function MaintenanceContent() {
             <>
               {/* Asset type filter */}
               <div className="flex items-center justify-end">
-                <Tabs value={maintenanceFilter} onValueChange={(v) => setMaintenanceFilter(v as 'both' | 'van' | 'hgv' | 'plant')}>
+                <Tabs value={maintenanceFilter} onValueChange={(v) => handleMaintenanceFilterChange(v as 'both' | 'van' | 'hgv' | 'plant')}>
                   <TabsList>
                     <TabsTrigger value="both" className="gap-2">
                       <Wrench className="h-4 w-4" />

@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -23,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ArrowUpDown, Calendar, ChevronLeft, ChevronRight, Plus, Filter, Trash2, Settings, Users, Search, ExternalLink } from 'lucide-react';
+import { ArrowUpDown, Calendar, ChevronLeft, ChevronRight, Plus, Filter, Trash2, Search, ExternalLink } from 'lucide-react';
 import { 
   useAllAbsences, 
   useAllAbsenceReasons,
@@ -33,8 +34,12 @@ import {
 import { formatDate, calculateDurationDays } from '@/lib/utils/date';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import Link from 'next/link';
 import { BackButton } from '@/components/ui/back-button';
+import Link from 'next/link';
+import { AbsenceReasonsContent } from '@/app/(dashboard)/absence/manage/components/AbsenceReasonsContent';
+import { AllowancesContent } from '@/app/(dashboard)/absence/manage/components/AllowancesContent';
+import { AbsenceCalendarAdmin } from '@/app/(dashboard)/absence/manage/components/AbsenceCalendarAdmin';
+import { AbsenceAboutHelper } from '@/app/(dashboard)/absence/components/AbsenceAboutHelper';
 
 type ManageSortField = 'employee' | 'reason' | 'status' | 'date' | 'duration' | 'approved_at';
 type ManageSortDirection = 'asc' | 'desc';
@@ -42,7 +47,9 @@ type ManageSortDirection = 'asc' | 'desc';
 export default function AdminAbsencePage() {
   const { isAdmin, isManager, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+  const canManage = isAdmin || isManager;
   
   // Filters
   const [profileId, setProfileId] = useState('');
@@ -50,6 +57,7 @@ export default function AdminAbsencePage() {
   const [dateTo, setDateTo] = useState('');
   const [reasonId, setReasonId] = useState('');
   const [status, setStatus] = useState('');
+  const [includeArchived, setIncludeArchived] = useState(false);
   const [listSearch, setListSearch] = useState('');
 
   // Sort + pagination
@@ -57,6 +65,7 @@ export default function AdminAbsencePage() {
   const [sortDirection, setSortDirection] = useState<ManageSortDirection>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 25;
+  const [activeTab, setActiveTab] = useState<'records' | 'calendar' | 'reasons' | 'allowances'>('records');
   
   // Data
   const { data: absences, isLoading } = useAllAbsences({ 
@@ -64,7 +73,8 @@ export default function AdminAbsencePage() {
     dateFrom, 
     dateTo, 
     reasonId, 
-    status 
+    status,
+    includeArchived,
   });
   const filteredAbsences = useMemo(() => {
     const term = listSearch.trim().toLowerCase();
@@ -150,6 +160,65 @@ export default function AdminAbsencePage() {
       router.push('/dashboard');
     }
   }, [isAdmin, isManager, authLoading, router]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    const requestedTab = searchParams.get('tab') || 'records';
+    const allowedTabs: Array<'records' | 'calendar' | 'reasons' | 'allowances'> = ['records', 'calendar'];
+    if (isAdmin) allowedTabs.push('reasons', 'allowances');
+    else if (isManager) allowedTabs.push('allowances');
+
+    if (allowedTabs.includes(requestedTab as typeof allowedTabs[number])) {
+      setActiveTab(requestedTab as typeof allowedTabs[number]);
+    } else {
+      const fallback = allowedTabs[0];
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('tab', fallback);
+      if (includeArchived) {
+        params.set('archived', '1');
+      } else {
+        params.delete('archived');
+      }
+      router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
+    }
+  }, [searchParams, authLoading, isAdmin, isManager, router, includeArchived]);
+
+  useEffect(() => {
+    const archivedParam = searchParams.get('archived');
+    setIncludeArchived(archivedParam === '1');
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!isAdmin && activeTab === 'reasons') {
+      setActiveTab('records');
+    }
+  }, [isAdmin, activeTab]);
+
+  function handleTabChange(nextTab: 'records' | 'calendar' | 'reasons' | 'allowances') {
+    if (!isAdmin && nextTab === 'reasons') return;
+    if (!canManage && nextTab === 'allowances') return;
+    setActiveTab(nextTab);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', nextTab);
+    if (includeArchived) {
+      params.set('archived', '1');
+    } else {
+      params.delete('archived');
+    }
+    router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
+  }
+
+  function handleIncludeArchivedChange(nextValue: boolean) {
+    setIncludeArchived(nextValue);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', activeTab);
+    if (nextValue) {
+      params.set('archived', '1');
+    } else {
+      params.delete('archived');
+    }
+    router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
+  }
   
   // Fetch profiles
   useEffect(() => {
@@ -290,18 +359,6 @@ export default function AdminAbsencePage() {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
-            <Link href="/absence/manage/reasons" className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full border-border text-muted-foreground">
-                <Settings className="h-4 w-4 mr-2" />
-                Manage Reasons
-              </Button>
-            </Link>
-            <Link href="/absence/manage/allowances" className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full border-border text-muted-foreground">
-                <Users className="h-4 w-4 mr-2" />
-                Manage Allowances
-              </Button>
-            </Link>
             <Button
               onClick={() => setShowCreateDialog(true)}
               className="w-full sm:w-auto bg-absence hover:bg-absence-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
@@ -312,219 +369,324 @@ export default function AdminAbsencePage() {
           </div>
         </div>
       </div>
-      
-      {/* Filters */}
-      <Card className="">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-foreground">
-            <Filter className="h-5 w-5" />
-            Filters
-          </CardTitle>
-          {(profileId || dateFrom || dateTo || reasonId || status) && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setProfileId('');
-                setDateFrom('');
-                setDateTo('');
-                setReasonId('');
-                setStatus('');
-              }}
-              className="border-border text-muted-foreground"
-            >
-              Clear Filters
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div>
-              <Label>Employee</Label>
-              <Select value={profileId || 'all'} onValueChange={(value) => setProfileId(value === 'all' ? '' : value)}>
-                <SelectTrigger className="bg-background border-border text-foreground">
-                  <SelectValue placeholder="All employees" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All employees</SelectItem>
-                  {profiles.map(profile => (
-                    <SelectItem key={profile.id} value={profile.id}>
-                      {profile.full_name} {profile.employee_id ? `(${profile.employee_id})` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <Label>From Date</Label>
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="bg-background border-border text-foreground"
-              />
-            </div>
-            
-            <div>
-              <Label>To Date</Label>
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="bg-background border-border text-foreground"
-              />
-            </div>
-            
-            <div>
-              <Label>Reason</Label>
-              <Select value={reasonId || 'all'} onValueChange={(value) => setReasonId(value === 'all' ? '' : value)}>
-                <SelectTrigger className="bg-background border-border text-foreground">
-                  <SelectValue placeholder="All reasons" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All reasons</SelectItem>
-                  {reasons?.map(reason => (
-                    <SelectItem key={reason.id} value={reason.id}>
-                      {reason.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <Label>Status</Label>
-              <Select value={status || 'all'} onValueChange={(value) => setStatus(value === 'all' ? '' : value)}>
-                <SelectTrigger className="bg-background border-border text-foreground">
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Absences Table */}
-      <Card className="border-border">
-        <CardHeader>
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div>
-              <CardTitle className="text-foreground">
-                Absence Records
-              </CardTitle>
-              <CardDescription className="text-muted-foreground">
-                {filteredAbsences.length} records found{pendingCount > 0 ? ` · ${pendingCount} pending` : ''}
-              </CardDescription>
-            </div>
-            <Link href="/approvals?tab=absences" className="w-full md:w-auto">
-              <Button
-                variant="outline"
-                className="w-full md:w-auto border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Review Pending in Approvals
-              </Button>
-            </Link>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={listSearch}
-              onChange={(event) => setListSearch(event.target.value)}
-              placeholder="Search records..."
-              className="pl-11 bg-slate-900/50 border-slate-600 text-white"
-            />
-          </div>
 
-          {filteredAbsences.length === 0 ? (
-            <div className="text-center py-12">
-              <Calendar className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-white mb-2">No absences found</h3>
-              <p className="text-muted-foreground">Try adjusting your filters</p>
-            </div>
-          ) : (
-            <>
-              <div className="hidden md:block border border-slate-700 rounded-lg overflow-hidden">
-                <Table className="min-w-full">
-                  <TableHeader>
-                    <TableRow className="border-border">
-                      <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer" onClick={() => handleSort('employee')}>
-                        <div className="flex items-center gap-2">Employee <ArrowUpDown className="h-3 w-3" /></div>
-                      </TableHead>
-                      <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer" onClick={() => handleSort('reason')}>
-                        <div className="flex items-center gap-2">Reason <ArrowUpDown className="h-3 w-3" /></div>
-                      </TableHead>
-                      <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer" onClick={() => handleSort('date')}>
-                        <div className="flex items-center gap-2">Date <ArrowUpDown className="h-3 w-3" /></div>
-                      </TableHead>
-                      <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer" onClick={() => handleSort('duration')}>
-                        <div className="flex items-center gap-2">Duration <ArrowUpDown className="h-3 w-3" /></div>
-                      </TableHead>
-                      <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer" onClick={() => handleSort('approved_at')}>
-                        <div className="flex items-center gap-2">Date Approved <ArrowUpDown className="h-3 w-3" /></div>
-                      </TableHead>
-                      <TableHead className="bg-slate-900 text-muted-foreground">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+      <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as 'records' | 'calendar' | 'reasons' | 'allowances')} className="space-y-6">
+        <div className="flex items-center justify-end">
+          <TabsList>
+            <TabsTrigger value="records">Records</TabsTrigger>
+            <TabsTrigger value="calendar">Calendar</TabsTrigger>
+            {isAdmin && <TabsTrigger value="reasons">Reasons</TabsTrigger>}
+            {canManage && <TabsTrigger value="allowances">Allowances</TabsTrigger>}
+          </TabsList>
+        </div>
+
+        <TabsContent value="records" className="space-y-6 mt-0">
+          {/* Filters */}
+          <Card className="">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-foreground">
+                <Filter className="h-5 w-5" />
+                Filters
+              </CardTitle>
+              {(profileId || dateFrom || dateTo || reasonId || status) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setProfileId('');
+                    setDateFrom('');
+                    setDateTo('');
+                    setReasonId('');
+                    setStatus('');
+                  }}
+                  className="border-border text-muted-foreground"
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div>
+                  <Label>Employee</Label>
+                  <Select value={profileId || 'all'} onValueChange={(value) => setProfileId(value === 'all' ? '' : value)}>
+                    <SelectTrigger className="bg-background border-border text-foreground">
+                      <SelectValue placeholder="All employees" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All employees</SelectItem>
+                      {profiles.map((profile) => (
+                        <SelectItem key={profile.id} value={profile.id}>
+                          {profile.full_name} {profile.employee_id ? `(${profile.employee_id})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>From Date</Label>
+                  <Input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="bg-background border-border text-foreground"
+                  />
+                </div>
+
+                <div>
+                  <Label>To Date</Label>
+                  <Input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="bg-background border-border text-foreground"
+                  />
+                </div>
+
+                <div>
+                  <Label>Reason</Label>
+                  <Select value={reasonId || 'all'} onValueChange={(value) => setReasonId(value === 'all' ? '' : value)}>
+                    <SelectTrigger className="bg-background border-border text-foreground">
+                      <SelectValue placeholder="All reasons" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All reasons</SelectItem>
+                      {reasons?.map((reason) => (
+                        <SelectItem key={reason.id} value={reason.id}>
+                          {reason.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>Status</Label>
+                  <Select value={status || 'all'} onValueChange={(value) => setStatus(value === 'all' ? '' : value)}>
+                    <SelectTrigger className="bg-background border-border text-foreground">
+                      <SelectValue placeholder="All statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All statuses</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeArchived}
+                    onChange={(event) => handleIncludeArchivedChange(event.target.checked)}
+                    className="rounded border-border"
+                  />
+                  <span className="text-sm text-muted-foreground">Include archived records</span>
+                </label>
+                <Link href="/absence/archive-report" className="text-sm text-absence hover:underline">
+                  Open archive report
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Absences Table */}
+          <Card className="border-border">
+            <CardHeader>
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <CardTitle className="text-foreground">
+                    Absence Records
+                  </CardTitle>
+                  <CardDescription className="text-muted-foreground">
+                    {filteredAbsences.length} records found{pendingCount > 0 ? ` · ${pendingCount} pending` : ''}
+                  </CardDescription>
+                </div>
+                <Link href="/approvals?tab=absences" className="w-full md:w-auto">
+                  <Button
+                    variant="outline"
+                    className="w-full md:w-auto border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Review Pending in Approvals
+                  </Button>
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={listSearch}
+                  onChange={(event) => setListSearch(event.target.value)}
+                  placeholder="Search records..."
+                  className="pl-11 bg-slate-900/50 border-slate-600 text-white"
+                />
+              </div>
+
+              {filteredAbsences.length === 0 ? (
+                <div className="text-center py-12">
+                  <Calendar className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-white mb-2">No absences found</h3>
+                  <p className="text-muted-foreground">Try adjusting your filters</p>
+                </div>
+              ) : (
+                <>
+                  <div className="hidden md:block border border-slate-700 rounded-lg overflow-hidden">
+                    <Table className="min-w-full">
+                      <TableHeader>
+                        <TableRow className="border-border">
+                          <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer" onClick={() => handleSort('employee')}>
+                            <div className="flex items-center gap-2">Employee <ArrowUpDown className="h-3 w-3" /></div>
+                          </TableHead>
+                          <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer" onClick={() => handleSort('reason')}>
+                            <div className="flex items-center gap-2">Reason <ArrowUpDown className="h-3 w-3" /></div>
+                          </TableHead>
+                          <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer" onClick={() => handleSort('date')}>
+                            <div className="flex items-center gap-2">Date <ArrowUpDown className="h-3 w-3" /></div>
+                          </TableHead>
+                          <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer" onClick={() => handleSort('duration')}>
+                            <div className="flex items-center gap-2">Duration <ArrowUpDown className="h-3 w-3" /></div>
+                          </TableHead>
+                          <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer" onClick={() => handleSort('approved_at')}>
+                            <div className="flex items-center gap-2">Date Approved <ArrowUpDown className="h-3 w-3" /></div>
+                          </TableHead>
+                          <TableHead className="bg-slate-900 text-muted-foreground">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedAbsences.map((absence) => (
+                          <TableRow key={absence.id} className="border-slate-700 hover:bg-slate-800/30">
+                            <TableCell className={
+                              absence.status === 'pending'
+                                ? 'text-amber-300'
+                                : absence.status === 'rejected'
+                                ? 'text-red-400'
+                                : 'text-white'
+                            }>
+                              {absence.profiles.full_name}
+                              {absence.profiles.employee_id && (
+                                <span className="text-muted-foreground"> ({absence.profiles.employee_id})</span>
+                              )}
+                              {absence.record_source === 'archived' && (
+                                <span className="ml-2 text-xs px-2 py-0.5 rounded border border-blue-500/30 text-blue-300">
+                                  Archived
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="h-2 w-2 rounded-full shrink-0"
+                                  style={
+                                    absence.absence_reasons.is_paid
+                                      ? { backgroundColor: absence.absence_reasons.color || '#6b7280' }
+                                      : { border: `1.5px solid ${absence.absence_reasons.color || '#6b7280'}` }
+                                  }
+                                />
+                                <span className="text-muted-foreground">{absence.absence_reasons.name}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {absence.end_date && absence.date !== absence.end_date
+                                ? `${formatDate(absence.date)} - ${formatDate(absence.end_date)}`
+                                : formatDate(absence.date)}
+                              {absence.is_half_day && ` (${absence.half_day_session})`}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">{formatDuration(absence.duration_days)}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {absence.approved_at ? formatDate(absence.approved_at) : <span className="text-muted-foreground/50">—</span>}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDelete(absence.id)}
+                                  disabled={absence.record_source === 'archived'}
+                                  className="px-2 text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                                {absence.status === 'pending' && absence.record_source !== 'archived' && (
+                                  <Link href="/approvals?tab=absences">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+                                    >
+                                      Review
+                                    </Button>
+                                  </Link>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <div className="md:hidden space-y-3">
                     {paginatedAbsences.map((absence) => (
-                      <TableRow key={absence.id} className="border-slate-700 hover:bg-slate-800/30">
-                        <TableCell className={
-                          absence.status === 'pending'
-                            ? 'text-amber-300'
-                            : absence.status === 'rejected'
-                            ? 'text-red-400'
-                            : 'text-white'
-                        }>
-                          {absence.profiles.full_name}
-                          {absence.profiles.employee_id && (
-                            <span className="text-muted-foreground"> ({absence.profiles.employee_id})</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="h-2 w-2 rounded-full shrink-0"
-                              style={
-                                absence.absence_reasons.is_paid
-                                  ? { backgroundColor: absence.absence_reasons.color || '#6b7280' }
-                                  : { border: `1.5px solid ${absence.absence_reasons.color || '#6b7280'}` }
-                              }
-                            />
-                            <span className="text-muted-foreground">{absence.absence_reasons.name}</span>
+                      <div
+                        key={absence.id}
+                        className="p-4 rounded-lg bg-slate-800/30 border border-border/50 hover:border-slate-600 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className={`font-semibold ${
+                                absence.status === 'pending'
+                                  ? 'text-amber-300'
+                                  : absence.status === 'rejected'
+                                  ? 'text-red-400'
+                                  : 'text-white'
+                              }`}>
+                                {absence.profiles.full_name}
+                                {absence.profiles.employee_id && ` (${absence.profiles.employee_id})`}
+                              </h3>
+                              {absence.record_source === 'archived' && (
+                                <span className="text-[10px] px-2 py-0.5 rounded border border-blue-500/30 text-blue-300">
+                                  Archived
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span
+                                className="h-2 w-2 rounded-full shrink-0"
+                                style={
+                                  absence.absence_reasons.is_paid
+                                    ? { backgroundColor: absence.absence_reasons.color || '#6b7280' }
+                                    : { border: `1.5px solid ${absence.absence_reasons.color || '#6b7280'}` }
+                                }
+                              />
+                              <span className="text-sm text-muted-foreground">{absence.absence_reasons.name}</span>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {absence.end_date && absence.date !== absence.end_date
+                                ? `${formatDate(absence.date)} - ${formatDate(absence.end_date)}`
+                                : formatDate(absence.date)}
+                              {absence.is_half_day && ` (${absence.half_day_session})`}
+                              {' · '}{formatDuration(absence.duration_days)}
+                              {absence.approved_at && ` · Approved ${formatDate(absence.approved_at)}`}
+                            </div>
                           </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {absence.end_date && absence.date !== absence.end_date
-                            ? `${formatDate(absence.date)} - ${formatDate(absence.end_date)}`
-                            : formatDate(absence.date)}
-                          {absence.is_half_day && ` (${absence.half_day_session})`}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{formatDuration(absence.duration_days)}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {absence.approved_at ? formatDate(absence.approved_at) : <span className="text-muted-foreground/50">—</span>}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
+                          <div className="flex gap-2">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDelete(absence.id)}
+                              disabled={absence.record_source === 'archived'}
                               className="px-2 text-red-500 hover:text-red-400 hover:bg-red-500/10"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
-                            {absence.status === 'pending' && (
+                            {absence.status === 'pending' && absence.record_source !== 'archived' && (
                               <Link href="/approvals?tab=absences">
                                 <Button
                                   variant="outline"
@@ -536,114 +698,66 @@ export default function AdminAbsencePage() {
                               </Link>
                             )}
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <div className="md:hidden space-y-3">
-                {paginatedAbsences.map((absence) => (
-                  <div
-                    key={absence.id}
-                    className="p-4 rounded-lg bg-slate-800/30 border border-border/50 hover:border-slate-600 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className={`font-semibold ${
-                            absence.status === 'pending'
-                              ? 'text-amber-300'
-                              : absence.status === 'rejected'
-                              ? 'text-red-400'
-                              : 'text-white'
-                          }`}>
-                            {absence.profiles.full_name}
-                            {absence.profiles.employee_id && ` (${absence.profiles.employee_id})`}
-                          </h3>
-                        </div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <span
-                            className="h-2 w-2 rounded-full shrink-0"
-                            style={
-                              absence.absence_reasons.is_paid
-                                ? { backgroundColor: absence.absence_reasons.color || '#6b7280' }
-                                : { border: `1.5px solid ${absence.absence_reasons.color || '#6b7280'}` }
-                            }
-                          />
-                          <span className="text-sm text-muted-foreground">{absence.absence_reasons.name}</span>
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {absence.end_date && absence.date !== absence.end_date
-                            ? `${formatDate(absence.date)} - ${formatDate(absence.end_date)}`
-                            : formatDate(absence.date)}
-                          {absence.is_half_day && ` (${absence.half_day_session})`}
-                          {' · '}{formatDuration(absence.duration_days)}
-                          {absence.approved_at && ` · Approved ${formatDate(absence.approved_at)}`}
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                    ))}
+                  </div>
+
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-4">
+                      <p className="text-sm text-muted-foreground">
+                        Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredAbsences.length)} of {filteredAbsences.length}
+                      </p>
+                      <div className="flex items-center gap-2">
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          onClick={() => handleDelete(absence.id)}
-                          className="px-2 text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                          disabled={currentPage <= 1}
+                          onClick={() => setCurrentPage((p) => p - 1)}
+                          className="border-slate-600"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <ChevronLeft className="h-4 w-4" />
                         </Button>
-                        {absence.status === 'pending' && (
-                          <Link href="/approvals?tab=absences">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
-                            >
-                              Review
-                            </Button>
-                          </Link>
-                        )}
+                        <span className="text-sm text-muted-foreground">
+                          Page {currentPage} of {totalPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={currentPage >= totalPages}
+                          onClick={() => setCurrentPage((p) => p + 1)}
+                          className="border-slate-600"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between pt-4">
-                  <p className="text-sm text-muted-foreground">
-                    Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredAbsences.length)} of {filteredAbsences.length}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={currentPage <= 1}
-                      onClick={() => setCurrentPage((p) => p - 1)}
-                      className="border-slate-600"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="text-sm text-muted-foreground">
-                      Page {currentPage} of {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={currentPage >= totalPages}
-                      onClick={() => setCurrentPage((p) => p + 1)}
-                      className="border-slate-600"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+                  )}
+                </>
               )}
-            </>
-          )}
-        </CardContent>
-      </Card>
-      
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="calendar" className="space-y-6 mt-0">
+          <AbsenceCalendarAdmin />
+        </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="reasons" className="space-y-6 mt-0">
+            <AbsenceReasonsContent />
+          </TabsContent>
+        )}
+
+        {canManage && (
+          <TabsContent value="allowances" className="space-y-6 mt-0">
+            <AllowancesContent />
+          </TabsContent>
+        )}
+      </Tabs>
+
+      <AbsenceAboutHelper variant="manage" />
+
       {/* Create Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent className="border-border max-w-2xl">

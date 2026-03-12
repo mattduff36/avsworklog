@@ -26,8 +26,7 @@ const PROTECTED_ROUTES = [
   '/inspections/new',
   '/absence',
   '/absence/manage',
-  '/absence/manage/reasons',
-  '/absence/manage/allowances',
+  '/absence/archive-report',
   
   // Manager/Admin pages
   '/approvals',

@@ -93,14 +93,11 @@ export function getParentHref(
   }
   
   // Absence routes
-  if (normalizedPath === '/absence/manage/allowances') {
-    return '/absence/manage';
-  }
-  if (normalizedPath === '/absence/manage/reasons') {
-    return '/absence/manage';
-  }
   if (normalizedPath === '/absence/manage') {
     return '/absence';
+  }
+  if (normalizedPath === '/absence/archive-report') {
+    return '/absence/manage';
   }
   
   // Workshop tasks routes

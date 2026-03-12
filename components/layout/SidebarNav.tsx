@@ -166,8 +166,9 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   if (!isManager && !isSuperAdmin) return null;
 
   const managerLinks = getFilteredNavByPermissions(managerNavItems, userPermissions, isAdmin);
+  const sidebarManagerLinks = managerLinks.filter((link) => link.href !== '/absence/manage');
   const adminLinks = getFilteredNavByPermissions(adminNavItems, userPermissions, isAdmin);
-  const hasAnyManagementLinks = managerLinks.length > 0 || adminLinks.length > 0;
+  const hasAnyManagementLinks = sidebarManagerLinks.length > 0 || adminLinks.length > 0;
   const showSidebar = hasAnyManagementLinks || showDeveloperTools;
 
   const viewAsPopoverContent = (
@@ -294,7 +295,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         {/* Navigation */}
         <div className={`overflow-y-auto py-4 ${isSuperAdmin ? 'h-[calc(100vh-10rem)]' : 'h-[calc(100vh-8.25rem)]'}`}>
           {/* Manager Links */}
-          {(isManager || isAdmin) && managerLinks.length > 0 && (
+          {(isManager || isAdmin) && sidebarManagerLinks.length > 0 && (
           <div className={open ? 'px-3 mb-6' : 'px-2 mb-6'}>
             <div className={`px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider transition-opacity duration-200 ${
               open ? 'opacity-100 delay-300' : 'opacity-0 h-0 overflow-hidden'
@@ -302,7 +303,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
               Management
             </div>
             <div className="space-y-1">
-              {managerLinks.map((link) => {
+              {sidebarManagerLinks.map((link) => {
                 const Icon = link.icon;
                 const isActive = pathname?.startsWith(link.href);
                 const badgeCount = link.href === '/absence/manage' ? pendingAbsenceCount : 0;

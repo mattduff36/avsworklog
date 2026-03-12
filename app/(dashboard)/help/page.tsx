@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,8 @@ import { MODULE_PAGES, getPageLabel, getPageUrl } from '@/lib/config/module-page
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function HelpPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { profile, isAdmin } = useAuth(); // Get user info
   const supabase = createClient();
   
@@ -61,6 +64,22 @@ export default function HelpPage() {
   
   // Active tab
   const [activeTab, setActiveTab] = useState('faq');
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab') || 'faq';
+    const validTabs = ['faq', 'errors', 'suggest', 'my-suggestions'];
+    if (validTabs.includes(requestedTab)) {
+      setActiveTab(requestedTab);
+      return;
+    }
+    setActiveTab('faq');
+    router.replace('/help?tab=faq', { scroll: false });
+  }, [searchParams, router]);
+
+  function handleTabChange(value: string) {
+    setActiveTab(value);
+    router.replace(`/help?tab=${value}`, { scroll: false });
+  }
   
   // User permissions
   const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
@@ -400,7 +419,7 @@ export default function HelpPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full max-w-3xl grid-cols-4 bg-slate-100 dark:bg-slate-800 p-0">
           <TabsTrigger value="faq" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
             <BookOpen className="h-4 w-4" />

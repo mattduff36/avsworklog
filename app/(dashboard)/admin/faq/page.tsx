@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,9 +46,26 @@ import type { FAQCategory, FAQArticleWithCategory } from '@/types/faq';
 
 export default function FAQEditorPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { hasPermission: canEditFaq, loading: permissionLoading } = usePermissionCheck('faq-editor', false);
   
   const [activeTab, setActiveTab] = useState('categories');
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab') || 'categories';
+    const validTabs = ['categories', 'articles'];
+    if (validTabs.includes(requestedTab)) {
+      setActiveTab(requestedTab);
+      return;
+    }
+    setActiveTab('categories');
+    router.replace('/admin/faq?tab=categories', { scroll: false });
+  }, [searchParams, router]);
+
+  function handleTabChange(value: string) {
+    setActiveTab(value);
+    router.replace(`/admin/faq?tab=${value}`, { scroll: false });
+  }
   
   // Categories state
   const [categories, setCategories] = useState<(FAQCategory & { article_count: number })[]>([]);
@@ -361,7 +378,7 @@ export default function FAQEditorPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full max-w-md grid-cols-2 bg-slate-100 dark:bg-slate-800 p-0">
           <TabsTrigger value="categories" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
             <FolderOpen className="h-4 w-4" />

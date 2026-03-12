@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -18,10 +18,12 @@ import { DebugInfo } from './types';
 export default function DebugPage() {
   const { profile } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
+  const [activeTab, setActiveTab] = useState<'errors' | 'audit' | 'dvla' | 'test-fleet' | 'notifications'>('errors');
 
   useEffect(() => {
     async function checkAccess() {
@@ -88,6 +90,22 @@ export default function DebugPage() {
     }
     void checkAccess();
   }, [supabase, router]);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab') || 'errors';
+    const validTabs: Array<'errors' | 'audit' | 'dvla' | 'test-fleet' | 'notifications'> = ['errors', 'audit', 'dvla', 'test-fleet', 'notifications'];
+    if (validTabs.includes(requestedTab as (typeof validTabs)[number])) {
+      setActiveTab(requestedTab as (typeof validTabs)[number]);
+      return;
+    }
+    setActiveTab('errors');
+    router.replace('/debug?tab=errors', { scroll: false });
+  }, [searchParams, router]);
+
+  function handleTabChange(value: 'errors' | 'audit' | 'dvla' | 'test-fleet' | 'notifications') {
+    setActiveTab(value);
+    router.replace(`/debug?tab=${value}`, { scroll: false });
+  }
 
   if (loading) {
     return (
@@ -159,7 +177,7 @@ export default function DebugPage() {
         </Card>
       </div>
 
-      <Tabs defaultValue="errors" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as 'errors' | 'audit' | 'dvla' | 'test-fleet' | 'notifications')} className="space-y-6">
         <TabsList className="grid w-full grid-cols-5 gap-1 md:gap-0 h-auto md:h-10 p-1">
           <TabsTrigger value="errors" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
             <Bug className="h-4 w-4 flex-shrink-0" />

@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useAuth } from '@/lib/hooks/useAuth';
-import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,7 +32,6 @@ import {
 } from '@/components/ui/select';
 import { ArrowUpDown, ChevronLeft, ChevronRight, Loader2, Search, Settings2, Sparkles, Trash2, Users } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { BackButton } from '@/components/ui/back-button';
 import { useUpdateEmployeeAllowance } from '@/lib/hooks/useAbsence';
 import { getCurrentFinancialYear } from '@/lib/utils/date';
 import { createClient } from '@/lib/supabase/client';
@@ -87,12 +84,16 @@ const DEFAULT_BASE_COLUMN_VISIBILITY: BaseColumnVisibility = {
 const DEFAULT_VISIBLE_REASON_NAMES = new Set(['sickness', 'training', 'unpaid leave']);
 
 function FmtDays({ value }: { value: number }) {
-  const hasHalf = value % 1 !== 0;
-  const whole = Math.floor(value);
-  if (!hasHalf) return <>{whole}</>;
+  const absValue = Math.abs(value);
+  const hasHalf = absValue % 1 !== 0;
+  const whole = Math.trunc(absValue);
+  const sign = value < 0 ? '-' : '';
+  if (!hasHalf) return <>{Math.trunc(value)}</>;
   return (
     <>
-      {whole} <span className="text-[0.75em] opacity-50">.5</span>
+      {sign}
+      {whole > 0 && `${whole} `}
+      <span className="text-[0.75em] opacity-50">.5</span>
     </>
   );
 }
@@ -122,9 +123,7 @@ function buildFinancialYearFromStartYear(startYear: number) {
   };
 }
 
-export default function AllowancesPage() {
-  const { isAdmin, isManager, loading: authLoading } = useAuth();
-  const router = useRouter();
+export function AllowancesContent() {
   const supabase = createClient();
   const currentFinancialYear = getCurrentFinancialYear();
 
@@ -174,12 +173,6 @@ export default function AllowancesPage() {
   }, [currentFinancialYear, generationStatus]);
 
   useEffect(() => {
-    if (!authLoading && !isAdmin && !isManager) {
-      router.push('/dashboard');
-    }
-  }, [isAdmin, isManager, authLoading, router]);
-
-  useEffect(() => {
     try {
       const stored = localStorage.getItem(COLUMN_VISIBILITY_STORAGE_KEY);
       if (!stored) return;
@@ -220,10 +213,9 @@ export default function AllowancesPage() {
     void loadRows();
     void loadGenerationStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, isManager, selectedFinancialYearStartYear]);
+  }, [selectedFinancialYearStartYear]);
 
   async function loadRows() {
-    if (!isAdmin && !isManager) return;
     setLoading(true);
     try {
       const fyStart = selectedFinancialYear.startIso;
@@ -534,37 +526,31 @@ export default function AllowancesPage() {
     }
   }
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
-      <div className="space-y-6 max-w-6xl">
-        <Card>
-          <CardContent className="flex items-center justify-center py-12">
-            <p className="text-muted-foreground">Loading...</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardContent className="flex items-center justify-center py-12">
+          <p className="text-muted-foreground">Loading...</p>
+        </CardContent>
+      </Card>
     );
   }
 
-  if (!isAdmin && !isManager) return null;
-
   return (
-    <div className="space-y-6 max-w-6xl">
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-4">
-            <BackButton />
-            <div>
-              <h1 className="text-3xl font-bold text-foreground mb-2">Employee Allowances</h1>
-              <p className="text-muted-foreground">
-                Manage annual leave allowances for all employees ({selectedFinancialYear.label})
+    <div className="space-y-6">
+      <Card className="border-border">
+        <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <CardTitle className="text-foreground">Employee Allowances</CardTitle>
+            <CardDescription className="text-muted-foreground">
+              Manage annual leave allowances for all employees ({selectedFinancialYear.label})
+            </CardDescription>
+            {generationStatus && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Current booking horizon: {generationStatus.latestGeneratedFinancialYearLabel}. Next available generation:{' '}
+                {generationStatus.nextFinancialYearLabel}.
               </p>
-              {generationStatus && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Current booking horizon: {generationStatus.latestGeneratedFinancialYearLabel}. Next available generation: {generationStatus.nextFinancialYearLabel}.
-                </p>
-              )}
-            </div>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <TooltipProvider>
@@ -597,8 +583,8 @@ export default function AllowancesPage() {
               </Tooltip>
             </TooltipProvider>
           </div>
-        </div>
-      </div>
+        </CardHeader>
+      </Card>
 
       <Card className="border-border">
         <CardContent className="pt-6">

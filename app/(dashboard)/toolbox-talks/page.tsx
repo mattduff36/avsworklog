@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, MessageSquare, Bell, BarChart3 } from 'lucide-react';
@@ -13,7 +13,16 @@ import { MessagesReportView } from '@/components/messages/MessagesReportView';
 export default function ToolboxTalksPage() {
   const { hasPermission: canViewToolboxTalks, loading: permissionLoading } = usePermissionCheck('toolbox-talks', false);
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('create-toolbox-talk');
+  const searchParams = useSearchParams();
+  const activeTab = useMemo(() => {
+    const requestedTab = searchParams.get('tab') || 'create-toolbox-talk';
+    const validTabs = ['create-toolbox-talk', 'create-reminder', 'reports'];
+    return validTabs.includes(requestedTab) ? requestedTab : 'create-toolbox-talk';
+  }, [searchParams]);
+
+  function handleTabChange(value: string) {
+    router.replace(`/toolbox-talks?tab=${value}`, { scroll: false });
+  }
 
   // Redirect non-managers/admins
   if (!permissionLoading && !canViewToolboxTalks) {
@@ -49,7 +58,7 @@ export default function ToolboxTalksPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList className="grid w-full grid-cols-3 bg-slate-800 p-0">
           <TabsTrigger value="create-toolbox-talk" data-tab="toolbox-talk" className="gap-2 data-[state=active]:bg-red-600 data-[state=active]:text-white">
             <MessageSquare className="h-4 w-4" />

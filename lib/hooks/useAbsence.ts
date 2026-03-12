@@ -8,11 +8,29 @@ import {
   AbsenceSummary
 } from '@/types/absence';
 import { getCurrentFinancialYear, getFinancialYear } from '@/lib/utils/date';
+import { isClosedFinancialYearDate } from '@/lib/services/absence-archive';
 
 const ANNUAL_LEAVE_REASON_NAME = 'annual leave';
 
 function hasFilterValue(value?: string): value is string {
   return !!value && value.trim().length > 0;
+}
+
+async function assertAbsenceFinancialYearOpen(
+  supabase: ReturnType<typeof createClient>,
+  id: string
+): Promise<void> {
+  const { data, error } = await supabase
+    .from('absences')
+    .select('date')
+    .eq('id', id)
+    .single();
+
+  if (error) throw error;
+  if (!data?.date) throw new Error('Absence record not found');
+  if (isClosedFinancialYearDate(data.date)) {
+    throw new Error('This absence is in a closed financial year and is read-only');
+  }
 }
 
 // ============================================================================
@@ -253,6 +271,7 @@ export function useUpdateAbsence() {
   
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: AbsenceUpdate }) => {
+      await assertAbsenceFinancialYearOpen(supabase, id);
       const { data, error } = await supabase
         .from('absences')
         .update(updates)
@@ -279,6 +298,7 @@ export function useCancelAbsence() {
   
   return useMutation({
     mutationFn: async (id: string) => {
+      await assertAbsenceFinancialYearOpen(supabase, id);
       const { data, error } = await supabase
         .from('absences')
         .update({ status: 'cancelled' })
@@ -305,6 +325,7 @@ export function useDeleteAbsence() {
   
   return useMutation({
     mutationFn: async (id: string) => {
+      await assertAbsenceFinancialYearOpen(supabase, id);
       const { error } = await supabase
         .from('absences')
         .delete()
@@ -332,6 +353,8 @@ export function useAllAbsences(filters?: {
   dateTo?: string;
   reasonId?: string;
   status?: string;
+  includeArchived?: boolean;
+  archivedOnly?: boolean;
 }) {
   const supabase = createClient();
   
@@ -339,36 +362,87 @@ export function useAllAbsences(filters?: {
     queryKey: ['absences', 'all', filters],
     enabled: filters !== undefined,
     queryFn: async () => {
-      let query = supabase
-        .from('absences')
-        .select(`
-          *,
-          absence_reasons (*),
-          profiles!absences_profile_id_fkey (full_name, employee_id),
-          created_by_profile:profiles!absences_created_by_fkey (full_name),
-          approved_by_profile:profiles!absences_approved_by_fkey (full_name)
-        `);
-      
-      if (hasFilterValue(filters?.profileId)) {
-        query = query.eq('profile_id', filters.profileId);
+      const PAGE_SIZE = 1000;
+      const includeArchived = filters?.includeArchived === true;
+      const archivedOnly = filters?.archivedOnly === true;
+
+      const fetchRows = async (
+        source: 'active' | 'archived'
+      ): Promise<AbsenceWithRelations[]> => {
+        const allRows: AbsenceWithRelations[] = [];
+        let from = 0;
+
+        while (true) {
+          const tableName = source === 'archived' ? 'absences_archive' : 'absences';
+          const profileJoin =
+            source === 'archived'
+              ? 'profiles!absences_archive_profile_id_fkey (full_name, employee_id)'
+              : 'profiles!absences_profile_id_fkey (full_name, employee_id)';
+          const createdByJoin =
+            source === 'archived'
+              ? 'created_by_profile:profiles!absences_archive_created_by_fkey (full_name)'
+              : 'created_by_profile:profiles!absences_created_by_fkey (full_name)';
+          const approvedByJoin =
+            source === 'archived'
+              ? 'approved_by_profile:profiles!absences_archive_approved_by_fkey (full_name)'
+              : 'approved_by_profile:profiles!absences_approved_by_fkey (full_name)';
+
+          let query = supabase.from(tableName).select(`
+            *,
+            absence_reasons (*),
+            ${profileJoin},
+            ${createdByJoin},
+            ${approvedByJoin}
+          `);
+
+          if (hasFilterValue(filters?.profileId)) {
+            query = query.eq('profile_id', filters.profileId);
+          }
+          if (filters?.dateFrom) {
+            query = query.gte('date', filters.dateFrom);
+          }
+          if (filters?.dateTo) {
+            query = query.lte('date', filters.dateTo);
+          }
+          if (hasFilterValue(filters?.reasonId)) {
+            query = query.eq('reason_id', filters.reasonId);
+          }
+          if (hasFilterValue(filters?.status)) {
+            query = query.eq('status', filters.status);
+          }
+
+          const { data, error } = await query
+            .order('date', { ascending: false })
+            .range(from, from + PAGE_SIZE - 1);
+
+          if (error) throw error;
+
+          const pageRows = ((data || []) as AbsenceWithRelations[]).map((row) => ({
+            ...row,
+            record_source: source,
+          }));
+          allRows.push(...pageRows);
+
+          if (pageRows.length < PAGE_SIZE) {
+            break;
+          }
+          from += PAGE_SIZE;
+        }
+
+        return allRows;
+      };
+
+      if (archivedOnly) {
+        return fetchRows('archived');
       }
-      if (filters?.dateFrom) {
-        query = query.gte('date', filters.dateFrom);
+
+      const activeRows = await fetchRows('active');
+      if (!includeArchived) {
+        return activeRows;
       }
-      if (filters?.dateTo) {
-        query = query.lte('date', filters.dateTo);
-      }
-      if (hasFilterValue(filters?.reasonId)) {
-        query = query.eq('reason_id', filters.reasonId);
-      }
-      if (hasFilterValue(filters?.status)) {
-        query = query.eq('status', filters.status);
-      }
-      
-      const { data, error } = await query.order('date', { ascending: false });
-      
-      if (error) throw error;
-      return data as AbsenceWithRelations[];
+
+      const archivedRows = await fetchRows('archived');
+      return [...activeRows, ...archivedRows].sort((a, b) => b.date.localeCompare(a.date));
     },
   });
 }
@@ -407,6 +481,7 @@ export function useApproveAbsence() {
   
   return useMutation({
     mutationFn: async (id: string) => {
+      await assertAbsenceFinancialYearOpen(supabase, id);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
       
@@ -440,6 +515,7 @@ export function useRejectAbsence() {
   
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
+      await assertAbsenceFinancialYearOpen(supabase, id);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
       

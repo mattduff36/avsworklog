@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,6 +66,8 @@ type ProfileWithEmail = ProfileWithRole & { email?: string };
 type TabType = 'users' | 'roles' | 'permissions';
 
 export default function UsersAdminPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { user: currentUser, profile, isAdmin, loading: authLoading } = useAuth();
   const { hasPermission: canManageUsers, loading: permissionLoading } = usePermissionCheck('admin-users', false);
   const supabase = createClient();
@@ -80,6 +83,22 @@ export default function UsersAdminPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'manager' | 'employee'>('all');
   const [availableRoles, setAvailableRoles] = useState<Array<{ id: string; name: string; display_name: string }>>([]);
+
+  useEffect(() => {
+    const requestedTab = (searchParams.get('tab') || 'users') as TabType;
+    const validTabs: TabType[] = ['users', 'roles', 'permissions'];
+    if (validTabs.includes(requestedTab)) {
+      setActiveTab(requestedTab);
+      return;
+    }
+    setActiveTab('users');
+    router.replace('/admin/users?tab=users', { scroll: false });
+  }, [searchParams, router]);
+
+  function handleTabChange(nextTab: TabType) {
+    setActiveTab(nextTab);
+    router.replace(`/admin/users?tab=${nextTab}`, { scroll: false });
+  }
 
   // Dialog states
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -490,7 +509,7 @@ export default function UsersAdminPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabType)} className="space-y-6">
         <TabsList className={`grid w-full ${canEditRolePermissions ? 'max-w-xl grid-cols-3' : canManageRoleDefinitions ? 'max-w-md grid-cols-2' : 'max-w-sm grid-cols-1'} bg-slate-100 dark:bg-slate-800 p-0`}>
           <TabsTrigger 
             value="users" 

@@ -53,6 +53,11 @@ export default function NotificationsPage() {
     clearOnDefault: true,
     shallow: true,
   });
+  const [tabParam, setTabParam] = useQueryState('tab', {
+    defaultValue: 'all',
+    clearOnDefault: true,
+    shallow: true,
+  });
   const hasHandledDeepLink = useRef(false);
 
   // Notifications state
@@ -74,6 +79,16 @@ export default function NotificationsPage() {
   const [, setLoadingUsers] = useState(false);
   const [adminNotifications, setAdminNotifications] = useState<NotificationItem[]>([]);
   const [loadingAdminNotifications, setLoadingAdminNotifications] = useState(false);
+
+  const activeTab = tabParam === 'preferences' || tabParam === 'all' || (tabParam === 'admin' && isAdmin)
+    ? tabParam
+    : 'all';
+
+  useEffect(() => {
+    if (tabParam === 'admin' && !isAdmin) {
+      void setTabParam('all');
+    }
+  }, [tabParam, isAdmin, setTabParam]);
 
   // Filter modules based on user permissions
   const availableModules = NOTIFICATION_MODULES.filter(module => {
@@ -327,7 +342,7 @@ export default function NotificationsPage() {
 
       {/* Main Content */}
       <div>
-        <Tabs defaultValue="all" className="w-full">
+        <Tabs value={activeTab} onValueChange={(value) => void setTabParam(value)} className="w-full">
             <TabsList className="grid w-full max-w-2xl grid-cols-3 bg-slate-100 dark:bg-slate-800 p-0">
               <TabsTrigger value="all" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
                 <Bell className="h-4 w-4" />
