@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getBankHolidaysForYear } from '@/lib/utils/bank-holidays';
+import { calculateDurationDays } from '@/lib/utils/date';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = SupabaseClient<any, any, any>;
@@ -39,11 +40,40 @@ interface BankHolidayEvent {
   date: string;
 }
 
+interface BulkShutdownEmployee {
+  id: string;
+  full_name: string | null;
+  employee_id: string | null;
+  annual_holiday_allowance_days: number | null;
+}
+
+export interface ShutdownAllowanceWarning {
+  profileId: string;
+  fullName: string;
+  employeeId: string | null;
+  allowance: number;
+  alreadyBooked: number;
+  requestedDays: number;
+  projectedRemaining: number;
+}
+
+export interface CompanyShutdownBookingResult {
+  startDate: string;
+  endDate: string;
+  requestedDays: number;
+  totalEmployees: number;
+  wouldCreate: number;
+  createdCount: number;
+  duplicateCount: number;
+  warningCount: number;
+  warnings: ShutdownAllowanceWarning[];
+}
+
 export function getFinancialYearStartYear(date: Date): number {
   const year = date.getFullYear();
   const month = date.getMonth();
   const day = date.getDate();
-  if (month < 3 || (month === 3 && day < 6)) {
+  if (month < 3 || (month === 3 && day < 1)) {
     return year - 1;
   }
   return year;
@@ -51,10 +81,14 @@ export function getFinancialYearStartYear(date: Date): number {
 
 export function buildFinancialYearBounds(startYear: number): { start: Date; end: Date; label: string } {
   return {
-    start: new Date(startYear, 3, 6),
-    end: new Date(startYear + 1, 3, 5),
+    start: new Date(startYear, 3, 1),
+    end: new Date(startYear + 1, 2, 31),
     label: `${startYear}/${(startYear + 1).toString().slice(-2)}`,
   };
+}
+
+function normalizeIsoDate(value: string): string {
+  return value.trim().slice(0, 10);
 }
 
 function isWeekdayIsoDate(isoDate: string): boolean {
@@ -347,5 +381,207 @@ export async function removeLatestGeneratedFinancialYear(
     removedFinancialYearStartYear: latestGeneration.financial_year_start_year,
     removedFinancialYearLabel: financialYear.label,
     removedGeneratedAbsences: removedCount ?? 0,
+  };
+}
+
+async function getAnnualLeaveReason(
+  supabase: AnySupabase
+): Promise<{ id: string; name: string }> {
+  const { data, error } = await supabase
+    .from('absence_reasons')
+    .select('id, name')
+    .ilike('name', 'annual leave')
+    .single();
+
+  if (error || !data?.id) {
+    throw new Error('Annual leave reason not found');
+  }
+
+  return data as { id: string; name: string };
+}
+
+async function getBulkShutdownEmployees(supabase: AnySupabase): Promise<BulkShutdownEmployee[]> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, employee_id, annual_holiday_allowance_days')
+    .order('full_name');
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || []) as BulkShutdownEmployee[];
+}
+
+function buildShutdownNotes(startDate: string, endDate: string, customNotes?: string | null): string {
+  if (customNotes && customNotes.trim().length > 0) {
+    return customNotes.trim();
+  }
+  if (startDate === endDate) {
+    return `Company shutdown: ${startDate}`;
+  }
+  return `Company shutdown: ${startDate} to ${endDate}`;
+}
+
+interface BookCompanyShutdownOptions {
+  supabase: AnySupabase;
+  actorProfileId: string;
+  startDate: string;
+  endDate?: string;
+  notes?: string | null;
+  confirm?: boolean;
+}
+
+export async function bookCompanyShutdownForAllStaff(
+  options: BookCompanyShutdownOptions
+): Promise<CompanyShutdownBookingResult> {
+  const startDate = normalizeIsoDate(options.startDate);
+  const endDate = normalizeIsoDate(options.endDate || options.startDate);
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    throw new Error('Invalid start or end date');
+  }
+  if (end < start) {
+    throw new Error('End date cannot be before start date');
+  }
+
+  const requestedDays = calculateDurationDays(start, end, false);
+  if (requestedDays <= 0) {
+    throw new Error('Selected shutdown range does not include a working day');
+  }
+
+  const annualLeaveReason = await getAnnualLeaveReason(options.supabase);
+  const employees = await getBulkShutdownEmployees(options.supabase);
+  if (employees.length === 0) {
+    return {
+      startDate,
+      endDate,
+      requestedDays,
+      totalEmployees: 0,
+      wouldCreate: 0,
+      createdCount: 0,
+      duplicateCount: 0,
+      warningCount: 0,
+      warnings: [],
+    };
+  }
+
+  const profileIds = employees.map((employee) => employee.id);
+  const financialYear = buildFinancialYearBounds(getFinancialYearStartYear(start));
+  const fyStartIso = formatIsoDate(financialYear.start);
+  const fyEndIso = formatIsoDate(financialYear.end);
+
+  const [{ data: annualAbsences, error: annualAbsencesError }, { data: existingRows, error: existingRowsError }] =
+    await Promise.all([
+      options.supabase
+        .from('absences')
+        .select('profile_id, duration_days, status')
+        .eq('reason_id', annualLeaveReason.id)
+        .in('profile_id', profileIds)
+        .in('status', ['approved', 'pending'])
+        .gte('date', fyStartIso)
+        .lte('date', fyEndIso),
+      options.supabase
+        .from('absences')
+        .select('profile_id, date, end_date')
+        .eq('reason_id', annualLeaveReason.id)
+        .in('profile_id', profileIds)
+        .in('status', ['approved', 'pending']),
+    ]);
+
+  if (annualAbsencesError) {
+    throw annualAbsencesError;
+  }
+  if (existingRowsError) {
+    throw existingRowsError;
+  }
+
+  const usedByProfile = new Map<string, number>();
+  for (const row of (annualAbsences || []) as Array<{ profile_id: string; duration_days: number | null }>) {
+    usedByProfile.set(row.profile_id, (usedByProfile.get(row.profile_id) || 0) + (row.duration_days || 0));
+  }
+
+  const existingKeySet = new Set<string>();
+  const normalizedEndDate = endDate === startDate ? null : endDate;
+  for (const row of (existingRows || []) as Array<{ profile_id: string; date: string; end_date: string | null }>) {
+    const existingKey = `${row.profile_id}:${row.date}:${row.end_date || ''}`;
+    existingKeySet.add(existingKey);
+  }
+
+  const warnings: ShutdownAllowanceWarning[] = [];
+  const rowsToInsert = employees
+    .filter((employee) => {
+      const key = `${employee.id}:${startDate}:${normalizedEndDate || ''}`;
+      return !existingKeySet.has(key);
+    })
+    .map((employee) => {
+      const allowance = employee.annual_holiday_allowance_days ?? 28;
+      const alreadyBooked = usedByProfile.get(employee.id) || 0;
+      const projectedRemaining = allowance - alreadyBooked - requestedDays;
+      if (projectedRemaining < 0) {
+        warnings.push({
+          profileId: employee.id,
+          fullName: employee.full_name || 'Unknown employee',
+          employeeId: employee.employee_id,
+          allowance,
+          alreadyBooked,
+          requestedDays,
+          projectedRemaining,
+        });
+      }
+
+      return {
+        profile_id: employee.id,
+        date: startDate,
+        end_date: normalizedEndDate,
+        reason_id: annualLeaveReason.id,
+        duration_days: requestedDays,
+        is_half_day: false,
+        half_day_session: null,
+        notes: buildShutdownNotes(startDate, endDate, options.notes),
+        status: 'approved' as const,
+        created_by: options.actorProfileId,
+        approved_by: options.actorProfileId,
+        approved_at: new Date().toISOString(),
+      };
+    });
+
+  if (!options.confirm) {
+    return {
+      startDate,
+      endDate,
+      requestedDays,
+      totalEmployees: employees.length,
+      wouldCreate: rowsToInsert.length,
+      createdCount: 0,
+      duplicateCount: employees.length - rowsToInsert.length,
+      warningCount: warnings.length,
+      warnings,
+    };
+  }
+
+  if (rowsToInsert.length > 0) {
+    const batchSize = 500;
+    for (let i = 0; i < rowsToInsert.length; i += batchSize) {
+      const chunk = rowsToInsert.slice(i, i + batchSize);
+      const { error } = await options.supabase.from('absences').insert(chunk);
+      if (error) {
+        throw error;
+      }
+    }
+  }
+
+  return {
+    startDate,
+    endDate,
+    requestedDays,
+    totalEmployees: employees.length,
+    wouldCreate: rowsToInsert.length,
+    createdCount: rowsToInsert.length,
+    duplicateCount: employees.length - rowsToInsert.length,
+    warningCount: warnings.length,
+    warnings,
   };
 }

@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Keep `absences` fast for daily operations by moving closed UK financial year rows to `absences_archive`.
+Keep `absences` fast for daily operations by moving closed financial year rows to `absences_archive`.
 
 Financial year boundaries:
-- Start: `6 April`
-- End: `5 April`
+- Start: `1 April`
+- End: `31 March`
 
 Closed FY rows are read-only in both app hooks and database guards.
 

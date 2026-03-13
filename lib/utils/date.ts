@@ -83,8 +83,8 @@ export function formatTime(time: string | null): string {
 }
 
 /**
- * Get the UK financial year for a given date
- * UK financial year runs from 6 April to 5 April the following year
+ * Get the financial year for a given date
+ * Financial year runs from 1 April to 31 March the following year
  * @param date The date to get the financial year for
  * @returns Object with start, end dates and label (e.g., "2024/25")
  */
@@ -97,27 +97,27 @@ export function getFinancialYear(date: Date = new Date()): {
   const month = date.getMonth(); // 0-11
   const day = date.getDate();
   
-  // If before April 6th, financial year started last year
-  // If on or after April 6th, financial year started this year
+  // If before April 1st, financial year started last year
+  // If on or after April 1st, financial year started this year
   let startYear: number;
   
-  if (month < 3 || (month === 3 && day < 6)) {
-    // Jan-Mar or 1-5 April: FY started last year
+  if (month < 3 || (month === 3 && day < 1)) {
+    // Jan-Mar: FY started last year
     startYear = year - 1;
   } else {
-    // 6 April onwards: FY started this year
+    // 1 April onwards: FY started this year
     startYear = year;
   }
   
-  const start = new Date(startYear, 3, 6); // April 6th
-  const end = new Date(startYear + 1, 3, 5); // April 5th next year
+  const start = new Date(startYear, 3, 1); // April 1st
+  const end = new Date(startYear + 1, 2, 31); // March 31st next year
   const label = `${startYear}/${(startYear + 1).toString().slice(-2)}`;
   
   return { start, end, label };
 }
 
 /**
- * Get the current UK financial year
+ * Get the current financial year
  */
 export function getCurrentFinancialYear(): {
   start: Date;

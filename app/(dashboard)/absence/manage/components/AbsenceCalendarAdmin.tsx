@@ -170,8 +170,8 @@ export function AbsenceCalendarAdmin() {
     }
     const startYear = generationStatus.latestGeneratedFinancialYearStartYear;
     return {
-      start: new Date(startYear, 3, 6),
-      end: new Date(startYear + 1, 3, 5),
+      start: new Date(startYear, 3, 1),
+      end: new Date(startYear + 1, 2, 31),
       label: generationStatus.latestGeneratedFinancialYearLabel,
     };
   }, [currentFinancialYear, generationStatus]);

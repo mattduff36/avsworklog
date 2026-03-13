@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { ArrowUpDown, ChevronLeft, ChevronRight, Loader2, Search, Settings2, Sparkles, Trash2, Users } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useUpdateEmployeeAllowance } from '@/lib/hooks/useAbsence';
@@ -61,6 +62,28 @@ interface GenerationStatus {
   latestGeneratedFinancialYearEndDate: string;
   nextFinancialYearStartYear: number;
   nextFinancialYearLabel: string;
+}
+
+interface ShutdownWarningRow {
+  profileId: string;
+  fullName: string;
+  employeeId: string | null;
+  allowance: number;
+  alreadyBooked: number;
+  requestedDays: number;
+  projectedRemaining: number;
+}
+
+interface ShutdownPreviewResult {
+  startDate: string;
+  endDate: string;
+  requestedDays: number;
+  totalEmployees: number;
+  wouldCreate: number;
+  createdCount: number;
+  duplicateCount: number;
+  warningCount: number;
+  warnings: ShutdownWarningRow[];
 }
 
 type SortField = 'full_name' | 'allowance' | 'taken' | 'upcoming' | 'remaining';
@@ -112,8 +135,8 @@ function formatLocalDate(date: Date): string {
 }
 
 function buildFinancialYearFromStartYear(startYear: number) {
-  const start = new Date(startYear, 3, 6);
-  const end = new Date(startYear + 1, 3, 5);
+  const start = new Date(startYear, 3, 1);
+  const end = new Date(startYear + 1, 2, 31);
   return {
     start,
     end,
@@ -146,6 +169,12 @@ export function AllowancesContent() {
   const [removingGeneratedYear, setRemovingGeneratedYear] = useState(false);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
+  const [showShutdownDialog, setShowShutdownDialog] = useState(false);
+  const [shutdownStartDate, setShutdownStartDate] = useState('');
+  const [shutdownEndDate, setShutdownEndDate] = useState('');
+  const [shutdownNotes, setShutdownNotes] = useState('');
+  const [shutdownLoading, setShutdownLoading] = useState(false);
+  const [shutdownPreview, setShutdownPreview] = useState<ShutdownPreviewResult | null>(null);
 
   const updateAllowance = useUpdateEmployeeAllowance();
 
@@ -490,6 +519,61 @@ export function AllowancesContent() {
     }
   }
 
+  async function requestShutdownPreview(confirm: boolean) {
+    if (!shutdownStartDate) {
+      toast.error('Please select the first day of shutdown');
+      return;
+    }
+
+    setShutdownLoading(true);
+    try {
+      const response = await fetch('/api/absence/shutdown', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          startDate: shutdownStartDate,
+          endDate: shutdownEndDate || shutdownStartDate,
+          notes: shutdownNotes,
+          confirm,
+        }),
+      });
+      const payload = (await response.json()) as ShutdownPreviewResult & { success?: boolean; error?: string };
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error || 'Failed to process shutdown booking');
+      }
+
+      setShutdownPreview(payload);
+
+      if (confirm) {
+        toast.success(
+          `Created ${payload.createdCount} annual leave bookings. ${payload.warningCount} employee(s) are now over allowance.`
+        );
+        setShowShutdownDialog(false);
+        setShutdownStartDate('');
+        setShutdownEndDate('');
+        setShutdownNotes('');
+        setShutdownPreview(null);
+        await loadRows();
+        return;
+      }
+
+      if (payload.warningCount > 0) {
+        toast.warning(
+          `${payload.warningCount} employee(s) would exceed allowance. Review list and consider Unpaid Leave where needed.`
+        );
+      } else {
+        toast.success(`Preview ready: ${payload.wouldCreate} booking(s) will be created.`);
+      }
+    } catch (error) {
+      console.error('Error processing company shutdown booking:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to process shutdown booking');
+    } finally {
+      setShutdownLoading(false);
+    }
+  }
+
   function openEdit(profile: ProfileRow) {
     setEditingProfile(profile);
     setNewAllowance(String(profile.allowance));
@@ -563,6 +647,23 @@ export function AllowancesContent() {
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>Remove auto-generated bank holidays for the most recently prepared year</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={() => setShowShutdownDialog(true)}
+                    variant="outline"
+                    className="border-border text-muted-foreground"
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Book Shutdown (All Staff)
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Create one annual leave booking for every employee in a date range</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -861,6 +962,148 @@ export function AllowancesContent() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={showShutdownDialog}
+        onOpenChange={(open) => {
+          setShowShutdownDialog(open);
+          if (!open) {
+            setShutdownPreview(null);
+          }
+        }}
+      >
+        <DialogContent className="border-border max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Book Company Shutdown for All Staff</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Add one approved Annual Leave booking for every employee. A warning list is shown if this would take people over allowance.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="shutdown-start-date">First day off *</Label>
+                <Input
+                  id="shutdown-start-date"
+                  type="date"
+                  value={shutdownStartDate}
+                  onChange={(event) => {
+                    setShutdownStartDate(event.target.value);
+                    setShutdownPreview(null);
+                    if (shutdownEndDate && shutdownEndDate < event.target.value) {
+                      setShutdownEndDate(event.target.value);
+                    }
+                  }}
+                  className="border-border bg-background text-foreground"
+                />
+              </div>
+              <div>
+                <Label htmlFor="shutdown-end-date">Last day off *</Label>
+                <Input
+                  id="shutdown-end-date"
+                  type="date"
+                  value={shutdownEndDate}
+                  onChange={(event) => {
+                    setShutdownEndDate(event.target.value);
+                    setShutdownPreview(null);
+                  }}
+                  min={shutdownStartDate || undefined}
+                  className="border-border bg-background text-foreground"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="shutdown-notes">Booking Notes (optional)</Label>
+              <Textarea
+                id="shutdown-notes"
+                value={shutdownNotes}
+                onChange={(event) => {
+                  setShutdownNotes(event.target.value);
+                  setShutdownPreview(null);
+                }}
+                placeholder="Example: Christmas shutdown"
+                className="border-border bg-background text-foreground min-h-[88px]"
+              />
+            </div>
+
+            {shutdownPreview && (
+              <div className="rounded-lg border border-border bg-slate-900/40 p-4 space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Preview for <span className="text-foreground font-medium">{shutdownPreview.startDate}</span> to{' '}
+                  <span className="text-foreground font-medium">{shutdownPreview.endDate}</span> (
+                  {shutdownPreview.requestedDays} working day{shutdownPreview.requestedDays === 1 ? '' : 's'})
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">Employees</p>
+                    <p className="text-foreground font-medium">{shutdownPreview.totalEmployees}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Will create</p>
+                    <p className="text-foreground font-medium">{shutdownPreview.wouldCreate}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Already exists</p>
+                    <p className="text-foreground font-medium">{shutdownPreview.duplicateCount}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Over allowance</p>
+                    <p className={`font-medium ${shutdownPreview.warningCount > 0 ? 'text-amber-300' : 'text-green-400'}`}>
+                      {shutdownPreview.warningCount}
+                    </p>
+                  </div>
+                </div>
+
+                {shutdownPreview.warningCount > 0 && (
+                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 space-y-2">
+                    <p className="text-sm text-amber-200">
+                      These employees would go over allowance. You can still continue, but consider creating Unpaid Leave for these people instead.
+                    </p>
+                    <div className="max-h-40 overflow-y-auto space-y-1">
+                      {shutdownPreview.warnings.slice(0, 12).map((warning) => (
+                        <p key={warning.profileId} className="text-xs text-amber-100">
+                          {warning.fullName}
+                          {warning.employeeId ? ` (${warning.employeeId})` : ''} — projected remaining {warning.projectedRemaining}
+                        </p>
+                      ))}
+                      {shutdownPreview.warnings.length > 12 && (
+                        <p className="text-xs text-amber-100/80">
+                          +{shutdownPreview.warnings.length - 12} more employees in warning list
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowShutdownDialog(false)} className="border-border text-muted-foreground">
+              Cancel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => requestShutdownPreview(false)}
+              disabled={shutdownLoading || !shutdownStartDate}
+              className="border-border text-muted-foreground"
+            >
+              {shutdownLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Preview Impact
+            </Button>
+            <Button
+              onClick={() => requestShutdownPreview(true)}
+              disabled={shutdownLoading || !shutdownStartDate || !shutdownPreview}
+              className="bg-absence hover:bg-absence-dark text-white"
+            >
+              {shutdownLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Confirm & Create Annual Leave
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showGenerateDialog} onOpenChange={setShowGenerateDialog}>
         <DialogContent className="border-border">

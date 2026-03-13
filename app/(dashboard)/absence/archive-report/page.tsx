@@ -22,7 +22,7 @@ function getFinancialYearStartYear(isoDate: string): number {
   const year = date.getFullYear();
   const month = date.getMonth();
   const day = date.getDate();
-  if (month < 3 || (month === 3 && day < 6)) {
+  if (month < 3 || (month === 3 && day < 1)) {
     return year - 1;
   }
   return year;

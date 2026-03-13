@@ -117,8 +117,8 @@ export default function AbsencePage() {
     }
     const startYear = generationStatus.latestGeneratedFinancialYearStartYear;
     return {
-      start: new Date(startYear, 3, 6),
-      end: new Date(startYear + 1, 3, 5),
+      start: new Date(startYear, 3, 1),
+      end: new Date(startYear + 1, 2, 31),
       label: generationStatus.latestGeneratedFinancialYearLabel,
     };
   }, [currentFinancialYear, generationStatus]);
@@ -609,7 +609,7 @@ export default function AbsencePage() {
             Annual Leave Summary ({displayFinancialYear.label})
           </CardTitle>
           <CardDescription className="text-purple-100">
-            UK Financial Year: {formatDate(displayFinancialYear.start)} - {formatDate(displayFinancialYear.end)}
+            Financial Year: {formatDate(displayFinancialYear.start)} - {formatDate(displayFinancialYear.end)}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -639,121 +639,133 @@ export default function AbsencePage() {
       </Card>
       
       <Dialog open={showRequestDialog} onOpenChange={setShowRequestDialog}>
-        <DialogContent className="border-border max-w-2xl">
+        <DialogContent className="border-border max-w-3xl">
           <DialogHeader>
             <DialogTitle className="text-foreground">Request Leave</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Submit a leave request for the current financial year.
+            <DialogDescription className="text-slate-400/90">
+              Submit leave dates for approval in the current booking window.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="reason">Absence Reason</Label>
-                <Select value={selectedReasonId} onValueChange={setSelectedReasonId}>
-                  <SelectTrigger id="reason" className="bg-background border-border text-foreground">
-                    <SelectValue placeholder="Select reason" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableRequestReasons.map((reason) => (
-                      <SelectItem key={reason.id} value={reason.id}>
-                        {reason.name} ({reason.is_paid ? 'Paid' : 'Unpaid'})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="startDate">Start Date</Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => {
-                    setStartDate(e.target.value);
-                    if (endDate && endDate < e.target.value) {
-                      setEndDate('');
-                    }
-                  }}
-                  min={formatDateISO(new Date())}
-                  max={bookingMaxDate}
-                  required
-                  className="bg-background border-border text-foreground"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Booking window currently ends on {formatDate(bookingMaxDate)}.
-                </p>
-              </div>
-              <div>
-                <Label htmlFor="endDate">End Date (optional for multi-day)</Label>
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  min={startDate || formatDateISO(new Date())}
-                  max={bookingMaxDate}
-                  disabled={!startDate || isHalfDay}
-                  className="bg-background border-border text-foreground"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isHalfDay}
-                  onChange={(e) => {
-                    setIsHalfDay(e.target.checked);
-                    if (e.target.checked) {
-                      setEndDate('');
-                    }
-                  }}
-                  className="rounded border-border"
-                />
-                <span className="text-sm text-muted-foreground">Half Day</span>
-              </label>
-              {isHalfDay && (
-                <div className="flex gap-2">
-                  <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="session"
-                      value="AM"
-                      checked={halfDaySession === 'AM'}
-                      onChange={() => setHalfDaySession('AM')}
-                      className="text-purple-500"
-                    />
-                    <span className="text-sm text-muted-foreground">AM</span>
-                  </label>
-                  <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="session"
-                      value="PM"
-                      checked={halfDaySession === 'PM'}
-                      onChange={() => setHalfDaySession('PM')}
-                      className="text-purple-500"
-                    />
-                    <span className="text-sm text-muted-foreground">PM</span>
-                  </label>
+            <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="reason" className="text-foreground font-medium">Absence reason</Label>
+                  <p className="text-xs text-slate-400/90">Choose the leave type for this request.</p>
+                  <Select value={selectedReasonId} onValueChange={setSelectedReasonId}>
+                    <SelectTrigger id="reason" className="bg-slate-950 border-border text-foreground">
+                      <SelectValue placeholder="Select reason" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableRequestReasons.map((reason) => (
+                        <SelectItem key={reason.id} value={reason.id}>
+                          {reason.name} ({reason.is_paid ? 'Paid' : 'Unpaid'})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
-            </div>
 
-            <div>
-              <Label htmlFor="notes">Notes (optional)</Label>
-              <Input
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Add any additional information..."
-                className="bg-background border-border text-foreground"
-              />
+                <div className="space-y-1.5">
+                  <Label className="text-foreground font-medium">Duration options</Label>
+                  <p className="text-xs text-slate-400/90">Tick for a half-day request.</p>
+                  <div className="flex items-center gap-2 rounded-md border border-border bg-slate-950 px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={isHalfDay}
+                      onChange={(e) => {
+                        setIsHalfDay(e.target.checked);
+                        if (e.target.checked) {
+                          setEndDate('');
+                        }
+                      }}
+                      className="rounded border-border"
+                    />
+                    <span className="text-sm text-slate-400/90">Half Day</span>
+                  </div>
+                  {isHalfDay && (
+                    <div className="flex gap-3 pt-1">
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="session"
+                          value="AM"
+                          checked={halfDaySession === 'AM'}
+                          onChange={() => setHalfDaySession('AM')}
+                          className="text-purple-500"
+                        />
+                        <span className="text-sm text-slate-400/90">AM</span>
+                      </label>
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="session"
+                          value="PM"
+                          checked={halfDaySession === 'PM'}
+                          onChange={() => setHalfDaySession('PM')}
+                          className="text-purple-500"
+                        />
+                        <span className="text-sm text-slate-400/90">PM</span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="startDate" className="text-foreground font-medium">First day off</Label>
+                  <p className="text-xs text-slate-400/90">
+                    Select the first day you will be away from work.
+                  </p>
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      if (endDate && endDate < e.target.value) {
+                        setEndDate('');
+                      }
+                    }}
+                    min={formatDateISO(new Date())}
+                    max={bookingMaxDate}
+                    required
+                    className="bg-slate-950 border-border text-foreground"
+                  />
+                  <p className="text-xs text-slate-400/90 mt-1">
+                    Booking window currently ends on {formatDate(bookingMaxDate)}.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="endDate" className="text-foreground font-medium">Last day off</Label>
+                  <p className="text-xs text-slate-400/90">
+                    Leave blank for a single day. Disabled for half-day requests.
+                  </p>
+                  <Input
+                    id="endDate"
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    min={startDate || formatDateISO(new Date())}
+                    max={bookingMaxDate}
+                    disabled={!startDate || isHalfDay}
+                    className="bg-slate-950 border-border text-foreground"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="notes" className="text-foreground font-medium">Notes (optional)</Label>
+                <p className="text-xs text-slate-400/90">Add any context your manager should see.</p>
+                <Input
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Add any additional information..."
+                  className="bg-slate-950 border-border text-foreground"
+                />
+              </div>
             </div>
 
             {startDate && (
