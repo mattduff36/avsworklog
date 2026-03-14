@@ -41,7 +41,7 @@ export async function PUT(
     // Check if role exists and is not super admin
     const { data: existingRole, error: fetchError } = await supabase
       .from('roles')
-      .select('name, is_super_admin')
+      .select('name, role_class, is_super_admin')
       .eq('id', id)
       .single();
 
@@ -60,7 +60,7 @@ export async function PUT(
     }
 
     // Employee roles are restricted to standard modules only.
-    if (existingRole.name.startsWith('employee-')) {
+    if (existingRole.role_class === 'employee') {
       const managementEnabled = body.permissions.filter(
         (perm) => MANAGEMENT_MODULES.includes(perm.module_name) && perm.enabled
       );

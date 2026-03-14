@@ -11,6 +11,7 @@ type Profile = Database['public']['Tables']['profiles']['Row'] & {
   role?: {
     name: string;
     display_name: string;
+    role_class?: 'admin' | 'manager' | 'employee';
     is_manager_admin: boolean;
     is_super_admin: boolean;
   } | null;
@@ -19,6 +20,7 @@ type Profile = Database['public']['Tables']['profiles']['Row'] & {
 interface EffectiveRole {
   name: string;
   display_name: string;
+  role_class?: 'admin' | 'manager' | 'employee';
   is_manager_admin: boolean;
   is_super_admin: boolean;
 }
@@ -59,6 +61,7 @@ export function useAuth() {
           role:roles(
             name,
             display_name,
+            role_class,
             is_manager_admin,
             is_super_admin
           )
@@ -78,6 +81,7 @@ export function useAuth() {
               role:roles(
                 name,
                 display_name,
+                role_class,
                 is_manager_admin,
                 is_super_admin
               )
@@ -274,7 +278,7 @@ export function useAuth() {
       try {
         const { data, error } = await supabase
           .from('roles')
-          .select('name, display_name, is_manager_admin, is_super_admin')
+          .select('name, display_name, role_class, is_manager_admin, is_super_admin')
           .eq('id', viewAsRoleId)
           .single();
         if (!error && data) {
@@ -344,9 +348,9 @@ export function useAuth() {
     signOut,
     signUp,
     // These flags reflect the EFFECTIVE role (overridden when viewing-as)
-    isAdmin: roleForFlags?.name === 'admin',
-    isManager: roleForFlags?.is_manager_admin || false,
-    isEmployee: roleForFlags?.name?.startsWith('employee-') || false,
+    isAdmin: roleForFlags?.role_class === 'admin' || roleForFlags?.name === 'admin',
+    isManager: roleForFlags?.role_class === 'manager' || false,
+    isEmployee: roleForFlags?.role_class === 'employee' || false,
     isSuperAdmin: isViewingAs ? (roleForFlags?.is_super_admin || false) : isActualSuperAdmin,
     // Always reflects the real user, unaffected by view-as
     isActualSuperAdmin,

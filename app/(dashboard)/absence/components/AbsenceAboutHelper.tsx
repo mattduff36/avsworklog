@@ -73,7 +73,7 @@ export function AbsenceAboutHelper({ variant }: AbsenceAboutHelperProps) {
                 </div>
                 <p className="mt-4 text-xs text-blue-600 dark:text-blue-400">
                   <strong>Tip:</strong> Go back to{' '}
-                  <Link href="/absence/manage?tab=records" className="font-medium underline underline-offset-2">
+                  <Link href="/absence/manage?tab=overview" className="font-medium underline underline-offset-2">
                     manage records
                   </Link>{' '}
                   for current-day operational actions.

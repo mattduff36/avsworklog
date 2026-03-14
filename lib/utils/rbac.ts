@@ -5,6 +5,7 @@ import type { ModuleName } from '@/types/roles';
 interface RoleRecord {
   id: string;
   name: string;
+  role_class: 'admin' | 'manager' | 'employee';
   is_super_admin: boolean;
 }
 
@@ -46,11 +47,11 @@ export async function canEffectiveRoleAssignRole(targetRoleId: string): Promise<
   const admin = createAdminClient();
   const { data: targetRole } = await admin
     .from('roles')
-    .select('name, is_manager_admin')
+    .select('role_class, is_super_admin')
     .eq('id', targetRoleId)
     .maybeSingle();
 
-  return !!targetRole?.name?.startsWith('employee-') && !targetRole?.is_manager_admin;
+  return targetRole?.role_class === 'employee' && targetRole?.is_super_admin !== true;
 }
 
 export async function isEffectiveRoleAdminOrSuper(): Promise<boolean> {
@@ -71,14 +72,14 @@ export async function getAssignableRolesForEffectiveActor(): Promise<RoleRecord[
   const admin = createAdminClient();
   let query = admin
     .from('roles')
-    .select('id, name, is_super_admin')
+    .select('id, name, role_class, is_super_admin')
     .order('is_super_admin', { ascending: false })
     .order('is_manager_admin', { ascending: false })
     .order('display_name', { ascending: true });
 
   if (!(effectiveRole.is_super_admin || effectiveRole.role_name === 'admin')) {
     if (effectiveRole.is_manager_admin) {
-      query = query.like('name', 'employee-%').eq('is_manager_admin', false);
+      query = query.eq('role_class', 'employee').eq('is_super_admin', false);
     } else {
       return [];
     }

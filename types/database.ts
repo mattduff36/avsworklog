@@ -19,7 +19,8 @@ export interface Database {
           employee_id: string | null
           full_name: string
           phone_number: string | null
-          role: 'admin' | 'manager' | 'employee-civils' | 'employee-plant' | 'employee-transport' | 'employee-office' | 'employee-workshop'
+          role: string | null
+          role_id: string | null
           must_change_password: boolean
           annual_holiday_allowance_days: number | null
           created_at: string
@@ -30,7 +31,8 @@ export interface Database {
           employee_id?: string | null
           full_name: string
           phone_number?: string | null
-          role: 'admin' | 'manager' | 'employee-civils' | 'employee-plant' | 'employee-transport' | 'employee-office' | 'employee-workshop'
+          role?: string | null
+          role_id?: string | null
           must_change_password?: boolean
           annual_holiday_allowance_days?: number | null
           created_at?: string
@@ -41,9 +43,74 @@ export interface Database {
           employee_id?: string | null
           full_name?: string
           phone_number?: string | null
-          role?: 'admin' | 'manager' | 'employee-civils' | 'employee-plant' | 'employee-transport' | 'employee-office' | 'employee-workshop'
+          role?: string | null
+          role_id?: string | null
           must_change_password?: boolean
           annual_holiday_allowance_days?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      roles: {
+        Row: {
+          id: string
+          name: string
+          display_name: string
+          description: string | null
+          role_class: 'admin' | 'manager' | 'employee'
+          is_super_admin: boolean
+          is_manager_admin: boolean
+          timesheet_type: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          display_name: string
+          description?: string | null
+          role_class?: 'admin' | 'manager' | 'employee'
+          is_super_admin?: boolean
+          is_manager_admin?: boolean
+          timesheet_type?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          display_name?: string
+          description?: string | null
+          role_class?: 'admin' | 'manager' | 'employee'
+          is_super_admin?: boolean
+          is_manager_admin?: boolean
+          timesheet_type?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      role_permissions: {
+        Row: {
+          id: string
+          role_id: string
+          module_name: string
+          enabled: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          role_id: string
+          module_name: string
+          enabled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          role_id?: string
+          module_name?: string
+          enabled?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -1573,6 +1640,7 @@ export interface Database {
           auto_generated: boolean
           generation_source: string | null
           holiday_key: string | null
+          bulk_batch_id: string | null
           created_at: string
           updated_at: string
         }
@@ -1594,6 +1662,7 @@ export interface Database {
           auto_generated?: boolean
           generation_source?: string | null
           holiday_key?: string | null
+          bulk_batch_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -1615,6 +1684,60 @@ export interface Database {
           auto_generated?: boolean
           generation_source?: string | null
           holiday_key?: string | null
+          bulk_batch_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      absence_bulk_batches: {
+        Row: {
+          id: string
+          created_by: string | null
+          reason_id: string
+          reason_name: string
+          start_date: string
+          end_date: string
+          notes: string | null
+          apply_to_all: boolean
+          role_names: string[]
+          explicit_profile_ids: string[]
+          targeted_count: number
+          created_count: number
+          duplicate_count: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          created_by?: string | null
+          reason_id: string
+          reason_name: string
+          start_date: string
+          end_date: string
+          notes?: string | null
+          apply_to_all?: boolean
+          role_names?: string[]
+          explicit_profile_ids?: string[]
+          targeted_count?: number
+          created_count?: number
+          duplicate_count?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          created_by?: string | null
+          reason_id?: string
+          reason_name?: string
+          start_date?: string
+          end_date?: string
+          notes?: string | null
+          apply_to_all?: boolean
+          role_names?: string[]
+          explicit_profile_ids?: string[]
+          targeted_count?: number
+          created_count?: number
+          duplicate_count?: number
           created_at?: string
           updated_at?: string
         }

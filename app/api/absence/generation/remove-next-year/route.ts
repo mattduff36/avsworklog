@@ -3,7 +3,7 @@ import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { removeLatestGeneratedFinancialYear } from '@/lib/services/absence-bank-holiday-sync';
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const supabase = await createServerClient();
     const {
@@ -22,7 +22,17 @@ export async function POST() {
       );
     }
 
-    const result = await removeLatestGeneratedFinancialYear({ supabase });
+    const rawBody = await request.text();
+    let deleteExistingBookings = false;
+    if (rawBody.trim()) {
+      const parsed = JSON.parse(rawBody) as { deleteExistingBookings?: boolean };
+      deleteExistingBookings = parsed.deleteExistingBookings === true;
+    }
+
+    const result = await removeLatestGeneratedFinancialYear({
+      supabase,
+      deleteExistingBookings,
+    });
 
     return NextResponse.json({
       success: true,

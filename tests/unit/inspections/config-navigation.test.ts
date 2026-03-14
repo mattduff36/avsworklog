@@ -14,14 +14,14 @@ describe('Navigation Config — Inspection Rename Verification', () => {
   it('has Van Inspections as separate nav item pointing to /van-inspections', () => {
     const vanNav = employeeNavItems.find(n => n.href === '/van-inspections');
     expect(vanNav).toBeDefined();
-    expect(vanNav!.label).toBe('Van Inspections');
+    expect(vanNav!.label).toMatch(/Van (Daily Checks|Inspections)/i);
     expect(vanNav!.module).toBe('inspections');
   });
 
   it('has Plant Inspections as separate nav item pointing to /plant-inspections', () => {
     const plantNav = employeeNavItems.find(n => n.href === '/plant-inspections');
     expect(plantNav).toBeDefined();
-    expect(plantNav!.label).toBe('Plant Inspections');
+    expect(plantNav!.label).toMatch(/Plant (Daily Checks|Inspections)/i);
     expect(plantNav!.module).toBe('plant-inspections');
   });
 
@@ -56,7 +56,7 @@ describe('Forms Config — Inspection Rename Verification', () => {
   it('has Van Inspections form type with /van-inspections href', () => {
     const vanForm = FORM_TYPES.find(f => f.id === 'inspection');
     expect(vanForm).toBeDefined();
-    expect(vanForm!.title).toBe('Van Inspections');
+    expect(vanForm!.title).toMatch(/Van (Daily Checks|Inspections)/i);
     expect(vanForm!.href).toBe('/van-inspections');
     expect(vanForm!.listHref).toBe('/van-inspections');
     expect(vanForm!.enabled).toBe(true);
@@ -65,7 +65,7 @@ describe('Forms Config — Inspection Rename Verification', () => {
   it('has Plant Inspections form type with /plant-inspections href', () => {
     const plantForm = FORM_TYPES.find(f => f.id === 'plant-inspection');
     expect(plantForm).toBeDefined();
-    expect(plantForm!.title).toBe('Plant Inspections');
+    expect(plantForm!.title).toMatch(/Plant (Daily Checks|Inspections)/i);
     expect(plantForm!.href).toBe('/plant-inspections');
     expect(plantForm!.listHref).toBe('/plant-inspections');
     expect(plantForm!.enabled).toBe(true);

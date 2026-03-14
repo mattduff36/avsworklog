@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { isEffectiveRoleAdminOrSuper } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { GetRoleResponse, UpdateRoleRequest } from '@/types/roles';
+import { managerFlagFromRoleClass, normalizeRoleInternalName } from '@/lib/utils/role-name';
 
 /**
  * GET /api/admin/roles/[id]
@@ -100,16 +101,12 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
-    const body = (await request.json()) as UpdateRoleRequest & {
-      name?: string;
-      is_manager_admin?: boolean;
-      timesheet_type?: string;
-    };
+    const body = (await request.json()) as UpdateRoleRequest;
 
     // Check if role exists and is not super admin
     const { data: existingRole, error: fetchError } = await supabase
       .from('roles')
-      .select('is_super_admin')
+      .select('is_super_admin, role_class, name')
       .eq('id', id)
       .single();
 
@@ -126,12 +123,15 @@ export async function PATCH(
       }, { status: 403 });
     }
 
+    const nextRoleClass = body.role_class ?? existingRole.role_class;
+
     // If changing name, check it doesn't conflict
     if (body.name) {
+      const normalizedName = normalizeRoleInternalName(body.name);
       const { data: conflictRole } = await supabase
         .from('roles')
         .select('id')
-        .eq('name', body.name)
+        .eq('name', normalizedName)
         .neq('id', id)
         .single();
 
@@ -140,15 +140,27 @@ export async function PATCH(
           error: 'A role with this name already exists' 
         }, { status: 409 });
       }
+
+      if (nextRoleClass === 'admin' && normalizedName !== 'admin') {
+        return NextResponse.json({
+          error: 'Admin role must use internal name \"admin\"'
+        }, { status: 400 });
+      }
     }
 
     // Update the role
     const updateData: Record<string, unknown> = {};
-    if (body.name !== undefined) updateData.name = body.name;
-    if (body.display_name !== undefined) updateData.display_name = body.display_name;
+    if (body.name !== undefined) updateData.name = normalizeRoleInternalName(body.name);
+    if (body.display_name !== undefined) updateData.display_name = body.display_name.trim();
     if (body.description !== undefined) updateData.description = body.description;
-    if (body.is_manager_admin !== undefined) updateData.is_manager_admin = body.is_manager_admin;
-    if (body.timesheet_type !== undefined) updateData.timesheet_type = body.timesheet_type; // Phase 6
+    if (body.role_class !== undefined) {
+      updateData.role_class = body.role_class;
+      updateData.is_manager_admin = managerFlagFromRoleClass(body.role_class);
+      if (body.role_class === 'admin' && updateData.name !== 'admin') {
+        updateData.name = 'admin';
+      }
+    }
+    if (body.timesheet_type !== undefined) updateData.timesheet_type = body.timesheet_type;
 
     const { data: updatedRole, error: updateError } = await supabase
       .from('roles')

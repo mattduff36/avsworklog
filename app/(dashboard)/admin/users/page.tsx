@@ -58,7 +58,13 @@ const JobRolesTab = dynamic(() => import('@/components/admin/JobRolesTab').then(
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 type ProfileWithRole = Omit<Profile, 'role'> & {
-  role?: { name: string; display_name: string } | null;
+  role?: {
+    name: string;
+    display_name: string;
+    role_class?: 'admin' | 'manager' | 'employee';
+    is_super_admin?: boolean;
+    is_manager_admin?: boolean;
+  } | null;
   role_id?: string | null;
 };
 type ProfileWithEmail = ProfileWithRole & { email?: string };
@@ -82,7 +88,7 @@ export default function UsersAdminPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'manager' | 'employee'>('all');
-  const [availableRoles, setAvailableRoles] = useState<Array<{ id: string; name: string; display_name: string }>>([]);
+  const [availableRoles, setAvailableRoles] = useState<Array<{ id: string; name: string; display_name: string; role_class: 'admin' | 'manager' | 'employee' }>>([]);
 
   useEffect(() => {
     const requestedTab = (searchParams.get('tab') || 'users') as TabType;
@@ -129,9 +135,9 @@ export default function UsersAdminPage() {
   // Stats
   const stats = {
     total: users.length,
-    admins: users.filter((u) => u.role?.name === 'admin').length,
-    managers: users.filter((u) => u.role?.name === 'manager').length,
-    employees: users.filter((u) => u.role?.name?.startsWith('employee-')).length,
+    admins: users.filter((u) => u.role?.role_class === 'admin' || u.role?.name === 'admin').length,
+    managers: users.filter((u) => u.role?.role_class === 'manager').length,
+    employees: users.filter((u) => u.role?.role_class === 'employee').length,
   };
 
   // Helper function to fetch users with emails
@@ -143,7 +149,10 @@ export default function UsersAdminPage() {
         *,
         role:roles(
           name,
-          display_name
+          display_name,
+          role_class,
+          is_super_admin,
+          is_manager_admin
         )
       `)
       .order('full_name', { ascending: true });
@@ -170,7 +179,7 @@ export default function UsersAdminPage() {
       try {
         const { data, error } = await supabase
           .from('roles')
-          .select('id, name, display_name')
+          .select('id, name, display_name, role_class')
           .order('is_super_admin', { ascending: false })
           .order('is_manager_admin', { ascending: false })
           .order('display_name');
@@ -178,7 +187,7 @@ export default function UsersAdminPage() {
         if (error) throw error;
 
         const filteredRoles = isManagerActor
-          ? (data || []).filter((role: { name: string }) => role.name.startsWith('employee-'))
+          ? (data || []).filter((role: { role_class: string }) => role.role_class === 'employee')
           : (data || []);
 
         setAvailableRoles(filteredRoles);
@@ -220,9 +229,9 @@ export default function UsersAdminPage() {
     // Apply role filter
     if (roleFilter !== 'all') {
       filtered = filtered.filter((user) => {
-        if (roleFilter === 'admin') return user.role?.name === 'admin';
-        if (roleFilter === 'manager') return user.role?.name === 'manager';
-        if (roleFilter === 'employee') return user.role?.name?.startsWith('employee-');
+        if (roleFilter === 'admin') return user.role?.role_class === 'admin' || user.role?.name === 'admin';
+        if (roleFilter === 'manager') return user.role?.role_class === 'manager';
+        if (roleFilter === 'employee') return user.role?.role_class === 'employee';
         return true;
       });
     }
@@ -697,8 +706,8 @@ export default function UsersAdminPage() {
                         <TableCell>
                           <Badge variant={
                             user.email === 'admin@mpdee.co.uk' ? 'destructive' :
-                            user.role?.name === 'admin' ? 'destructive' :
-                            user.role?.name === 'manager' ? 'warning' : 'secondary'
+                            user.role?.role_class === 'admin' ? 'destructive' :
+                            user.role?.role_class === 'manager' ? 'warning' : 'secondary'
                           }>
                             {user.email === 'admin@mpdee.co.uk' ? 'SuperAdmin' : (user.role?.display_name || 'No Role')}
                           </Badge>
@@ -965,7 +974,7 @@ export default function UsersAdminPage() {
                   <span className="text-muted-foreground">Role:</span>{' '}
                   <Badge variant={
                     selectedUser.email === 'admin@mpdee.co.uk' ? 'destructive' :
-                    selectedUser.role?.name === 'admin' ? 'destructive' : 'default'
+                    selectedUser.role?.role_class === 'admin' ? 'destructive' : 'default'
                   }>
                     {selectedUser.email === 'admin@mpdee.co.uk' ? 'SuperAdmin' : (selectedUser.role?.display_name || 'No Role')}
                   </Badge>

@@ -72,7 +72,14 @@ function PDFViewerContent() {
     }
 
     try {
-      setPdfUrl(decodeURIComponent(url));
+      // `useSearchParams().get()` already returns a decoded value.
+      // Decoding again can alter signed query values and break access.
+      const normalizedUrl = url.trim();
+      const parsed = new URL(normalizedUrl);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        throw new Error('Unsupported PDF URL protocol');
+      }
+      setPdfUrl(normalizedUrl);
     } catch {
       setError('Invalid PDF URL');
     }

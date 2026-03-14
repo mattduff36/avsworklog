@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
+import { getProfileWithRole } from '@/lib/utils/permissions';
 import type {
   CreateCategoryRequest,
   CategoriesListResponse
@@ -65,15 +66,8 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Check if user is admin/manager
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role:roles(name)')
-      .eq('id', user.id)
-      .single();
-    
-    const roleName = (profile?.role as { name?: string } | null)?.name;
-    if (!roleName || !['admin', 'manager'].includes(roleName)) {
+    const profile = await getProfileWithRole(user.id);
+    if (!profile?.role || profile.role.role_class === 'employee') {
       return NextResponse.json(
         { error: 'Only admins and managers can create categories' },
         { status: 403 }

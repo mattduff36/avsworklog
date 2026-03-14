@@ -32,7 +32,7 @@ export const CreateUserSchema = z.object({
   email: z.string().email('Invalid email address'),
   full_name: z.string().min(1, 'Name is required').max(100),
   employee_id: z.string().optional(),
-  role: z.enum(['admin', 'manager', 'employee-civils', 'employee-plant', 'employee-transport', 'employee-office', 'employee-workshop']),
+  role: z.string().min(1, 'Role is required'),
   phone_number: z.string().optional(),
   annual_holiday_allowance_days: z.number().int().min(0).max(365).optional(),
 });

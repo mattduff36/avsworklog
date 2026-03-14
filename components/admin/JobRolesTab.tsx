@@ -60,7 +60,6 @@ export function JobRolesTab() {
     name: '',
     display_name: '',
     description: '',
-    is_manager_admin: false,
     role_type: 'employee' as RoleType,
     timesheet_type: 'civils' as string,
   });
@@ -106,7 +105,6 @@ export function JobRolesTab() {
       name: '',
       display_name: '',
       description: '',
-      is_manager_admin: false,
       role_type: 'employee',
       timesheet_type: 'civils',
     });
@@ -119,8 +117,7 @@ export function JobRolesTab() {
       name: role.name,
       display_name: role.display_name,
       description: role.description || '',
-      is_manager_admin: role.is_manager_admin,
-      role_type: role.name === 'admin' ? 'admin' : (role.is_manager_admin ? 'manager' : 'employee'),
+      role_type: role.role_class || (role.name === 'admin' ? 'admin' : (role.is_manager_admin ? 'manager' : 'employee')),
       timesheet_type: role.timesheet_type || 'civils',
     });
     setFormError('');
@@ -144,7 +141,10 @@ export function JobRolesTab() {
       const response = await fetch('/api/admin/roles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          role_class: formData.role_type,
+        }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to create role');
@@ -171,7 +171,10 @@ export function JobRolesTab() {
       const response = await fetch(`/api/admin/roles/${selectedRole.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          role_class: formData.role_type,
+        }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to update role');
@@ -465,7 +468,6 @@ export function JobRolesTab() {
                   setFormData({
                     ...formData,
                     role_type: value,
-                    is_manager_admin: value === 'manager' || value === 'admin',
                   });
                 }}
               >
@@ -565,7 +567,6 @@ export function JobRolesTab() {
                   setFormData({
                     ...formData,
                     role_type: value,
-                    is_manager_admin: value === 'manager' || value === 'admin',
                   });
                 }}
               >

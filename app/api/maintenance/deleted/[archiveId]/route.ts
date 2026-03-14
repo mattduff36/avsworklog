@@ -27,7 +27,7 @@ export async function DELETE(
     // Check if user is admin or manager
     const profile = await getProfileWithRole(user.id);
     
-    if (!profile || !['admin', 'manager'].includes(profile.role?.name || '')) {
+    if (!profile?.role || profile.role.role_class === 'employee') {
       return NextResponse.json(
         { error: 'Forbidden: Admin or Manager access required' },
         { status: 403 }

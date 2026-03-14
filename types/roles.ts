@@ -1,10 +1,13 @@
 // Role and Permission Types
 
+export type RoleClass = 'admin' | 'manager' | 'employee';
+
 export interface Role {
   id: string;
   name: string;
   display_name: string;
   description: string | null;
+  role_class: RoleClass;
   is_super_admin: boolean;
   is_manager_admin: boolean;
   timesheet_type?: string;
@@ -208,13 +211,17 @@ export interface CreateRoleRequest {
   name: string;
   display_name: string;
   description?: string;
-  is_manager_admin?: boolean;
-  role_type?: 'admin' | 'manager' | 'employee';
+  role_class?: RoleClass;
+  role_type?: RoleClass;
+  timesheet_type?: string;
 }
 
 export interface UpdateRoleRequest {
+  name?: string;
   display_name?: string;
   description?: string;
+  role_class?: RoleClass;
+  timesheet_type?: string;
 }
 
 export interface UpdatePermissionsRequest {

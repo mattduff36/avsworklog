@@ -40,6 +40,7 @@ import { AbsenceReasonsContent } from '@/app/(dashboard)/absence/manage/componen
 import { AllowancesContent } from '@/app/(dashboard)/absence/manage/components/AllowancesContent';
 import { AbsenceCalendarAdmin } from '@/app/(dashboard)/absence/manage/components/AbsenceCalendarAdmin';
 import { AbsenceAboutHelper } from '@/app/(dashboard)/absence/components/AbsenceAboutHelper';
+import { ManageOverviewAdminActions } from '@/app/(dashboard)/absence/manage/components/ManageOverviewAdminActions';
 
 type ManageSortField = 'employee' | 'reason' | 'status' | 'date' | 'duration' | 'approved_at';
 type ManageSortDirection = 'asc' | 'desc';
@@ -65,7 +66,7 @@ export default function AdminAbsencePage() {
   const [sortDirection, setSortDirection] = useState<ManageSortDirection>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 25;
-  const [activeTab, setActiveTab] = useState<'records' | 'calendar' | 'reasons' | 'allowances'>('records');
+  const [activeTab, setActiveTab] = useState<'overview' | 'calendar' | 'reasons' | 'allowances'>('overview');
   
   // Data
   const { data: absences, isLoading } = useAllAbsences({ 
@@ -145,6 +146,9 @@ export default function AdminAbsencePage() {
   
   // Dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [selectedProfileId, setSelectedProfileId] = useState('');
   const [selectedReasonId, setSelectedReasonId] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -163,13 +167,14 @@ export default function AdminAbsencePage() {
 
   useEffect(() => {
     if (authLoading) return;
-    const requestedTab = searchParams.get('tab') || 'records';
-    const allowedTabs: Array<'records' | 'calendar' | 'reasons' | 'allowances'> = ['records', 'calendar'];
+    const tabParam = searchParams.get('tab') || 'overview';
+    const requestedTab = tabParam === 'records' ? 'overview' : tabParam;
+    const allowedTabs: Array<'overview' | 'calendar' | 'reasons' | 'allowances'> = ['overview', 'calendar'];
     if (isAdmin) allowedTabs.push('reasons', 'allowances');
     else if (isManager) allowedTabs.push('allowances');
 
     if (allowedTabs.includes(requestedTab as typeof allowedTabs[number])) {
-      setActiveTab(requestedTab as typeof allowedTabs[number]);
+      setActiveTab(requestedTab as 'overview' | 'calendar' | 'reasons' | 'allowances');
     } else {
       const fallback = allowedTabs[0];
       const params = new URLSearchParams(searchParams.toString());
@@ -190,11 +195,11 @@ export default function AdminAbsencePage() {
 
   useEffect(() => {
     if (!isAdmin && activeTab === 'reasons') {
-      setActiveTab('records');
+      setActiveTab('overview');
     }
   }, [isAdmin, activeTab]);
 
-  function handleTabChange(nextTab: 'records' | 'calendar' | 'reasons' | 'allowances') {
+  function handleTabChange(nextTab: 'overview' | 'calendar' | 'reasons' | 'allowances') {
     if (!isAdmin && nextTab === 'reasons') return;
     if (!canManage && nextTab === 'allowances') return;
     setActiveTab(nextTab);
@@ -308,23 +313,24 @@ export default function AdminAbsencePage() {
   }
   
   // Handle delete
-  async function handleDelete(id: string) {
-    const confirmed = await import('@/lib/services/notification.service').then(m => 
-      m.notify.confirm({
-        title: 'Delete Absence',
-        description: 'Are you sure you want to delete this absence? This cannot be undone.',
-        confirmText: 'Delete',
-        destructive: true,
-      })
-    );
-    if (!confirmed) return;
-    
+  function handleDelete(id: string) {
+    setDeleteTargetId(id);
+    setShowDeleteDialog(true);
+  }
+
+  async function confirmDeleteAbsence() {
+    if (!deleteTargetId) return;
+    setDeleteSubmitting(true);
     try {
-      await deleteAbsence.mutateAsync(id);
+      await deleteAbsence.mutateAsync(deleteTargetId);
       toast.success('Absence deleted');
+      setShowDeleteDialog(false);
+      setDeleteTargetId(null);
     } catch (error) {
       console.error('Error deleting:', error);
       toast.error('Failed to delete absence');
+    } finally {
+      setDeleteSubmitting(false);
     }
   }
   
@@ -370,129 +376,30 @@ export default function AdminAbsencePage() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as 'records' | 'calendar' | 'reasons' | 'allowances')} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as 'overview' | 'calendar' | 'reasons' | 'allowances')} className="space-y-6">
         <div className="flex items-center justify-end">
           <TabsList>
-            <TabsTrigger value="records">Records</TabsTrigger>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="calendar">Calendar</TabsTrigger>
             {isAdmin && <TabsTrigger value="reasons">Reasons</TabsTrigger>}
             {canManage && <TabsTrigger value="allowances">Allowances</TabsTrigger>}
           </TabsList>
         </div>
 
-        <TabsContent value="records" className="space-y-6 mt-0">
-          {/* Filters */}
-          <Card className="">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-foreground">
-                <Filter className="h-5 w-5" />
-                Filters
-              </CardTitle>
-              {(profileId || dateFrom || dateTo || reasonId || status) && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setProfileId('');
-                    setDateFrom('');
-                    setDateTo('');
-                    setReasonId('');
-                    setStatus('');
-                  }}
-                  className="border-border text-muted-foreground"
-                >
-                  Clear Filters
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div>
-                  <Label>Employee</Label>
-                  <Select value={profileId || 'all'} onValueChange={(value) => setProfileId(value === 'all' ? '' : value)}>
-                    <SelectTrigger className="bg-background border-border text-foreground">
-                      <SelectValue placeholder="All employees" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All employees</SelectItem>
-                      {profiles.map((profile) => (
-                        <SelectItem key={profile.id} value={profile.id}>
-                          {profile.full_name} {profile.employee_id ? `(${profile.employee_id})` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>From Date</Label>
-                  <Input
-                    type="date"
-                    value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                    className="bg-background border-border text-foreground"
-                  />
-                </div>
-
-                <div>
-                  <Label>To Date</Label>
-                  <Input
-                    type="date"
-                    value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)}
-                    className="bg-background border-border text-foreground"
-                  />
-                </div>
-
-                <div>
-                  <Label>Reason</Label>
-                  <Select value={reasonId || 'all'} onValueChange={(value) => setReasonId(value === 'all' ? '' : value)}>
-                    <SelectTrigger className="bg-background border-border text-foreground">
-                      <SelectValue placeholder="All reasons" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All reasons</SelectItem>
-                      {reasons?.map((reason) => (
-                        <SelectItem key={reason.id} value={reason.id}>
-                          {reason.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Status</Label>
-                  <Select value={status || 'all'} onValueChange={(value) => setStatus(value === 'all' ? '' : value)}>
-                    <SelectTrigger className="bg-background border-border text-foreground">
-                      <SelectValue placeholder="All statuses" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All statuses</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="approved">Approved</SelectItem>
-                      <SelectItem value="rejected">Rejected</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-                <label className="inline-flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={includeArchived}
-                    onChange={(event) => handleIncludeArchivedChange(event.target.checked)}
-                    className="rounded border-border"
-                  />
-                  <span className="text-sm text-muted-foreground">Include archived records</span>
-                </label>
-                <Link href="/absence/archive-report" className="text-sm text-absence hover:underline">
-                  Open archive report
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="overview" className="space-y-6 mt-0">
+          {canManage && (
+            <Card className="border-border">
+              <CardHeader>
+                <CardTitle className="text-foreground">Admin Actions</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  Run bulk absence booking and prepare next-year setup actions.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ManageOverviewAdminActions />
+              </CardContent>
+            </Card>
+          )}
 
           {/* Absences Table */}
           <Card className="border-border">
@@ -506,18 +413,130 @@ export default function AdminAbsencePage() {
                     {filteredAbsences.length} records found{pendingCount > 0 ? ` · ${pendingCount} pending` : ''}
                   </CardDescription>
                 </div>
-                <Link href="/approvals?tab=absences" className="w-full md:w-auto">
-                  <Button
-                    variant="outline"
-                    className="w-full md:w-auto border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
-                  >
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Review Pending in Approvals
-                  </Button>
-                </Link>
+                {pendingCount > 0 && (
+                  <Link href="/approvals?tab=absences" className="w-full md:w-auto">
+                    <Button
+                      variant="outline"
+                      className="w-full md:w-auto border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Review Pending in Approvals
+                    </Button>
+                  </Link>
+                )}
               </div>
             </CardHeader>
             <CardContent>
+              <div className="rounded-lg border border-border/60 bg-slate-900/20 p-4 mb-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+                  <h3 className="flex items-center gap-2 text-foreground font-medium">
+                    <Filter className="h-4 w-4" />
+                    Filters
+                  </h3>
+                  {(profileId || dateFrom || dateTo || reasonId || status) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setProfileId('');
+                        setDateFrom('');
+                        setDateTo('');
+                        setReasonId('');
+                        setStatus('');
+                      }}
+                      className="border-border text-muted-foreground"
+                    >
+                      Clear Filters
+                    </Button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div>
+                    <Label>Employee</Label>
+                    <Select value={profileId || 'all'} onValueChange={(value) => setProfileId(value === 'all' ? '' : value)}>
+                      <SelectTrigger className="bg-background border-border text-foreground">
+                        <SelectValue placeholder="All employees" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All employees</SelectItem>
+                        {profiles.map((profile) => (
+                          <SelectItem key={profile.id} value={profile.id}>
+                            {profile.full_name} {profile.employee_id ? `(${profile.employee_id})` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>From Date</Label>
+                    <Input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      className="bg-background border-border text-foreground"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>To Date</Label>
+                    <Input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      className="bg-background border-border text-foreground"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Reason</Label>
+                    <Select value={reasonId || 'all'} onValueChange={(value) => setReasonId(value === 'all' ? '' : value)}>
+                      <SelectTrigger className="bg-background border-border text-foreground">
+                        <SelectValue placeholder="All reasons" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All reasons</SelectItem>
+                        {reasons?.map((reason) => (
+                          <SelectItem key={reason.id} value={reason.id}>
+                            {reason.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Status</Label>
+                    <Select value={status || 'all'} onValueChange={(value) => setStatus(value === 'all' ? '' : value)}>
+                      <SelectTrigger className="bg-background border-border text-foreground">
+                        <SelectValue placeholder="All statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All statuses</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+                  <label className="inline-flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeArchived}
+                      onChange={(event) => handleIncludeArchivedChange(event.target.checked)}
+                      className="rounded border-border"
+                    />
+                    <span className="text-sm text-muted-foreground">Include archived records</span>
+                  </label>
+                  <Link href="/absence/archive-report" className="text-sm text-absence hover:underline">
+                    Open archive report
+                  </Link>
+                </div>
+              </div>
+
               <div className="relative mb-4">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -760,19 +779,19 @@ export default function AdminAbsencePage() {
 
       {/* Create Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="border-border max-w-2xl">
+        <DialogContent className="border-border max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="text-white">Create Absence Entry</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
+            <DialogTitle className="text-foreground">Create Absence Entry</DialogTitle>
+            <DialogDescription className="text-slate-400/90">
               Create an absence entry for any employee
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4">
-            <div>
-              <Label>Employee *</Label>
+          <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4 space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-foreground font-medium">Employee *</Label>
               <Select value={selectedProfileId} onValueChange={setSelectedProfileId}>
-                <SelectTrigger className="border-border bg-background text-foreground">
+                <SelectTrigger className="bg-slate-950 border-border text-foreground">
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
@@ -785,10 +804,10 @@ export default function AdminAbsencePage() {
               </Select>
             </div>
             
-            <div>
-              <Label>Reason *</Label>
+            <div className="space-y-1.5">
+              <Label className="text-foreground font-medium">Reason *</Label>
               <Select value={selectedReasonId} onValueChange={setSelectedReasonId}>
-                <SelectTrigger className="border-border bg-background text-foreground">
+                <SelectTrigger className="bg-slate-950 border-border text-foreground">
                   <SelectValue placeholder="Select reason" />
                 </SelectTrigger>
                 <SelectContent>
@@ -801,9 +820,9 @@ export default function AdminAbsencePage() {
               </Select>
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Start Date *</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-foreground font-medium">Start Date *</Label>
                 <Input
                   type="date"
                   value={startDate}
@@ -813,25 +832,26 @@ export default function AdminAbsencePage() {
                       setEndDate('');
                     }
                   }}
-                  className="border-border bg-background text-foreground"
+                  className="bg-slate-950 border-border text-foreground"
                 />
               </div>
               
-              <div>
-                <Label>End Date (optional)</Label>
+              <div className="space-y-1.5">
+                <Label className="text-foreground font-medium">End Date (optional)</Label>
                 <Input
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   min={startDate}
                   disabled={!startDate || isHalfDay}
-                  className="border-border bg-background text-foreground"
+                  className="bg-slate-950 border-border text-foreground"
                 />
               </div>
             </div>
             
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
+            <div className="space-y-1.5">
+              <Label className="text-foreground font-medium">Duration options</Label>
+              <div className="flex items-center gap-2 rounded-md border border-border bg-slate-950 px-3 py-2">
                 <input
                   type="checkbox"
                   checked={isHalfDay}
@@ -841,11 +861,11 @@ export default function AdminAbsencePage() {
                   }}
                   className="rounded border-border"
                 />
-                <span className="text-sm text-muted-foreground">Half Day</span>
-              </label>
+                <span className="text-sm text-slate-400/90">Half Day</span>
+              </div>
               
               {isHalfDay && (
-                <div className="flex gap-2">
+                <div className="flex gap-3 pt-1">
                   <label className="flex items-center gap-1 cursor-pointer">
                     <input
                       type="radio"
@@ -854,7 +874,7 @@ export default function AdminAbsencePage() {
                       checked={halfDaySession === 'AM'}
                       onChange={() => setHalfDaySession('AM')}
                     />
-                    <span className="text-sm text-muted-foreground">AM</span>
+                    <span className="text-sm text-slate-400/90">AM</span>
                   </label>
                   <label className="flex items-center gap-1 cursor-pointer">
                     <input
@@ -864,19 +884,19 @@ export default function AdminAbsencePage() {
                       checked={halfDaySession === 'PM'}
                       onChange={() => setHalfDaySession('PM')}
                     />
-                    <span className="text-sm text-muted-foreground">PM</span>
+                    <span className="text-sm text-slate-400/90">PM</span>
                   </label>
                 </div>
               )}
             </div>
             
-            <div>
-              <Label>Notes</Label>
+            <div className="space-y-1.5">
+              <Label className="text-foreground font-medium">Notes</Label>
               <Input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Optional notes..."
-                className="border-border bg-background text-foreground"
+                className="bg-slate-950 border-border text-foreground"
               />
             </div>
             
@@ -904,6 +924,28 @@ export default function AdminAbsencePage() {
               className="bg-absence hover:bg-absence-dark text-white"
             >
               {submitting ? 'Creating...' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="border-border max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Delete Absence</DialogTitle>
+            <DialogDescription className="text-slate-400/90">
+              Are you sure you want to delete this absence record? This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+            <p className="text-sm text-red-300">This will permanently remove the absence record.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} className="border-border text-muted-foreground">
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteAbsence} disabled={deleteSubmitting || !deleteTargetId}>
+              {deleteSubmitting ? 'Deleting...' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>

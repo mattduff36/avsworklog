@@ -4,6 +4,7 @@ import { sendToolboxTalkEmail } from '@/lib/utils/email';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { CreateMessageInput, CreateMessageResponse } from '@/types/messages';
+import { normalizeRoleInternalName } from '@/lib/utils/role-name';
 
 /**
  * POST /api/messages
@@ -105,15 +106,35 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'No roles specified' }, { status: 400 });
       }
 
-      // Fetch users with the specified roles
-      const { data: roleUsers, error: roleError } = await supabase
-        .from('profiles')
-        .select('id')
-        .in('role', recipient_roles);
+      const selectedTokens = new Set(
+        recipient_roles
+          .map((value) => normalizeRoleInternalName(value))
+          .filter((value) => value.length > 0)
+      );
 
-      if (roleError) throw roleError;
-      
-      recipientUserIds = roleUsers?.map(u => u.id) || [];
+      const { data: roleRows, error: roleLookupError } = await supabase
+        .from('roles')
+        .select('id, name, display_name');
+      if (roleLookupError) throw roleLookupError;
+
+      const roleIds = (roleRows || [])
+        .filter((role) => {
+          const byName = normalizeRoleInternalName(role.name || '');
+          const byDisplay = normalizeRoleInternalName(role.display_name || '');
+          return selectedTokens.has(byName) || selectedTokens.has(byDisplay);
+        })
+        .map((role) => role.id);
+
+      if (roleIds.length === 0) {
+        recipientUserIds = [];
+      } else {
+        const { data: roleUsers, error: roleUsersError } = await supabase
+          .from('profiles')
+          .select('id')
+          .in('role_id', roleIds);
+        if (roleUsersError) throw roleUsersError;
+        recipientUserIds = roleUsers?.map((u) => u.id) || [];
+      }
 
     } else if (recipient_type === 'all_staff') {
       // Fetch all active users

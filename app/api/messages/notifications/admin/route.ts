@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
 
     // Check if user is admin (strict: super admin OR admin role only, NOT regular managers)
     const profile = await getProfileWithRole(user.id);
-    const isStrictAdmin = profile?.role?.is_super_admin === true || profile?.role?.name === 'admin';
+    const isStrictAdmin = profile?.role?.is_super_admin === true || profile?.role?.role_class === 'admin';
     
     if (!isStrictAdmin) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });

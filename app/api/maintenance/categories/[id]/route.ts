@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
 import type { UpdateCategoryRequest } from '@/types/maintenance';
+import { getProfileWithRole } from '@/lib/utils/permissions';
 
 /**
  * PUT /api/maintenance/categories/[id]
@@ -20,15 +21,8 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    // Check if user is admin/manager
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role:roles(name)')
-      .eq('id', user.id)
-      .single();
-    
-    const roleName = (profile?.role as { name?: string } | null)?.name;
-    if (!roleName || !['admin', 'manager'].includes(roleName)) {
+    const profile = await getProfileWithRole(user.id);
+    if (!profile?.role || profile.role.role_class === 'employee') {
       return NextResponse.json(
         { error: 'Only admins and managers can update categories' },
         { status: 403 }
@@ -91,15 +85,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    // Check if user is admin/manager
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role:roles(name)')
-      .eq('id', user.id)
-      .single();
-    
-    const roleName = (profile?.role as { name?: string } | null)?.name;
-    if (!roleName || !['admin', 'manager'].includes(roleName)) {
+    const profile = await getProfileWithRole(user.id);
+    if (!profile?.role || profile.role.role_class === 'employee') {
       return NextResponse.json(
         { error: 'Only admins and managers can delete categories' },
         { status: 403 }

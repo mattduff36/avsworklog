@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getProfileWithRole } from '@/lib/utils/permissions';
 
 export async function GET() {
   const supabase = await createClient();
@@ -30,13 +31,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile || !['admin', 'manager'].includes(profile.role)) {
+  const profile = await getProfileWithRole(user.id);
+  if (!profile?.role || profile.role.role_class === 'employee') {
     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
   }
 
@@ -87,13 +83,8 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile || !['admin', 'manager'].includes(profile.role)) {
+  const profile = await getProfileWithRole(user.id);
+  if (!profile?.role || profile.role.role_class === 'employee') {
     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
   }
 
@@ -136,13 +127,8 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile || !['admin', 'manager'].includes(profile.role)) {
+  const profile = await getProfileWithRole(user.id);
+  if (!profile?.role || profile.role.role_class === 'employee') {
     return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
   }
 

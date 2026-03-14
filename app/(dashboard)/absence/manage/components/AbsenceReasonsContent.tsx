@@ -75,6 +75,8 @@ export function AbsenceReasonsContent() {
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDisableDialog, setShowDisableDialog] = useState(false);
+  const [disableTargetReason, setDisableTargetReason] = useState<AbsenceReason | null>(null);
   const [editingReason, setEditingReason] = useState<AbsenceReason | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [tab, setTab] = useState<TabState>('active');
@@ -85,6 +87,7 @@ export function AbsenceReasonsContent() {
   const [isPaid, setIsPaid] = useState(true);
   const [color, setColor] = useState('#6366f1');
   const [submitting, setSubmitting] = useState(false);
+  const [disableSubmitting, setDisableSubmitting] = useState(false);
 
   useEffect(() => {
     try {
@@ -232,23 +235,24 @@ export function AbsenceReasonsContent() {
     }
   }
 
-  async function handleDelete(reason: AbsenceReason) {
-    const confirmed = await import('@/lib/services/notification.service').then((m) =>
-      m.notify.confirm({
-        title: 'Disable Absence Reason',
-        description: `Are you sure you want to disable "${reason.name}"? It will no longer be available for new absence requests.`,
-        confirmText: 'Disable',
-        destructive: true,
-      })
-    );
-    if (!confirmed) return;
+  function handleDelete(reason: AbsenceReason) {
+    setDisableTargetReason(reason);
+    setShowDisableDialog(true);
+  }
 
+  async function confirmDisableReason() {
+    if (!disableTargetReason) return;
+    setDisableSubmitting(true);
     try {
-      await deleteReason.mutateAsync(reason.id);
+      await deleteReason.mutateAsync(disableTargetReason.id);
       toast.success('Reason disabled');
+      setShowDisableDialog(false);
+      setDisableTargetReason(null);
     } catch (error) {
       console.error('Error deleting reason:', error);
       toast.error('Failed to delete reason');
+    } finally {
+      setDisableSubmitting(false);
     }
   }
 
@@ -539,34 +543,34 @@ export function AbsenceReasonsContent() {
       </Tabs>
 
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="border-border">
+        <DialogContent className="border-border max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="text-white">Add Absence Reason</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
+            <DialogTitle className="text-foreground">Add Absence Reason</DialogTitle>
+            <DialogDescription className="text-slate-400/90">
               Create a new reason for absence or leave
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="name">Reason Name *</Label>
+          <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4 space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="name" className="text-foreground font-medium">Reason Name *</Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Sick Leave"
-                className="border-border bg-background text-foreground"
+                className="bg-slate-950 border-border text-foreground"
               />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 rounded-md border border-border bg-slate-950 px-3 py-2">
               <Checkbox id="isPaid" checked={isPaid} onCheckedChange={(value) => setIsPaid(Boolean(value))} />
-              <label htmlFor="isPaid" className="text-sm text-muted-foreground cursor-pointer">
+              <label htmlFor="isPaid" className="text-sm text-slate-400/90 cursor-pointer">
                 This is a paid absence
               </label>
             </div>
-            <div>
-              <Label htmlFor="reasonColor">Calendar Color</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="reasonColor" className="text-foreground font-medium">Calendar Color</Label>
               <div className="mt-2 flex items-center gap-3">
                 <Input
                   id="reasonColor"
@@ -596,32 +600,32 @@ export function AbsenceReasonsContent() {
       </Dialog>
 
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="border-border">
+        <DialogContent className="border-border max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="text-white">Edit Absence Reason</DialogTitle>
-            <DialogDescription className="text-muted-foreground">Update the reason details</DialogDescription>
+            <DialogTitle className="text-foreground">Edit Absence Reason</DialogTitle>
+            <DialogDescription className="text-slate-400/90">Update the reason details</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="editName">Reason Name *</Label>
+          <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4 space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="editName" className="text-foreground font-medium">Reason Name *</Label>
               <Input
                 id="editName"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Sick Leave"
-                className="border-border bg-background text-foreground"
+                className="bg-slate-950 border-border text-foreground"
               />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 rounded-md border border-border bg-slate-950 px-3 py-2">
               <Checkbox id="editIsPaid" checked={isPaid} onCheckedChange={(value) => setIsPaid(Boolean(value))} />
-              <label htmlFor="editIsPaid" className="text-sm text-muted-foreground cursor-pointer">
+              <label htmlFor="editIsPaid" className="text-sm text-slate-400/90 cursor-pointer">
                 This is a paid absence
               </label>
             </div>
-            <div>
-              <Label htmlFor="editReasonColor">Calendar Color</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="editReasonColor" className="text-foreground font-medium">Calendar Color</Label>
               <div className="mt-2 flex items-center gap-3">
                 <Input
                   id="editReasonColor"
@@ -671,6 +675,28 @@ export function AbsenceReasonsContent() {
               className="bg-absence hover:bg-absence-dark text-white"
             >
               {submitting ? 'Updating...' : 'Update'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDisableDialog} onOpenChange={setShowDisableDialog}>
+        <DialogContent className="border-border max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Disable Absence Reason</DialogTitle>
+            <DialogDescription className="text-slate-400/90">
+              Are you sure you want to disable {disableTargetReason?.name ? `'${disableTargetReason.name}'` : 'this reason'}? It will no longer be available for new absence requests.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+            <p className="text-sm text-red-300">Existing records remain unchanged, but this reason will be unavailable for new requests.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDisableDialog(false)} className="border-border text-muted-foreground">
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDisableReason} disabled={disableSubmitting || !disableTargetReason}>
+              {disableSubmitting ? 'Disabling...' : 'Disable'}
             </Button>
           </DialogFooter>
         </DialogContent>

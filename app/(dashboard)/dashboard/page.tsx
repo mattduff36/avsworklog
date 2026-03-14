@@ -23,7 +23,6 @@ import {
 import { getEnabledForms } from '@/lib/config/forms';
 import type { ModuleName } from '@/types/roles';
 import { ALL_MODULES } from '@/types/roles';
-import { toast } from 'sonner';
 import { managerNavItems, adminNavItems, getFilteredNavByPermissions } from '@/lib/config/navigation';
 
 type PendingApprovalCount = {
@@ -83,6 +82,7 @@ export default function DashboardPage() {
   const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
   const [permissionsLoading, setPermissionsLoading] = useState(true);
   const [ramsLoading, setRamsLoading] = useState(true);
+  const [badgesLoading, setBadgesLoading] = useState(true);
   
   // Intro animation state (all devices)
   const [showIntro, setShowIntro] = useState(true);
@@ -182,413 +182,260 @@ export default function DashboardPage() {
   const canViewSuggestions = userPermissions.has('suggestions');
   const canViewErrorReports = userPermissions.has('error-reports');
 
-  useEffect(() => {
-    if (!permissionsLoading) {
-      if (canViewApprovals) {
-        fetchPendingApprovals();
-      }
-      if (canViewActions) {
-        fetchTopActions();
-      }
-      if (canViewSuggestions || canViewErrorReports) {
-        fetchNotificationCounts();
-      }
-      fetchBadgeCounts();
-    }
-    fetchPendingRAMS();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [permissionsLoading, canViewApprovals, canViewActions, canViewSuggestions, canViewErrorReports, profile?.id]);
+  function buildPendingApprovalsSummary(timesheetsCount: number, absencesCount: number): PendingApprovalCount[] {
+    return [
+      {
+        type: 'timesheets',
+        label: 'Timesheets',
+        count: timesheetsCount,
+        icon: FileText,
+        color: 'hsl(210 90% 50%)',
+        href: '/approvals?tab=timesheets',
+      },
+      {
+        type: 'absences',
+        label: 'Absences',
+        count: absencesCount,
+        icon: Calendar,
+        color: 'hsl(260 60% 50%)',
+        href: '/approvals?tab=absences',
+      },
+    ];
+  }
 
-  const fetchPendingApprovals = async () => {
-    // Skip fetching if offline - rely on cached page data
+  function buildActionsSummary(params: {
+    workshopTotal: number;
+    maintenanceTotal: number;
+    suggestionsTotal: number;
+    errorsTotal: number;
+  }): PendingApprovalCount[] {
+    return [
+      {
+        type: 'workshop',
+        label: 'Workshop Tasks',
+        count: params.workshopTotal,
+        icon: Wrench,
+        color: 'hsl(13 37% 48%)',
+        href: '/workshop-tasks',
+      },
+      {
+        type: 'maintenance',
+        label: 'Maintenance & Service',
+        count: params.maintenanceTotal,
+        icon: Settings,
+        color: 'hsl(0 84% 60%)',
+        href: '/maintenance',
+      },
+      {
+        type: 'suggestions',
+        label: 'Suggestions',
+        count: params.suggestionsTotal,
+        icon: Lightbulb,
+        color: 'hsl(48 87% 69%)',
+        href: '/suggestions/manage',
+      },
+      {
+        type: 'errors',
+        label: 'Error Reports',
+        count: params.errorsTotal,
+        icon: Bug,
+        color: 'hsl(48 87% 69%)',
+        href: '/admin/errors/manage',
+      },
+      {
+        type: 'inspections',
+        label: 'Site Audit Inspections',
+        count: 0,
+        icon: FileText,
+        color: 'hsl(215 20% 50%)',
+        href: '#',
+      },
+    ];
+  }
+
+  async function fetchDashboardMetrics() {
     if (!navigator.onLine) {
-      setLoading(false);
-      return;
+      return {
+        pendingApprovals: canViewApprovals ? buildPendingApprovalsSummary(0, 0) : [],
+        actionsSummary: canViewActions
+          ? buildActionsSummary({ workshopTotal: 0, maintenanceTotal: 0, suggestionsTotal: 0, errorsTotal: 0 })
+          : [],
+        newSuggestionsCount: 0,
+        newErrorReportsCount: 0,
+        pendingQuotesCount: 0,
+        errorLogsCount: 0,
+      };
     }
 
-    try {
+    const approvalsPromise = canViewApprovals
+      ? Promise.all([
+          supabase.from('timesheets').select('id', { count: 'exact', head: true }).eq('status', 'submitted'),
+          supabase.from('absences').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+        ])
+      : Promise.resolve(null);
+
+    const workshopPromise = canViewActions && canViewWorkshopTasks
+      ? Promise.all([
+          supabase
+            .from('actions')
+            .select('id', { count: 'exact', head: true })
+            .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
+            .eq('status', 'pending'),
+          supabase
+            .from('actions')
+            .select('id', { count: 'exact', head: true })
+            .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
+            .eq('status', 'logged'),
+        ])
+      : Promise.resolve(null);
+
+    const maintenancePromise = canViewActions && canViewMaintenance
+      ? fetch('/api/maintenance')
+      : Promise.resolve(null);
+
+    const suggestionsPromise = canViewSuggestions
+      ? Promise.all([
+          supabase.from('suggestions').select('id', { count: 'exact', head: true }).eq('status', 'new'),
+          supabase.from('suggestions').select('id', { count: 'exact', head: true }).in('status', ['under_review', 'planned']),
+        ])
+      : Promise.resolve(null);
+
+    const errorsPromise = canViewErrorReports
+      ? Promise.all([
+          supabase.from('error_reports').select('id', { count: 'exact', head: true }).eq('status', 'new'),
+          supabase.from('error_reports').select('id', { count: 'exact', head: true }).eq('status', 'investigating'),
+        ])
+      : Promise.resolve(null);
+
+    const [approvals, workshop, maintenanceResponse, suggestions, errors, quotes, errorLogs] = await Promise.all([
+      approvalsPromise,
+      workshopPromise,
+      maintenancePromise,
+      suggestionsPromise,
+      errorsPromise,
+      supabase.from('quotes').select('id', { count: 'exact', head: true }).eq('status', 'pending_internal_approval'),
+      supabase.from('error_logs').select('id', { count: 'exact', head: true }),
+    ]);
+
+    if (approvals) {
+      const [timesheetsResult, absencesResult] = approvals;
+      if (timesheetsResult.error) throw timesheetsResult.error;
+      if (absencesResult.error) throw absencesResult.error;
+    }
+    if (workshop) {
+      const [workshopPendingResult, workshopInProgressResult] = workshop;
+      if (workshopPendingResult.error) throw workshopPendingResult.error;
+      if (workshopInProgressResult.error) throw workshopInProgressResult.error;
+    }
+    if (suggestions) {
+      const [suggestionsNewResult, suggestionsReviewResult] = suggestions;
+      if (suggestionsNewResult.error) throw suggestionsNewResult.error;
+      if (suggestionsReviewResult.error) throw suggestionsReviewResult.error;
+    }
+    if (errors) {
+      const [errorsNewResult, errorsInvestigatingResult] = errors;
+      if (errorsNewResult.error) throw errorsNewResult.error;
+      if (errorsInvestigatingResult.error) throw errorsInvestigatingResult.error;
+    }
+    if (quotes.error) throw quotes.error;
+    if (errorLogs.error) throw errorLogs.error;
+
+    let maintenanceTotal = 0;
+    if (maintenanceResponse?.ok) {
+      const maintenanceData = await maintenanceResponse.json();
+      const vehicles = (maintenanceData.vehicles || []) as Array<{
+        tax_status?: { status: string };
+        mot_status?: { status: string };
+        service_status?: { status: string };
+        cambelt_status?: { status: string };
+        first_aid_status?: { status: string };
+      }>;
+
+      for (const vehicle of vehicles) {
+        const statuses = [
+          vehicle.tax_status?.status,
+          vehicle.mot_status?.status,
+          vehicle.service_status?.status,
+          vehicle.cambelt_status?.status,
+          vehicle.first_aid_status?.status,
+        ];
+        maintenanceTotal += statuses.filter((status) => status === 'overdue' || status === 'due_soon').length;
+      }
+    }
+
+    const timesheetsCount = approvals?.[0].count || 0;
+    const absencesCount = approvals?.[1].count || 0;
+    const workshopTotal = (workshop?.[0].count || 0) + (workshop?.[1].count || 0);
+    const suggestionsNewCount = suggestions?.[0].count || 0;
+    const suggestionsReviewCount = suggestions?.[1].count || 0;
+    const errorsNewCount = errors?.[0].count || 0;
+    const errorsInvestigatingCount = errors?.[1].count || 0;
+
+    return {
+      pendingApprovals: canViewApprovals ? buildPendingApprovalsSummary(timesheetsCount, absencesCount) : [],
+      actionsSummary: canViewActions
+        ? buildActionsSummary({
+            workshopTotal,
+            maintenanceTotal,
+            suggestionsTotal: suggestionsNewCount + suggestionsReviewCount,
+            errorsTotal: errorsNewCount + errorsInvestigatingCount,
+          })
+        : [],
+      newSuggestionsCount: suggestionsNewCount,
+      newErrorReportsCount: errorsNewCount,
+      pendingQuotesCount: quotes.count || 0,
+      errorLogsCount: errorLogs.count || 0,
+    };
+  }
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadDashboardMetrics() {
+      if (permissionsLoading) return;
+
       setLoading(true);
-      
-      // Fetch pending timesheets count
-      const { count: timesheetsCount, error: timesheetsError } = await supabase
-        .from('timesheets')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'submitted');
-
-      if (timesheetsError) throw timesheetsError;
-
-      // Fetch pending absences count
-      const { count: absencesCount, error: absencesError } = await supabase
-        .from('absences')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-
-      if (absencesError) throw absencesError;
-
-      // Build dynamic approval types array
-      const approvalTypes: PendingApprovalCount[] = [
-        {
-          type: 'timesheets',
-          label: 'Timesheets',
-          count: timesheetsCount || 0,
-          icon: FileText,
-          color: 'hsl(210 90% 50%)', // Blue
-          href: '/approvals?tab=timesheets'
-        },
-        {
-          type: 'absences',
-          label: 'Absences',
-          count: absencesCount || 0,
-          icon: Calendar,
-          color: 'hsl(260 60% 50%)', // Purple
-          href: '/approvals?tab=absences'
-        }
-      ];
-
-      setPendingApprovals(approvalTypes);
-    } catch (error) {
-      console.error('Error fetching pending approvals:', error);
+      setBadgesLoading(true);
       try {
-        toast.error('Unable to load dashboard data', {
-          description: 'Please check your internet connection and try again.',
-        });
-      } catch {
-        console.error('Unable to load dashboard data (toast unavailable)');
+        const metrics = await fetchDashboardMetrics();
+        if (!active) return;
+
+        setPendingApprovals(metrics.pendingApprovals);
+        setActionsSummary(metrics.actionsSummary);
+        setNewSuggestionsCount(metrics.newSuggestionsCount);
+        setNewErrorReportsCount(metrics.newErrorReportsCount);
+        setPendingQuotesCount(metrics.pendingQuotesCount);
+        setErrorLogsCount(metrics.errorLogsCount);
+      } catch (error) {
+        console.error('Error loading dashboard metrics:', error);
+        if (active) {
+          setPendingApprovals(canViewApprovals ? buildPendingApprovalsSummary(0, 0) : []);
+          setActionsSummary(
+            canViewActions
+              ? buildActionsSummary({ workshopTotal: 0, maintenanceTotal: 0, suggestionsTotal: 0, errorsTotal: 0 })
+              : []
+          );
+          setNewSuggestionsCount(0);
+          setNewErrorReportsCount(0);
+          setPendingQuotesCount(0);
+          setErrorLogsCount(0);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+          setBadgesLoading(false);
+        }
       }
-    } finally {
-      setLoading(false);
     }
-  };
 
-  const fetchTopActions = async () => {
-    try {
-      // Skip fetching if offline - rely on cached page data
-      if (!navigator.onLine) {
-        setActionsSummary([
-          {
-            type: 'workshop',
-            label: 'Workshop Tasks',
-            count: 0,
-            icon: Wrench,
-            color: 'hsl(13 37% 48%)',
-            href: '/workshop-tasks'
-          },
-          {
-            type: 'maintenance',
-            label: 'Maintenance & Service',
-            count: 0,
-            icon: Settings,
-            color: 'hsl(0 84% 60%)',
-            href: '/maintenance'
-          },
-          {
-            type: 'suggestions',
-            label: 'Suggestions',
-            count: 0,
-            icon: Lightbulb,
-            color: 'hsl(48 87% 69%)',
-            href: '/suggestions/manage'
-          },
-          {
-            type: 'errors',
-            label: 'Error Reports',
-            count: 0,
-            icon: Bug,
-            color: 'hsl(48 87% 69%)',
-            href: '/admin/errors/manage'
-          },
-          {
-            type: 'inspections',
-            label: 'Site Audit Inspections',
-            count: 0,
-            icon: FileText,
-            color: 'hsl(215 20% 50%)',
-            href: '#'
-          }
-        ]);
-        return;
-      }
+    void loadDashboardMetrics();
+    void fetchPendingRAMS();
 
-      // Fetch all actions to count workshop tasks
-      const { data: allActions, error: actionsError } = await supabase
-        .from('actions')
-        .select('*');
-
-      if (actionsError) {
-        console.error('Error fetching actions:', actionsError);
-        setActionsSummary([
-          {
-            type: 'workshop',
-            label: 'Workshop Tasks',
-            count: 0,
-            icon: Wrench,
-            color: 'hsl(13 37% 48%)',
-            href: '/workshop-tasks'
-          },
-          {
-            type: 'maintenance',
-            label: 'Maintenance & Service',
-            count: 0,
-            icon: Settings,
-            color: 'hsl(0 84% 60%)',
-            href: '/maintenance'
-          },
-          {
-            type: 'suggestions',
-            label: 'Suggestions',
-            count: 0,
-            icon: Lightbulb,
-            color: 'hsl(48 87% 69%)',
-            href: '/suggestions/manage'
-          },
-          {
-            type: 'errors',
-            label: 'Error Reports',
-            count: 0,
-            icon: Bug,
-            color: 'hsl(48 87% 69%)',
-            href: '/admin/errors/manage'
-          },
-          {
-            type: 'inspections',
-            label: 'Site Audit Inspections',
-            count: 0,
-            icon: FileText,
-            color: 'hsl(215 20% 50%)',
-            href: '#'
-          }
-        ]);
-        return;
-      }
-
-      // Filter workshop tasks
-      type ActionRow = { action_type?: string; status?: string };
-      const workshopTasks = (allActions || []).filter((a: ActionRow) => 
-        a.action_type === 'inspection_defect' || a.action_type === 'workshop_vehicle_task'
-      );
-
-      const workshopPending = workshopTasks.filter((t: ActionRow) => t.status === 'pending').length;
-      const workshopInProgress = workshopTasks.filter((t: ActionRow) => t.status === 'logged').length;
-      const workshopTotal = workshopPending + workshopInProgress;
-
-      // Fetch maintenance data to count alerts
-      let maintenanceOverdue = 0;
-      let maintenanceDueSoon = 0;
-
-      try {
-        const maintenanceResponse = await fetch('/api/maintenance');
-        if (maintenanceResponse.ok) {
-          const maintenanceData = await maintenanceResponse.json();
-          const vehicles = maintenanceData.vehicles || [];
-          
-          vehicles.forEach((vehicle: { tax_status?: { status: string }, mot_status?: { status: string }, service_status?: { status: string }, cambelt_status?: { status: string }, first_aid_status?: { status: string } }) => {
-            // Check Tax
-            if (vehicle.tax_status?.status === 'overdue') maintenanceOverdue++;
-            else if (vehicle.tax_status?.status === 'due_soon') maintenanceDueSoon++;
-            
-            // Check MOT
-            if (vehicle.mot_status?.status === 'overdue') maintenanceOverdue++;
-            else if (vehicle.mot_status?.status === 'due_soon') maintenanceDueSoon++;
-            
-            // Check Service
-            if (vehicle.service_status?.status === 'overdue') maintenanceOverdue++;
-            else if (vehicle.service_status?.status === 'due_soon') maintenanceDueSoon++;
-            
-            // Check Cambelt
-            if (vehicle.cambelt_status?.status === 'overdue') maintenanceOverdue++;
-            else if (vehicle.cambelt_status?.status === 'due_soon') maintenanceDueSoon++;
-            
-            // Check First Aid
-            if (vehicle.first_aid_status?.status === 'overdue') maintenanceOverdue++;
-            else if (vehicle.first_aid_status?.status === 'due_soon') maintenanceDueSoon++;
-          });
-        }
-      } catch (maintenanceError) {
-        console.error('Error fetching maintenance data:', maintenanceError);
-        // Continue with 0 counts if maintenance fetch fails
-      }
-
-      const maintenanceTotal = maintenanceOverdue + maintenanceDueSoon;
-
-      // Fetch suggestion counts only when user can view suggestions
-      let suggestionsTotal = 0;
-      if (canViewSuggestions) {
-        try {
-          const [{ count: sNew }, { count: sReview }] = await Promise.all([
-            supabase.from('suggestions').select('*', { count: 'exact', head: true }).eq('status', 'new'),
-            supabase.from('suggestions').select('*', { count: 'exact', head: true }).in('status', ['under_review', 'planned']),
-          ]);
-          suggestionsTotal = (sNew || 0) + (sReview || 0);
-        } catch (e) {
-          console.error('Error fetching suggestion counts:', e);
-        }
-      }
-
-      // Fetch error report counts only when user can view error reports
-      let errorsTotal = 0;
-      if (canViewErrorReports) {
-        try {
-          const [{ count: eNew }, { count: eInv }] = await Promise.all([
-            supabase.from('error_reports').select('*', { count: 'exact', head: true }).eq('status', 'new'),
-            supabase.from('error_reports').select('*', { count: 'exact', head: true }).eq('status', 'investigating'),
-          ]);
-          errorsTotal = (eNew || 0) + (eInv || 0);
-        } catch (e) {
-          console.error('Error fetching error report counts:', e);
-        }
-      }
-
-      // Build actions summary array
-      const actionTypes: PendingApprovalCount[] = [
-        {
-          type: 'workshop',
-          label: 'Workshop Tasks',
-          count: workshopTotal,
-          icon: Wrench,
-          color: 'hsl(13 37% 48%)',
-          href: '/workshop-tasks'
-        },
-        {
-          type: 'maintenance',
-          label: 'Maintenance & Service',
-          count: maintenanceTotal,
-          icon: Settings,
-          color: 'hsl(0 84% 60%)',
-          href: '/maintenance'
-        },
-        {
-          type: 'suggestions',
-          label: 'Suggestions',
-          count: suggestionsTotal,
-          icon: Lightbulb,
-          color: 'hsl(48 87% 69%)',
-          href: '/suggestions/manage'
-        },
-        {
-          type: 'errors',
-          label: 'Error Reports',
-          count: errorsTotal,
-          icon: Bug,
-          color: 'hsl(48 87% 69%)',
-          href: '/admin/errors/manage'
-        },
-        {
-          type: 'inspections',
-          label: 'Site Audit Inspections',
-          count: 0,
-          icon: FileText,
-          color: 'hsl(215 20% 50%)',
-          href: '#'
-        }
-      ];
-
-      setActionsSummary(actionTypes);
-    } catch (error) {
-      console.error('Error fetching actions summary:', error);
-      try {
-        toast.error('Unable to load actions data', {
-          description: 'Please check your internet connection and try again.',
-        });
-      } catch {
-        console.error('Unable to load actions data (toast unavailable)');
-      }
-      setActionsSummary([
-        {
-          type: 'workshop',
-          label: 'Workshop Tasks',
-          count: 0,
-          icon: Wrench,
-          color: 'hsl(13 37% 48%)',
-          href: '/workshop-tasks'
-        },
-        {
-          type: 'maintenance',
-          label: 'Maintenance & Service',
-          count: 0,
-          icon: Settings,
-          color: 'hsl(0 84% 60%)',
-          href: '/maintenance'
-        },
-        {
-          type: 'suggestions',
-          label: 'Suggestions',
-          count: 0,
-          icon: Lightbulb,
-          color: 'hsl(48 87% 69%)',
-          href: '/suggestions/manage'
-        },
-        {
-          type: 'errors',
-          label: 'Error Reports',
-          count: 0,
-          icon: Bug,
-          color: 'hsl(48 87% 69%)',
-          href: '/admin/errors/manage'
-        },
-        {
-          type: 'inspections',
-          label: 'Site Audit Inspections',
-          count: 0,
-          icon: FileText,
-          color: 'hsl(215 20% 50%)',
-          href: '#'
-        }
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchNotificationCounts = async () => {
-    if (!navigator.onLine) return;
-
-    try {
-      let suggestionsCount = 0;
-      let errorReportsCount = 0;
-
-      if (canViewSuggestions) {
-        const { count } = await supabase
-          .from('suggestions')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'new');
-        suggestionsCount = count || 0;
-      }
-
-      if (canViewErrorReports) {
-        const { count } = await supabase
-          .from('error_reports')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'new');
-        errorReportsCount = count || 0;
-      }
-
-      setNewSuggestionsCount(suggestionsCount);
-      setNewErrorReportsCount(errorReportsCount);
-    } catch (error) {
-      console.error('Error fetching notification counts:', error);
-    }
-  };
-
-  const fetchBadgeCounts = async () => {
-    if (!navigator.onLine) return;
-
-    try {
-      const [quotesResult, errorLogsResult] = await Promise.all([
-        supabase
-          .from('quotes')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending_internal_approval'),
-        supabase
-          .from('error_logs')
-          .select('*', { count: 'exact', head: true }),
-      ]);
-
-      setPendingQuotesCount(quotesResult.count || 0);
-      setErrorLogsCount(errorLogsResult.count || 0);
-    } catch (error) {
-      console.error('Error fetching badge counts:', error);
-    }
-  };
+    return () => {
+      active = false;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [permissionsLoading, canViewApprovals, canViewActions, canViewWorkshopTasks, canViewMaintenance, canViewSuggestions, canViewErrorReports, profile?.id]);
 
   const fetchPendingRAMS = async () => {
     if (!profile?.id) {
@@ -647,6 +494,16 @@ export default function DashboardPage() {
     return true;
   });
   const totalActionsCount = visibleActionsSummary.reduce((sum, a) => sum + a.count, 0);
+  const managementTileBadgeCountByHref: Record<string, number> = {
+    '/approvals': totalPendingApprovalsCount,
+    '/actions': totalActionsCount,
+    '/suggestions/manage': newSuggestionsCount,
+    '/admin/errors/manage': newErrorReportsCount,
+    '/quotes': pendingQuotesCount,
+    '/debug': errorLogsCount,
+  };
+  const hasManagementTileBadge = (href: string) => href in managementTileBadgeCountByHref;
+  const getManagementTileBadgeCount = (href: string) => managementTileBadgeCountByHref[href] || 0;
 
   return (
     <div className="space-y-8 max-w-6xl">
@@ -769,13 +626,8 @@ export default function DashboardPage() {
             {/* Manager Links - Using shared navigation config */}
             {visibleManagerTiles.filter(link => link.href !== '/absence/manage').map((link, index) => {
               const Icon = link.icon;
-              const badgeCount = link.href === '/suggestions/manage'
-                ? newSuggestionsCount
-                : link.href === '/approvals'
-                ? totalPendingApprovalsCount
-                : link.href === '/actions'
-                ? totalActionsCount
-                : 0;
+              const canHaveBadge = hasManagementTileBadge(link.href);
+              const badgeCount = getManagementTileBadgeCount(link.href);
               
               return (
                 <Link key={link.href} href={link.href}>
@@ -783,11 +635,15 @@ export default function DashboardPage() {
                     className="relative bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
                     style={{ height: '100px', animationDelay: `${index * 75}ms` }}
                   >
-                    {badgeCount > 0 && (
+                    {badgesLoading && canHaveBadge ? (
+                      <div className="absolute top-2 right-2 bg-slate-500/80 rounded-full h-6 w-6 flex items-center justify-center shadow-lg ring-2 ring-slate-700 animate-pulse">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                      </div>
+                    ) : badgeCount > 0 ? (
                       <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800">
                         {badgeCount > 99 ? '99+' : badgeCount}
                       </div>
-                    )}
+                    ) : null}
                     <div className="flex flex-col items-start justify-between h-full">
                       <Icon className="h-6 w-6 text-muted-foreground" />
                       <span className="text-white font-semibold text-base leading-tight">
@@ -803,11 +659,8 @@ export default function DashboardPage() {
             {visibleAdminTiles.map((link, index) => {
               const Icon = link.icon;
               const animationIndex = visibleManagerTiles.length + index;
-              const badgeCount = link.href === '/admin/errors/manage'
-                ? newErrorReportsCount
-                : link.href === '/quotes'
-                ? pendingQuotesCount
-                : 0;
+              const canHaveBadge = hasManagementTileBadge(link.href);
+              const badgeCount = getManagementTileBadgeCount(link.href);
               
               return (
                 <Link key={link.href} href={link.href}>
@@ -815,11 +668,15 @@ export default function DashboardPage() {
                     className="relative bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
                     style={{ height: '100px', animationDelay: `${animationIndex * 75}ms` }}
                   >
-                    {badgeCount > 0 && (
+                    {badgesLoading && canHaveBadge ? (
+                      <div className="absolute top-2 right-2 bg-slate-500/80 rounded-full h-6 w-6 flex items-center justify-center shadow-lg ring-2 ring-slate-700 animate-pulse">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                      </div>
+                    ) : badgeCount > 0 ? (
                       <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800">
                         {badgeCount > 99 ? '99+' : badgeCount}
                       </div>
-                    )}
+                    ) : null}
                     <div className="flex flex-col items-start justify-between h-full">
                       <Icon className="h-6 w-6 text-muted-foreground" />
                       <span className="text-white font-semibold text-base leading-tight">
@@ -842,11 +699,15 @@ export default function DashboardPage() {
                     className="relative bg-slate-800 dark:bg-slate-900 border-4 border-red-600 hover:border-red-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
                     style={{ height: '100px', animationDelay: `${animationIndex * 75}ms` }}
                   >
-                    {errorLogsCount > 0 && (
-                      <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800">
-                        {errorLogsCount > 99 ? '99+' : errorLogsCount}
+                    {badgesLoading ? (
+                      <div className="absolute top-2 right-2 bg-slate-500/80 rounded-full h-6 w-6 flex items-center justify-center shadow-lg ring-2 ring-slate-700 animate-pulse">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
                       </div>
-                    )}
+                    ) : getManagementTileBadgeCount('/debug') > 0 ? (
+                      <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800">
+                        {getManagementTileBadgeCount('/debug') > 99 ? '99+' : getManagementTileBadgeCount('/debug')}
+                      </div>
+                    ) : null}
                     <div className="flex flex-col items-start justify-between h-full">
                       <Icon className="h-6 w-6 text-red-500" />
                       <span className="font-semibold text-base leading-tight text-red-500">

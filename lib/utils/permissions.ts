@@ -16,6 +16,7 @@ export type ProfileWithRole = {
   role: {
     name: string;
     display_name: string;
+    role_class: 'admin' | 'manager' | 'employee';
     is_manager_admin: boolean;
     is_super_admin: boolean;
   } | null;
@@ -36,6 +37,7 @@ export async function getProfileWithRole(userId: string): Promise<ProfileWithRol
         role:roles(
           name,
           display_name,
+          role_class,
           is_manager_admin,
           is_super_admin
         )
@@ -56,6 +58,7 @@ export async function getProfileWithRole(userId: string): Promise<ProfileWithRol
       profile_id: typedData?.id,
       role_id: typedData?.role_id,
       role_name: role?.name,
+      role_class: role?.role_class,
       role_display_name: role?.display_name,
       is_manager_admin: role?.is_manager_admin
     });
