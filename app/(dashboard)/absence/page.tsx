@@ -504,37 +504,62 @@ export default function AbsencePage() {
                 </div>
               )}
               
-              {/* Regular user - just indicators */}
-              {!(isManager || isAdmin) && (
-                <div className="absolute bottom-2 left-2 right-2 flex gap-0.5 justify-center">
-                  {Array.from(
-                    dayAbsences.reduce(
-                      (map, absence) => {
-                        const key = absence.reason_id;
-                        if (!map.has(key)) {
-                          map.set(key, absence);
-                        }
-                        return map;
-                      },
-                      new Map<string, typeof dayAbsences[number]>()
-                    ).values()
-                  )
-                    .slice(0, 5)
-                    .map((absence) => (
-                      <div
-                        key={absence.reason_id}
-                        className="h-1.5 w-1.5 rounded-full border"
-                        style={{
-                          backgroundColor: getReasonColor(absence.absence_reasons.name, absence.absence_reasons.color),
-                          borderColor: dayAbsences.some(
-                            (entry) => entry.reason_id === absence.reason_id && entry.status === 'pending'
-                          )
-                            ? '#f59e0b'
-                            : 'transparent',
-                        }}
-                        title={absence.absence_reasons.name}
-                      />
-                    ))}
+              {/* Regular user - filled colour blocks */}
+              {!(isManager || isAdmin) && dayAbsences.length > 0 && (
+                <div className="absolute bottom-0 left-0 right-0 h-[60%] overflow-hidden rounded-b-lg">
+                  {(() => {
+                    const unique = Array.from(
+                      dayAbsences.reduce(
+                        (map, absence) => {
+                          const key = absence.reason_id;
+                          if (!map.has(key)) map.set(key, absence);
+                          return map;
+                        },
+                        new Map<string, typeof dayAbsences[number]>()
+                      ).values()
+                    );
+
+                    const isHalf = dayAbsences.length === 1 && dayAbsences[0].is_half_day;
+                    const halfSession = isHalf ? dayAbsences[0].half_day_session : null;
+
+                    return unique.map((absence) => {
+                      const color = getReasonColor(absence.absence_reasons.name, absence.absence_reasons.color);
+                      const isPending = absence.status === 'pending';
+                      const isRejected = absence.status === 'rejected';
+
+                      return (
+                        <div
+                          key={absence.reason_id}
+                          className="absolute inset-0"
+                          style={{
+                            backgroundColor: color,
+                            opacity: isPending ? 0.45 : isRejected ? 0.25 : 0.7,
+                            clipPath: isHalf
+                              ? halfSession === 'AM'
+                                ? 'inset(0 50% 0 0)'
+                                : 'inset(0 0 0 50%)'
+                              : undefined,
+                          }}
+                          title={`${absence.absence_reasons.name}${isHalf ? ` (${halfSession})` : ''}${isPending ? ' – pending' : isRejected ? ' – rejected' : ''}`}
+                        />
+                      );
+                    });
+                  })()}
+
+                  {dayAbsences.some(a => a.status === 'pending') && (
+                    <div className="absolute bottom-1 left-0 right-0 flex justify-center">
+                      <span className="text-[8px] font-semibold text-amber-300 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
+                        PENDING
+                      </span>
+                    </div>
+                  )}
+                  {dayAbsences.every(a => a.status === 'rejected') && (
+                    <div className="absolute bottom-1 left-0 right-0 flex justify-center">
+                      <span className="text-[8px] font-semibold text-red-300 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
+                        REJECTED
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
