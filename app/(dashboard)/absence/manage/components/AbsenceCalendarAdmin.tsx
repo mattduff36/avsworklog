@@ -39,7 +39,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from 'date-fns';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Settings2 } from 'lucide-react';
+import { AlertTriangle, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Employee = {
@@ -47,7 +47,9 @@ type Employee = {
   full_name: string;
   employee_id: string | null;
   annual_holiday_allowance_days: number | null;
+  role_id: string | null;
   role_name: string | null;
+  role_display_name: string | null;
 };
 
 type GenerationStatus = {
@@ -78,6 +80,7 @@ type CalendarEvent = {
   halfDaySession: 'AM' | 'PM' | null;
   createdAt: string;
   approvedAt: string | null;
+  isBankHoliday: boolean;
   start: Date;
   end: Date;
 };
@@ -137,6 +140,24 @@ function formatAllowance(days: number | null): string {
   return `${Number.isInteger(days) ? days : days.toFixed(1)} days`;
 }
 
+function RemainingAllowanceBadge({ days }: { days: number | null }) {
+  if (days === null || Number.isNaN(days)) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+
+  const formatted = formatAllowance(days);
+  if (days < 0) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-300">
+        <AlertTriangle className="h-3.5 w-3.5" />
+        {formatted}
+      </span>
+    );
+  }
+
+  return <span className="text-xs text-muted-foreground">{formatted}</span>;
+}
+
 function parseIsoDateAsLocalMidnight(isoDate: string): Date {
   const [yearStr, monthStr, dayStr] = isoDate.split('-');
   const year = Number(yearStr);
@@ -164,17 +185,38 @@ export function AbsenceCalendarAdmin() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   const currentFinancialYear = getCurrentFinancialYear();
-  const displayFinancialYear = useMemo(() => {
-    if (!generationStatus?.latestGeneratedFinancialYearStartYear) {
-      return currentFinancialYear;
+  const currentFinancialYearStartYear = currentFinancialYear.start.getFullYear();
+  const latestGeneratedFinancialYearStartYear =
+    generationStatus?.latestGeneratedFinancialYearStartYear || currentFinancialYearStartYear;
+  const availableFinancialYearStartYears = useMemo(() => {
+    const fromYear = Math.min(currentFinancialYearStartYear, latestGeneratedFinancialYearStartYear);
+    const toYear = Math.max(currentFinancialYearStartYear, latestGeneratedFinancialYearStartYear);
+    const years: number[] = [];
+    for (let year = fromYear; year <= toYear; year += 1) {
+      years.push(year);
     }
-    const startYear = generationStatus.latestGeneratedFinancialYearStartYear;
+    return years.reverse();
+  }, [currentFinancialYearStartYear, latestGeneratedFinancialYearStartYear]);
+  const [selectedFinancialYearStartYear, setSelectedFinancialYearStartYear] = useState(currentFinancialYearStartYear);
+
+  useEffect(() => {
+    if (!availableFinancialYearStartYears.includes(selectedFinancialYearStartYear)) {
+      setSelectedFinancialYearStartYear(currentFinancialYearStartYear);
+    }
+  }, [availableFinancialYearStartYears, selectedFinancialYearStartYear, currentFinancialYearStartYear]);
+
+  const displayFinancialYear = useMemo(() => {
+    const startYear = selectedFinancialYearStartYear;
+    const label =
+      startYear === generationStatus?.latestGeneratedFinancialYearStartYear && generationStatus?.latestGeneratedFinancialYearLabel
+        ? generationStatus.latestGeneratedFinancialYearLabel
+        : `${startYear}/${(startYear + 1).toString().slice(-2)}`;
     return {
       start: new Date(startYear, 3, 1),
       end: new Date(startYear + 1, 2, 31),
-      label: generationStatus.latestGeneratedFinancialYearLabel,
+      label,
     };
-  }, [currentFinancialYear, generationStatus]);
+  }, [selectedFinancialYearStartYear, generationStatus]);
 
   const months = useMemo(() => getFinancialYearMonths(displayFinancialYear), [displayFinancialYear]);
   const initialMonthIndex = useMemo(() => {
@@ -225,18 +267,20 @@ export function AbsenceCalendarAdmin() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, employee_id, annual_holiday_allowance_days, roles(name)')
+        .select('id, full_name, employee_id, annual_holiday_allowance_days, roles(id, name, display_name)')
         .order('full_name');
 
       if (error) throw error;
       const list = ((data || []) as Array<Record<string, unknown>>).map((row) => {
-        const roleRef = row.roles as { name?: string } | null;
+        const roleRef = row.roles as { id?: string; name?: string; display_name?: string } | null;
         return {
           id: String(row.id || ''),
           full_name: String(row.full_name || ''),
           employee_id: (row.employee_id as string | null) || null,
           annual_holiday_allowance_days: (row.annual_holiday_allowance_days as number | null) ?? null,
+          role_id: roleRef?.id || null,
           role_name: roleRef?.name || null,
+          role_display_name: roleRef?.display_name || null,
         };
       });
       setEmployees(list);
@@ -282,8 +326,7 @@ export function AbsenceCalendarAdmin() {
       if (selectedStatus !== 'all' && absence.status !== selectedStatus) return false;
       if (selectedRole !== 'all') {
         const employee = employees.find((emp) => emp.id === absence.profile_id);
-        const role = (employee?.role_name || '').trim().toLowerCase();
-        if (role !== selectedRole) return false;
+        if (!employee?.role_id || employee.role_id !== selectedRole) return false;
       }
       return true;
     });
@@ -310,6 +353,7 @@ export function AbsenceCalendarAdmin() {
         halfDaySession: absence.half_day_session,
         createdAt: absence.created_at,
         approvedAt: absence.approved_at,
+        isBankHoliday: Boolean(absence.is_bank_holiday),
         start,
         end,
       } as CalendarEvent;
@@ -373,7 +417,7 @@ export function AbsenceCalendarAdmin() {
     () =>
       roles
         .map((role) => {
-          const value = role.name.trim().toLowerCase();
+          const value = role.id;
           const label = (role.display_name || role.name).trim();
           return { value, label };
         })
@@ -562,6 +606,21 @@ export function AbsenceCalendarAdmin() {
               </CardDescription>
             </div>
             <div className="flex gap-2">
+              <Select
+                value={String(selectedFinancialYearStartYear)}
+                onValueChange={(value) => setSelectedFinancialYearStartYear(Number(value))}
+              >
+                <SelectTrigger className="w-[160px] border-border text-muted-foreground">
+                  <SelectValue placeholder="Financial Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableFinancialYearStartYears.map((startYear) => (
+                    <SelectItem key={startYear} value={String(startYear)}>
+                      {startYear}/{(startYear + 1).toString().slice(-2)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button
                 variant="outline"
                 size="sm"
@@ -618,6 +677,9 @@ export function AbsenceCalendarAdmin() {
                 <div className="grid grid-cols-7 gap-1 mb-1">
                   {week.map((day) => {
                     const inMonth = day.getMonth() === currentMonth.getMonth();
+                    const hasBankHoliday = calendarEvents.some(
+                      (event) => event.isBankHoliday && day >= event.start && day <= event.end
+                    );
                     return (
                       <button
                         key={day.toISOString()}
@@ -627,9 +689,12 @@ export function AbsenceCalendarAdmin() {
                           inMonth
                             ? 'bg-slate-800/40 text-foreground hover:bg-slate-700/40'
                             : 'bg-slate-900/40 text-muted-foreground/60 hover:bg-slate-800/40'
-                        }`}
+                        } ${hasBankHoliday ? 'ring-1 ring-amber-400/70 border border-amber-500/40' : ''}`}
                       >
-                        {format(day, 'd')}
+                        <div className="flex items-center justify-between">
+                          <span>{format(day, 'd')}</span>
+                          {hasBankHoliday && <span className="text-[9px] font-semibold text-amber-300">BH</span>}
+                        </div>
                       </button>
                     );
                   })}
@@ -700,17 +765,17 @@ export function AbsenceCalendarAdmin() {
       </Card>
 
       <Dialog open={showDayModal} onOpenChange={setShowDayModal}>
-        <DialogContent className="border-border max-w-2xl">
+        <DialogContent className="border-border max-w-3xl">
           <DialogHeader>
             <DialogTitle className="text-foreground">
               {selectedDate && format(selectedDate, 'EEEE, MMMM d, yyyy')}
             </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
+            <DialogDescription className="text-slate-400/90">
               Detailed absences for this day
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+          <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4 space-y-4 max-h-[60vh] overflow-y-auto pr-1">
             {selectedDate && (() => {
               const dayAbsences = calendarEvents
                 .filter((event) => selectedDate >= event.start && selectedDate <= event.end)
@@ -739,6 +804,11 @@ export function AbsenceCalendarAdmin() {
                           <p className="font-medium text-foreground flex items-center gap-2">
                             <span className="h-2.5 w-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10" style={{ backgroundColor: event.reasonColor }} />
                             {event.reasonName}
+                            {event.isBankHoliday && (
+                              <Badge variant="outline" className="border-amber-500/40 text-amber-300 bg-amber-500/10">
+                                Bank Holiday
+                              </Badge>
+                            )}
                           </p>
                           <p className="text-sm text-muted-foreground">
                             {event.employeeName}
@@ -764,7 +834,8 @@ export function AbsenceCalendarAdmin() {
                           )}
                           {detailVisibility.remainingAllowance && (
                             <p className="text-xs text-muted-foreground mt-1">
-                              Remaining allowance: {formatAllowance(remainingAllowanceByProfile.get(event.profileId) ?? null)}
+                              Remaining allowance:{' '}
+                              <RemainingAllowanceBadge days={remainingAllowanceByProfile.get(event.profileId) ?? null} />
                             </p>
                           )}
 

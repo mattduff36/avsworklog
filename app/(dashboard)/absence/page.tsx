@@ -42,8 +42,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { 
-  useAbsencesForCurrentUser, 
-  useAbsenceSummaryForCurrentUser,
+  useAbsencesForUserFinancialYear,
+  useAbsenceSummaryForUserFinancialYear,
   useAbsenceReasons,
   useCreateAbsence,
   useCancelAbsence,
@@ -99,6 +99,19 @@ function getReasonColor(name: string, color?: string | null): string {
   return fallbackByReason[reasonName] || '#6366f1';
 }
 
+function parseIsoDateAsLocalMidnight(isoDate: string): Date {
+  const [yearStr, monthStr, dayStr] = isoDate.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return new Date(isoDate);
+  }
+
+  return new Date(year, month - 1, day);
+}
+
 export default function AbsencePage() {
   const { profile, isManager, isAdmin } = useAuth();
   const router = useRouter();
@@ -109,19 +122,42 @@ export default function AbsencePage() {
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
   
-  // Financial year months - controlled by latest generated financial year
+  // Financial year months
   const currentFinancialYear = getCurrentFinancialYear();
-  const displayFinancialYear = useMemo(() => {
-    if (!generationStatus?.latestGeneratedFinancialYearStartYear) {
-      return currentFinancialYear;
+  const currentFinancialYearStartYear = currentFinancialYear.start.getFullYear();
+  const latestGeneratedFinancialYearStartYear =
+    generationStatus?.latestGeneratedFinancialYearStartYear || currentFinancialYearStartYear;
+
+  const availableFinancialYearStartYears = useMemo(() => {
+    const fromYear = Math.min(currentFinancialYearStartYear, latestGeneratedFinancialYearStartYear);
+    const toYear = Math.max(currentFinancialYearStartYear, latestGeneratedFinancialYearStartYear);
+    const years: number[] = [];
+    for (let year = fromYear; year <= toYear; year += 1) {
+      years.push(year);
     }
-    const startYear = generationStatus.latestGeneratedFinancialYearStartYear;
+    return years.reverse();
+  }, [currentFinancialYearStartYear, latestGeneratedFinancialYearStartYear]);
+
+  const [selectedFinancialYearStartYear, setSelectedFinancialYearStartYear] = useState(currentFinancialYearStartYear);
+
+  useEffect(() => {
+    if (!availableFinancialYearStartYears.includes(selectedFinancialYearStartYear)) {
+      setSelectedFinancialYearStartYear(currentFinancialYearStartYear);
+    }
+  }, [availableFinancialYearStartYears, selectedFinancialYearStartYear, currentFinancialYearStartYear]);
+
+  const displayFinancialYear = useMemo(() => {
+    const startYear = selectedFinancialYearStartYear;
+    const label =
+      startYear === generationStatus?.latestGeneratedFinancialYearStartYear && generationStatus?.latestGeneratedFinancialYearLabel
+        ? generationStatus.latestGeneratedFinancialYearLabel
+        : `${startYear}/${(startYear + 1).toString().slice(-2)}`;
     return {
       start: new Date(startYear, 3, 1),
       end: new Date(startYear + 1, 2, 31),
-      label: generationStatus.latestGeneratedFinancialYearLabel,
+      label,
     };
-  }, [currentFinancialYear, generationStatus]);
+  }, [selectedFinancialYearStartYear, generationStatus]);
   const bookingMaxDate = generationStatus?.latestGeneratedFinancialYearEndDate || formatDateISO(displayFinancialYear.end);
   const months = useMemo(() => getFinancialYearMonths(displayFinancialYear), [displayFinancialYear]);
   
@@ -142,16 +178,26 @@ export default function AbsencePage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [showDayModal, setShowDayModal] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
+  const [cancelTargetStatus, setCancelTargetStatus] = useState<string>('pending');
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [bookingsPage, setBookingsPage] = useState(1);
   const BOOKINGS_PAGE_SIZE = 15;
   
   // Fetch data - use all absences for managers/admins
-  const { data: userAbsences, isLoading: loadingUserAbsences } = useAbsencesForCurrentUser();
+  const { data: userAbsences, isLoading: loadingUserAbsences } = useAbsencesForUserFinancialYear({
+    start: displayFinancialYear.start,
+    end: displayFinancialYear.end,
+  });
   const { data: allAbsencesData, isLoading: loadingAllAbsences } = useAllAbsences(
     isManager || isAdmin ? {} : undefined
   );
-  const { data: summary, isLoading: loadingSummary } = useAbsenceSummaryForCurrentUser();
+  const { data: summary, isLoading: loadingSummary } = useAbsenceSummaryForUserFinancialYear({
+    start: displayFinancialYear.start,
+    end: displayFinancialYear.end,
+  });
   const { data: reasons } = useAbsenceReasons();
   const createAbsence = useCreateAbsence();
   const cancelAbsence = useCancelAbsence();
@@ -384,32 +430,38 @@ export default function AbsencePage() {
   }
   
   // Handle cancel
-  async function handleCancel(id: string, status: string) {
-    const confirmed = await import('@/lib/services/notification.service').then(m => 
-      m.notify.confirm({
-        title: 'Cancel Absence',
-        description: `Are you sure you want to cancel this ${status === 'approved' ? 'approved' : 'pending'} absence?`,
-        confirmText: 'Cancel Absence',
-        destructive: true,
-      })
-    );
-    if (!confirmed) {
-      return;
-    }
-    
+  function handleCancel(id: string, status: string) {
+    setCancelTargetId(id);
+    setCancelTargetStatus(status);
+    setShowCancelDialog(true);
+  }
+
+  async function confirmCancelAbsence() {
+    if (!cancelTargetId) return;
+    setCancelSubmitting(true);
     try {
-      await cancelAbsence.mutateAsync(id);
+      await cancelAbsence.mutateAsync(cancelTargetId);
       toast.success('Absence cancelled');
+      setShowCancelDialog(false);
+      setCancelTargetId(null);
     } catch (error) {
       console.error('Error cancelling:', error);
       toast.error('Failed to cancel absence');
+    } finally {
+      setCancelSubmitting(false);
     }
   }
   
-  const activeBookings = useMemo(
-    () => (userAbsences || []).filter(a => a.status !== 'cancelled'),
-    [userAbsences]
-  );
+  const activeBookings = useMemo(() => {
+    const fyStart = displayFinancialYear.start;
+    const fyEnd = displayFinancialYear.end;
+    return (userAbsences || []).filter((absence) => {
+      if (absence.status === 'cancelled') return false;
+      const absenceStart = parseIsoDateAsLocalMidnight(absence.date);
+      const absenceEnd = absence.end_date ? parseIsoDateAsLocalMidnight(absence.end_date) : absenceStart;
+      return absenceStart <= fyEnd && absenceEnd >= fyStart;
+    });
+  }, [userAbsences, displayFinancialYear]);
   const bookingsTotalPages = Math.max(1, Math.ceil(activeBookings.length / BOOKINGS_PAGE_SIZE));
   const paginatedBookings = useMemo(
     () => activeBookings.slice((bookingsPage - 1) * BOOKINGS_PAGE_SIZE, bookingsPage * BOOKINGS_PAGE_SIZE),
@@ -453,10 +505,11 @@ export default function AbsencePage() {
         {/* Day cells */}
         {days.map(day => {
           const dayAbsences = calendarAbsences.filter(a => {
-            const absenceStart = new Date(a.date);
-            const absenceEnd = a.end_date ? new Date(a.end_date) : absenceStart;
+            const absenceStart = parseIsoDateAsLocalMidnight(a.date);
+            const absenceEnd = a.end_date ? parseIsoDateAsLocalMidnight(a.end_date) : absenceStart;
             return day >= absenceStart && day <= absenceEnd;
           });
+          const hasBankHoliday = dayAbsences.some((absence) => Boolean(absence.is_bank_holiday));
           
           return (
             <div
@@ -468,11 +521,13 @@ export default function AbsencePage() {
                   ? 'border-border bg-slate-800/40'
                   : 'border-slate-700 bg-slate-800/30'
                 }
+                ${hasBankHoliday ? 'ring-1 ring-amber-400/70 border-amber-500/40' : ''}
                 hover:bg-slate-700/30 hover:border-purple-500/50 transition-colors
               `}
             >
-              <div className="text-xs text-muted-foreground font-medium mb-1">
-                {format(day, 'd')}
+              <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground font-medium">
+                <span>{format(day, 'd')}</span>
+                {hasBankHoliday && <span className="text-[9px] font-semibold text-amber-300">BH</span>}
               </div>
               
               {/* Employee list with bullet points */}
@@ -873,6 +928,21 @@ export default function AbsencePage() {
                   {format(currentMonth, 'MMMM yyyy')}
                 </CardTitle>
                 <div className="flex gap-2">
+                  <Select
+                    value={String(selectedFinancialYearStartYear)}
+                    onValueChange={(value) => setSelectedFinancialYearStartYear(Number(value))}
+                  >
+                    <SelectTrigger className="w-[160px] border-border text-muted-foreground">
+                      <SelectValue placeholder="Financial Year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableFinancialYearStartYears.map((startYear) => (
+                        <SelectItem key={startYear} value={String(startYear)}>
+                          {startYear}/{(startYear + 1).toString().slice(-2)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {/* Employee Filter for Managers/Admins */}
                   {(isManager || isAdmin) && employees.length > 0 && (
                     <Popover>
@@ -967,11 +1037,28 @@ export default function AbsencePage() {
         <TabsContent value="bookings">
           <Card className="">
             <CardHeader>
-              <CardTitle className="text-foreground">
-                My Absence Records ({displayFinancialYear.label})
-              </CardTitle>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="text-foreground">
+                  My Absence Records ({displayFinancialYear.label})
+                </CardTitle>
+                <Select
+                  value={String(selectedFinancialYearStartYear)}
+                  onValueChange={(value) => setSelectedFinancialYearStartYear(Number(value))}
+                >
+                  <SelectTrigger className="w-full sm:w-[180px] border-border text-muted-foreground">
+                    <SelectValue placeholder="Financial Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableFinancialYearStartYears.map((startYear) => (
+                      <SelectItem key={startYear} value={String(startYear)}>
+                        {startYear}/{(startYear + 1).toString().slice(-2)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <CardDescription className="text-muted-foreground">
-                All absences in the current financial year
+                All absences in the selected financial year
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1102,12 +1189,12 @@ export default function AbsencePage() {
       
       {/* Day Click Modal */}
       <Dialog open={showDayModal} onOpenChange={setShowDayModal}>
-        <DialogContent className="border-border">
+        <DialogContent className="border-border max-w-3xl">
           <DialogHeader>
             <DialogTitle className="text-foreground">
               {selectedDate && format(selectedDate, 'EEEE, MMMM d, yyyy')}
             </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
+            <DialogDescription className="text-slate-400/90">
               What would you like to do?
             </DialogDescription>
           </DialogHeader>
@@ -1115,8 +1202,8 @@ export default function AbsencePage() {
           <div className="space-y-4">
             {selectedDate && (() => {
               const dayAbsences = (isManager || isAdmin ? calendarAbsences : userAbsences || []).filter(a => {
-                const absenceStart = new Date(a.date);
-                const absenceEnd = a.end_date ? new Date(a.end_date) : absenceStart;
+                const absenceStart = parseIsoDateAsLocalMidnight(a.date);
+                const absenceEnd = a.end_date ? parseIsoDateAsLocalMidnight(a.end_date) : absenceStart;
                 return selectedDate >= absenceStart && selectedDate <= absenceEnd && a.status !== 'cancelled';
               });
               
@@ -1133,6 +1220,11 @@ export default function AbsencePage() {
                             <p className="font-medium text-foreground flex items-center gap-2">
                               <span className="h-2.5 w-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10" style={{ backgroundColor: reasonColor }} />
                               {absence.absence_reasons.name}
+                              {absence.is_bank_holiday && (
+                                <Badge variant="outline" className="border-amber-500/40 text-amber-300 bg-amber-500/10">
+                                  Bank Holiday
+                                </Badge>
+                              )}
                             </p>
                             {(isManager || isAdmin) && absence.profiles && (
                               <p className="text-sm text-muted-foreground">{absence.profiles.full_name}</p>
@@ -1192,6 +1284,28 @@ export default function AbsencePage() {
               className="border-border text-muted-foreground"
             >
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent className="border-border max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Cancel Absence</DialogTitle>
+            <DialogDescription className="text-slate-400/90">
+              Are you sure you want to cancel this {cancelTargetStatus === 'approved' ? 'approved' : 'pending'} absence?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+            <p className="text-sm text-red-300">This change cannot be undone from this screen.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCancelDialog(false)} className="border-border text-muted-foreground">
+              Keep Booking
+            </Button>
+            <Button variant="destructive" onClick={confirmCancelAbsence} disabled={cancelSubmitting || !cancelTargetId}>
+              {cancelSubmitting ? 'Cancelling...' : 'Cancel Absence'}
             </Button>
           </DialogFooter>
         </DialogContent>

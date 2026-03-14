@@ -31,8 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowUpDown, ChevronLeft, ChevronRight, Loader2, Search, Settings2, Sparkles, Trash2, Users } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AlertTriangle, ArrowUpDown, ChevronLeft, ChevronRight, Loader2, Search, Settings2, Sparkles, Trash2, Users } from 'lucide-react';
 import { useUpdateEmployeeAllowance } from '@/lib/hooks/useAbsence';
 import { getCurrentFinancialYear } from '@/lib/utils/date';
 import { createClient } from '@/lib/supabase/client';
@@ -47,6 +46,15 @@ interface ProfileRow {
   upcoming: number;
   remaining: number;
   reason_totals: Record<string, number>;
+}
+
+interface BulkEmployeeOption {
+  id: string;
+  full_name: string;
+  employee_id: string | null;
+  role_id: string | null;
+  role_name: string | null;
+  role_display_name: string | null;
 }
 
 interface ReasonColumn {
@@ -74,16 +82,51 @@ interface ShutdownWarningRow {
   projectedRemaining: number;
 }
 
+interface ShutdownConflictRow {
+  profileId: string;
+  fullName: string;
+  employeeId: string | null;
+  reasonName: string | null;
+  status: string;
+  conflictStartDate: string;
+  conflictEndDate: string;
+}
+
 interface ShutdownPreviewResult {
   startDate: string;
   endDate: string;
+  reasonId: string;
+  reasonName: string;
   requestedDays: number;
   totalEmployees: number;
+  targetedEmployees: number;
   wouldCreate: number;
   createdCount: number;
   duplicateCount: number;
+  partialConflictEmployeeCount: number;
+  conflictingWorkingDaysSkipped: number;
+  createdSegmentsCount: number;
   warningCount: number;
   warnings: ShutdownWarningRow[];
+  conflicts: ShutdownConflictRow[];
+  batchId: string | null;
+}
+
+interface BulkAbsenceBatchSummary {
+  id: string;
+  reasonId: string;
+  reasonName: string;
+  startDate: string;
+  endDate: string;
+  notes: string | null;
+  applyToAll: boolean;
+  roleNames: string[];
+  explicitProfileIds: string[];
+  targetedEmployees: number;
+  createdCount: number;
+  duplicateCount: number;
+  createdAt: string;
+  createdByName: string | null;
 }
 
 type SortField = 'full_name' | 'allowance' | 'taken' | 'upcoming' | 'remaining';
@@ -125,6 +168,23 @@ function remainingColor(days: number): string {
   if (days <= 4.5) return '#f87171';
   if (days <= 9.5) return '#fbbf24';
   return '#4ade80';
+}
+
+function RemainingAllowanceValue({ value }: { value: number }) {
+  if (value < 0) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-0.5 font-medium text-red-300">
+        <AlertTriangle className="h-3.5 w-3.5" />
+        <FmtDays value={value} />
+      </span>
+    );
+  }
+
+  return (
+    <span className="font-medium" style={{ color: remainingColor(value) }}>
+      <FmtDays value={value} />
+    </span>
+  );
 }
 
 function formatLocalDate(date: Date): string {
@@ -173,8 +233,19 @@ export function AllowancesContent() {
   const [shutdownStartDate, setShutdownStartDate] = useState('');
   const [shutdownEndDate, setShutdownEndDate] = useState('');
   const [shutdownNotes, setShutdownNotes] = useState('');
+  const [shutdownReasonId, setShutdownReasonId] = useState('');
+  const [shutdownApplyMode, setShutdownApplyMode] = useState<'all' | 'selection'>('all');
+  const [shutdownRoleFilters, setShutdownRoleFilters] = useState<string[]>([]);
+  const [shutdownEmployeeFilters, setShutdownEmployeeFilters] = useState<string[]>([]);
   const [shutdownLoading, setShutdownLoading] = useState(false);
   const [shutdownPreview, setShutdownPreview] = useState<ShutdownPreviewResult | null>(null);
+  const [bulkEmployeeOptions, setBulkEmployeeOptions] = useState<BulkEmployeeOption[]>([]);
+  const [bulkReasonOptions, setBulkReasonOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [bulkRoleOptions, setBulkRoleOptions] = useState<Array<{ id: string; label: string }>>([]);
+  const [showBulkUndoDialog, setShowBulkUndoDialog] = useState(false);
+  const [bulkUndoLoading, setBulkUndoLoading] = useState(false);
+  const [bulkBatchUndoId, setBulkBatchUndoId] = useState('');
+  const [bulkBatches, setBulkBatches] = useState<BulkAbsenceBatchSummary[]>([]);
 
   const updateAllowance = useUpdateEmployeeAllowance();
 
@@ -253,7 +324,7 @@ export function AllowancesContent() {
       const [{ data: profiles, error: profilesError }, { data: reasons, error: reasonsError }] = await Promise.all([
         supabase
           .from('profiles')
-          .select('id, full_name, employee_id, annual_holiday_allowance_days')
+          .select('id, full_name, employee_id, annual_holiday_allowance_days, roles(id, name, display_name)')
           .order('full_name'),
         supabase
           .from('absence_reasons')
@@ -275,6 +346,11 @@ export function AllowancesContent() {
         .filter((reason) => reason.is_active && reason.id !== annualReason.id)
         .map((reason) => ({ id: reason.id, name: reason.name, color: reason.color || '#6366f1' }));
       setReasonColumns(visibleReasonColumns);
+      const activeReasons = typedReasons.filter((reason) => reason.is_active).map((reason) => ({ id: reason.id, name: reason.name }));
+      setBulkReasonOptions(activeReasons);
+      if (!shutdownReasonId) {
+        setShutdownReasonId(annualReason.id || activeReasons[0]?.id || '');
+      }
 
       const mergedReasonVisibility = { ...reasonColumnVisibilityRef.current };
       for (const reason of visibleReasonColumns) {
@@ -331,8 +407,15 @@ export function AllowancesContent() {
         }
       }
 
-      type ProfileData = { id: string; full_name: string; employee_id: string | null; annual_holiday_allowance_days: number | null };
-      const computedRows: ProfileRow[] = ((profiles || []) as ProfileData[]).map((profile) => {
+      type ProfileData = {
+        id: string;
+        full_name: string;
+        employee_id: string | null;
+        annual_holiday_allowance_days: number | null;
+        roles?: { id?: string; name?: string; display_name?: string } | null;
+      };
+      const typedProfiles = (profiles || []) as ProfileData[];
+      const computedRows: ProfileRow[] = typedProfiles.map((profile) => {
         const totals = summaryByProfile.get(profile.id) || {
           annualTaken: 0,
           annualUpcoming: 0,
@@ -352,6 +435,30 @@ export function AllowancesContent() {
           reason_totals: totals.byReason,
         };
       });
+
+      const employeeOptions: BulkEmployeeOption[] = typedProfiles.map((profile) => ({
+        id: profile.id,
+        full_name: profile.full_name,
+        employee_id: profile.employee_id,
+        role_id: profile.roles?.id || null,
+        role_name: profile.roles?.name || null,
+        role_display_name: profile.roles?.display_name || null,
+      }));
+      setBulkEmployeeOptions(employeeOptions);
+
+      const roleMap = new Map<string, string>();
+      employeeOptions.forEach((employee) => {
+        if (!employee.role_id) return;
+        const label = employee.role_display_name?.trim() || employee.role_name?.trim();
+        if (!label) return;
+        if (!roleMap.has(employee.role_id)) {
+          roleMap.set(employee.role_id, label);
+        }
+      });
+      const roleOptions = Array.from(roleMap.entries())
+        .map(([id, label]) => ({ id, label }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+      setBulkRoleOptions(roleOptions);
 
       setRows(computedRows);
     } catch (error) {
@@ -519,9 +626,98 @@ export function AllowancesContent() {
     }
   }
 
+  function toggleShutdownRole(roleId: string) {
+    setShutdownRoleFilters((prev) =>
+      prev.includes(roleId) ? prev.filter((role) => role !== roleId) : [...prev, roleId]
+    );
+    setShutdownPreview(null);
+  }
+
+  function toggleShutdownEmployee(profileId: string) {
+    setShutdownEmployeeFilters((prev) =>
+      prev.includes(profileId) ? prev.filter((id) => id !== profileId) : [...prev, profileId]
+    );
+    setShutdownPreview(null);
+  }
+
+  async function loadBulkAbsenceBatches() {
+    setBulkUndoLoading(true);
+    try {
+      const response = await fetch('/api/absence/shutdown', { method: 'GET' });
+      const payload = (await response.json()) as {
+        success?: boolean;
+        batches?: BulkAbsenceBatchSummary[];
+        error?: string;
+      };
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error || 'Failed to load bulk booking history');
+      }
+      const nextBatches = payload.batches || [];
+      setBulkBatches(nextBatches);
+      setBulkBatchUndoId((current) => {
+        if (current && nextBatches.some((batch) => batch.id === current)) {
+          return current;
+        }
+        return nextBatches[0]?.id || '';
+      });
+    } catch (error) {
+      console.error('Error loading bulk absence batches:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to load bulk booking history');
+    } finally {
+      setBulkUndoLoading(false);
+    }
+  }
+
+  async function handleUndoBulkAbsenceBatch() {
+    if (!bulkBatchUndoId) {
+      toast.error('Please choose a batch to undo');
+      return;
+    }
+    if (!bulkBatches.some((batch) => batch.id === bulkBatchUndoId)) {
+      toast.error('Selected batch is no longer available. Please refresh and choose again.');
+      return;
+    }
+
+    setBulkUndoLoading(true);
+    try {
+      const response = await fetch('/api/absence/shutdown', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ batchId: bulkBatchUndoId }),
+      });
+      const payload = (await response.json()) as {
+        success?: boolean;
+        removedAbsences?: number;
+        error?: string;
+      };
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error || 'Failed to undo bulk absence batch');
+      }
+
+      toast.success(`Undo complete. Removed ${payload.removedAbsences ?? 0} booking(s).`);
+      setShowBulkUndoDialog(false);
+      await Promise.all([loadRows(), loadBulkAbsenceBatches()]);
+    } catch (error) {
+      console.error('Error undoing bulk absence batch:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to undo bulk absence batch');
+    } finally {
+      setBulkUndoLoading(false);
+    }
+  }
+
   async function requestShutdownPreview(confirm: boolean) {
     if (!shutdownStartDate) {
-      toast.error('Please select the first day of shutdown');
+      toast.error('Please select the first day off');
+      return;
+    }
+    if (!shutdownReasonId) {
+      toast.error('Please select an absence reason');
+      return;
+    }
+    if (shutdownApplyMode === 'selection' && shutdownRoleFilters.length === 0 && shutdownEmployeeFilters.length === 0) {
+      toast.error('Choose at least one role or employee');
       return;
     }
 
@@ -533,29 +729,36 @@ export function AllowancesContent() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          reasonId: shutdownReasonId,
           startDate: shutdownStartDate,
           endDate: shutdownEndDate || shutdownStartDate,
           notes: shutdownNotes,
+          applyToAll: shutdownApplyMode === 'all',
+          roleIds: shutdownRoleFilters,
+          employeeIds: shutdownEmployeeFilters,
           confirm,
         }),
       });
       const payload = (await response.json()) as ShutdownPreviewResult & { success?: boolean; error?: string };
       if (!response.ok || !payload.success) {
-        throw new Error(payload.error || 'Failed to process shutdown booking');
+        throw new Error(payload.error || 'Failed to process bulk absence booking');
       }
 
       setShutdownPreview(payload);
 
       if (confirm) {
         toast.success(
-          `Created ${payload.createdCount} annual leave bookings. ${payload.warningCount} employee(s) are now over allowance.`
+          `Created ${payload.createdCount} ${payload.reasonName} booking(s). ${payload.duplicateCount} fully skipped, ${payload.partialConflictEmployeeCount} partially applied.`
         );
         setShowShutdownDialog(false);
         setShutdownStartDate('');
         setShutdownEndDate('');
         setShutdownNotes('');
+        setShutdownRoleFilters([]);
+        setShutdownEmployeeFilters([]);
+        setShutdownApplyMode('all');
         setShutdownPreview(null);
-        await loadRows();
+        await Promise.all([loadRows(), loadBulkAbsenceBatches()]);
         return;
       }
 
@@ -567,8 +770,8 @@ export function AllowancesContent() {
         toast.success(`Preview ready: ${payload.wouldCreate} booking(s) will be created.`);
       }
     } catch (error) {
-      console.error('Error processing company shutdown booking:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to process shutdown booking');
+      console.error('Error processing bulk absence booking:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to process bulk absence booking');
     } finally {
       setShutdownLoading(false);
     }
@@ -636,54 +839,9 @@ export function AllowancesContent() {
               </p>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button onClick={() => setShowRemoveDialog(true)} variant="outline" className="border-border text-muted-foreground">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Undo Last Year Setup
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Remove auto-generated bank holidays for the most recently prepared year</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    onClick={() => setShowShutdownDialog(true)}
-                    variant="outline"
-                    className="border-border text-muted-foreground"
-                  >
-                    <Users className="h-4 w-4 mr-2" />
-                    Book Shutdown (All Staff)
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Create one annual leave booking for every employee in a date range</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    onClick={() => setShowGenerateDialog(true)}
-                    className="bg-absence hover:bg-absence-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
-                  >
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Prepare Next Year
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Create bank holiday entries and open the next financial year for booking</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
+          <p className="text-xs text-muted-foreground md:text-right">
+            Bulk Absence and Set up actions are now available in the Overview tab.
+          </p>
         </CardHeader>
       </Card>
 
@@ -706,7 +864,7 @@ export function AllowancesContent() {
               <SelectTrigger className="w-full md:w-[190px] border-slate-600">
                 <SelectValue placeholder="Financial Year" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-slate-950 border-border text-foreground">
                 {yearOptions.map((startYear) => {
                   const year = buildFinancialYearFromStartYear(startYear);
                   return (
@@ -874,7 +1032,7 @@ export function AllowancesContent() {
                         )}
                         {baseColumnVisibility.remaining && (
                           <TableCell style={{ borderLeft: `3px solid ${annualLeaveColor}22` }}>
-                            <span className="font-medium" style={{ color: remainingColor(profile.remaining) }}><FmtDays value={profile.remaining} /></span>
+                            <RemainingAllowanceValue value={profile.remaining} />
                           </TableCell>
                         )}
                         {reasonColumns
@@ -920,7 +1078,9 @@ export function AllowancesContent() {
                         </div>
                         <div>
                           <p className="text-muted-foreground">Remaining</p>
-                          <p className="font-medium" style={{ color: remainingColor(profile.remaining) }}><FmtDays value={profile.remaining} /></p>
+                          <p>
+                            <RemainingAllowanceValue value={profile.remaining} />
+                          </p>
                         </div>
                       </div>
                     </CardContent>
@@ -969,21 +1129,130 @@ export function AllowancesContent() {
           setShowShutdownDialog(open);
           if (!open) {
             setShutdownPreview(null);
+            setShutdownRoleFilters([]);
+            setShutdownEmployeeFilters([]);
+            setShutdownApplyMode('all');
           }
         }}
       >
-        <DialogContent className="border-border max-w-3xl">
+        <DialogContent className="border-border max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle className="text-foreground">Book Company Shutdown for All Staff</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Add one approved Annual Leave booking for every employee. A warning list is shown if this would take people over allowance.
+            <DialogTitle className="text-foreground">Book Bulk Absence</DialogTitle>
+            <DialogDescription className="text-slate-400/90">
+              Create approved absence bookings in bulk with filters for reason, job role, and selected employees.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="shutdown-start-date">First day off *</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="shutdown-reason" className="text-foreground font-medium">Reason *</Label>
+                <Select
+                  value={shutdownReasonId}
+                  onValueChange={(value) => {
+                    setShutdownReasonId(value);
+                    setShutdownPreview(null);
+                  }}
+                >
+                  <SelectTrigger id="shutdown-reason" className="bg-slate-950 border-border text-foreground">
+                    <SelectValue placeholder="Select absence reason" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-950 border-border text-foreground">
+                    {bulkReasonOptions.map((reason) => (
+                      <SelectItem key={reason.id} value={reason.id}>
+                        {reason.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="shutdown-apply-mode" className="text-foreground font-medium">Apply to *</Label>
+                <Select
+                  value={shutdownApplyMode}
+                  onValueChange={(value: 'all' | 'selection') => {
+                    setShutdownApplyMode(value);
+                    setShutdownPreview(null);
+                  }}
+                >
+                  <SelectTrigger id="shutdown-apply-mode" className="bg-slate-950 border-border text-foreground">
+                    <SelectValue placeholder="Select targeting mode" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-950 border-border text-foreground">
+                    <SelectItem value="all">All employees</SelectItem>
+                    <SelectItem value="selection">Selected roles/employees</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {shutdownApplyMode === 'selection' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-foreground font-medium">Job roles (union filter)</Label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start bg-slate-950 border-border text-foreground hover:bg-slate-950"
+                      >
+                        {shutdownRoleFilters.length > 0
+                          ? `${shutdownRoleFilters.length} role(s) selected`
+                          : 'Select job roles'}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="z-[120] w-72 max-h-64 overflow-y-auto bg-slate-950 border-border text-foreground">
+                      {bulkRoleOptions.length === 0 ? (
+                        <DropdownMenuLabel className="text-muted-foreground">No roles available</DropdownMenuLabel>
+                      ) : (
+                        bulkRoleOptions.map((roleOption) => (
+                          <DropdownMenuCheckboxItem
+                            key={roleOption.id}
+                            checked={shutdownRoleFilters.includes(roleOption.id)}
+                            onCheckedChange={() => toggleShutdownRole(roleOption.id)}
+                            className="text-foreground focus:bg-slate-800/70 focus:text-foreground"
+                          >
+                            {roleOption.label}
+                          </DropdownMenuCheckboxItem>
+                        ))
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-foreground font-medium">Employees (union filter)</Label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start bg-slate-950 border-border text-foreground hover:bg-slate-950"
+                      >
+                        {shutdownEmployeeFilters.length > 0
+                          ? `${shutdownEmployeeFilters.length} employee(s) selected`
+                          : 'Select employees'}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="z-[120] w-80 max-h-72 overflow-y-auto bg-slate-950 border-border text-foreground">
+                      {bulkEmployeeOptions.map((employee) => (
+                        <DropdownMenuCheckboxItem
+                          key={employee.id}
+                          checked={shutdownEmployeeFilters.includes(employee.id)}
+                          onCheckedChange={() => toggleShutdownEmployee(employee.id)}
+                          className="text-foreground focus:bg-slate-800/70 focus:text-foreground"
+                        >
+                          {employee.full_name}
+                          {employee.employee_id ? ` (${employee.employee_id})` : ''}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="shutdown-start-date" className="text-foreground font-medium">First day off *</Label>
                 <Input
                   id="shutdown-start-date"
                   type="date"
@@ -995,11 +1264,11 @@ export function AllowancesContent() {
                       setShutdownEndDate(event.target.value);
                     }
                   }}
-                  className="border-border bg-background text-foreground"
+                  className="bg-slate-950 border-border text-foreground"
                 />
               </div>
-              <div>
-                <Label htmlFor="shutdown-end-date">Last day off *</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="shutdown-end-date" className="text-foreground font-medium">Last day off *</Label>
                 <Input
                   id="shutdown-end-date"
                   type="date"
@@ -1009,13 +1278,13 @@ export function AllowancesContent() {
                     setShutdownPreview(null);
                   }}
                   min={shutdownStartDate || undefined}
-                  className="border-border bg-background text-foreground"
+                  className="bg-slate-950 border-border text-foreground"
                 />
               </div>
             </div>
 
-            <div>
-              <Label htmlFor="shutdown-notes">Booking Notes (optional)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="shutdown-notes" className="text-foreground font-medium">Booking Notes (optional)</Label>
               <Textarea
                 id="shutdown-notes"
                 value={shutdownNotes}
@@ -1023,30 +1292,43 @@ export function AllowancesContent() {
                   setShutdownNotes(event.target.value);
                   setShutdownPreview(null);
                 }}
-                placeholder="Example: Christmas shutdown"
-                className="border-border bg-background text-foreground min-h-[88px]"
+                placeholder="Example: Company training day"
+                className="bg-slate-950 border-border text-foreground min-h-[88px]"
               />
             </div>
 
             {shutdownPreview && (
               <div className="rounded-lg border border-border bg-slate-900/40 p-4 space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Preview for <span className="text-foreground font-medium">{shutdownPreview.startDate}</span> to{' '}
+                  Preview for <span className="text-foreground font-medium">{shutdownPreview.reasonName}</span> from{' '}
+                  <span className="text-foreground font-medium">{shutdownPreview.startDate}</span> to{' '}
                   <span className="text-foreground font-medium">{shutdownPreview.endDate}</span> (
                   {shutdownPreview.requestedDays} working day{shutdownPreview.requestedDays === 1 ? '' : 's'})
                 </p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div className="grid grid-cols-2 md:grid-cols-7 gap-3 text-sm">
                   <div>
-                    <p className="text-muted-foreground">Employees</p>
+                    <p className="text-muted-foreground">All employees</p>
                     <p className="text-foreground font-medium">{shutdownPreview.totalEmployees}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Targeted</p>
+                    <p className="text-foreground font-medium">{shutdownPreview.targetedEmployees}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Will create</p>
                     <p className="text-foreground font-medium">{shutdownPreview.wouldCreate}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Already exists</p>
+                    <p className="text-muted-foreground">Fully skipped</p>
                     <p className="text-foreground font-medium">{shutdownPreview.duplicateCount}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Partially applied</p>
+                    <p className="text-foreground font-medium">{shutdownPreview.partialConflictEmployeeCount}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Conflict days skipped</p>
+                    <p className="text-foreground font-medium">{shutdownPreview.conflictingWorkingDaysSkipped}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Over allowance</p>
@@ -1056,26 +1338,54 @@ export function AllowancesContent() {
                   </div>
                 </div>
 
-                {shutdownPreview.warningCount > 0 && (
-                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 space-y-2">
-                    <p className="text-sm text-amber-200">
-                      These employees would go over allowance. You can still continue, but consider creating Unpaid Leave for these people instead.
-                    </p>
-                    <div className="max-h-40 overflow-y-auto space-y-1">
-                      {shutdownPreview.warnings.slice(0, 12).map((warning) => (
-                        <p key={warning.profileId} className="text-xs text-amber-100">
-                          {warning.fullName}
-                          {warning.employeeId ? ` (${warning.employeeId})` : ''} — projected remaining {warning.projectedRemaining}
-                        </p>
-                      ))}
-                      {shutdownPreview.warnings.length > 12 && (
-                        <p className="text-xs text-amber-100/80">
-                          +{shutdownPreview.warnings.length - 12} more employees in warning list
-                        </p>
-                      )}
+                <div className="max-h-56 overflow-y-auto pr-1 space-y-3">
+                  {shutdownPreview.conflicts.length > 0 && (
+                    <div className="rounded-md border border-red-500/40 bg-red-500/10 p-3 space-y-2">
+                      <p className="text-sm text-red-200">
+                        Conflicts found: {shutdownPreview.duplicateCount} employee
+                        {shutdownPreview.duplicateCount === 1 ? '' : 's'} fully skipped, {shutdownPreview.partialConflictEmployeeCount}{' '}
+                        partially applied, and {shutdownPreview.conflictingWorkingDaysSkipped} conflicting working day
+                        {shutdownPreview.conflictingWorkingDaysSkipped === 1 ? '' : 's'} skipped across {shutdownPreview.conflicts.length}{' '}
+                        overlapping existing booking{shutdownPreview.conflicts.length === 1 ? '' : 's'}.
+                      </p>
+                      <div className="space-y-1">
+                        {shutdownPreview.conflicts.map((conflict, index) => (
+                          <p key={`${conflict.profileId}-${conflict.conflictStartDate}-${index}`} className="text-xs text-red-100">
+                            {conflict.fullName}
+                            {conflict.employeeId ? ` (${conflict.employeeId})` : ''} -{' '}
+                            {(conflict.reasonName || 'Existing absence')} ({conflict.status}) from {conflict.conflictStartDate} to{' '}
+                            {conflict.conflictEndDate}
+                          </p>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+
+                  {shutdownPreview.warningCount > 0 && (
+                    <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 space-y-2">
+                      <p className="text-sm text-amber-200">
+                        These employees would go over allowance. You can still continue, but consider creating Unpaid Leave for these people instead.
+                      </p>
+                      <div className="space-y-1">
+                        {shutdownPreview.warnings.map((warning) => (
+                          <p key={warning.profileId} className="text-xs text-amber-100">
+                            {warning.fullName}
+                            {warning.employeeId ? ` (${warning.employeeId})` : ''} - allowance {warning.allowance}, already booked{' '}
+                            {warning.alreadyBooked}, requested {warning.requestedDays}, projected remaining{' '}
+                            {warning.projectedRemaining < 0 ? (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 font-medium text-red-300">
+                                <AlertTriangle className="h-3 w-3" />
+                                {warning.projectedRemaining}
+                              </span>
+                            ) : (
+                              warning.projectedRemaining
+                            )}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -1086,8 +1396,19 @@ export function AllowancesContent() {
             </Button>
             <Button
               variant="outline"
+              onClick={() => {
+                setShowBulkUndoDialog(true);
+                void loadBulkAbsenceBatches();
+              }}
+              className="border-border text-muted-foreground"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Undo Bulk Absence
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => requestShutdownPreview(false)}
-              disabled={shutdownLoading || !shutdownStartDate}
+              disabled={shutdownLoading || !shutdownStartDate || !shutdownReasonId}
               className="border-border text-muted-foreground"
             >
               {shutdownLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
@@ -1095,21 +1416,84 @@ export function AllowancesContent() {
             </Button>
             <Button
               onClick={() => requestShutdownPreview(true)}
-              disabled={shutdownLoading || !shutdownStartDate || !shutdownPreview}
+              disabled={shutdownLoading || !shutdownStartDate || !shutdownReasonId || !shutdownPreview}
               className="bg-absence hover:bg-absence-dark text-white"
             >
               {shutdownLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              Confirm & Create Annual Leave
+              Confirm & Create Bulk Bookings
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBulkUndoDialog} onOpenChange={setShowBulkUndoDialog}>
+        <DialogContent className="border-border max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Undo Bulk Absence</DialogTitle>
+            <DialogDescription className="text-slate-400/90">
+              Select a previous bulk booking batch to remove all absences created by that run.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4 space-y-4">
+            <div>
+              <Label htmlFor="bulk-undo-batch" className="text-foreground font-medium">Batch</Label>
+              <Select value={bulkBatchUndoId} onValueChange={setBulkBatchUndoId}>
+                <SelectTrigger id="bulk-undo-batch" className="bg-slate-950 border-border text-foreground">
+                  <SelectValue placeholder={bulkUndoLoading ? 'Loading batches...' : 'Select bulk booking batch'} />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-950 border-border text-foreground">
+                  {bulkBatches.map((batch) => (
+                    <SelectItem key={batch.id} value={batch.id}>
+                      {batch.reasonName} | {batch.startDate} to {batch.endDate} | {batch.createdCount} created
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {bulkBatchUndoId && (
+              <div className="rounded-md border border-border bg-slate-800/30 p-3 text-sm">
+                {(() => {
+                  const batch = bulkBatches.find((item) => item.id === bulkBatchUndoId);
+                  if (!batch) return <p className="text-muted-foreground">Selected batch details unavailable.</p>;
+                  return (
+                    <div className="space-y-1">
+                      <p className="text-foreground font-medium">{batch.reasonName}</p>
+                      <p className="text-muted-foreground">
+                        {batch.startDate} to {batch.endDate}
+                      </p>
+                      <p className="text-muted-foreground">
+                        Created {batch.createdCount}, skipped {batch.duplicateCount}, targeted {batch.targetedEmployees}
+                      </p>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkUndoDialog(false)} className="border-border text-muted-foreground">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUndoBulkAbsenceBatch}
+              disabled={bulkUndoLoading || !bulkBatchUndoId || !bulkBatches.some((batch) => batch.id === bulkBatchUndoId)}
+              className="bg-absence hover:bg-absence-dark text-white"
+            >
+              {bulkUndoLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              {bulkUndoLoading ? 'Undoing...' : 'Undo Selected Batch'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={showGenerateDialog} onOpenChange={setShowGenerateDialog}>
-        <DialogContent className="border-border">
+        <DialogContent className="border-border max-w-3xl">
           <DialogHeader>
             <DialogTitle className="text-foreground">Prepare Next Financial Year</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
+            <DialogDescription className="text-slate-400/90">
               This will create bank holiday leave entries for every employee in{' '}
               <span className="font-medium text-foreground">{generationStatus?.nextFinancialYearLabel || 'the next financial year'}</span>{' '}
               and make that year available for booking. Please confirm before proceeding.
@@ -1118,6 +1502,14 @@ export function AllowancesContent() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowGenerateDialog(false)} className="border-border text-muted-foreground">
               Cancel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowRemoveDialog(true)}
+              className="border-border text-muted-foreground"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Undo Last Year Setup
             </Button>
             <Button
               onClick={handleGenerateAllowances}
@@ -1132,10 +1524,10 @@ export function AllowancesContent() {
       </Dialog>
 
       <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
-        <DialogContent className="border-border">
+        <DialogContent className="border-border max-w-3xl">
           <DialogHeader>
             <DialogTitle className="text-foreground">Undo Last Year Setup</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
+            <DialogDescription className="text-slate-400/90">
               This will remove the bank holiday entries that were automatically created for the most recently prepared year.
               It cannot be undone if employees have already booked leave in that year.
             </DialogDescription>
@@ -1157,17 +1549,17 @@ export function AllowancesContent() {
       </Dialog>
 
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="border-border">
+        <DialogContent className="border-border max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="text-white">Edit Allowance</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
+            <DialogTitle className="text-foreground">Edit Allowance</DialogTitle>
+            <DialogDescription className="text-slate-400/90">
               Update annual leave allowance for {editingProfile?.full_name}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="allowance">Annual Leave Allowance (days) *</Label>
+          <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4 space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="allowance" className="text-foreground font-medium">Annual Leave Allowance (days) *</Label>
               <Input
                 id="allowance"
                 type="number"
@@ -1176,7 +1568,7 @@ export function AllowancesContent() {
                 value={newAllowance}
                 onChange={(e) => setNewAllowance(e.target.value)}
                 placeholder="28"
-                className="border-border bg-background text-foreground"
+                className="bg-slate-950 border-border text-foreground"
               />
               <p className="text-xs text-muted-foreground mt-1">
                 Standard UK allowance is 28 days (including bank holidays)

@@ -5,7 +5,8 @@ import {
   AbsenceUpdate, 
   AbsenceReason,
   AbsenceWithRelations,
-  AbsenceSummary
+  AbsenceSummary,
+  FinancialYear
 } from '@/types/absence';
 import { getCurrentFinancialYear, getFinancialYear } from '@/lib/utils/date';
 import { isClosedFinancialYearDate } from '@/lib/services/absence-archive';
@@ -30,6 +31,76 @@ async function assertAbsenceFinancialYearOpen(
   if (!data?.date) throw new Error('Absence record not found');
   if (isClosedFinancialYearDate(data.date)) {
     throw new Error('This absence is in a closed financial year and is read-only');
+  }
+}
+
+async function assertNoAbsenceConflictBeforeInsert(
+  supabase: ReturnType<typeof createClient>,
+  absence: AbsenceInsert
+): Promise<void> {
+  const profileId = absence.profile_id;
+  const startDate = absence.date;
+  const endDate = absence.end_date || absence.date;
+  const nextStatus = absence.status || 'pending';
+  const isHalfDay = absence.is_half_day === true;
+  const halfDaySession = absence.half_day_session || null;
+
+  if (!profileId || !startDate) {
+    return;
+  }
+
+  if (nextStatus !== 'approved' && nextStatus !== 'pending') {
+    return;
+  }
+
+  if (isHalfDay && !halfDaySession) {
+    throw new Error('Half-day absences require AM or PM session');
+  }
+  if (isHalfDay && endDate !== startDate) {
+    throw new Error('Half-day absences must be a single day');
+  }
+
+  const { data, error } = await supabase
+    .from('absences')
+    .select('date, end_date, is_half_day, half_day_session')
+    .eq('profile_id', profileId)
+    .in('status', ['approved', 'pending'])
+    .lte('date', endDate);
+
+  if (error) throw error;
+
+  const existingRows = (data || []) as Array<{
+    date: string;
+    end_date: string | null;
+    is_half_day: boolean;
+    half_day_session: 'AM' | 'PM' | null;
+  }>;
+
+  const overlappingRows = existingRows.filter((row) => {
+    const rowEnd = row.end_date || row.date;
+    return row.date <= endDate && rowEnd >= startDate;
+  });
+
+  if (!isHalfDay && overlappingRows.length > 0) {
+    throw new Error('This absence conflicts with an existing approved/pending booking');
+  }
+
+  if (!isHalfDay) {
+    return;
+  }
+
+  for (const row of overlappingRows) {
+    const rowEnd = row.end_date || row.date;
+    const sameSingleDay = row.date === startDate && rowEnd === startDate;
+    if (!sameSingleDay) {
+      throw new Error('This half-day conflicts with an existing multi-day or different-day booking');
+    }
+    if (!row.is_half_day) {
+      throw new Error('This half-day conflicts with an existing full-day booking');
+    }
+    if (row.half_day_session === halfDaySession) {
+      throw new Error(`This ${halfDaySession} half-day is already booked`);
+    }
   }
 }
 
@@ -86,8 +157,22 @@ export function useAllAbsenceReasons() {
  * Get absences for current user in the current financial year
  */
 export function useAbsencesForCurrentUser() {
-  const supabase = createClient();
   const { start, end } = getCurrentFinancialYear();
+  
+  return useAbsencesForUserFinancialYear({
+    start,
+    end,
+  });
+}
+
+/**
+ * Get absences for current user in a selected financial year
+ */
+export function useAbsencesForUserFinancialYear(financialYear?: Pick<FinancialYear, 'start' | 'end'>) {
+  const supabase = createClient();
+  const fallback = getCurrentFinancialYear();
+  const start = financialYear?.start || fallback.start;
+  const end = financialYear?.end || fallback.end;
   
   return useQuery({
     queryKey: ['absences', 'current-user', start.toISOString(), end.toISOString()],
@@ -117,8 +202,22 @@ export function useAbsencesForCurrentUser() {
  * Get absence summary for current user in the current financial year
  */
 export function useAbsenceSummaryForCurrentUser() {
-  const supabase = createClient();
   const { start, end } = getCurrentFinancialYear();
+  
+  return useAbsenceSummaryForUserFinancialYear({
+    start,
+    end,
+  });
+}
+
+/**
+ * Get absence summary for current user in a selected financial year
+ */
+export function useAbsenceSummaryForUserFinancialYear(financialYear?: Pick<FinancialYear, 'start' | 'end'>) {
+  const supabase = createClient();
+  const fallback = getCurrentFinancialYear();
+  const start = financialYear?.start || fallback.start;
+  const end = financialYear?.end || fallback.end;
   
   return useQuery({
     queryKey: ['absence-summary', 'current-user', start.toISOString(), end.toISOString()],
@@ -198,6 +297,8 @@ export function useCreateAbsence() {
   
   return useMutation({
     mutationFn: async (absence: AbsenceInsert) => {
+      await assertNoAbsenceConflictBeforeInsert(supabase, absence);
+
       // Enforce annual leave allowance at mutation time to prevent stale UI bypasses.
       if (absence.status === 'pending' && absence.reason_id && absence.profile_id && (absence.duration_days || 0) > 0) {
         const { data: reason, error: reasonError } = await supabase

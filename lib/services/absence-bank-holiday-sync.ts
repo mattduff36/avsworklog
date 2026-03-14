@@ -33,6 +33,7 @@ export interface AbsenceGenerationRemoveResult {
   removedFinancialYearStartYear: number;
   removedFinancialYearLabel: string;
   removedGeneratedAbsences: number;
+  removedExistingAbsences: number;
 }
 
 interface BankHolidayEvent {
@@ -40,14 +41,17 @@ interface BankHolidayEvent {
   date: string;
 }
 
-interface BulkShutdownEmployee {
+interface BulkAbsenceEmployee {
   id: string;
   full_name: string | null;
   employee_id: string | null;
   annual_holiday_allowance_days: number | null;
+  role_id: string | null;
+  role_name: string | null;
+  role_display_name: string | null;
 }
 
-export interface ShutdownAllowanceWarning {
+export interface BulkAbsenceAllowanceWarning {
   profileId: string;
   fullName: string;
   employeeId: string | null;
@@ -57,16 +61,56 @@ export interface ShutdownAllowanceWarning {
   projectedRemaining: number;
 }
 
-export interface CompanyShutdownBookingResult {
+export interface BulkAbsenceConflictDetail {
+  profileId: string;
+  fullName: string;
+  employeeId: string | null;
+  reasonName: string | null;
+  status: 'approved' | 'pending' | string;
+  conflictStartDate: string;
+  conflictEndDate: string;
+}
+
+export interface BulkAbsenceBookingResult {
   startDate: string;
   endDate: string;
+  reasonId: string;
+  reasonName: string;
   requestedDays: number;
   totalEmployees: number;
+  targetedEmployees: number;
   wouldCreate: number;
   createdCount: number;
-  duplicateCount: number;
+  duplicateCount: number; // Fully skipped employees due to existing overlapping absences
+  partialConflictEmployeeCount: number;
+  conflictingWorkingDaysSkipped: number;
+  createdSegmentsCount: number;
   warningCount: number;
-  warnings: ShutdownAllowanceWarning[];
+  warnings: BulkAbsenceAllowanceWarning[];
+  conflicts: BulkAbsenceConflictDetail[];
+  batchId: string | null;
+}
+
+export interface BulkAbsenceBatchSummary {
+  id: string;
+  reasonId: string;
+  reasonName: string;
+  startDate: string;
+  endDate: string;
+  notes: string | null;
+  applyToAll: boolean;
+  roleNames: string[];
+  explicitProfileIds: string[];
+  targetedEmployees: number;
+  createdCount: number;
+  duplicateCount: number;
+  createdAt: string;
+  createdByName: string | null;
+}
+
+export interface UndoBulkAbsenceBatchResult {
+  batchId: string;
+  removedAbsences: number;
 }
 
 export function getFinancialYearStartYear(date: Date): number {
@@ -102,6 +146,98 @@ function formatIsoDate(date: Date): string {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+}
+
+interface DateInterval {
+  start: string;
+  end: string;
+}
+
+function toDateAtMidnight(isoDate: string): Date {
+  return new Date(`${isoDate}T00:00:00`);
+}
+
+function addDaysIso(isoDate: string, days: number): string {
+  const date = toDateAtMidnight(isoDate);
+  date.setDate(date.getDate() + days);
+  return formatIsoDate(date);
+}
+
+function countWeekdaysInInterval(interval: DateInterval): number {
+  const start = toDateAtMidnight(interval.start);
+  const end = toDateAtMidnight(interval.end);
+  return calculateDurationDays(start, end, false);
+}
+
+function mergeDateIntervals(intervals: DateInterval[]): DateInterval[] {
+  if (intervals.length <= 1) {
+    return intervals.slice();
+  }
+
+  const sorted = intervals
+    .slice()
+    .sort((a, b) => (a.start === b.start ? a.end.localeCompare(b.end) : a.start.localeCompare(b.start)));
+  const merged: DateInterval[] = [];
+
+  for (const interval of sorted) {
+    const last = merged[merged.length - 1];
+    if (!last) {
+      merged.push({ ...interval });
+      continue;
+    }
+
+    const adjacentOrOverlapping = interval.start <= addDaysIso(last.end, 1);
+    if (adjacentOrOverlapping) {
+      if (interval.end > last.end) {
+        last.end = interval.end;
+      }
+      continue;
+    }
+
+    merged.push({ ...interval });
+  }
+
+  return merged;
+}
+
+function subtractDateIntervals(base: DateInterval, blocked: DateInterval[]): DateInterval[] {
+  const mergedBlocked = mergeDateIntervals(
+    blocked
+      .map((interval) => ({
+        start: interval.start < base.start ? base.start : interval.start,
+        end: interval.end > base.end ? base.end : interval.end,
+      }))
+      .filter((interval) => interval.start <= interval.end)
+  );
+
+  if (mergedBlocked.length === 0) {
+    return [base];
+  }
+
+  const available: DateInterval[] = [];
+  let cursor = base.start;
+
+  for (const interval of mergedBlocked) {
+    if (cursor < interval.start) {
+      available.push({
+        start: cursor,
+        end: addDaysIso(interval.start, -1),
+      });
+    }
+    const nextCursor = addDaysIso(interval.end, 1);
+    if (nextCursor > cursor) {
+      cursor = nextCursor;
+    }
+    if (cursor > base.end) {
+      break;
+    }
+  }
+
+  if (cursor <= base.end) {
+    available.push({ start: cursor, end: base.end });
+  }
+
+  return available;
 }
 
 function buildHolidayKey(profileId: string, isoDate: string): string {
@@ -312,6 +448,7 @@ export async function generateNextFinancialYearAllowances(
 
 interface RemoveGeneratedFinancialYearOptions {
   supabase: AnySupabase;
+  deleteExistingBookings?: boolean;
 }
 
 export async function removeLatestGeneratedFinancialYear(
@@ -349,10 +486,29 @@ export async function removeLatestGeneratedFinancialYear(
     throw userEnteredError;
   }
 
-  if ((userEnteredRows || []).length > 0) {
+  const existingRows = userEnteredRows || [];
+  const shouldDeleteExistingBookings = options.deleteExistingBookings === true;
+
+  if (existingRows.length > 0 && !shouldDeleteExistingBookings) {
     throw new Error(
-      `Cannot remove ${financialYear.label}. User-entered leave requests already exist in this financial year.`
+      `Cannot remove ${financialYear.label}. User-entered leave requests already exist in this financial year. Enable booking deletion to continue.`
     );
+  }
+
+  let removedExistingAbsences = 0;
+  if (existingRows.length > 0 && shouldDeleteExistingBookings) {
+    const { count: removedExistingCount, error: deleteExistingError } = await options.supabase
+      .from('absences')
+      .delete({ count: 'exact' })
+      .gte('date', fyStartIso)
+      .lte('date', fyEndIso)
+      .eq('auto_generated', false)
+      .neq('status', 'cancelled');
+
+    if (deleteExistingError) {
+      throw deleteExistingError;
+    }
+    removedExistingAbsences = removedExistingCount ?? 0;
   }
 
   const { count: removedCount, error: deleteGeneratedError } = await options.supabase
@@ -381,6 +537,7 @@ export async function removeLatestGeneratedFinancialYear(
     removedFinancialYearStartYear: latestGeneration.financial_year_start_year,
     removedFinancialYearLabel: financialYear.label,
     removedGeneratedAbsences: removedCount ?? 0,
+    removedExistingAbsences,
   };
 }
 
@@ -400,41 +557,114 @@ async function getAnnualLeaveReason(
   return data as { id: string; name: string };
 }
 
-async function getBulkShutdownEmployees(supabase: AnySupabase): Promise<BulkShutdownEmployee[]> {
+async function getAbsenceReasonById(
+  supabase: AnySupabase,
+  reasonId: string
+): Promise<{ id: string; name: string }> {
+  const { data, error } = await supabase
+    .from('absence_reasons')
+    .select('id, name, is_active')
+    .eq('id', reasonId)
+    .single();
+
+  if (error || !data?.id) {
+    throw new Error('Absence reason not found');
+  }
+
+  if (!data.is_active) {
+    throw new Error('Selected absence reason is inactive');
+  }
+
+  return { id: data.id, name: data.name };
+}
+
+async function getBulkAbsenceEmployees(supabase: AnySupabase): Promise<BulkAbsenceEmployee[]> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, employee_id, annual_holiday_allowance_days')
+    .select('id, full_name, employee_id, annual_holiday_allowance_days, roles(id, name, display_name)')
     .order('full_name');
 
   if (error) {
     throw error;
   }
 
-  return (data || []) as BulkShutdownEmployee[];
+  return ((data || []) as Array<Record<string, unknown>>).map((row) => {
+    const roleRef = row.roles as { id?: string; name?: string; display_name?: string } | null;
+    return {
+      id: String(row.id || ''),
+      full_name: (row.full_name as string | null) || null,
+      employee_id: (row.employee_id as string | null) || null,
+      annual_holiday_allowance_days: (row.annual_holiday_allowance_days as number | null) ?? null,
+      role_id: roleRef?.id || null,
+      role_name: roleRef?.name || null,
+      role_display_name: roleRef?.display_name || null,
+    };
+  });
 }
 
-function buildShutdownNotes(startDate: string, endDate: string, customNotes?: string | null): string {
+function buildBulkAbsenceNotes(reasonName: string, startDate: string, endDate: string, customNotes?: string | null): string {
   if (customNotes && customNotes.trim().length > 0) {
     return customNotes.trim();
   }
   if (startDate === endDate) {
-    return `Company shutdown: ${startDate}`;
+    return `Bulk ${reasonName} booking: ${startDate}`;
   }
-  return `Company shutdown: ${startDate} to ${endDate}`;
+  return `Bulk ${reasonName} booking: ${startDate} to ${endDate}`;
 }
 
-interface BookCompanyShutdownOptions {
+interface BookBulkAbsenceOptions {
   supabase: AnySupabase;
   actorProfileId: string;
+  reasonId: string;
   startDate: string;
   endDate?: string;
   notes?: string | null;
+  applyToAll?: boolean;
+  roleIds?: string[];
+  roleNames?: string[];
+  employeeIds?: string[];
   confirm?: boolean;
 }
 
-export async function bookCompanyShutdownForAllStaff(
-  options: BookCompanyShutdownOptions
-): Promise<CompanyShutdownBookingResult> {
+function normalizeRoleName(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function resolveTargetEmployees(
+  employees: BulkAbsenceEmployee[],
+  applyToAll: boolean,
+  roleIds: string[],
+  roleNames: string[],
+  employeeIds: string[]
+): BulkAbsenceEmployee[] {
+  if (applyToAll) {
+    return employees;
+  }
+
+  const roleIdSet = new Set(roleIds.filter((value) => value.length > 0));
+  const normalizedRoleSet = new Set(roleNames.map(normalizeRoleName).filter((value) => value.length > 0));
+  const employeeSet = new Set(employeeIds.filter((value) => value.length > 0));
+
+  if (roleIdSet.size === 0 && normalizedRoleSet.size === 0 && employeeSet.size === 0) {
+    throw new Error('Choose at least one role or employee when not applying to all employees');
+  }
+
+  return employees.filter((employee) => {
+    const inRoleIdSet = employee.role_id ? roleIdSet.has(employee.role_id) : false;
+    const normalizedName = employee.role_name ? normalizeRoleName(employee.role_name) : '';
+    const normalizedDisplayName = employee.role_display_name ? normalizeRoleName(employee.role_display_name) : '';
+    const inRoleSet =
+      normalizedRoleSet.has(normalizedName) ||
+      normalizedRoleSet.has(normalizedDisplayName);
+    const explicitlySelected = employeeSet.has(employee.id);
+    // Union behaviour: role matches + explicitly selected employees
+    return inRoleIdSet || inRoleSet || explicitlySelected;
+  });
+}
+
+export async function bookBulkAbsence(
+  options: BookBulkAbsenceOptions
+): Promise<BulkAbsenceBookingResult> {
   const startDate = normalizeIsoDate(options.startDate);
   const endDate = normalizeIsoDate(options.endDate || options.startDate);
   const start = new Date(`${startDate}T00:00:00`);
@@ -449,29 +679,48 @@ export async function bookCompanyShutdownForAllStaff(
 
   const requestedDays = calculateDurationDays(start, end, false);
   if (requestedDays <= 0) {
-    throw new Error('Selected shutdown range does not include a working day');
+    throw new Error('Selected date range does not include a working day');
   }
 
-  const annualLeaveReason = await getAnnualLeaveReason(options.supabase);
-  const employees = await getBulkShutdownEmployees(options.supabase);
-  if (employees.length === 0) {
+  const reason = await getAbsenceReasonById(options.supabase, options.reasonId);
+  const allEmployees = await getBulkAbsenceEmployees(options.supabase);
+  if (allEmployees.length === 0) {
     return {
       startDate,
       endDate,
+      reasonId: reason.id,
+      reasonName: reason.name,
       requestedDays,
       totalEmployees: 0,
+      targetedEmployees: 0,
       wouldCreate: 0,
       createdCount: 0,
       duplicateCount: 0,
+      partialConflictEmployeeCount: 0,
+      conflictingWorkingDaysSkipped: 0,
+      createdSegmentsCount: 0,
       warningCount: 0,
       warnings: [],
+      conflicts: [],
+      batchId: null,
     };
+  }
+
+  const applyToAll = options.applyToAll !== false;
+  const roleIds = options.roleIds || [];
+  const roleNames = options.roleNames || [];
+  const employeeIds = options.employeeIds || [];
+  const employees = resolveTargetEmployees(allEmployees, applyToAll, roleIds, roleNames, employeeIds);
+  if (employees.length === 0) {
+    throw new Error('No employees matched the selected filters');
   }
 
   const profileIds = employees.map((employee) => employee.id);
   const financialYear = buildFinancialYearBounds(getFinancialYearStartYear(start));
   const fyStartIso = formatIsoDate(financialYear.start);
   const fyEndIso = formatIsoDate(financialYear.end);
+  const reasonIsAnnualLeave = reason.name.trim().toLowerCase() === 'annual leave';
+  const annualLeaveReason = reasonIsAnnualLeave ? reason : await getAnnualLeaveReason(options.supabase);
 
   const [{ data: annualAbsences, error: annualAbsencesError }, { data: existingRows, error: existingRowsError }] =
     await Promise.all([
@@ -485,10 +734,10 @@ export async function bookCompanyShutdownForAllStaff(
         .lte('date', fyEndIso),
       options.supabase
         .from('absences')
-        .select('profile_id, date, end_date')
-        .eq('reason_id', annualLeaveReason.id)
+        .select('profile_id, date, end_date, status, absence_reasons(name)')
         .in('profile_id', profileIds)
-        .in('status', ['approved', 'pending']),
+        .in('status', ['approved', 'pending'])
+        .lte('date', endDate),
     ]);
 
   if (annualAbsencesError) {
@@ -503,23 +752,108 @@ export async function bookCompanyShutdownForAllStaff(
     usedByProfile.set(row.profile_id, (usedByProfile.get(row.profile_id) || 0) + (row.duration_days || 0));
   }
 
-  const existingKeySet = new Set<string>();
-  const normalizedEndDate = endDate === startDate ? null : endDate;
-  for (const row of (existingRows || []) as Array<{ profile_id: string; date: string; end_date: string | null }>) {
-    const existingKey = `${row.profile_id}:${row.date}:${row.end_date || ''}`;
-    existingKeySet.add(existingKey);
+  const employeesById = new Map(employees.map((employee) => [employee.id, employee]));
+  const conflicts: BulkAbsenceConflictDetail[] = [];
+  const blockedIntervalsByProfile = new Map<string, DateInterval[]>();
+  for (const row of (existingRows || []) as Array<{
+    profile_id: string;
+    date: string;
+    end_date: string | null;
+    status: string | null;
+    absence_reasons?: { name?: string | null } | null;
+  }>) {
+    const rowEnd = row.end_date || row.date;
+    const overlaps = row.date <= endDate && rowEnd >= startDate;
+    if (overlaps) {
+      const overlapStart = row.date < startDate ? startDate : row.date;
+      const overlapEnd = rowEnd > endDate ? endDate : rowEnd;
+      const existingIntervals = blockedIntervalsByProfile.get(row.profile_id) || [];
+      existingIntervals.push({ start: overlapStart, end: overlapEnd });
+      blockedIntervalsByProfile.set(row.profile_id, existingIntervals);
+      const employee = employeesById.get(row.profile_id);
+      conflicts.push({
+        profileId: row.profile_id,
+        fullName: employee?.full_name || 'Unknown employee',
+        employeeId: employee?.employee_id || null,
+        reasonName: row.absence_reasons?.name || null,
+        status: row.status || 'approved',
+        conflictStartDate: row.date,
+        conflictEndDate: rowEnd,
+      });
+    }
   }
+  conflicts.sort((a, b) => {
+    const byName = a.fullName.localeCompare(b.fullName);
+    if (byName !== 0) return byName;
+    return a.conflictStartDate.localeCompare(b.conflictStartDate);
+  });
 
-  const warnings: ShutdownAllowanceWarning[] = [];
-  const rowsToInsert = employees
-    .filter((employee) => {
-      const key = `${employee.id}:${startDate}:${normalizedEndDate || ''}`;
-      return !existingKeySet.has(key);
-    })
-    .map((employee) => {
+  const warnings: BulkAbsenceAllowanceWarning[] = [];
+  const rowsToInsert: Array<{
+    profile_id: string;
+    date: string;
+    end_date: string | null;
+    reason_id: string;
+    duration_days: number;
+    is_half_day: boolean;
+    half_day_session: null;
+    notes: string;
+    status: 'approved';
+    created_by: string;
+    approved_by: string;
+    approved_at: string;
+    bulk_batch_id: string | null;
+  }> = [];
+  const requestedRange: DateInterval = { start: startDate, end: endDate };
+  let duplicateCount = 0;
+  let partialConflictEmployeeCount = 0;
+  let conflictingWorkingDaysSkipped = 0;
+
+  for (const employee of employees) {
+    const blockedIntervals = blockedIntervalsByProfile.get(employee.id) || [];
+    const mergedBlockedIntervals = mergeDateIntervals(blockedIntervals);
+    const availableIntervals = subtractDateIntervals(requestedRange, mergedBlockedIntervals);
+    const employeeRows = availableIntervals
+      .map((interval) => {
+        const durationDays = countWeekdaysInInterval(interval);
+        if (durationDays <= 0) {
+          return null;
+        }
+
+        return {
+          profile_id: employee.id,
+          date: interval.start,
+          end_date: interval.start === interval.end ? null : interval.end,
+          reason_id: reason.id,
+          duration_days: durationDays,
+          is_half_day: false,
+          half_day_session: null,
+          notes: buildBulkAbsenceNotes(reason.name, interval.start, interval.end, options.notes),
+          status: 'approved' as const,
+          created_by: options.actorProfileId,
+          approved_by: options.actorProfileId,
+          approved_at: new Date().toISOString(),
+          bulk_batch_id: null,
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null);
+
+    const createdDaysForEmployee = employeeRows.reduce((total, row) => total + row.duration_days, 0);
+    const skippedDaysForEmployee = Math.max(0, requestedDays - createdDaysForEmployee);
+
+    if (skippedDaysForEmployee > 0) {
+      conflictingWorkingDaysSkipped += skippedDaysForEmployee;
+      if (createdDaysForEmployee <= 0) {
+        duplicateCount += 1;
+      } else {
+        partialConflictEmployeeCount += 1;
+      }
+    }
+
+    if (reasonIsAnnualLeave && createdDaysForEmployee > 0) {
       const allowance = employee.annual_holiday_allowance_days ?? 28;
       const alreadyBooked = usedByProfile.get(employee.id) || 0;
-      const projectedRemaining = allowance - alreadyBooked - requestedDays;
+      const projectedRemaining = allowance - alreadyBooked - createdDaysForEmployee;
       if (projectedRemaining < 0) {
         warnings.push({
           profileId: employee.id,
@@ -527,45 +861,78 @@ export async function bookCompanyShutdownForAllStaff(
           employeeId: employee.employee_id,
           allowance,
           alreadyBooked,
-          requestedDays,
+          requestedDays: createdDaysForEmployee,
           projectedRemaining,
         });
       }
+    }
 
-      return {
-        profile_id: employee.id,
-        date: startDate,
-        end_date: normalizedEndDate,
-        reason_id: annualLeaveReason.id,
-        duration_days: requestedDays,
-        is_half_day: false,
-        half_day_session: null,
-        notes: buildShutdownNotes(startDate, endDate, options.notes),
-        status: 'approved' as const,
-        created_by: options.actorProfileId,
-        approved_by: options.actorProfileId,
-        approved_at: new Date().toISOString(),
-      };
-    });
+    rowsToInsert.push(...employeeRows);
+  }
+  const createdSegmentsCount = rowsToInsert.length;
 
   if (!options.confirm) {
     return {
       startDate,
       endDate,
+      reasonId: reason.id,
+      reasonName: reason.name,
       requestedDays,
-      totalEmployees: employees.length,
+      totalEmployees: allEmployees.length,
+      targetedEmployees: employees.length,
       wouldCreate: rowsToInsert.length,
       createdCount: 0,
-      duplicateCount: employees.length - rowsToInsert.length,
+      duplicateCount,
+      partialConflictEmployeeCount,
+      conflictingWorkingDaysSkipped,
+      createdSegmentsCount,
       warningCount: warnings.length,
       warnings,
+      conflicts,
+      batchId: null,
     };
   }
 
+  const roleNamesForBatch = roleIds.length > 0
+    ? Array.from(
+        new Set(
+          allEmployees
+            .filter((employee) => employee.role_id && roleIds.includes(employee.role_id))
+            .map((employee) => employee.role_name)
+            .filter((value): value is string => Boolean(value))
+        )
+      )
+    : roleNames;
+
+  let batchId: string | null = null;
   if (rowsToInsert.length > 0) {
+    const { data: createdBatch, error: batchError } = await options.supabase
+      .from('absence_bulk_batches')
+      .insert({
+        created_by: options.actorProfileId,
+        reason_id: reason.id,
+        reason_name: reason.name,
+        start_date: startDate,
+        end_date: endDate,
+        notes: options.notes?.trim() || null,
+        apply_to_all: applyToAll,
+        role_names: roleNamesForBatch,
+        explicit_profile_ids: employeeIds,
+        targeted_count: employees.length,
+        created_count: rowsToInsert.length,
+        duplicate_count: duplicateCount,
+      })
+      .select('id')
+      .single();
+
+    if (batchError || !createdBatch?.id) {
+      throw batchError || new Error('Failed to create bulk absence batch');
+    }
+    batchId = createdBatch.id;
+
     const batchSize = 500;
     for (let i = 0; i < rowsToInsert.length; i += batchSize) {
-      const chunk = rowsToInsert.slice(i, i + batchSize);
+      const chunk = rowsToInsert.slice(i, i + batchSize).map((row) => ({ ...row, bulk_batch_id: batchId }));
       const { error } = await options.supabase.from('absences').insert(chunk);
       if (error) {
         throw error;
@@ -576,12 +943,108 @@ export async function bookCompanyShutdownForAllStaff(
   return {
     startDate,
     endDate,
+    reasonId: reason.id,
+    reasonName: reason.name,
     requestedDays,
-    totalEmployees: employees.length,
+    totalEmployees: allEmployees.length,
+    targetedEmployees: employees.length,
     wouldCreate: rowsToInsert.length,
     createdCount: rowsToInsert.length,
-    duplicateCount: employees.length - rowsToInsert.length,
+    duplicateCount,
+    partialConflictEmployeeCount,
+    conflictingWorkingDaysSkipped,
+    createdSegmentsCount,
     warningCount: warnings.length,
     warnings,
+    conflicts,
+    batchId,
   };
+}
+
+export async function listBulkAbsenceBatches(
+  supabase: AnySupabase,
+  limit = 25
+): Promise<BulkAbsenceBatchSummary[]> {
+  const { data, error } = await supabase
+    .from('absence_bulk_batches')
+    .select('id, reason_id, reason_name, start_date, end_date, notes, apply_to_all, role_names, explicit_profile_ids, targeted_count, created_count, duplicate_count, created_at, created_by_profile:profiles!absence_bulk_batches_created_by_fkey(full_name)')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data || []) as Array<Record<string, unknown>>).map((row) => {
+    const creator = row.created_by_profile as { full_name?: string } | null;
+    return {
+      id: String(row.id),
+      reasonId: String(row.reason_id),
+      reasonName: String(row.reason_name),
+      startDate: String(row.start_date),
+      endDate: String(row.end_date),
+      notes: (row.notes as string | null) || null,
+      applyToAll: Boolean(row.apply_to_all),
+      roleNames: ((row.role_names as string[] | null) || []).map((value) => String(value)),
+      explicitProfileIds: ((row.explicit_profile_ids as string[] | null) || []).map((value) => String(value)),
+      targetedEmployees: Number(row.targeted_count || 0),
+      createdCount: Number(row.created_count || 0),
+      duplicateCount: Number(row.duplicate_count || 0),
+      createdAt: String(row.created_at),
+      createdByName: creator?.full_name || null,
+    };
+  });
+}
+
+export async function undoBulkAbsenceBatch(
+  supabase: AnySupabase,
+  batchId: string
+): Promise<UndoBulkAbsenceBatchResult> {
+  const { data: batch, error: batchError } = await supabase
+    .from('absence_bulk_batches')
+    .select('id')
+    .eq('id', batchId)
+    .maybeSingle();
+
+  if (batchError) {
+    throw batchError;
+  }
+  if (!batch?.id) {
+    throw new Error('Bulk absence batch not found');
+  }
+
+  const { count: removedAbsences, error: deleteAbsencesError } = await supabase
+    .from('absences')
+    .delete({ count: 'exact' })
+    .eq('bulk_batch_id', batchId);
+
+  if (deleteAbsencesError) {
+    throw deleteAbsencesError;
+  }
+
+  const { error: deleteBatchError } = await supabase
+    .from('absence_bulk_batches')
+    .delete()
+    .eq('id', batchId);
+
+  if (deleteBatchError) {
+    throw deleteBatchError;
+  }
+
+  return {
+    batchId,
+    removedAbsences: removedAbsences ?? 0,
+  };
+}
+
+// Backward-compatible wrapper while UI/API naming migrates from "shutdown".
+export async function bookCompanyShutdownForAllStaff(
+  options: Omit<BookBulkAbsenceOptions, 'reasonId' | 'applyToAll'> & { reasonId?: string }
+): Promise<BulkAbsenceBookingResult> {
+  const annualLeave = await getAnnualLeaveReason(options.supabase);
+  return bookBulkAbsence({
+    ...options,
+    reasonId: options.reasonId || annualLeave.id,
+    applyToAll: true,
+  });
 }
