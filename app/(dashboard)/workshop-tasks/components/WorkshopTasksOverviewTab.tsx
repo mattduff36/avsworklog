@@ -23,6 +23,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import type { Action, AssetTab, Vehicle } from '../types';
 
 interface WorkshopTasksOverviewTabProps {
@@ -108,27 +109,28 @@ export function WorkshopTasksOverviewTab({
   onEditTask,
   onDeleteTask,
 }: WorkshopTasksOverviewTabProps) {
+  const { tabletModeEnabled } = useTabletMode();
   const hasHighPriorityPending = highPriorityPendingCount > 0;
   const pendingHeaderIconClass = hasHighPriorityPending ? 'text-red-500' : 'text-amber-400';
 
   return (
     <TabsContent value="overview" className="space-y-6 mt-0">
-      <div className="flex items-center justify-end">
+      <div className={`flex ${tabletModeEnabled ? 'justify-start' : 'justify-end'}`}>
         <Tabs value={assetTab} onValueChange={onAssetTabChange}>
-          <TabsList>
-            <TabsTrigger value="all" className="gap-2">
+          <TabsList className={tabletModeEnabled ? 'h-auto flex-wrap gap-2 p-1.5 justify-start' : undefined}>
+            <TabsTrigger value="all" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}>
               <Wrench className="h-4 w-4" />
               All Assets
             </TabsTrigger>
-            <TabsTrigger value="van" className="gap-2">
+            <TabsTrigger value="van" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}>
               <Truck className="h-4 w-4" />
               Vans
             </TabsTrigger>
-            <TabsTrigger value="plant" className="gap-2">
+            <TabsTrigger value="plant" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}>
               <HardHat className="h-4 w-4" />
               Plant
             </TabsTrigger>
-            <TabsTrigger value="hgv" className="gap-2">
+            <TabsTrigger value="hgv" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}>
               <Truck className="h-4 w-4" />
               HGVs
             </TabsTrigger>
@@ -138,11 +140,11 @@ export function WorkshopTasksOverviewTab({
 
       <Card>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className={`grid grid-cols-1 md:grid-cols-2 ${tabletModeEnabled ? 'gap-5' : 'gap-4'}`}>
             <div className="space-y-2">
               <Label>Status Filter</Label>
               <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-                <SelectTrigger className="bg-white dark:bg-slate-900 border-border dark:text-slate-100 text-slate-900">
+                <SelectTrigger className={`bg-white dark:bg-slate-900 border-border dark:text-slate-100 text-slate-900 ${tabletModeEnabled ? 'min-h-11 text-base' : ''}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -157,7 +159,7 @@ export function WorkshopTasksOverviewTab({
             <div className="space-y-2">
               <Label>{assetTab === 'plant' ? 'Plant' : assetTab === 'hgv' ? 'HGV' : assetTab === 'van' ? 'Van' : 'Asset'} Filter</Label>
               <Select value={vehicleFilter} onValueChange={onVehicleFilterChange}>
-                <SelectTrigger className="bg-white dark:bg-slate-900 border-border dark:text-slate-100 text-slate-900">
+                <SelectTrigger className={`bg-white dark:bg-slate-900 border-border dark:text-slate-100 text-slate-900 ${tabletModeEnabled ? 'min-h-11 text-base' : ''}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -178,7 +180,7 @@ export function WorkshopTasksOverviewTab({
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className={`grid gap-4 ${tabletModeEnabled ? 'grid-cols-2 xl:grid-cols-4' : 'grid-cols-4'}`}>
         <Card>
           <CardHeader className="pb-3">
             <CardDescription className="text-muted-foreground">Pending</CardDescription>
@@ -306,7 +308,7 @@ export function WorkshopTasksOverviewTab({
                                 disabled={isUpdating}
                                 size="sm"
                                 variant="outline"
-                                className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800"
+                                className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}
                               >
                                 <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                                 Comments
@@ -318,7 +320,7 @@ export function WorkshopTasksOverviewTab({
                                 }}
                                 disabled={isUpdating}
                                 size="sm"
-                                className="h-9 px-3 text-xs bg-blue-600/80 hover:bg-blue-600 text-white border-0"
+                                className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} bg-blue-600/80 hover:bg-blue-600 text-white border-0`}
                               >
                                 <Clock className="h-3.5 w-3.5 mr-1.5" />
                                 In Progress
@@ -330,7 +332,7 @@ export function WorkshopTasksOverviewTab({
                                 }}
                                 disabled={isUpdating}
                                 size="sm"
-                                className="h-9 px-3 text-xs transition-all border-0 bg-green-600 hover:bg-green-700 text-white"
+                                className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} transition-all border-0 bg-green-600 hover:bg-green-700 text-white`}
                               >
                                 <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                                 Complete
@@ -349,7 +351,7 @@ export function WorkshopTasksOverviewTab({
                                   disabled={isUpdating}
                                   size="sm"
                                   variant="ghost"
-                                  className="h-7 w-7 p-0 text-muted-foreground hover:text-muted-foreground hover:bg-slate-800"
+                                  className={`${tabletModeEnabled ? 'h-11 w-11' : 'h-7 w-7'} p-0 text-muted-foreground hover:text-muted-foreground hover:bg-slate-800`}
                                   title="Edit task"
                                 >
                                   <Edit className="h-3.5 w-3.5" />
@@ -359,7 +361,7 @@ export function WorkshopTasksOverviewTab({
                                   disabled={isUpdating}
                                   size="sm"
                                   variant="ghost"
-                                  className="h-7 w-7 p-0 text-red-500 hover:text-red-400 hover:bg-red-950/50"
+                                  className={`${tabletModeEnabled ? 'h-11 w-11' : 'h-7 w-7'} p-0 text-red-500 hover:text-red-400 hover:bg-red-950/50`}
                                   title="Delete task"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
@@ -447,27 +449,27 @@ export function WorkshopTasksOverviewTab({
                               )}
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
-                              <Button onClick={(e) => { e.stopPropagation(); onOpenComments(task); }} disabled={isUpdating} size="sm" variant="outline" className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800">
+                              <Button onClick={(e) => { e.stopPropagation(); onOpenComments(task); }} disabled={isUpdating} size="sm" variant="outline" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
                                 <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                                 Comments
                               </Button>
-                              <Button onClick={(e) => { e.stopPropagation(); onUndoLogged(task.id); }} variant="outline" disabled={isUpdating} size="sm" className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800">
+                              <Button onClick={(e) => { e.stopPropagation(); onUndoLogged(task.id); }} variant="outline" disabled={isUpdating} size="sm" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
                                 <Undo2 className="h-3.5 w-3.5 mr-1.5" />
                                 Undo
                               </Button>
                               {task.status === 'logged' && (
-                                <Button onClick={(e) => { e.stopPropagation(); onMarkOnHold(task); }} disabled={isUpdating} size="sm" className="h-9 px-3 text-xs bg-purple-600/80 hover:bg-purple-600 text-white border-0">
+                                <Button onClick={(e) => { e.stopPropagation(); onMarkOnHold(task); }} disabled={isUpdating} size="sm" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} bg-purple-600/80 hover:bg-purple-600 text-white border-0`}>
                                   <Pause className="h-3.5 w-3.5 mr-1.5" />
                                   On Hold
                                 </Button>
                               )}
                               {task.status === 'on_hold' && (
-                                <Button onClick={(e) => { e.stopPropagation(); onResumeTask(task); }} disabled={isUpdating} size="sm" className="h-9 px-3 text-xs bg-blue-600/80 hover:bg-blue-600 text-white border-0">
+                                <Button onClick={(e) => { e.stopPropagation(); onResumeTask(task); }} disabled={isUpdating} size="sm" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} bg-blue-600/80 hover:bg-blue-600 text-white border-0`}>
                                   <Clock className="h-3.5 w-3.5 mr-1.5" />
                                   Resume
                                 </Button>
                               )}
-                              <Button onClick={(e) => { e.stopPropagation(); onMarkComplete(task); }} disabled={isUpdating} size="sm" className="h-9 px-3 text-xs transition-all border-0 bg-green-600 hover:bg-green-700 text-white">
+                              <Button onClick={(e) => { e.stopPropagation(); onMarkComplete(task); }} disabled={isUpdating} size="sm" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} transition-all border-0 bg-green-600 hover:bg-green-700 text-white`}>
                                 <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                                 Complete
                               </Button>
@@ -485,7 +487,7 @@ export function WorkshopTasksOverviewTab({
                             </div>
                             {task.action_type === 'workshop_vehicle_task' && (
                               <div className="flex items-center gap-1">
-                                <Button onClick={(e) => { e.stopPropagation(); onEditTask(task); }} disabled={isUpdating} size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-muted-foreground hover:bg-slate-800" title="Edit task">
+                                <Button onClick={(e) => { e.stopPropagation(); onEditTask(task); }} disabled={isUpdating} size="sm" variant="ghost" className={`${tabletModeEnabled ? 'h-11 w-11' : 'h-7 w-7'} p-0 text-muted-foreground hover:text-muted-foreground hover:bg-slate-800`} title="Edit task">
                                   <Edit className="h-3.5 w-3.5" />
                                 </Button>
                               </div>
@@ -563,15 +565,15 @@ export function WorkshopTasksOverviewTab({
                               )}
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              <Button onClick={(e) => { e.stopPropagation(); onOpenComments(task); }} disabled={isUpdating} size="sm" variant="outline" className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800">
+                              <Button onClick={(e) => { e.stopPropagation(); onOpenComments(task); }} disabled={isUpdating} size="sm" variant="outline" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
                                 <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                                 Comments
                               </Button>
-                              <Button onClick={(e) => { e.stopPropagation(); onResumeTask(task); }} disabled={isUpdating} size="sm" className="h-9 px-3 text-xs transition-all border-0 bg-workshop hover:bg-workshop-dark text-white">
+                              <Button onClick={(e) => { e.stopPropagation(); onResumeTask(task); }} disabled={isUpdating} size="sm" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} transition-all border-0 bg-workshop hover:bg-workshop-dark text-white`}>
                                 <Clock className="h-3.5 w-3.5 mr-1.5" />
                                 Resume
                               </Button>
-                              <Button onClick={(e) => { e.stopPropagation(); onMarkComplete(task); }} disabled={isUpdating} size="sm" className="h-9 px-3 text-xs transition-all border-0 bg-green-600 hover:bg-green-700 text-white">
+                              <Button onClick={(e) => { e.stopPropagation(); onMarkComplete(task); }} disabled={isUpdating} size="sm" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} transition-all border-0 bg-green-600 hover:bg-green-700 text-white`}>
                                 <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                                 Complete
                               </Button>
@@ -587,10 +589,10 @@ export function WorkshopTasksOverviewTab({
                             </div>
                             {task.action_type === 'workshop_vehicle_task' && (
                               <div className="flex items-center gap-1">
-                                <Button onClick={(e) => { e.stopPropagation(); onEditTask(task); }} disabled={isUpdating} size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-muted-foreground hover:bg-slate-800" title="Edit task">
+                                <Button onClick={(e) => { e.stopPropagation(); onEditTask(task); }} disabled={isUpdating} size="sm" variant="ghost" className={`${tabletModeEnabled ? 'h-11 w-11' : 'h-7 w-7'} p-0 text-muted-foreground hover:text-muted-foreground hover:bg-slate-800`} title="Edit task">
                                   <Edit className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button onClick={(e) => { e.stopPropagation(); onDeleteTask(task); }} disabled={isUpdating} size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500 hover:text-red-400 hover:bg-red-950/50" title="Delete task">
+                                <Button onClick={(e) => { e.stopPropagation(); onDeleteTask(task); }} disabled={isUpdating} size="sm" variant="ghost" className={`${tabletModeEnabled ? 'h-11 w-11' : 'h-7 w-7'} p-0 text-red-500 hover:text-red-400 hover:bg-red-950/50`} title="Delete task">
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                               </div>
@@ -677,11 +679,11 @@ export function WorkshopTasksOverviewTab({
                               </div>
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
-                              <Button onClick={(e) => { e.stopPropagation(); onOpenComments(task); }} size="sm" variant="outline" className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800">
+                              <Button onClick={(e) => { e.stopPropagation(); onOpenComments(task); }} size="sm" variant="outline" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
                                 <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                                 Comments
                               </Button>
-                              <Button onClick={(e) => { e.stopPropagation(); onUndoComplete(task.id); }} size="sm" variant="outline" className="h-9 px-3 text-xs border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800">
+                              <Button onClick={(e) => { e.stopPropagation(); onUndoComplete(task.id); }} size="sm" variant="outline" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
                                 <Undo2 className="h-3.5 w-3.5 mr-1.5" />
                                 Undo
                               </Button>

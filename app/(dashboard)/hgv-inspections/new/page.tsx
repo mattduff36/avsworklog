@@ -23,6 +23,7 @@ import { scrollAndHighlightValidationTarget } from '@/lib/utils/validation-scrol
 import type { Database } from '@/types/database';
 import type { Employee } from '@/types/common';
 import type { InspectionStatus } from '@/types/inspection';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
 
 const SignaturePad = dynamic(() => import('@/components/forms/SignaturePad'), { ssr: false });
 
@@ -50,6 +51,7 @@ function NewHgvInspectionContent() {
   const router = useRouter();
   const supabase = createClient();
   const { user, isManager } = useAuth();
+  const { tabletModeEnabled } = useTabletMode();
 
   const [hgvs, setHgvs] = useState<HgvAsset[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -414,7 +416,7 @@ function NewHgvInspectionContent() {
   const totalItems = TRUCK_CHECKLIST_ITEMS.length;
 
   return (
-    <div className="space-y-4 pb-32 md:pb-6 max-w-5xl">
+    <div className={`space-y-4 max-w-5xl ${tabletModeEnabled ? 'pb-36' : 'pb-32 md:pb-6'}`}>
       <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-3">
@@ -575,7 +577,7 @@ function NewHgvInspectionContent() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 p-4 md:p-6">
-            <div className="hidden md:block overflow-x-auto">
+            <div className={tabletModeEnabled ? 'hidden' : 'hidden md:block overflow-x-auto'}>
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-border">
@@ -641,7 +643,7 @@ function NewHgvInspectionContent() {
               </table>
             </div>
 
-            <div className="md:hidden space-y-3">
+            <div className={tabletModeEnabled ? 'space-y-3' : 'md:hidden space-y-3'}>
               {TRUCK_CHECKLIST_ITEMS.map((item, index) => {
                 const itemNumber = index + 1;
                 const key = `${itemNumber}`;
@@ -711,7 +713,7 @@ function NewHgvInspectionContent() {
               </div>
             </div>
 
-            <div className="hidden md:flex flex-row gap-3 justify-end pt-4">
+            <div className={tabletModeEnabled ? 'hidden' : 'hidden md:flex flex-row gap-3 justify-end pt-4'}>
               <Button
                 onClick={onSubmitClicked}
                 disabled={loading || !canSubmitNow}
@@ -726,11 +728,11 @@ function NewHgvInspectionContent() {
       )}
 
       {checklistStarted && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-border/50 p-4 z-20">
+        <div className={`${tabletModeEnabled ? 'fixed bottom-0 left-0 right-0' : 'md:hidden fixed bottom-0 left-0 right-0'} bg-slate-900/95 backdrop-blur-xl border-t border-border/50 p-4 z-20`}>
           <Button
             onClick={onSubmitClicked}
             disabled={loading || !canSubmitNow}
-            className="w-full h-14 bg-inspection hover:bg-inspection/90 text-white font-semibold text-base disabled:opacity-70"
+            className={`${tabletModeEnabled ? 'w-full min-h-11 text-base bg-inspection hover:bg-inspection/90 text-white font-semibold disabled:opacity-70' : 'w-full h-14 bg-inspection hover:bg-inspection/90 text-white font-semibold text-base disabled:opacity-70'}`}
           >
             <Send className="h-5 w-5 mr-2" />
             {canSubmitNow ? 'Submit Daily Check' : `Submit in ${countdownLabel}`}

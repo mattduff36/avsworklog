@@ -1,8 +1,11 @@
+import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Clock, Pause } from 'lucide-react';
+import { triggerShakeAnimation } from '@/lib/utils/animations';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import type { Action } from '../types';
 
 interface WorkshopTaskStatusDialogsProps {
@@ -52,10 +55,42 @@ export function WorkshopTaskStatusDialogs({
   resumingTask,
   updatingStatus,
 }: WorkshopTaskStatusDialogsProps) {
+  const { tabletModeEnabled } = useTabletMode();
+  const statusDialogRef = useRef<HTMLDivElement>(null);
+  const onHoldDialogRef = useRef<HTMLDivElement>(null);
+  const resumeDialogRef = useRef<HTMLDivElement>(null);
+  const isStatusDirty = loggedComment.trim().length > 0;
+  const isOnHoldDirty = onHoldComment.trim().length > 0;
+  const isResumeDirty = resumeComment.trim().length > 0;
+
   return (
     <>
-      <Dialog open={showStatusModal} onOpenChange={onShowStatusModalChange}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
+      <Dialog
+        open={showStatusModal}
+        onOpenChange={(open) => {
+          if (!open && isStatusDirty) {
+            triggerShakeAnimation(statusDialogRef.current);
+            return;
+          }
+          onShowStatusModalChange(open);
+        }}
+      >
+        <DialogContent
+          ref={statusDialogRef}
+          className={`bg-white dark:bg-slate-900 border-border text-foreground max-w-lg ${tabletModeEnabled ? 'p-5 sm:p-6' : ''}`}
+          onInteractOutside={(event) => {
+            if (isStatusDirty) {
+              event.preventDefault();
+              triggerShakeAnimation(statusDialogRef.current);
+            }
+          }}
+          onEscapeKeyDown={(event) => {
+            if (isStatusDirty) {
+              event.preventDefault();
+              triggerShakeAnimation(statusDialogRef.current);
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="text-foreground text-xl">Mark Task In Progress</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -83,7 +118,7 @@ export function WorkshopTaskStatusDialogs({
                   }
                 }}
                 placeholder="e.g., Started work on brakes"
-                className="bg-white dark:bg-slate-800 border-border text-foreground"
+              className={`bg-white dark:bg-slate-800 border-border text-foreground ${tabletModeEnabled ? 'min-h-11 text-base' : ''}`}
                 maxLength={300}
                 rows={3}
               />
@@ -97,14 +132,14 @@ export function WorkshopTaskStatusDialogs({
             <Button
               variant="outline"
               onClick={onCancelStatusModal}
-              className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+              className={`border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
             >
-              Cancel
+              {isStatusDirty ? 'Discard Changes' : 'Cancel'}
             </Button>
             <Button
               onClick={onConfirmMarkInProgress}
               disabled={!loggedComment.trim() || loggedComment.length > 300}
-              className="bg-workshop hover:bg-workshop-dark text-white"
+              className={`bg-workshop hover:bg-workshop-dark text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
             >
               <Clock className="h-4 w-4 mr-2" />
               Mark In Progress
@@ -113,8 +148,32 @@ export function WorkshopTaskStatusDialogs({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showOnHoldModal} onOpenChange={onShowOnHoldModalChange}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
+      <Dialog
+        open={showOnHoldModal}
+        onOpenChange={(open) => {
+          if (!open && isOnHoldDirty) {
+            triggerShakeAnimation(onHoldDialogRef.current);
+            return;
+          }
+          onShowOnHoldModalChange(open);
+        }}
+      >
+        <DialogContent
+          ref={onHoldDialogRef}
+          className={`bg-white dark:bg-slate-900 border-border text-foreground max-w-lg ${tabletModeEnabled ? 'p-5 sm:p-6' : ''}`}
+          onInteractOutside={(event) => {
+            if (isOnHoldDirty) {
+              event.preventDefault();
+              triggerShakeAnimation(onHoldDialogRef.current);
+            }
+          }}
+          onEscapeKeyDown={(event) => {
+            if (isOnHoldDirty) {
+              event.preventDefault();
+              triggerShakeAnimation(onHoldDialogRef.current);
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="text-foreground text-xl">Put Task On Hold</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -142,7 +201,7 @@ export function WorkshopTaskStatusDialogs({
                   }
                 }}
                 placeholder="e.g., Awaiting parts delivery, Waiting for customer approval"
-                className="bg-white dark:bg-slate-800 border-border text-foreground min-h-[80px]"
+                className={`bg-white dark:bg-slate-800 border-border text-foreground min-h-[80px] ${tabletModeEnabled ? 'text-base' : ''}`}
                 maxLength={300}
                 rows={3}
               />
@@ -157,9 +216,9 @@ export function WorkshopTaskStatusDialogs({
               variant="outline"
               onClick={onCancelOnHoldModal}
               disabled={onHoldingTask ? updatingStatus.has(onHoldingTask.id) : false}
-              className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+              className={`border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
             >
-              Cancel
+              {isOnHoldDirty ? 'Discard Changes' : 'Cancel'}
             </Button>
             <Button
               onClick={onConfirmMarkOnHold}
@@ -168,7 +227,7 @@ export function WorkshopTaskStatusDialogs({
                 onHoldComment.length > 300 ||
                 (onHoldingTask ? updatingStatus.has(onHoldingTask.id) : false)
               }
-              className="bg-purple-500 hover:bg-purple-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`bg-purple-500 hover:bg-purple-600 text-white disabled:opacity-50 disabled:cursor-not-allowed ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
             >
               <Pause className="h-4 w-4 mr-2" />
               Put On Hold
@@ -177,8 +236,32 @@ export function WorkshopTaskStatusDialogs({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showResumeModal} onOpenChange={onShowResumeModalChange}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
+      <Dialog
+        open={showResumeModal}
+        onOpenChange={(open) => {
+          if (!open && isResumeDirty) {
+            triggerShakeAnimation(resumeDialogRef.current);
+            return;
+          }
+          onShowResumeModalChange(open);
+        }}
+      >
+        <DialogContent
+          ref={resumeDialogRef}
+          className={`bg-white dark:bg-slate-900 border-border text-foreground max-w-lg ${tabletModeEnabled ? 'p-5 sm:p-6' : ''}`}
+          onInteractOutside={(event) => {
+            if (isResumeDirty) {
+              event.preventDefault();
+              triggerShakeAnimation(resumeDialogRef.current);
+            }
+          }}
+          onEscapeKeyDown={(event) => {
+            if (isResumeDirty) {
+              event.preventDefault();
+              triggerShakeAnimation(resumeDialogRef.current);
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="text-foreground text-xl">Resume Task</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -206,7 +289,7 @@ export function WorkshopTaskStatusDialogs({
                   }
                 }}
                 placeholder="e.g., Parts arrived, ready to continue work"
-                className="bg-white dark:bg-slate-800 border-border text-foreground min-h-[80px]"
+                className={`bg-white dark:bg-slate-800 border-border text-foreground min-h-[80px] ${tabletModeEnabled ? 'text-base' : ''}`}
                 maxLength={300}
                 rows={3}
               />
@@ -221,9 +304,9 @@ export function WorkshopTaskStatusDialogs({
               variant="outline"
               onClick={onCancelResumeModal}
               disabled={resumingTask ? updatingStatus.has(resumingTask.id) : false}
-              className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+              className={`border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
             >
-              Cancel
+              {isResumeDirty ? 'Discard Changes' : 'Cancel'}
             </Button>
             <Button
               onClick={onConfirmResumeTask}
@@ -232,7 +315,7 @@ export function WorkshopTaskStatusDialogs({
                 resumeComment.length > 300 ||
                 (resumingTask ? updatingStatus.has(resumingTask.id) : false)
               }
-              className="bg-workshop hover:bg-workshop-dark text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`bg-workshop hover:bg-workshop-dark text-white disabled:opacity-50 disabled:cursor-not-allowed ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
             >
               <Clock className="h-4 w-4 mr-2" />
               Resume Task

@@ -33,6 +33,8 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { Undo2, XCircle } from 'lucide-react';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { cn } from '@/lib/utils/cn';
 
 type PlantAsset = {
   id: string;
@@ -79,6 +81,7 @@ export function PlantTable({
   onVehicleAdded
 }: PlantTableProps) {
   const router = useRouter();
+  const { tabletModeEnabled } = useTabletMode();
   // ✅ Create supabase client using useMemo to avoid recreating on every render
   const supabase = useMemo(() => createClient(), []);
   const [sortField, setSortField] = useState<SortField>('plant_id');
@@ -371,11 +374,11 @@ export function PlantTable({
           
           {/* Internal Tabs for Active vs Retired Plant */}
           <Tabs defaultValue="active" className="w-full">
-            <TabsList className="bg-slate-800 border-border">
-              <TabsTrigger value="active">
+            <TabsList className={cn('bg-slate-800 border-border', tabletModeEnabled && 'h-auto flex-wrap gap-2 p-1.5')}>
+              <TabsTrigger value="active" className={tabletModeEnabled ? 'min-h-11 text-base px-4' : undefined}>
                 Active Plant ({activePlantAssets.length})
               </TabsTrigger>
-              <TabsTrigger value="deleted" className="flex items-center gap-2">
+              <TabsTrigger value="deleted" className={cn('flex items-center gap-2', tabletModeEnabled && 'min-h-11 text-base px-4')}>
                 <FolderClock className="h-4 w-4" />
                 Retired Plant ({retiredPlantCount})
               </TabsTrigger>
@@ -384,21 +387,21 @@ export function PlantTable({
             {/* Active Plant Tab */}
             <TabsContent value="active" className="space-y-4 mt-4">
               {/* Search Bar and Column Filter */}
-              <div className="flex gap-2">
+              <div className={cn('flex gap-2', tabletModeEnabled && 'flex-wrap')}>
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Search className={cn('absolute left-3 text-muted-foreground', tabletModeEnabled ? 'top-3.5 h-5 w-5' : 'top-3 h-4 w-4')} />
               <Input
                 placeholder="Search by registration number..."
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
-                className="pl-11 bg-slate-900/50 border-slate-600 text-white"
+                className={cn('bg-slate-900/50 border-slate-600 text-white', tabletModeEnabled ? 'pl-12 min-h-11 text-base' : 'pl-11')}
               />
             </div>
             
             {/* Column Visibility Dropdown - Hidden on Mobile */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="border-slate-600 hidden md:flex">
+                <Button variant="outline" className={cn('border-slate-600 hidden md:flex', tabletModeEnabled && 'min-h-11 text-base px-4')}>
                   <Settings2 className="h-4 w-4 mr-2" />
                   Show columns
                 </Button>
@@ -452,7 +455,7 @@ export function PlantTable({
               {searchQuery ? 'No plant machinery found matching your search.' : 'No plant machinery with maintenance records yet.'}
             </div>
           ) : (
-            <div className="hidden md:block border border-slate-700 rounded-lg">
+            <div className={cn('border border-slate-700 rounded-lg', tabletModeEnabled ? 'hidden' : 'hidden md:block')}>
                 <Table className="min-w-full">
                   <TableHeader>
                     <TableRow className="border-border">
@@ -620,7 +623,7 @@ export function PlantTable({
 
           {/* Mobile Card View */}
           {sortedPlant.length > 0 && (
-            <div className="md:hidden space-y-3">
+            <div className={cn('space-y-3', tabletModeEnabled ? 'block' : 'md:hidden')}>
               {sortedPlant.map((asset) => {
                 const isExpanded = expandedCardId === asset.plant_id;
                 
@@ -753,7 +756,7 @@ export function PlantTable({
                                 e.stopPropagation();
                                 handleViewHistory(asset.plant?.id || '');
                               }}
-                              className="h-10 w-10 p-0"
+                              className={tabletModeEnabled ? 'h-11 w-11 p-0' : 'h-10 w-10 p-0'}
                             >
                               <History className="h-5 w-5" />
                             </Button>
@@ -794,7 +797,7 @@ export function PlantTable({
               ) : (
                 <>
                   {/* Desktop Table View for Retired Plant */}
-                  <div className="hidden md:block border border-slate-700 rounded-lg">
+                  <div className={cn('border border-slate-700 rounded-lg', tabletModeEnabled ? 'hidden' : 'hidden md:block')}>
                     <Table className="min-w-full">
                       <TableHeader>
                         <TableRow className="border-border">
@@ -918,7 +921,7 @@ export function PlantTable({
                   </div>
 
                   {/* Mobile Card View for Retired Plant */}
-                  <div className="md:hidden space-y-3">
+                  <div className={cn('space-y-3', tabletModeEnabled ? 'block' : 'md:hidden')}>
                     {filteredRetiredPlant.map((plant) => (
                       <Card
                         key={plant.id}
@@ -984,7 +987,7 @@ export function PlantTable({
                               size="sm"
                               onClick={() => handleRestorePlant(plant)}
                               disabled={restoringId === plant.id}
-                              className="w-full text-green-400 hover:text-green-300 hover:bg-green-900/20"
+                              className={cn('w-full text-green-400 hover:text-green-300 hover:bg-green-900/20', tabletModeEnabled && 'min-h-11 text-base')}
                             >
                               {restoringId === plant.id ? (
                                 <>
@@ -1003,7 +1006,7 @@ export function PlantTable({
                               size="sm"
                               onClick={() => handlePermanentDelete(plant)}
                               disabled={deletingId === plant.id}
-                              className="w-full text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                              className={cn('w-full text-red-400 hover:text-red-300 hover:bg-red-900/20', tabletModeEnabled && 'min-h-11 text-base')}
                             >
                               {deletingId === plant.id ? (
                                 <>

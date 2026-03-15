@@ -32,12 +32,14 @@ import { FleetCategoryDialogs } from './components/FleetCategoryDialogs';
 import { AddAssetFlowDialog } from '@/app/(dashboard)/maintenance/components/add-asset/AddAssetFlowDialog';
 import { Button } from '@/components/ui/button';
 import type { Category, HgvAsset, HgvCategory, PlantAsset, Vehicle } from './types';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
 
 function FleetContent() {
   const searchParams = useSearchParams();
   const router = useNextRouter();
   const { profile, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const supabase = createClient();
+  const { tabletModeEnabled } = useTabletMode();
   
   // Two-level tab state matching Maintenance/Workshop pages
   const [pageTab, setPageTab] = useState<'overview' | 'settings'>('overview');
@@ -403,7 +405,7 @@ function FleetContent() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
+      <div className={`bg-white dark:bg-slate-900 rounded-lg border border-border ${tabletModeEnabled ? 'p-5 md:p-6' : 'p-6'}`}>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Fleet Management</h1>
@@ -412,7 +414,7 @@ function FleetContent() {
             </p>
           </div>
           <Button
-            className="bg-fleet hover:bg-fleet-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
+            className={`bg-fleet hover:bg-fleet-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg ${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''}`}
             onClick={() => setHeaderAddAssetOpen(true)}
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -423,12 +425,12 @@ function FleetContent() {
 
       <Tabs value={pageTab} onValueChange={handlePageTabChange}>
         {(isAdmin || isManager) && (
-          <TabsList>
-            <TabsTrigger value="overview" className="gap-2">
+          <TabsList className={tabletModeEnabled ? 'h-auto flex-wrap gap-2 p-1.5' : undefined}>
+            <TabsTrigger value="overview" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}>
               <Wrench className="h-4 w-4" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="settings" className="gap-2">
+            <TabsTrigger value="settings" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}>
               <Settings className="h-4 w-4" />
               Settings
             </TabsTrigger>
@@ -436,18 +438,18 @@ function FleetContent() {
         )}
 
         <TabsContent value="overview" className="space-y-6 mt-0">
-          <div className="flex items-center justify-end">
+          <div className={`flex ${tabletModeEnabled ? 'justify-start' : 'justify-end'}`}>
             <Tabs value={assetTab} onValueChange={handleAssetTabChange}>
-              <TabsList>
-                <TabsTrigger value="vans" className="gap-2">
+              <TabsList className={tabletModeEnabled ? 'h-auto flex-wrap gap-2 p-1.5 justify-start' : undefined}>
+                <TabsTrigger value="vans" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}>
                   <Truck className="h-4 w-4" />
                   Vans
                 </TabsTrigger>
-                <TabsTrigger value="plant" className="gap-2">
+                <TabsTrigger value="plant" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}>
                   <HardHat className="h-4 w-4" />
                   Plant
                 </TabsTrigger>
-                <TabsTrigger value="hgvs" className="gap-2">
+                <TabsTrigger value="hgvs" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}>
                   <Truck className="h-4 w-4" />
                   HGVs
                 </TabsTrigger>

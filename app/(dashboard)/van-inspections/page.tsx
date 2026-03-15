@@ -29,6 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
 
 interface InspectionWithVehicle extends VanInspection {
   vans: {
@@ -49,6 +50,7 @@ function InspectionsContent() {
   const pageSize = isElevatedUser ? 20 : 10;
   usePermissionCheck('inspections');
   const router = useRouter();
+  const { tabletModeEnabled } = useTabletMode();
   const [inspections, setInspections] = useState<InspectionWithVehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -371,7 +373,7 @@ function InspectionsContent() {
     <div className="space-y-6 max-w-6xl">
       
       {/* Header */}
-      <div className="bg-slate-900 rounded-lg p-6 border border-border">
+      <div className={`bg-slate-900 rounded-lg border border-border ${tabletModeEnabled ? 'p-5 md:p-6' : 'p-6'}`}>
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">Van Daily Checks</h1>
@@ -380,7 +382,7 @@ function InspectionsContent() {
             </p>
           </div>
           <Link href="/van-inspections/new">
-            <Button className="bg-inspection hover:bg-inspection-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg">
+            <Button className={`bg-inspection hover:bg-inspection-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg ${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''}`}>
               <Plus className="h-4 w-4 mr-2" />
               New Daily Check
             </Button>
@@ -390,13 +392,13 @@ function InspectionsContent() {
         {/* Manager: Employee Filter */}
         {isElevatedUser && employees.length > 0 && (
           <div className="pt-4 border-t border-border">
-            <div className="flex items-center gap-3 max-w-md">
+            <div className={`flex items-center gap-3 ${tabletModeEnabled ? 'max-w-none flex-wrap' : 'max-w-md'}`}>
               <Label htmlFor="employee-filter" className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
                 <User className="h-4 w-4" />
                 View daily checks for:
               </Label>
               <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                <SelectTrigger id="employee-filter" className="h-10 border-border text-white">
+                <SelectTrigger id="employee-filter" className={`${tabletModeEnabled ? 'min-h-11 text-base' : 'h-10'} border-border text-white`}>
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
@@ -418,7 +420,7 @@ function InspectionsContent() {
       {isElevatedUser && (
         <Card className="border-border">
           <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className={`grid grid-cols-1 gap-6 ${tabletModeEnabled ? 'md:grid-cols-1' : 'md:grid-cols-2'}`}>
               {/* Status Filter */}
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
@@ -430,7 +432,7 @@ function InspectionsContent() {
                       variant="outline"
                       size="sm"
                       onClick={() => setStatusFilter(filter)}
-                      className={statusFilter === filter ? 'bg-white text-slate-900 border-white/80 hover:bg-slate-200' : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'}
+                      className={`${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''} ${statusFilter === filter ? 'bg-white text-slate-900 border-white/80 hover:bg-slate-200' : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'}`}
                     >
                       {filter === 'submitted' && <Clock className="h-3 w-3 mr-1" />}
                       {filter === 'draft' && <FileText className="h-3 w-3 mr-1" />}
@@ -445,7 +447,7 @@ function InspectionsContent() {
                 <Truck className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-slate-400 mr-2 whitespace-nowrap">Filter by van:</span>
                 <Select value={vehicleFilter} onValueChange={setVehicleFilter}>
-                  <SelectTrigger className="h-9 border-border text-white">
+                <SelectTrigger className={`${tabletModeEnabled ? 'min-h-11 text-base' : 'h-9'} border-border text-white`}>
                     <SelectValue placeholder="All vans" />
                   </SelectTrigger>
                   <SelectContent>
@@ -566,7 +568,7 @@ function InspectionsContent() {
                         onClick={(e) => openDeleteDialog(e, inspection)}
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                        className={`${tabletModeEnabled ? 'h-11 w-11 p-0' : 'h-8 w-8 p-0'} text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950`}
                         title="Delete inspection"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -594,7 +596,7 @@ function InspectionsContent() {
                       disabled={downloading === inspection.id}
                       variant="outline"
                       size="sm"
-                      className="bg-slate-900 border-inspection text-inspection hover:bg-inspection hover:text-white transition-all duration-200"
+                      className={`bg-slate-900 border-inspection text-inspection hover:bg-inspection hover:text-white transition-all duration-200 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
                     >
                       <Download className="h-4 w-4 mr-2" />
                       {downloading === inspection.id ? 'Downloading...' : 'Download PDF'}
@@ -613,7 +615,7 @@ function InspectionsContent() {
               <Button
                 onClick={() => setDisplayCount((prev) => prev + pageSize)}
                 variant="outline"
-                className="w-full max-w-xs border-border text-white hover:bg-slate-800"
+                className={`w-full max-w-xs border-border text-white hover:bg-slate-800 ${tabletModeEnabled ? 'min-h-11 text-base' : ''}`}
               >
                 Show More ({inspections.length - displayCount} remaining)
               </Button>

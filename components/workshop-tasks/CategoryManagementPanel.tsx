@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Edit, Trash2, ChevronDown, ChevronUp, Settings } from 'lucide-react';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
 type Category = {
   id: string;
   name: string;
@@ -42,6 +43,7 @@ export function CategoryManagementPanel({
   onEditSubcategory,
   onDeleteSubcategory,
 }: CategoryManagementPanelProps) {
+  const { tabletModeEnabled } = useTabletMode();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [expandedSubcategories, setExpandedSubcategories] = useState<Set<string>>(new Set());
   const [isExpanded, setIsExpanded] = useState(false);
@@ -97,7 +99,7 @@ export function CategoryManagementPanel({
                 e.stopPropagation();
                 onAddCategory();
               }}
-              className="bg-workshop hover:bg-workshop-dark text-white"
+              className={`bg-workshop hover:bg-workshop-dark text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Category
@@ -147,7 +149,7 @@ export function CategoryManagementPanel({
               e.stopPropagation();
               onAddCategory();
             }}
-            className="bg-workshop hover:bg-workshop-dark text-white"
+            className={`bg-workshop hover:bg-workshop-dark text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Category
@@ -219,6 +221,7 @@ export function CategoryManagementPanel({
                       variant="outline"
                       size="sm"
                       onClick={() => onEditCategory(selectedCategory)}
+                      className={tabletModeEnabled ? 'min-h-11 text-base px-4' : undefined}
                     >
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
@@ -227,7 +230,7 @@ export function CategoryManagementPanel({
                       variant="outline"
                       size="sm"
                       onClick={() => onDeleteCategory(selectedCategory)}
-                      className="border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"
+                      className={`${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''} border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950`}
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
                       Delete
@@ -244,7 +247,7 @@ export function CategoryManagementPanel({
                     <Button
                       size="sm"
                       onClick={() => onAddSubcategory(selectedCategory)}
-                      className="bg-workshop/20 hover:bg-workshop/30 text-workshop border border-workshop/30"
+                      className={`bg-workshop/20 hover:bg-workshop/30 text-workshop border border-workshop/30 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
                       variant="outline"
                     >
                       <Plus className="h-3 w-3 mr-1" />
@@ -274,7 +277,7 @@ export function CategoryManagementPanel({
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => onEditSubcategory(subcategory, selectedCategory)}
-                                  className="h-8 w-8 p-0"
+                                  className={`${tabletModeEnabled ? 'h-11 w-11' : 'h-8 w-8'} p-0`}
                                   title="Edit Subcategory"
                                 >
                                   <Edit className="h-3 w-3" />
@@ -283,7 +286,7 @@ export function CategoryManagementPanel({
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => onDeleteSubcategory(subcategory.id, subcategory.name)}
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 h-8 w-8 p-0"
+                                  className={`text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 ${tabletModeEnabled ? 'h-11 w-11' : 'h-8 w-8'} p-0`}
                                   title="Delete Subcategory"
                                 >
                                   <Trash2 className="h-3 w-3" />
@@ -292,7 +295,7 @@ export function CategoryManagementPanel({
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => toggleSubcategoryExpansion(subcategory.id)}
-                                  className="h-8 w-8 p-0"
+                                  className={`${tabletModeEnabled ? 'h-11 w-11' : 'h-8 w-8'} p-0`}
                                 >
                                   {isExpanded ? (
                                     <ChevronUp className="h-4 w-4" />

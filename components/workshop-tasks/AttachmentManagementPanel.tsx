@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +16,8 @@ import { Plus, Edit, Trash2, ChevronDown, ChevronUp, FileText, Truck, HardHat } 
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { Database } from '@/types/database';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { triggerShakeAnimation } from '@/lib/utils/animations';
 
 type Template = Database['public']['Tables']['workshop_attachment_templates']['Row'];
 type Question = Database['public']['Tables']['workshop_attachment_questions']['Row'];
@@ -33,6 +35,7 @@ interface AttachmentManagementPanelProps {
 }
 
 export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagementPanelProps) {
+  const { tabletModeEnabled } = useTabletMode();
   const supabase = createClient();
   
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -64,6 +67,8 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
   const [deleteTemplateId, setDeleteTemplateId] = useState<string | null>(null);
   const [deleteQuestionId, setDeleteQuestionId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const templateDialogRef = useRef<HTMLDivElement>(null);
+  const questionDialogRef = useRef<HTMLDivElement>(null);
 
   const fetchTemplates = useCallback(async () => {
     try {
@@ -122,6 +127,38 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
   }, [filteredTemplates, selectedTemplateId]);
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
+  const isTemplateDirty = useMemo(() => {
+    const defaultName = editingTemplate?.name ?? '';
+    const defaultDescription = editingTemplate?.description ?? '';
+    const defaultActive = editingTemplate?.is_active ?? true;
+    const defaultAppliesTo = editingTemplate?.applies_to || ['van', 'hgv', 'plant'];
+    return (
+      templateName.trim() !== defaultName.trim() ||
+      templateDescription.trim() !== defaultDescription.trim() ||
+      templateActive !== defaultActive ||
+      templateAppliesToVehicle !== defaultAppliesTo.includes('van') ||
+      templateAppliesToHgv !== defaultAppliesTo.includes('hgv') ||
+      templateAppliesToPlant !== defaultAppliesTo.includes('plant')
+    );
+  }, [
+    editingTemplate,
+    templateName,
+    templateDescription,
+    templateActive,
+    templateAppliesToVehicle,
+    templateAppliesToHgv,
+    templateAppliesToPlant,
+  ]);
+  const isQuestionDirty = useMemo(() => {
+    const defaultText = editingQuestion?.question_text ?? '';
+    const defaultType = editingQuestion?.question_type ?? 'checkbox';
+    const defaultRequired = editingQuestion?.is_required ?? false;
+    return (
+      questionText.trim() !== defaultText.trim() ||
+      questionType !== defaultType ||
+      questionRequired !== defaultRequired
+    );
+  }, [editingQuestion, questionText, questionType, questionRequired]);
   
   const templateQuestions = selectedTemplateId
     ? questions.filter(q => q.template_id === selectedTemplateId).sort((a, b) => a.sort_order - b.sort_order)
@@ -411,7 +448,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
                 e.stopPropagation();
                 openAddTemplateDialog();
               }}
-              className="bg-workshop hover:bg-workshop-dark text-white"
+              className={`bg-workshop hover:bg-workshop-dark text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Template
@@ -460,7 +497,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
                 e.stopPropagation();
                 openAddTemplateDialog();
               }}
-              className="bg-workshop hover:bg-workshop-dark text-white"
+              className={`bg-workshop hover:bg-workshop-dark text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Template
@@ -544,6 +581,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
                         variant="outline"
                         size="sm"
                         onClick={() => openEditTemplateDialog(selectedTemplate)}
+                        className={tabletModeEnabled ? 'min-h-11 text-base px-4' : undefined}
                       >
                         <Edit className="h-4 w-4 mr-1" />
                         Edit
@@ -552,7 +590,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
                         variant="outline"
                         size="sm"
                         onClick={() => setDeleteTemplateId(selectedTemplate.id)}
-                        className="border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"
+                        className={`${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''} border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950`}
                       >
                         <Trash2 className="h-4 w-4 mr-1" />
                         Delete
@@ -569,7 +607,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
                       <Button
                         size="sm"
                         onClick={openAddQuestionDialog}
-                        className="bg-workshop/20 hover:bg-workshop/30 text-workshop border border-workshop/30"
+                        className={`bg-workshop/20 hover:bg-workshop/30 text-workshop border border-workshop/30 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
                         variant="outline"
                       >
                         <Plus className="h-3 w-3 mr-1" />
@@ -586,7 +624,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
                           size="sm"
                           onClick={openAddQuestionDialog}
                           variant="outline"
-                          className="border-workshop/30 text-workshop hover:bg-workshop/10"
+                          className={`border-workshop/30 text-workshop hover:bg-workshop/10 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
                         >
                           <Plus className="h-3 w-3 mr-1" />
                           Add First Question
@@ -606,7 +644,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
                                 size="sm"
                                 onClick={() => moveQuestion(question.id, 'up')}
                                 disabled={index === 0}
-                                className="h-6 w-6 p-0"
+                                className={`${tabletModeEnabled ? 'h-11 w-11' : 'h-6 w-6'} p-0`}
                               >
                                 <ChevronUp className="h-3 w-3" />
                               </Button>
@@ -615,7 +653,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
                                 size="sm"
                                 onClick={() => moveQuestion(question.id, 'down')}
                                 disabled={index === templateQuestions.length - 1}
-                                className="h-6 w-6 p-0"
+                                className={`${tabletModeEnabled ? 'h-11 w-11' : 'h-6 w-6'} p-0`}
                               >
                                 <ChevronDown className="h-3 w-3" />
                               </Button>
@@ -644,7 +682,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => openEditQuestionDialog(question)}
-                                className="h-8 w-8 p-0"
+                                className={`${tabletModeEnabled ? 'h-11 w-11' : 'h-8 w-8'} p-0`}
                               >
                                 <Edit className="h-3 w-3" />
                               </Button>
@@ -652,7 +690,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => setDeleteQuestionId(question.id)}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 h-8 w-8 p-0"
+                                className={`text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 ${tabletModeEnabled ? 'h-11 w-11' : 'h-8 w-8'} p-0`}
                               >
                                 <Trash2 className="h-3 w-3" />
                               </Button>
@@ -677,8 +715,32 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
       </Card>
 
       {/* Template Dialog */}
-      <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
-        <DialogContent>
+      <Dialog
+        open={showTemplateDialog}
+        onOpenChange={(open) => {
+          if (!open && !savingTemplate && isTemplateDirty) {
+            triggerShakeAnimation(templateDialogRef.current);
+            return;
+          }
+          setShowTemplateDialog(open);
+        }}
+      >
+        <DialogContent
+          ref={templateDialogRef}
+          className={tabletModeEnabled ? 'p-5 sm:p-6' : undefined}
+          onInteractOutside={(event) => {
+            if (!savingTemplate && isTemplateDirty) {
+              event.preventDefault();
+              triggerShakeAnimation(templateDialogRef.current);
+            }
+          }}
+          onEscapeKeyDown={(event) => {
+            if (!savingTemplate && isTemplateDirty) {
+              event.preventDefault();
+              triggerShakeAnimation(templateDialogRef.current);
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>
               {editingTemplate ? 'Edit Template' : 'Create Template'}
@@ -700,6 +762,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
                 value={templateName}
                 onChange={(e) => setTemplateName(e.target.value)}
                 placeholder="e.g., Full Service Checklist"
+                className={tabletModeEnabled ? 'min-h-11 text-base' : undefined}
               />
             </div>
 
@@ -711,6 +774,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
                 onChange={(e) => setTemplateDescription(e.target.value)}
                 placeholder="Optional description of what this template is used for"
                 rows={3}
+                className={tabletModeEnabled ? 'text-base' : undefined}
               />
             </div>
 
@@ -775,14 +839,14 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowTemplateDialog(false)}>
-              Cancel
+          <DialogFooter className={tabletModeEnabled ? 'gap-3 pt-2' : undefined}>
+            <Button variant="outline" onClick={() => setShowTemplateDialog(false)} className={tabletModeEnabled ? 'min-h-11 text-base px-4' : undefined}>
+              {isTemplateDirty ? 'Discard Changes' : 'Cancel'}
             </Button>
             <Button
               onClick={handleSaveTemplate}
               disabled={savingTemplate || !templateName.trim()}
-              className="bg-workshop hover:bg-workshop-dark text-white"
+              className={`bg-workshop hover:bg-workshop-dark text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
             >
               {savingTemplate ? 'Saving...' : editingTemplate ? 'Update' : 'Create'}
             </Button>
@@ -791,8 +855,32 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
       </Dialog>
 
       {/* Question Dialog */}
-      <Dialog open={showQuestionDialog} onOpenChange={setShowQuestionDialog}>
-        <DialogContent>
+      <Dialog
+        open={showQuestionDialog}
+        onOpenChange={(open) => {
+          if (!open && !savingQuestion && isQuestionDirty) {
+            triggerShakeAnimation(questionDialogRef.current);
+            return;
+          }
+          setShowQuestionDialog(open);
+        }}
+      >
+        <DialogContent
+          ref={questionDialogRef}
+          className={tabletModeEnabled ? 'p-5 sm:p-6' : undefined}
+          onInteractOutside={(event) => {
+            if (!savingQuestion && isQuestionDirty) {
+              event.preventDefault();
+              triggerShakeAnimation(questionDialogRef.current);
+            }
+          }}
+          onEscapeKeyDown={(event) => {
+            if (!savingQuestion && isQuestionDirty) {
+              event.preventDefault();
+              triggerShakeAnimation(questionDialogRef.current);
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>
               {editingQuestion ? 'Edit Question' : 'Add Question'}
@@ -814,13 +902,14 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
                 value={questionText}
                 onChange={(e) => setQuestionText(e.target.value)}
                 placeholder="e.g., Engine oil replaced"
+                className={tabletModeEnabled ? 'min-h-11 text-base' : undefined}
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="questionType">Response Type</Label>
               <Select value={questionType} onValueChange={(v) => setQuestionType(v as Question['question_type'])}>
-                <SelectTrigger>
+                <SelectTrigger className={tabletModeEnabled ? 'min-h-11 text-base' : undefined}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -848,14 +937,14 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowQuestionDialog(false)}>
-              Cancel
+          <DialogFooter className={tabletModeEnabled ? 'gap-3 pt-2' : undefined}>
+            <Button variant="outline" onClick={() => setShowQuestionDialog(false)} className={tabletModeEnabled ? 'min-h-11 text-base px-4' : undefined}>
+              {isQuestionDirty ? 'Discard Changes' : 'Cancel'}
             </Button>
             <Button
               onClick={handleSaveQuestion}
               disabled={savingQuestion || !questionText.trim()}
-              className="bg-workshop hover:bg-workshop-dark text-white"
+              className={`bg-workshop hover:bg-workshop-dark text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
             >
               {savingQuestion ? 'Saving...' : editingQuestion ? 'Update' : 'Add'}
             </Button>

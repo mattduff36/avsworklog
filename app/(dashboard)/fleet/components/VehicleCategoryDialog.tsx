@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -17,6 +17,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Truck, HardHat } from 'lucide-react';
 import { toast } from 'sonner';
+import { triggerShakeAnimation } from '@/lib/utils/animations';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
 
 interface VehicleCategory {
   id: string;
@@ -41,11 +43,36 @@ export function VehicleCategoryDialog({
   onSuccess,
 }: VehicleCategoryDialogProps) {
   const router = useRouter();
+  const { tabletModeEnabled } = useTabletMode();
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [appliesToVan, setAppliesToVan] = useState(true);
   const [appliesToPlant, setAppliesToPlant] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const isDirty = useMemo(() => {
+    const defaultName = mode === 'edit' ? (category?.name || '') : '';
+    const defaultDescription = mode === 'edit' ? (category?.description || '') : '';
+    const defaultAppliesTo = mode === 'edit' ? (category?.applies_to || ['van']) : ['van'];
+    const defaultVan = defaultAppliesTo.includes('van');
+    const defaultPlant = defaultAppliesTo.includes('plant');
+
+    return (
+      name.trim() !== defaultName.trim() ||
+      description.trim() !== defaultDescription.trim() ||
+      appliesToVan !== defaultVan ||
+      appliesToPlant !== defaultPlant
+    );
+  }, [mode, category, name, description, appliesToVan, appliesToPlant]);
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen && !loading && isDirty) {
+      triggerShakeAnimation(contentRef.current);
+      return;
+    }
+    onOpenChange(nextOpen);
+  }
 
   // Reset form when dialog opens/closes or category changes
   useEffect(() => {
@@ -124,8 +151,23 @@ export function VehicleCategoryDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] border-border text-white">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent
+        ref={contentRef}
+        className={`sm:max-w-[500px] border-border text-white ${tabletModeEnabled ? 'p-5 sm:p-6' : ''}`}
+        onInteractOutside={(event) => {
+          if (!loading && isDirty) {
+            event.preventDefault();
+            triggerShakeAnimation(contentRef.current);
+          }
+        }}
+        onEscapeKeyDown={(event) => {
+          if (!loading && isDirty) {
+            event.preventDefault();
+            triggerShakeAnimation(contentRef.current);
+          }
+        }}
+      >
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>
@@ -209,7 +251,7 @@ export function VehicleCategoryDialog({
               disabled={loading}
               className="border-slate-600 text-white hover:bg-slate-800"
             >
-              Cancel
+              {isDirty ? 'Discard Changes' : 'Cancel'}
             </Button>
             <Button
               type="submit"

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -16,6 +16,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { triggerShakeAnimation } from '@/lib/utils/animations';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
 
 interface HgvCategory {
   id: string;
@@ -39,9 +41,29 @@ export function HgvCategoryDialog({
   onSuccess,
 }: HgvCategoryDialogProps) {
   const router = useRouter();
+  const { tabletModeEnabled } = useTabletMode();
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const isDirty = useMemo(() => {
+    const defaultName = mode === 'edit' ? (category?.name || '') : '';
+    const defaultDescription = mode === 'edit' ? (category?.description || '') : '';
+
+    return (
+      name.trim() !== defaultName.trim() ||
+      description.trim() !== defaultDescription.trim()
+    );
+  }, [mode, category, name, description]);
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen && !loading && isDirty) {
+      triggerShakeAnimation(contentRef.current);
+      return;
+    }
+    onOpenChange(nextOpen);
+  }
 
   useEffect(() => {
     if (open) {
@@ -105,8 +127,23 @@ export function HgvCategoryDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] border-border text-white">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent
+        ref={contentRef}
+        className={`sm:max-w-[500px] border-border text-white ${tabletModeEnabled ? 'p-5 sm:p-6' : ''}`}
+        onInteractOutside={(event) => {
+          if (!loading && isDirty) {
+            event.preventDefault();
+            triggerShakeAnimation(contentRef.current);
+          }
+        }}
+        onEscapeKeyDown={(event) => {
+          if (!loading && isDirty) {
+            event.preventDefault();
+            triggerShakeAnimation(contentRef.current);
+          }
+        }}
+      >
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>
@@ -154,7 +191,7 @@ export function HgvCategoryDialog({
               disabled={loading}
               className="border-slate-600 text-white hover:bg-slate-800"
             >
-              Cancel
+              {isDirty ? 'Discard Changes' : 'Cancel'}
             </Button>
             <Button
               type="submit"

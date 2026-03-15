@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -15,6 +15,8 @@ import { FileText } from 'lucide-react';
 import { getTaskContent, type AlertType } from '@/lib/utils/serviceTaskCreation';
 import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { triggerShakeAnimation } from '@/lib/utils/animations';
 
 type Vehicle = {
   id: string;
@@ -64,7 +66,9 @@ export function CreateWorkshopTaskDialog({
   onSuccess
 }: CreateWorkshopTaskDialogProps) {
   const { user } = useAuth();
+  const { tabletModeEnabled } = useTabletMode();
   const supabase = createClient();
+  const contentRef = useRef<HTMLDivElement>(null);
   
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [recentVehicleIds, setRecentVehicleIds] = useState<string[]>([]);
@@ -508,10 +512,44 @@ export function CreateWorkshopTaskDialog({
     }
     onOpenChange(newOpen);
   };
+  const isDirty = useMemo(
+    () =>
+      selectedVehicleId.length > 0 ||
+      selectedCategoryId.length > 0 ||
+      selectedSubcategoryId.length > 0 ||
+      workshopComments.trim().length > 0 ||
+      newMeterReading.trim().length > 0 ||
+      selectedTemplateIds.length > 0,
+    [selectedVehicleId, selectedCategoryId, selectedSubcategoryId, workshopComments, newMeterReading, selectedTemplateIds]
+  );
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-lg">
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && !submitting && isDirty) {
+          triggerShakeAnimation(contentRef.current);
+          return;
+        }
+        handleOpenChange(nextOpen);
+      }}
+    >
+      <DialogContent
+        ref={contentRef}
+        className={`max-w-lg ${tabletModeEnabled ? 'max-w-xl p-5 sm:p-6' : ''}`}
+        onInteractOutside={(event) => {
+          if (!submitting && isDirty) {
+            event.preventDefault();
+            triggerShakeAnimation(contentRef.current);
+          }
+        }}
+        onEscapeKeyDown={(event) => {
+          if (!submitting && isDirty) {
+            event.preventDefault();
+            triggerShakeAnimation(contentRef.current);
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="text-xl">Create Workshop Task</DialogTitle>
           <DialogDescription>
@@ -541,7 +579,7 @@ export function CreateWorkshopTaskDialog({
                 setCurrentMeterReading(null);
               }
             }}>
-              <SelectTrigger id="vehicle">
+              <SelectTrigger id="vehicle" className={tabletModeEnabled ? 'min-h-11 text-base' : undefined}>
                 <SelectValue placeholder="Select van, HGV, or plant" />
               </SelectTrigger>
               <SelectContent>
@@ -590,7 +628,7 @@ export function CreateWorkshopTaskDialog({
               Category <span className="text-red-500">*</span>
             </Label>
             <Select value={selectedCategoryId} onValueChange={handleCategoryChange}>
-              <SelectTrigger id="category">
+              <SelectTrigger id="category" className={tabletModeEnabled ? 'min-h-11 text-base' : undefined}>
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
@@ -613,7 +651,7 @@ export function CreateWorkshopTaskDialog({
                 onValueChange={setSelectedSubcategoryId}
                 disabled={!selectedCategoryId}
               >
-                <SelectTrigger id="subcategory">
+                <SelectTrigger id="subcategory" className={tabletModeEnabled ? 'min-h-11 text-base' : undefined}>
                   <SelectValue placeholder={selectedCategoryId ? "Select subcategory" : "Select a category first"} />
                 </SelectTrigger>
                 <SelectContent>
@@ -639,6 +677,7 @@ export function CreateWorkshopTaskDialog({
               placeholder={`Enter current ${meterReadingType === 'hours' ? 'hours' : 'mileage'}`}
               min="0"
               step="1"
+              className={tabletModeEnabled ? 'min-h-11 text-base' : undefined}
             />
             {currentMeterReading !== null && (
               <p className="text-xs text-muted-foreground">
@@ -656,7 +695,7 @@ export function CreateWorkshopTaskDialog({
               value={workshopComments}
               onChange={(e) => setWorkshopComments(e.target.value)}
               placeholder="Describe the work needed (minimum 10 characters)"
-              className="min-h-[100px]"
+              className={`min-h-[100px] ${tabletModeEnabled ? 'text-base' : ''}`}
               maxLength={300}
             />
             <p className="text-xs text-muted-foreground">
@@ -706,17 +745,18 @@ export function CreateWorkshopTaskDialog({
           )}
         </div>
 
-        <DialogFooter>
+          <DialogFooter className={tabletModeEnabled ? 'gap-3 pt-2' : undefined}>
           <Button
             variant="outline"
             onClick={handleClose}
+              className={tabletModeEnabled ? 'min-h-11 text-base px-4' : undefined}
           >
-            Cancel
+              {isDirty ? 'Discard Changes' : 'Cancel'}
           </Button>
           <Button
             onClick={handleAddTask}
             disabled={submitting || !selectedVehicleId || !selectedCategoryId || (categoryHasSubcategories && !selectedSubcategoryId) || workshopComments.length < 10 || !newMeterReading.trim()}
-            className="bg-workshop hover:bg-workshop-dark text-white"
+              className={`bg-workshop hover:bg-workshop-dark text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
           >
             {submitting ? 'Creating...' : 'Create Task'}
           </Button>

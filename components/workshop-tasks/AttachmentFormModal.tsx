@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Check, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Database } from '@/types/database';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { triggerShakeAnimation } from '@/lib/utils/animations';
 
 type AttachmentQuestion = Database['public']['Tables']['workshop_attachment_questions']['Row'];
 type AttachmentResponse = Database['public']['Tables']['workshop_attachment_responses']['Row'];
@@ -40,6 +42,8 @@ export function AttachmentFormModal({
   attachmentId,
   isCompleted = false,
 }: AttachmentFormModalProps) {
+  const { tabletModeEnabled } = useTabletMode();
+  const contentRef = useRef<HTMLDivElement>(null);
   const [responses, setResponses] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
@@ -91,6 +95,7 @@ export function AttachmentFormModal({
   };
 
   const [downloading, setDownloading] = useState(false);
+  const isDirty = useMemo(() => Object.values(responses).some((v) => (v ?? '').trim() !== ''), [responses]);
 
   const handleSave = async (markComplete: boolean) => {
     if (!onSave) return;
@@ -286,8 +291,32 @@ export function AttachmentFormModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh]">
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!readOnly && !saving && !downloading && !nextOpen && isDirty) {
+          triggerShakeAnimation(contentRef.current);
+          return;
+        }
+        onOpenChange(nextOpen);
+      }}
+    >
+      <DialogContent
+        ref={contentRef}
+        className={`max-w-2xl max-h-[90vh] ${tabletModeEnabled ? 'p-5 sm:p-6' : ''}`}
+        onInteractOutside={(event) => {
+          if (!readOnly && !saving && !downloading && isDirty) {
+            event.preventDefault();
+            triggerShakeAnimation(contentRef.current);
+          }
+        }}
+        onEscapeKeyDown={(event) => {
+          if (!readOnly && !saving && !downloading && isDirty) {
+            event.preventDefault();
+            triggerShakeAnimation(contentRef.current);
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{templateName}</DialogTitle>
           <DialogDescription className="flex items-center gap-2">
@@ -337,25 +366,27 @@ export function AttachmentFormModal({
         </ScrollArea>
 
         {!readOnly && (
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className={`gap-2 sm:gap-0 ${tabletModeEnabled ? 'pt-2' : ''}`}>
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={saving}
+              className={tabletModeEnabled ? 'min-h-11 text-base px-4' : undefined}
             >
-              Cancel
+              {isDirty ? 'Discard Changes' : 'Cancel'}
             </Button>
             <Button
               variant="outline"
               onClick={() => handleSave(false)}
               disabled={saving}
+              className={tabletModeEnabled ? 'min-h-11 text-base px-4' : undefined}
             >
               {saving ? 'Saving...' : 'Save Draft'}
             </Button>
             <Button
               onClick={() => handleSave(true)}
               disabled={saving}
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className={`bg-green-600 hover:bg-green-700 text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
             >
               {saving ? 'Saving...' : 'Mark Complete'}
             </Button>
@@ -363,15 +394,15 @@ export function AttachmentFormModal({
         )}
 
         {readOnly && (
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <DialogFooter className={`gap-2 sm:gap-0 ${tabletModeEnabled ? 'pt-2' : ''}`}>
+            <Button variant="outline" onClick={() => onOpenChange(false)} className={tabletModeEnabled ? 'min-h-11 text-base px-4' : undefined}>
               Close
             </Button>
             {attachmentId && (
               <Button
                 onClick={handleDownloadPdf}
                 disabled={downloading || !isCompleted}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className={`bg-blue-600 hover:bg-blue-700 text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
                 title={isCompleted ? 'Download as PDF' : 'Complete the attachment to enable PDF export'}
               >
                 {downloading ? (
