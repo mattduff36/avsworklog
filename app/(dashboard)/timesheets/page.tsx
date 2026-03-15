@@ -35,9 +35,9 @@ interface TimesheetWithProfile extends Timesheet {
 }
 
 export default function TimesheetsPage() {
-  const { user, isManager, isAdmin, loading: authLoading } = useAuth();
+  const { user, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('timesheets');
-  const isElevatedUser = isManager || isAdmin;
+  const isElevatedUser = isManager || isAdmin || isSuperAdmin;
   const pageSize = isElevatedUser ? 20 : 10;
   const router = useRouter();
   const [timesheets, setTimesheets] = useState<TimesheetWithProfile[]>([]);
@@ -500,7 +500,7 @@ export default function TimesheetsPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {getStatusBadge(timesheet.status)}
-                    {isManager && (
+                    {isElevatedUser && (
                       <Button
                         onClick={(e) => openDeleteDialog(e, timesheet)}
                         variant="ghost"

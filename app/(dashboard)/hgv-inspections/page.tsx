@@ -37,8 +37,8 @@ interface HgvSummary {
 }
 
 function HgvInspectionsContent() {
-  const { user, isManager, isAdmin, loading: authLoading } = useAuth();
-  const isElevatedUser = isManager || isAdmin;
+  const { user, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
+  const isElevatedUser = isManager || isAdmin || isSuperAdmin;
   const pageSize = isElevatedUser ? 20 : 10;
   usePermissionCheck('hgv-inspections');
   const router = useRouter();
@@ -283,7 +283,7 @@ function HgvInspectionsContent() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge>Submitted</Badge>
-                    {isManager && (
+                    {isElevatedUser && (
                       <Button
                         variant="ghost"
                         size="sm"

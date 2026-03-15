@@ -45,8 +45,8 @@ interface Vehicle {
 }
 
 function InspectionsContent() {
-  const { user, isManager, isAdmin, loading: authLoading } = useAuth();
-  const isElevatedUser = isManager || isAdmin;
+  const { user, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
+  const isElevatedUser = isManager || isAdmin || isSuperAdmin;
   const pageSize = isElevatedUser ? 20 : 10;
   usePermissionCheck('inspections');
   const router = useRouter();
@@ -563,7 +563,7 @@ function InspectionsContent() {
                   </div>
                   <div className="flex items-center gap-2">
                     {getStatusBadge(inspection.status)}
-                    {isManager && (
+                    {isElevatedUser && (
                       <Button
                         onClick={(e) => openDeleteDialog(e, inspection)}
                         variant="ghost"

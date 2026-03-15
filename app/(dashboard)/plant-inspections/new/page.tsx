@@ -71,7 +71,8 @@ function NewPlantInspectionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const draftId = searchParams.get('id');
-  const { user, isManager } = useAuth();
+  const { user, isManager, isAdmin, isSuperAdmin } = useAuth();
+  const isElevatedUser = isManager || isAdmin || isSuperAdmin;
   const { tabletModeEnabled } = useTabletMode();
   const supabase = createClient();
   
@@ -264,7 +265,7 @@ function NewPlantInspectionContent() {
   }, [draftId, user, loadDraftInspection]);
 
   useEffect(() => {
-    if (user && isManager) {
+    if (user && isElevatedUser) {
       const fetchEmployees = async () => {
         try {
           const { data: profiles, error } = await supabase
@@ -301,7 +302,7 @@ function NewPlantInspectionContent() {
     } else if (user) {
       setSelectedEmployeeId(user.id);
     }
-  }, [user, isManager, supabase]);
+  }, [user, isElevatedUser, supabase]);
 
   const checkForDuplicate = useCallback(async (
     plantIdToCheck: string, 
@@ -926,7 +927,7 @@ function NewPlantInspectionContent() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Manager: Employee Selector */}
-          {isManager && (
+          {isElevatedUser && (
             <div className="space-y-2 pb-4 border-b border-border">
               <Label htmlFor="employee" className="text-foreground text-base flex items-center gap-2">
                 <User className="h-4 w-4" />

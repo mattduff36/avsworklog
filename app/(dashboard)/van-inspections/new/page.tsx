@@ -96,7 +96,8 @@ function NewInspectionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const draftId = searchParams.get('id'); // Get draft ID from URL if editing
-  const { user, isManager } = useAuth();
+  const { user, isManager, isAdmin, isSuperAdmin } = useAuth();
+  const isElevatedUser = isManager || isAdmin || isSuperAdmin;
   const { tabletModeEnabled } = useTabletMode();
   const supabase = createClient();
   
@@ -314,7 +315,7 @@ function NewInspectionContent() {
 
   // Fetch employees if manager, and set initial selected employee
   useEffect(() => {
-    if (user && isManager) {
+    if (user && isElevatedUser) {
       const fetchEmployees = async () => {
         try {
           const { data: profiles, error } = await supabase
@@ -352,7 +353,7 @@ function NewInspectionContent() {
       // If not a manager, set selected employee to current user
       setSelectedEmployeeId(user.id);
     }
-  }, [user, isManager, supabase]);
+  }, [user, isElevatedUser, supabase]);
 
   // Load recent vehicle IDs for the user
   useEffect(() => {
@@ -1394,7 +1395,7 @@ function NewInspectionContent() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Manager: Employee Selector */}
-          {isManager && (
+          {isElevatedUser && (
             <div className="space-y-2 pb-4 border-b border-border">
               <Label htmlFor="employee" className="text-foreground text-base flex items-center gap-2">
                 <User className="h-4 w-4" />

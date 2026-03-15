@@ -163,7 +163,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const selectedRole = allRoles.find((r) => r.id === viewAsRoleId) ?? null;
   
   // Show sidebar for managers/admins or superadmins (who need View As feature)
-  if (!isManager && !isSuperAdmin) return null;
+  if (!isManager && !isAdmin && !isSuperAdmin) return null;
 
   const managerLinks = getFilteredNavByPermissions(managerNavItems, userPermissions, isAdmin);
   const sidebarManagerLinks = managerLinks.filter((link) => link.href !== '/absence/manage');

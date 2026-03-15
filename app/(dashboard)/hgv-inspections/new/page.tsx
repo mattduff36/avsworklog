@@ -50,7 +50,8 @@ function isArticOnlyItem(itemNumber: number): boolean {
 function NewHgvInspectionContent() {
   const router = useRouter();
   const supabase = createClient();
-  const { user, isManager } = useAuth();
+  const { user, isManager, isAdmin, isSuperAdmin } = useAuth();
+  const isElevatedUser = isManager || isAdmin || isSuperAdmin;
   const { tabletModeEnabled } = useTabletMode();
 
   const [hgvs, setHgvs] = useState<HgvAsset[]>([]);
@@ -83,7 +84,7 @@ function NewHgvInspectionContent() {
           .select('id, reg_number, nickname, current_mileage, hgv_categories(name)')
           .eq('status', 'active')
           .order('reg_number'),
-        isManager
+        isElevatedUser
           ? supabase.from('profiles').select('id, full_name, employee_id').order('full_name')
           : Promise.resolve({ data: [] as unknown[] }),
       ]);
@@ -94,7 +95,7 @@ function NewHgvInspectionContent() {
     };
 
     loadData();
-  }, [isManager, supabase, user]);
+  }, [isElevatedUser, supabase, user]);
 
   useEffect(() => {
     if (!checklistStarted || !inspectionStartMs) return;
@@ -450,7 +451,7 @@ function NewHgvInspectionContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {isManager && (
+          {isElevatedUser && (
             <div className="space-y-2 pb-4 border-b border-border">
               <Label className="text-foreground text-base flex items-center gap-2">
                 <User className="h-4 w-4" />
