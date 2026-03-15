@@ -34,7 +34,7 @@ import {
 export default function ViewTimesheetPage() {
   const router = useRouter();
   const params = useParams();
-  const { user, isManager, loading: authLoading } = useAuth();
+  const { user, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const supabase = createClient();
   
   const [timesheet, setTimesheet] = useState<Timesheet | null>(null);
@@ -74,7 +74,7 @@ export default function ViewTimesheetPage() {
       }
       
       // Check if user has access
-      if (!isManager && timesheetData.user_id !== user?.id) {
+      if (!isManager && !isAdmin && !isSuperAdmin && timesheetData.user_id !== user?.id) {
         setError('You do not have permission to view this timesheet');
         setLoading(false);
         return;
@@ -130,7 +130,7 @@ export default function ViewTimesheetPage() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, isManager, user]);
+  }, [supabase, isManager, isAdmin, isSuperAdmin, user]);
 
   useEffect(() => {
     if (params.id && !authLoading) {
@@ -277,7 +277,7 @@ export default function ViewTimesheetPage() {
   };
 
   const handleApprove = async () => {
-    if (!timesheet || !isManager) return;
+    if (!timesheet || (!isManager && !isAdmin && !isSuperAdmin)) return;
 
     setSaving(true);
     try {
@@ -301,7 +301,7 @@ export default function ViewTimesheetPage() {
   };
 
   const handleReject = async () => {
-    if (!timesheet || !isManager) return;
+    if (!timesheet || (!isManager && !isAdmin && !isSuperAdmin)) return;
     if (rejectionComments.trim().length === 0) {
       toast.error('Please provide a reason for rejection');
       return;
@@ -340,7 +340,7 @@ export default function ViewTimesheetPage() {
   };
 
   const handleMarkAsProcessed = async () => {
-    if (!timesheet || !isManager) return;
+    if (!timesheet || (!isManager && !isAdmin && !isSuperAdmin)) return;
 
     setSaving(true);
     setShowProcessedDialog(false);
@@ -366,7 +366,7 @@ export default function ViewTimesheetPage() {
   };
 
   const handleAdjust = async (selectedManagerIds: string[], comments: string) => {
-    if (!timesheet || !isManager || !user) return;
+    if (!timesheet || (!isManager && !isAdmin && !isSuperAdmin) || !user) return;
 
     try {
       // Save the entries first
@@ -447,11 +447,12 @@ export default function ViewTimesheetPage() {
 
   if (!timesheet) return null;
 
-  const canEdit = editing && (timesheet.status === 'draft' || timesheet.status === 'rejected' || (isManager && timesheet.status === 'approved'));
+  const hasElevatedAccess = isManager || isAdmin || isSuperAdmin;
+  const canEdit = editing && (timesheet.status === 'draft' || timesheet.status === 'rejected' || (hasElevatedAccess && timesheet.status === 'approved'));
   const canSubmit = timesheet.user_id === user?.id && (timesheet.status === 'draft' || timesheet.status === 'rejected');
-  const canApprove = isManager && timesheet.status === 'submitted';
-  const canMarkAsProcessed = isManager && timesheet.status === 'approved';
-  const canEditApproved = isManager && timesheet.status === 'approved';
+  const canApprove = hasElevatedAccess && timesheet.status === 'submitted';
+  const canMarkAsProcessed = hasElevatedAccess && timesheet.status === 'approved';
+  const canEditApproved = hasElevatedAccess && timesheet.status === 'approved';
   const isEndState = timesheet.status === 'processed' || timesheet.status === 'adjusted';
 
   return (
@@ -469,7 +470,7 @@ export default function ViewTimesheetPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {isManager && (
+            {hasElevatedAccess && (
               <Button 
                 variant="outline" 
                 size="sm"
@@ -591,7 +592,7 @@ export default function ViewTimesheetPage() {
                       )}
                     </td>
                     <td className="p-2 text-right font-semibold">
-                      {canEdit && isManager ? (
+                      {canEdit && hasElevatedAccess ? (
                         <Input
                           type="number"
                           step="0.25"
@@ -709,7 +710,7 @@ export default function ViewTimesheetPage() {
                   <div className="pt-2 border-t">
                     <div className="flex justify-between items-center gap-2">
                       <span className="text-sm font-medium">Daily Total:</span>
-                      {canEdit && isManager ? (
+                      {canEdit && hasElevatedAccess ? (
                         <Input
                           type="number"
                           step="0.25"
@@ -815,7 +816,7 @@ export default function ViewTimesheetPage() {
             )}
 
             {/* Mark as Adjusted button (for managers editing approved timesheets) */}
-            {editing && timesheet.status === 'approved' && dataChanged && isManager && (
+            {editing && timesheet.status === 'approved' && dataChanged && hasElevatedAccess && (
               <Button
                 variant="outline"
                 onClick={() => setShowAdjustmentModal(true)}

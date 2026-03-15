@@ -33,7 +33,7 @@ interface HgvInspectionDetails {
 export default function ViewHgvInspectionPage() {
   const params = useParams();
   const supabase = createClient();
-  const { user, isManager, loading: authLoading } = useAuth();
+  const { user, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
 
   const [inspection, setInspection] = useState<HgvInspectionDetails | null>(null);
   const [items, setItems] = useState<InspectionItem[]>([]);
@@ -61,7 +61,7 @@ export default function ViewHgvInspectionPage() {
 
       if (inspectionError || !inspectionData) throw inspectionError || new Error('Daily check not found');
 
-      if (!isManager && inspectionData.user_id !== user?.id) {
+      if (!isManager && !isAdmin && !isSuperAdmin && inspectionData.user_id !== user?.id) {
         setError('You do not have permission to view this inspection');
         setLoading(false);
         return;
@@ -97,7 +97,7 @@ export default function ViewHgvInspectionPage() {
     } finally {
       setLoading(false);
     }
-  }, [isManager, supabase, user?.id]);
+  }, [isManager, isAdmin, isSuperAdmin, supabase, user?.id]);
 
   useEffect(() => {
     if (!params.id || authLoading) return;

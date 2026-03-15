@@ -30,7 +30,7 @@ interface InspectionItemWithDay extends InspectionItem {
 export default function ViewInspectionPage() {
   const router = useRouter();
   const params = useParams();
-  const { user, isManager, loading: authLoading } = useAuth();
+  const { user, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const supabase = createClient();
   
   const [inspection, setInspection] = useState<InspectionWithDetails | null>(null);
@@ -62,7 +62,7 @@ export default function ViewInspectionPage() {
       if (inspectionError) throw inspectionError;
       
       // Check if user has access
-      if (!isManager && inspectionData && inspectionData.user_id !== user?.id) {
+      if (!isManager && !isAdmin && !isSuperAdmin && inspectionData && inspectionData.user_id !== user?.id) {
         setError('You do not have permission to view this inspection');
         setLoading(false);
         return;
@@ -96,7 +96,7 @@ export default function ViewInspectionPage() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, isManager, user?.id]);
+  }, [supabase, isManager, isAdmin, isSuperAdmin, user?.id]);
 
   useEffect(() => {
     if (params.id && !authLoading) {
@@ -648,7 +648,7 @@ export default function ViewInspectionPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {isManager && (
+            {(isManager || isAdmin || isSuperAdmin) && (
               <Button 
                 variant="outline" 
                 size="sm"
@@ -660,10 +660,8 @@ export default function ViewInspectionPage() {
                   const vehicleReg = inspection.vans?.reg_number || 'Unknown';
                   
                   if (isStandalone || isMobile) {
-                    // Use in-app PDF viewer for PWA/mobile
                     router.push(`/pdf-viewer?url=${encodeURIComponent(pdfUrl)}&title=${encodeURIComponent(`Inspection-${vehicleReg}`)}&return=${encodeURIComponent(`/van-inspections/${inspection.id}`)}`);
                   } else {
-                    // Desktop: Open in new tab
                     window.open(pdfUrl, '_blank');
                   }
                 }}
