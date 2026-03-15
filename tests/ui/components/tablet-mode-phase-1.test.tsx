@@ -229,4 +229,53 @@ describe('Tablet mode Phase 0/1', () => {
       expect(screen.getByRole('button', { name: 'Try Tablet Mode' })).toBeInTheDocument();
     });
   });
+
+  it('shows an information modal on first enable and stores acknowledgement', async () => {
+    render(
+      <DashboardLayoutClient>
+        <TabletModeToggleActions />
+      </DashboardLayoutClient>
+    );
+
+    await waitFor(() => {
+      expect(localStorage.getItem('tablet_mode:user-default')).toBe('off');
+    });
+
+    fireEvent.click(screen.getByTitle('Enable Tablet Mode'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Information' })).toBeInTheDocument();
+      expect(
+        screen.getByText(/Tablet mode is still under development/i)
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'Information' })).not.toBeInTheDocument();
+      expect(localStorage.getItem('tablet_mode_info_ack:user-default:v1')).toBe('acknowledged');
+    });
+  });
+
+  it('does not show information modal again after acknowledgement', async () => {
+    localStorage.setItem('tablet_mode_info_ack:user-default:v1', 'acknowledged');
+
+    render(
+      <DashboardLayoutClient>
+        <TabletModeToggleActions />
+      </DashboardLayoutClient>
+    );
+
+    await waitFor(() => {
+      expect(localStorage.getItem('tablet_mode:user-default')).toBe('off');
+    });
+
+    fireEvent.click(screen.getByTitle('Enable Tablet Mode'));
+
+    await waitFor(() => {
+      expect(localStorage.getItem('tablet_mode:user-default')).toBe('on');
+      expect(screen.queryByRole('heading', { name: 'Information' })).not.toBeInTheDocument();
+    });
+  });
 });
