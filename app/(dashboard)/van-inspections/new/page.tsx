@@ -26,6 +26,8 @@ import { Employee } from '@/types/common';
 import { toast } from 'sonner';
 import { showErrorWithReport } from '@/lib/utils/error-reporting';
 import { scrollAndHighlightValidationTarget } from '@/lib/utils/validation-scroll';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { triggerShakeAnimation } from '@/lib/utils/animations';
 
 // Dynamic imports for heavy components - loaded only when needed
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -95,6 +97,7 @@ function NewInspectionContent() {
   const searchParams = useSearchParams();
   const draftId = searchParams.get('id'); // Get draft ID from URL if editing
   const { user, isManager } = useAuth();
+  const { tabletModeEnabled } = useTabletMode();
   const supabase = createClient();
   
   const [vehicles, setVehicles] = useState<Array<{ 
@@ -127,6 +130,7 @@ function NewInspectionContent() {
   const [newVehicleReg, setNewVehicleReg] = useState('');
   const [newVehicleCategoryId, setNewVehicleCategoryId] = useState('');
   const [addingVehicle, setAddingVehicle] = useState(false);
+  const addVehicleDialogContentRef = useRef<HTMLDivElement>(null);
   const [existingInspectionId, setExistingInspectionId] = useState<string | null>(null);
   
   // Manager-specific states
@@ -162,6 +166,8 @@ function NewInspectionContent() {
   const [inspectorComments, setInspectorComments] = useState('');
   const [informWorkshop, setInformWorkshop] = useState(false);
   const [, setCreatingWorkshopTask] = useState(false);
+
+  const isAddVehicleFormDirty = Boolean(newVehicleReg.trim() || newVehicleCategoryId);
 
   const fetchVehicles = useCallback(async () => {
     try {
@@ -877,6 +883,15 @@ function NewInspectionContent() {
     }
   };
 
+  const handleAddVehicleDialogOpenChange = (open: boolean) => {
+    if (!open && isAddVehicleFormDirty && !addingVehicle) {
+      triggerShakeAnimation(addVehicleDialogContentRef.current);
+      return;
+    }
+
+    setShowAddVehicleDialog(open);
+  };
+
   const saveInspection = async (status: 'draft' | 'submitted', signatureData?: string) => {
     if (!user || !selectedEmployeeId || !vehicleId) return;
     
@@ -1327,7 +1342,7 @@ function NewInspectionContent() {
   const progressPercent = Math.round((completedItems / totalItems) * 100);
 
   return (
-    <div className="space-y-4 pb-32 md:pb-6 max-w-5xl">
+    <div className={`space-y-4 max-w-5xl ${tabletModeEnabled ? 'pb-36' : 'pb-32 md:pb-6'}`}>
       
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">
@@ -1646,7 +1661,7 @@ function NewInspectionContent() {
                 </div>
 
                 {/* Mobile View - Card-based */}
-                <div className="md:hidden space-y-3">
+          <div className={tabletModeEnabled ? 'space-y-3' : 'md:hidden space-y-3'}>
                   {currentChecklist.map((item, index) => {
                     const itemNumber = index + 1;
                     const dayOfWeek = dayIndex + 1;
@@ -1751,7 +1766,7 @@ function NewInspectionContent() {
           </div>
 
           {/* Desktop View - Table */}
-          <div className="hidden md:block overflow-x-auto">
+          <div className={tabletModeEnabled ? 'hidden' : 'hidden md:block overflow-x-auto'}>
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-border">
@@ -1933,7 +1948,7 @@ function NewInspectionContent() {
           </div>
 
           {/* Desktop Action Buttons */}
-          <div className="hidden md:flex flex-row gap-3 justify-end pt-4">
+          <div className={tabletModeEnabled ? 'hidden' : 'hidden md:flex flex-row gap-3 justify-end pt-4'}>
             <Button
               variant="outline"
               onClick={() => saveInspection('draft')}
@@ -1957,7 +1972,7 @@ function NewInspectionContent() {
       )}
 
       {/* Mobile Sticky Footer */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-border/50 p-4 z-20">
+      <div className={`${tabletModeEnabled ? 'fixed bottom-0 left-0 right-0' : 'md:hidden fixed bottom-0 left-0 right-0'} bg-slate-900/95 backdrop-blur-xl border-t border-border/50 p-4 z-20`}>
         <div className="flex gap-3">
           <Button
             variant="outline"
@@ -1980,8 +1995,23 @@ function NewInspectionContent() {
       </div>
 
       {/* Add Van Dialog */}
-      <Dialog open={showAddVehicleDialog} onOpenChange={setShowAddVehicleDialog}>
-        <DialogContent className="border-border text-white max-w-md">
+      <Dialog open={showAddVehicleDialog} onOpenChange={handleAddVehicleDialogOpenChange}>
+        <DialogContent
+          ref={addVehicleDialogContentRef}
+          className={`border-border text-white max-w-md ${tabletModeEnabled ? 'max-w-lg p-5 sm:p-6' : ''}`}
+          onInteractOutside={(event) => {
+            if (isAddVehicleFormDirty && !addingVehicle) {
+              event.preventDefault();
+              triggerShakeAnimation(addVehicleDialogContentRef.current);
+            }
+          }}
+          onEscapeKeyDown={(event) => {
+            if (isAddVehicleFormDirty && !addingVehicle) {
+              event.preventDefault();
+              triggerShakeAnimation(addVehicleDialogContentRef.current);
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Add New Van</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -2036,7 +2066,7 @@ function NewInspectionContent() {
               disabled={addingVehicle}
               className="border-slate-600 text-white hover:bg-slate-800"
             >
-              Cancel
+              {isAddVehicleFormDirty ? 'Discard Changes' : 'Cancel'}
             </Button>
             <Button
               onClick={handleAddVehicle}

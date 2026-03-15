@@ -24,6 +24,7 @@ import { Employee } from '@/types/common';
 import { toast } from 'sonner';
 import { showErrorWithReport } from '@/lib/utils/error-reporting';
 import { scrollAndHighlightValidationTarget } from '@/lib/utils/validation-scroll';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
 
 // Dynamic imports for heavy components
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -71,6 +72,7 @@ function NewPlantInspectionContent() {
   const searchParams = useSearchParams();
   const draftId = searchParams.get('id');
   const { user, isManager } = useAuth();
+  const { tabletModeEnabled } = useTabletMode();
   const supabase = createClient();
   
   const [plants, setPlants] = useState<Array<{ 
@@ -874,7 +876,7 @@ function NewPlantInspectionContent() {
   const progressPercent = Math.round((completedItems / totalItems) * 100);
 
   return (
-    <div className="space-y-4 pb-32 md:pb-6 max-w-5xl">
+    <div className={`space-y-4 max-w-5xl ${tabletModeEnabled ? 'pb-36' : 'pb-32 md:pb-6'}`}>
       
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">
@@ -1115,7 +1117,7 @@ function NewPlantInspectionContent() {
         <CardContent className="space-y-3 p-4 md:p-6">
 
           {/* Mobile View */}
-          <div className="md:hidden space-y-3">
+          <div className={tabletModeEnabled ? 'space-y-3' : 'md:hidden space-y-3'}>
             {currentChecklist.map((item, index) => {
               const itemNumber = index + 1;
               const key = `${itemNumber}`;
@@ -1204,7 +1206,7 @@ function NewPlantInspectionContent() {
           </div>
 
           {/* Desktop View */}
-          <div className="hidden md:block overflow-x-auto">
+          <div className={tabletModeEnabled ? 'hidden' : 'hidden md:block overflow-x-auto'}>
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-border">
@@ -1349,7 +1351,7 @@ function NewPlantInspectionContent() {
           </div>
 
           {/* Desktop Action Buttons */}
-          <div className="hidden md:flex flex-row gap-3 justify-end pt-4">
+          <div className={tabletModeEnabled ? 'hidden' : 'hidden md:flex flex-row gap-3 justify-end pt-4'}>
             <Button
               onClick={handleSubmit}
               disabled={loading || (!selectedPlantId && !isHiredPlant)}
@@ -1364,7 +1366,7 @@ function NewPlantInspectionContent() {
       )}
 
       {/* Mobile Sticky Footer */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-border/50 p-4 z-20">
+      <div className={`${tabletModeEnabled ? 'fixed bottom-0 left-0 right-0' : 'md:hidden fixed bottom-0 left-0 right-0'} bg-slate-900/95 backdrop-blur-xl border-t border-border/50 p-4 z-20`}>
         <Button
           onClick={handleSubmit}
           disabled={loading || (!selectedPlantId && !isHiredPlant)}

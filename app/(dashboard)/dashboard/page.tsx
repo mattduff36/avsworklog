@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { TabletModeToggleActions } from '@/components/layout/TabletModeToggleActions';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
@@ -67,6 +69,7 @@ function isExpectedNetworkError(error: unknown): boolean {
 
 export default function DashboardPage() {
   const { profile, isManager, isAdmin, isActualSuperAdmin, isViewingAs, effectiveRole } = useAuth();
+  const { tabletModeEnabled } = useTabletMode();
   const formTypes = getEnabledForms();
   const supabase = createClient();
 
@@ -509,7 +512,7 @@ export default function DashboardPage() {
     <div className="space-y-8 max-w-6xl">
       
       {/* Welcome Section */}
-      <div className="bg-slate-900 rounded-lg p-6 border border-slate-700 relative overflow-hidden">
+      <div className="bg-slate-900 rounded-lg p-4 md:p-5 border border-slate-700 relative overflow-hidden">
         {/* Intro Animation Overlay (All Devices) */}
         <div 
           className={`flex absolute inset-0 bg-slate-900 items-center justify-center z-10 transition-opacity duration-700 ${
@@ -531,12 +534,19 @@ export default function DashboardPage() {
         </div>
         
         {/* Actual Content */}
-        <h1 className="text-3xl font-bold text-white">
-          Welcome back, {profile?.full_name}
-        </h1>
-        <p className="text-slate-400 mt-1">
-          {isSuperAdmin ? 'SuperAdmin' : (profile?.role?.display_name || 'No Role Assigned')}
-        </p>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white">
+              Welcome back, {profile?.full_name}
+            </h1>
+            <p className="text-slate-400 mt-1">
+              {isSuperAdmin ? 'SuperAdmin' : (profile?.role?.display_name || 'No Role Assigned')}
+            </p>
+          </div>
+          <div className="flex items-center justify-end">
+            <TabletModeToggleActions size="dashboard" />
+          </div>
+        </div>
       </div>
 
       {/* Quick Actions - Square Button Grid */}
@@ -595,13 +605,13 @@ export default function DashboardPage() {
                         {pendingRAMSCount}
                       </div>
                     )}
-                    <Icon className="h-8 w-8" />
-                    <span className="font-semibold text-2xl leading-tight">
+                    <Icon className={tabletModeEnabled ? 'h-12 w-12' : 'h-8 w-8'} />
+                    <span className={`font-semibold leading-tight ${tabletModeEnabled ? 'text-base' : 'text-2xl'}`}>
                       {formType.title}
                     </span>
                     {formType.subtitle && (
                       <span
-                        className={`pointer-events-none absolute bottom-2 left-2 right-2 truncate text-base leading-tight opacity-90 max-[350px]:hidden ${textColorClass}`}
+                        className={`pointer-events-none absolute bottom-2 left-2 right-2 truncate leading-tight opacity-90 max-[350px]:hidden ${tabletModeEnabled ? 'text-xs' : 'text-base'} ${textColorClass}`}
                         aria-hidden
                       >
                         {formType.subtitle}

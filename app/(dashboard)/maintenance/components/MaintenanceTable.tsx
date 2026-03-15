@@ -44,6 +44,8 @@ import { EditMaintenanceDialog } from './EditMaintenanceDialog';
 import { useDeletedVehicles, usePermanentlyDeleteArchivedVehicle, useRestoreArchivedVehicle } from '@/lib/hooks/useMaintenance';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { cn } from '@/lib/utils/cn';
 
 type RetiredHgv = {
   id: string;
@@ -102,6 +104,7 @@ export function MaintenanceTable({
   const assetLabelPluralLower = `${assetLabelLower}s`;
   const router = useRouter();
   const { isAdmin, isManager } = useAuth();
+  const { tabletModeEnabled } = useTabletMode();
   const [sortField, setSortField] = useState<SortField>('reg_number');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -299,11 +302,11 @@ export function MaintenanceTable({
           
           {/* Internal Tabs for Active vs Retired Vans */}
           <Tabs defaultValue="active" className="w-full">
-            <TabsList className="bg-slate-800 border-border">
-              <TabsTrigger value="active">
+            <TabsList className={cn('bg-slate-800 border-border', tabletModeEnabled && 'h-auto flex-wrap gap-2 p-1.5')}>
+              <TabsTrigger value="active" className={tabletModeEnabled ? 'min-h-11 text-base px-4' : undefined}>
                 Active {assetLabelPlural} ({vehicles.length})
               </TabsTrigger>
-              <TabsTrigger value="deleted" className="flex items-center gap-2">
+              <TabsTrigger value="deleted" className={cn('flex items-center gap-2', tabletModeEnabled && 'min-h-11 text-base px-4')}>
                 <FolderClock className="h-4 w-4" />
                 Retired {assetLabelPlural} ({effectiveRetiredCount})
               </TabsTrigger>
@@ -312,21 +315,21 @@ export function MaintenanceTable({
             {/* Active Vans Tab */}
             <TabsContent value="active" className="space-y-4 mt-4">
               {/* Search Bar and Column Filter */}
-              <div className="flex gap-2">
+              <div className={cn('flex gap-2', tabletModeEnabled && 'flex-wrap')}>
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Search className={cn('absolute left-3 text-muted-foreground', tabletModeEnabled ? 'top-3.5 h-5 w-5' : 'top-3 h-4 w-4')} />
               <Input
                 placeholder="Search by registration number..."
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
-                className="pl-11 bg-slate-900/50 border-slate-600 text-white"
+                className={cn('bg-slate-900/50 border-slate-600 text-white', tabletModeEnabled ? 'pl-12 min-h-11 text-base' : 'pl-11')}
               />
             </div>
             
             {/* Column Visibility Dropdown - Hidden on Mobile */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="border-slate-600 hidden md:flex">
+                <Button variant="outline" className={cn('border-slate-600 hidden md:flex', tabletModeEnabled && 'min-h-11 text-base px-4')}>
                   <Settings2 className="h-4 w-4 mr-2" />
                   Show columns
                 </Button>
@@ -410,7 +413,7 @@ export function MaintenanceTable({
               {searchQuery ? `No ${assetLabelPluralLower} found matching your search.` : `No ${assetLabelPluralLower} with maintenance records yet.`}
             </div>
           ) : (
-            <div className="hidden md:block border border-slate-700 rounded-lg">
+            <div className={cn('border border-slate-700 rounded-lg', tabletModeEnabled ? 'hidden' : 'hidden md:block')}>
                 <Table className="min-w-full">
                   <TableHeader>
                     <TableRow className="border-border">
@@ -658,7 +661,7 @@ export function MaintenanceTable({
 
           {/* Mobile Card View */}
           {vehicles.length > 0 && (
-            <div className="md:hidden space-y-3">
+            <div className={cn('space-y-3', tabletModeEnabled ? 'block' : 'md:hidden')}>
               {sortedVehicles.map((vehicle) => {
                 const cardVehicleId = vehicle.hgv_id ?? vehicle.van_id ?? vehicle.id;
                 const isExpanded = expandedCardId === cardVehicleId;
@@ -828,7 +831,7 @@ export function MaintenanceTable({
                                   }
                                 }
                               }}
-                              className="h-10 w-10 p-0"
+                              className={tabletModeEnabled ? 'h-11 w-11 p-0' : 'h-10 w-10 p-0'}
                             >
                               <History className="h-5 w-5" />
                             </Button>
@@ -840,7 +843,7 @@ export function MaintenanceTable({
                                 setSelectedVehicle(vehicle);
                                 setEditDialogOpen(true);
                               }}
-                              className="h-10 w-10 p-0"
+                              className={tabletModeEnabled ? 'h-11 w-11 p-0' : 'h-10 w-10 p-0'}
                             >
                               <Edit className="h-5 w-5" />
                             </Button>
@@ -852,7 +855,7 @@ export function MaintenanceTable({
                                 setSelectedVehicle(vehicle);
                                 setDeleteDialogOpen(true);
                               }}
-                              className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 ml-auto h-10 w-10 p-0"
+                              className={cn('text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 ml-auto p-0', tabletModeEnabled ? 'h-11 w-11' : 'h-10 w-10')}
                             >
                               <Archive className="h-5 w-5" />
                             </Button>
@@ -894,7 +897,7 @@ export function MaintenanceTable({
                   </div>
                 ) : (
                   <>
-                    <div className="hidden md:block border border-slate-700 rounded-lg">
+                    <div className={cn('border border-slate-700 rounded-lg', tabletModeEnabled ? 'hidden' : 'hidden md:block')}>
                       <Table className="min-w-full">
                         <TableHeader>
                           <TableRow className="border-border">
@@ -920,7 +923,7 @@ export function MaintenanceTable({
                         </TableBody>
                       </Table>
                     </div>
-                    <div className="md:hidden space-y-3">
+                    <div className={cn('space-y-3', tabletModeEnabled ? 'block' : 'md:hidden')}>
                       {retiredHgvs
                         .filter(h => (h.reg_number || '').toLowerCase().includes(retiredSearchQuery.toLowerCase()))
                         .map((hgv) => (
@@ -957,7 +960,7 @@ export function MaintenanceTable({
                   </div>
                 ) : (
                   <>
-                    <div className="hidden md:block border border-slate-700 rounded-lg">
+                    <div className={cn('border border-slate-700 rounded-lg', tabletModeEnabled ? 'hidden' : 'hidden md:block')}>
                       <Table className="min-w-full">
                         <TableHeader>
                           <TableRow className="border-border">
@@ -1043,7 +1046,7 @@ export function MaintenanceTable({
                         </TableBody>
                       </Table>
                     </div>
-                    <div className="md:hidden space-y-3">
+                    <div className={cn('space-y-3', tabletModeEnabled ? 'block' : 'md:hidden')}>
                       {retiredData.vehicles
                         .filter(vehicle => vehicle.reg_number.toLowerCase().includes(retiredSearchQuery.toLowerCase()))
                         .map((vehicle) => (

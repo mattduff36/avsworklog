@@ -16,6 +16,7 @@ import { WorkshopTasksOverviewTab } from './components/WorkshopTasksOverviewTab'
 import { WorkshopTaskStatusDialogs } from './components/WorkshopTaskStatusDialogs';
 import { WorkshopTaskFormDialogs } from './components/WorkshopTaskFormDialogs';
 import { WorkshopTaskAdminDialogs } from './components/WorkshopTaskAdminDialogs';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { useWorkshopTasksFetchers } from './hooks/useWorkshopTasksFetchers';
 import { useWorkshopTaskLifecycleActions } from './hooks/useWorkshopTaskLifecycleActions';
 import { useWorkshopTaskCrudActions } from './hooks/useWorkshopTaskCrudActions';
@@ -34,6 +35,7 @@ export default function WorkshopTasksPage() {
   const searchParams = useSearchParams();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('workshop-tasks');
   const { user, profile, isManager, isAdmin } = useAuth();
+  const { tabletModeEnabled } = useTabletMode();
   const showSettings = isAdmin || isManager;
   const supabase = createClient();
   const { templates: attachmentTemplates } = useAttachmentTemplates();
@@ -182,18 +184,18 @@ export default function WorkshopTasksPage() {
 
   return (
     <div className="space-y-6 max-w-6xl">
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
+      <div className={`bg-white dark:bg-slate-900 rounded-lg border border-border ${tabletModeEnabled ? 'p-5 md:p-6' : 'p-6'}`}>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Workshop Tasks</h1>
             <p className="text-muted-foreground">Track van, HGV, and plant repairs and workshop work</p>
           </div>
-          <Button onClick={() => setShowAddModal(true)} className="bg-workshop hover:bg-workshop-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"><Plus className="h-4 w-4 mr-2" />New Task</Button>
+          <Button onClick={() => setShowAddModal(true)} className={`bg-workshop hover:bg-workshop-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg ${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''}`}><Plus className="h-4 w-4 mr-2" />New Task</Button>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => handlePageTabChange(v as 'overview' | 'settings')}>
-        {showSettings && <TabsList><TabsTrigger value="overview" className="gap-2"><Wrench className="h-4 w-4" />Overview</TabsTrigger><TabsTrigger value="settings" className="gap-2"><Settings className="h-4 w-4" />Settings</TabsTrigger></TabsList>}
+        {showSettings && <TabsList className={tabletModeEnabled ? 'h-auto flex-wrap gap-2 p-1.5' : undefined}><TabsTrigger value="overview" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}><Wrench className="h-4 w-4" />Overview</TabsTrigger><TabsTrigger value="settings" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}><Settings className="h-4 w-4" />Settings</TabsTrigger></TabsList>}
         <WorkshopTasksOverviewTab assetTab={assetTab} onAssetTabChange={(newTab) => handleAssetTabChange(newTab as 'all' | 'van' | 'plant' | 'hgv')} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter} vehicleFilter={vehicleFilter} onVehicleFilterChange={setVehicleFilter} vehicles={vehicles} loading={loading} tabFilteredTasks={tabFilteredTasks} pendingTasks={pendingTasks} highPriorityPendingCount={highPriorityPendingTasks.length} inProgressTasks={inProgressTasks} onHoldTasks={onHoldTasks} completedTasks={completedTasks} showPending={showPending} onShowPendingChange={setShowPending} showInProgress={showInProgress} onShowInProgressChange={setShowInProgress} showOnHold={showOnHold} onShowOnHoldChange={setShowOnHold} showCompleted={showCompleted} onShowCompletedChange={setShowCompleted} updatingStatus={updatingStatus} taskAttachmentCounts={taskAttachmentCounts} getStatusIcon={getStatusIcon} getVehicleReg={getVehicleReg} getSourceLabel={getSourceLabel} getAssetDisplay={getAssetDisplay} onCreateTask={() => setShowAddModal(true)} onOpenTaskModal={(task) => { setModalTask(task); setShowTaskModal(true); }} onOpenComments={(task) => { setCommentsTask(task); setShowCommentsDrawer(true); }} onMarkInProgress={(task) => { setSelectedTask(task); setLoggedComment(''); setShowStatusModal(true); }} onMarkComplete={(task) => { setCompletingTask(task); setShowCompleteModal(true); }} onMarkOnHold={(task) => { setOnHoldingTask(task); setOnHoldComment(''); setShowOnHoldModal(true); }} onResumeTask={(task) => { setResumingTask(task); setResumeComment(''); setShowResumeModal(true); }} onUndoLogged={lifecycle.handleUndoLogged} onUndoComplete={lifecycle.handleUndoComplete} onEditTask={crud.handleEditTask} onDeleteTask={crud.handleDeleteTask} />
         {showSettings && <TabsContent value="settings" className="space-y-6 mt-0"><Card className="border-border"><CardHeader><CardTitle className="text-white">Category Taxonomy</CardTitle><CardDescription className="text-muted-foreground">Manage categories for vans, HGVs, or plant machinery</CardDescription></CardHeader><CardContent><Tabs value={categoryTaxonomyMode} onValueChange={(v) => setCategoryTaxonomyMode(v as 'van' | 'plant' | 'hgv')}><TabsList className="grid w-full grid-cols-3"><TabsTrigger value="van">Van Categories</TabsTrigger><TabsTrigger value="plant">Plant Categories</TabsTrigger><TabsTrigger value="hgv">HGV Categories</TabsTrigger></TabsList></Tabs></CardContent></Card><CategoryManagementPanel categories={categoryTaxonomyMode === 'plant' ? plantCategories : categoryTaxonomyMode === 'hgv' ? hgvCategories : categories} subcategories={categoryTaxonomyMode === 'plant' ? plantSubcategories : categoryTaxonomyMode === 'hgv' ? hgvSubcategories : subcategories} onAddCategory={crud.openAddCategoryModal} onEditCategory={crud.openEditCategoryModal} onDeleteCategory={crud.handleDeleteCategory} onAddSubcategory={crud.openAddSubcategoryModal} onEditSubcategory={crud.openEditSubcategoryModal} onDeleteSubcategory={crud.handleDeleteSubcategory} /><AttachmentManagementPanel taxonomyMode={categoryTaxonomyMode} /></TabsContent>}
       </Tabs>

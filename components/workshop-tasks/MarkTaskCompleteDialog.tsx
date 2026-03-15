@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { CheckCircle2, Info } from 'lucide-react';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { triggerShakeAnimation } from '@/lib/utils/animations';
 import type { CompletionUpdateConfig, CompletionFieldValues } from '@/types/workshop-completion';
 
 export interface TaskForCompletion {
@@ -54,6 +56,8 @@ export function MarkTaskCompleteDialog({
   onConfirm,
   isSubmitting = false,
 }: MarkTaskCompleteDialogProps) {
+  const { tabletModeEnabled } = useTabletMode();
+  const contentRef = useRef<HTMLDivElement>(null);
   const [intermediateComment, setIntermediateComment] = useState('');
   const [completedComment, setCompletedComment] = useState('');
   const [completedSignatureData, setCompletedSignatureData] = useState<string | null>(null);
@@ -156,12 +160,44 @@ export function MarkTaskCompleteDialog({
     completedComment.length <= 500 &&
     (!requiresCompletionSignature || Boolean(completedSignatureData)) &&
     validateMaintenanceFields();
+  const isDirty = useMemo(
+    () =>
+      intermediateComment.trim().length > 0 ||
+      completedComment.trim().length > 0 ||
+      Boolean(completedSignatureData) ||
+      Object.values(maintenanceFields).some((value) => value !== undefined && value !== null && `${value}`.trim() !== ''),
+    [intermediateComment, completedComment, completedSignatureData, maintenanceFields]
+  );
 
   if (!task) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && !isSubmitting && isDirty) {
+          triggerShakeAnimation(contentRef.current);
+          return;
+        }
+        onOpenChange(nextOpen);
+      }}
+    >
+      <DialogContent
+        ref={contentRef}
+        className={`max-w-lg max-h-[90vh] overflow-y-auto ${tabletModeEnabled ? 'p-5 sm:p-6' : ''}`}
+        onInteractOutside={(event) => {
+          if (!isSubmitting && isDirty) {
+            event.preventDefault();
+            triggerShakeAnimation(contentRef.current);
+          }
+        }}
+        onEscapeKeyDown={(event) => {
+          if (!isSubmitting && isDirty) {
+            event.preventDefault();
+            triggerShakeAnimation(contentRef.current);
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="text-xl">
             Mark Task Complete
@@ -214,7 +250,7 @@ export function MarkTaskCompleteDialog({
                     ? 'e.g., Parts have arrived, resuming work'
                     : 'e.g., Started work on this task'
                 }
-                className="min-h-[80px]"
+                className={`min-h-[80px] ${tabletModeEnabled ? 'text-base' : ''}`}
                 maxLength={300}
                 rows={3}
               />
@@ -240,7 +276,7 @@ export function MarkTaskCompleteDialog({
                 }
               }}
               placeholder="e.g., Replaced brake pads and discs on front axle. Tested and working correctly."
-              className="min-h-[100px]"
+              className={`min-h-[100px] ${tabletModeEnabled ? 'text-base' : ''}`}
               maxLength={500}
               rows={4}
             />
@@ -362,18 +398,19 @@ export function MarkTaskCompleteDialog({
           )}
         </div>
 
-        <DialogFooter>
+          <DialogFooter className={tabletModeEnabled ? 'gap-3 pt-2' : undefined}>
           <Button
             variant="outline"
             onClick={handleCancel}
             disabled={isSubmitting}
+            className={tabletModeEnabled ? 'min-h-11 text-base px-4' : undefined}
           >
-            Cancel
+            {isDirty ? 'Discard Changes' : 'Cancel'}
           </Button>
           <Button
             onClick={handleConfirm}
             disabled={!isValid || isSubmitting}
-            className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
           >
             <CheckCircle2 className="h-4 w-4 mr-2" />
             {isSubmitting ? 'Completing...' : 'Mark Complete'}

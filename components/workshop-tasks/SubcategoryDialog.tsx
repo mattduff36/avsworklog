@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -15,6 +15,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { triggerShakeAnimation } from '@/lib/utils/animations';
 
 interface Subcategory {
   id: string;
@@ -44,9 +46,16 @@ export function SubcategoryDialog({
   subcategory,
   onSuccess,
 }: SubcategoryDialogProps) {
+  const { tabletModeEnabled } = useTabletMode();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const isDirty = useMemo(() => {
+    const initialName = mode === 'edit' && subcategory ? subcategory.name : '';
+    return name.trim() !== initialName.trim();
+  }, [mode, subcategory, name]);
 
   // Reset form when dialog opens/closes or subcategory changes
   useEffect(() => {
@@ -114,8 +123,32 @@ export function SubcategoryDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && !loading && isDirty) {
+          triggerShakeAnimation(contentRef.current);
+          return;
+        }
+        onOpenChange(nextOpen);
+      }}
+    >
+      <DialogContent
+        ref={contentRef}
+        className={`sm:max-w-[500px] ${tabletModeEnabled ? 'p-5 sm:p-6' : ''}`}
+        onInteractOutside={(event) => {
+          if (!loading && isDirty) {
+            event.preventDefault();
+            triggerShakeAnimation(contentRef.current);
+          }
+        }}
+        onEscapeKeyDown={(event) => {
+          if (!loading && isDirty) {
+            event.preventDefault();
+            triggerShakeAnimation(contentRef.current);
+          }
+        }}
+      >
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>
@@ -138,6 +171,7 @@ export function SubcategoryDialog({
                 placeholder="e.g., Engine, Brakes, Body Work"
                 required
                 disabled={loading}
+                className={tabletModeEnabled ? 'min-h-11 text-base' : undefined}
               />
               <p className="text-xs text-muted-foreground">
                 Subcategories are automatically organized alphabetically
@@ -145,19 +179,20 @@ export function SubcategoryDialog({
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className={tabletModeEnabled ? 'gap-3 pt-2' : undefined}>
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={loading}
+              className={tabletModeEnabled ? 'min-h-11 text-base px-4' : undefined}
             >
-              Cancel
+              {isDirty ? 'Discard Changes' : 'Cancel'}
             </Button>
             <Button
               type="submit"
               disabled={loading}
-              className="bg-workshop hover:bg-workshop-dark"
+              className={`bg-workshop hover:bg-workshop-dark ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {mode === 'create' ? 'Create Subcategory' : 'Save Changes'}

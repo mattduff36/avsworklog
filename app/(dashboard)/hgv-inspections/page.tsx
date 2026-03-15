@@ -16,6 +16,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { formatDate } from '@/lib/utils/date';
 import type { Employee } from '@/types/common';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
 
 interface HgvInspectionWithRelations {
   id: string;
@@ -41,6 +42,7 @@ function HgvInspectionsContent() {
   const pageSize = isElevatedUser ? 20 : 10;
   usePermissionCheck('hgv-inspections');
   const router = useRouter();
+  const { tabletModeEnabled } = useTabletMode();
   const supabase = createClient();
 
   const [inspections, setInspections] = useState<HgvInspectionWithRelations[]>([]);
@@ -171,14 +173,14 @@ function HgvInspectionsContent() {
 
   return (
     <div className="space-y-6 max-w-6xl">
-      <div className="bg-slate-900 rounded-lg p-6 border border-border">
+      <div className={`bg-slate-900 rounded-lg border border-border ${tabletModeEnabled ? 'p-5 md:p-6' : 'p-6'}`}>
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">HGV Daily Checks</h1>
             <p className="text-muted-foreground">Daily 25-point HGV safety checks</p>
           </div>
           <Link href="/hgv-inspections/new">
-            <Button className="bg-inspection hover:bg-inspection/90 text-white">
+            <Button className={`bg-inspection hover:bg-inspection/90 text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''}`}>
               <Plus className="h-4 w-4 mr-2" />
               New Daily Check
             </Button>
@@ -186,13 +188,13 @@ function HgvInspectionsContent() {
         </div>
 
         {isElevatedUser && employees.length > 0 && (
-          <div className="pt-4 border-t border-border flex items-center gap-3 max-w-md">
+          <div className={`pt-4 border-t border-border flex items-center gap-3 ${tabletModeEnabled ? 'max-w-none flex-wrap' : 'max-w-md'}`}>
             <Label className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
               <User className="h-4 w-4" />
               View daily checks for:
             </Label>
             <Select value={selectedEmployeeId || 'all'} onValueChange={setSelectedEmployeeId}>
-              <SelectTrigger className="h-10 border-border text-white">
+              <SelectTrigger className={`${tabletModeEnabled ? 'min-h-11 text-base' : 'h-10'} border-border text-white`}>
                 <SelectValue placeholder="All employees" />
               </SelectTrigger>
               <SelectContent>
@@ -212,11 +214,11 @@ function HgvInspectionsContent() {
       {isElevatedUser && (
         <Card>
           <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
+            <div className={`flex items-center gap-3 ${tabletModeEnabled ? 'flex-wrap' : ''}`}>
               <Filter className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm text-slate-400">Filter by HGV:</span>
               <Select value={hgvFilter || 'all'} onValueChange={setHgvFilter}>
-                <SelectTrigger className="w-[320px] h-9">
+                <SelectTrigger className={`${tabletModeEnabled ? 'min-h-11 text-base w-full md:w-[360px]' : 'w-[320px] h-9'}`}>
                   <SelectValue placeholder="All HGVs" />
                 </SelectTrigger>
                 <SelectContent>
@@ -248,7 +250,7 @@ function HgvInspectionsContent() {
             <h3 className="text-lg font-semibold text-white mb-2">No HGV daily checks yet</h3>
             <p className="text-slate-400 mb-4">Create your first HGV daily check</p>
             <Link href="/hgv-inspections/new">
-              <Button className="bg-inspection hover:bg-inspection/90 text-white">
+              <Button className={`bg-inspection hover:bg-inspection/90 text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''}`}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Daily Check
               </Button>
@@ -287,7 +289,7 @@ function HgvInspectionsContent() {
                         size="sm"
                         onClick={(e) => handleDelete(e, inspection.id)}
                         disabled={deleting === inspection.id}
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                        className={`${tabletModeEnabled ? 'h-11 w-11 p-0' : 'h-8 w-8 p-0'} text-red-600 hover:text-red-700`}
                         title="Delete inspection"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -306,7 +308,7 @@ function HgvInspectionsContent() {
                     disabled={downloading === inspection.id}
                     variant="outline"
                     size="sm"
-                    className="bg-slate-900 border-inspection text-inspection hover:bg-inspection hover:text-white"
+                    className={`bg-slate-900 border-inspection text-inspection hover:bg-inspection hover:text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
                   >
                     <Download className="h-4 w-4 mr-2" />
                     {downloading === inspection.id ? 'Downloading...' : 'Download PDF'}
@@ -321,7 +323,7 @@ function HgvInspectionsContent() {
               <Button
                 onClick={() => setDisplayCount((prev) => prev + pageSize)}
                 variant="outline"
-                className="w-full max-w-xs border-border text-white hover:bg-slate-800"
+                className={`w-full max-w-xs border-border text-white hover:bg-slate-800 ${tabletModeEnabled ? 'min-h-11 text-base' : ''}`}
               >
                 Show More ({inspections.length - displayCount} remaining)
               </Button>

@@ -1,7 +1,10 @@
+import { useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { triggerShakeAnimation } from '@/lib/utils/animations';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import type { Action, Category } from '../types';
 
 interface WorkshopTaskAdminDialogsProps {
@@ -41,11 +44,42 @@ export function WorkshopTaskAdminDialogs({
   onConfirmDeleteTask,
   onResetDeleteTask,
 }: WorkshopTaskAdminDialogsProps) {
+  const { tabletModeEnabled } = useTabletMode();
+  const categoryDialogRef = useRef<HTMLDivElement>(null);
+  const isCategoryDirty = useMemo(() => {
+    const initialName = editingCategory?.name ?? '';
+    return categoryName.trim() !== initialName.trim();
+  }, [categoryName, editingCategory]);
+
   return (
     <>
       {showSettings && (
-        <Dialog open={showCategoryModal} onOpenChange={onShowCategoryModalChange}>
-          <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
+        <Dialog
+          open={showCategoryModal}
+          onOpenChange={(open) => {
+            if (!open && isCategoryDirty) {
+              triggerShakeAnimation(categoryDialogRef.current);
+              return;
+            }
+            onShowCategoryModalChange(open);
+          }}
+        >
+          <DialogContent
+            ref={categoryDialogRef}
+            className={`bg-white dark:bg-slate-900 border-border text-foreground max-w-lg ${tabletModeEnabled ? 'p-5 sm:p-6' : ''}`}
+            onInteractOutside={(event) => {
+              if (isCategoryDirty) {
+                event.preventDefault();
+                triggerShakeAnimation(categoryDialogRef.current);
+              }
+            }}
+            onEscapeKeyDown={(event) => {
+              if (isCategoryDirty) {
+                event.preventDefault();
+                triggerShakeAnimation(categoryDialogRef.current);
+              }
+            }}
+          >
             <DialogHeader>
               <DialogTitle className="text-foreground text-xl">
                 {editingCategory ? 'Edit Category' : 'Add Category'}
@@ -65,7 +99,7 @@ export function WorkshopTaskAdminDialogs({
                   value={categoryName}
                   onChange={(e) => onCategoryNameChange(e.target.value)}
                   placeholder="e.g., Brakes, Engine, Electrical"
-                  className="bg-white dark:bg-slate-800 border-border text-foreground"
+                  className={`bg-white dark:bg-slate-800 border-border text-foreground ${tabletModeEnabled ? 'min-h-11 text-base' : ''}`}
                   maxLength={50}
                 />
                 <p className="text-xs text-muted-foreground">
@@ -74,18 +108,18 @@ export function WorkshopTaskAdminDialogs({
               </div>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className={tabletModeEnabled ? 'gap-3 pt-2' : undefined}>
               <Button
                 variant="outline"
                 onClick={onResetCategoryForm}
-                className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                className={`border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
               >
-                Cancel
+                {isCategoryDirty ? 'Discard Changes' : 'Cancel'}
               </Button>
               <Button
                 onClick={onSaveCategory}
                 disabled={submittingCategory || !categoryName.trim()}
-                className="bg-workshop hover:bg-workshop-dark text-white"
+                className={`bg-workshop hover:bg-workshop-dark text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
               >
                 {submittingCategory ? 'Saving...' : (editingCategory ? 'Update' : 'Create')}
               </Button>
@@ -95,7 +129,7 @@ export function WorkshopTaskAdminDialogs({
       )}
 
       <Dialog open={showDeleteConfirm} onOpenChange={onShowDeleteConfirmChange}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-md">
+        <DialogContent className={`bg-white dark:bg-slate-900 border-border text-foreground max-w-md ${tabletModeEnabled ? 'p-5 sm:p-6' : ''}`}>
           <DialogHeader>
             <DialogTitle className="text-foreground text-xl">Delete Workshop Task</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -116,19 +150,19 @@ export function WorkshopTaskAdminDialogs({
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className={tabletModeEnabled ? 'gap-3 pt-2' : undefined}>
             <Button
               variant="outline"
               onClick={onResetDeleteTask}
               disabled={deleting}
-              className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+              className={`border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
             >
               Cancel
             </Button>
             <Button
               onClick={onConfirmDeleteTask}
               disabled={deleting}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className={`bg-red-600 hover:bg-red-700 text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
             >
               {deleting ? 'Deleting...' : 'Delete Task'}
             </Button>

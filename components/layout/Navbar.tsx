@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { NotificationPanel } from '@/components/messages/NotificationPanel';
+import { TabletModeToggleActions } from '@/components/layout/TabletModeToggleActions';
 import { SidebarNav } from './SidebarNav';
 import { createClient } from '@/lib/supabase/client';
 import type { ModuleName } from '@/types/roles';
@@ -505,6 +506,11 @@ export function Navbar() {
 
             {/* Right side */}
             <div className="flex items-center space-x-2 ml-auto">
+              {/* Tablet Mode toggle (desktop only) */}
+              <div className="hidden md:block">
+                <TabletModeToggleActions />
+              </div>
+
               {/* Help link (desktop only) */}
               <Link
                 href="/help"

@@ -18,6 +18,7 @@ import { formatDate } from '@/lib/utils/date';
 import { WorkshopTaskTimeline } from '@/components/workshop-tasks/WorkshopTaskTimeline';
 import { TaskAttachmentsSection } from '@/components/workshop-tasks/TaskAttachmentsSection';
 import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import type { Database } from '@/types/database';
 
 type Task = Database['public']['Tables']['actions']['Row'] & {
@@ -64,6 +65,7 @@ export function WorkshopTaskModal({
   onResume,
   isUpdating,
 }: WorkshopTaskModalProps) {
+  const { tabletModeEnabled } = useTabletMode();
   const { comments: taskComments, loading } = useWorkshopTaskComments({
     taskIds: task ? [task.id] : [],
     enabled: open && !!task,
@@ -154,7 +156,7 @@ export function WorkshopTaskModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto border-border">
+      <DialogContent className={`max-w-3xl max-h-[90vh] overflow-y-auto border-border ${tabletModeEnabled ? 'p-5 sm:p-6' : ''}`}>
         <DialogHeader>
           <div className="space-y-4">
             {/* Header with asset */}
@@ -192,14 +194,14 @@ export function WorkshopTaskModal({
             )}
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap gap-2">
+            <div className={`flex flex-wrap ${tabletModeEnabled ? 'gap-3' : 'gap-2'}`}>
               {task.status === 'pending' && (
                 <>
                   <Button
                     onClick={() => onMarkInProgress(task)}
                     disabled={isUpdating}
                     size="sm"
-                    className="bg-blue-600/80 hover:bg-blue-600 text-white border-0"
+                    className={`bg-blue-600/80 hover:bg-blue-600 text-white border-0 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
                   >
                     <Clock className="h-4 w-4 mr-2" />
                     Mark In Progress
@@ -208,7 +210,7 @@ export function WorkshopTaskModal({
                     onClick={() => onMarkOnHold(task)}
                     disabled={isUpdating}
                     size="sm"
-                    className="bg-purple-600/80 hover:bg-purple-600 text-white border-0"
+                    className={`bg-purple-600/80 hover:bg-purple-600 text-white border-0 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
                   >
                     <Pause className="h-4 w-4 mr-2" />
                     Put On Hold
@@ -217,7 +219,7 @@ export function WorkshopTaskModal({
                     onClick={() => onMarkComplete(task)}
                     disabled={isUpdating}
                     size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-white border-0"
+                    className={`bg-green-600 hover:bg-green-700 text-white border-0 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
                   >
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     Mark Complete
@@ -231,7 +233,7 @@ export function WorkshopTaskModal({
                       onClick={() => onMarkOnHold(task)}
                       disabled={isUpdating}
                       size="sm"
-                      className="bg-purple-600/80 hover:bg-purple-600 text-white border-0"
+                      className={`bg-purple-600/80 hover:bg-purple-600 text-white border-0 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
                     >
                       <Pause className="h-4 w-4 mr-2" />
                       Put On Hold
@@ -242,7 +244,7 @@ export function WorkshopTaskModal({
                       onClick={() => onResume(task)}
                       disabled={isUpdating}
                       size="sm"
-                      className="bg-blue-600/80 hover:bg-blue-600 text-white border-0"
+                      className={`bg-blue-600/80 hover:bg-blue-600 text-white border-0 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
                     >
                       <Clock className="h-4 w-4 mr-2" />
                       Resume
@@ -252,7 +254,7 @@ export function WorkshopTaskModal({
                     onClick={() => onMarkComplete(task)}
                     disabled={isUpdating}
                     size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-white border-0"
+                    className={`bg-green-600 hover:bg-green-700 text-white border-0 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
                   >
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     Mark Complete
@@ -266,7 +268,7 @@ export function WorkshopTaskModal({
                     disabled={isUpdating}
                     size="sm"
                     variant="ghost"
-                    className="text-muted-foreground hover:text-foreground hover:bg-accent"
+                    className={`text-muted-foreground hover:text-foreground hover:bg-accent ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Edit
@@ -276,7 +278,7 @@ export function WorkshopTaskModal({
                     disabled={isUpdating}
                     size="sm"
                     variant="ghost"
-                    className="text-red-400 hover:text-red-300 hover:bg-accent"
+                    className={`text-red-400 hover:text-red-300 hover:bg-accent ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete

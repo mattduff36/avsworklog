@@ -12,6 +12,7 @@ import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useMaintenance } from '@/lib/hooks/useMaintenance';
 import { MaintenanceSettings } from '@/app/(dashboard)/maintenance/components/MaintenanceSettings';
 import { createClient } from '@/lib/supabase/client';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
 
 const MaintenanceOverview = dynamic(
   () => import('@/app/(dashboard)/maintenance/components/MaintenanceOverview').then(mod => ({ default: mod.MaintenanceOverview })),
@@ -30,6 +31,7 @@ function MaintenanceContent() {
   const searchParams = useSearchParams();
   const { profile, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const supabase = createClient();
+  const { tabletModeEnabled } = useTabletMode();
 
   const [hasModulePermission, setHasModulePermission] = useState<boolean | null>(null);
   const canManage = isManager || isAdmin || isSuperAdmin;
@@ -167,7 +169,7 @@ function MaintenanceContent() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
+      <div className={`bg-white dark:bg-slate-900 rounded-lg border border-border ${tabletModeEnabled ? 'p-5 md:p-6' : 'p-6'}`}>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Maintenance &amp; Service</h1>
@@ -181,12 +183,12 @@ function MaintenanceContent() {
       {/* Page-level tabs: Overview + Settings (managers/admins only) */}
       <Tabs value={activeTab} onValueChange={(v) => handlePageTabChange(v as 'overview' | 'settings')}>
         {canManage && (
-          <TabsList>
-            <TabsTrigger value="overview" className="gap-2">
+          <TabsList className={tabletModeEnabled ? 'h-auto flex-wrap gap-2 p-1.5' : undefined}>
+            <TabsTrigger value="overview" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}>
               <Wrench className="h-4 w-4" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="settings" className="gap-2">
+            <TabsTrigger value="settings" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}>
               <Settings className="h-4 w-4" />
               Settings
             </TabsTrigger>
@@ -211,22 +213,22 @@ function MaintenanceContent() {
           ) : (
             <>
               {/* Asset type filter */}
-              <div className="flex items-center justify-end">
+              <div className={`flex ${tabletModeEnabled ? 'justify-start' : 'justify-end'}`}>
                 <Tabs value={maintenanceFilter} onValueChange={(v) => handleMaintenanceFilterChange(v as 'both' | 'van' | 'hgv' | 'plant')}>
-                  <TabsList>
-                    <TabsTrigger value="both" className="gap-2">
+                  <TabsList className={tabletModeEnabled ? 'h-auto flex-wrap gap-2 p-1.5 justify-start' : undefined}>
+                    <TabsTrigger value="both" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}>
                       <Wrench className="h-4 w-4" />
                       All Assets
                     </TabsTrigger>
-                    <TabsTrigger value="van" className="gap-2">
+                    <TabsTrigger value="van" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}>
                       <Truck className="h-4 w-4" />
                       Vans
                     </TabsTrigger>
-                    <TabsTrigger value="plant" className="gap-2">
+                    <TabsTrigger value="plant" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}>
                       <HardHat className="h-4 w-4" />
                       Plant
                     </TabsTrigger>
-                    <TabsTrigger value="hgv" className="gap-2">
+                    <TabsTrigger value="hgv" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}>
                       <Truck className="h-4 w-4" />
                       HGVs
                     </TabsTrigger>

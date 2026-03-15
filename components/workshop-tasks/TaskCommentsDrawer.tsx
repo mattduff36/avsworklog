@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,6 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { MessageSquare, Send, Edit2, Trash2, CheckCircle2, Clock, User, Pause, Undo2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { triggerShakeAnimation } from '@/lib/utils/animations';
 
 // Types from API
 type TimelineItem = {
@@ -41,12 +43,18 @@ export function TaskCommentsDrawer({
   taskId,
   taskTitle,
 }: TaskCommentsDrawerProps) {
+  const { tabletModeEnabled } = useTabletMode();
+  const contentRef = useRef<HTMLDivElement>(null);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+  const isDirty = useMemo(
+    () => newComment.trim().length > 0 || (editingCommentId !== null && editText.trim().length > 0),
+    [newComment, editingCommentId, editText]
+  );
 
   // Fetch timeline when dialog opens
   useEffect(() => {
@@ -318,12 +326,13 @@ export function TaskCommentsDrawer({
                     placeholder="Edit comment..."
                     rows={3}
                     maxLength={1000}
+                    className={tabletModeEnabled ? 'text-base' : undefined}
                   />
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => handleEditComment(item.id)}>
+                    <Button size="sm" onClick={() => handleEditComment(item.id)} className={tabletModeEnabled ? 'min-h-11 text-base px-4' : undefined}>
                       Save
                     </Button>
-                    <Button size="sm" variant="outline" onClick={cancelEdit}>
+                    <Button size="sm" variant="outline" onClick={cancelEdit} className={tabletModeEnabled ? 'min-h-11 text-base px-4' : undefined}>
                       Cancel
                     </Button>
                   </div>
@@ -339,8 +348,32 @@ export function TaskCommentsDrawer({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && isDirty) {
+          triggerShakeAnimation(contentRef.current);
+          return;
+        }
+        onOpenChange(nextOpen);
+      }}
+    >
+      <DialogContent
+        ref={contentRef}
+        className={`max-w-2xl max-h-[80vh] flex flex-col ${tabletModeEnabled ? 'p-5 sm:p-6' : ''}`}
+        onInteractOutside={(event) => {
+          if (isDirty) {
+            event.preventDefault();
+            triggerShakeAnimation(contentRef.current);
+          }
+        }}
+        onEscapeKeyDown={(event) => {
+          if (isDirty) {
+            event.preventDefault();
+            triggerShakeAnimation(contentRef.current);
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5" />
@@ -375,15 +408,27 @@ export function TaskCommentsDrawer({
             rows={3}
             maxLength={1000}
             disabled={submitting}
+            className={tabletModeEnabled ? 'text-base' : undefined}
           />
           <div className="flex justify-between items-center">
             <span className="text-xs text-muted-foreground">
               {newComment.length}/1000
             </span>
+            {newComment.trim().length > 0 && (
+              <Button
+                onClick={() => setNewComment('')}
+                variant="outline"
+                size="sm"
+                className={tabletModeEnabled ? 'min-h-11 text-base px-4' : undefined}
+              >
+                Discard Draft
+              </Button>
+            )}
             <Button
               onClick={handleAddComment}
               disabled={submitting || !newComment.trim()}
               size="sm"
+              className={tabletModeEnabled ? 'min-h-11 text-base px-4' : undefined}
             >
               <Send className="h-4 w-4 mr-2" />
               {submitting ? 'Adding...' : 'Add Comment'}
