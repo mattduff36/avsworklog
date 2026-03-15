@@ -8,7 +8,7 @@ interface DashboardContentProps {
 }
 
 export function DashboardContent({ children }: DashboardContentProps) {
-  const { isManager } = useAuth();
+  const { isManager, isActualSuperAdmin } = useAuth();
   const [isPWA] = useState(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -24,7 +24,7 @@ export function DashboardContent({ children }: DashboardContentProps) {
   });
 
   return (
-    <div className={`transition-all duration-300 ${isManager ? 'md:pl-16' : ''}`}>
+    <div className={`transition-all duration-300 ${(isManager || isActualSuperAdmin) ? 'md:pl-16' : ''}`}>
       <main className={`relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:pb-8 ${
         isPWA ? 'pb-24' : 'pb-8'
       }`}>

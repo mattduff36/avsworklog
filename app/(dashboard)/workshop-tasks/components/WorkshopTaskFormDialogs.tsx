@@ -1,11 +1,19 @@
-import { Button } from '@/components/ui/button';
+import { useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectGroup, SelectLabel, SelectSeparator, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { FileText } from 'lucide-react';
 import { splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
+import { triggerShakeAnimation } from '@/lib/utils/animations';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import {
+  TabletAwareButton,
+  TabletAwareSelectContent,
+  TabletAwareSelectItem,
+  TabletAwareSelectTrigger,
+} from '@/components/ui/tablet-mode-controls';
 import type { Action, AssetTab, Category, Subcategory, Vehicle } from '../types';
 
 interface AttachmentTemplate {
@@ -124,18 +132,75 @@ export function WorkshopTaskFormDialogs({
   onSaveEdit,
   onResetEditForm,
 }: WorkshopTaskFormDialogsProps) {
+  const { tabletModeEnabled } = useTabletMode();
+  const addDialogContentRef = useRef<HTMLDivElement>(null);
+  const editDialogContentRef = useRef<HTMLDivElement>(null);
+
+  const isAddFormDirty = Boolean(
+    selectedVehicleId ||
+      selectedCategoryId ||
+      selectedSubcategoryId ||
+      newMeterReading.trim() ||
+      workshopComments.trim() ||
+      selectedAttachmentTemplateIds.length > 0
+  );
+
+  const editTaskVehicleId = editingTask?.van_id ?? editingTask?.hgv_id ?? editingTask?.plant_id ?? '';
+  const editTaskComments = editingTask?.workshop_comments ?? '';
+  const editTaskSubcategoryId = editingTask?.workshop_subcategory_id ?? '';
+  const isEditFormDirty = Boolean(
+    editVehicleId !== editTaskVehicleId ||
+      editCategoryId !== initialEditCategoryId ||
+      editSubcategoryId !== editTaskSubcategoryId ||
+      editComments !== editTaskComments ||
+      editMileage.trim()
+  );
+
+  function handleAddDialogOpenChange(open: boolean) {
+    if (!open && isAddFormDirty) {
+      triggerShakeAnimation(addDialogContentRef.current);
+      return;
+    }
+
+    onShowAddModalChange(open);
+    if (!open) {
+      onResetAddForm();
+    }
+  }
+
+  function handleEditDialogOpenChange(open: boolean) {
+    if (!open && isEditFormDirty) {
+      triggerShakeAnimation(editDialogContentRef.current);
+      return;
+    }
+
+    onShowEditModalChange(open);
+  }
+
   return (
     <>
       <Dialog
         open={showAddModal}
-        onOpenChange={(open) => {
-          onShowAddModalChange(open);
-          if (!open) {
-            onResetAddForm();
-          }
-        }}
+        onOpenChange={handleAddDialogOpenChange}
       >
-        <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
+        <DialogContent
+          ref={addDialogContentRef}
+          className={`bg-white dark:bg-slate-900 border-border text-foreground max-w-lg overflow-y-auto max-h-[92vh] ${
+            tabletModeEnabled ? 'max-w-xl p-5 sm:p-6' : ''
+          }`}
+          onInteractOutside={(event) => {
+            if (isAddFormDirty) {
+              event.preventDefault();
+              triggerShakeAnimation(addDialogContentRef.current);
+            }
+          }}
+          onEscapeKeyDown={(event) => {
+            if (isAddFormDirty) {
+              event.preventDefault();
+              triggerShakeAnimation(addDialogContentRef.current);
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="text-foreground text-xl">Create Workshop Task</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -143,7 +208,7 @@ export function WorkshopTaskFormDialogs({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className={tabletModeEnabled ? 'space-y-5' : 'space-y-4'}>
             <div className="space-y-2">
               <Label htmlFor="vehicle" className="text-foreground">
                 {assetTab === 'plant' ? 'Plant' : assetTab === 'hgv' ? 'HGV' : assetTab === 'all' ? 'Asset' : 'Van'} <span className="text-red-500">*</span>
@@ -154,18 +219,18 @@ export function WorkshopTaskFormDialogs({
                   onFetchCurrentMeterReading(value);
                 }
               }}>
-                <SelectTrigger id="vehicle" className="bg-white dark:bg-slate-800 border-border text-foreground">
+                <TabletAwareSelectTrigger id="vehicle" className="bg-white dark:bg-slate-800 border-border text-foreground">
                   <SelectValue placeholder={`Select ${assetTab === 'plant' ? 'plant' : assetTab === 'hgv' ? 'HGV' : assetTab === 'all' ? 'asset' : 'van'}`} />
-                </SelectTrigger>
-                <SelectContent>
+                </TabletAwareSelectTrigger>
+                <TabletAwareSelectContent>
                   {vehicles
                     .filter(v => assetTab === 'all' ? true : assetTab === 'plant' ? v.asset_type === 'plant' : assetTab === 'hgv' ? v.asset_type === 'hgv' : v.asset_type === 'van')
                     .map((vehicle) => (
-                      <SelectItem key={vehicle.id} value={vehicle.id}>
+                      <TabletAwareSelectItem key={vehicle.id} value={vehicle.id}>
                         {getAssetDisplay(vehicle)}
-                      </SelectItem>
+                      </TabletAwareSelectItem>
                     ))}
-                </SelectContent>
+                </TabletAwareSelectContent>
               </Select>
             </div>
 
@@ -174,16 +239,16 @@ export function WorkshopTaskFormDialogs({
                 Category <span className="text-red-500">*</span>
               </Label>
               <Select value={selectedCategoryId} onValueChange={onSelectedCategoryIdChange}>
-                <SelectTrigger id="category" className="bg-white dark:bg-slate-800 border-border text-foreground">
+                <TabletAwareSelectTrigger id="category" className="bg-white dark:bg-slate-800 border-border text-foreground">
                   <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
+                </TabletAwareSelectTrigger>
+                <TabletAwareSelectContent>
                   {activeCategories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
+                    <TabletAwareSelectItem key={category.id} value={category.id}>
                       {category.name}
-                    </SelectItem>
+                    </TabletAwareSelectItem>
                   ))}
-                </SelectContent>
+                </TabletAwareSelectContent>
               </Select>
             </div>
 
@@ -197,16 +262,16 @@ export function WorkshopTaskFormDialogs({
                   onValueChange={onSelectedSubcategoryIdChange}
                   disabled={!selectedCategoryId}
                 >
-                  <SelectTrigger id="subcategory" className="bg-white dark:bg-slate-800 border-border text-foreground">
+                  <TabletAwareSelectTrigger id="subcategory" className="bg-white dark:bg-slate-800 border-border text-foreground">
                     <SelectValue placeholder={selectedCategoryId ? 'Select subcategory' : 'Select a category first'} />
-                  </SelectTrigger>
-                  <SelectContent>
+                  </TabletAwareSelectTrigger>
+                  <TabletAwareSelectContent>
                     {filteredSubcategories.map((subcategory) => (
-                      <SelectItem key={subcategory.id} value={subcategory.id}>
+                      <TabletAwareSelectItem key={subcategory.id} value={subcategory.id}>
                         {subcategory.name}
-                      </SelectItem>
+                      </TabletAwareSelectItem>
                     ))}
-                  </SelectContent>
+                  </TabletAwareSelectContent>
                 </Select>
               </div>
             )}
@@ -258,9 +323,9 @@ export function WorkshopTaskFormDialogs({
                 <p className="text-xs text-muted-foreground mb-2">
                   Add service checklists or documentation to complete later
                 </p>
-                <div className="space-y-2 max-h-32 overflow-y-auto p-2 border border-border rounded-md bg-muted/30">
+                <div className={`space-y-2 max-h-40 overflow-y-auto p-2 border border-border rounded-md bg-muted/30 ${tabletModeEnabled ? 'p-3' : ''}`}>
                   {attachmentTemplates.map((template) => (
-                    <div key={template.id} className="flex items-center space-x-2">
+                    <div key={template.id} className={`flex items-center ${tabletModeEnabled ? 'space-x-3 py-1' : 'space-x-2'}`}>
                       <input
                         type="checkbox"
                         id={`template-inline-${template.id}`}
@@ -272,11 +337,11 @@ export function WorkshopTaskFormDialogs({
                             onSelectedAttachmentTemplateIdsChange(selectedAttachmentTemplateIds.filter(id => id !== template.id));
                           }
                         }}
-                        className="h-4 w-4 rounded border-gray-300 text-workshop focus:ring-workshop"
+                        className={`rounded border-gray-300 text-workshop focus:ring-workshop ${tabletModeEnabled ? 'h-5 w-5' : 'h-4 w-4'}`}
                       />
                       <label
                         htmlFor={`template-inline-${template.id}`}
-                        className="text-sm font-normal cursor-pointer text-foreground"
+                        className={`font-normal cursor-pointer text-foreground ${tabletModeEnabled ? 'text-base' : 'text-sm'}`}
                       >
                         {template.name}
                       </label>
@@ -292,8 +357,8 @@ export function WorkshopTaskFormDialogs({
             )}
           </div>
 
-          <DialogFooter>
-            <Button
+          <DialogFooter className={tabletModeEnabled ? 'gap-3 pt-2' : 'gap-3'}>
+            <TabletAwareButton
               variant="outline"
               onClick={() => {
                 onShowAddModalChange(false);
@@ -301,21 +366,38 @@ export function WorkshopTaskFormDialogs({
               }}
               className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
             >
-              Cancel
-            </Button>
-            <Button
+              {isAddFormDirty ? 'Discard Changes' : 'Cancel'}
+            </TabletAwareButton>
+            <TabletAwareButton
               onClick={onCreateTask}
               disabled={submitting || !selectedVehicleId || !selectedCategoryId || (categoryHasSubcategories && !selectedSubcategoryId) || workshopComments.length < 10 || !newMeterReading.trim()}
               className="bg-workshop hover:bg-workshop-dark text-white"
             >
               {submitting ? 'Creating...' : 'Create Task'}
-            </Button>
+            </TabletAwareButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showEditModal} onOpenChange={onShowEditModalChange}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
+      <Dialog open={showEditModal} onOpenChange={handleEditDialogOpenChange}>
+        <DialogContent
+          ref={editDialogContentRef}
+          className={`bg-white dark:bg-slate-900 border-border text-foreground max-w-lg overflow-y-auto max-h-[92vh] ${
+            tabletModeEnabled ? 'max-w-xl p-5 sm:p-6' : ''
+          }`}
+          onInteractOutside={(event) => {
+            if (isEditFormDirty) {
+              event.preventDefault();
+              triggerShakeAnimation(editDialogContentRef.current);
+            }
+          }}
+          onEscapeKeyDown={(event) => {
+            if (isEditFormDirty) {
+              event.preventDefault();
+              triggerShakeAnimation(editDialogContentRef.current);
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="text-foreground text-xl">Edit Workshop Task</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -323,16 +405,16 @@ export function WorkshopTaskFormDialogs({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className={tabletModeEnabled ? 'space-y-5' : 'space-y-4'}>
             <div className="space-y-2">
               <Label htmlFor="edit-vehicle" className="text-foreground">
                 {editingTask?.plant_id ? 'Plant' : editingTask?.hgv_id ? 'HGV' : 'Van'} <span className="text-red-500">*</span>
               </Label>
               <Select value={editVehicleId} onValueChange={onEditVehicleIdChange}>
-                <SelectTrigger id="edit-vehicle" className="bg-white dark:bg-slate-800 border-border text-foreground">
+                <TabletAwareSelectTrigger id="edit-vehicle" className="bg-white dark:bg-slate-800 border-border text-foreground">
                   <SelectValue placeholder={editingTask?.plant_id ? 'Select plant' : editingTask?.hgv_id ? 'Select HGV' : 'Select van'} />
-                </SelectTrigger>
-                <SelectContent>
+                </TabletAwareSelectTrigger>
+                <TabletAwareSelectContent>
                   {(() => {
                     const isEditingPlant = !!editingTask?.plant_id;
                     const isEditingHgv = !!editingTask?.hgv_id;
@@ -346,9 +428,9 @@ export function WorkshopTaskFormDialogs({
                           <SelectGroup>
                             <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">Recent</SelectLabel>
                             {recentVehicles.map((vehicle) => (
-                              <SelectItem key={vehicle.id} value={vehicle.id}>
+                              <TabletAwareSelectItem key={vehicle.id} value={vehicle.id}>
                                 {getAssetDisplay(vehicle)}
-                              </SelectItem>
+                              </TabletAwareSelectItem>
                             ))}
                           </SelectGroup>
                         )}
@@ -361,16 +443,16 @@ export function WorkshopTaskFormDialogs({
                               <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">All {isEditingPlant ? 'Plant' : isEditingHgv ? 'HGVs' : 'Vans'}</SelectLabel>
                             )}
                             {otherVehicles.map((vehicle) => (
-                              <SelectItem key={vehicle.id} value={vehicle.id}>
+                              <TabletAwareSelectItem key={vehicle.id} value={vehicle.id}>
                                 {getAssetDisplay(vehicle)}
-                              </SelectItem>
+                              </TabletAwareSelectItem>
                             ))}
                           </SelectGroup>
                         )}
                       </>
                     );
                   })()}
-                </SelectContent>
+                </TabletAwareSelectContent>
               </Select>
             </div>
 
@@ -379,19 +461,19 @@ export function WorkshopTaskFormDialogs({
                 Category <span className="text-red-500">*</span>
               </Label>
               <Select value={editCategoryId} onValueChange={onEditCategoryIdChange}>
-                <SelectTrigger id="edit-category" className="bg-white dark:bg-slate-800 border-border text-foreground">
+                <TabletAwareSelectTrigger id="edit-category" className="bg-white dark:bg-slate-800 border-border text-foreground">
                   <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
+                </TabletAwareSelectTrigger>
+                <TabletAwareSelectContent>
                   {(() => {
                     const editCategories = editingTask?.plant_id ? plantCategories : editingTask?.hgv_id ? hgvCategories : categories;
                     return editCategories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
+                      <TabletAwareSelectItem key={category.id} value={category.id}>
                         {category.name}
-                      </SelectItem>
+                      </TabletAwareSelectItem>
                     ));
                   })()}
-                </SelectContent>
+                </TabletAwareSelectContent>
               </Select>
             </div>
 
@@ -409,16 +491,16 @@ export function WorkshopTaskFormDialogs({
                     Subcategory {isRequired && <span className="text-red-500">*</span>}
                   </Label>
                   <Select value={editSubcategoryId} onValueChange={onEditSubcategoryIdChange}>
-                    <SelectTrigger id="edit-subcategory" className="bg-white dark:bg-slate-800 border-border text-foreground">
+                    <TabletAwareSelectTrigger id="edit-subcategory" className="bg-white dark:bg-slate-800 border-border text-foreground">
                       <SelectValue placeholder="Select subcategory" />
-                    </SelectTrigger>
-                    <SelectContent>
+                    </TabletAwareSelectTrigger>
+                    <TabletAwareSelectContent>
                       {editFilteredSubcategories.map((sub) => (
-                        <SelectItem key={sub.id} value={sub.id}>
+                        <TabletAwareSelectItem key={sub.id} value={sub.id}>
                           {sub.name}
-                        </SelectItem>
+                        </TabletAwareSelectItem>
                       ))}
-                    </SelectContent>
+                    </TabletAwareSelectContent>
                   </Select>
                 </div>
               );
@@ -463,21 +545,21 @@ export function WorkshopTaskFormDialogs({
             </div>
           </div>
 
-          <DialogFooter>
-            <Button
+          <DialogFooter className={tabletModeEnabled ? 'gap-3 pt-2' : 'gap-3'}>
+            <TabletAwareButton
               variant="outline"
               onClick={onResetEditForm}
               className="border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
             >
-              Cancel
-            </Button>
-            <Button
+              {isEditFormDirty ? 'Discard Changes' : 'Cancel'}
+            </TabletAwareButton>
+            <TabletAwareButton
               onClick={onSaveEdit}
               disabled={isSaveEditDisabled}
               className="bg-workshop hover:bg-workshop-dark text-white"
             >
               {submitting ? 'Saving...' : 'Save Changes'}
-            </Button>
+            </TabletAwareButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { TabletModeToggleActions } from '@/components/layout/TabletModeToggleActions';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
@@ -531,12 +532,19 @@ export default function DashboardPage() {
         </div>
         
         {/* Actual Content */}
-        <h1 className="text-3xl font-bold text-white">
-          Welcome back, {profile?.full_name}
-        </h1>
-        <p className="text-slate-400 mt-1">
-          {isSuperAdmin ? 'SuperAdmin' : (profile?.role?.display_name || 'No Role Assigned')}
-        </p>
+        <div className="relative z-20 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white">
+              Welcome back, {profile?.full_name}
+            </h1>
+            <p className="text-slate-400 mt-1">
+              {isSuperAdmin ? 'SuperAdmin' : (profile?.role?.display_name || 'No Role Assigned')}
+            </p>
+          </div>
+          <div className="flex items-center justify-end">
+            <TabletModeToggleActions />
+          </div>
+        </div>
       </div>
 
       {/* Quick Actions - Square Button Grid */}
