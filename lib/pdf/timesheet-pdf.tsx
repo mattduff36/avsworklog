@@ -2,6 +2,7 @@ import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image as PdfImage } from '@react-pdf/renderer';
 import { Timesheet, DAY_NAMES } from '@/types/timesheet';
 import { formatDate } from '@/lib/utils/date';
+import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
 
 // Create styles for the PDF matching the scanned form
 const styles = StyleSheet.create({
@@ -317,7 +318,9 @@ export function TimesheetPDF({ timesheet, employeeName }: TimesheetPDFProps) {
               </View>
               <View style={styles.colRemarks}>
                 <Text style={[styles.cellText, { textAlign: 'left' }]}>
-                  {entry.did_not_work ? 'DID NOT WORK' : formatRemarks(entry)}
+                  {entry.did_not_work
+                    ? getDidNotWorkReasonInfo(entry.did_not_work, entry.remarks).combinedDisplay
+                    : formatRemarks(entry)}
                 </Text>
               </View>
             </View>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
 import { 
   generateExcelFile, 
   formatExcelDate, 
@@ -26,6 +27,7 @@ type TimesheetEntryRow = {
   working_in_yard?: boolean | null;
   daily_total?: number | null;
   job_number?: string | null;
+  remarks?: string | null;
 };
 
 type EmployeeRow = {
@@ -171,24 +173,40 @@ function transformTimesheetsToExcel(
     };
 
     const jobNumbers: string[] = [];
+    const dnwDetails: string[] = [];
+    const dnwReasons = new Set<string>();
+    let dnwDays = 0;
+
     sortedEntries.forEach((entry) => {
       const dayName = DAY_NAMES[entry.day_of_week] || '';
       const day = dayName.substring(0, 3);
-      
+
       if (entry.did_not_work) {
-        row[`${day} Hours`] = 'DNW';
+        const reasonInfo = getDidNotWorkReasonInfo(entry.did_not_work, entry.remarks);
+        row[`${day} Hours`] = `DNW - ${reasonInfo.reasonDisplay}`;
+        dnwDays += 1;
+
+        if (reasonInfo.reasonDisplay) {
+          dnwReasons.add(reasonInfo.reasonDisplay);
+          dnwDetails.push(`${dayName}: ${reasonInfo.reasonDisplay}`);
+        } else {
+          dnwDetails.push(`${dayName}: Unknown`);
+        }
       } else if (entry.working_in_yard) {
         row[`${day} Hours`] = `${formatExcelHours(entry.daily_total ?? null)} (Yard)`;
       } else {
         row[`${day} Hours`] = formatExcelHours(entry.daily_total ?? null);
       }
-      
+
       if (entry.job_number && !entry.did_not_work) {
         jobNumbers.push(entry.job_number);
       }
     });
-    
+
     row['Job Numbers'] = [...new Set(jobNumbers)].join(', ') || '-';
+    row['DNW Days'] = dnwDays > 0 ? String(dnwDays) : '-';
+    row['DNW Reasons'] = dnwReasons.size > 0 ? [...dnwReasons].join(', ') : '-';
+    row['DNW Details'] = dnwDetails.length > 0 ? dnwDetails.join('; ') : '-';
     
     const employeeAbsences = absencesByEmployee.get(timesheet.user_id) || { paidDays: 0, unpaidDays: 0, reasons: [] };
     row['Paid Absence (Days)'] = employeeAbsences.paidDays > 0 ? employeeAbsences.paidDays.toFixed(1) : '-';
@@ -254,14 +272,14 @@ export async function GET(request: NextRequest) {
       excelData.push({
         'Employee Name': '', 'Employee ID': '', 'Week Ending': '', 'Status': '', 'Total Hours': '',
         'Mon Hours': '', 'Tue Hours': '', 'Wed Hours': '', 'Thu Hours': '', 'Fri Hours': '', 'Sat Hours': '', 'Sun Hours': '',
-        'Job Numbers': '', 'Paid Absence (Days)': '', 'Unpaid Absence (Days)': '', 'Absence Reasons': '', 'Submitted': '', 'Reviewed': '',
+        'Job Numbers': '', 'DNW Days': '', 'DNW Reasons': '', 'DNW Details': '', 'Paid Absence (Days)': '', 'Unpaid Absence (Days)': '', 'Absence Reasons': '', 'Submitted': '', 'Reviewed': '',
       });
 
       excelData.push({
         'Employee Name': 'TOTALS (Approved Only)', 'Employee ID': '', 'Week Ending': '',
         'Status': `${approvedTimesheets.length} timesheets`, 'Total Hours': totalHours.toFixed(2),
         'Mon Hours': '', 'Tue Hours': '', 'Wed Hours': '', 'Thu Hours': '', 'Fri Hours': '', 'Sat Hours': '', 'Sun Hours': '',
-        'Job Numbers': '', 'Paid Absence (Days)': '', 'Unpaid Absence (Days)': '', 'Absence Reasons': '', 'Submitted': '', 'Reviewed': '',
+        'Job Numbers': '', 'DNW Days': '', 'DNW Reasons': '', 'DNW Details': '', 'Paid Absence (Days)': '', 'Unpaid Absence (Days)': '', 'Absence Reasons': '', 'Submitted': '', 'Reviewed': '',
       });
     }
 
@@ -282,6 +300,9 @@ export async function GET(request: NextRequest) {
         { header: 'Sat Hours', key: 'Sat Hours', width: 12 },
         { header: 'Sun Hours', key: 'Sun Hours', width: 12 },
         { header: 'Job Numbers', key: 'Job Numbers', width: 20 },
+        { header: 'DNW Days', key: 'DNW Days', width: 10 },
+        { header: 'DNW Reasons', key: 'DNW Reasons', width: 26 },
+        { header: 'DNW Details', key: 'DNW Details', width: 40 },
         { header: 'Paid Absence (Days)', key: 'Paid Absence (Days)', width: 16 },
         { header: 'Unpaid Absence (Days)', key: 'Unpaid Absence (Days)', width: 18 },
         { header: 'Absence Reasons', key: 'Absence Reasons', width: 25 },

@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import { 
-  generateExcelFile, 
-  formatExcelDate, 
+import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
+import {
+  generateExcelFile,
+  formatExcelDate,
   formatExcelHours
 } from '@/lib/utils/excel';
 
@@ -23,6 +24,7 @@ type TimesheetEntryRow = {
   daily_total?: number | null;
   working_in_yard?: boolean | null;
   did_not_work?: boolean | null;
+  remarks?: string | null;
   job_number?: string | null;
   night_shift?: boolean | null;
   bank_holiday?: boolean | null;
@@ -84,6 +86,7 @@ export async function GET(request: NextRequest) {
           daily_total,
           working_in_yard,
           did_not_work,
+          remarks,
           job_number,
           night_shift,
           bank_holiday
@@ -101,7 +104,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: timesheets, error } = await query;
-    
+
     // Fetch approved paid absences in the date range
     let absenceQuery = supabase
       .from('absences')
@@ -123,7 +126,7 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq('status', 'approved');
-    
+
     // Apply date filters for absences
     if (dateFrom) {
       absenceQuery = absenceQuery.gte('date', dateFrom);
@@ -131,14 +134,14 @@ export async function GET(request: NextRequest) {
     if (dateTo) {
       absenceQuery = absenceQuery.lte('date', dateTo);
     }
-    
+
     const { data: absences, error: absenceError } = await absenceQuery;
 
     if (error) {
       console.error('Error fetching timesheets:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    
+
     if (absenceError) {
       console.error('Error fetching absences:', absenceError);
       // Continue without absences rather than fail completely
@@ -147,22 +150,22 @@ export async function GET(request: NextRequest) {
     if (!timesheets || timesheets.length === 0) {
       return NextResponse.json({ error: 'No approved timesheets found for the specified criteria' }, { status: 404 });
     }
-    
+
     // Group absences by employee for easier lookup
     // Convert absence days to hours (9 hours per day as standard working day)
     const HOURS_PER_DAY = 9;
     const absencesByEmployee = new Map<string, { paidDays: number; unpaidDays: number }>();
-    
+
     if (absences && absences.length > 0) {
       (absences as AbsenceRow[]).forEach((absence) => {
         const employeeId = absence.profile_id;
         const isPaid = absence.absence_reasons?.is_paid || false;
         const days = absence.duration_days || 0;
-        
+
         if (!absencesByEmployee.has(employeeId)) {
           absencesByEmployee.set(employeeId, { paidDays: 0, unpaidDays: 0 });
         }
-        
+
         const employeeAbsences = absencesByEmployee.get(employeeId)!;
         if (isPaid) {
           employeeAbsences.paidDays += days;
@@ -174,6 +177,16 @@ export async function GET(request: NextRequest) {
 
     // Transform data for Excel - Payroll format
     const excelData: Array<Record<string, string>> = [];
+    const dnwDetailsData: Array<Record<string, string>> = [];
+    const dayNameMap: Record<number, string> = {
+      1: 'Monday',
+      2: 'Tuesday',
+      3: 'Wednesday',
+      4: 'Thursday',
+      5: 'Friday',
+      6: 'Saturday',
+      7: 'Sunday',
+    };
 
     (timesheets as TimesheetRow[]).forEach((timesheet) => {
       const employee = timesheet.employee;
@@ -184,14 +197,27 @@ export async function GET(request: NextRequest) {
       // - Sat-Sun: 1.5x rate
       // - Night shifts: 2x rate
       // - Bank holidays: 2x rate
-      
-      let basicHours = 0;        // Mon-Fri regular hours
-      let overtime15Hours = 0;    // Sat-Sun hours at 1.5x
-      let overtime2Hours = 0;     // Night shifts + Bank holidays at 2x
+
+      let basicHours = 0; // Mon-Fri regular hours
+      let overtime15Hours = 0; // Sat-Sun hours at 1.5x
+      let overtime2Hours = 0; // Night shifts + Bank holidays at 2x
 
       entries.forEach((entry) => {
+        const dnwReason = getDidNotWorkReasonInfo(entry.did_not_work, entry.remarks);
+
         // Skip days not worked
-        if (entry.did_not_work) {
+        if (dnwReason.isDidNotWork) {
+          dnwDetailsData.push({
+            'Employee Name': employee?.full_name || 'Unknown',
+            'Employee ID': employee?.employee_id || '-',
+            'Week Ending': formatExcelDate(timesheet.week_ending),
+            'Day': dayNameMap[entry.day_of_week] || String(entry.day_of_week),
+            'DNW Category': dnwReason.category || '-',
+            'DNW Remarks': dnwReason.remarks || '-',
+            'DNW Reason': dnwReason.reasonDisplay || '-',
+            'DNW Display': dnwReason.combinedDisplay || '-',
+            'Approved Date': timesheet.reviewed_at ? formatExcelDate(timesheet.reviewed_at) : '-',
+          });
           return;
         }
 
@@ -215,7 +241,7 @@ export async function GET(request: NextRequest) {
       });
 
       const totalHours = basicHours + overtime15Hours + overtime2Hours;
-      
+
       // Get absence data for this employee
       const employeeAbsences = absencesByEmployee.get(timesheet.user_id) || { paidDays: 0, unpaidDays: 0 };
       const paidAbsenceHours = employeeAbsences.paidDays * HOURS_PER_DAY;
@@ -269,6 +295,20 @@ export async function GET(request: NextRequest) {
       'Approved Date': '',
     });
 
+    if (dnwDetailsData.length === 0) {
+      dnwDetailsData.push({
+        'Employee Name': '-',
+        'Employee ID': '-',
+        'Week Ending': '-',
+        'Day': '-',
+        'DNW Category': '-',
+        'DNW Remarks': '-',
+        'DNW Reason': '-',
+        'DNW Display': '-',
+        'Approved Date': '-',
+      });
+    }
+
     // Generate Excel file
     const buffer = await generateExcelFile([
       {
@@ -287,10 +327,25 @@ export async function GET(request: NextRequest) {
         ],
         data: excelData,
       },
+      {
+        sheetName: 'Did Not Work Details',
+        columns: [
+          { header: 'Employee Name', key: 'Employee Name', width: 20 },
+          { header: 'Employee ID', key: 'Employee ID', width: 12 },
+          { header: 'Week Ending', key: 'Week Ending', width: 12 },
+          { header: 'Day', key: 'Day', width: 12 },
+          { header: 'DNW Category', key: 'DNW Category', width: 14 },
+          { header: 'DNW Remarks', key: 'DNW Remarks', width: 30 },
+          { header: 'DNW Reason', key: 'DNW Reason', width: 30 },
+          { header: 'DNW Display', key: 'DNW Display', width: 42 },
+          { header: 'Approved Date', key: 'Approved Date', width: 14 },
+        ],
+        data: dnwDetailsData,
+      },
     ]);
 
     // Generate filename
-    const dateRange = dateFrom && dateTo 
+    const dateRange = dateFrom && dateTo
       ? `${dateFrom}_to_${dateTo}`
       : new Date().toISOString().split('T')[0];
     const filename = `Payroll_Report_${dateRange}.xlsx`;
