@@ -18,7 +18,7 @@ if (!connectionString) {
 async function runMigration() {
   console.log('Running inspection photos storage policy migration...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port, 10) || 5432,
