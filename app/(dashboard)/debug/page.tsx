@@ -13,7 +13,10 @@ import { DVLASyncDebugPanel } from './components/DVLASyncDebugPanel';
 import { ErrorLogsDebugPanel } from './components/ErrorLogsDebugPanel';
 import { NotificationSettingsDebugPanel } from './components/NotificationSettingsDebugPanel';
 import { TestFleetDebugPanel } from './components/TestFleetDebugPanel';
+import { UIModalStylesDebugPanel } from './components/UIModalStylesDebugPanel';
 import { DebugInfo } from './types';
+
+type DebugTab = 'errors' | 'audit' | 'dvla' | 'test-fleet' | 'notifications' | 'modal-styles';
 
 export default function DebugPage() {
   const { profile } = useAuth();
@@ -23,7 +26,7 @@ export default function DebugPage() {
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
-  const [activeTab, setActiveTab] = useState<'errors' | 'audit' | 'dvla' | 'test-fleet' | 'notifications'>('errors');
+  const [activeTab, setActiveTab] = useState<DebugTab>('errors');
 
   useEffect(() => {
     async function checkAccess() {
@@ -93,16 +96,16 @@ export default function DebugPage() {
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab') || 'errors';
-    const validTabs: Array<'errors' | 'audit' | 'dvla' | 'test-fleet' | 'notifications'> = ['errors', 'audit', 'dvla', 'test-fleet', 'notifications'];
-    if (validTabs.includes(requestedTab as (typeof validTabs)[number])) {
-      setActiveTab(requestedTab as (typeof validTabs)[number]);
+    const validTabs: DebugTab[] = ['errors', 'audit', 'dvla', 'test-fleet', 'notifications', 'modal-styles'];
+    if (validTabs.includes(requestedTab as DebugTab)) {
+      setActiveTab(requestedTab as DebugTab);
       return;
     }
     setActiveTab('errors');
     router.replace('/debug?tab=errors', { scroll: false });
   }, [searchParams, router]);
 
-  function handleTabChange(value: 'errors' | 'audit' | 'dvla' | 'test-fleet' | 'notifications') {
+  function handleTabChange(value: DebugTab) {
     setActiveTab(value);
     router.replace(`/debug?tab=${value}`, { scroll: false });
   }
@@ -177,8 +180,8 @@ export default function DebugPage() {
         </Card>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as 'errors' | 'audit' | 'dvla' | 'test-fleet' | 'notifications')} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 gap-1 md:gap-0 h-auto md:h-10 p-1">
+      <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as DebugTab)} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 gap-1 md:gap-0 h-auto md:h-10 p-1">
           <TabsTrigger value="errors" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
             <Bug className="h-4 w-4 flex-shrink-0" />
             <span className="hidden md:inline">Error Log</span>
@@ -204,6 +207,10 @@ export default function DebugPage() {
             <span className="hidden md:inline">Notification Settings</span>
             <span className="md:hidden data-[state=active]:inline hidden">Notifs</span>
           </TabsTrigger>
+          <TabsTrigger value="modal-styles" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+            <span className="hidden md:inline">Modal Styles</span>
+            <span className="md:hidden data-[state=active]:inline hidden">Modals</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="errors">
@@ -224,6 +231,10 @@ export default function DebugPage() {
 
         <TabsContent value="notifications">
           <NotificationSettingsDebugPanel />
+        </TabsContent>
+
+        <TabsContent value="modal-styles">
+          <UIModalStylesDebugPanel />
         </TabsContent>
       </Tabs>
     </div>
