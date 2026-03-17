@@ -66,6 +66,7 @@ export function WorkshopTaskModal({
   isUpdating,
 }: WorkshopTaskModalProps) {
   const { tabletModeEnabled } = useTabletMode();
+  const taskActionButtonClass = tabletModeEnabled ? 'min-h-11 text-base px-4' : '';
   const { comments: taskComments, loading } = useWorkshopTaskComments({
     taskIds: task ? [task.id] : [],
     enabled: open && !!task,
@@ -194,14 +195,14 @@ export function WorkshopTaskModal({
             )}
 
             {/* Action Buttons */}
-            <div className={`flex flex-wrap ${tabletModeEnabled ? 'gap-3' : 'gap-2'}`}>
+            <div className={`flex flex-wrap items-center ${tabletModeEnabled ? 'gap-3' : 'gap-2'}`}>
               {task.status === 'pending' && (
                 <>
                   <Button
                     onClick={() => onMarkInProgress(task)}
                     disabled={isUpdating}
                     size="sm"
-                    className={`bg-blue-600/80 hover:bg-blue-600 text-white border-0 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
+                    className={`bg-blue-600/80 hover:bg-blue-600 text-white border-0 ${taskActionButtonClass}`}
                   >
                     <Clock className="h-4 w-4 mr-2" />
                     Mark In Progress
@@ -210,7 +211,7 @@ export function WorkshopTaskModal({
                     onClick={() => onMarkOnHold(task)}
                     disabled={isUpdating}
                     size="sm"
-                    className={`bg-purple-600/80 hover:bg-purple-600 text-white border-0 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
+                    className={`bg-purple-600/80 hover:bg-purple-600 text-white border-0 ${taskActionButtonClass}`}
                   >
                     <Pause className="h-4 w-4 mr-2" />
                     Put On Hold
@@ -219,7 +220,7 @@ export function WorkshopTaskModal({
                     onClick={() => onMarkComplete(task)}
                     disabled={isUpdating}
                     size="sm"
-                    className={`bg-green-600 hover:bg-green-700 text-white border-0 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
+                    className={`bg-green-600 hover:bg-green-700 text-white border-0 ${taskActionButtonClass}`}
                   >
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     Mark Complete
@@ -233,7 +234,7 @@ export function WorkshopTaskModal({
                       onClick={() => onMarkOnHold(task)}
                       disabled={isUpdating}
                       size="sm"
-                      className={`bg-purple-600/80 hover:bg-purple-600 text-white border-0 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
+                      className={`bg-purple-600/80 hover:bg-purple-600 text-white border-0 ${taskActionButtonClass}`}
                     >
                       <Pause className="h-4 w-4 mr-2" />
                       Put On Hold
@@ -244,7 +245,7 @@ export function WorkshopTaskModal({
                       onClick={() => onResume(task)}
                       disabled={isUpdating}
                       size="sm"
-                      className={`bg-blue-600/80 hover:bg-blue-600 text-white border-0 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
+                      className={`bg-blue-600/80 hover:bg-blue-600 text-white border-0 ${taskActionButtonClass}`}
                     >
                       <Clock className="h-4 w-4 mr-2" />
                       Resume
@@ -254,7 +255,7 @@ export function WorkshopTaskModal({
                     onClick={() => onMarkComplete(task)}
                     disabled={isUpdating}
                     size="sm"
-                    className={`bg-green-600 hover:bg-green-700 text-white border-0 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
+                    className={`bg-green-600 hover:bg-green-700 text-white border-0 ${taskActionButtonClass}`}
                   >
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     Mark Complete
@@ -268,7 +269,7 @@ export function WorkshopTaskModal({
                     disabled={isUpdating}
                     size="sm"
                     variant="ghost"
-                    className={`text-muted-foreground hover:text-foreground hover:bg-accent ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
+                    className={`text-muted-foreground hover:text-foreground hover:bg-accent ${taskActionButtonClass}`}
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Edit
@@ -278,7 +279,7 @@ export function WorkshopTaskModal({
                     disabled={isUpdating}
                     size="sm"
                     variant="ghost"
-                    className={`text-red-400 hover:text-red-300 hover:bg-accent ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
+                    className={`text-red-400 hover:text-red-300 hover:bg-accent ${taskActionButtonClass}`}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete

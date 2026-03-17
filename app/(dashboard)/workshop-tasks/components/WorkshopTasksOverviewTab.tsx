@@ -112,6 +112,10 @@ export function WorkshopTasksOverviewTab({
   const { tabletModeEnabled } = useTabletMode();
   const hasHighPriorityPending = highPriorityPendingCount > 0;
   const pendingHeaderIconClass = hasHighPriorityPending ? 'text-red-500' : 'text-amber-400';
+  const taskActionButtonClass = tabletModeEnabled ? 'min-h-11 px-4 text-base' : 'h-9 px-3 text-xs';
+  const taskActionGroupClass = tabletModeEnabled
+    ? 'flex flex-wrap items-center gap-1.5 w-full lg:w-auto'
+    : 'flex flex-wrap items-center gap-1.5 w-full md:w-auto';
 
   return (
     <TabsContent value="overview" className="space-y-6 mt-0">
@@ -261,7 +265,7 @@ export function WorkshopTasksOverviewTab({
                     >
                       <CardContent className="pt-6">
                         <div className="flex flex-col gap-3">
-                          <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                          <div className="flex flex-col lg:flex-row items-start justify-between gap-4">
                             <div className="flex-1 w-full">
                               <div className="flex items-center gap-2 mb-2">
                                 {getStatusIcon(task.status, task)}
@@ -299,7 +303,7 @@ export function WorkshopTasksOverviewTab({
                                 </p>
                               )}
                             </div>
-                            <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
+                            <div className={taskActionGroupClass}>
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -308,7 +312,7 @@ export function WorkshopTasksOverviewTab({
                                 disabled={isUpdating}
                                 size="sm"
                                 variant="outline"
-                                className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}
+                                className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}
                               >
                                 <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                                 Comments
@@ -320,7 +324,7 @@ export function WorkshopTasksOverviewTab({
                                 }}
                                 disabled={isUpdating}
                                 size="sm"
-                                className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} bg-blue-600/80 hover:bg-blue-600 text-white border-0`}
+                                className={`${taskActionButtonClass} bg-blue-600/80 hover:bg-blue-600 text-white border-0`}
                               >
                                 <Clock className="h-3.5 w-3.5 mr-1.5" />
                                 In Progress
@@ -332,7 +336,7 @@ export function WorkshopTasksOverviewTab({
                                 }}
                                 disabled={isUpdating}
                                 size="sm"
-                                className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} transition-all border-0 bg-green-600 hover:bg-green-700 text-white`}
+                                className={`${taskActionButtonClass} transition-all border-0 bg-green-600 hover:bg-green-700 text-white`}
                               >
                                 <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                                 Complete
@@ -407,7 +411,7 @@ export function WorkshopTasksOverviewTab({
                     >
                       <CardContent className="pt-6">
                         <div className="flex flex-col gap-3">
-                          <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                          <div className="flex flex-col lg:flex-row items-start justify-between gap-4">
                             <div className="flex-1 w-full">
                               <div className="flex items-center gap-2 mb-2">
                                 {getStatusIcon(task.status)}
@@ -448,28 +452,28 @@ export function WorkshopTasksOverviewTab({
                                 </p>
                               )}
                             </div>
-                            <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
-                              <Button onClick={(e) => { e.stopPropagation(); onOpenComments(task); }} disabled={isUpdating} size="sm" variant="outline" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
+                            <div className={taskActionGroupClass}>
+                              <Button onClick={(e) => { e.stopPropagation(); onOpenComments(task); }} disabled={isUpdating} size="sm" variant="outline" className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
                                 <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                                 Comments
                               </Button>
-                              <Button onClick={(e) => { e.stopPropagation(); onUndoLogged(task.id); }} variant="outline" disabled={isUpdating} size="sm" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
+                              <Button onClick={(e) => { e.stopPropagation(); onUndoLogged(task.id); }} variant="outline" disabled={isUpdating} size="sm" className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
                                 <Undo2 className="h-3.5 w-3.5 mr-1.5" />
                                 Undo
                               </Button>
                               {task.status === 'logged' && (
-                                <Button onClick={(e) => { e.stopPropagation(); onMarkOnHold(task); }} disabled={isUpdating} size="sm" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} bg-purple-600/80 hover:bg-purple-600 text-white border-0`}>
+                                <Button onClick={(e) => { e.stopPropagation(); onMarkOnHold(task); }} disabled={isUpdating} size="sm" className={`${taskActionButtonClass} bg-purple-600/80 hover:bg-purple-600 text-white border-0`}>
                                   <Pause className="h-3.5 w-3.5 mr-1.5" />
                                   On Hold
                                 </Button>
                               )}
                               {task.status === 'on_hold' && (
-                                <Button onClick={(e) => { e.stopPropagation(); onResumeTask(task); }} disabled={isUpdating} size="sm" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} bg-blue-600/80 hover:bg-blue-600 text-white border-0`}>
+                                <Button onClick={(e) => { e.stopPropagation(); onResumeTask(task); }} disabled={isUpdating} size="sm" className={`${taskActionButtonClass} bg-blue-600/80 hover:bg-blue-600 text-white border-0`}>
                                   <Clock className="h-3.5 w-3.5 mr-1.5" />
                                   Resume
                                 </Button>
                               )}
-                              <Button onClick={(e) => { e.stopPropagation(); onMarkComplete(task); }} disabled={isUpdating} size="sm" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} transition-all border-0 bg-green-600 hover:bg-green-700 text-white`}>
+                              <Button onClick={(e) => { e.stopPropagation(); onMarkComplete(task); }} disabled={isUpdating} size="sm" className={`${taskActionButtonClass} transition-all border-0 bg-green-600 hover:bg-green-700 text-white`}>
                                 <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                                 Complete
                               </Button>
@@ -527,7 +531,7 @@ export function WorkshopTasksOverviewTab({
                     <Card key={task.id} className="bg-white dark:bg-slate-900 border-purple-500/30 dark:border-purple-500/30 hover:shadow-lg hover:border-purple-500/50 transition-all duration-200 cursor-pointer" onClick={() => onOpenTaskModal(task)}>
                       <CardContent className="pt-6">
                         <div className="flex flex-col gap-3">
-                          <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                          <div className="flex flex-col lg:flex-row items-start justify-between gap-4">
                             <div className="flex-1 w-full">
                               <div className="flex items-center gap-2 mb-2">
                                 {getStatusIcon(task.status)}
@@ -564,16 +568,16 @@ export function WorkshopTasksOverviewTab({
                                 <p className="text-sm text-muted-foreground">{task.workshop_comments}</p>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <Button onClick={(e) => { e.stopPropagation(); onOpenComments(task); }} disabled={isUpdating} size="sm" variant="outline" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
+                            <div className={taskActionGroupClass}>
+                              <Button onClick={(e) => { e.stopPropagation(); onOpenComments(task); }} disabled={isUpdating} size="sm" variant="outline" className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
                                 <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                                 Comments
                               </Button>
-                              <Button onClick={(e) => { e.stopPropagation(); onResumeTask(task); }} disabled={isUpdating} size="sm" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} transition-all border-0 bg-workshop hover:bg-workshop-dark text-white`}>
+                              <Button onClick={(e) => { e.stopPropagation(); onResumeTask(task); }} disabled={isUpdating} size="sm" className={`${taskActionButtonClass} transition-all border-0 bg-workshop hover:bg-workshop-dark text-white`}>
                                 <Clock className="h-3.5 w-3.5 mr-1.5" />
                                 Resume
                               </Button>
-                              <Button onClick={(e) => { e.stopPropagation(); onMarkComplete(task); }} disabled={isUpdating} size="sm" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} transition-all border-0 bg-green-600 hover:bg-green-700 text-white`}>
+                              <Button onClick={(e) => { e.stopPropagation(); onMarkComplete(task); }} disabled={isUpdating} size="sm" className={`${taskActionButtonClass} transition-all border-0 bg-green-600 hover:bg-green-700 text-white`}>
                                 <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                                 Complete
                               </Button>
@@ -635,7 +639,7 @@ export function WorkshopTasksOverviewTab({
                     <CardContent className="pt-6">
                       <div className="flex flex-col items-start gap-4">
                         <div className="flex-1 space-y-2 w-full">
-                          <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                          <div className="flex flex-col lg:flex-row items-start justify-between gap-4">
                             <div className="flex-1 w-full">
                               <div className="flex items-center gap-2 mb-2">
                                 <CheckCircle2 className="h-5 w-5 text-green-400" />
@@ -678,12 +682,12 @@ export function WorkshopTasksOverviewTab({
                                 )}
                               </div>
                             </div>
-                            <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
-                              <Button onClick={(e) => { e.stopPropagation(); onOpenComments(task); }} size="sm" variant="outline" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
+                            <div className={taskActionGroupClass}>
+                              <Button onClick={(e) => { e.stopPropagation(); onOpenComments(task); }} size="sm" variant="outline" className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
                                 <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                                 Comments
                               </Button>
-                              <Button onClick={(e) => { e.stopPropagation(); onUndoComplete(task.id); }} size="sm" variant="outline" className={`${tabletModeEnabled ? 'h-11 px-4 text-base' : 'h-9 px-3 text-xs'} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
+                              <Button onClick={(e) => { e.stopPropagation(); onUndoComplete(task.id); }} size="sm" variant="outline" className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
                                 <Undo2 className="h-3.5 w-3.5 mr-1.5" />
                                 Undo
                               </Button>

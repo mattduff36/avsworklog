@@ -249,7 +249,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
             align="start"
             sideOffset={8}
             className="w-64 p-2 bg-slate-900 border border-slate-700 shadow-2xl max-h-[70vh] overflow-y-auto"
-            style={{ zIndex: 999999, color: '#e2e8f0' }}
+            style={{ color: '#e2e8f0' }}
           >
             {viewAsPopoverContent}
           </PopoverContent>
@@ -262,7 +262,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     <>
       {/* Backdrop - only show when expanded */}
       <div
-        className={`fixed inset-0 bg-black/50 z-[60] transition-opacity duration-300 ${
+        className={`fixed inset-0 bg-black/50 z-[50] transition-opacity duration-300 ${
           open ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onToggle}
@@ -270,7 +270,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
 
       {/* Sidebar - Always visible on desktop, hidden on mobile */}
       <div
-        className={`hidden md:flex md:flex-col fixed left-0 top-[68px] bottom-0 bg-slate-900 border-r border-slate-700 z-[70] transition-all duration-300 ease-in-out ${
+        className={`hidden md:flex md:flex-col fixed left-0 top-[68px] bottom-0 bg-slate-900 border-r border-slate-700 z-[60] transition-all duration-300 ease-in-out ${
           open ? 'w-64' : 'w-16'
         }`}
       >
@@ -450,7 +450,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                 align="start"
                 sideOffset={12}
                 className="w-64 p-2 bg-slate-900 border border-slate-700 shadow-2xl max-h-[70vh] overflow-y-auto"
-                style={{ zIndex: 999999, color: '#e2e8f0' }}
+                style={{ color: '#e2e8f0' }}
               >
                 {viewAsPopoverContent}
               </PopoverContent>
