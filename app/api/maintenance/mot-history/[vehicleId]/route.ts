@@ -162,7 +162,10 @@ export async function GET(
           motDueMessage = `Vehicle registration ${registrationNumber || vehicleId} not found in the DVLA database. This may be an invalid registration or a vehicle not yet registered.`;
         }
       } else if (maintenanceData.mot_due_date || maintenanceData.ves_month_of_first_registration) {
-        motDueMessage = `No MOT history available for ${registrationNumber || vehicleId}. This vehicle may be less than 3 years old and not yet required to have an MOT.`;
+        const ageNote = assetType === 'hgv'
+          ? 'This vehicle may not yet have had its first annual test.'
+          : 'This vehicle may be less than 3 years old and not yet required to have an MOT.';
+        motDueMessage = `No MOT history available for ${registrationNumber || vehicleId}. ${ageNote}`;
       }
       
       return NextResponse.json({
@@ -180,7 +183,8 @@ export async function GET(
     );
 
     // Calculate MOT expiry status and days remaining
-    const latestPassedTest = sortedTests.find((test) => test.testResult === 'PASSED');
+    const passResults = new Set(['PASSED', 'PASS', 'PRS']);
+    const latestPassedTest = sortedTests.find((test) => passResults.has((test.testResult ?? '').toUpperCase()));
     const motExpiryDate = maintenanceData.mot_expiry_date || latestPassedTest?.expiryDate || motHistory.motTestDueDate || null;
     let motStatus = 'Unknown';
     let daysRemaining = null;

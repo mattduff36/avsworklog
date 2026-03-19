@@ -191,11 +191,6 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
                 const firstRegDate = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
                 const nextDue = new Date(firstRegDate);
                 nextDue.setFullYear(nextDue.getFullYear() + intervalYears);
-                // For HGVs, advance year-by-year until the due date is in the future
-                const now = new Date();
-                while (nextDue < now) {
-                  nextDue.setFullYear(nextDue.getFullYear() + 1);
-                }
                 const calculatedMotDue = toIsoDate(nextDue);
                 updates.mot_due_date = calculatedMotDue;
                 updates.mot_expiry_date = calculatedMotDue;
@@ -237,10 +232,6 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
               const firstUsedDate = new Date(firstUsedRaw);
               const nextDue = new Date(firstUsedDate);
               nextDue.setFullYear(nextDue.getFullYear() + intervalYears);
-              const now = new Date();
-              while (nextDue < now) {
-                nextDue.setFullYear(nextDue.getFullYear() + 1);
-              }
               const calculatedMotDue = toIsoDate(nextDue);
               updates.mot_due_date = calculatedMotDue;
               updates.mot_expiry_date = calculatedMotDue;

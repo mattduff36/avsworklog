@@ -1270,7 +1270,8 @@ export default function VanHistoryPage({
                         const defects = Array.isArray(test.defects) ? test.defects : [];
                         const defectCounts = countDefectsByType(defects);
                         const isExpanded = expandedTestId === (test.motTestNumber ?? '');
-                        const isPassed = test.testResult === 'PASSED';
+                        const testResultUpper = (test.testResult ?? '').toUpperCase();
+                        const isPassed = testResultUpper === 'PASSED' || testResultUpper === 'PASS' || testResultUpper === 'PRS';
                         
                         return (
                           <Card 

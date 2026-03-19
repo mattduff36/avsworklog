@@ -799,12 +799,35 @@ export default function HgvHistoryPage({
                       <span className="text-white font-medium">{vehicleData.ves_tax_status}</span>
                     </div>
                   )}
-                  {vehicleData.ves_mot_status && (
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">MOT Status</span>
-                      <span className="text-white font-medium">{vehicleData.ves_mot_status}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const vesStatus = vehicleData.ves_mot_status;
+                    const dvlaHasNoData = vesStatus === 'No details held by DVLA';
+
+                    if (dvlaHasNoData && vehicleData.mot_due_date) {
+                      const dueDate = new Date(vehicleData.mot_due_date);
+                      const now = new Date();
+                      const isValid = dueDate > now;
+                      return (
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Annual Test</span>
+                          <span className={`font-medium ${isValid ? 'text-green-400' : 'text-red-400'}`}>
+                            {isValid ? 'Valid' : 'Expired'}
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    if (vesStatus && !dvlaHasNoData) {
+                      return (
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">MOT Status</span>
+                          <span className="text-white font-medium">{vesStatus}</span>
+                        </div>
+                      );
+                    }
+
+                    return null;
+                  })()}
                   {vehicleData.ves_co2_emissions && (
                     <div className="flex items-baseline gap-2">
                       <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">CO2</span>
@@ -1117,7 +1140,7 @@ export default function HgvHistoryPage({
           <Card className="bg-slate-800/50 border-border">
             <CardHeader>
               <CardTitle>MOT History</CardTitle>
-              <CardDescription>Complete MOT test history from GOV.UK database</CardDescription>
+              <CardDescription>Complete annual test (MOT) history from GOV.UK database</CardDescription>
             </CardHeader>
             <CardContent>
               {motLoading ? (
@@ -1127,14 +1150,14 @@ export default function HgvHistoryPage({
               ) : !motData || motData.tests?.length === 0 ? (
                 <div className="text-center py-12">
                   <ClipboardCheck className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold mb-2">No MOT History</h3>
+                  <h3 className="text-xl font-semibold mb-2">No Annual Test History</h3>
                   <p className="text-muted-foreground mb-4">
-                    This vehicle may be too new or exempt from MOT testing
+                    This HGV may not yet have had its first annual test
                   </p>
                   {vehicleData?.mot_due_date && (
                     <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4 max-w-md mx-auto">
                       <p className="text-sm text-blue-300">
-                        First MOT due: <span className="text-white font-medium">{formatDate(vehicleData.mot_due_date)}</span>
+                        First annual test due: <span className="text-white font-medium">{formatDate(vehicleData.mot_due_date)}</span>
                       </p>
                     </div>
                   )}
@@ -1184,7 +1207,8 @@ export default function HgvHistoryPage({
                         const defects = Array.isArray(test.defects) ? test.defects : [];
                         const defectCounts = countDefectsByType(defects);
                         const isExpanded = expandedTestId === (test.motTestNumber ?? '');
-                        const isPassed = test.testResult === 'PASSED';
+                        const testResultUpper = (test.testResult ?? '').toUpperCase();
+                        const isPassed = testResultUpper === 'PASSED' || testResultUpper === 'PASS' || testResultUpper === 'PRS';
                         
                         return (
                           <Card 

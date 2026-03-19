@@ -299,7 +299,8 @@ const [motData, setMotData] = useState<MotData | null>(null);
                 const defects = Array.isArray(test.defects) ? test.defects as { type?: string; text?: string; locationLateral?: string }[] : [];
                 const defectCounts = countDefectsByType(defects);
                 const isExpanded = expandedTestId === test.motTestNumber;
-                const isPassed = test.testResult === 'PASSED';
+                const testResultUpper = String(test.testResult ?? '').toUpperCase();
+                const isPassed = testResultUpper === 'PASSED' || testResultUpper === 'PASS' || testResultUpper === 'PRS';
                 
                 return (
                   <div 
