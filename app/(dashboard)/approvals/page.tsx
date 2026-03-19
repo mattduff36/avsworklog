@@ -24,7 +24,13 @@ import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 import { AbsenceWithRelations } from '@/types/absence';
 import { TimesheetStatusFilter, StatusFilter } from '@/types/common';
-import { usePendingAbsences, useApproveAbsence, useRejectAbsence, useAbsenceSummaryForEmployee } from '@/lib/hooks/useAbsence';
+import {
+  usePendingAbsences,
+  useApproveAbsence,
+  useRejectAbsence,
+  useAbsenceSummaryForEmployee,
+  useAbsenceRealtimeQueryInvalidation,
+} from '@/lib/hooks/useAbsence';
 import { toast } from 'sonner';
 import { TimesheetsApprovalTable, COLUMN_VISIBILITY_STORAGE_KEY, DEFAULT_COLUMN_VISIBILITY } from './components/TimesheetsApprovalTable';
 import type { ColumnVisibility } from './components/TimesheetsApprovalTable';
@@ -128,6 +134,7 @@ function ApprovalsContent() {
   const { data: absences } = usePendingAbsences();
   const approveAbsence = useApproveAbsence();
   const rejectAbsence = useRejectAbsence();
+  useAbsenceRealtimeQueryInvalidation();
 
   const fetchApprovals = useCallback(async (filter: StatusFilter) => {
     try {

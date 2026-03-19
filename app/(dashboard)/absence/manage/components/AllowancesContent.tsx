@@ -33,6 +33,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { AlertTriangle, ArrowUpDown, ChevronLeft, ChevronRight, Loader2, Search, Settings2, Sparkles, Trash2, Users } from 'lucide-react';
 import { useUpdateEmployeeAllowance } from '@/lib/hooks/useAbsence';
+import { useAbsenceRealtime } from '@/lib/hooks/useRealtime';
 import { getCurrentFinancialYear } from '@/lib/utils/date';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -171,20 +172,16 @@ function remainingColor(days: number): string {
 }
 
 function RemainingAllowanceValue({ value }: { value: number }) {
-  if (value < 0) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-0.5 font-medium text-red-300">
-        <AlertTriangle className="h-3.5 w-3.5" />
-        <FmtDays value={value} />
-      </span>
-    );
-  }
-
   return (
     <span className="font-medium" style={{ color: remainingColor(value) }}>
       <FmtDays value={value} />
     </span>
   );
+}
+
+function remainingTint(value: number): string | undefined {
+  if (value >= 0) return undefined;
+  return `${remainingColor(value)}1f`;
 }
 
 function formatLocalDate(date: Date): string {
@@ -206,7 +203,7 @@ function buildFinancialYearFromStartYear(startYear: number) {
   };
 }
 
-export function AllowancesContent() {
+export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
   const supabase = createClient();
   const currentFinancialYear = getCurrentFinancialYear();
 
@@ -314,6 +311,13 @@ export function AllowancesContent() {
     void loadGenerationStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFinancialYearStartYear]);
+
+  useEffect(() => {
+    if (refreshKey !== undefined && refreshKey > 0) {
+      void loadRows();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
 
   async function loadRows() {
     setLoading(true);
@@ -667,6 +671,15 @@ export function AllowancesContent() {
       setBulkUndoLoading(false);
     }
   }
+
+  useAbsenceRealtime((payload) => {
+    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+      void loadRows();
+      if (showBulkUndoDialog) {
+        void loadBulkAbsenceBatches();
+      }
+    }
+  });
 
   async function handleUndoBulkAbsenceBatch() {
     if (!bulkBatchUndoId) {
@@ -1031,7 +1044,12 @@ export function AllowancesContent() {
                           </TableCell>
                         )}
                         {baseColumnVisibility.remaining && (
-                          <TableCell style={{ borderLeft: `3px solid ${annualLeaveColor}22` }}>
+                          <TableCell
+                            style={{
+                              borderLeft: `3px solid ${annualLeaveColor}22`,
+                              backgroundColor: remainingTint(profile.remaining),
+                            }}
+                          >
                             <RemainingAllowanceValue value={profile.remaining} />
                           </TableCell>
                         )}
@@ -1076,7 +1094,10 @@ export function AllowancesContent() {
                           <p className="text-muted-foreground">Upcoming</p>
                           <p className="text-white"><FmtDays value={profile.upcoming} /></p>
                         </div>
-                        <div>
+                        <div
+                          className={profile.remaining < 0 ? 'rounded-md px-2 py-1' : undefined}
+                          style={{ backgroundColor: remainingTint(profile.remaining) }}
+                        >
                           <p className="text-muted-foreground">Remaining</p>
                           <p>
                             <RemainingAllowanceValue value={profile.remaining} />

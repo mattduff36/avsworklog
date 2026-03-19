@@ -27,7 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useAllAbsenceReasons, useAllAbsences } from '@/lib/hooks/useAbsence';
+import { useAllAbsenceReasons, useAllAbsences, useDeleteAbsence } from '@/lib/hooks/useAbsence';
 import { getCurrentFinancialYear, getFinancialYearMonths } from '@/lib/utils/date';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -39,7 +39,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from 'date-fns';
-import { AlertTriangle, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Settings2 } from 'lucide-react';
+import { AlertTriangle, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Settings2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Employee = {
@@ -232,6 +232,9 @@ export function AbsenceCalendarAdmin() {
 
   const { data: absences, isLoading } = useAllAbsences({});
   const { data: reasons } = useAllAbsenceReasons();
+  const deleteAbsence = useDeleteAbsence();
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
   useEffect(() => {
     void loadGenerationStatus();
@@ -311,6 +314,21 @@ export function AbsenceCalendarAdmin() {
       localStorage.setItem(DETAIL_VISIBILITY_STORAGE_KEY, JSON.stringify(next));
       return next;
     });
+  }
+
+  async function confirmDeleteAbsence() {
+    if (!deleteTargetId) return;
+    setDeleteSubmitting(true);
+    try {
+      await deleteAbsence.mutateAsync(deleteTargetId);
+      toast.success('Absence deleted');
+      setDeleteTargetId(null);
+    } catch (error) {
+      console.error('Error deleting absence:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to delete absence');
+    } finally {
+      setDeleteSubmitting(false);
+    }
   }
 
   const monthStart = useMemo(() => startOfMonth(currentMonth), [currentMonth]);
@@ -841,20 +859,34 @@ export function AbsenceCalendarAdmin() {
 
                           {event.notes && <p className="text-xs text-muted-foreground mt-1">{event.notes}</p>}
                         </div>
-                        <Badge
-                          variant="outline"
-                          className={
-                            event.status === 'approved'
-                              ? 'border-green-500/30 text-green-400 bg-green-500/10'
-                              : event.status === 'pending'
-                              ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
-                              : event.status === 'rejected'
-                              ? 'border-red-500/30 text-red-400 bg-red-500/10'
-                              : 'border-slate-600 text-muted-foreground'
-                          }
-                        >
-                          {event.status}
-                        </Badge>
+                        <div className="flex flex-col items-end gap-2">
+                          <Badge
+                            variant="outline"
+                            className={
+                              event.status === 'approved'
+                                ? 'border-green-500/30 text-green-400 bg-green-500/10'
+                                : event.status === 'pending'
+                                ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
+                                : event.status === 'rejected'
+                                ? 'border-red-500/30 text-red-400 bg-red-500/10'
+                                : 'border-slate-600 text-muted-foreground'
+                            }
+                          >
+                            {event.status}
+                          </Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTargetId(event.id);
+                            }}
+                            className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 h-7 px-2 text-xs"
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -870,6 +902,37 @@ export function AbsenceCalendarAdmin() {
               className="border-border text-muted-foreground"
             >
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleteTargetId} onOpenChange={(open) => { if (!open) setDeleteTargetId(null); }}>
+        <DialogContent className="border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Delete Absence</DialogTitle>
+            <DialogDescription className="text-slate-400/90">
+              Are you sure you want to delete this absence record? This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+            <p className="text-sm text-red-300">This will permanently remove the absence record.</p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTargetId(null)}
+              className="border-border text-muted-foreground"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteAbsence}
+              disabled={deleteSubmitting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deleteSubmitting ? 'Deleting...' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>

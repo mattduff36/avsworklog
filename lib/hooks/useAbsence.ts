@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useAbsenceRealtime } from '@/lib/hooks/useRealtime';
 import { 
   AbsenceInsert, 
   AbsenceUpdate, 
@@ -15,6 +17,21 @@ const ANNUAL_LEAVE_REASON_NAME = 'annual leave';
 
 function hasFilterValue(value?: string): value is string {
   return !!value && value.trim().length > 0;
+}
+
+export function useAbsenceRealtimeQueryInvalidation() {
+  const queryClient = useQueryClient();
+
+  const invalidateAbsenceQueries = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['absences'] });
+    queryClient.invalidateQueries({ queryKey: ['absence-summary'] });
+  }, [queryClient]);
+
+  useAbsenceRealtime((payload) => {
+    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+      invalidateAbsenceQueries();
+    }
+  });
 }
 
 async function assertAbsenceFinancialYearOpen(

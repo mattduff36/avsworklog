@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 
@@ -13,6 +13,11 @@ export function useRealtimeSubscription(
   filter?: string
 ) {
   const supabase = useMemo(() => createClient(), []);
+  const callbackRef = useRef(callback);
+
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -35,7 +40,7 @@ export function useRealtimeSubscription(
           filter,
         },
         (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-          callback(payload);
+          callbackRef.current(payload);
         }
       );
       
@@ -49,7 +54,7 @@ export function useRealtimeSubscription(
         supabase.removeChannel(channel);
       }
     };
-  }, [table, event, filter, callback, supabase]);
+  }, [table, event, filter, supabase]);
 }
 
 export function useTimesheetRealtime(callback: RealtimeCallback) {
@@ -58,5 +63,9 @@ export function useTimesheetRealtime(callback: RealtimeCallback) {
 
 export function useInspectionRealtime(callback: RealtimeCallback) {
   useRealtimeSubscription('van_inspections', '*', callback);
+}
+
+export function useAbsenceRealtime(callback: RealtimeCallback) {
+  useRealtimeSubscription('absences', '*', callback);
 }
 

@@ -47,7 +47,8 @@ import {
   useAbsenceReasons,
   useCreateAbsence,
   useCancelAbsence,
-  useAllAbsences
+  useAllAbsences,
+  useAbsenceRealtimeQueryInvalidation
 } from '@/lib/hooks/useAbsence';
 import { formatDate, formatDateISO, calculateDurationDays, getFinancialYearMonths, getCurrentFinancialYear } from '@/lib/utils/date';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isThisMonth } from 'date-fns';
@@ -201,6 +202,7 @@ export default function AbsencePage() {
   const { data: reasons } = useAbsenceReasons();
   const createAbsence = useCreateAbsence();
   const cancelAbsence = useCancelAbsence();
+  useAbsenceRealtimeQueryInvalidation();
   
   // Determine which absences to show on calendar
   const calendarAbsences = useMemo(() => {

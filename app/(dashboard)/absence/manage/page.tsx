@@ -29,7 +29,8 @@ import {
   useAllAbsences, 
   useAllAbsenceReasons,
   useCreateAbsence,
-  useDeleteAbsence
+  useDeleteAbsence,
+  useAbsenceRealtimeQueryInvalidation
 } from '@/lib/hooks/useAbsence';
 import { formatDate, calculateDurationDays } from '@/lib/utils/date';
 import { createClient } from '@/lib/supabase/client';
@@ -143,6 +144,8 @@ export default function AdminAbsencePage() {
   // Mutations
   const createAbsence = useCreateAbsence();
   const deleteAbsence = useDeleteAbsence();
+  useAbsenceRealtimeQueryInvalidation();
+  const [allowancesRefreshKey, setAllowancesRefreshKey] = useState(0);
   
   // Dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -295,6 +298,7 @@ export default function AdminAbsencePage() {
       });
       
       toast.success('Absence created and approved');
+      setAllowancesRefreshKey((k) => k + 1);
       
       // Reset form
       setSelectedProfileId('');
@@ -324,6 +328,7 @@ export default function AdminAbsencePage() {
     try {
       await deleteAbsence.mutateAsync(deleteTargetId);
       toast.success('Absence deleted');
+      setAllowancesRefreshKey((k) => k + 1);
       setShowDeleteDialog(false);
       setDeleteTargetId(null);
     } catch (error) {
@@ -770,7 +775,7 @@ export default function AdminAbsencePage() {
 
         {canManage && (
           <TabsContent value="allowances" className="space-y-6 mt-0">
-            <AllowancesContent />
+            <AllowancesContent refreshKey={allowancesRefreshKey} />
           </TabsContent>
         )}
       </Tabs>
