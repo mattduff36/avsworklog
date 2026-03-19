@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, CheckCircle2, Clock, Trash2, FileText, Undo2, Wrench, ArrowRight, Info, Settings, Ban, Lightbulb, Bug, Truck } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Trash2, FileText, Undo2, Wrench, ArrowRight, Settings, Lightbulb, Bug, Truck } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Database } from '@/types/database';
 import { toast } from 'sonner';
@@ -797,44 +797,6 @@ export default function ActionsPage() {
         </Card>
         )}
 
-        {/* Site Audit Inspections - Coming Soon */}
-        <Card className="bg-white dark:bg-slate-900 border-border opacity-60">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-slate-500/20">
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <CardTitle className="text-foreground">Site Audit Inspections</CardTitle>
-                    <Badge variant="outline" className="bg-slate-500/10 text-muted-foreground border-slate-500/30">
-                      Coming Soon
-                    </Badge>
-                  </div>
-                  <CardDescription className="text-muted-foreground">
-                    Site safety audits and compliance checks
-                  </CardDescription>
-                </div>
-              </div>
-              <Button
-                disabled
-                className="bg-slate-600 text-white cursor-not-allowed opacity-50"
-              >
-                <Ban className="h-4 w-4 mr-2" />
-                Coming Soon
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-8">
-              <Info className="h-12 w-12 mx-auto mb-3 opacity-20 text-muted-foreground" />
-              <p className="text-muted-foreground">
-                Site audit inspection tracking will be available in a future update
-              </p>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {error && (

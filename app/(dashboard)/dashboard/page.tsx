@@ -245,14 +245,6 @@ export default function DashboardPage() {
         color: 'hsl(48 87% 69%)',
         href: '/admin/errors/manage',
       },
-      {
-        type: 'inspections',
-        label: 'Site Audit Inspections',
-        count: 0,
-        icon: FileText,
-        color: 'hsl(215 20% 50%)',
-        href: '#',
-      },
     ];
   }
 
@@ -840,46 +832,7 @@ export default function DashboardPage() {
               <div className="space-y-2">
                 {visibleActionsSummary.map((actionType) => {
                   const Icon = actionType.icon;
-                  const isComingSoon = actionType.type === 'inspections';
                   
-                  // For "coming soon" items, render as non-clickable
-                  if (isComingSoon) {
-                    return (
-                      <div
-                        key={actionType.type}
-                        className="opacity-60"
-                      >
-                        <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-800/30 border border-border/50">
-                          <div className="flex items-center gap-4">
-                          <div 
-                            className="flex items-center justify-center w-10 h-10 rounded-lg"
-                            style={{ backgroundColor: applyAlphaToHSL(actionType.color) }}
-                          >
-                            <Icon 
-                              className="h-5 w-5" 
-                              style={{ color: actionType.color }}
-                            />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium text-white">
-                                {actionType.label}
-                              </p>
-                              <Badge variant="outline" className="bg-slate-500/10 text-slate-400 border-slate-500/30 text-xs">
-                                Coming Soon
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              Site safety audits and compliance checks
-                            </p>
-                          </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                  
-                  // Regular clickable action type
                   return (
                     <Link
                       key={actionType.type}
