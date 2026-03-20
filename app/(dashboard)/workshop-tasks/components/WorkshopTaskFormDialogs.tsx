@@ -155,6 +155,15 @@ export function WorkshopTaskFormDialogs({
       editComments !== editTaskComments ||
       editMileage.trim()
   );
+  const selectedAddVehicle = vehicles.find((vehicle) => vehicle.id === selectedVehicleId);
+  const addUsesKm = meterReadingType === 'mileage' && selectedAddVehicle?.asset_type === 'hgv';
+  const addMeterLabel = meterReadingType === 'hours' ? 'Current Hours' : addUsesKm ? 'Current KM' : 'Current Mileage';
+  const addMeterPlaceholder = meterReadingType === 'hours' ? 'hours' : addUsesKm ? 'KM' : 'mileage';
+  const addMeterUnit = meterReadingType === 'hours' ? 'hours' : addUsesKm ? 'km' : 'miles';
+  const editUsesKm = !editingTask?.plant_id && Boolean(editingTask?.hgv_id);
+  const editMeterLabel = editingTask?.plant_id ? 'Current Hours' : editUsesKm ? 'Current KM' : 'Current Mileage';
+  const editMeterPlaceholder = editingTask?.plant_id ? 'hours' : editUsesKm ? 'KM' : 'mileage';
+  const editMeterUnit = editingTask?.plant_id ? 'hours' : editUsesKm ? 'km' : 'miles';
 
   function handleAddDialogOpenChange(open: boolean) {
     if (!open && isAddFormDirty) {
@@ -278,21 +287,21 @@ export function WorkshopTaskFormDialogs({
 
             <div className="space-y-2">
               <Label htmlFor="mileage" className="text-foreground">
-                {meterReadingType === 'hours' ? 'Current Hours' : 'Current Mileage'} <span className="text-red-500">*</span>
+                {addMeterLabel} <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="mileage"
                 type="number"
                 value={newMeterReading}
                 onChange={(e) => onNewMeterReadingChange(e.target.value)}
-                placeholder={`Enter current ${meterReadingType === 'hours' ? 'hours' : 'mileage'}`}
+                placeholder={`Enter current ${addMeterPlaceholder}`}
                 className="bg-white dark:bg-slate-800 border-border text-foreground"
                 min="0"
                 step="1"
               />
               {currentMeterReading !== null && (
                 <p className="text-xs text-muted-foreground">
-                  Last recorded: {currentMeterReading.toLocaleString()} {meterReadingType === 'hours' ? 'hours' : 'miles'}
+                  Last recorded: {currentMeterReading.toLocaleString()} {addMeterUnit}
                 </p>
               )}
             </div>
@@ -508,21 +517,21 @@ export function WorkshopTaskFormDialogs({
 
             <div className="space-y-2">
               <Label htmlFor="edit-mileage" className="text-foreground">
-                {editingTask?.plant_id ? 'Current Hours' : 'Current Mileage'} <span className="text-red-500">*</span>
+                {editMeterLabel} <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="edit-mileage"
                 type="number"
                 value={editMileage}
                 onChange={(e) => onEditMileageChange(e.target.value)}
-                placeholder={`Enter current ${editingTask?.plant_id ? 'hours' : 'mileage'}`}
+                placeholder={`Enter current ${editMeterPlaceholder}`}
                 className="bg-white dark:bg-slate-800 border-border text-foreground"
                 min="0"
                 step="1"
               />
               {editCurrentMileage !== null && (
                 <p className="text-xs text-muted-foreground">
-                  Last recorded: {editCurrentMileage.toLocaleString()} {editingTask?.plant_id ? 'hours' : 'miles'}
+                  Last recorded: {editCurrentMileage.toLocaleString()} {editMeterUnit}
                 </p>
               )}
             </div>

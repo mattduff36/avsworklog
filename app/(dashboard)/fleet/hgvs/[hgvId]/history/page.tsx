@@ -685,9 +685,9 @@ export default function HgvHistoryPage({
       mot_expiry_date: 'MOT Expiry',
       tax_due_date: 'Tax Due Date',
       service_due_date: 'Service Due',
-      service_due_mileage: 'Service Due Mileage',
+      service_due_mileage: 'Service Due KM',
       last_service_date: 'Last Service',
-      last_service_mileage: 'Last Service Mileage',
+      last_service_mileage: 'Last Service KM',
       notes: 'Notes',
     };
     return labels[fieldName] || fieldName.replace(/_/g, ' ');
@@ -921,7 +921,7 @@ export default function HgvHistoryPage({
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   <div className="space-y-1">
-                    <span className="text-xs text-slate-400 uppercase tracking-wide">Current Mileage</span>
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">Current KM</span>
                     <p className="text-lg font-semibold text-white">
                       {formatMileage(maintenanceRecord.current_mileage)}
                     </p>
@@ -945,7 +945,7 @@ export default function HgvHistoryPage({
                     <span className="text-xs text-slate-400 uppercase tracking-wide">Service Due</span>
                     <p className="text-lg font-semibold text-white">
                       {maintenanceRecord.next_service_mileage 
-                        ? `${formatMileage(maintenanceRecord.next_service_mileage)} miles` 
+                        ? `${formatMileage(maintenanceRecord.next_service_mileage)} km` 
                         : 'Not Set'}
                     </p>
                   </div>
@@ -961,7 +961,7 @@ export default function HgvHistoryPage({
                     <span className="text-xs text-slate-400 uppercase tracking-wide">Last Service</span>
                     <p className="text-lg font-semibold text-white">
                       {maintenanceRecord.last_service_mileage 
-                        ? `${formatMileage(maintenanceRecord.last_service_mileage)} miles` 
+                        ? `${formatMileage(maintenanceRecord.last_service_mileage)} km` 
                         : 'Not Set'}
                     </p>
                   </div>
@@ -1120,7 +1120,7 @@ export default function HgvHistoryPage({
                           </div>
                           <div className="text-xs text-muted-foreground mt-1">
                             {inspection.profiles?.full_name ? `${inspection.profiles.full_name} • ` : ''}
-                            {inspection.current_mileage != null ? `${inspection.current_mileage.toLocaleString()} miles` : 'Mileage not set'}
+                            {inspection.current_mileage != null ? `${inspection.current_mileage.toLocaleString()} km` : 'KM not set'}
                           </div>
                         </div>
                         <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30">

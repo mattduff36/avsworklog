@@ -157,6 +157,8 @@ export interface Database {
           status: string
           nickname: string | null
           current_mileage: number | null
+          retired_at: string | null
+          retire_reason: string | null
           created_at: string
         }
         Insert: {
@@ -166,6 +168,8 @@ export interface Database {
           status?: string
           nickname?: string | null
           current_mileage?: number | null
+          retired_at?: string | null
+          retire_reason?: string | null
           created_at?: string
         }
         Update: {
@@ -175,6 +179,8 @@ export interface Database {
           status?: string
           nickname?: string | null
           current_mileage?: number | null
+          retired_at?: string | null
+          retire_reason?: string | null
           created_at?: string
         }
       }

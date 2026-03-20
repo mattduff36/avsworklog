@@ -233,7 +233,7 @@ export function HgvInspectionPDF({ inspection, hgv, operator, items, defectsWith
               <Text style={styles.topValue}>{hgv.reg_number}</Text>
             </View>
             <View style={[styles.topCell, { width: '20%' }]}>
-              <Text style={styles.topLabel}>HOURS / MILEAGE</Text>
+              <Text style={styles.topLabel}>HOURS / KM</Text>
               <Text style={styles.topValue}>{inspection.current_mileage ?? '-'}</Text>
             </View>
             <View style={[styles.topCellLast, { width: '40%' }]}>

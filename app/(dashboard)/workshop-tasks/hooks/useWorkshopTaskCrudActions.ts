@@ -182,14 +182,18 @@ export function useWorkshopTaskCrudActions({
     }
 
     const readingValue = parseInt(newMeterReading);
+    const selectedVehicleForValidation = vehicles.find(v => v.id === selectedVehicleId);
+    const usesKm = selectedVehicleForValidation?.asset_type === 'hgv';
+    const meterDescriptor = meterReadingType === 'hours' ? 'hours' : usesKm ? 'KM' : 'mileage';
+    const meterLabel = meterReadingType === 'hours' ? 'Hours' : usesKm ? 'KM' : 'Mileage';
+    const meterUnit = meterReadingType === 'hours' ? 'hours' : usesKm ? 'km' : 'miles';
     if (isNaN(readingValue) || readingValue < 0) {
-      toast.error(`Please enter a valid ${meterReadingType === 'hours' ? 'hours' : 'mileage'}`);
+      toast.error(`Please enter a valid ${meterDescriptor}`);
       return;
     }
 
     if (currentMeterReading !== null && readingValue < currentMeterReading) {
-      const unit = meterReadingType === 'hours' ? 'hours' : 'miles';
-      toast.error(`${meterReadingType === 'hours' ? 'Hours' : 'Mileage'} must be equal to or greater than current reading (${currentMeterReading.toLocaleString()} ${unit})`);
+      toast.error(`${meterLabel} must be equal to or greater than current reading (${currentMeterReading.toLocaleString()} ${meterUnit})`);
       return;
     }
 
@@ -295,7 +299,7 @@ export function useWorkshopTaskCrudActions({
 
       if (meterReadingError) {
         console.error('Error updating meter reading:', meterReadingError);
-        toast.error(`Task created but failed to update ${meterReadingType}`);
+        toast.error(`Task created but failed to update ${meterReadingType === 'hours' ? 'hours' : (isHgv ? 'KM' : 'mileage')}`);
       } else {
         toast.success('Workshop task created successfully');
       }
@@ -426,16 +430,19 @@ export function useWorkshopTaskCrudActions({
     }
 
     const mileageValue = parseInt(editMileage);
-    const editIsPlant = editingTask?.plant_id !== null && editingTask?.plant_id !== undefined;
-    const editMeterLabel = editIsPlant ? 'hours' : 'mileage';
-    const editMeterUnit = editIsPlant ? 'hours' : 'miles';
+    const selectedEditVehicle = vehicles.find(v => v.id === editVehicleId);
+    const editIsPlant = selectedEditVehicle?.asset_type === 'plant';
+    const editIsHgv = selectedEditVehicle?.asset_type === 'hgv';
+    const editMeterLabel = editIsPlant ? 'hours' : editIsHgv ? 'KM' : 'mileage';
+    const editMeterUnit = editIsPlant ? 'hours' : editIsHgv ? 'km' : 'miles';
+    const editMeterTitleLabel = editIsPlant ? 'Hours' : editIsHgv ? 'KM' : 'Mileage';
     if (isNaN(mileageValue) || mileageValue < 0) {
       toast.error(`Please enter a valid ${editMeterLabel}`);
       return;
     }
 
     if (editCurrentMileage !== null && mileageValue < editCurrentMileage) {
-      toast.error(`${editIsPlant ? 'Hours' : 'Mileage'} must be equal to or greater than current reading (${editCurrentMileage.toLocaleString()} ${editMeterUnit})`);
+      toast.error(`${editMeterTitleLabel} must be equal to or greater than current reading (${editCurrentMileage.toLocaleString()} ${editMeterUnit})`);
       return;
     }
 

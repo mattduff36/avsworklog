@@ -30,6 +30,9 @@ interface VehicleData {
   fire_extinguisher_due_date?: string | null;
   taco_calibration_due_date?: string | null;
   next_service_hours?: number | null;
+  vehicle?: {
+    asset_type?: 'van' | 'hgv' | 'plant' | 'tool' | null;
+  } | null;
 }
 
 interface QuickEditPopoverProps {
@@ -58,8 +61,8 @@ const ALERT_TO_LABEL: Record<string, string> = {
   'Tax': 'Tax Due Date',
   'MOT': 'MOT Due Date',
   'First Aid Kit': 'First Aid Kit Expiry',
-  'Service': 'Service Due Mileage',
-  'Cambelt': 'Cambelt Due Mileage',
+  'Service': 'Service Due',
+  'Cambelt': 'Cambelt Due',
   'LOLER': 'LOLER Due Date',
   '6 Weekly Inspection': '6 Weekly Inspection Due',
   'Fire Extinguisher': 'Fire Extinguisher Due',
@@ -102,7 +105,7 @@ function getCurrentValue(alertType: string, vehicle: VehicleData): string {
 }
 
 // Format current value for display
-function formatCurrentValue(alertType: string, value: string): string {
+function formatCurrentValue(alertType: string, value: string, useKm: boolean): string {
   if (!value) return 'Not set';
   
   if (DATE_FIELDS.includes(alertType)) {
@@ -128,7 +131,7 @@ function formatCurrentValue(alertType: string, value: string): string {
   // Mileage - format with commas
   const num = parseInt(value, 10);
   if (!isNaN(num)) {
-    return `${num.toLocaleString()} miles`;
+    return `${num.toLocaleString()} ${useKm ? 'km' : 'miles'}`;
   }
   return value;
 }
@@ -144,8 +147,16 @@ export function QuickEditPopover({
   const [newValue, setNewValue] = useState('');
   const [comment, setComment] = useState('');
 
+  const isHgvAsset = vehicle.vehicle?.asset_type === 'hgv';
+  const distanceUnit = isHgvAsset ? 'km' : 'miles';
+  const distanceInputLabel = isHgvAsset ? 'KM' : 'mileage';
   const fieldName = ALERT_TO_FIELD[alert.type];
-  const fieldLabel = ALERT_TO_LABEL[alert.type] || alert.type;
+  const fieldLabel =
+    alert.type === 'Service'
+      ? `Service Due (${isHgvAsset ? 'KM' : 'Miles'})`
+      : alert.type === 'Cambelt'
+        ? `Cambelt Due (${isHgvAsset ? 'KM' : 'Miles'})`
+        : (ALERT_TO_LABEL[alert.type] || alert.type);
   const isDateField = DATE_FIELDS.includes(alert.type);
   const isHoursField = HOURS_FIELDS.includes(alert.type);
   const currentValue = getCurrentValue(alert.type, vehicle);
@@ -208,7 +219,7 @@ export function QuickEditPopover({
       } else {
         const mileageValue = parseInt(newValue.replace(/,/g, ''), 10);
         if (isNaN(mileageValue) || mileageValue < 0) {
-          toast.error('Please enter a valid mileage');
+          toast.error(`Please enter a valid ${isHgvAsset ? 'KM' : 'mileage'}`);
           setLoading(false);
           return;
         }
@@ -232,7 +243,7 @@ export function QuickEditPopover({
           ? `Changed to ${new Date(newValue).toLocaleDateString('en-GB')}`
           : isHoursField
           ? `Changed to ${parseInt(newValue.replace(/,/g, ''), 10).toLocaleString()} hours`
-          : `Changed to ${parseInt(newValue.replace(/,/g, ''), 10).toLocaleString()} miles`,
+          : `Changed to ${parseInt(newValue.replace(/,/g, ''), 10).toLocaleString()} ${distanceUnit}`,
       });
 
       setOpen(false);
@@ -278,7 +289,7 @@ export function QuickEditPopover({
           <div className="space-y-2">
             <h4 className="font-medium text-sm text-white">Quick Edit: {fieldLabel}</h4>
             <p className="text-xs text-muted-foreground">
-              Current: {formatCurrentValue(alert.type, currentValue)}
+              Current: {formatCurrentValue(alert.type, currentValue, isHgvAsset)}
             </p>
           </div>
 
@@ -301,7 +312,7 @@ export function QuickEditPopover({
                 type="number"
                 min="0"
                 step="1"
-                placeholder={isHoursField ? 'Enter hours' : 'Enter mileage'}
+                placeholder={isHoursField ? 'Enter hours' : `Enter ${distanceInputLabel}`}
                 value={newValue}
                 onChange={(e) => setNewValue(e.target.value)}
                 className="border-border text-white"

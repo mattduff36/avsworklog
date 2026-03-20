@@ -153,7 +153,7 @@ function NewHgvInspectionContent() {
     }
     const mileageValue = parseInt(currentMileage, 10);
     if (!currentMileage || Number.isNaN(mileageValue) || mileageValue < 0) {
-      setError('Please enter a valid current mileage');
+      setError('Please enter a valid current KM');
       return;
     }
     setError('');
@@ -180,7 +180,7 @@ function NewHgvInspectionContent() {
 
     const mileageValue = parseInt(currentMileage, 10);
     if (Number.isNaN(mileageValue) || mileageValue < 0) {
-      return 'Please enter a valid current mileage';
+      return 'Please enter a valid current KM';
     }
 
     if (!checklistStarted) {
@@ -529,7 +529,7 @@ function NewHgvInspectionContent() {
           <div className="flex items-end gap-4">
             <div className="flex-1 space-y-2">
               <Label htmlFor="currentMileage" className="text-foreground text-base flex items-center gap-2">
-                Current Mileage
+                Current KM
                 <span className="text-red-400">*</span>
               </Label>
               <Input

@@ -556,7 +556,7 @@ export function CategoryDialog({
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              {selectedType === 'mileage' && 'Mileage-based categories apply to vans and HGVs.'}
+              {selectedType === 'mileage' && 'Mileage-based categories apply to vans and HGVs (HGV frontend displays KM).'}
               {selectedType === 'hours' && 'Hours-based categories only apply to plant machinery.'}
               {selectedType === 'date' && 'Select which asset types this category applies to (at least one required).'}
             </p>

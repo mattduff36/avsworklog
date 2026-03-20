@@ -297,6 +297,10 @@ export function CreateWorkshopTaskDialog({
   // Get selected vehicle's asset type
   const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
   const selectedAssetType = selectedVehicle?.asset_type || 'van';
+  const isSelectedHgv = selectedAssetType === 'hgv';
+  const meterFieldLabel = meterReadingType === 'hours' ? 'Current Hours' : isSelectedHgv ? 'Current KM' : 'Current Mileage';
+  const meterInputDescriptor = meterReadingType === 'hours' ? 'hours' : isSelectedHgv ? 'KM' : 'mileage';
+  const meterUnit = meterReadingType === 'hours' ? 'hours' : isSelectedHgv ? 'km' : 'miles';
 
   // Filter categories by selected vehicle's asset type
   const filteredCategories = categories.filter(cat => cat.applies_to === selectedAssetType);
@@ -339,15 +343,19 @@ export function CreateWorkshopTaskDialog({
     }
 
     const readingValue = parseInt(newMeterReading);
+    const selectedVehicleForValidation = vehicles.find(v => v.id === selectedVehicleId);
+    const isHgvSelection = selectedVehicleForValidation?.asset_type === 'hgv';
+    const readingDescriptor = meterReadingType === 'hours' ? 'hours' : isHgvSelection ? 'KM' : 'mileage';
+    const readingLabel = meterReadingType === 'hours' ? 'Hours' : isHgvSelection ? 'KM' : 'Mileage';
+    const readingUnit = meterReadingType === 'hours' ? 'hours' : isHgvSelection ? 'km' : 'miles';
     if (isNaN(readingValue) || readingValue < 0) {
-      toast.error(`Please enter a valid ${meterReadingType === 'hours' ? 'hours' : 'mileage'}`);
+      toast.error(`Please enter a valid ${readingDescriptor}`);
       return;
     }
 
     // Validate reading is >= current reading
     if (currentMeterReading !== null && readingValue < currentMeterReading) {
-      const unit = meterReadingType === 'hours' ? 'hours' : 'miles';
-      toast.error(`${meterReadingType === 'hours' ? 'Hours' : 'Mileage'} must be equal to or greater than current reading (${currentMeterReading.toLocaleString()} ${unit})`);
+      toast.error(`${readingLabel} must be equal to or greater than current reading (${currentMeterReading.toLocaleString()} ${readingUnit})`);
       return;
     }
 
@@ -474,7 +482,7 @@ export function CreateWorkshopTaskDialog({
         meterReadingUpdated = true;
       } catch (meterReadingUpdateError) {
         console.error('Error updating meter reading:', meterReadingUpdateError);
-        toast.error(`Task created but failed to update ${meterReadingType}`);
+        toast.error(`Task created but failed to update ${meterReadingType === 'hours' ? 'hours' : (selectedVehicle?.asset_type === 'hgv' ? 'KM' : 'mileage')}`);
       }
 
       if (meterReadingUpdated) toast.success('Workshop task created successfully');
@@ -667,21 +675,21 @@ export function CreateWorkshopTaskDialog({
 
           <div className="space-y-2">
             <Label htmlFor="mileage">
-              {meterReadingType === 'hours' ? 'Current Hours' : 'Current Mileage'} <span className="text-red-500">*</span>
+              {meterFieldLabel} <span className="text-red-500">*</span>
             </Label>
             <Input
               id="mileage"
               type="number"
               value={newMeterReading}
               onChange={(e) => setNewMeterReading(e.target.value)}
-              placeholder={`Enter current ${meterReadingType === 'hours' ? 'hours' : 'mileage'}`}
+              placeholder={`Enter current ${meterInputDescriptor}`}
               min="0"
               step="1"
               className={tabletModeEnabled ? 'min-h-11 text-base' : undefined}
             />
             {currentMeterReading !== null && (
               <p className="text-xs text-muted-foreground">
-                Last recorded: {currentMeterReading.toLocaleString()} {meterReadingType === 'hours' ? 'hours' : 'miles'}
+                Last recorded: {currentMeterReading.toLocaleString()} {meterUnit}
               </p>
             )}
           </div>

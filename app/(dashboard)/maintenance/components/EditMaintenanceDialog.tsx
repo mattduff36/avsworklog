@@ -32,7 +32,7 @@ const editMaintenanceSchema = z.object({
   nickname: z.string().max(100, 'Nickname must be less than 100 characters').optional().nullable(),
   current_mileage: z.preprocess(
     (val) => val === '' || val === null || val === undefined ? null : Number(val),
-    z.number().int().positive('Current mileage must be a positive number').optional().nullable()
+    z.number().int().positive('Current reading must be a positive number').optional().nullable()
   ),
   tax_due_date: z.string().optional().nullable(),
   mot_due_date: z.string().optional().nullable(),
@@ -100,6 +100,9 @@ export function EditMaintenanceDialog({
   const [isMileageFocused, setIsMileageFocused] = useState(false);
   const dialogContentRef = useRef<HTMLDivElement>(null);
   const assetTypeLabel = vehicle?.vehicle?.asset_type === 'plant' ? 'Plant' : vehicle?.vehicle?.asset_type === 'hgv' ? 'HGV' : 'Van';
+  const isHgvAsset = vehicle?.vehicle?.asset_type === 'hgv';
+  const distanceUnitLabel = isHgvAsset ? 'KM' : 'Miles';
+  const currentDistanceLabel = isHgvAsset ? 'Current KM' : 'Current Mileage';
   
   // Check if this is a new maintenance record (vehicle.id is null for vans without maintenance records)
   const isNewRecord = !vehicle?.id;
@@ -294,7 +297,7 @@ export function EditMaintenanceDialog({
                 : 'bg-slate-800/50 border border-border'
             }`}>
               <Label htmlFor="current_mileage" className="text-white">
-                Current Mileage {isMileageFocused && <span className="text-amber-400">(Manual Override)</span>}
+                {currentDistanceLabel} {isMileageFocused && <span className="text-amber-400">(Manual Override)</span>}
               </Label>
               <Input
                 id="current_mileage"
@@ -307,7 +310,7 @@ export function EditMaintenanceDialog({
               />
               {isMileageFocused && (
                 <p className="text-xs text-amber-400 mt-2">
-                  ⚠️ Normally auto-updated from inspections. Only edit if the current mileage is incorrect (e.g., typo in inspection).
+                  ⚠️ Normally auto-updated from inspections. Only edit if the current reading is incorrect (e.g., typo in inspection).
                 </p>
               )}
               {!isMileageFocused && vehicle.last_mileage_update && (
@@ -426,13 +429,13 @@ export function EditMaintenanceDialog({
           {vehicle.vehicle?.asset_type !== 'plant' && (
             <div className="space-y-4">
               <h3 className="font-semibold text-lg border-b border-slate-700 pb-2">
-                Mileage-Based Maintenance
+                {isHgvAsset ? 'KM-Based Maintenance' : 'Mileage-Based Maintenance'}
               </h3>
               
               <div className="grid md:grid-cols-3 gap-4">
                 {/* Service Due */}
                 <div className="space-y-2">
-                  <Label htmlFor="next_service_mileage">Next Service (Miles)</Label>
+                  <Label htmlFor="next_service_mileage">Next Service ({distanceUnitLabel})</Label>
                   <Input
                     id="next_service_mileage"
                     type="number"
@@ -447,7 +450,7 @@ export function EditMaintenanceDialog({
 
                 {/* Last Service */}
                 <div className="space-y-2">
-                  <Label htmlFor="last_service_mileage">Last Service (Miles)</Label>
+                  <Label htmlFor="last_service_mileage">Last Service ({distanceUnitLabel})</Label>
                   <Input
                     id="last_service_mileage"
                     type="number"
@@ -462,7 +465,7 @@ export function EditMaintenanceDialog({
 
                 {/* Cambelt Due */}
                 <div className="space-y-2">
-                  <Label htmlFor="cambelt_due_mileage">Cambelt Due (Miles)</Label>
+                  <Label htmlFor="cambelt_due_mileage">Cambelt Due ({distanceUnitLabel})</Label>
                   <Input
                     id="cambelt_due_mileage"
                     type="number"

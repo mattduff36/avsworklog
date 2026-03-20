@@ -582,11 +582,11 @@ export function PlantTable({
                         
                         {/* Hours */}
                         {columnVisibility.current_hours && (
-                          <TableCell className="text-muted-foreground">
-                            {asset.current_hours ? (
-                              <>{asset.current_hours.toLocaleString()}h</>
+                          <TableCell>
+                            {asset.current_hours != null ? (
+                              <span className="text-muted-foreground">{asset.current_hours.toLocaleString()}h</span>
                             ) : (
-                              <span className="text-slate-400 italic">Not set</span>
+                              <Badge className={`font-medium ${getStatusColorClass('not_set')}`}>Not Set</Badge>
                             )}
                           </TableCell>
                         )}

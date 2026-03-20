@@ -278,7 +278,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
               </p>
               <ul className="list-disc list-inside mt-1 space-y-1">
                 <li><strong>Date-based</strong> (Tax, MOT, LOLOR / Inspection) - Alert X days before due</li>
-                <li><strong>Mileage-based</strong> (Service, Cambelt) - Alert X miles before due</li>
+                <li><strong>Mileage-based</strong> (Service, Cambelt) - Alert X miles before due (displayed as KM for HGV frontend)</li>
                 <li><strong>Hours-based</strong> (Plant Service) - Alert X engine hours before due</li>
               </ul>
               <p className="mt-2">

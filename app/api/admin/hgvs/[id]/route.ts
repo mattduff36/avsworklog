@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { validateRegistrationNumber, formatRegistrationForStorage } from '@/lib/utils/registration';
+
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+}
 
 // PUT - Update an HGV
 export async function PUT(
@@ -111,7 +125,7 @@ export async function PUT(
   }
 }
 
-// DELETE - Archive/soft-delete an HGV
+// DELETE - Retire an HGV (soft-delete with reason tracking)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -133,6 +147,30 @@ export async function DELETE(
     const supabase = await createServerClient();
     const hgvId = (await params).id;
 
+    const body = await request.json().catch(() => ({}));
+    const reason = body.reason || 'Other';
+
+    const adminSupabase = getSupabaseAdmin();
+    const { data: openTasks, error: tasksError } = await adminSupabase
+      .from('actions')
+      .select('id, status, workshop_comments')
+      .eq('hgv_id', hgvId)
+      .in('action_type', ['workshop_vehicle_task', 'inspection_defect'])
+      .neq('status', 'completed')
+      .limit(1);
+
+    if (tasksError) {
+      console.error('Error checking for open tasks:', tasksError);
+      throw new Error('Failed to check for open workshop tasks');
+    }
+
+    if (openTasks && openTasks.length > 0) {
+      return NextResponse.json(
+        { error: 'Cannot retire HGV with open workshop tasks. Please complete or delete all open tasks first.' },
+        { status: 400 }
+      );
+    }
+
     const { data: hgv } = await supabase
       .from('hgvs')
       .select('id, reg_number')
@@ -146,19 +184,24 @@ export async function DELETE(
       );
     }
 
+    const now = new Date().toISOString();
     const { error: updateError } = await supabase
       .from('hgvs')
-      .update({ status: 'archived' })
+      .update({
+        status: 'retired',
+        retired_at: now,
+        retire_reason: reason,
+      })
       .eq('id', hgvId);
 
     if (updateError) throw updateError;
 
     return NextResponse.json({
       success: true,
-      message: `HGV ${hgv.reg_number} archived`,
+      message: `HGV ${hgv.reg_number} retired (Reason: ${reason})`,
     });
   } catch (error) {
-    console.error('Error archiving HGV:', error);
+    console.error('Error retiring HGV:', error);
 
     await logServerError({
       error: error as Error,

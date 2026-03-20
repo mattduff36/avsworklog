@@ -69,6 +69,13 @@ export function MarkTaskCompleteDialog({
   const completionUpdates = task?.workshop_task_categories?.completion_updates || [];
   const hasMaintenanceUpdates = completionUpdates.length > 0;
   const requiresCompletionSignature = task?.action_type === 'inspection_defect' && Boolean(task.hgv_id);
+  const isHgvTask = Boolean(task?.hgv_id);
+  const formatDistanceCopy = (value: string) =>
+    isHgvTask
+      ? value
+          .replace(/\b[Mm]ileage\b/g, 'KM')
+          .replace(/\b[Mm]iles\b/g, 'KM')
+      : value;
   const getInputValue = (value: CompletionFieldValues[string]): string | number =>
     typeof value === 'number' ? value : typeof value === 'string' ? value : '';
 
@@ -339,7 +346,7 @@ export function MarkTaskCompleteDialog({
                       <Label
                         htmlFor={`maintenance-${config.field_name}`}
                       >
-                        {config.label}
+                        {formatDistanceCopy(config.label)}
                         {config.required && <span className="text-red-500 ml-1">*</span>}
                       </Label>
 
@@ -387,7 +394,7 @@ export function MarkTaskCompleteDialog({
 
                       {config.help_text && (
                         <p className="text-xs text-muted-foreground">
-                          {config.help_text}
+                          {formatDistanceCopy(config.help_text)}
                         </p>
                       )}
                     </div>

@@ -318,6 +318,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     const alerts: Alert[] = [];
     const isPlant = 'is_plant' in vehicle && vehicle.is_plant === true;
     const rawAssetType = (vehicle.vehicle?.asset_type || (isPlant ? 'plant' : 'vehicle')).toLowerCase();
+    const distanceUnit = rawAssetType === 'hgv' ? 'km' : 'miles';
     
     // Helper to check if category applies to this asset
     const categoryApplies = (categoryName: string): boolean => {
@@ -377,7 +378,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         const milesUntil = vehicle.service_status.miles_until ?? 0;
         alerts.push({
           type: 'Service',
-          detail: formatMilesUntil(milesUntil),
+          detail: formatMilesUntil(milesUntil, distanceUnit),
           severity: 'overdue',
           sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
         });
@@ -385,7 +386,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         const milesUntil = vehicle.service_status.miles_until ?? 0;
         alerts.push({
           type: 'Service',
-          detail: formatMilesUntil(milesUntil),
+          detail: formatMilesUntil(milesUntil, distanceUnit),
           severity: 'due_soon',
           sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
         });
@@ -398,7 +399,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         const milesUntil = vehicle.cambelt_status.miles_until ?? 0;
         alerts.push({
           type: 'Cambelt',
-          detail: formatMilesUntil(milesUntil),
+          detail: formatMilesUntil(milesUntil, distanceUnit),
           severity: 'overdue',
           sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
         });
@@ -406,7 +407,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         const milesUntil = vehicle.cambelt_status.miles_until ?? 0;
         alerts.push({
           type: 'Cambelt',
-          detail: formatMilesUntil(milesUntil),
+          detail: formatMilesUntil(milesUntil, distanceUnit),
           severity: 'due_soon',
           sortValue: Math.round(milesUntil / ESTIMATED_DAILY_MILES) // Convert miles to days equivalent
         });
@@ -1186,7 +1187,9 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 ) : (
                   <>
                     <div className="space-y-0">
-                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Mileage</div>
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
+                        {vehicle.vehicle?.asset_type === 'hgv' ? 'KM' : 'Mileage'}
+                      </div>
                       <div className="text-sm font-medium text-white">
                         {formatMileage(vehicle.current_mileage)}
                       </div>

@@ -78,3 +78,6 @@ node_modules/
 # Testsuite (generated state, reports, auth snapshots)
 /testsuite/.state/
 /testsuite/reports/
+
+# Audit reports (screenshots and generated artifacts)
+/reports/

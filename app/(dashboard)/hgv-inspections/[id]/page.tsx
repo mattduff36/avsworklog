@@ -192,7 +192,7 @@ export default function ViewHgvInspectionPage() {
         <Card>
           <CardContent className="pt-6 text-center">
             <div className="text-3xl font-bold text-foreground">{inspection.current_mileage?.toLocaleString() || '-'}</div>
-            <div className="text-sm text-muted-foreground">Mileage</div>
+            <div className="text-sm text-muted-foreground">KM</div>
           </CardContent>
         </Card>
       </div>

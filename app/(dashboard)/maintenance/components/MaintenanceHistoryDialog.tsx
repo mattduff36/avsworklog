@@ -33,6 +33,7 @@ export function MaintenanceHistoryDialog({
   onEditClick
 }: MaintenanceHistoryDialogProps) {
   const { data: historyData, isLoading } = useMaintenanceHistory(vehicleId);
+  const isHgvAsset = assetType === 'hgv';
   const [showFullHistory, setShowFullHistory] = useState(false);
   const [visibleHistoryCount, setVisibleHistoryCount] = useState(10);
   const [motHistoryOpen, setMotHistoryOpen] = useState(false);
@@ -120,9 +121,9 @@ export function MaintenanceHistoryDialog({
       'six_weekly_inspection_due_date': '6 Weekly Inspection Due',
       'fire_extinguisher_due_date': 'Fire Extinguisher Due',
       'taco_calibration_due_date': 'Taco Calibration Due',
-      'next_service_mileage': 'Next Service',
-      'last_service_mileage': 'Last Service',
-      'cambelt_due_mileage': 'Cambelt Due',
+      'next_service_mileage': isHgvAsset ? 'Next Service (KM)' : 'Next Service',
+      'last_service_mileage': isHgvAsset ? 'Last Service (KM)' : 'Last Service',
+      'cambelt_due_mileage': isHgvAsset ? 'Cambelt Due (KM)' : 'Cambelt Due',
       'cambelt_done': 'Cambelt Done',
       'notes': 'Notes',
       'all_fields': 'All Fields',
@@ -138,7 +139,7 @@ export function MaintenanceHistoryDialog({
       return formatMaintenanceDate(value);
     }
     if (type === 'mileage') {
-      return parseInt(value).toLocaleString() + ' miles';
+      return parseInt(value).toLocaleString() + (isHgvAsset ? ' km' : ' miles');
     }
     if (type === 'boolean') {
       return value === 'true' ? 'Yes' : 'No';
@@ -328,7 +329,7 @@ export function MaintenanceHistoryDialog({
             <div className="flex-1">
               <DialogTitle className="text-xl md:text-2xl flex items-center gap-2">
                 <HistoryIcon className="h-5 w-5 md:h-6 md:w-6" />
-                <span className="truncate">Maintenance History - {vehicleReg || 'Van'}</span>
+                <span className="truncate">Maintenance History - {vehicleReg || (assetType === 'hgv' ? 'HGV' : assetType === 'plant' ? 'Plant' : 'Van')}</span>
               </DialogTitle>
               <DialogDescription className="text-slate-400 text-sm">
                 Complete audit trail of all maintenance changes

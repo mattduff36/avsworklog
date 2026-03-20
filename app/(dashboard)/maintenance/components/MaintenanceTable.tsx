@@ -46,12 +46,15 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { cn } from '@/lib/utils/cn';
+import { toast } from 'sonner';
 
 type RetiredHgv = {
   id: string;
   reg_number: string;
   nickname: string | null;
   current_mileage: number | null;
+  retired_at: string | null;
+  retire_reason: string | null;
   hgv_categories?: { name: string; id: string } | null;
 };
 
@@ -100,6 +103,8 @@ export function MaintenanceTable({
 }: MaintenanceTableProps) {
   const assetLabelLower = assetLabel.toLowerCase();
   const isHgvTable = assetLabel === 'HGV';
+  const distanceHeaderLabel = isHgvTable ? 'KM' : 'Mileage';
+  const currentDistanceLabel = isHgvTable ? 'Current KM' : 'Current Mileage';
   const assetLabelPlural = `${assetLabel}s`;
   const assetLabelPluralLower = `${assetLabelLower}s`;
   const router = useRouter();
@@ -114,7 +119,7 @@ export function MaintenanceTable({
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [retiredSearchQuery, setRetiredSearchQuery] = useState('');
   
-  // Track pending operations per vehicle ID
+  // Track pending operations per vehicle ID (vans + HGVs share these)
   const [pendingRestore, setPendingRestore] = useState<Set<string>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<Set<string>>(new Set());
   
@@ -134,9 +139,9 @@ export function MaintenanceTable({
     try {
       const { data, error } = await supabase
         .from('hgvs')
-        .select('id, reg_number, nickname, current_mileage, hgv_categories(name, id)')
-        .eq('status', 'retired')
-        .order('reg_number', { ascending: true });
+        .select('id, reg_number, nickname, current_mileage, retired_at, retire_reason, hgv_categories(name, id)')
+        .in('status', ['retired', 'archived'])
+        .order('retired_at', { ascending: false, nullsFirst: false });
       if (error) throw error;
       setRetiredHgvs(data || []);
     } catch {
@@ -182,6 +187,77 @@ export function MaintenanceTable({
         },
       });
     }
+  };
+
+  const handleRestoreHgv = (hgv: RetiredHgv) => {
+    if (!confirm(`Restore ${hgv.reg_number} to active HGVs?\n\nThis will:\n• Move HGV back to Active HGVs tab\n• Restore all maintenance data\n\nContinue?`)) return;
+
+    setPendingRestore(prev => new Set(prev).add(hgv.id));
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('hgvs')
+          .update({ status: 'active', retired_at: null, retire_reason: null })
+          .eq('id', hgv.id);
+
+        if (error) throw error;
+
+        toast.success('HGV restored', {
+          description: `${hgv.reg_number} has been moved back to Active HGVs.`,
+        });
+
+        fetchRetiredHgvs();
+        onVehicleAdded?.();
+      } catch (error: unknown) {
+        console.error('Error restoring HGV:', error);
+        toast.error('Failed to restore HGV', {
+          description: error instanceof Error ? error.message : 'Please try again.',
+        });
+      } finally {
+        setPendingRestore(prev => {
+          const next = new Set(prev);
+          next.delete(hgv.id);
+          return next;
+        });
+      }
+    })();
+  };
+
+  const handlePermanentDeleteHgv = (hgv: RetiredHgv) => {
+    if (!confirm(`⚠️ Permanently remove ${hgv.reg_number}?\n\nThis will:\n• Remove from Retired HGVs tab\n• Preserve all inspection history\n• Cannot be undone\n\nContinue?`)) return;
+
+    setPendingDelete(prev => new Set(prev).add(hgv.id));
+    (async () => {
+      try {
+        const { error, count } = await supabase
+          .from('hgvs')
+          .delete({ count: 'exact' })
+          .eq('id', hgv.id);
+
+        if (error) throw error;
+
+        if (count === 0) {
+          throw new Error('You do not have permission to permanently delete HGV records.');
+        }
+
+        toast.success('HGV permanently removed', {
+          description: `${hgv.reg_number} has been permanently deleted from the archive.`,
+        });
+
+        fetchRetiredHgvs();
+      } catch (error: unknown) {
+        console.error('Error permanently deleting HGV:', error);
+        toast.error('Failed to permanently remove HGV', {
+          description: error instanceof Error ? error.message : 'Please try again.',
+        });
+      } finally {
+        setPendingDelete(prev => {
+          const next = new Set(prev);
+          next.delete(hgv.id);
+          return next;
+        });
+      }
+    })();
   };
   
   // Column visibility state - all columns visible by default
@@ -347,7 +423,7 @@ export function MaintenanceTable({
                   checked={columnVisibility.current_mileage}
                   onCheckedChange={() => toggleColumn('current_mileage')}
                 >
-                  Mileage
+                  {distanceHeaderLabel}
                 </DropdownMenuCheckboxItem>
                 <DropdownMenuCheckboxItem
                   checked={columnVisibility.tax_due}
@@ -446,7 +522,7 @@ export function MaintenanceTable({
                           onClick={() => handleSort('current_mileage')}
                         >
                           <div className="flex items-center gap-2">
-                            Mileage
+                            {distanceHeaderLabel}
                             <ArrowUpDown className="h-3 w-3" />
                           </div>
                         </TableHead>
@@ -580,10 +656,14 @@ export function MaintenanceTable({
                           </TableCell>
                         )}
                         
-                        {/* Current Mileage */}
+                        {/* Current distance reading */}
                         {columnVisibility.current_mileage && (
-                          <TableCell className="text-muted-foreground">
-                            {formatMileage(vehicle.current_mileage)}
+                          <TableCell>
+                            {vehicle.current_mileage != null ? (
+                              <span className="text-muted-foreground">{formatMileage(vehicle.current_mileage)}</span>
+                            ) : (
+                              <Badge className={`font-medium ${getStatusColorClass('not_set')}`}>Not Set</Badge>
+                            )}
                           </TableCell>
                         )}
                         
@@ -748,7 +828,7 @@ export function MaintenanceTable({
                           <div className="space-y-2">
                             {columnVisibility.current_mileage && vehicle.current_mileage && (
                               <div className="flex items-center justify-between">
-                                <span className="text-sm text-muted-foreground">Current Mileage:</span>
+                                <span className="text-sm text-muted-foreground">{currentDistanceLabel}:</span>
                                 <span className="text-white font-medium">{formatMileage(vehicle.current_mileage)}</span>
                               </div>
                             )}
@@ -897,14 +977,18 @@ export function MaintenanceTable({
                   </div>
                 ) : (
                   <>
+                    {/* Desktop Table View for Retired HGVs */}
                     <div className={cn('border border-slate-700 rounded-lg', tabletModeEnabled ? 'hidden' : 'hidden md:block')}>
                       <Table className="min-w-full">
                         <TableHeader>
                           <TableRow className="border-border">
                             <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">Registration</TableHead>
                             <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">Nickname</TableHead>
-                            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">Mileage</TableHead>
+                            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">{distanceHeaderLabel}</TableHead>
                             <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">Category</TableHead>
+                            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">Retired Date</TableHead>
+                            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">Reason</TableHead>
+                            <TableHead className="bg-slate-900 text-right text-muted-foreground border-b-2 border-border">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -918,23 +1002,104 @@ export function MaintenanceTable({
                                 </TableCell>
                                 <TableCell className="text-muted-foreground">{formatMileage(hgv.current_mileage)}</TableCell>
                                 <TableCell className="text-muted-foreground">{hgv.hgv_categories?.name || '—'}</TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {hgv.retired_at
+                                    ? new Date(hgv.retired_at).toLocaleDateString()
+                                    : '—'}
+                                </TableCell>
+                                <TableCell>
+                                  {hgv.retire_reason ? (
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        hgv.retire_reason === 'Sold'
+                                          ? 'border-blue-500 text-blue-400'
+                                          : hgv.retire_reason === 'Scrapped'
+                                          ? 'border-red-500 text-red-400'
+                                          : 'border-slate-500 text-muted-foreground'
+                                      }
+                                    >
+                                      {hgv.retire_reason}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {(isAdmin || isManager) && (
+                                    <div className="flex items-center justify-end gap-2">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleRestoreHgv(hgv)}
+                                        disabled={pendingRestore.has(hgv.id)}
+                                        className="text-green-400 hover:text-green-300 hover:bg-green-900/20"
+                                        title="Restore to Active"
+                                      >
+                                        {pendingRestore.has(hgv.id) ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <Undo2 className="h-3 w-3" />
+                                        )}
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handlePermanentDeleteHgv(hgv)}
+                                        disabled={pendingDelete.has(hgv.id)}
+                                        className="text-red-400 hover:text-red-300 hover:bg-slate-800"
+                                        title="Permanently Remove"
+                                      >
+                                        {pendingDelete.has(hgv.id) ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <XCircle className="h-3 w-3" />
+                                        )}
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
                               </TableRow>
                             ))}
                         </TableBody>
                       </Table>
                     </div>
+
+                    {/* Mobile Card View for Retired HGVs */}
                     <div className={cn('space-y-3', tabletModeEnabled ? 'block' : 'md:hidden')}>
                       {retiredHgvs
                         .filter(h => (h.reg_number || '').toLowerCase().includes(retiredSearchQuery.toLowerCase()))
                         .map((hgv) => (
                           <Card key={hgv.id} className="bg-slate-800 border-border">
                             <CardContent className="p-4">
-                              <h3 className="font-semibold text-white text-lg">{hgv.reg_number}</h3>
-                              {hgv.nickname && <p className="text-xs text-muted-foreground">{hgv.nickname}</p>}
-                              <div className="space-y-2 text-sm mt-2">
+                              <div className="flex items-center justify-between mb-3">
+                                <div>
+                                  <h3 className="font-semibold text-white text-lg">{hgv.reg_number}</h3>
+                                  {hgv.nickname && <p className="text-xs text-muted-foreground">{hgv.nickname}</p>}
+                                </div>
+                                {hgv.retire_reason ? (
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      hgv.retire_reason === 'Sold'
+                                        ? 'border-blue-500 text-blue-400'
+                                        : hgv.retire_reason === 'Scrapped'
+                                        ? 'border-red-500 text-red-400'
+                                        : 'border-slate-500 text-muted-foreground'
+                                    }
+                                  >
+                                    {hgv.retire_reason}
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-500/10">
+                                    Retired
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="space-y-2 text-sm">
                                 {hgv.current_mileage && (
                                   <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Mileage:</span>
+                                    <span className="text-muted-foreground">{distanceHeaderLabel}:</span>
                                     <span className="text-white">{formatMileage(hgv.current_mileage)}</span>
                                   </div>
                                 )}
@@ -944,7 +1109,57 @@ export function MaintenanceTable({
                                     <span className="text-white">{hgv.hgv_categories.name}</span>
                                   </div>
                                 )}
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Retired:</span>
+                                  <span className="text-white">
+                                    {hgv.retired_at
+                                      ? new Date(hgv.retired_at).toLocaleDateString()
+                                      : '—'}
+                                  </span>
+                                </div>
                               </div>
+                              {(isAdmin || isManager) && (
+                                <div className="mt-4 pt-3 border-t border-slate-700 space-y-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRestoreHgv(hgv)}
+                                    disabled={pendingRestore.has(hgv.id)}
+                                    className={cn('w-full text-green-400 hover:text-green-300 hover:bg-green-900/20', tabletModeEnabled && 'min-h-11 text-base')}
+                                  >
+                                    {pendingRestore.has(hgv.id) ? (
+                                      <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Restoring...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Undo2 className="h-4 w-4 mr-2" />
+                                        Restore to Active
+                                      </>
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handlePermanentDeleteHgv(hgv)}
+                                    disabled={pendingDelete.has(hgv.id)}
+                                    className={cn('w-full text-red-400 hover:text-red-300 hover:bg-red-900/20', tabletModeEnabled && 'min-h-11 text-base')}
+                                  >
+                                    {pendingDelete.has(hgv.id) ? (
+                                      <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Removing...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <XCircle className="h-4 w-4 mr-2" />
+                                        Permanently Remove
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              )}
                             </CardContent>
                           </Card>
                         ))}
@@ -1179,9 +1394,12 @@ export function MaintenanceTable({
           reg_number: selectedVehicle.vehicle?.reg_number ?? selectedVehicle.vehicle?.plant_id ?? 'Unknown',
           category: selectedVehicle.vehicle?.category_id ? { name: 'Vehicle' } : null
         } : null}
+        endpoint={isHgvTable ? 'hgvs' : 'vans'}
+        entityLabel={isHgvTable ? 'HGV' : 'Van'}
         onSuccess={() => {
           setDeleteDialogOpen(false);
           setSelectedVehicle(null);
+          if (isHgvTable) fetchRetiredHgvs();
           onVehicleAdded?.(); // Refresh the list
         }}
       />

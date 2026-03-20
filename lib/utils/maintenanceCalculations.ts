@@ -281,15 +281,18 @@ export function formatDaysUntil(daysUntil: number | null | undefined): string {
 /**
  * Format miles until due for display
  */
-export function formatMilesUntil(milesUntil: number | null | undefined): string {
+export function formatMilesUntil(
+  milesUntil: number | null | undefined,
+  unit: 'miles' | 'km' = 'miles'
+): string {
   if (milesUntil === null || milesUntil === undefined) return 'Not Set';
   
   if (milesUntil < 0) {
     const absMiles = Math.abs(milesUntil);
-    return `${absMiles.toLocaleString()} miles overdue`;
+    return `${absMiles.toLocaleString()} ${unit} overdue`;
   }
   
-  return `${milesUntil.toLocaleString()} miles remaining`;
+  return `${milesUntil.toLocaleString()} ${unit} remaining`;
 }
 
 /**
