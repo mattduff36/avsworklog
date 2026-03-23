@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -53,12 +54,12 @@ import {
 import { formatDate, formatDateISO, calculateDurationDays, getFinancialYearMonths, getCurrentFinancialYear } from '@/lib/utils/date';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isThisMonth } from 'date-fns';
 import { toast } from 'sonner';
-import { createClient } from '@/lib/supabase/client';
 
 type Employee = {
   id: string;
   full_name: string;
   employee_id: string | null;
+  has_module_access?: boolean;
 };
 
 type GenerationStatus = {
@@ -113,12 +114,25 @@ function parseIsoDateAsLocalMidnight(isoDate: string): Date {
   return new Date(year, month - 1, day);
 }
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message.trim().length > 0 ? error.message : fallback;
+}
+
+function isExpectedAbsenceSubmissionError(message: string): boolean {
+  const normalized = message.trim().toLowerCase();
+  return (
+    normalized.includes('annual leave request exceeds available allowance') ||
+    normalized.includes('conflicts with an existing approved/pending booking') ||
+    normalized.includes('half-day conflicts') ||
+    normalized.includes('half-day is already booked')
+  );
+}
+
 export default function AbsencePage() {
   const { profile, isManager, isAdmin } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('absence');
-  const supabase = createClient();
   const [activeTab, setActiveTab] = useState<'calendar' | 'bookings'>('calendar');
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
@@ -222,6 +236,10 @@ export default function AbsencePage() {
     // Filter by selected employees
     return allAbsences.filter(a => selectedEmployeeIds.includes(a.profile_id));
   }, [isManager, isAdmin, userAbsences, allAbsencesData, selectedEmployeeIds]);
+  const accessibleEmployees = useMemo(
+    () => employees.filter((employee) => employee.has_module_access !== false),
+    [employees]
+  );
   
   const loadingAbsences = isManager || isAdmin ? loadingAllAbsences : loadingUserAbsences;
   // Form state
@@ -240,9 +258,8 @@ export default function AbsencePage() {
     }
     void loadGenerationStatus();
     if (isManager || isAdmin) {
-      fetchEmployees();
+      void fetchEmployees();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isManager, isAdmin, permissionLoading, hasPermission]);
 
   async function loadGenerationStatus() {
@@ -261,15 +278,15 @@ export default function AbsencePage() {
   
   async function fetchEmployees() {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, employee_id')
-        .order('full_name');
-      
-      if (error) throw error;
-      const employees = (data || []) as Employee[];
+      const data = await fetchUserDirectory({ module: 'absence' });
+      const employees = data.map((employee) => ({
+        id: employee.id,
+        full_name: employee.full_name || 'Unknown User',
+        employee_id: employee.employee_id,
+        has_module_access: employee.has_module_access,
+      })) as Employee[];
       setEmployees(employees);
-      setSelectedEmployeeIds(employees.map(e => e.id));
+      setSelectedEmployeeIds(employees.filter((employee) => employee.has_module_access !== false).map(e => e.id));
     } catch (err) {
       console.error('Error fetching employees:', err);
     }
@@ -277,6 +294,9 @@ export default function AbsencePage() {
   
   // Toggle employee selection
   function toggleEmployee(employeeId: string) {
+    const employee = employees.find((candidate) => candidate.id === employeeId);
+    if (!employee || employee.has_module_access === false) return;
+
     setSelectedEmployeeIds(prev => 
       prev.includes(employeeId)
         ? prev.filter(id => id !== employeeId)
@@ -285,10 +305,10 @@ export default function AbsencePage() {
   }
   
   function toggleAllEmployees() {
-    if (selectedEmployeeIds.length === employees.length) {
+    if (selectedEmployeeIds.length === accessibleEmployees.length) {
       setSelectedEmployeeIds([]);
     } else {
-      setSelectedEmployeeIds(employees.map(e => e.id));
+      setSelectedEmployeeIds(accessibleEmployees.map(e => e.id));
     }
   }
 
@@ -403,8 +423,11 @@ export default function AbsencePage() {
       setShowRequestDialog(false);
       setShowDayModal(false);
     } catch (error) {
-      console.error('Error submitting request:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to submit request');
+      const message = getErrorMessage(error, 'Failed to submit request');
+      if (!isExpectedAbsenceSubmissionError(message)) {
+        console.error('Error submitting request:', error);
+      }
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -951,7 +974,7 @@ export default function AbsencePage() {
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="sm" className="border-border text-muted-foreground">
                           <Users className="h-4 w-4 mr-2" />
-                          Filter ({selectedEmployeeIds.length}/{employees.length})
+                          Filter ({selectedEmployeeIds.length}/{accessibleEmployees.length})
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-80 border-border" align="end">
@@ -964,7 +987,7 @@ export default function AbsencePage() {
                               onClick={toggleAllEmployees}
                               className="h-7 text-xs text-purple-400 hover:text-purple-300"
                             >
-                              {selectedEmployeeIds.length === employees.length ? 'Deselect All' : 'Select All'}
+                              {selectedEmployeeIds.length === accessibleEmployees.length ? 'Deselect All' : 'Select All'}
                             </Button>
                           </div>
                           <div className="max-h-60 overflow-y-auto space-y-2">
@@ -974,13 +997,18 @@ export default function AbsencePage() {
                                   id={`emp-${emp.id}`}
                                   checked={selectedEmployeeIds.includes(emp.id)}
                                   onCheckedChange={() => toggleEmployee(emp.id)}
+                                  disabled={emp.has_module_access === false}
                                   className="border-border"
                                 />
                                 <label
                                   htmlFor={`emp-${emp.id}`}
-                                  className="text-sm text-muted-foreground cursor-pointer flex-1"
+                                  className={`text-sm cursor-pointer flex-1 ${
+                                    emp.has_module_access === false ? 'text-slate-500' : 'text-muted-foreground'
+                                  }`}
                                 >
                                   {emp.full_name}
+                                  {emp.employee_id ? ` (${emp.employee_id})` : ''}
+                                  {emp.has_module_access === false ? ' - No Absence access' : ''}
                                 </label>
                               </div>
                             ))}

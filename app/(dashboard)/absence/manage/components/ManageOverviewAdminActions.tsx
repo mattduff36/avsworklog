@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
 import { Loader2, Sparkles, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
@@ -31,6 +32,7 @@ interface BulkEmployeeOption {
   role_id: string | null;
   role_name: string | null;
   role_display_name: string | null;
+  has_module_access?: boolean;
 }
 
 interface GenerationStatus {
@@ -142,11 +144,8 @@ export function ManageOverviewAdminActions() {
 
   const loadBulkOptions = useCallback(async () => {
     try {
-      const [{ data: profiles, error: profilesError }, { data: reasons, error: reasonsError }] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('id, full_name, employee_id, roles(id, name, display_name)')
-          .order('full_name'),
+      const [profiles, { data: reasons, error: reasonsError }] = await Promise.all([
+        fetchUserDirectory({ includeRole: true, module: 'absence' }),
         supabase
           .from('absence_reasons')
           .select('id, name, is_active')
@@ -154,22 +153,22 @@ export function ManageOverviewAdminActions() {
           .order('name'),
       ]);
 
-      if (profilesError) throw profilesError;
       if (reasonsError) throw reasonsError;
 
       type ProfileData = {
         id: string;
         full_name: string;
         employee_id: string | null;
-        roles?: { id?: string; name?: string; display_name?: string } | null;
+        role?: { id?: string | null; name?: string | null; display_name?: string | null } | null;
       };
       const nextEmployees = ((profiles || []) as ProfileData[]).map((profile) => ({
         id: profile.id,
-        full_name: profile.full_name,
+        full_name: profile.full_name || 'Unknown User',
         employee_id: profile.employee_id,
-        role_id: profile.roles?.id || null,
-        role_name: profile.roles?.name || null,
-        role_display_name: profile.roles?.display_name || null,
+        role_id: profile.role?.id || null,
+        role_name: profile.role?.name || null,
+        role_display_name: profile.role?.display_name || null,
+        has_module_access: (profile as { has_module_access?: boolean }).has_module_access,
       }));
       setBulkEmployeeOptions(nextEmployees);
 
@@ -542,10 +541,12 @@ export function ManageOverviewAdminActions() {
                           key={employee.id}
                           checked={shutdownEmployeeFilters.includes(employee.id)}
                           onCheckedChange={() => toggleShutdownEmployee(employee.id)}
+                          disabled={employee.has_module_access === false}
                           className="text-foreground focus:bg-slate-800/70 focus:text-foreground"
                         >
                           {employee.full_name}
                           {employee.employee_id ? ` (${employee.employee_id})` : ''}
+                          {employee.has_module_access === false ? ' - No Absence access' : ''}
                         </DropdownMenuCheckboxItem>
                       ))}
                     </DropdownMenuContent>

@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Send, Search } from 'lucide-react';
 import { toast } from 'sonner';
-import { createClient } from '@/lib/supabase/client';
+import { fetchUserDirectory } from '@/lib/client/user-directory';
 
 interface Employee {
   id: string;
@@ -17,6 +17,7 @@ interface Employee {
     name: string;
     display_name: string;
   } | null;
+  hasModuleAccess?: boolean;
 }
 
 interface Role {
@@ -51,33 +52,37 @@ export function AssignRecipientsModal({
       async function fetchEmployees() {
         setFetching(true);
         try {
-          const supabase = createClient();
-          // Fetch all roles
-          const { data: rolesData, error: rolesError } = await supabase
-            .from('roles')
-            .select('name, display_name')
-            .order('display_name');
+          const allEmployees = await fetchUserDirectory({ includeRole: true, module: 'toolbox-talks' });
+          const typedEmployees = allEmployees.map((employee) => ({
+            id: employee.id,
+            full_name: employee.full_name || 'Unknown User',
+            role: employee.role?.name
+              ? {
+                  name: employee.role.name,
+                  display_name: employee.role.display_name || employee.role.name,
+                }
+              : null,
+            hasModuleAccess: employee.has_module_access !== false,
+          }));
+          const roleMap = new Map<string, Role>();
 
-          if (rolesError) throw rolesError;
-          setRoles(rolesData || []);
+          typedEmployees.forEach((employee) => {
+            if (!employee.role?.name) return;
+            if (!roleMap.has(employee.role.name)) {
+              roleMap.set(employee.role.name, {
+                name: employee.role.name,
+                display_name: employee.role.display_name,
+              });
+            }
+          });
 
-          // Fetch all employees with roles
-          const { data: allEmployees, error: empError } = await supabase
-            .from('profiles')
-            .select(`
-              id,
-              full_name,
-              role:roles(
-                name,
-                display_name
-              )
-            `)
-            .order('full_name');
+          const roleOptions = Array.from(roleMap.values()).sort((a, b) =>
+            a.display_name.localeCompare(b.display_name)
+          );
 
-          if (empError) throw empError;
-
-          setEmployees(allEmployees || []);
-          setFilteredEmployees(allEmployees || []);
+          setRoles(roleOptions);
+          setEmployees(typedEmployees);
+          setFilteredEmployees(typedEmployees);
         } catch (error) {
           console.error('Error fetching employees:', error);
           toast.error('Failed to load employees');
@@ -102,6 +107,9 @@ export function AssignRecipientsModal({
   }, [searchQuery, employees]);
 
   const handleToggleEmployee = (id: string) => {
+    const employee = employees.find((candidate) => candidate.id === id);
+    if (!employee || employee.hasModuleAccess === false) return;
+
     const newSelected = new Set(selectedIds);
     if (newSelected.has(id)) {
       newSelected.delete(id);
@@ -112,8 +120,9 @@ export function AssignRecipientsModal({
   };
 
   const handleSelectAll = (checked: boolean) => {
+    const selectableEmployees = filteredEmployees.filter((employee) => employee.hasModuleAccess !== false);
     if (checked) {
-      const allIds = filteredEmployees.map(emp => emp.id);
+      const allIds = selectableEmployees.map(emp => emp.id);
       setSelectedIds(new Set(allIds));
     } else {
       setSelectedIds(new Set());
@@ -121,7 +130,9 @@ export function AssignRecipientsModal({
   };
 
   const handleSelectRole = (role: string) => {
-    const employeesWithRole = employees.filter(emp => emp.role?.name === role);
+    const employeesWithRole = employees.filter(
+      (emp) => emp.role?.name === role && emp.hasModuleAccess !== false
+    );
     // Check if all employees in this role are already selected
     const allRoleSelected = employeesWithRole.every(emp => selectedIds.has(emp.id));
     
@@ -174,7 +185,10 @@ export function AssignRecipientsModal({
     onClose();
   };
 
-  const allSelected = filteredEmployees.length > 0 && selectedIds.size === filteredEmployees.length;
+  const selectableFilteredEmployees = filteredEmployees.filter((employee) => employee.hasModuleAccess !== false);
+  const allSelected =
+    selectableFilteredEmployees.length > 0 &&
+    selectableFilteredEmployees.every((employee) => selectedIds.has(employee.id));
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -199,7 +213,9 @@ export function AssignRecipientsModal({
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {roles.map((role) => {
-                  const roleEmployees = employees.filter(emp => emp.role?.name === role.name);
+                  const roleEmployees = employees.filter(
+                    (emp) => emp.role?.name === role.name && emp.hasModuleAccess !== false
+                  );
                   const roleCount = roleEmployees.length;
                   const allRoleSelected = roleEmployees.length > 0 && roleEmployees.every(emp => selectedIds.has(emp.id));
                   
@@ -268,13 +284,15 @@ export function AssignRecipientsModal({
                     filteredEmployees.map((employee) => (
                       <div
                         key={employee.id}
-                        className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-accent/50"
+                        className={`flex items-center space-x-3 p-3 rounded-lg border ${
+                          employee.hasModuleAccess === false ? 'opacity-60' : 'hover:bg-accent/50'
+                        }`}
                       >
                         <Checkbox
                           id={employee.id}
                           checked={selectedIds.has(employee.id)}
                           onCheckedChange={() => handleToggleEmployee(employee.id)}
-                          disabled={loading}
+                          disabled={loading || employee.hasModuleAccess === false}
                         />
                         <label
                           htmlFor={employee.id}
@@ -283,7 +301,9 @@ export function AssignRecipientsModal({
                           {employee.full_name}
                         </label>
                         <span className="text-xs text-muted-foreground">
-                          {employee.role?.display_name || 'No Role'}
+                          {employee.hasModuleAccess === false
+                            ? `${employee.role?.display_name || 'No Role'} • No Toolbox access`
+                            : employee.role?.display_name || 'No Role'}
                         </span>
                       </div>
                     ))

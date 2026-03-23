@@ -11,6 +11,35 @@ type PdfjsLib = {
 
 let pdfjsCache: PdfjsLib | null = null;
 
+function isExpectedPdfLoadError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('unexpected server response (400)') ||
+    message.includes('unexpected server response (401)') ||
+    message.includes('unexpected server response (403)') ||
+    message.includes('unexpected server response (404)')
+  );
+}
+
+function getPdfLoadMessage(error: unknown): string {
+  if (!(error instanceof Error) || error.message.trim().length === 0) {
+    return 'Failed to load PDF';
+  }
+
+  const message = error.message;
+  if (/(400|401|403)/.test(message) && message.includes('Unexpected server response')) {
+    return 'This PDF link has expired or is unavailable. Please reopen the document and try again.';
+  }
+
+  if (/404/.test(message) && message.includes('Unexpected server response')) {
+    return 'This PDF is no longer available.';
+  }
+
+  return message;
+}
+
 async function getPdfjs(): Promise<PdfjsLib> {
   if (pdfjsCache) return pdfjsCache;
   // webpackIgnore makes the browser's native ESM loader handle this import
@@ -40,6 +69,8 @@ export function PDFCanvasRenderer({ url, className }: PDFCanvasRendererProps) {
 
     async function load() {
       try {
+        setLoading(true);
+        setError(null);
         const pdfjs = await getPdfjs();
         const doc = await pdfjs.getDocument({ url, useSystemFonts: true }).promise;
         if (cancelled) {
@@ -50,9 +81,11 @@ export function PDFCanvasRenderer({ url, className }: PDFCanvasRendererProps) {
         setPageCount(doc.numPages);
         setLoading(false);
       } catch (err) {
-        console.error('Failed to load PDF document:', err);
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load PDF');
+          if (!isExpectedPdfLoadError(err)) {
+            console.error('Failed to load PDF document:', err);
+          }
+          setError(getPdfLoadMessage(err));
           setLoading(false);
         }
       }

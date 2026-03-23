@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { createClient } from '@/lib/supabase/client';
+import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { Employee } from '@/types/common';
 
 interface EmployeeSelectorProps {
@@ -31,24 +31,21 @@ export function EmployeeSelector({
   useEffect(() => {
     async function fetchEmployees() {
       try {
-        const supabase = createClient();
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, full_name, employee_id')
-          .order('full_name');
-
-        if (error) throw error;
+        const data = await fetchUserDirectory();
 
         // Sort: current user first, then alphabetically
-        const sorted = ((data || []) as Array<{ id: string; full_name: string; employee_id: string | null }>).sort((a, b) => {
+        const sorted = (data as Array<{ id: string; full_name: string | null; employee_id: string | null }>).sort((a, b) => {
           if (currentUserId) {
             if (a.id === currentUserId) return -1;
             if (b.id === currentUserId) return 1;
           }
-          return a.full_name.localeCompare(b.full_name);
+          return (a.full_name || '').localeCompare(b.full_name || '');
         });
 
-        setEmployees(sorted);
+        setEmployees(sorted.map((employee) => ({
+          ...employee,
+          full_name: employee.full_name || 'Unknown User',
+        })));
       } catch (error) {
         console.error('Error fetching employees:', error);
       } finally {

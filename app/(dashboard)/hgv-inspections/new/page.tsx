@@ -3,6 +3,7 @@
 import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
+import { fetchUserDirectory, type DirectoryUser } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { BackButton } from '@/components/ui/back-button';
@@ -78,19 +79,26 @@ function NewHgvInspectionContent() {
 
   useEffect(() => {
     const loadData = async () => {
-      const [{ data: hgvData }, { data: employeeData }] = await Promise.all([
+      const [{ data: hgvData }, employeeData] = await Promise.all([
         supabase
           .from('hgvs')
           .select('id, reg_number, nickname, current_mileage, hgv_categories(name)')
           .eq('status', 'active')
           .order('reg_number'),
         isElevatedUser
-          ? supabase.from('profiles').select('id, full_name, employee_id').order('full_name')
-          : Promise.resolve({ data: [] as unknown[] }),
+          ? fetchUserDirectory({ module: 'hgv-inspections' })
+          : Promise.resolve([] as DirectoryUser[]),
       ]);
 
       setHgvs((hgvData || []) as HgvAsset[]);
-      setEmployees((employeeData || []) as Employee[]);
+      setEmployees(
+        employeeData.map((employee) => ({
+          id: employee.id,
+          full_name: employee.full_name || 'Unknown User',
+          employee_id: employee.employee_id,
+          has_module_access: employee.has_module_access,
+        })) as Employee[]
+      );
       if (user) setSelectedEmployeeId(user.id);
     };
 
@@ -463,10 +471,11 @@ function NewHgvInspectionContent() {
                 </SelectTrigger>
                 <SelectContent>
                   {employees.map((employee) => (
-                    <SelectItem key={employee.id} value={employee.id}>
+                    <SelectItem key={employee.id} value={employee.id} disabled={employee.has_module_access === false}>
                       {employee.full_name}
                       {employee.employee_id ? ` (${employee.employee_id})` : ''}
                       {employee.id === user?.id ? ' (You)' : ''}
+                      {employee.has_module_access === false ? ' - No HGV Checks access' : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>

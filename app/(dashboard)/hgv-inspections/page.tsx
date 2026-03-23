@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Clipboard, Clock, Download, Filter, Loader2, Plus, Trash2, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
+import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { formatDate } from '@/lib/utils/date';
@@ -71,11 +72,15 @@ function HgvInspectionsContent() {
     setHgvs(hgvData || []);
 
     if (isElevatedUser) {
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('id, full_name, employee_id')
-        .order('full_name');
-      setEmployees((profileData || []) as Employee[]);
+      const profileData = await fetchUserDirectory({ module: 'hgv-inspections' });
+      setEmployees(
+        profileData.map((employee) => ({
+          id: employee.id,
+          full_name: employee.full_name || 'Unknown User',
+          employee_id: employee.employee_id,
+          has_module_access: employee.has_module_access,
+        })) as Employee[]
+      );
     }
   }, [isElevatedUser, supabase]);
 
@@ -200,9 +205,10 @@ function HgvInspectionsContent() {
               <SelectContent>
                 <SelectItem value="all">All Employees</SelectItem>
                 {employees.map((employee) => (
-                  <SelectItem key={employee.id} value={employee.id}>
+                    <SelectItem key={employee.id} value={employee.id} disabled={employee.has_module_access === false}>
                     {employee.full_name}
                     {employee.employee_id ? ` (${employee.employee_id})` : ''}
+                      {employee.has_module_access === false && ' - No HGV Checks access'}
                   </SelectItem>
                 ))}
               </SelectContent>

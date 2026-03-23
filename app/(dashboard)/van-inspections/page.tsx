@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useInspectionRealtime } from '@/lib/hooks/useRealtime';
+import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -81,13 +82,15 @@ function InspectionsContent() {
     if (user && isElevatedUser) {
       const fetchEmployees = async () => {
         try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('id, full_name, employee_id')
-            .order('full_name');
-          
-          if (error) throw error;
-          setEmployees(data || []);
+          const data = await fetchUserDirectory({ module: 'inspections' });
+          setEmployees(
+            data.map((employee) => ({
+              id: employee.id,
+              full_name: employee.full_name || 'Unknown User',
+              employee_id: employee.employee_id,
+              has_module_access: employee.has_module_access,
+            }))
+          );
         } catch (err) {
           console.error('Error fetching employees:', err);
         }
@@ -404,9 +407,10 @@ function InspectionsContent() {
                 <SelectContent>
                   <SelectItem value="all">All Employees</SelectItem>
                   {employees.map((employee) => (
-                    <SelectItem key={employee.id} value={employee.id}>
+                    <SelectItem key={employee.id} value={employee.id} disabled={employee.has_module_access === false}>
                       {employee.full_name}
                       {employee.employee_id && ` (${employee.employee_id})`}
+                      {employee.has_module_access === false && ' - No Van Checks access'}
                     </SelectItem>
                   ))}
                 </SelectContent>

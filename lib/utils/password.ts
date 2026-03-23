@@ -2,26 +2,49 @@
  * Password generation and management utilities
  */
 
+function getSecureRandomIndex(max: number): number {
+  const buffer = new Uint32Array(1);
+  crypto.getRandomValues(buffer);
+  return buffer[0] % max;
+}
+
+function pickRandomCharacter(characters: string): string {
+  return characters[getSecureRandomIndex(characters.length)];
+}
+
+function shuffleCharacters(characters: string[]): string[] {
+  const result = [...characters];
+
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = getSecureRandomIndex(index + 1);
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+
+  return result;
+}
+
 /**
  * Generate a secure random password
  * Format: AVS + 5 random characters (e.g., "AVSfeh5J")
  * - Always starts with "AVS"
+ * - Always contains at least one lowercase letter and one number
  * - Followed by 5 random letters (upper/lower) and numbers
  * - Total length: 8 characters
  */
 export function generateSecurePassword(): string {
-  // Characters to use (letters and numbers, mixed case)
-  const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  
-  // Generate 5 random characters
-  let randomPart = '';
-  for (let i = 0; i < 5; i++) {
-    const randomIndex = Math.floor(Math.random() * characters.length);
-    randomPart += characters[randomIndex];
-  }
-  
-  // Format: AVS + 5 random characters
-  return `AVS${randomPart}`;
+  const lowercaseCharacters = 'abcdefghijklmnopqrstuvwxyz';
+  const mixedCharacters = `${lowercaseCharacters}ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789`;
+  const numericCharacters = '0123456789';
+
+  const requiredCharacters = [
+    pickRandomCharacter(lowercaseCharacters),
+    pickRandomCharacter(numericCharacters),
+    pickRandomCharacter(mixedCharacters),
+    pickRandomCharacter(mixedCharacters),
+    pickRandomCharacter(mixedCharacters),
+  ];
+
+  return `AVS${shuffleCharacters(requiredCharacters).join('')}`;
 }
 
 /**

@@ -15,6 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { fetchUserDirectory } from '@/lib/client/user-directory';
 import {
   Dialog,
   DialogContent,
@@ -56,6 +57,7 @@ interface BulkEmployeeOption {
   role_id: string | null;
   role_name: string | null;
   role_display_name: string | null;
+  has_module_access?: boolean;
 }
 
 interface ReasonColumn {
@@ -325,18 +327,14 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
       const fyStart = selectedFinancialYear.startIso;
       const fyEnd = selectedFinancialYear.endIso;
 
-      const [{ data: profiles, error: profilesError }, { data: reasons, error: reasonsError }] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('id, full_name, employee_id, annual_holiday_allowance_days, roles(id, name, display_name)')
-          .order('full_name'),
+      const [profiles, { data: reasons, error: reasonsError }] = await Promise.all([
+        fetchUserDirectory({ includeRole: true, includeAllowance: true, module: 'absence' }),
         supabase
           .from('absence_reasons')
           .select('id, name, is_active, color')
           .order('name'),
       ]);
 
-      if (profilesError) throw profilesError;
       if (reasonsError) throw reasonsError;
 
       type ReasonRow = { id: string; name: string; is_active: boolean; color: string | null };
@@ -416,9 +414,15 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
         full_name: string;
         employee_id: string | null;
         annual_holiday_allowance_days: number | null;
-        roles?: { id?: string; name?: string; display_name?: string } | null;
+        role?: { id?: string | null; name?: string | null; display_name?: string | null } | null;
       };
-      const typedProfiles = (profiles || []) as ProfileData[];
+      const typedProfiles = (profiles || []).map((profile) => ({
+        id: profile.id,
+        full_name: profile.full_name || 'Unknown User',
+        employee_id: profile.employee_id,
+        annual_holiday_allowance_days: profile.annual_holiday_allowance_days ?? null,
+        role: profile.role || null,
+      })) as ProfileData[];
       const computedRows: ProfileRow[] = typedProfiles.map((profile) => {
         const totals = summaryByProfile.get(profile.id) || {
           annualTaken: 0,
@@ -444,9 +448,10 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
         id: profile.id,
         full_name: profile.full_name,
         employee_id: profile.employee_id,
-        role_id: profile.roles?.id || null,
-        role_name: profile.roles?.name || null,
-        role_display_name: profile.roles?.display_name || null,
+        role_id: profile.role?.id || null,
+        role_name: profile.role?.name || null,
+        role_display_name: profile.role?.display_name || null,
+        has_module_access: (profile as { has_module_access?: boolean }).has_module_access,
       }));
       setBulkEmployeeOptions(employeeOptions);
 
@@ -1259,10 +1264,12 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
                           key={employee.id}
                           checked={shutdownEmployeeFilters.includes(employee.id)}
                           onCheckedChange={() => toggleShutdownEmployee(employee.id)}
+                          disabled={employee.has_module_access === false}
                           className="text-foreground focus:bg-slate-800/70 focus:text-foreground"
                         >
                           {employee.full_name}
                           {employee.employee_id ? ` (${employee.employee_id})` : ''}
+                          {employee.has_module_access === false ? ' - No Absence access' : ''}
                         </DropdownMenuCheckboxItem>
                       ))}
                     </DropdownMenuContent>

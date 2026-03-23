@@ -152,29 +152,20 @@ export async function isSuperAdmin(userId: string): Promise<boolean> {
 export async function getUsersWithPermission(
   module: ModuleName
 ): Promise<string[]> {
-  const supabase = await createClient();
   const admin = createAdminClient();
 
   try {
     // Get all users who either:
     // 1. Are admin/super-admin, OR
     // 2. Have specific permission enabled for this module.
-    const { data: profiles } = await supabase
+    const { data: profiles, error: profilesError } = await admin
       .from('profiles')
-      .select(`
-        id,
-        role_id,
-        roles!inner(
-          name,
-          is_super_admin,
-          is_manager_admin,
-        )
-      `);
-    const typedProfiles = profiles as Array<{
-      id: string;
-      role_id: string | null;
-      roles: { name: string; is_super_admin: boolean; is_manager_admin: boolean } | null;
-    }> | null;
+      .select('id');
+
+    if (profilesError) {
+      throw profilesError;
+    }
+    const typedProfiles = profiles as Array<{ id: string }> | null;
 
     if (!typedProfiles?.length) {
       return [];
@@ -206,8 +197,8 @@ export async function validateUserAssignment(
   const hasPermission = await userHasPermission(userId, module);
 
   if (!hasPermission) {
-    const supabase = await createClient();
-    const { data: profile } = await supabase
+    const admin = createAdminClient();
+    const { data: profile } = await admin
       .from('profiles')
       .select('full_name, roles!inner(display_name)')
       .eq('id', userId)

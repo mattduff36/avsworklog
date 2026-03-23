@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -139,7 +140,7 @@ export default function AdminAbsencePage() {
   }, [listSearch, sortField, sortDirection, profileId, dateFrom, dateTo, reasonId, status]);
 
   const { data: reasons } = useAllAbsenceReasons();
-  const [profiles, setProfiles] = useState<Array<{ id: string; full_name: string; employee_id: string | null }>>([]);
+  const [profiles, setProfiles] = useState<Array<{ id: string; full_name: string; employee_id: string | null; has_module_access?: boolean }>>([]);
   
   // Mutations
   const createAbsence = useCreateAbsence();
@@ -231,17 +232,20 @@ export default function AdminAbsencePage() {
   // Fetch profiles
   useEffect(() => {
     async function fetchProfiles() {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, employee_id')
-        .order('full_name');
-      
-      if (error) {
+      try {
+        const data = await fetchUserDirectory({ module: 'absence' });
+        setProfiles(
+          data.map((profile) => ({
+            id: profile.id,
+            full_name: profile.full_name || 'Unknown User',
+            employee_id: profile.employee_id,
+            has_module_access: profile.has_module_access,
+          }))
+        );
+      } catch (error) {
         console.error('Error fetching profiles:', error);
         return;
       }
-      
-      setProfiles(data || []);
     }
     
     fetchProfiles();
@@ -465,8 +469,9 @@ export default function AdminAbsencePage() {
                       <SelectContent>
                         <SelectItem value="all">All employees</SelectItem>
                         {profiles.map((profile) => (
-                          <SelectItem key={profile.id} value={profile.id}>
+                          <SelectItem key={profile.id} value={profile.id} disabled={profile.has_module_access === false}>
                             {profile.full_name} {profile.employee_id ? `(${profile.employee_id})` : ''}
+                            {profile.has_module_access === false ? ' - No Absence access' : ''}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -801,8 +806,9 @@ export default function AdminAbsencePage() {
                 </SelectTrigger>
                 <SelectContent>
                   {profiles.map(profile => (
-                    <SelectItem key={profile.id} value={profile.id}>
+                    <SelectItem key={profile.id} value={profile.id} disabled={profile.has_module_access === false}>
                       {profile.full_name} {profile.employee_id ? `(${profile.employee_id})` : ''}
+                      {profile.has_module_access === false ? ' - No Absence access' : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>

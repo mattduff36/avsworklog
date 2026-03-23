@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useQueryState } from 'nuqs';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { resolveNotificationToOpen } from '@/lib/utils/notification-helpers';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -137,13 +138,8 @@ export default function NotificationsPage() {
       const fetchUsers = async () => {
         setLoadingUsers(true);
         try {
-          const { data: profilesData, error } = await (await import('@/lib/supabase/client')).createClient()
-            .from('profiles')
-            .select('id, full_name, role:roles(name)')
-            .order('full_name');
-
-          if (error) throw error;
-          setUsers((profilesData || []).map((p: { id: string; full_name?: string | null; role?: { name?: string } | null }) => ({
+          const profilesData = await fetchUserDirectory({ includeRole: true });
+          setUsers(profilesData.map((p) => ({
             id: p.id,
             full_name: p.full_name ?? '',
             role: p.role?.name || 'unknown',

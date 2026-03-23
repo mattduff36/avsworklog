@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,6 +51,7 @@ type Employee = {
   role_id: string | null;
   role_name: string | null;
   role_display_name: string | null;
+  has_module_access?: boolean;
 };
 
 type GenerationStatus = {
@@ -268,22 +270,18 @@ export function AbsenceCalendarAdmin() {
 
   async function fetchEmployees() {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, employee_id, annual_holiday_allowance_days, roles(id, name, display_name)')
-        .order('full_name');
-
-      if (error) throw error;
-      const list = ((data || []) as Array<Record<string, unknown>>).map((row) => {
-        const roleRef = row.roles as { id?: string; name?: string; display_name?: string } | null;
+    const data = await fetchUserDirectory({ includeRole: true, includeAllowance: true, module: 'absence' });
+    const list = data.map((row) => {
+      const roleRef = row.role as { id?: string | null; name?: string | null; display_name?: string | null } | null;
         return {
           id: String(row.id || ''),
           full_name: String(row.full_name || ''),
-          employee_id: (row.employee_id as string | null) || null,
-          annual_holiday_allowance_days: (row.annual_holiday_allowance_days as number | null) ?? null,
-          role_id: roleRef?.id || null,
+        employee_id: row.employee_id || null,
+        annual_holiday_allowance_days: row.annual_holiday_allowance_days ?? null,
+        role_id: roleRef?.id || null,
           role_name: roleRef?.name || null,
           role_display_name: roleRef?.display_name || null,
+        has_module_access: row.has_module_access,
         };
       });
       setEmployees(list);
@@ -527,8 +525,9 @@ export function AbsenceCalendarAdmin() {
                 <SelectContent>
                   <SelectItem value="all">All employees</SelectItem>
                   {employees.map((employee) => (
-                    <SelectItem key={employee.id} value={employee.id}>
+                    <SelectItem key={employee.id} value={employee.id} disabled={employee.has_module_access === false}>
                       {employee.full_name} {employee.employee_id ? `(${employee.employee_id})` : ''}
+                      {employee.has_module_access === false ? ' - No Absence access' : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>

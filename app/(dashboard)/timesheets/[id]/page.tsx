@@ -53,6 +53,19 @@ export default function ViewTimesheetPage() {
   const [dataChanged, setDataChanged] = useState(false);
   const [manuallyEditedDays, setManuallyEditedDays] = useState<Set<number>>(new Set());
 
+  const getActionErrorMessage = (err: unknown, fallback: string) => {
+    return err instanceof Error && err.message.trim().length > 0 ? err.message : fallback;
+  };
+
+  const isExpectedTimesheetActionError = (message: string) => {
+    const normalized = message.trim().toLowerCase();
+    return (
+      normalized.includes('timesheet not found') ||
+      normalized.includes('only submitted timesheets can be rejected') ||
+      normalized.includes('only approved timesheets can be marked as adjusted')
+    );
+  };
+
   const fetchTimesheet = useCallback(async (id: string) => {
     try {
       setError(''); // Clear any previous errors
@@ -66,6 +79,9 @@ export default function ViewTimesheetPage() {
 
       if (timesheetError) {
         if (timesheetError.code === 'PGRST116') {
+          setTimesheet(null);
+          setEntries([]);
+          setSignature(null);
           setError('Timesheet not found. It may have been deleted.');
           setLoading(false);
           return;
@@ -75,6 +91,9 @@ export default function ViewTimesheetPage() {
       
       // Check if user has access
       if (!isManager && !isAdmin && !isSuperAdmin && timesheetData.user_id !== user?.id) {
+        setTimesheet(null);
+        setEntries([]);
+        setSignature(null);
         setError('You do not have permission to view this timesheet');
         setLoading(false);
         return;
@@ -323,17 +342,31 @@ export default function ViewTimesheetPage() {
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to reject timesheet');
+        const data = await response.json().catch(() => null) as { error?: string } | null;
+        const errorMessage = data?.error || 'Failed to reject timesheet';
+
+        if (response.status === 404 && errorMessage === 'Timesheet not found') {
+          setTimesheet(null);
+          setEntries([]);
+          setSignature(null);
+          setError('Timesheet not found. It may have been deleted.');
+          toast.error('Timesheet not found. It may have been deleted.');
+          return;
+        }
+
+        throw new Error(errorMessage);
       }
 
       toast.success('Timesheet rejected and employee notified');
       setRejectionComments('');
       await fetchTimesheet(timesheet.id);
     } catch (err) {
-      console.error('Rejection error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to reject timesheet');
-      toast.error(err instanceof Error ? err.message : 'Failed to reject timesheet');
+      const message = getActionErrorMessage(err, 'Failed to reject timesheet');
+      if (!isExpectedTimesheetActionError(message)) {
+        console.error('Rejection error:', err);
+      }
+      setError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }

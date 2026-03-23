@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -318,24 +319,13 @@ function NewInspectionContent() {
     if (user && isElevatedUser) {
       const fetchEmployees = async () => {
         try {
-          const { data: profiles, error } = await supabase
-            .from('profiles')
-            .select('id, full_name, employee_id')
-            .order('full_name');
-
-          if (error) throw error;
-
-          const allEmployees = (profiles || []) as Array<{
-            id: string;
-            full_name: string | null;
-            employee_id: string | null;
-          }>;
-          
+          const allEmployees = await fetchUserDirectory({ module: 'inspections' });
           const formattedEmployees: Employee[] = allEmployees
             .map((emp) => ({
               id: emp.id,
               full_name: emp.full_name || 'Unnamed User',
               employee_id: emp.employee_id || null,
+              has_module_access: emp.has_module_access,
             }))
             .sort((a: Employee, b: Employee) => a.full_name.localeCompare(b.full_name));
           
@@ -1407,10 +1397,11 @@ function NewInspectionContent() {
                 </SelectTrigger>
                 <SelectContent>
                   {employees.map((employee) => (
-                    <SelectItem key={employee.id} value={employee.id}>
+                    <SelectItem key={employee.id} value={employee.id} disabled={employee.has_module_access === false}>
                       {employee.full_name}
                       {employee.employee_id && ` (${employee.employee_id})`}
                       {employee.id === user?.id && ' (You)'}
+                      {employee.has_module_access === false && ' - No Van Checks access'}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -16,6 +16,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Save, Users, X, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { createClient } from '@/lib/supabase/client';
+import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { toast } from 'sonner';
 import type { MaintenanceCategory } from '@/types/maintenance';
 
@@ -26,6 +27,7 @@ interface Profile {
     name: string;
     is_manager_admin: boolean;
   } | null;
+  hasModuleAccess?: boolean;
 }
 
 interface CategoryRecipientsDialogProps {
@@ -53,27 +55,30 @@ export function CategoryRecipientsDialog({
         const supabase = createClient();
         
         try {
-          // Fetch all profiles (managers/admins primarily)
-          const { data: profilesData, error: profilesError } = await supabase
-            .from('profiles')
-            .select(`
-              id,
-              full_name,
-              role:roles(name, is_manager_admin)
-            `)
-            .order('full_name');
-          
-          if (profilesError) throw profilesError;
-          
           // Fetch current recipients for this category
-          const { data: recipientsData, error: recipientsError } = await supabase
-            .from('maintenance_category_recipients')
-            .select('user_id')
-            .eq('category_id', category.id);
+          const [profilesData, { data: recipientsData, error: recipientsError }] = await Promise.all([
+            fetchUserDirectory({ includeRole: true, module: 'maintenance' }),
+            supabase
+              .from('maintenance_category_recipients')
+              .select('user_id')
+              .eq('category_id', category.id),
+          ]);
           
           if (recipientsError) throw recipientsError;
           
-          setProfiles(profilesData || []);
+          setProfiles(
+            profilesData.map((profile) => ({
+              id: profile.id,
+              full_name: profile.full_name,
+              role: profile.role?.name
+                ? {
+                    name: profile.role.name,
+                    is_manager_admin: profile.role.is_manager_admin === true,
+                  }
+                : null,
+              hasModuleAccess: profile.has_module_access !== false,
+            }))
+          );
           setSelectedUserIds(new Set(recipientsData?.map((r: { user_id: string }) => r.user_id) || []));
         } catch (error) {
           console.error('Error fetching data:', error);
@@ -87,6 +92,9 @@ export function CategoryRecipientsDialog({
   }, [open, category.id]);
   
   const handleToggleUser = (userId: string) => {
+    const profile = profiles.find((candidate) => candidate.id === userId);
+    if (!profile || profile.hasModuleAccess === false) return;
+
     const newSelected = new Set(selectedUserIds);
     if (newSelected.has(userId)) {
       newSelected.delete(userId);
@@ -131,7 +139,11 @@ export function CategoryRecipientsDialog({
   
   const handleSelectAllManagers = () => {
     const managerIds = profiles
-      .filter(p => p.role?.is_manager_admin || p.role?.name === 'admin' || p.role?.name === 'manager')
+      .filter(
+        (p) =>
+          p.hasModuleAccess !== false &&
+          (p.role?.is_manager_admin || p.role?.name === 'admin' || p.role?.name === 'manager')
+      )
       .map(p => p.id);
     setSelectedUserIds(new Set([...selectedUserIds, ...managerIds]));
   };
@@ -229,16 +241,19 @@ export function CategoryRecipientsDialog({
                       <div
                         key={profile.id}
                         className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${
-                          isSelected 
-                            ? 'bg-blue-600/20 border border-blue-500/30' 
-                            : 'hover:bg-slate-800 border border-transparent'
+                          profile.hasModuleAccess === false
+                            ? 'opacity-60 border border-transparent'
+                            : isSelected 
+                              ? 'bg-blue-600/20 border border-blue-500/30' 
+                              : 'hover:bg-slate-800 border border-transparent'
                         }`}
-                        onClick={() => handleToggleUser(profile.id)}
+                        onClick={() => profile.hasModuleAccess !== false && handleToggleUser(profile.id)}
                       >
                         <div className="flex items-center gap-3">
                           <Checkbox
                             checked={isSelected}
                             onCheckedChange={() => handleToggleUser(profile.id)}
+                            disabled={profile.hasModuleAccess === false}
                             className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                           />
                           <div>
@@ -247,7 +262,9 @@ export function CategoryRecipientsDialog({
                             </p>
                             {profile.role && (
                               <p className="text-xs text-slate-400 capitalize">
-                                {profile.role.name}
+                                {profile.hasModuleAccess === false
+                                  ? `${profile.role.name} • No Maintenance access`
+                                  : profile.role.name}
                               </p>
                             )}
                           </div>

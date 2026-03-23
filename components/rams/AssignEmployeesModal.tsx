@@ -1,23 +1,38 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { SelectableCard } from '@/components/ui/selectable-card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, UserCheck, Search, CheckCircle2 } from 'lucide-react';
+import { Loader2, UserCheck, Search, CheckCircle2, Users, ChevronDown, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Employee {
   id: string;
   full_name: string;
+  employee_id?: string | null;
+  team: {
+    id: string;
+    name: string;
+  } | null;
   role: {
     name: string;
     display_name: string;
   } | null;
+  hasModuleAccess?: boolean;
   alreadySigned?: boolean;
   isAssigned?: boolean;
+}
+
+interface TeamOption {
+  id: string;
+  name: string;
+  hasModuleAccess: boolean;
+  employeeIds: string[];
 }
 
 interface AssignEmployeesModalProps {
@@ -47,15 +62,7 @@ export function AssignEmployeesModal({
       async function fetchEmployees() {
         setFetching(true);
         try {
-          const usersResponse = await fetch('/api/permissions/users?module=rams', {
-            cache: 'no-store',
-          });
-          const usersData = await usersResponse.json();
-          if (!usersResponse.ok) {
-            throw new Error(usersData.error || 'Failed to load assignable users');
-          }
-
-          const allEmployees = usersData.users || [];
+          const allEmployees = await fetchUserDirectory({ includeRole: true, module: 'rams' });
 
           const supabase = (await import('@/lib/supabase/client')).createClient();
 
@@ -83,13 +90,21 @@ export function AssignEmployeesModal({
           // Pre-select all currently assigned employees
           setSelectedIds(assignedEmployeeIds);
 
-          const employeesWithStatus = (allEmployees as Array<{ id: string; full_name: string; role: { name: string; display_name: string } | null }>).map((emp) => ({
+          const employeesWithStatus = allEmployees.map((emp) => ({
             id: emp.id,
-            full_name: emp.full_name,
+            full_name: emp.full_name || 'Unknown User',
+            employee_id: emp.employee_id || null,
+            team: emp.team?.id
+              ? {
+                  id: emp.team.id,
+                  name: emp.team.name || emp.team.id,
+                }
+              : null,
             role: emp.role ? {
-              name: emp.role.name,
-              display_name: emp.role.display_name,
+              name: emp.role.name || 'unknown',
+              display_name: emp.role.display_name || emp.role.name || 'Unknown',
             } : null,
+            hasModuleAccess: emp.has_module_access !== false,
             alreadySigned: signedEmployeeIds.has(emp.id),
             isAssigned: assignedEmployeeIds.has(emp.id),
           })) || [];
@@ -119,11 +134,40 @@ export function AssignEmployeesModal({
     }
   }, [searchQuery, employees]);
 
+  const teamOptions = useMemo<TeamOption[]>(() => {
+    const teamMap = new Map<string, TeamOption>();
+
+    employees.forEach((employee) => {
+      if (!employee.team?.id) {
+        return;
+      }
+
+      const existing = teamMap.get(employee.team.id);
+      if (existing) {
+        existing.employeeIds.push(employee.id);
+        existing.hasModuleAccess = existing.hasModuleAccess || employee.hasModuleAccess !== false;
+        return;
+      }
+
+      teamMap.set(employee.team.id, {
+        id: employee.team.id,
+        name: employee.team.name,
+        hasModuleAccess: employee.hasModuleAccess !== false,
+        employeeIds: [employee.id],
+      });
+    });
+
+    return Array.from(teamMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [employees]);
+
+  const accessibleTeamOptions = useMemo(
+    () => teamOptions.filter((team) => team.hasModuleAccess),
+    [teamOptions]
+  );
+
   const handleToggleEmployee = (id: string) => {
-    // Prevent unchecking employees who have already signed
     const employee = employees.find(emp => emp.id === id);
-    if (employee?.alreadySigned && selectedIds.has(id)) {
-      // Cannot unassign employees who have signed
+    if (!employee || employee.alreadySigned || employee.hasModuleAccess === false) {
       return;
     }
     
@@ -136,18 +180,64 @@ export function AssignEmployeesModal({
     setSelectedIds(newSelected);
   };
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      // Select all employees (including those who have signed - they can't be unselected)
-      const allIds = filteredEmployees.map(emp => emp.id);
-      setSelectedIds(new Set(allIds));
-    } else {
-      // Only deselect employees who haven't signed
-      const signedIds = filteredEmployees
-        .filter(emp => emp.alreadySigned)
-        .map(emp => emp.id);
-      setSelectedIds(new Set(signedIds));
+  const handleToggleTeam = (team: TeamOption) => {
+    if (!team.hasModuleAccess) {
+      return;
     }
+
+    const teamEmployeeIds = employees
+      .filter(
+        (employee) =>
+          employee.team?.id === team.id &&
+          employee.hasModuleAccess !== false &&
+          !employee.alreadySigned
+      )
+      .map((employee) => employee.id);
+
+    if (teamEmployeeIds.length === 0) {
+      return;
+    }
+
+    const nextSelectedIds = new Set(selectedIds);
+    const allTeamEmployeesSelected = teamEmployeeIds.every((employeeId) => nextSelectedIds.has(employeeId));
+
+    if (allTeamEmployeesSelected) {
+      teamEmployeeIds.forEach((employeeId) => nextSelectedIds.delete(employeeId));
+    } else {
+      teamEmployeeIds.forEach((employeeId) => nextSelectedIds.add(employeeId));
+    }
+
+    setSelectedIds(nextSelectedIds);
+  };
+
+  const handleToggleAllTeams = () => {
+    if (accessibleTeamOptions.length === 0) {
+      return;
+    }
+
+    const nextSelectedIds = new Set(selectedIds);
+    const allTeamsSelected = accessibleTeamOptions.every((team) =>
+      employees
+        .filter(
+          (employee) =>
+            employee.team?.id === team.id &&
+            employee.hasModuleAccess !== false &&
+            !employee.alreadySigned
+        )
+        .every((employee) => nextSelectedIds.has(employee.id))
+    );
+
+    if (allTeamsSelected) {
+      employees
+        .filter((employee) => !employee.alreadySigned)
+        .forEach((employee) => nextSelectedIds.delete(employee.id));
+    } else {
+      employees
+        .filter((employee) => employee.hasModuleAccess !== false)
+        .forEach((employee) => nextSelectedIds.add(employee.id));
+    }
+
+    setSelectedIds(nextSelectedIds);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -209,7 +299,17 @@ export function AssignEmployeesModal({
     onClose();
   };
 
-  const allSelected = filteredEmployees.length > 0 && selectedIds.size === filteredEmployees.length;
+  const selectedTeamCount = accessibleTeamOptions.filter((team) =>
+    employees
+      .filter(
+        (employee) =>
+          employee.team?.id === team.id &&
+          employee.hasModuleAccess !== false &&
+          !employee.alreadySigned
+      )
+      .every((employee) => selectedIds.has(employee.id))
+  ).length;
+  const allTeamsSelected = accessibleTeamOptions.length > 0 && selectedTeamCount === accessibleTeamOptions.length;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -237,18 +337,71 @@ export function AssignEmployeesModal({
               />
             </div>
 
-            {/* Select All */}
+            {/* Team Selection */}
             <div className="flex items-center justify-between border-b border-slate-700 pb-3">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleSelectAll(!allSelected)}
-                disabled={loading || fetching || filteredEmployees.length === 0}
-                className="text-xs"
-              >
-                {allSelected ? 'Deselect All' : 'Select All'}
-              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={loading || fetching || teamOptions.length === 0}
+                    className="border-rams text-rams hover:bg-rams hover:text-white text-xs"
+                  >
+                    <Users className="mr-2 h-4 w-4" />
+                    {selectedTeamCount > 0 ? `${selectedTeamCount} team${selectedTeamCount !== 1 ? 's' : ''} selected` : 'Select Teams'}
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-72 border-slate-700 bg-slate-900 p-2 text-slate-100">
+                  <div className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={handleToggleAllTeams}
+                      disabled={accessibleTeamOptions.length === 0}
+                      className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors ${
+                        allTeamsSelected ? 'bg-rams text-white' : 'hover:bg-slate-800'
+                      } ${accessibleTeamOptions.length === 0 ? 'cursor-not-allowed opacity-50' : ''}`}
+                    >
+                      <Users className="h-4 w-4 flex-shrink-0" />
+                      <span className="flex-1 text-left">All Teams</span>
+                      {allTeamsSelected && <Check className="h-4 w-4 flex-shrink-0" />}
+                    </button>
+                    <div className="max-h-56 space-y-1 overflow-y-auto border-t border-slate-700 pt-2">
+                      {teamOptions.map((team) => {
+                        const isSelected = employees
+                          .filter(
+                            (employee) =>
+                              employee.team?.id === team.id &&
+                              employee.hasModuleAccess !== false &&
+                              !employee.alreadySigned
+                          )
+                          .every((employee) => selectedIds.has(employee.id));
+
+                        return (
+                          <button
+                            key={team.id}
+                            type="button"
+                            onClick={() => handleToggleTeam(team)}
+                            disabled={!team.hasModuleAccess}
+                            className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors ${
+                              isSelected ? 'bg-rams text-white' : 'hover:bg-slate-800'
+                            } ${!team.hasModuleAccess ? 'cursor-not-allowed opacity-50' : ''}`}
+                          >
+                            <Users className="h-4 w-4 flex-shrink-0" />
+                            <span className="flex-1 truncate text-left">{team.name}</span>
+                            {!team.hasModuleAccess ? (
+                              <span className="text-[11px] uppercase tracking-wide text-slate-400">No Access</span>
+                            ) : (
+                              isSelected && <Check className="h-4 w-4 flex-shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
               <span className="text-sm text-muted-foreground">
                 {selectedIds.size} selected
               </span>
@@ -272,18 +425,21 @@ export function AssignEmployeesModal({
                         key={employee.id}
                         selected={selectedIds.has(employee.id)}
                         onSelect={() => handleToggleEmployee(employee.id)}
-                        disabled={loading}
-                        locked={employee.alreadySigned}
-                        lockedMessage="Signed"
+                        disabled={loading || employee.hasModuleAccess === false}
+                        locked={employee.alreadySigned || employee.hasModuleAccess === false}
+                        lockedMessage={employee.alreadySigned ? 'Signed' : 'No Access'}
                         variant="rams"
                       >
                         <div className="flex items-center justify-between w-full">
                           <div className="flex flex-col">
                             <span className="text-sm font-medium text-slate-100">
                               {employee.full_name}
+                              {employee.employee_id ? ` (${employee.employee_id})` : ''}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                              {employee.role?.display_name || 'No Role'}
+                              {employee.hasModuleAccess === false
+                                ? `${employee.role?.display_name || 'No Role'} • No RAMS access`
+                                : employee.role?.display_name || 'No Role'}
                             </span>
                           </div>
                           {employee.alreadySigned && (

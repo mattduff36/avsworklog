@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -258,22 +259,13 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
 
   const fetchEmployees = async () => {
     try {
-      // Get all profiles
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, employee_id')
-        .order('full_name');
-
-      if (error) throw error;
-
-      const allEmployees = profiles || [];
-      
       // Convert to expected format
-      const formattedEmployees: Employee[] = allEmployees
+      const formattedEmployees: Employee[] = (await fetchUserDirectory({ module: 'timesheets' }))
         .map((emp: { id: string; full_name: string | null; employee_id: string | null }) => ({
           id: emp.id,
           full_name: emp.full_name || 'Unnamed User',
           employee_id: emp.employee_id || null,
+          has_module_access: (emp as { has_module_access?: boolean }).has_module_access,
         }));
       
       setEmployees(formattedEmployees);
@@ -374,13 +366,15 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       if (hasElevatedPermissions) {
         // If employees haven't been loaded yet, fetch them now
         if (employees.length === 0) {
-          const { data: employeesData, error: employeesError } = await supabase
-            .from('profiles')
-            .select('id, full_name, employee_id')
-            .order('full_name');
-          
-          if (employeesError) throw employeesError;
-          setEmployees(employeesData || []);
+          const employeesData = await fetchUserDirectory({ module: 'timesheets' });
+          setEmployees(
+            employeesData.map((employee) => ({
+              id: employee.id,
+              full_name: employee.full_name || 'Unnamed User',
+              employee_id: employee.employee_id,
+              has_module_access: employee.has_module_access,
+            }))
+          );
         }
       }
       
@@ -995,10 +989,11 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
                 </SelectTrigger>
                 <SelectContent>
                   {employees.map((employee) => (
-                    <SelectItem key={employee.id} value={employee.id}>
+                    <SelectItem key={employee.id} value={employee.id} disabled={employee.has_module_access === false}>
                       {employee.full_name}
                       {employee.employee_id && ` (${employee.employee_id})`}
                       {employee.id === user?.id && ' (You)'}
+                      {employee.has_module_access === false && ' - No Timesheets access'}
                     </SelectItem>
                   ))}
                 </SelectContent>
